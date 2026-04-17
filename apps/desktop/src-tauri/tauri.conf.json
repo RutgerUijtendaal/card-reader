@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Card Reader",
+  "version": "0.1.0",
+  "identifier": "com.cardreader.app",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @card-reader/web dev",
+    "beforeBuildCommand": "pnpm --filter @card-reader/web build",
+    "frontendDist": "../web/dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Card Reader",
+        "width": 1400,
+        "height": 900,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "mtg-like-v1",
+  "card_width": 744,
+  "card_height": 1039,
+  "regions": {
+    "name": [56, 42, 632, 66],
+    "mana": [608, 34, 86, 72],
+    "type_line": [56, 466, 632, 52],
+    "rules_text": [56, 534, 632, 320]
+  }
+}

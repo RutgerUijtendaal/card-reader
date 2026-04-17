@@ -1,0 +1,15 @@
+{
+  "name": "@card-reader/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "lint": "echo \"Desktop lint delegated to Rust clippy in CI\"",
+    "test": "echo \"No desktop tests yet\"",
+    "typecheck": "echo \"No desktop typecheck step\""
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

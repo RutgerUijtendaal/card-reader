@@ -1,0 +1,8 @@
+{
+  "baseBranch": "main",
+  "changelog": ["@changesets/cli/changelog", { "repo": "local/card-reader" }],
+  "commit": false,
+  "access": "restricted",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}

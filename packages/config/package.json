@@ -1,0 +1,10 @@
+{
+  "name": "@card-reader/config",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./eslint-base": "./eslint.base.cjs",
+    "./prettier": "./prettier.config.cjs",
+    "./tsconfig-base": "./tsconfig.base.json"
+  }
+}

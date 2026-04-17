@@ -1,0 +1,7 @@
+{
+  "name": "card-reader-monorepo",
+  "private": true,
+  "scripts": {
+    "release": "changeset publish"
+  }
+}
