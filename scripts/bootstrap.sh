@@ -46,8 +46,9 @@ fi
 
 if [[ "$INSTALL_PYTHON_DEPS" == "true" ]]; then
   require_cmd uv "Install uv first (curl -LsSf https://astral.sh/uv/install.sh | sh)."
+  (cd "$REPO_ROOT/services/core" && uv sync --extra dev)
   (cd "$REPO_ROOT/services/api" && uv sync --extra dev)
-  (cd "$REPO_ROOT/services/worker" && uv sync --extra dev)
+  (cd "$REPO_ROOT/services/parser" && uv sync --extra dev)
 fi
 
 echo "Bootstrap complete."

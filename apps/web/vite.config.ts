@@ -10,6 +10,10 @@ export default defineConfig({
     }
   },
   server: {
-    port: 8888
+    port: 8888,
+    watch: {
+      usePolling: true,
+      interval: 120
+    }
   }
 });

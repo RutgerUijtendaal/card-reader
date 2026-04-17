@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "PYTHONPATH=src uv run --project . uvicorn card_reader_api.main:app --host 127.0.0.1 --port 8000 --reload",
+    "migrate": "PYTHONPATH=src:../core/src uv run --project . alembic upgrade head",
+    "dev": "pnpm run migrate && PYTHONPATH=src:../core/src WATCHFILES_FORCE_POLLING=true uv run --project . uvicorn main:app --host 127.0.0.1 --port 8000 --reload --reload-dir src",
     "build": "echo \"Python service has no build step\"",
-    "test": "uv run --project . pytest -q",
-    "lint": "uv run --project . ruff check src tests",
-    "typecheck": "uv run --project . mypy src"
+    "test": "PYTHONPATH=src:../core/src uv run --project . pytest -q",
+    "lint": "PYTHONPATH=src:../core/src uv run --project . ruff check src tests",
+    "typecheck": "PYTHONPATH=src:../core/src uv run --project . mypy src"
   }
 }

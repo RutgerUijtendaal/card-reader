@@ -1,0 +1,12 @@
+{
+  "name": "@card-reader/core",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"Core has no standalone dev process\"",
+    "build": "echo \"Core has no build step\"",
+    "test": "echo \"No core tests yet\"",
+    "lint": "uv run --project . ruff check src",
+    "typecheck": "PYTHONPATH=src uv run --project . mypy src"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@card-reader/parser",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "PYTHONPATH=src:../core/src WATCHFILES_FORCE_POLLING=true uv run --project . python -m watchfiles --ignore-permission-denied --filter python \"python -m main\" src ../core/src",
+    "build": "echo \"Python service has no build step\"",
+    "test": "echo \"No parser tests yet\"",
+    "lint": "uv run --project . ruff check src",
+    "typecheck": "PYTHONPATH=src:../core/src uv run --project . mypy src"
+  }
+}

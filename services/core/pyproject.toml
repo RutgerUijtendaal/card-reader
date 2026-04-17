@@ -1,0 +1,23 @@
+[project]
+name = "card-reader-core"
+version = "0.1.0"
+description = "Shared core runtime and data layer for Card Reader services"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic-settings>=2.5.2",
+  "sqlmodel>=0.0.22"
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.11.2",
+  "ruff>=0.6.9"
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.12"
+strict = true

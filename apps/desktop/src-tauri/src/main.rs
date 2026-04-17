@@ -5,7 +5,7 @@ use tauri::{Manager, State};
 
 struct Sidecars {
     api: Mutex<Option<Child>>,
-    worker: Mutex<Option<Child>>,
+    parser: Mutex<Option<Child>>,
 }
 
 #[tauri::command]
@@ -25,16 +25,16 @@ fn main() {
     tauri::Builder::default()
         .manage(Sidecars {
             api: Mutex::new(None),
-            worker: Mutex::new(None),
+            parser: Mutex::new(None),
         })
         .setup(|app| {
             let state: State<Sidecars> = app.state();
             let mut api_lock = state.api.lock().expect("api lock poisoned");
-            let mut worker_lock = state.worker.lock().expect("worker lock poisoned");
+            let mut parser_lock = state.parser.lock().expect("parser lock poisoned");
 
             // Placeholder names for bundled sidecar binaries.
             *api_lock = spawn_sidecar("card-reader-api");
-            *worker_lock = spawn_sidecar("card-reader-worker");
+            *parser_lock = spawn_sidecar("card-reader-parser");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![backend_status])

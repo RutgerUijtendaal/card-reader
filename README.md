@@ -10,7 +10,7 @@ Install these before running bootstrap:
 - `Python` 3.12+
 - `uv` (Astral)
 - `Rust` + `cargo` (required only for Tauri desktop)
-- OCR runtime note: `bootstrap` installs both `paddleocr` and `paddlepaddle` for API/worker.
+- OCR runtime note: `bootstrap` installs OCR deps for parser (`paddleocr`, `paddlepaddle`) and shared deps for core/API.
 
 Linux/WSL install examples:
 
@@ -40,7 +40,7 @@ pkg-config --modversion glib-2.0
 Optional sanity check after bootstrap:
 
 ```bash
-cd services/worker
+cd services/parser
 uv run --project . python -c "import paddle, paddleocr; print('ok')"
 ```
 
@@ -56,14 +56,19 @@ uv run --project . python -c "import paddle, paddleocr; print('ok')"
 ./scripts/dev.sh
 ```
 
-This starts API + worker + web (desktop excluded).
-It also re-syncs Python dependencies for API/worker before starting.
+This starts API + parser + web (desktop excluded).
+It also re-syncs Python dependencies for core/API/parser before starting.
+Hot reload behavior in dev:
+- Web (Vite): HMR enabled with polling watch (WSL-safe).
+- API (Uvicorn): `--reload` enabled with polling-based file watch.
+- Parser: auto-restarts on Python file changes via `watchfiles`.
 
 Or run specific services:
 
 ```bash
 pnpm --filter @card-reader/api dev
-pnpm --filter @card-reader/worker dev
+pnpm --filter @card-reader/parser dev
+pnpm --filter @card-reader/core lint
 pnpm --filter @card-reader/web dev
 pnpm dev:all
 pnpm dev:desktop

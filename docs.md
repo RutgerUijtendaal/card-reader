@@ -5,7 +5,8 @@
 
 ## Services
 - API: `pnpm --filter @card-reader/api dev`
-- Worker: `pnpm --filter @card-reader/worker dev`
+- Parser: `pnpm --filter @card-reader/parser dev`
+- Core: `pnpm --filter @card-reader/core lint`
 - Web: `pnpm --filter @card-reader/web dev`
 - All incl. desktop: `pnpm dev:all`
 - Desktop: `pnpm dev:desktop`

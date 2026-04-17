@@ -1,0 +1,21 @@
+[project]
+name = "card-reader-parser"
+version = "0.1.0"
+description = "Card Reader parser service"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "paddlepaddle>=3.1.0",
+  "paddleocr>=3.1.0",
+  "pillow>=10.4.0",
+  "pydantic-settings>=2.5.2",
+  "sqlmodel>=0.0.22",
+  "watchfiles>=0.24.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.3",
+  "ruff>=0.6.9",
+  "mypy>=1.11.2"
+]
