@@ -1,0 +1,11 @@
+# One keyword label per line.
+# Empty lines and lines starting with # are ignored.
+Setup
+Charge
+Guard
+Lethal
+Flying
+Trample
+Lifesteal
+Setup
+

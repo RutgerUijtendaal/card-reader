@@ -74,6 +74,16 @@ pnpm dev:all
 pnpm dev:desktop
 ```
 
+Known keywords are auto-seeded on first API boot (only when the `keyword` table is empty).
+
+Manual reseed:
+
+```bash
+pnpm --filter @card-reader/api run seed:keywords
+```
+
+Edit defaults in `services/core/seeds/keywords.txt` (one keyword label per line).
+
 ## Desktop (Tauri) Prerequisites
 
 Desktop dev requires Rust/Cargo and GTK/WebKit system libraries on Linux/WSL:

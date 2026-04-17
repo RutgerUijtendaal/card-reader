@@ -1,11 +1,13 @@
 from .requests import UpdateCardRequest
 from .responses import (
+    CardFiltersResponse,
     CardDetailResponse,
     CardGenerationResponse,
     CardSummaryResponse,
     ImportJobDetailResponse,
     ImportJobItemResponse,
     ImportJobResponse,
+    MetadataOptionResponse,
 )
 
 __all__ = [
@@ -15,5 +17,7 @@ __all__ = [
     "CardSummaryResponse",
     "CardDetailResponse",
     "CardGenerationResponse",
+    "MetadataOptionResponse",
+    "CardFiltersResponse",
     "UpdateCardRequest",
 ]

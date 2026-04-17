@@ -10,6 +10,10 @@ from models import (
     Card,
     CardVersion,
     CardVersionImage,
+    CardVersionKeyword,
+    CardVersionSymbol,
+    CardVersionTag,
+    CardVersionType,
     ImportJobItem,
     ImportJobStatus,
     ParseResult,
@@ -142,28 +146,69 @@ def list_cards(
     *,
     query: str | None,
     max_confidence: float | None,
+    keyword_ids: list[str] | None = None,
+    tag_ids: list[str] | None = None,
+    symbol_ids: list[str] | None = None,
+    type_ids: list[str] | None = None,
+    mana_cost: str | None = None,
+    template_id: str | None = None,
+    attack_min: int | None = None,
+    attack_max: int | None = None,
+    health_min: int | None = None,
+    health_max: int | None = None,
 ) -> list[tuple[Card, CardVersion]]:
+    statement = (
+        select(Card, CardVersion)
+        .join(CardVersion, CardVersion.card_id == Card.id)
+        .where(CardVersion.is_latest.is_(True))
+        .order_by(Card.updated_at.desc())
+    )
+
     if query:
         rows = session.exec(
             text("SELECT card_id FROM card_version_search WHERE card_version_search MATCH :query"),
             params={"query": query},
         )
-        card_ids = [row[0] for row in rows]
-        if not card_ids:
+        matched_card_ids = [row[0] for row in rows]
+        if not matched_card_ids:
             return []
-        cards = list(session.exec(select(Card).where(Card.id.in_(card_ids))))
-    else:
-        cards = list(session.exec(select(Card).order_by(Card.updated_at.desc())))
+        statement = statement.where(Card.id.in_(matched_card_ids))
 
-    out: list[tuple[Card, CardVersion]] = []
-    for card in cards:
-        version = get_latest_card_version(session, card.id)
-        if version is None:
-            continue
-        if max_confidence is not None and version.confidence > max_confidence:
-            continue
-        out.append((card, version))
-    return out
+    if max_confidence is not None:
+        statement = statement.where(CardVersion.confidence <= max_confidence)
+    if mana_cost:
+        statement = statement.where(CardVersion.mana_cost == mana_cost)
+    if template_id:
+        statement = statement.where(CardVersion.template_id == template_id)
+    if attack_min is not None:
+        statement = statement.where(CardVersion.attack.is_not(None), CardVersion.attack >= attack_min)
+    if attack_max is not None:
+        statement = statement.where(CardVersion.attack.is_not(None), CardVersion.attack <= attack_max)
+    if health_min is not None:
+        statement = statement.where(CardVersion.health.is_not(None), CardVersion.health >= health_min)
+    if health_max is not None:
+        statement = statement.where(CardVersion.health.is_not(None), CardVersion.health <= health_max)
+
+    if keyword_ids:
+        keyword_subquery = (
+            select(CardVersionKeyword.card_version_id)
+            .where(CardVersionKeyword.keyword_id.in_(keyword_ids))
+        )
+        statement = statement.where(CardVersion.id.in_(keyword_subquery))
+    if tag_ids:
+        tag_subquery = select(CardVersionTag.card_version_id).where(CardVersionTag.tag_id.in_(tag_ids))
+        statement = statement.where(CardVersion.id.in_(tag_subquery))
+    if symbol_ids:
+        symbol_subquery = (
+            select(CardVersionSymbol.card_version_id)
+            .where(CardVersionSymbol.symbol_id.in_(symbol_ids))
+        )
+        statement = statement.where(CardVersion.id.in_(symbol_subquery))
+    if type_ids:
+        type_subquery = select(CardVersionType.card_version_id).where(CardVersionType.type_id.in_(type_ids))
+        statement = statement.where(CardVersion.id.in_(type_subquery))
+
+    return list(session.exec(statement))
 
 
 def get_card(session: Session, card_id: str) -> Card | None:

@@ -2,11 +2,11 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Card Reader",
   "version": "0.1.0",
-  "identifier": "com.cardreader.app",
+  "identifier": "com.cardreader.desktop",
   "build": {
     "beforeDevCommand": "pnpm --filter @card-reader/web dev",
     "beforeBuildCommand": "pnpm --filter @card-reader/web build",
-    "frontendDist": "../web/dist",
+    "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:8888"
   },
   "app": {
@@ -21,6 +21,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all"
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ]
   }
 }

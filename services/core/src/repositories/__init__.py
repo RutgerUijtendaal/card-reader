@@ -24,6 +24,20 @@ from .import_jobs_repository import (
     mark_job_item_failed,
     mark_job_running,
 )
+from .metadata_repository import list_keywords, replace_card_version_keywords
+from .metadata_repository import (
+    get_keywords_for_card_version,
+    get_symbols_for_card_version,
+    get_tags_for_card_version,
+    get_types_for_card_version,
+    list_symbols,
+    list_tags,
+    list_types,
+    replace_card_version_tags,
+    replace_card_version_types,
+    upsert_tags_by_labels,
+    upsert_types_by_labels,
+)
 
 __all__ = [
     "SUPPORTED_IMAGE_SUFFIXES",
@@ -48,6 +62,19 @@ __all__ = [
     "update_card",
     "export_cards_csv",
     "normalize_slug_key",
+    "list_keywords",
+    "replace_card_version_keywords",
+    "replace_card_version_tags",
+    "replace_card_version_types",
+    "upsert_tags_by_labels",
+    "upsert_types_by_labels",
+    "list_tags",
+    "list_symbols",
+    "list_types",
+    "get_keywords_for_card_version",
+    "get_tags_for_card_version",
+    "get_symbols_for_card_version",
+    "get_types_for_card_version",
 ]
 
 
