@@ -7,4 +7,5 @@
 - API: `pnpm --filter @card-reader/api dev`
 - Worker: `pnpm --filter @card-reader/worker dev`
 - Web: `pnpm --filter @card-reader/web dev`
-- Desktop: `pnpm --filter @card-reader/desktop dev`
+- All incl. desktop: `pnpm dev:all`
+- Desktop: `pnpm dev:desktop`

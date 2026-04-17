@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
 from card_reader_api.application.services import CardService
 from card_reader_api.infrastructure.db import get_session
@@ -36,7 +39,7 @@ def get_card(card_id: str) -> CardDetailResponse:
             mana_cost=card.mana_cost,
             rules_text=card.rules_text,
             confidence=card.confidence,
-            image_path=image.stored_path if image else None,
+            image_url=f"/cards/{card.id}/image" if image else None,
         )
 
 
@@ -62,5 +65,19 @@ def patch_card(card_id: str, request: UpdateCardRequest) -> CardDetailResponse:
             mana_cost=card.mana_cost,
             rules_text=card.rules_text,
             confidence=card.confidence,
-            image_path=image.stored_path if image else None,
+            image_url=f"/cards/{card.id}/image" if image else None,
         )
+
+
+@router.get("/cards/{card_id}/image")
+def get_card_image(card_id: str) -> FileResponse:
+    with get_session() as session:
+        card, image = card_service.get_card_with_image(session, card_id)
+        if card is None or image is None:
+            raise HTTPException(status_code=404, detail="Card image not found")
+
+        file_path = Path(image.stored_path)
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="Card image file is missing")
+
+        return FileResponse(path=file_path)

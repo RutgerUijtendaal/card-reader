@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   webServer: {
     command: 'pnpm dev',
-    port: 5173,
+    port: 8888,
     reuseExistingServer: true
   }
 });

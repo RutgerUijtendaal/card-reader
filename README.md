@@ -9,14 +9,21 @@ Install these before running bootstrap:
 - `pnpm` 10+
 - `Python` 3.12+
 - `uv` (Astral)
+- `Rust` + `cargo` (required only for Tauri desktop)
+- OCR runtime note: `bootstrap` installs both `paddleocr` and `paddlepaddle` for API/worker.
 
 Linux/WSL install examples:
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs python3.12 python3.12-venv python3-pip
+sudo apt install -y \
+  nodejs python3.12 python3.12-venv python3-pip \
+  pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
+  libayatana-appindicator3-dev librsvg2-dev
 npm install -g pnpm
 curl -LsSf https://astral.sh/uv/install.sh | sh
+curl https://sh.rustup.rs -sSf | sh
+source "$HOME/.cargo/env"
 ```
 
 Verify:
@@ -26,6 +33,15 @@ node --version
 pnpm --version
 python --version
 uv --version
+cargo --version
+pkg-config --modversion glib-2.0
+```
+
+Optional sanity check after bootstrap:
+
+```bash
+cd services/worker
+uv run --project . python -c "import paddle, paddleocr; print('ok')"
 ```
 
 ## Bootstrap
@@ -40,11 +56,43 @@ uv --version
 ./scripts/dev.sh
 ```
 
+This starts API + worker + web (desktop excluded).
+It also re-syncs Python dependencies for API/worker before starting.
+
 Or run specific services:
 
 ```bash
 pnpm --filter @card-reader/api dev
 pnpm --filter @card-reader/worker dev
 pnpm --filter @card-reader/web dev
-pnpm --filter @card-reader/desktop dev
+pnpm dev:all
+pnpm dev:desktop
 ```
+
+## Desktop (Tauri) Prerequisites
+
+Desktop dev requires Rust/Cargo and GTK/WebKit system libraries on Linux/WSL:
+
+```bash
+curl https://sh.rustup.rs -sSf | sh
+source "$HOME/.cargo/env"
+cargo --version
+sudo apt install -y pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+## Storage Behavior
+
+- Development (default): runtime data is written to `storage/` in the repo.
+- Production (`CARD_READER_ENV=production`): runtime data is written to OS app data:
+- Linux: `~/.local/share/card-reader`
+- macOS: `~/Library/Application Support/card-reader`
+- Windows: `%LOCALAPPDATA%/CardReader`
+
+Optional override:
+- Set `CARD_READER_APP_DATA_DIR=/custom/path` to force a specific storage root in any environment.
+
+## API Logs
+
+- API logs are written to `<storage_root>/logs/api.log`.
+- In development defaults, that is `storage/logs/api.log`.
+- Use this file to diagnose backend-side import failures.

@@ -5,12 +5,21 @@ from sqlmodel import Session, SQLModel, create_engine
 from card_reader_api.infrastructure.models import Card
 from card_reader_api.settings import settings
 
-DATABASE_URL = f"sqlite:///{settings.database_path}"
+def _resolve_database_path() -> Path:
+    configured_path = settings.database_path
+    if configured_path.is_absolute():
+        return configured_path
+    return settings.storage_root_dir / configured_path
+
+
+DATABASE_PATH = _resolve_database_path()
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 
 def initialize_database() -> None:
-    settings.app_data_dir.mkdir(parents=True, exist_ok=True)
+    settings.storage_root_dir.mkdir(parents=True, exist_ok=True)
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     settings.image_store_dir.mkdir(parents=True, exist_ok=True)
     SQLModel.metadata.create_all(engine)
     with engine.begin() as connection:

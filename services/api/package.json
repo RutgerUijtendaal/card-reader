@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "uv run --project . uvicorn card_reader_api.main:app --host 127.0.0.1 --port 8000 --reload",
+    "dev": "PYTHONPATH=src uv run --project . uvicorn card_reader_api.main:app --host 127.0.0.1 --port 8000 --reload",
     "build": "echo \"Python service has no build step\"",
     "test": "uv run --project . pytest -q",
     "lint": "uv run --project . ruff check src tests",

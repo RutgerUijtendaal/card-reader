@@ -1,10 +1,4 @@
-from pydantic import BaseModel, Field
-
-
-class CreateImportJobRequest(BaseModel):
-    source_path: str
-    template_id: str
-    options: dict[str, object] = Field(default_factory=dict)
+from pydantic import BaseModel
 
 
 class ImportJobResponse(BaseModel):
@@ -30,7 +24,7 @@ class CardDetailResponse(BaseModel):
     mana_cost: str
     rules_text: str
     confidence: float
-    image_path: str | None = None
+    image_url: str | None = None
 
 
 class UpdateCardRequest(BaseModel):

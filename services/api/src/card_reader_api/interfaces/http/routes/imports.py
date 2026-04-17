@@ -1,15 +1,25 @@
+import json
+import logging
 from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from card_reader_api.application.services import ImportService
 from card_reader_api.infrastructure.db import get_session
 from card_reader_api.infrastructure.parser import CardParser
-from card_reader_api.infrastructure.repositories import fetch_items_for_job, fetch_job, list_import_jobs
-from card_reader_api.interfaces.http.schemas import CreateImportJobRequest, ImportJobResponse
+from card_reader_api.infrastructure.repositories import (
+    SUPPORTED_IMAGE_SUFFIXES,
+    fetch_items_for_job,
+    fetch_job,
+    list_import_jobs,
+)
+from card_reader_api.interfaces.http.schemas import ImportJobResponse
+from card_reader_api.settings import settings
 
 router = APIRouter()
 import_service = ImportService(parser=CardParser(Path(__file__).resolve().parents[3] / "infrastructure" / "templates"))
+logger = logging.getLogger(__name__)
 
 
 @router.get("/imports", response_model=list[ImportJobResponse])
@@ -29,27 +39,68 @@ def get_imports() -> list[ImportJobResponse]:
         ]
 
 
-@router.post("/imports", response_model=ImportJobResponse, status_code=201)
-def create_import(request: CreateImportJobRequest) -> ImportJobResponse:
-    source_path = Path(request.source_path)
-    if not source_path.exists() or not source_path.is_dir():
-        raise HTTPException(status_code=400, detail="source_path must point to an existing directory")
+@router.post("/imports/upload", response_model=ImportJobResponse, status_code=201)
+async def create_import_from_upload(
+    template_id: str = Form(...),
+    options_json: str = Form("{}"),
+    files: list[UploadFile] = File(...),
+) -> ImportJobResponse:
+    if not files:
+        raise HTTPException(status_code=400, detail="At least one file is required")
 
-    with get_session() as session:
-        job = import_service.create_job(
-            session,
-            source_path=request.source_path,
-            template_id=request.template_id,
-            options=request.options,
+    try:
+        options_raw = json.loads(options_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="options_json must be valid JSON") from exc
+
+    if not isinstance(options_raw, dict):
+        raise HTTPException(status_code=400, detail="options_json must decode to an object")
+
+    upload_dir = settings.storage_root_dir / "uploads" / str(uuid4())
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    saved_count = 0
+
+    for index, upload in enumerate(files):
+        original_name = Path(upload.filename or f"upload-{index}.img").name
+        suffix = Path(original_name).suffix.lower()
+        if suffix not in SUPPORTED_IMAGE_SUFFIXES:
+            await upload.close()
+            continue
+
+        target_file = upload_dir / f"{index:04d}-{original_name}"
+        content = await upload.read()
+        target_file.write_bytes(content)
+        await upload.close()
+        saved_count += 1
+
+    if saved_count == 0:
+        raise HTTPException(status_code=400, detail="No supported image files found in upload")
+
+    try:
+        with get_session() as session:
+            job = import_service.create_job(
+                session,
+                source_path=str(upload_dir),
+                template_id=template_id,
+                options=options_raw,
+            )
+            return ImportJobResponse(
+                id=job.id,
+                source_path=job.source_path,
+                template_id=job.template_id,
+                status=job.status,
+                total_items=job.total_items,
+                processed_items=job.processed_items,
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception(
+            "Failed to create import job from upload. template_id=%s upload_dir=%s",
+            template_id,
+            upload_dir,
         )
-        return ImportJobResponse(
-            id=job.id,
-            source_path=job.source_path,
-            template_id=job.template_id,
-            status=job.status,
-            total_items=job.total_items,
-            processed_items=job.processed_items,
-        )
+        raise HTTPException(status_code=500, detail="Failed to create import job from upload. See API logs.")
 
 
 @router.get("/imports/{job_id}")

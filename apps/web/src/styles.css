@@ -1,59 +1,35 @@
-:root {
-  color-scheme: light;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 bg-gradient-to-br from-amber-50 to-slate-200 text-slate-900 antialiased;
+  }
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer components {
+  .page-card {
+    @apply rounded-xl border border-slate-200/80 bg-white/85 p-5 shadow-sm;
+  }
 
-body {
-  margin: 0;
-  background: linear-gradient(135deg, #f6f4ec 0%, #dde7f2 100%);
-  color: #152238;
-}
+  .field-label {
+    @apply grid gap-2 text-sm font-medium text-slate-700;
+  }
 
-.app-shell {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 260px 1fr;
-}
+  .input-base {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200;
+  }
 
-aside {
-  padding: 24px;
-  background: #142238;
-  color: #f2f6fa;
-}
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
 
-nav {
-  display: grid;
-  gap: 8px;
-}
+  .nav-link {
+    @apply rounded-md px-3 py-2 text-sm font-medium text-slate-100/90 transition hover:bg-white/10 hover:text-white;
+  }
 
-a {
-  color: #f2f6fa;
-  text-decoration: none;
-  padding: 8px;
-  border-radius: 8px;
-}
-
-a.router-link-active {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-main {
-  padding: 24px;
-}
-
-.page-card {
-  background: rgba(255, 255, 255, 0.85);
-  border-radius: 14px;
-  padding: 18px;
-  border: 1px solid rgba(20, 34, 56, 0.1);
-}
-
-@media (max-width: 900px) {
-  .app-shell {
-    grid-template-columns: 1fr;
+  .nav-link.router-link-active {
+    @apply bg-white/20 text-white;
   }
 }

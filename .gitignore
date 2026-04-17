@@ -9,6 +9,10 @@ __pycache__/
 .ruff_cache/
 .venv/
 .uv-cache/
+storage/
+test-results/
+playwright-report/
+htmlcov/
 *.pyc
 *.pyo
 *.pyd
@@ -16,6 +20,8 @@ __pycache__/
 *.sqlite
 *.sqlite3
 *.db
+**/debug-crops/
+**/uploads/
 .env
 .env.*
 .DS_Store

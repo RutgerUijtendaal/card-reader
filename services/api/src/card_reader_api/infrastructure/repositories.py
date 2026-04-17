@@ -19,6 +19,8 @@ from card_reader_api.infrastructure.models import (
 )
 from card_reader_api.infrastructure.storage import store_image
 
+SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
 
 def list_import_jobs(session: Session) -> list[ImportJob]:
     statement = select(ImportJob).order_by(ImportJob.created_at.desc())
@@ -32,11 +34,7 @@ def create_import_job(
     template_id: str,
     options: dict[str, object],
 ) -> ImportJob:
-    files = [
-        path
-        for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp")
-        for path in source_path.glob(pattern)
-    ]
+    files = collect_supported_files(source_path)
     job = ImportJob(
         source_path=str(source_path),
         template_id=template_id,
@@ -61,6 +59,22 @@ def create_import_job(
     return job
 
 
+def collect_supported_files(source_path: Path) -> list[Path]:
+    if source_path.is_file():
+        return [source_path] if source_path.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES else []
+
+    if source_path.is_dir():
+        return sorted(
+            [
+                path
+                for path in source_path.rglob("*")
+                if path.is_file() and path.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES
+            ]
+        )
+
+    return []
+
+
 def mark_job_running(session: Session, job: ImportJob) -> None:
     job.status = ImportJobStatus.running
     job.updated_at = now_utc()
@@ -70,6 +84,13 @@ def mark_job_running(session: Session, job: ImportJob) -> None:
 
 def mark_job_complete(session: Session, job: ImportJob) -> None:
     job.status = ImportJobStatus.completed
+    job.updated_at = now_utc()
+    session.add(job)
+    session.commit()
+
+
+def mark_job_failed(session: Session, job: ImportJob) -> None:
+    job.status = ImportJobStatus.failed
     job.updated_at = now_utc()
     session.add(job)
     session.commit()
@@ -105,6 +126,14 @@ def get_job_items(session: Session, job_id: str) -> list[ImportJobItem]:
     return list(session.exec(statement))
 
 
+def mark_job_item_failed(session: Session, item: ImportJobItem, error_message: str) -> None:
+    item.status = ImportJobStatus.failed
+    item.error_message = error_message[:2000]
+    item.updated_at = now_utc()
+    session.add(item)
+    session.commit()
+
+
 def save_parsed_card(
     session: Session,
     *,
@@ -114,13 +143,35 @@ def save_parsed_card(
     normalized_fields: dict[str, str],
     confidence: dict[str, float],
     raw_ocr: dict[str, object],
+    reparse_existing: bool = True,
 ) -> Card:
     existing = session.exec(select(Card).where(Card.image_hash == checksum)).first()
     if existing:
+        if reparse_existing:
+            _apply_parsed_fields_to_card(
+                existing,
+                normalized_fields=normalized_fields,
+                confidence=confidence,
+            )
+            parse_result = ParseResult(
+                card_id=existing.id,
+                raw_ocr_json=json.dumps(raw_ocr),
+                normalized_fields_json=json.dumps(normalized_fields),
+                confidence_json=json.dumps(confidence),
+            )
+            session.add(parse_result)
+            session.flush()
+            existing.parse_result_id = parse_result.id
+            existing.updated_at = now_utc()
+            session.add(existing)
+            _upsert_card_search(session, existing)
+
         item.status = ImportJobStatus.completed
+        item.error_message = None
         item.updated_at = now_utc()
         session.add(item)
         session.commit()
+        session.refresh(existing)
         return existing
 
     source_file_path = Path(item.source_file)
@@ -165,19 +216,7 @@ def save_parsed_card(
     session.commit()
     session.refresh(card)
 
-    session.exec(
-        text(
-            "INSERT INTO card_search(card_id, name, type_line, rules_text, mana_cost) "
-            "VALUES (:card_id, :name, :type_line, :rules_text, :mana_cost)"
-        ),
-        params={
-            "card_id": card.id,
-            "name": card.name,
-            "type_line": card.type_line,
-            "rules_text": card.rules_text,
-            "mana_cost": card.mana_cost,
-        },
-    )
+    _upsert_card_search(session, card)
     session.commit()
     return card
 
@@ -242,23 +281,7 @@ def update_card(
     session.commit()
     session.refresh(card)
 
-    session.exec(
-        text("DELETE FROM card_search WHERE card_id = :card_id"),
-        params={"card_id": card.id},
-    )
-    session.exec(
-        text(
-            "INSERT INTO card_search(card_id, name, type_line, rules_text, mana_cost) "
-            "VALUES (:card_id, :name, :type_line, :rules_text, :mana_cost)"
-        ),
-        params={
-            "card_id": card.id,
-            "name": card.name,
-            "type_line": card.type_line,
-            "rules_text": card.rules_text,
-            "mana_cost": card.mana_cost,
-        },
-    )
+    _upsert_card_search(session, card)
     session.commit()
     return card
 
@@ -284,3 +307,36 @@ def export_cards_csv(session: Session, *, query: str | None) -> str:
             }
         )
     return stream.getvalue()
+
+
+def _apply_parsed_fields_to_card(
+    card: Card,
+    *,
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+) -> None:
+    card.name = normalized_fields.get("name", "")
+    card.type_line = normalized_fields.get("type_line", "")
+    card.mana_cost = normalized_fields.get("mana_cost", "")
+    card.rules_text = normalized_fields.get("rules_text", "")
+    card.confidence = float(confidence.get("overall", 0.0))
+
+
+def _upsert_card_search(session: Session, card: Card) -> None:
+    session.exec(
+        text("DELETE FROM card_search WHERE card_id = :card_id"),
+        params={"card_id": card.id},
+    )
+    session.exec(
+        text(
+            "INSERT INTO card_search(card_id, name, type_line, rules_text, mana_cost) "
+            "VALUES (:card_id, :name, :type_line, :rules_text, :mana_cost)"
+        ),
+        params={
+            "card_id": card.id,
+            "name": card.name,
+            "type_line": card.type_line,
+            "rules_text": card.rules_text,
+            "mana_cost": card.mana_cost,
+        },
+    )

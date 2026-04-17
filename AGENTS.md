@@ -29,13 +29,15 @@ Core stack:
 - Import flow must remain async:
   - API creates jobs and items
   - Worker claims queued jobs and processes files
-- Persist imported images under app data using hash-based filenames.
+- Persist imported images under the configured storage root using hash-based filenames.
 - Keep parser provider-agnostic: PaddleOCR is default, but behind adapter boundaries.
 
 ## Development Commands
 From repo root:
 - Install deps: `./scripts/bootstrap.sh --node --python`
-- Dev all (turbo): `./scripts/dev.sh`
+- Dev default (no desktop): `./scripts/dev.sh`
+- Dev all (including desktop): `pnpm dev:all`
+- Desktop dev: `pnpm dev:desktop` (requires Rust/Cargo)
 - Build all: `pnpm build`
 - Lint all: `pnpm lint`
 - Typecheck all: `pnpm typecheck`
@@ -45,7 +47,7 @@ Targeted dev commands:
 - API: `pnpm --filter @card-reader/api dev`
 - Worker: `pnpm --filter @card-reader/worker dev`
 - Web: `pnpm --filter @card-reader/web dev`
-- Desktop: `pnpm --filter @card-reader/desktop dev`
+- Desktop: `pnpm dev:desktop`
 
 ## Coding Standards
 - Python:

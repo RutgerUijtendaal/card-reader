@@ -3,7 +3,9 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "turbo run dev --parallel --filter=!@card-reader/desktop",
+    "dev:all": "turbo run dev --parallel",
+    "dev:desktop": "pnpm --filter @card-reader/desktop dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
