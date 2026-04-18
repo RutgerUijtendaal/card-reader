@@ -9,6 +9,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   desktop:
     name: Desktop (${{ matrix.platform.name }})
@@ -103,9 +107,19 @@ jobs:
           merge-multiple: true
           path: release-assets
 
+      - name: Keep executable artifacts only
+        run: |
+          find release-assets -type f \
+            ! -name "*.exe" \
+            ! -name "*.AppImage" \
+            -delete
+
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: release-assets/**
+          tag: ${{ github.ref_name }}
+          generateReleaseNotes: true
+          artifacts: "release-assets/**"
+          allowUpdates: true
+          replacesArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
