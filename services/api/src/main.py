@@ -9,6 +9,7 @@ import uvicorn
 
 from router import build_api_router
 from database.connection import initialize_database
+from database_migrations import run_migrations_to_head
 from core_logging import configure_logging
 from seeds.keywords import ensure_default_keywords_seeded
 from settings import settings
@@ -57,6 +58,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 def on_startup() -> None:
     configure_logging()
     initialize_database()
+    run_migrations_to_head()
     try:
         ensure_default_keywords_seeded()
     except Exception:

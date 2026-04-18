@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+import sys
 
 from sqlmodel import select
 
@@ -10,9 +11,15 @@ from database.connection import get_session, initialize_database
 from models import Keyword, now_utc
 from repositories import normalize_slug_key
 
-DEFAULT_KEYWORDS_FILE = (
-    Path(__file__).resolve().parents[3] / "core" / "seeds" / "keywords.txt"
-)
+def _resolve_default_keywords_file() -> Path:
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", "")
+        if meipass:
+            return Path(meipass) / "core" / "seeds" / "keywords.txt"
+    return Path(__file__).resolve().parents[3] / "core" / "seeds" / "keywords.txt"
+
+
+DEFAULT_KEYWORDS_FILE = _resolve_default_keywords_file()
 logger = logging.getLogger(__name__)
 
 

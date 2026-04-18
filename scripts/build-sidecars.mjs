@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -11,8 +11,7 @@ const repoRoot = resolve(__dirname, '..');
 
 const binariesDir = join(repoRoot, 'apps', 'desktop', 'src-tauri', 'binaries');
 const pyinstallerTmpDir = join(repoRoot, '.tmp', 'pyinstaller');
-const isWindows = process.platform === 'win32';
-const addDataSeparator = isWindows ? ';' : ':';
+const addDataSeparator = process.platform === 'win32' ? ';' : ':';
 
 const run = (command, args, cwd = repoRoot) => {
   const result = spawnSync(command, args, {
@@ -38,6 +37,8 @@ const buildApi = () => {
   const corePath = join(repoRoot, 'services', 'core', 'src');
   const seedFile = join(repoRoot, 'services', 'core', 'seeds', 'keywords.txt');
   const dataSpec = `${seedFile}${addDataSeparator}core/seeds`;
+  const alembicDir = join(repoRoot, 'services', 'api', 'alembic');
+  const alembicDataSpec = `${alembicDir}${addDataSeparator}alembic`;
 
   run('uv', [
     'run',
@@ -63,6 +64,8 @@ const buildApi = () => {
     corePath,
     '--add-data',
     dataSpec,
+    '--add-data',
+    alembicDataSpec,
     apiEntry
   ]);
 };
@@ -96,31 +99,42 @@ const buildParser = () => {
     parserPath,
     '--paths',
     corePath,
+    '--collect-all',
+    'paddleocr',
+    '--collect-all',
+    'paddlex',
+    '--collect-all',
+    'paddle',
+    '--collect-all',
+    'cv2',
+    '--collect-all',
+    'shapely',
+    '--collect-binaries',
+    'paddle',
+    '--copy-metadata',
+    'paddlex',
+    '--copy-metadata',
+    'paddleocr',
+    '--copy-metadata',
+    'paddlepaddle',
+    '--copy-metadata',
+    'imagesize',
+    '--copy-metadata',
+    'opencv-contrib-python',
+    '--copy-metadata',
+    'pyclipper',
+    '--copy-metadata',
+    'pypdfium2',
+    '--copy-metadata',
+    'python-bidi',
+    '--copy-metadata',
+    'shapely',
     '--add-data',
     dataSpec,
     parserEntry
   ]);
 };
 
-const duplicateWindowsExes = () => {
-  if (!isWindows) {
-    return;
-  }
-
-  const copyIfExists = (fromName, toName) => {
-    const from = join(binariesDir, fromName);
-    const to = join(binariesDir, toName);
-    if (existsSync(from)) {
-      cpSync(from, to);
-    }
-  };
-
-  copyIfExists('card-reader-api.exe', 'card-reader-api');
-  copyIfExists('card-reader-parser.exe', 'card-reader-parser');
-};
-
 clean();
 buildApi();
 buildParser();
-duplicateWindowsExes();
-

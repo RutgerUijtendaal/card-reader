@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Callable
 
 from sqlmodel import Session
 
@@ -27,10 +28,17 @@ class ImportProcessorService:
         self._tags_extractor = tags_extractor or TagsExtractor()
         self._types_extractor = types_extractor or TypesExtractor()
 
-    def process_job(self, session: Session, job_id: str) -> None:
+    def process_job(
+        self,
+        session: Session,
+        job_id: str,
+        *,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> None:
         job = repositories.fetch_job(session, job_id)
         if job is None:
             return
+        stop_requested = should_stop or (lambda: False)
 
         options: dict[str, object] = {}
         if job.options_json:
@@ -45,11 +53,16 @@ class ImportProcessorService:
         keyword_keys = self._parse_keyword_keys(options.get("keyword_keys"))
         known_keywords = repositories.list_keywords(session, keys=keyword_keys)
         failed_items = 0
+        shutdown_requested = False
 
         repositories.mark_job_running(session, job)
         items = repositories.get_job_items(session, job.id)
 
         for item in items:
+            if stop_requested():
+                shutdown_requested = True
+                logger.info("Parser shutdown requested; pausing job processing. job_id=%s", job.id)
+                break
             if item.status != ImportJobStatus.queued:
                 continue
 
@@ -107,6 +120,9 @@ class ImportProcessorService:
 
         if failed_items > 0:
             repositories.mark_job_failed(session, job)
+            return
+        if shutdown_requested:
+            repositories.mark_job_queued(session, job)
             return
         repositories.mark_job_complete(session, job)
 

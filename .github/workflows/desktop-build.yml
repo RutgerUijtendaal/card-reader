@@ -25,7 +25,6 @@ jobs:
             artifact_name: windows-desktop-bundle
             artifact_paths: |
               apps/desktop/src-tauri/target/release/bundle/nsis/*
-              apps/desktop/src-tauri/target/release/*.exe
           - name: linux
             os: ubuntu-22.04
             bundles: appimage,deb

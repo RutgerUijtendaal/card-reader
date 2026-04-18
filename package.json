@@ -7,6 +7,7 @@
     "dev:all": "turbo run dev --parallel",
     "dev:desktop": "pnpm --filter @card-reader/desktop dev",
     "build": "turbo run build",
+    "build:desktop": "pnpm --filter @card-reader/desktop run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

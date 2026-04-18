@@ -70,6 +70,13 @@ def mark_job_running(session: Session, job: ImportJob) -> None:
     session.commit()
 
 
+def mark_job_queued(session: Session, job: ImportJob) -> None:
+    job.status = ImportJobStatus.queued
+    job.updated_at = now_utc()
+    session.add(job)
+    session.commit()
+
+
 def mark_job_complete(session: Session, job: ImportJob) -> None:
     job.status = ImportJobStatus.completed
     job.updated_at = now_utc()

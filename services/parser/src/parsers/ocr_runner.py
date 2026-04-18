@@ -17,6 +17,33 @@ try:
 except Exception:  # pragma: no cover
     PaddleOCR = None  # type: ignore[assignment]
 
+_PADDLEX_OCR_CONFIG: dict[str, Any] = {
+    "pipeline_name": "OCR",
+    "text_type": "general",
+    "use_doc_preprocessor": False,
+    "use_textline_orientation": False,
+    "SubModules": {
+        "TextDetection": {
+            "module_name": "text_detection",
+            "model_name": "PP-OCRv5_server_det",
+            "model_dir": None,
+            "limit_side_len": 64,
+            "limit_type": "min",
+            "max_side_limit": 4000,
+            "thresh": 0.3,
+            "box_thresh": 0.6,
+            "unclip_ratio": 1.5,
+        },
+        "TextRecognition": {
+            "module_name": "text_recognition",
+            "model_name": "PP-OCRv5_server_rec",
+            "model_dir": None,
+            "batch_size": 6,
+            "score_thresh": 0.0,
+        },
+    },
+}
+
 
 class OcrRunner:
     def __init__(self) -> None:
@@ -106,6 +133,7 @@ class OcrRunner:
                 lang="en",
                 device="cpu",
                 enable_mkldnn=False,
+                paddlex_config=_PADDLEX_OCR_CONFIG,
             )
         except Exception:
             logger.exception("Failed to initialize PaddleOCR")

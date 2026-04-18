@@ -22,6 +22,7 @@ from .import_jobs_repository import (
     mark_job_complete,
     mark_job_failed,
     mark_job_item_failed,
+    mark_job_queued,
     mark_job_running,
 )
 from .metadata_repository import list_keywords, replace_card_version_keywords
@@ -45,6 +46,7 @@ __all__ = [
     "list_import_jobs",
     "create_import_job",
     "mark_job_running",
+    "mark_job_queued",
     "mark_job_complete",
     "mark_job_failed",
     "bump_job_processed",
