@@ -87,3 +87,25 @@ jobs:
         with:
           name: ${{ matrix.platform.artifact_name }}
           path: ${{ matrix.platform.artifact_paths }}
+
+  publish-release:
+    name: Publish Release Assets
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: desktop
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: "*-desktop-bundle"
+          merge-multiple: true
+          path: release-assets
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/**
