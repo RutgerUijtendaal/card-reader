@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 
 from router import build_api_router
 from database.connection import initialize_database
@@ -23,6 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(build_api_router())
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "environment": settings.environment}
 
 
 @app.exception_handler(Exception)
@@ -51,6 +57,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 def on_startup() -> None:
     configure_logging()
     initialize_database()
-    ensure_default_keywords_seeded()
+    try:
+        ensure_default_keywords_seeded()
+    except Exception:
+        logger.exception("Keyword seed initialization failed during startup")
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host=settings.api_host, port=settings.api_port)
 
 

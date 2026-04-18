@@ -29,7 +29,8 @@ def parse_args() -> argparse.Namespace:
 
 def read_keyword_labels(file_path: Path) -> list[str]:
     if not file_path.exists():
-        raise FileNotFoundError(f"Keyword seed file does not exist: {file_path}")
+        logger.warning("Keyword seed file not found; skipping default keyword seed. file=%s", file_path)
+        return []
 
     labels: list[str] = []
     for raw_line in file_path.read_text(encoding="utf-8").splitlines():

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:8888",
         "http://127.0.0.1:8888",
+        "tauri://localhost",
+        "http://tauri.localhost",
     ]
     environment: str = os.getenv("CARD_READER_ENV", "development")
     database_path: Path = Path("card_reader.db")

@@ -22,6 +22,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": [
+      "binaries/*"
+    ],
     "icon": [
       "icons/icon.png"
     ]

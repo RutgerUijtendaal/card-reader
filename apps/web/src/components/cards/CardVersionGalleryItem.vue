@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
 import { nextTick, onBeforeUnmount, ref } from 'vue';
-import { api } from '@/api/client';
+import { api, DEFAULT_API_BASE_URL } from '@/api/client';
 
 export type CardVersionGalleryItemModel = {
   id: string;
@@ -143,7 +143,7 @@ onBeforeUnmount(() => {
 });
 
 const toAbsoluteApiUrl = (urlPath: string): string => {
-  const base = api.defaults.baseURL ?? 'http://127.0.0.1:8000';
+  const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
   if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
     return urlPath;
   }

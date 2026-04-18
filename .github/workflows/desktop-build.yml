@@ -50,6 +50,14 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
@@ -68,6 +76,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build desktop sidecars
+        run: pnpm --filter @card-reader/desktop run build:sidecars
 
       - name: Build desktop bundle
         run: pnpm --filter @card-reader/desktop exec tauri build --bundles ${{ matrix.platform.bundles }}
