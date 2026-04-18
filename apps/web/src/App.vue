@@ -22,8 +22,10 @@
       <RouterView />
     </main>
   </div>
+  <Toaster rich-colors position="top-right" />
 </template>
 
 <script setup lang="ts">
 import { ClipboardCheck, Images, Upload } from 'lucide-vue-next';
+import { Toaster } from 'vue-sonner';
 </script>

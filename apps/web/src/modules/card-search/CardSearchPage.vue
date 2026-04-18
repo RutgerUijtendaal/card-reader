@@ -51,6 +51,7 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { Download, Images, RotateCcw } from 'lucide-vue-next';
 import { api } from '@/api/client';
+import { useCsvExport } from '@/composables/useCsvExport';
 import FilterMultiSelectPopover from '@/components/filters/FilterMultiSelectPopover.vue';
 import FilterTextPopover from '@/components/filters/FilterTextPopover.vue';
 import CardGalleryItem, { type CardGalleryItemModel } from '@/components/cards/CardGalleryItem.vue';
@@ -90,6 +91,7 @@ const filters = ref<CardFiltersResponse>({
 });
 const cards = ref<CardGalleryItemModel[]>([]);
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const { exportCardsCsv } = useCsvExport();
 
 const loadFilters = async (): Promise<void> => {
   const response = await api.get<CardFiltersResponse>('/cards/filters');
@@ -123,17 +125,7 @@ const searchCards = async (): Promise<void> => {
 };
 
 const exportCsv = async (): Promise<void> => {
-  const params = buildSearchParams().toString();
-  const path = params ? `/exports/csv?${params}` : '/exports/csv';
-  const response = await api.get<Blob>(path, { responseType: 'blob' });
-  const url = URL.createObjectURL(response.data);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'cards.csv';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  await exportCardsCsv(buildSearchParams());
 };
 
 const debouncedSearch = (): void => {
