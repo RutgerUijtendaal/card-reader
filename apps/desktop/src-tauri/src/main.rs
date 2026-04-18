@@ -21,9 +21,23 @@ fn backend_status() -> &'static str {
     "running"
 }
 
-fn spawn_sidecar(executable: &str) -> Option<Child> {
+fn spawn_sidecar(executable: &str, app_data_dir: Option<&str>) -> Option<Child> {
     let mut command = Command::new(executable);
-    command.stdout(Stdio::null()).stderr(Stdio::null());
+    let runtime_env = if cfg!(debug_assertions) {
+        "development"
+    } else {
+        "production"
+    };
+    command
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .env("CARD_READER_ENV", runtime_env);
+
+    if !cfg!(debug_assertions) {
+        if let Some(path) = app_data_dir {
+            command.env("CARD_READER_APP_DATA_DIR", path);
+        }
+    }
 
     #[cfg(target_os = "windows")]
     {
@@ -43,10 +57,15 @@ fn main() {
             let state: State<Sidecars> = app.state();
             let mut api_lock = state.api.lock().expect("api lock poisoned");
             let mut parser_lock = state.parser.lock().expect("parser lock poisoned");
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .ok()
+                .map(|path| path.to_string_lossy().into_owned());
 
             // Placeholder names for bundled sidecar binaries.
-            *api_lock = spawn_sidecar("card-reader-api");
-            *parser_lock = spawn_sidecar("card-reader-parser");
+            *api_lock = spawn_sidecar("card-reader-api", app_data_dir.as_deref());
+            *parser_lock = spawn_sidecar("card-reader-parser", app_data_dir.as_deref());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![backend_status])
