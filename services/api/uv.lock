@@ -62,9 +62,10 @@ wheels = [
 [[package]]
 name = "card-reader-api"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "card-reader-core" },
     { name = "fastapi" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -85,6 +86,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.13.3" },
+    { name = "card-reader-core", editable = "../core" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
@@ -96,6 +98,24 @@ requires-dist = [
     { name = "sqlmodel", specifier = ">=0.0.22" },
     { name = "uvicorn", specifier = ">=0.31.0" },
     { name = "watchfiles", marker = "extra == 'dev'", specifier = ">=0.24.0" },
+]
+provides-extras = ["dev"]
+
+[[package]]
+name = "card-reader-core"
+version = "0.1.0"
+source = { editable = "../core" }
+dependencies = [
+    { name = "pydantic-settings" },
+    { name = "sqlmodel" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
+    { name = "pydantic-settings", specifier = ">=2.5.2" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.9" },
+    { name = "sqlmodel", specifier = ">=0.0.22" },
 ]
 provides-extras = ["dev"]
 

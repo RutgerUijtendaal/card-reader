@@ -16,6 +16,7 @@ htmlcov/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 *.log
 *.sqlite
 *.sqlite3
@@ -32,3 +33,4 @@ apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/binaries/
 .tmp/
 *.spec
+TODO.local.md

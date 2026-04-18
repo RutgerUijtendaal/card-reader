@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "card-reader-api"
 version = "0.1.0"
@@ -5,6 +9,7 @@ description = "Card Reader API service"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "card-reader-core",
   "alembic>=1.13.3",
   "fastapi>=0.115.0",
   "pydantic>=2.9.2",
@@ -13,6 +18,17 @@ dependencies = [
   "sqlmodel>=0.0.22",
   "uvicorn>=0.31.0"
 ]
+
+[tool.uv.sources]
+card-reader-core = { path = "../core", editable = true }
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["main", "database_migrations"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["controllers*", "dependencies*", "mappers*", "router*", "schemas*", "seeds*", "services*"]
 
 [project.optional-dependencies]
 dev = [
@@ -31,4 +47,4 @@ python_version = "3.12"
 strict = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "../core/src"]
+pythonpath = ["src"]

@@ -15,6 +15,10 @@
           <ClipboardCheck class="h-4 w-4" />
           <span>Review Queue</span>
         </RouterLink>
+        <RouterLink class="nav-link" to="/settings">
+          <Settings class="h-4 w-4" />
+          <span>Settings</span>
+        </RouterLink>
       </nav>
     </aside>
 
@@ -26,6 +30,6 @@
 </template>
 
 <script setup lang="ts">
-import { ClipboardCheck, Images, Upload } from 'lucide-vue-next';
+import { ClipboardCheck, Images, Settings, Upload } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 </script>

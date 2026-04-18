@@ -97,3 +97,8 @@ class CardFiltersResponse(BaseModel):
     tags: list[MetadataOptionResponse] = []
     symbols: list[MetadataOptionResponse] = []
     types: list[MetadataOptionResponse] = []
+
+
+class MaintenanceActionResponse(BaseModel):
+    message: str
+    removed_paths: list[str] = []

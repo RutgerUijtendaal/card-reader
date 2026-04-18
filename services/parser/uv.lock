@@ -77,10 +77,29 @@ wheels = [
 ]
 
 [[package]]
+name = "card-reader-core"
+version = "0.1.0"
+source = { editable = "../core" }
+dependencies = [
+    { name = "pydantic-settings" },
+    { name = "sqlmodel" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
+    { name = "pydantic-settings", specifier = ">=2.5.2" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.9" },
+    { name = "sqlmodel", specifier = ">=0.0.22" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "card-reader-parser"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
+    { name = "card-reader-core" },
     { name = "paddleocr" },
     { name = "paddlepaddle" },
     { name = "paddlex", extra = ["ocr-core"] },
@@ -99,6 +118,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "card-reader-core", editable = "../core" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "paddleocr", specifier = ">=3.1.0" },
     { name = "paddlepaddle", specifier = ">=3.1.0" },

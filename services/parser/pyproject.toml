@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "card-reader-parser"
 version = "0.1.0"
@@ -5,6 +9,7 @@ description = "Card Reader parser service"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "card-reader-core",
   "paddlepaddle>=3.1.0",
   "paddleocr>=3.1.0",
   "paddlex[ocr-core]>=3.1.0",
@@ -13,6 +18,17 @@ dependencies = [
   "sqlmodel>=0.0.22",
   "watchfiles>=0.24.0"
 ]
+
+[tool.uv.sources]
+card-reader-core = { path = "../core", editable = true }
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["main", "template_store"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["parsers*", "services*"]
 
 [project.optional-dependencies]
 dev = [

@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "migrate": "PYTHONPATH=src:../core/src uv run --project . alembic upgrade head",
-    "seed:keywords": "pnpm run migrate && PYTHONPATH=src:../core/src uv run --project . python -m seeds.keywords",
-    "dev": "pnpm run migrate && PYTHONPATH=src:../core/src WATCHFILES_FORCE_POLLING=true uv run --project . uvicorn main:app --host 127.0.0.1 --port 8000 --reload --reload-dir src",
+    "predev": "uv sync --project . --extra dev",
+    "migrate": "uv run --project . alembic upgrade head",
+    "seed:keywords": "pnpm run migrate && uv run --project . python -m seeds.keywords",
+    "dev": "pnpm run migrate && uv run --project . uvicorn main:app --app-dir src --host 127.0.0.1 --port 8000 --reload --reload-dir src",
     "build": "echo \"Python service has no build step\"",
-    "test": "PYTHONPATH=src:../core/src uv run --project . pytest -q",
-    "lint": "PYTHONPATH=src:../core/src uv run --project . ruff check src tests",
-    "typecheck": "PYTHONPATH=src:../core/src uv run --project . mypy src"
+    "test": "uv run --project . pytest -q",
+    "lint": "uv run --project . ruff check src tests",
+    "typecheck": "uv run --project . mypy src"
   }
 }

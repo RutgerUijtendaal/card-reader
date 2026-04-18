@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "card-reader-core"
 version = "0.1.0"
@@ -14,6 +18,14 @@ dev = [
   "mypy>=1.11.2",
   "ruff>=0.6.9"
 ]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["core_logging", "settings", "storage", "templates"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["database*", "models*", "repositories*"]
 
 [tool.ruff]
 line-length = 100

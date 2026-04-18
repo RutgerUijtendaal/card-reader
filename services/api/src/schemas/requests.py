@@ -6,3 +6,7 @@ class UpdateCardRequest(BaseModel):
     type_line: str | None = None
     mana_cost: str | None = None
     rules_text: str | None = None
+
+
+class ClearStorageRequest(BaseModel):
+    include_images: bool = True
