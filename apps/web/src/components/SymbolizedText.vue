@@ -51,12 +51,12 @@ const props = withDefaults(
     text: '',
     tokens: () => [],
     symbolByKey: () => ({}),
-    emptyLabel: '-'
-  }
+    emptyLabel: '-',
+  },
 );
 
 const segments = computed<Segment[]>(() =>
-  tokenizeText(props.text ?? '', props.tokens ?? [], props.symbolByKey)
+  tokenizeText(props.text ?? '', props.tokens ?? [], props.symbolByKey),
 );
 
 const toAbsoluteApiUrl = (urlPath: string): string => {
@@ -70,7 +70,7 @@ const toAbsoluteApiUrl = (urlPath: string): string => {
 const tokenizeText = (
   rawValue: string,
   rawTokens: string[],
-  symbolByKey: Record<string, SymbolLookup>
+  symbolByKey: Record<string, SymbolLookup>,
 ): Segment[] => {
   if (rawTokens.length > 0) {
     return rawTokens
@@ -144,7 +144,7 @@ const toSegment = (rawToken: string, symbolByKey: Record<string, SymbolLookup>):
       kind: 'text',
       raw: normalized,
       label: normalized,
-      assetUrl: null
+      assetUrl: null,
     };
   }
 
@@ -152,7 +152,7 @@ const toSegment = (rawToken: string, symbolByKey: Record<string, SymbolLookup>):
     kind: 'symbol',
     raw: normalized,
     label: symbol.text_token?.trim() || `{${normalized}}`,
-    assetUrl: symbol.asset_url ?? null
+    assetUrl: symbol.asset_url ?? null,
   };
 };
 </script>

@@ -6,17 +6,18 @@ import type {
   SymbolAssetUploadResponse,
   SymbolUpsertRequest,
   TagUpsertRequest,
-  TypeUpsertRequest
+  TypeUpsertRequest,
 } from '@/modules/settings/types';
 
 const createPathByKind: Record<CatalogKind, string> = {
   keywords: '/settings/keywords',
   tags: '/settings/tags',
   symbols: '/settings/symbols',
-  types: '/settings/types'
+  types: '/settings/types',
 };
 
-const pathForKindAndId = (kind: CatalogKind, id: string): string => `${createPathByKind[kind]}/${id}`;
+const pathForKindAndId = (kind: CatalogKind, id: string): string =>
+  `${createPathByKind[kind]}/${id}`;
 
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
   const response = await api.get<CatalogResponse>('/settings/catalog');
@@ -25,7 +26,7 @@ export const fetchCatalog = async (): Promise<CatalogResponse> => {
 
 export const createCatalogEntry = async (
   kind: CatalogKind,
-  payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest
+  payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest,
 ): Promise<void> => {
   await api.post(createPathByKind[kind], payload);
 };
@@ -33,7 +34,7 @@ export const createCatalogEntry = async (
 export const updateCatalogEntry = async (
   kind: CatalogKind,
   id: string,
-  payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest
+  payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest,
 ): Promise<void> => {
   await api.patch(pathForKindAndId(kind, id), payload);
 };
@@ -45,8 +46,12 @@ export const deleteCatalogEntry = async (kind: CatalogKind, id: string): Promise
 export const uploadSymbolAsset = async (file: File): Promise<SymbolAssetUploadResponse> => {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await api.post<SymbolAssetUploadResponse>('/settings/symbols/assets/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+  const response = await api.post<SymbolAssetUploadResponse>(
+    '/settings/symbols/assets/upload',
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  );
   return response.data;
 };

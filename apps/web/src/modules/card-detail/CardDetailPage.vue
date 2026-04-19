@@ -45,7 +45,9 @@ import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import { api } from '@/api/client';
-import CardVersionGalleryItem, { type CardVersionGalleryItemModel } from '@/components/cards/CardVersionGalleryItem.vue';
+import CardVersionGalleryItem, {
+  type CardVersionGalleryItemModel,
+} from '@/components/cards/CardVersionGalleryItem.vue';
 
 type MetadataOption = {
   id: string;
@@ -89,12 +91,12 @@ const loadCard = async (): Promise<void> => {
   const [cardResponse, versionsResponse, filtersResponse] = await Promise.all([
     api.get<CardDetail>(`/cards/${cardId}`),
     api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
-    api.get<CardFiltersResponse>('/cards/filters')
+    api.get<CardFiltersResponse>('/cards/filters'),
   ]);
   card.value = cardResponse.data;
   versions.value = versionsResponse.data;
   symbolByKey.value = Object.fromEntries(
-    (filtersResponse.data.symbols ?? []).map((row) => [row.key, row])
+    (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
   );
 };
 

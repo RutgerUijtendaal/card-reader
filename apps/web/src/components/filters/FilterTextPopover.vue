@@ -4,7 +4,11 @@
       ref="triggerRef"
       type="button"
       class="filter-chip"
-      :class="hasValue ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'"
+      :class="
+        hasValue
+          ? 'border-sky-300 bg-sky-50 text-sky-700'
+          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+      "
       @click="toggle"
     >
       {{ label }} <span v-if="hasValue">(active)</span>
@@ -55,8 +59,8 @@ const props = withDefaults(
     inputType: 'text',
     step: undefined,
     min: undefined,
-    max: undefined
-  }
+    max: undefined,
+  },
 );
 
 const emit = defineEmits<{

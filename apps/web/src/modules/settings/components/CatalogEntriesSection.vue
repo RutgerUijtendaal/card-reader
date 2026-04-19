@@ -95,149 +95,163 @@
             </tr>
           </thead>
           <tbody>
-            <tr
+            <template
               v-for="entry in currentRows"
               :key="entry.id"
-              class="border-b border-slate-100 align-middle"
             >
-              <td class="px-2 py-2">
-                <input
-                  v-model="entry.label"
-                  class="input-base"
-                >
-              </td>
-              <td class="px-2 py-2">
-                <input
-                  v-model="entry.key"
-                  class="input-base"
-                >
-              </td>
-              <td
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2"
-              >
-                <input
-                  v-model="(entry as SymbolRecord).symbol_type"
-                  class="input-base"
-                >
-              </td>
-              <td
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2"
-              >
-                <input
-                  v-model="(entry as SymbolRecord).text_token"
-                  class="input-base"
-                >
-              </td>
-              <td
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2"
-              >
-                <select
-                  v-model="(entry as SymbolRecord).detector_type"
-                  class="input-base"
-                >
-                  <option
-                    v-for="option in detectorTypeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-              </td>
-              <td
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2 align-middle"
-              >
-                <label class="inline-flex items-center gap-2">
+              <tr class="border-b border-slate-100 align-middle">
+                <td class="px-2 py-2">
                   <input
-                    v-model="(entry as SymbolRecord).enabled"
-                    type="checkbox"
+                    v-model="entry.label"
+                    class="input-base"
                   >
-                  <span class="text-xs text-slate-600">On</span>
-                </label>
-              </td>
-              <td class="px-2 py-2 align-middle">
-                <div class="flex items-center gap-2">
-                  <button
-                    v-if="selectedKind === 'symbols' && (entry as SymbolRecord).detector_type === 'template'"
-                    class="btn-secondary h-10"
-                    type="button"
-                    @click="emit('toggle-advanced', entry.id)"
+                </td>
+                <td class="px-2 py-2">
+                  <input
+                    v-model="entry.key"
+                    class="input-base"
                   >
-                    {{ isEntryAdvancedOpen(entry.id) ? 'Hide Advanced' : 'Show Advanced' }}
-                  </button>
-                  <button
-                    class="btn-secondary h-10 flex-1"
-                    type="button"
-                    :disabled="savingEntryIds.has(entry.id)"
-                    @click="emit('save', entry)"
+                </td>
+                <td
+                  v-if="selectedKind === 'symbols'"
+                  class="px-2 py-2"
+                >
+                  <input
+                    v-model="(entry as SymbolRecord).symbol_type"
+                    class="input-base"
                   >
-                    {{ savingEntryIds.has(entry.id) ? 'Saving...' : 'Save' }}
-                  </button>
-                  <button
-                    class="h-10 rounded-md border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    type="button"
-                    :disabled="deletingEntryIds.has(entry.id)"
-                    @click="emit('request-delete', entry)"
+                </td>
+                <td
+                  v-if="selectedKind === 'symbols'"
+                  class="px-2 py-2"
+                >
+                  <input
+                    v-model="(entry as SymbolRecord).text_token"
+                    class="input-base"
                   >
-                    {{ deletingEntryIds.has(entry.id) ? 'Deleting...' : 'Delete' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-
-            <tr
-              v-for="entry in currentRows"
-              v-show="
-                selectedKind === 'symbols' &&
-                  (entry as SymbolRecord).detector_type === 'template' &&
-                  isEntryAdvancedOpen(entry.id)
-              "
-              :key="`${entry.id}-json`"
-              class="border-b border-slate-100"
-            >
-              <td
-                colspan="7"
-                class="px-2 pb-3"
-              >
-                <div class="grid gap-2 md:grid-cols-2">
-                  <div class="space-y-2">
-                    <label class="field-label">
-                      Reference assets JSON
-                      <textarea
-                        v-model="(entry as SymbolRecord).reference_assets_json"
-                        class="input-base min-h-24 font-mono"
-                        :placeholder="referenceAssetsExample"
-                      />
-                    </label>
-                    <button
-                      class="btn-secondary w-fit"
-                      type="button"
-                      :disabled="uploadingEntryAssetIds.has(entry.id)"
-                      @click="emit('upload-entry-asset', entry as SymbolRecord)"
+                </td>
+                <td
+                  v-if="selectedKind === 'symbols'"
+                  class="px-2 py-2"
+                >
+                  <select
+                    v-model="(entry as SymbolRecord).detector_type"
+                    class="input-base"
+                  >
+                    <option
+                      v-for="option in detectorTypeOptions"
+                      :key="option.value"
+                      :value="option.value"
                     >
-                      {{ uploadingEntryAssetIds.has(entry.id) ? 'Uploading...' : 'Add Asset From File' }}
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </td>
+                <td
+                  v-if="selectedKind === 'symbols'"
+                  class="px-2 py-2 align-middle"
+                >
+                  <label class="inline-flex items-center gap-2">
+                    <input
+                      v-model="(entry as SymbolRecord).enabled"
+                      type="checkbox"
+                    >
+                    <span class="text-xs text-slate-600">On</span>
+                  </label>
+                </td>
+                <td class="px-2 py-2 align-middle">
+                  <div class="flex items-center gap-2">
+                    <button
+                      v-if="
+                        selectedKind === 'symbols' &&
+                          (entry as SymbolRecord).detector_type === 'template'
+                      "
+                      class="btn-secondary h-10"
+                      type="button"
+                      @click="emit('toggle-advanced', entry.id)"
+                    >
+                      <span>Advanced</span>
+                      <ChevronDown
+                        v-if="!isEntryAdvancedOpen(entry.id)"
+                        class="pl-1 h-4 w-4"
+                      />
+                      <ChevronUp
+                        v-if="isEntryAdvancedOpen(entry.id)"
+                        class="pl-1 h-4 w-4"
+                      />
+                    </button>
+                    <button
+                      class="btn-secondary h-10 flex-1"
+                      type="button"
+                      :disabled="savingEntryIds.has(entry.id)"
+                      @click="emit('save', entry)"
+                    >
+                      {{ savingEntryIds.has(entry.id) ? 'Saving...' : 'Save' }}
+                    </button>
+                    <button
+                      class="h-10 rounded-md border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      type="button"
+                      :disabled="deletingEntryIds.has(entry.id)"
+                      @click="emit('request-delete', entry)"
+                    >
+                      {{ deletingEntryIds.has(entry.id) ? 'Deleting...' : 'Delete' }}
                     </button>
                   </div>
-                  <div>
-                    <label
-                      v-if="(entry as SymbolRecord).detector_type === 'template'"
-                      class="field-label"
-                    >
-                      Detection config JSON
-                      <textarea
-                        v-model="(entry as SymbolRecord).detection_config_json"
-                        class="input-base min-h-24 font-mono"
-                        :placeholder="detectionConfigExample"
-                      />
-                    </label>
+                </td>
+              </tr>
+
+              <tr
+                v-show="
+                  selectedKind === 'symbols' &&
+                    (entry as SymbolRecord).detector_type === 'template' &&
+                    isEntryAdvancedOpen(entry.id)
+                "
+                class="border-b border-slate-100"
+              >
+                <td
+                  colspan="7"
+                  class="px-2 pb-3"
+                >
+                  <div class="grid gap-2 md:grid-cols-2">
+                    <div class="space-y-2">
+                      <label class="field-label">
+                        Reference assets JSON
+                        <textarea
+                          v-model="(entry as SymbolRecord).reference_assets_json"
+                          class="input-base min-h-24 font-mono"
+                          :placeholder="referenceAssetsExample"
+                        />
+                      </label>
+                      <button
+                        class="btn-secondary w-fit"
+                        type="button"
+                        :disabled="uploadingEntryAssetIds.has(entry.id)"
+                        @click="emit('upload-entry-asset', entry as SymbolRecord)"
+                      >
+                        {{
+                          uploadingEntryAssetIds.has(entry.id)
+                            ? 'Uploading...'
+                            : 'Add Asset From File'
+                        }}
+                      </button>
+                    </div>
+                    <div>
+                      <label
+                        v-if="(entry as SymbolRecord).detector_type === 'template'"
+                        class="field-label"
+                      >
+                        Detection config JSON
+                        <textarea
+                          v-model="(entry as SymbolRecord).detection_config_json"
+                          class="input-base min-h-24 font-mono"
+                          :placeholder="detectionConfigExample"
+                        />
+                      </label>
+                    </div>
                   </div>
-                </div>
-              </td>
-            </tr>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -247,12 +261,13 @@
 
 <script setup lang="ts">
 import CatalogEntryForm from '@/modules/settings/components/CatalogEntryForm.vue';
+import { ChevronUp, ChevronDown } from 'lucide-vue-next';
 import type {
   CatalogFormEntry,
   CatalogKind,
   CatalogRow,
   SymbolDetectorOption,
-  SymbolRecord
+  SymbolRecord,
 } from '@/modules/settings/types';
 
 defineProps<{

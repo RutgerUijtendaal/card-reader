@@ -82,7 +82,9 @@
         <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
           Debug (Raw Card)
         </h5>
-        <pre class="max-h-[22rem] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5">{{ debugJson }}</pre>
+        <pre
+          class="max-h-[22rem] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5"
+        >{{ debugJson }}</pre>
       </aside>
     </Teleport>
   </div>
@@ -137,7 +139,7 @@ const updatePosition = async (): Promise<void> => {
 
   const position = await computePosition(reference, floating, {
     placement: 'right-start',
-    middleware: [offset(12), flip(), shift({ padding: 8 })]
+    middleware: [offset(12), flip(), shift({ padding: 8 })],
   });
   panelX.value = position.x;
   panelY.value = position.y;

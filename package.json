@@ -12,6 +12,7 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "check": "turbo run typecheck && turbo run lint && turbo run test",
     "format": "turbo run format"
   },
   "devDependencies": {

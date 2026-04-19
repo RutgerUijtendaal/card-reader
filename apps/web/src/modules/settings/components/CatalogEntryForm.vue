@@ -153,41 +153,41 @@ const updateEntry = (patch: Partial<CatalogFormEntry>): void => {
 
 const labelModel = computed({
   get: () => props.entry.label,
-  set: (value: string) => updateEntry({ label: value })
+  set: (value: string) => updateEntry({ label: value }),
 });
 
 const keyModel = computed({
   get: () => props.entry.key,
-  set: (value: string) => updateEntry({ key: value })
+  set: (value: string) => updateEntry({ key: value }),
 });
 
 const textTokenModel = computed({
   get: () => props.entry.text_token,
-  set: (value: string) => updateEntry({ text_token: value })
+  set: (value: string) => updateEntry({ text_token: value }),
 });
 
 const symbolTypeModel = computed({
   get: () => props.entry.symbol_type,
-  set: (value: string) => updateEntry({ symbol_type: value })
+  set: (value: string) => updateEntry({ symbol_type: value }),
 });
 
 const detectorTypeModel = computed({
   get: () => props.entry.detector_type,
-  set: (value: CatalogFormEntry['detector_type']) => updateEntry({ detector_type: value })
+  set: (value: CatalogFormEntry['detector_type']) => updateEntry({ detector_type: value }),
 });
 
 const enabledModel = computed({
   get: () => props.entry.enabled,
-  set: (value: boolean) => updateEntry({ enabled: value })
+  set: (value: boolean) => updateEntry({ enabled: value }),
 });
 
 const detectionConfigModel = computed({
   get: () => props.entry.detection_config_json,
-  set: (value: string) => updateEntry({ detection_config_json: value })
+  set: (value: string) => updateEntry({ detection_config_json: value }),
 });
 
 const referenceAssetsModel = computed({
   get: () => props.entry.reference_assets_json,
-  set: (value: string) => updateEntry({ reference_assets_json: value })
+  set: (value: string) => updateEntry({ reference_assets_json: value }),
 });
 </script>

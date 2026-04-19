@@ -29,7 +29,7 @@ export const useFloatingPopover = (): UseFloatingPopoverResult => {
 
     const position = await computePosition(trigger, panel, {
       placement: 'bottom-start',
-      middleware: [offset(8), flip(), shift({ padding: 8 })]
+      middleware: [offset(8), flip(), shift({ padding: 8 })],
     });
     x.value = position.x;
     y.value = position.y;
@@ -102,6 +102,6 @@ export const useFloatingPopover = (): UseFloatingPopoverResult => {
     x,
     y,
     toggle,
-    close
+    close,
   };
 };

@@ -162,7 +162,7 @@ const createJobFromPicker = async (): Promise<void> => {
 
   try {
     await api.post('/imports/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
   } catch (error) {
     console.error('Create import from upload failed', error);
@@ -202,7 +202,8 @@ const onDirectorySelected = (event: Event): void => {
 
 const extractError = (error: unknown): string => {
   if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown }; status?: number } }).response;
+    const maybeResponse = (error as { response?: { data?: { detail?: unknown }; status?: number } })
+      .response;
     const detail = maybeResponse?.data?.detail;
     if (typeof detail === 'string' && detail.length > 0) {
       return detail;

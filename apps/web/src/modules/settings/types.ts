@@ -82,7 +82,7 @@ export type SymbolDetectorOption = {
 };
 
 export const SYMBOL_DETECTOR_OPTIONS: SymbolDetectorOption[] = [
-  { value: 'template', label: 'Template Match' }
+  { value: 'template', label: 'Template Match' },
 ];
 
 export type SymbolUpsertRequest = {

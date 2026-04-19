@@ -126,7 +126,12 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
-import { createTemplate, deleteTemplate, fetchTemplates, updateTemplate } from '@/modules/settings/api/templates';
+import {
+  createTemplate,
+  deleteTemplate,
+  fetchTemplates,
+  updateTemplate,
+} from '@/modules/settings/api/templates';
 import type { TemplateRecord } from '@/modules/settings/types';
 
 type TemplateForm = {
@@ -144,7 +149,7 @@ const deleteModalOpen = ref(false);
 const form = reactive<TemplateForm>({
   label: '',
   key: '',
-  definition_json: '{}'
+  definition_json: '{}',
 });
 
 const createMode = computed(() => selectedId.value === null);
@@ -207,7 +212,7 @@ const saveTemplate = async (): Promise<void> => {
     const payload = {
       label: normalizedLabel,
       key: form.key.trim() || undefined,
-      definition_json: normalizedDefinition.value
+      definition_json: normalizedDefinition.value,
     };
     if (createMode.value) {
       await createTemplate(payload);
@@ -257,7 +262,7 @@ const prettyJson = (raw: string): string => {
 };
 
 const normalizeDefinitionJson = (
-  raw: string
+  raw: string,
 ): { ok: true; value: string } | { ok: false; message: string } => {
   const trimmed = raw.trim();
   if (!trimmed) {

@@ -74,7 +74,7 @@ import {
   detectionConfigExample,
   kindLabel,
   referenceAssetsExample,
-  useCatalogSettings
+  useCatalogSettings,
 } from '@/modules/settings/composables/useCatalogSettings';
 
 const {
@@ -102,7 +102,7 @@ const {
   closeDeleteModal,
   confirmDeleteEntry,
   pickAndUploadCreateAsset,
-  pickAndUploadEntryAsset
+  pickAndUploadEntryAsset,
 } = useCatalogSettings();
 
 onMounted(() => {

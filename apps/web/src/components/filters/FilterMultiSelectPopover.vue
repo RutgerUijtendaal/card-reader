@@ -4,7 +4,11 @@
       ref="triggerRef"
       type="button"
       class="filter-chip"
-      :class="isActive ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'"
+      :class="
+        isActive
+          ? 'border-sky-300 bg-sky-50 text-sky-700'
+          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+      "
       @click="toggle"
     >
       {{ label }} <span v-if="selectedCount">({{ selectedCount }})</span>
@@ -75,8 +79,8 @@ const props = withDefaults(
     emptyText?: string;
   }>(),
   {
-    emptyText: 'No options available.'
-  }
+    emptyText: 'No options available.',
+  },
 );
 
 const emit = defineEmits<{

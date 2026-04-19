@@ -70,7 +70,9 @@
           />
         </div>
 
-        <div class="order-1 flex min-w-0 flex-nowrap items-center gap-2 2xl:order-2 2xl:min-w-[26rem] 2xl:justify-end">
+        <div
+          class="order-1 flex min-w-0 flex-nowrap items-center gap-2 2xl:order-2 2xl:min-w-[26rem] 2xl:justify-end"
+        >
           <input
             v-model="query"
             class="input-base min-w-[14rem] flex-1 2xl:w-80 2xl:flex-none"
@@ -161,21 +163,21 @@ const filters = ref<CardFiltersResponse>({
   keywords: [],
   tags: [],
   symbols: [],
-  types: []
+  types: [],
 });
 const cards = ref<CardGalleryItemModel[]>([]);
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const { exportCardsCsv } = useCsvExport();
 const symbolByKey = computed<Record<string, SymbolFilterOption>>(() =>
-  Object.fromEntries((filters.value.symbols ?? []).map((row) => [row.key, row]))
+  Object.fromEntries((filters.value.symbols ?? []).map((row) => [row.key, row])),
 );
 
 const manaTypeOptions = computed<MetadataOption[]>(() =>
-  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'mana')
+  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'mana'),
 );
 
 const affinityTypeOptions = computed<MetadataOption[]>(() =>
-  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'affinity')
+  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'affinity'),
 );
 
 const loadFilters = async (): Promise<void> => {
@@ -197,7 +199,7 @@ const buildSearchParams = (): URLSearchParams => {
   selectedTagIds.value.forEach((id) => params.append('tag_ids', id));
   const selectedSymbolIds = new Set<string>([
     ...selectedManaTypeSymbolIds.value,
-    ...selectedAffinitySymbolIds.value
+    ...selectedAffinitySymbolIds.value,
   ]);
   selectedSymbolIds.forEach((id) => params.append('symbol_ids', id));
   selectedTypeIds.value.forEach((id) => params.append('type_ids', id));
@@ -237,7 +239,7 @@ const observedFilterState = computed(() => ({
   tagIds: [...selectedTagIds.value].sort(),
   manaTypeSymbolIds: [...selectedManaTypeSymbolIds.value].sort(),
   affinitySymbolIds: [...selectedAffinitySymbolIds.value].sort(),
-  typeIds: [...selectedTypeIds.value].sort()
+  typeIds: [...selectedTypeIds.value].sort(),
 }));
 
 watch(
@@ -245,7 +247,7 @@ watch(
   () => {
     debouncedSearch();
   },
-  { deep: true }
+  { deep: true },
 );
 
 const resetFilters = (): void => {

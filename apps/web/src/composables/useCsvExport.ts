@@ -21,9 +21,9 @@ export const useCsvExport = (): UseCsvExportResult => {
           filters: [
             {
               name: 'CSV',
-              extensions: ['csv']
-            }
-          ]
+              extensions: ['csv'],
+            },
+          ],
         });
 
         if (!targetPath) {
@@ -50,7 +50,7 @@ export const useCsvExport = (): UseCsvExportResult => {
     } catch (error) {
       console.error('CSV export failed', error);
       toast.error('CSV export failed', {
-        description: 'Check desktop log and devtools console for details.'
+        description: 'Check desktop log and devtools console for details.',
       });
     }
   };

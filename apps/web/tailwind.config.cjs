@@ -4,9 +4,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"IBM Plex Sans"', '"Segoe UI"', 'sans-serif']
-      }
-    }
+        sans: ['"IBM Plex Sans"', '"Segoe UI"', 'sans-serif'],
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };

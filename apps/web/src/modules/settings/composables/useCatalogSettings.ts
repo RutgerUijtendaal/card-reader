@@ -5,7 +5,7 @@ import {
   deleteCatalogEntry,
   fetchCatalog,
   updateCatalogEntry,
-  uploadSymbolAsset
+  uploadSymbolAsset,
 } from '@/modules/settings/api/catalog';
 import { SYMBOL_DETECTOR_OPTIONS } from '@/modules/settings/types';
 import type {
@@ -19,7 +19,7 @@ import type {
   TagRecord,
   TagUpsertRequest,
   TypeRecord,
-  TypeUpsertRequest
+  TypeUpsertRequest,
 } from '@/modules/settings/types';
 
 const CATALOG_KINDS: CatalogKind[] = ['keywords', 'tags', 'symbols', 'types'];
@@ -46,7 +46,7 @@ export const useCatalogSettings = () => {
     keywords: [],
     tags: [],
     symbols: [],
-    types: []
+    types: [],
   });
 
   const savingEntryIds = ref<Set<string>>(new Set());
@@ -67,7 +67,7 @@ export const useCatalogSettings = () => {
     loading: false,
     kind: null,
     entryId: null,
-    entryLabel: ''
+    entryLabel: '',
   });
 
   const newEntry = reactive<CatalogFormEntry>({
@@ -78,13 +78,13 @@ export const useCatalogSettings = () => {
     detection_config_json: '{}',
     reference_assets_json: '[]',
     text_token: '',
-    enabled: true
+    enabled: true,
   });
 
   const currentRows = computed<CatalogRow[]>(() => catalog[selectedKind.value]);
   const deleteModalMessage = computed(
     () =>
-      `Delete "${deleteModal.entryLabel || 'this entry'}"?\n\nThis also removes existing relations from card versions and cannot be undone.`
+      `Delete "${deleteModal.entryLabel || 'this entry'}"?\n\nThis also removes existing relations from card versions and cannot be undone.`,
   );
 
   const selectKind = (kind: CatalogKind): void => {
@@ -132,13 +132,13 @@ export const useCatalogSettings = () => {
           detection_config_json: newEntry.detection_config_json.trim() || '{}',
           reference_assets_json: newEntry.reference_assets_json.trim() || '[]',
           text_token: newEntry.text_token.trim(),
-          enabled: newEntry.enabled
+          enabled: newEntry.enabled,
         };
         await createCatalogEntry(kind, payload);
       } else {
         const payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest = {
           label: newEntry.label.trim(),
-          key: newEntry.key.trim() || undefined
+          key: newEntry.key.trim() || undefined,
         };
         await createCatalogEntry(kind, payload);
       }
@@ -181,13 +181,13 @@ export const useCatalogSettings = () => {
           detection_config_json: symbol.detection_config_json,
           reference_assets_json: symbol.reference_assets_json,
           text_token: symbol.text_token,
-          enabled: symbol.enabled
+          enabled: symbol.enabled,
         };
         await updateCatalogEntry(kind, symbol.id, payload);
       } else {
         const payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest = {
           label: entry.label,
-          key: entry.key
+          key: entry.key,
         };
         await updateCatalogEntry(kind, entry.id, payload);
       }
@@ -253,7 +253,10 @@ export const useCatalogSettings = () => {
     try {
       const relativePath = await pickAndUploadSymbolAsset();
       if (!relativePath) return;
-      newEntry.reference_assets_json = appendAssetPath(newEntry.reference_assets_json, relativePath);
+      newEntry.reference_assets_json = appendAssetPath(
+        newEntry.reference_assets_json,
+        relativePath,
+      );
       toast.success(`Asset uploaded: ${relativePath}`);
     } catch (error) {
       console.error('Upload symbol asset failed', error);
@@ -303,10 +306,10 @@ export const useCatalogSettings = () => {
     savingEntryIds,
     deletingEntryIds,
     creatingEntry,
-      uploadingCreateAsset,
-      uploadingEntryAssetIds,
-      detectorTypeOptions: SYMBOL_DETECTOR_OPTIONS,
-      advancedEntryIds,
+    uploadingCreateAsset,
+    uploadingEntryAssetIds,
+    detectorTypeOptions: SYMBOL_DETECTOR_OPTIONS,
+    advancedEntryIds,
     deleteModal,
     deleteModalMessage,
     kindLabel,
@@ -322,7 +325,7 @@ export const useCatalogSettings = () => {
     closeDeleteModal,
     confirmDeleteEntry,
     pickAndUploadCreateAsset,
-    pickAndUploadEntryAsset
+    pickAndUploadEntryAsset,
   };
 };
 
@@ -350,7 +353,9 @@ const appendAssetPath = (rawJson: string, path: string): string => {
   try {
     const parsed = JSON.parse(rawJson || '[]');
     if (Array.isArray(parsed)) {
-      arr = parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+      arr = parsed.filter(
+        (item): item is string => typeof item === 'string' && item.trim().length > 0,
+      );
     }
   } catch {
     arr = [];

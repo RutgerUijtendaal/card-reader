@@ -7,6 +7,6 @@ export default defineConfig({
     environment: 'jsdom',
     passWithNoTests: true,
     exclude: ['node_modules/**', 'dist/**'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/**/*.{test,spec}.{ts,tsx}']
-  }
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/**/*.{test,spec}.{ts,tsx}'],
+  },
 });

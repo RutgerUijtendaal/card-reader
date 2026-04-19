@@ -13,6 +13,6 @@ export const router = createRouter({
     { path: '/cards', component: CardSearchPage },
     { path: '/cards/:id', component: CardDetailPage, props: true },
     { path: '/review', component: ReviewQueuePage },
-    { path: '/settings', component: SettingsPage }
-  ]
+    { path: '/settings', component: SettingsPage },
+  ],
 });

@@ -6,14 +6,14 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
   },
   server: {
     port: 8888,
     watch: {
       usePolling: true,
-      interval: 120
-    }
-  }
+      interval: 120,
+    },
+  },
 });

@@ -50,8 +50,8 @@ withDefaults(
     confirmLabel: 'Confirm',
     cancelLabel: 'Cancel',
     loading: false,
-    loadingLabel: 'Working...'
-  }
+    loadingLabel: 'Working...',
+  },
 );
 
 const emit = defineEmits<{

@@ -76,7 +76,10 @@ import { isTauri } from '@tauri-apps/api/core';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { api } from '@/api/client';
-import type { MaintenanceActionResponse, OpenStorageLocationResponse } from '@/modules/settings/types';
+import type {
+  MaintenanceActionResponse,
+  OpenStorageLocationResponse,
+} from '@/modules/settings/types';
 
 const confirmText = ref('');
 const includeImages = ref(true);
@@ -91,7 +94,9 @@ const rebuildDatabase = async (): Promise<void> => {
   if (!canRunActions.value || runningRebuild.value) return;
   runningRebuild.value = true;
   try {
-    const response = await api.post<MaintenanceActionResponse>('/settings/maintenance/rebuild-database');
+    const response = await api.post<MaintenanceActionResponse>(
+      '/settings/maintenance/rebuild-database',
+    );
     lastRemovedPaths.value = response.data.removed_paths ?? [];
     toast.success(response.data.message);
   } catch (error) {
@@ -106,9 +111,12 @@ const clearStorage = async (): Promise<void> => {
   if (!canRunActions.value || runningClear.value) return;
   runningClear.value = true;
   try {
-    const response = await api.post<MaintenanceActionResponse>('/settings/maintenance/clear-storage', {
-      include_images: includeImages.value
-    });
+    const response = await api.post<MaintenanceActionResponse>(
+      '/settings/maintenance/clear-storage',
+      {
+        include_images: includeImages.value,
+      },
+    );
     lastRemovedPaths.value = response.data.removed_paths ?? [];
     toast.success(response.data.message);
   } catch (error) {
@@ -124,7 +132,7 @@ const openStorageLocation = async (): Promise<void> => {
   runningOpenStorage.value = true;
   try {
     const response = await api.post<OpenStorageLocationResponse>(
-      '/settings/maintenance/open-storage-location'
+      '/settings/maintenance/open-storage-location',
     );
     const path = response.data.path;
 
@@ -133,14 +141,14 @@ const openStorageLocation = async (): Promise<void> => {
       if (!opened) {
         await tryCopyPathToClipboard(path);
         toast.success(response.data.message, {
-          description: `Path copied: ${path}`
+          description: `Path copied: ${path}`,
         });
         return;
       }
     }
 
     toast.success(response.data.message, {
-      description: path
+      description: path,
     });
   } catch (error) {
     console.error('Open storage location failed', error);
