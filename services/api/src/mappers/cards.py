@@ -24,6 +24,7 @@ def to_card_summary_response(card: Card, version: CardVersion) -> CardSummaryRes
         is_latest=version.is_latest,
         type_line=version.type_line,
         mana_cost=version.mana_cost,
+        mana_symbols=_decode_mana_symbols(version.mana_symbols_json),
         attack=version.attack,
         health=version.health,
         confidence=version.confidence,

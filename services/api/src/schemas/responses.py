@@ -38,6 +38,7 @@ class CardSummaryResponse(BaseModel):
     is_latest: bool
     type_line: str
     mana_cost: str
+    mana_symbols: list[str] = []
     attack: int | None = None
     health: int | None = None
     confidence: float

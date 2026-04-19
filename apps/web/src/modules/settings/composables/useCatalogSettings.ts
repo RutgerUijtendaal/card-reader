@@ -31,7 +31,7 @@ export const kindLabel = (kind: CatalogKind): string => {
 };
 
 export const detectionConfigExample =
-  '{"threshold":0.9,"scales":[1.0,0.9,1.1],"max_candidates_per_asset":40,"max_detections_per_symbol":8,"nms_iou_threshold":0.25}';
+  '{"threshold":0.9,"scales":[1.0,0.9,1.1],"max_candidates_per_asset":40,"max_detections_per_symbol":8,"nms_iou_threshold":0.25,"center_crop_ratio":0.7}';
 export const referenceAssetsExample = '["mana/fire.png","mana/fire_alt.png"]';
 
 export const useCatalogSettings = () => {

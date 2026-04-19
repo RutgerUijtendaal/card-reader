@@ -57,15 +57,23 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
     initialize_database()
 
     while not shutdown.should_stop():
-        with get_session() as session:
-            job = get_next_queued_job(session)
-            if job is None:
-                shutdown.interruptible_sleep(interval_seconds)
-                continue
+        try:
+            with get_session() as session:
+                job = get_next_queued_job(session)
+                if job is None:
+                    shutdown.interruptible_sleep(interval_seconds)
+                    continue
+                try:
+                    service.process_job(session, job.id, should_stop=shutdown.should_stop)
+                except Exception:
+                    logger.exception("Unhandled parser error while processing job_id=%s", job.id)
+        except Exception:
+            logger.exception("Parser loop iteration failed; attempting recovery")
             try:
-                service.process_job(session, job.id, should_stop=shutdown.should_stop)
+                initialize_database()
             except Exception:
-                logger.exception("Unhandled parser error while processing job_id=%s", job.id)
+                logger.exception("Parser recovery initialize_database failed")
+            shutdown.interruptible_sleep(interval_seconds)
     logger.info("Parser loop stopped gracefully")
 
 

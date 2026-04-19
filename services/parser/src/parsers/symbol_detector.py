@@ -14,7 +14,6 @@ from models import Symbol
 from settings import settings
 
 logger = logging.getLogger(__name__)
-_TEMPLATE_CENTER_CROP_RATIO = 0.70
 
 
 @dataclass(slots=True)
@@ -48,6 +47,7 @@ class TemplateDetectorConfig:
     max_candidates_per_asset: int = 40
     max_detections_per_symbol: int = 8
     nms_iou_threshold: float = 0.25
+    center_crop_ratio: float = 0.70
     method: int = cv2.TM_CCOEFF_NORMED
 
 
@@ -83,7 +83,7 @@ class SymbolDetector:
             symbol_matches: list[DetectedSymbol] = []
             symbol_best_score = 0.0
             for asset_path in template_assets:
-                template_gray = self._load_template(asset_path)
+                template_gray = self._load_template(asset_path, config.center_crop_ratio)
                 if template_gray is None:
                     continue
                 asset_matches, asset_best_score = self._match_template(
@@ -140,12 +140,14 @@ class SymbolDetector:
         max_candidates_per_asset = self._to_positive_int(data.get("max_candidates_per_asset"), 40)
         max_detections_per_symbol = self._to_positive_int(data.get("max_detections_per_symbol"), 8)
         nms_iou_threshold = self._clamp_float(data.get("nms_iou_threshold"), 0.0, 1.0, 0.25)
+        center_crop_ratio = self._clamp_float(data.get("center_crop_ratio"), 0.0, 1.0, 0.70)
         return TemplateDetectorConfig(
             threshold=threshold,
             scales=scales,
             max_candidates_per_asset=max_candidates_per_asset,
             max_detections_per_symbol=max_detections_per_symbol,
             nms_iou_threshold=nms_iou_threshold,
+            center_crop_ratio=center_crop_ratio,
         )
 
     def _resolve_template_assets(self, raw: str) -> list[Path]:
@@ -173,11 +175,11 @@ class SymbolDetector:
                 out.append(path)
         return out
 
-    def _load_template(self, path: Path) -> np.ndarray | None:
+    def _load_template(self, path: Path, center_crop_ratio: float) -> np.ndarray | None:
         image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if image is None:
             return None
-        return self._center_crop_template(image, _TEMPLATE_CENTER_CROP_RATIO)
+        return self._center_crop_template(image, center_crop_ratio)
 
     def _center_crop_template(self, image: np.ndarray, ratio: float) -> np.ndarray:
         if ratio <= 0.0 or ratio >= 1.0:

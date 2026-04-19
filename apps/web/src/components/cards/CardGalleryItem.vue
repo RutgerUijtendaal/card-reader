@@ -30,7 +30,7 @@
         <div class="grid grid-cols-2 gap-2 text-xs text-slate-700">
           <span class="inline-flex items-center gap-1">
             Mana:
-            <SymbolizedText :text="card.mana_cost" :symbol-by-key="symbolByKey" />
+            <SymbolizedText :tokens="card.mana_symbols" :text="card.mana_cost" :symbol-by-key="symbolByKey" />
           </span>
           <span>Conf: {{ card.confidence.toFixed(2) }}</span>
           <span>ATK: {{ card.attack ?? '-' }}</span>
@@ -92,6 +92,7 @@ export type CardGalleryItemModel = {
   name: string;
   type_line: string;
   mana_cost: string;
+  mana_symbols: string[];
   attack: number | null;
   health: number | null;
   confidence: number;

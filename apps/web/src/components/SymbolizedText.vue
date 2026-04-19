@@ -34,17 +34,21 @@ type Segment = {
 const props = withDefaults(
   defineProps<{
     text?: string | null;
+    tokens?: string[] | null;
     symbolByKey?: Record<string, SymbolLookup>;
     emptyLabel?: string;
   }>(),
   {
     text: '',
+    tokens: () => [],
     symbolByKey: () => ({}),
     emptyLabel: '-'
   }
 );
 
-const segments = computed<Segment[]>(() => tokenizeText(props.text ?? '', props.symbolByKey));
+const segments = computed<Segment[]>(() =>
+  tokenizeText(props.text ?? '', props.tokens ?? [], props.symbolByKey)
+);
 
 const toAbsoluteApiUrl = (urlPath: string): string => {
   const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
@@ -56,8 +60,16 @@ const toAbsoluteApiUrl = (urlPath: string): string => {
 
 const tokenizeText = (
   rawValue: string,
+  rawTokens: string[],
   symbolByKey: Record<string, SymbolLookup>
 ): Segment[] => {
+  if (rawTokens.length > 0) {
+    return rawTokens
+      .map((token) => String(token).trim())
+      .filter((token) => token.length > 0)
+      .map((token) => toSegment(token, symbolByKey));
+  }
+
   const trimmed = rawValue.trim();
   if (!trimmed) {
     return [];
@@ -135,4 +147,3 @@ const toSegment = (rawToken: string, symbolByKey: Record<string, SymbolLookup>):
   };
 };
 </script>
-

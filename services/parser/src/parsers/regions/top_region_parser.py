@@ -20,6 +20,8 @@ class TopRegionParser:
     _star_tail_pattern = re.compile(r"\s*[★☆✪✫✬✭✮✯✰✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿]+.*$")
     _trailing_integer_pattern = re.compile(r"(\d+)\s*$")
     _leading_noise_number_pattern = re.compile(r"^\s*\d+(?:\s+\d+)?\s+")
+    _integer_pattern = re.compile(r"\d+")
+    _variable_x_pattern = re.compile(r"(?<![a-zA-Z0-9])x(?![a-zA-Z0-9])", re.IGNORECASE)
 
     def __init__(self, ocr_runner: OcrRunner, symbol_detector: SymbolDetector) -> None:
         self._ocr_runner = ocr_runner
@@ -45,11 +47,29 @@ class TopRegionParser:
             expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
         )
         detected_symbols = detected_symbols_all
-        any_color = self._extract_any_color_mana(full_text)
         mana_symbol_keys = self._mana_symbol_keys(detected_symbols)
-        name = self._extract_name(full_text, has_mana=any_color > 0 or len(mana_symbol_keys) > 0) or image_stem
-        mana_cost = self._build_mana_layout_text(any_color, mana_symbol_keys)
-        mana_total = any_color + len(mana_symbol_keys)
+        key_integer_values = self._extract_integer_values_from_symbol_keys(mana_symbol_keys)
+        ocr_integer_values = self._extract_integer_values_from_text(full_text)
+        integer_values = self._dedupe_preserving_order(key_integer_values + ocr_integer_values)
+        variable_x_in_symbols = any(self._is_variable_symbol_key(key) for key in mana_symbol_keys)
+        variable_x_in_ocr = self._has_variable_x_in_text(full_text)
+        has_variable_x = variable_x_in_symbols or variable_x_in_ocr
+
+        non_integer_symbol_count = sum(
+            1
+            for key in mana_symbol_keys
+            if self._extract_integer_values_from_symbol_key(key) == [] and not self._is_variable_symbol_key(key)
+        )
+        if has_variable_x and not variable_x_in_symbols:
+            mana_symbol_keys.append("x")
+
+        mana_total = sum(integer_values) + non_integer_symbol_count
+        mana_cost = self._format_mana_cost(mana_total=mana_total, has_variable_x=has_variable_x)
+        any_color = sum(integer_values)
+        name = self._extract_name(
+            full_text,
+            has_mana=any_color > 0 or len(mana_symbol_keys) > 0 or has_variable_x,
+        ) or image_stem
 
         logger.info(
             "Top parse summary. text=%r any_color=%s symbols_all=%s symbols_right=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
@@ -144,6 +164,56 @@ class TopRegionParser:
             return int(match.group(1))
         except ValueError:
             return 0
+
+    def _extract_integer_values_from_text(self, text: str) -> list[int]:
+        out: list[int] = []
+        for raw in self._integer_pattern.findall(text):
+            try:
+                out.append(int(raw))
+            except ValueError:
+                continue
+        return out
+
+    def _extract_integer_values_from_symbol_key(self, key: str) -> list[int]:
+        out: list[int] = []
+        for raw in self._integer_pattern.findall(key):
+            try:
+                out.append(int(raw))
+            except ValueError:
+                continue
+        return out
+
+    def _extract_integer_values_from_symbol_keys(self, keys: list[str]) -> list[int]:
+        out: list[int] = []
+        for key in keys:
+            out.extend(self._extract_integer_values_from_symbol_key(key))
+        return out
+
+    def _has_variable_x_in_text(self, text: str) -> bool:
+        return self._variable_x_pattern.search(text or "") is not None
+
+    def _is_variable_symbol_key(self, key: str) -> bool:
+        compact = (key or "").strip().lower().replace("_", "-")
+        if compact == "x":
+            return True
+        return any(part == "x" for part in compact.split("-"))
+
+    def _dedupe_preserving_order(self, values: list[int]) -> list[int]:
+        out: list[int] = []
+        seen: set[int] = set()
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            out.append(value)
+        return out
+
+    def _format_mana_cost(self, *, mana_total: int, has_variable_x: bool) -> str:
+        if not has_variable_x:
+            return str(mana_total)
+        if mana_total <= 0:
+            return "X"
+        return f"X+{mana_total}"
 
     def _build_mana_layout_text(self, any_color: int, symbol_keys: list[str]) -> str:
         tokens: list[str] = []

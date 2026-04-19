@@ -29,7 +29,7 @@
           <span>Conf: {{ version.confidence.toFixed(2) }}</span>
           <span class="inline-flex items-center gap-1">
             Mana:
-            <SymbolizedText :text="version.mana_cost" :symbol-by-key="symbolByKey" />
+            <SymbolizedText :tokens="version.mana_symbols" :text="version.mana_cost" :symbol-by-key="symbolByKey" />
           </span>
           <span>Date: {{ formatDate(version.created_at) }}</span>
           <span>ATK: {{ version.attack ?? '-' }}</span>
@@ -92,6 +92,7 @@ export type CardVersionGalleryItemModel = {
   name: string;
   type_line: string;
   mana_cost: string;
+  mana_symbols: string[];
   attack: number | null;
   health: number | null;
   rules_text: string;
