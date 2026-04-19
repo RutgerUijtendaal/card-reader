@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "card-reader-integration"
-version = "0.1.0"
+version = "0.1.7"
 description = "Cross-package integration tests for Card Reader"
 readme = "README.md"
 requires-python = ">=3.12"

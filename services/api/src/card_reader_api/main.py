@@ -31,7 +31,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="Card Reader API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Card Reader API", version="0.1.7", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if settings.is_dev else settings.cors_origins,
