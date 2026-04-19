@@ -318,16 +318,6 @@ def upsert_card_search(session: Session, *, card_id: str, version: CardVersion) 
         text("DELETE FROM card_version_search WHERE card_id = :card_id"),
         params={"card_id": card_id},
     )
-
-
-def _to_like_pattern(query: str) -> str:
-    escaped = (
-        query.replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-        .replace("[", "\\[")
-    )
-    return f"%{escaped}%"
     session.exec(
         text(
             "INSERT INTO card_version_search(card_id, card_version_id, name, type_line, rules_text, mana_cost) "
@@ -343,3 +333,12 @@ def _to_like_pattern(query: str) -> str:
         },
     )
 
+
+def _to_like_pattern(query: str) -> str:
+    escaped = (
+        query.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+        .replace("[", "\\[")
+    )
+    return f"%{escaped}%"

@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import time
+from pathlib import Path
 from threading import Event
 
 from database.connection import get_session, initialize_database

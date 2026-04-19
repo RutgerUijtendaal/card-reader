@@ -73,7 +73,7 @@ Targeted dev commands:
   - lint: `eslint`
   - format: `prettier`
   - typecheck: `vue-tsc`
-  - tests: `vitest`, `playwright` (smoke)
+  - tests: `vitest`
 
 ## API Surface (v1)
 - `POST /imports`

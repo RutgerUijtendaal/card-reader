@@ -1,5 +1,6 @@
 import logging
 from uuid import uuid4
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi import Request
@@ -16,7 +17,20 @@ from settings import settings
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Card Reader API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    configure_logging()
+    initialize_database()
+    run_migrations_to_head()
+    try:
+        run_registered_seeds(force=False)
+    except Exception:
+        logger.exception("Seed initialization failed during startup")
+    yield
+
+
+app = FastAPI(title="Card Reader API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if settings.is_dev else settings.cors_origins,
@@ -52,18 +66,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             )
         },
     )
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    configure_logging()
-    initialize_database()
-    run_migrations_to_head()
-    try:
-        run_registered_seeds(force=False)
-    except Exception:
-        logger.exception("Seed initialization failed during startup")
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host=settings.api_host, port=settings.api_port)

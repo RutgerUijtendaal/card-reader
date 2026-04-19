@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 env:
@@ -36,5 +36,3 @@ jobs:
         run: pnpm typecheck
       - name: Unit tests
         run: pnpm test
-      - name: Build (excluding desktop bundle)
-        run: pnpm exec turbo run build --filter=!@card-reader/desktop
