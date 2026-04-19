@@ -88,11 +88,9 @@ def export_cards_csv(
 
 
 def _sanitize_csv_text(value: str) -> str:
-    return " ".join(value.split())
+    return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _join_labels(labels: list[str]) -> str:
     clean = [_sanitize_csv_text(label) for label in labels if label.strip()]
     return ";".join(clean)
-
-

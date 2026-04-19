@@ -86,6 +86,7 @@ def to_symbol_filter_option_response(symbol: Symbol) -> SymbolFilterOptionRespon
         id=symbol.id,
         key=symbol.key,
         label=symbol.label,
+        symbol_type=symbol.symbol_type,
         text_token=symbol.text_token,
         asset_url=_first_symbol_asset_url(symbol.reference_assets_json),
     )

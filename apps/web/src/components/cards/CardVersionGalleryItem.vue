@@ -1,7 +1,7 @@
 <template>
   <div
     ref="referenceRef"
-    class="relative w-full sm:w-72"
+    class="relative w-full sm:w-80"
     @mouseenter="openHoverPanel"
     @mouseleave="closeHoverPanel"
   >
@@ -18,7 +18,7 @@
       <aside
         v-if="showHoverPanel"
         ref="floatingRef"
-        class="pointer-events-none z-30 hidden w-80 rounded-xl border border-slate-200 bg-white p-4 opacity-100 shadow-2xl lg:block"
+        class="pointer-events-none z-30 hidden w-96 rounded-xl border border-slate-200 bg-white p-4 opacity-100 shadow-2xl lg:block"
         :style="{ position: 'fixed', left: `${panelX}px`, top: `${panelY}px` }"
       >
         <h4 class="text-base font-semibold text-slate-900">{{ version.name }}</h4>
@@ -60,13 +60,13 @@
           </span>
         </div>
 
-        <p class="mt-3 text-xs text-slate-600 line-clamp-5">{{ version.rules_text || '-' }}</p>
+        <p class="mt-3 whitespace-pre-line text-xs text-slate-600">{{ version.rules_text || '-' }}</p>
       </aside>
 
       <aside
         v-if="showHoverPanel && isDev"
         class="pointer-events-none z-30 hidden w-[28rem] rounded-xl border border-slate-300 bg-slate-950 p-4 text-slate-100 opacity-100 shadow-2xl lg:block"
-        :style="{ position: 'fixed', left: `${panelX + 340}px`, top: `${panelY}px` }"
+        :style="{ position: 'fixed', left: `${panelX + 420}px`, top: `${panelY}px` }"
       >
         <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">Debug (Raw Version)</h5>
         <pre class="max-h-[22rem] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5">{{ debugJson }}</pre>

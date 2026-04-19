@@ -94,6 +94,7 @@ class MetadataOptionResponse(BaseModel):
 
 
 class SymbolFilterOptionResponse(MetadataOptionResponse):
+    symbol_type: str = "generic"
     text_token: str = ""
     asset_url: str | None = None
 

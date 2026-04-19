@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlmodel import Session, select
 
 from models import (
@@ -25,6 +26,8 @@ from repositories.helpers import (
     to_int_or_none,
 )
 from storage import store_image
+
+logger = logging.getLogger(__name__)
 
 
 def save_parsed_card(
@@ -164,15 +167,30 @@ def list_cards(
         .order_by(Card.updated_at.desc())
     )
 
-    if query:
-        rows = session.exec(
-            text("SELECT card_id FROM card_version_search WHERE card_version_search MATCH :query"),
-            params={"query": query},
+    if query and query.strip():
+        query_text = query.strip()
+        like_pattern = _to_like_pattern(query_text)
+        like_filter = or_(
+            CardVersion.name.like(like_pattern, escape="\\"),
+            CardVersion.type_line.like(like_pattern, escape="\\"),
+            CardVersion.rules_text.like(like_pattern, escape="\\"),
+            CardVersion.mana_cost.like(like_pattern, escape="\\"),
         )
-        matched_card_ids = [row[0] for row in rows]
-        if not matched_card_ids:
-            return []
-        statement = statement.where(Card.id.in_(matched_card_ids))
+
+        matched_card_ids: list[str] = []
+        try:
+            rows = session.exec(
+                text("SELECT card_id FROM card_version_search WHERE card_version_search MATCH :query"),
+                params={"query": query_text},
+            )
+            matched_card_ids = [row[0] for row in rows]
+        except Exception:
+            logger.exception("FTS query failed; falling back to LIKE search. query=%s", query_text)
+
+        if matched_card_ids:
+            statement = statement.where(or_(Card.id.in_(matched_card_ids), like_filter))
+        else:
+            statement = statement.where(like_filter)
 
     if max_confidence is not None:
         statement = statement.where(CardVersion.confidence <= max_confidence)
@@ -300,6 +318,16 @@ def upsert_card_search(session: Session, *, card_id: str, version: CardVersion) 
         text("DELETE FROM card_version_search WHERE card_id = :card_id"),
         params={"card_id": card_id},
     )
+
+
+def _to_like_pattern(query: str) -> str:
+    escaped = (
+        query.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+        .replace("[", "\\[")
+    )
+    return f"%{escaped}%"
     session.exec(
         text(
             "INSERT INTO card_version_search(card_id, card_version_id, name, type_line, rules_text, mana_cost) "
@@ -314,5 +342,4 @@ def upsert_card_search(session: Session, *, card_id: str, version: CardVersion) 
             "mana_cost": version.mana_cost,
         },
     )
-
 

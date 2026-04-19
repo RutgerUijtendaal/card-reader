@@ -1,6 +1,6 @@
 <template>
   <section class="space-y-6">
-    <div class="page-card space-y-4">
+    <div class="page-card sticky top-0 z-20 space-y-4">
       <h2 class="flex items-center gap-2 text-xl font-semibold text-slate-900">
         <Images class="h-5 w-5 text-slate-500" />
         <span>Card Gallery</span>
@@ -10,16 +10,15 @@
         <div class="order-2 flex flex-wrap gap-2 2xl:order-1">
           <FilterMultiSelectPopover v-model="selectedKeywordIds" label="Keywords" :options="filters.keywords" empty-text="No keywords available." />
           <FilterMultiSelectPopover v-model="selectedTagIds" label="Tags" :options="filters.tags" empty-text="No tags available." />
-          <FilterMultiSelectPopover v-model="selectedSymbolIds" label="Symbols" :options="filters.symbols" empty-text="No symbols available." />
           <FilterMultiSelectPopover v-model="selectedTypeIds" label="Types" :options="filters.types" empty-text="No types available." />
-
-          <FilterTextPopover v-model="manaCost" label="Mana" placeholder="e.g. 3RR" />
+          <FilterMultiSelectPopover v-model="selectedManaTypeSymbolIds" label="Mana Type" :options="manaTypeOptions" empty-text="No mana symbols available." />
+          <FilterMultiSelectPopover v-model="selectedAffinitySymbolIds" label="Affinity" :options="affinityTypeOptions" empty-text="No affinity symbols available." />
+          <FilterTextPopover v-model="manaCost" label="Mana Cost" placeholder="e.g. 3RR" />
           <FilterTextPopover v-model="templateId" label="Template" placeholder="mtg-like-v1" />
           <FilterTextPopover v-model="attackMin" label="Attack ≥" input-type="number" />
           <FilterTextPopover v-model="attackMax" label="Attack ≤" input-type="number" />
           <FilterTextPopover v-model="healthMin" label="Health ≥" input-type="number" />
           <FilterTextPopover v-model="healthMax" label="Health ≤" input-type="number" />
-          <FilterTextPopover v-model="confidenceMax" label="Confidence ≤" input-type="number" min="0" max="1" step="0.01" />
         </div>
 
         <div class="order-1 flex min-w-0 flex-nowrap items-center gap-2 2xl:order-2 2xl:min-w-[26rem] 2xl:justify-end">
@@ -68,6 +67,7 @@ type MetadataOption = {
 };
 
 type SymbolFilterOption = MetadataOption & {
+  symbol_type: string;
   text_token: string;
   asset_url: string | null;
 };
@@ -86,11 +86,11 @@ const attackMin = ref('');
 const attackMax = ref('');
 const healthMin = ref('');
 const healthMax = ref('');
-const confidenceMax = ref('');
 
 const selectedKeywordIds = ref<string[]>([]);
 const selectedTagIds = ref<string[]>([]);
-const selectedSymbolIds = ref<string[]>([]);
+const selectedManaTypeSymbolIds = ref<string[]>([]);
+const selectedAffinitySymbolIds = ref<string[]>([]);
 const selectedTypeIds = ref<string[]>([]);
 
 const filters = ref<CardFiltersResponse>({
@@ -104,6 +104,14 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const { exportCardsCsv } = useCsvExport();
 const symbolByKey = computed<Record<string, SymbolFilterOption>>(() =>
   Object.fromEntries((filters.value.symbols ?? []).map((row) => [row.key, row]))
+);
+
+const manaTypeOptions = computed<MetadataOption[]>(() =>
+  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'mana')
+);
+
+const affinityTypeOptions = computed<MetadataOption[]>(() =>
+  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'affinity')
 );
 
 const loadFilters = async (): Promise<void> => {
@@ -120,11 +128,14 @@ const buildSearchParams = (): URLSearchParams => {
   if (attackMax.value.trim()) params.set('attack_max', attackMax.value.trim());
   if (healthMin.value.trim()) params.set('health_min', healthMin.value.trim());
   if (healthMax.value.trim()) params.set('health_max', healthMax.value.trim());
-  if (confidenceMax.value.trim()) params.set('max_confidence', confidenceMax.value.trim());
 
   selectedKeywordIds.value.forEach((id) => params.append('keyword_ids', id));
   selectedTagIds.value.forEach((id) => params.append('tag_ids', id));
-  selectedSymbolIds.value.forEach((id) => params.append('symbol_ids', id));
+  const selectedSymbolIds = new Set<string>([
+    ...selectedManaTypeSymbolIds.value,
+    ...selectedAffinitySymbolIds.value
+  ]);
+  selectedSymbolIds.forEach((id) => params.append('symbol_ids', id));
   selectedTypeIds.value.forEach((id) => params.append('type_ids', id));
 
   return params;
@@ -158,10 +169,10 @@ const observedFilterState = computed(() => ({
   attackMax: attackMax.value.trim(),
   healthMin: healthMin.value.trim(),
   healthMax: healthMax.value.trim(),
-  confidenceMax: confidenceMax.value.trim(),
   keywordIds: [...selectedKeywordIds.value].sort(),
   tagIds: [...selectedTagIds.value].sort(),
-  symbolIds: [...selectedSymbolIds.value].sort(),
+  manaTypeSymbolIds: [...selectedManaTypeSymbolIds.value].sort(),
+  affinitySymbolIds: [...selectedAffinitySymbolIds.value].sort(),
   typeIds: [...selectedTypeIds.value].sort()
 }));
 
@@ -181,10 +192,10 @@ const resetFilters = (): void => {
   attackMax.value = '';
   healthMin.value = '';
   healthMax.value = '';
-  confidenceMax.value = '';
   selectedKeywordIds.value = [];
   selectedTagIds.value = [];
-  selectedSymbolIds.value = [];
+  selectedManaTypeSymbolIds.value = [];
+  selectedAffinitySymbolIds.value = [];
   selectedTypeIds.value = [];
 };
 

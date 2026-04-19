@@ -4,7 +4,7 @@
     "label": "MTG Like V1",
     "definition": {
       "id": "mtg-like-v1",
-      "version": 3,
+      "version": 4,
       "regions": {
         "top_bar": {
           "unit": "relative",
@@ -33,6 +33,13 @@
           "y": 0.9,
           "w": 0.14,
           "h": 0.08
+        },
+        "bottom_middle": {
+          "unit": "relative",
+          "x": 0.37,
+          "y": 0.93,
+          "w": 0.26,
+          "h": 0.06
         },
         "bottom_right": {
           "unit": "relative",

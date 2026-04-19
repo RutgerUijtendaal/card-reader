@@ -5,11 +5,9 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{AM}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
-    "asset_files": [
-      "arcane-mana.webp"
-    ]
+    "asset_files": ["arcane-mana.webp"]
   },
   {
     "key": "dark-mana",
@@ -17,12 +15,9 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{DM}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
-    "asset_files": [
-      "dark-mana.webp",
-      "dark-mana-old.webp"
-    ]
+    "asset_files": ["dark-mana.webp", "dark-mana-old.webp"]
   },
   {
     "key": "divine-mana",
@@ -30,11 +25,9 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{DIVM}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
-    "asset_files": [
-      "divine-mana.webp"
-    ]
+    "asset_files": ["divine-mana.webp"]
   },
   {
     "key": "martial-mana",
@@ -42,11 +35,9 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{MM}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
-    "asset_files": [
-      "martial-mana.webp"
-    ]
+    "asset_files": ["martial-mana.webp"]
   },
   {
     "key": "occult-mana",
@@ -54,11 +45,9 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{OM}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
-    "asset_files": [
-      "occult-mana.webp"
-    ]
+    "asset_files": ["occult-mana.webp"]
   },
   {
     "key": "primal-mana",
@@ -68,9 +57,7 @@
     "text_token": "{PM}",
     "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
-    "asset_files": [
-      "primal-mana.webp"
-    ]
+    "asset_files": ["primal-mana.webp"]
   },
   {
     "key": "colorless-mana-1",
@@ -78,11 +65,9 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{C1}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.8}",
     "enabled": true,
-    "asset_files": [
-      "colorless-mana-1.webp"
-    ]
+    "asset_files": ["colorless-mana-1.webp"]
   },
   {
     "key": "colorless-mana-2",
@@ -90,11 +75,9 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{C2}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.8}",
     "enabled": true,
-    "asset_files": [
-      "colorless-mana-2.webp"
-    ]
+    "asset_files": ["colorless-mana-2.webp"]
   },
   {
     "key": "colorless-mana-3",
@@ -102,10 +85,168 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{C3}",
-    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.8}",
     "enabled": true,
-    "asset_files": [
-      "colorless-mana-3.webp"
-    ]
+    "asset_files": ["colorless-mana-3.webp"]
+  },
+  {
+    "key": "arcane-affinity",
+    "label": "Arcane Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:ARCANE}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["arcane-affinity.webp"]
+  },
+  {
+    "key": "dark-affinity",
+    "label": "Dark Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:DARK}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["dark-affinity.webp", "dark-affinity-old.webp"]
+  },
+  {
+    "key": "divine-affinity",
+    "label": "Divine Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:DIVINE}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["divine-affinity.webp"]
+  },
+  {
+    "key": "grimmothy-affinity",
+    "label": "Grimmothy Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:GRIMMOTHY}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["grimmothy-affinity.webp"]
+  },
+  {
+    "key": "jorin-affinity",
+    "label": "Jorin Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:JORIN}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["jorin-affinity.webp"]
+  },
+  {
+    "key": "luna-affinity",
+    "label": "Luna Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:LUNA}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["luna-affinity.webp"]
+  },
+  {
+    "key": "martial-affinity",
+    "label": "Martial Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:MARTIAL}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["martial-affinity.webp"]
+  },
+  {
+    "key": "occult-affinity",
+    "label": "Occult Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:OCCULT}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["occult-affinity.webp"]
+  },
+  {
+    "key": "prima-affinity",
+    "label": "Prima Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:PRIMA}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["prima-affinity.webp"]
+  },
+  {
+    "key": "sola-affinity",
+    "label": "Sola Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:SOLA}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["sola-affinity.webp"]
+  },
+  {
+    "key": "steve-affinity",
+    "label": "Steve Affinity",
+    "symbol_type": "affinity",
+    "detector_type": "template",
+    "text_token": "{AFFINITY:STEVE}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["steve-affinity.webp"]
+  },
+  {
+    "key": "grimmothy-devotion",
+    "label": "Grimmothy Devotion",
+    "symbol_type": "devotion",
+    "detector_type": "template",
+    "text_token": "{DEVOTION:GRIMMOTHY}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["grimmothy-devotion.webp"]
+  },
+  {
+    "key": "jorin-devotion",
+    "label": "Jorin Devotion",
+    "symbol_type": "devotion",
+    "detector_type": "template",
+    "text_token": "{DEVOTION:JORIN}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["jorin-devotion.webp"]
+  },
+  {
+    "key": "luna-devotion",
+    "label": "Luna Devotion",
+    "symbol_type": "devotion",
+    "detector_type": "template",
+    "text_token": "{DEVOTION:LUNA}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["luna-devotion.webp"]
+  },
+  {
+    "key": "sola-devotion",
+    "label": "Sola Devotion",
+    "symbol_type": "devotion",
+    "detector_type": "template",
+    "text_token": "{DEVOTION:SOLA}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["sola-devotion.webp"]
+  },
+  {
+    "key": "steve-devotion",
+    "label": "Steve Devotion",
+    "symbol_type": "devotion",
+    "detector_type": "template",
+    "text_token": "{DEVOTION:STEVE}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "enabled": true,
+    "asset_files": ["steve-devotion.webp"]
   }
 ]

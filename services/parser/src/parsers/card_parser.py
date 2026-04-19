@@ -11,6 +11,7 @@ from templates import TemplateStore
 from .ocr_runner import OcrRunner
 from .regions import (
     BottomRegionParser,
+    AffinityRegionParser,
     MiddleRegionParser,
     RegionParseResult,
     StatsRegionParser,
@@ -37,6 +38,7 @@ class CardParser:
         self._bottom_region_parser = BottomRegionParser(
             self._ocr_runner, self._symbol_detector, self._keywords_extractor
         )
+        self._affinity_region_parser = AffinityRegionParser(self._symbol_detector)
         self._stats_region_parser = StatsRegionParser(self._ocr_runner)
 
     def parse(
@@ -84,6 +86,13 @@ class CardParser:
                 region_spec=regions_spec.get("rules_text", {}),
                 symbols=symbols,
                 known_keywords=known_keywords,
+            )
+        if "bottom_middle" in region_crops:
+            region_results["bottom_middle"] = self._affinity_region_parser.parse(
+                region_name="bottom_middle",
+                image=region_crops["bottom_middle"]["image"],
+                region_spec=regions_spec.get("bottom_middle", {}),
+                symbols=symbols,
             )
         if "bottom_left" in region_crops:
             region_results["bottom_left"] = self._stats_region_parser.parse(
