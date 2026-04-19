@@ -35,8 +35,12 @@ const buildApi = () => {
   const apiEntry = join(repoRoot, 'services', 'api', 'src', 'main.py');
   const apiPath = join(repoRoot, 'services', 'api', 'src');
   const corePath = join(repoRoot, 'services', 'core', 'src');
-  const seedFile = join(repoRoot, 'services', 'core', 'seeds', 'keywords.txt');
-  const dataSpec = `${seedFile}${addDataSeparator}core/seeds`;
+  const seedKeywordsFile = join(repoRoot, 'services', 'api', 'src', 'seeds', 'keywords.json');
+  const seedSymbolsFile = join(repoRoot, 'services', 'api', 'src', 'seeds', 'symbols.json');
+  const seedAssetsDir = join(repoRoot, 'services', 'api', 'src', 'seeds', 'assets');
+  const seedKeywordsDataSpec = `${seedKeywordsFile}${addDataSeparator}seeds`;
+  const seedSymbolsDataSpec = `${seedSymbolsFile}${addDataSeparator}seeds`;
+  const seedAssetsDataSpec = `${seedAssetsDir}${addDataSeparator}seeds/assets`;
   const alembicDir = join(repoRoot, 'services', 'api', 'alembic');
   const alembicDataSpec = `${alembicDir}${addDataSeparator}alembic`;
 
@@ -63,7 +67,11 @@ const buildApi = () => {
     '--paths',
     corePath,
     '--add-data',
-    dataSpec,
+    seedKeywordsDataSpec,
+    '--add-data',
+    seedSymbolsDataSpec,
+    '--add-data',
+    seedAssetsDataSpec,
     '--add-data',
     alembicDataSpec,
     apiEntry

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from database.connection import get_session
+from settings import settings
 from services import CardService
 from dependencies import get_card_service
 from mappers import (
@@ -11,13 +12,13 @@ from mappers import (
     to_card_generation_response,
     to_metadata_option_response,
     to_card_summary_response,
+    to_symbol_filter_option_response,
 )
 from schemas import (
     CardFiltersResponse,
     CardDetailResponse,
     CardGenerationResponse,
     CardSummaryResponse,
-    UpdateCardRequest,
 )
 
 router = APIRouter()
@@ -76,7 +77,7 @@ def get_card_filters(card_service: CardService = Depends(get_card_service)) -> C
         return CardFiltersResponse(
             keywords=[to_metadata_option_response(item) for item in meta["keywords"]],
             tags=[to_metadata_option_response(item) for item in meta["tags"]],
-            symbols=[to_metadata_option_response(item) for item in meta["symbols"]],
+            symbols=[to_symbol_filter_option_response(item) for item in meta["symbols"]],
             types=[to_metadata_option_response(item) for item in meta["types"]],
         )
 
@@ -87,29 +88,6 @@ def get_card(card_id: str, card_service: CardService = Depends(get_card_service)
         card, version, image = card_service.get_card_with_image(session, card_id)
         if card is None or version is None:
             raise HTTPException(status_code=404, detail="Card not found")
-        return to_card_detail_response(card, version, has_image=image is not None)
-
-
-@router.patch("/cards/{card_id}", response_model=CardDetailResponse)
-def patch_card(
-    card_id: str,
-    request: UpdateCardRequest,
-    card_service: CardService = Depends(get_card_service),
-) -> CardDetailResponse:
-    with get_session() as session:
-        updated = card_service.update_card(
-            session,
-            card_id=card_id,
-            name=request.name,
-            type_line=request.type_line,
-            mana_cost=request.mana_cost,
-            rules_text=request.rules_text,
-        )
-        if updated is None:
-            raise HTTPException(status_code=404, detail="Card not found")
-        card, version = updated
-
-        _, _, image = card_service.get_card_with_image(session, card.id)
         return to_card_detail_response(card, version, has_image=image is not None)
 
 
@@ -170,3 +148,17 @@ def get_card_version_image(
             raise HTTPException(status_code=404, detail="Card image file is missing")
         return FileResponse(path=file_path)
 
+
+@router.get("/symbols/assets/{asset_path:path}")
+def get_symbol_asset(asset_path: str) -> FileResponse:
+    symbols_root = settings.storage_root_dir.resolve() / "symbols"
+    requested_path = (symbols_root / asset_path).resolve()
+    try:
+        requested_path.relative_to(symbols_root)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Symbol asset not found")
+
+    if not requested_path.exists() or not requested_path.is_file():
+        raise HTTPException(status_code=404, detail="Symbol asset not found")
+
+    return FileResponse(path=requested_path)

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 
-from models import Card, CardVersion
+from models import Card, CardVersion, Symbol
 from schemas import (
     CardDetailResponse,
     CardGenerationResponse,
     CardSummaryResponse,
     MetadataOptionResponse,
+    SymbolFilterOptionResponse,
 )
 
 
@@ -79,6 +80,16 @@ def to_metadata_option_response(meta: object) -> MetadataOptionResponse:
     )
 
 
+def to_symbol_filter_option_response(symbol: Symbol) -> SymbolFilterOptionResponse:
+    return SymbolFilterOptionResponse(
+        id=symbol.id,
+        key=symbol.key,
+        label=symbol.label,
+        text_token=symbol.text_token,
+        asset_url=_first_symbol_asset_url(symbol.reference_assets_json),
+    )
+
+
 def _decode_mana_symbols(value: str) -> list[str]:
     try:
         payload = json.loads(value)
@@ -87,3 +98,20 @@ def _decode_mana_symbols(value: str) -> list[str]:
     if isinstance(payload, list):
         return [str(item) for item in payload]
     return []
+
+
+def _first_symbol_asset_url(raw: str) -> str | None:
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(payload, list):
+        return None
+    for item in payload:
+        if not isinstance(item, str):
+            continue
+        relative = item.strip().replace("\\", "/")
+        if not relative:
+            continue
+        return f"/symbols/assets/{relative}"
+    return None

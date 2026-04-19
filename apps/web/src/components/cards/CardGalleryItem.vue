@@ -28,7 +28,10 @@
         <p class="mb-3 text-xs text-slate-500">{{ card.type_line || 'No type' }}</p>
 
         <div class="grid grid-cols-2 gap-2 text-xs text-slate-700">
-          <span>Mana: {{ card.mana_cost || '-' }}</span>
+          <span class="inline-flex items-center gap-1">
+            Mana:
+            <SymbolizedText :text="card.mana_cost" :symbol-by-key="symbolByKey" />
+          </span>
           <span>Conf: {{ card.confidence.toFixed(2) }}</span>
           <span>ATK: {{ card.attack ?? '-' }}</span>
           <span>HP: {{ card.health ?? '-' }}</span>
@@ -60,14 +63,29 @@
 
         <p class="mt-3 text-xs text-slate-400">Open card to view version history</p>
       </aside>
+
+      <aside
+        v-if="showHoverPanel && isDev"
+        class="pointer-events-none z-30 hidden w-[28rem] rounded-xl border border-slate-300 bg-slate-950 p-4 text-slate-100 opacity-100 shadow-2xl lg:block"
+        :style="{ position: 'fixed', left: `${panelX + 340}px`, top: `${panelY}px` }"
+      >
+        <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">Debug (Raw Card)</h5>
+        <pre class="max-h-[22rem] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5">{{ debugJson }}</pre>
+      </aside>
     </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
-import { nextTick, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
+import SymbolizedText from '@/components/SymbolizedText.vue';
+
+type SymbolLookup = {
+  asset_url?: string | null;
+  text_token?: string;
+};
 
 export type CardGalleryItemModel = {
   id: string;
@@ -84,8 +102,9 @@ export type CardGalleryItemModel = {
   types: string[];
 };
 
-defineProps<{
+const props = defineProps<{
   card: CardGalleryItemModel;
+  symbolByKey: Record<string, SymbolLookup>;
 }>();
 
 const referenceRef = ref<HTMLElement | null>(null);
@@ -93,8 +112,10 @@ const floatingRef = ref<HTMLElement | null>(null);
 const showHoverPanel = ref(false);
 const panelX = ref(0);
 const panelY = ref(0);
+const isDev = import.meta.env.DEV;
 
 let stopAutoUpdate: (() => void) | null = null;
+const debugJson = computed(() => JSON.stringify(props.card, null, 2));
 
 const updatePosition = async (): Promise<void> => {
   const reference = referenceRef.value;

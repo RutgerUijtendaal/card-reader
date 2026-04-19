@@ -47,6 +47,15 @@ def list_symbols(session: Session, *, keys: set[str] | None = None) -> list[Symb
     return list(session.exec(statement))
 
 
+def list_detectable_symbols(session: Session) -> list[Symbol]:
+    statement = (
+        select(Symbol)
+        .where(Symbol.enabled.is_(True), Symbol.detector_type == "template")
+        .order_by(Symbol.label.asc())
+    )
+    return list(session.exec(statement))
+
+
 def list_types(session: Session, *, keys: set[str] | None = None) -> list[Type]:
     if keys is not None and not keys:
         return []
@@ -55,6 +64,230 @@ def list_types(session: Session, *, keys: set[str] | None = None) -> list[Type]:
     if keys is not None:
         statement = statement.where(Type.key.in_(keys))
     return list(session.exec(statement))
+
+
+def get_keyword(session: Session, entry_id: str) -> Keyword | None:
+    return session.get(Keyword, entry_id)
+
+
+def get_tag(session: Session, entry_id: str) -> Tag | None:
+    return session.get(Tag, entry_id)
+
+
+def get_symbol(session: Session, entry_id: str) -> Symbol | None:
+    return session.get(Symbol, entry_id)
+
+
+def get_type(session: Session, entry_id: str) -> Type | None:
+    return session.get(Type, entry_id)
+
+
+def keyword_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
+    existing = session.exec(select(Keyword).where(Keyword.key == key)).first()
+    if existing is None:
+        return False
+    if exclude_id is not None and existing.id == exclude_id:
+        return False
+    return True
+
+
+def tag_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
+    existing = session.exec(select(Tag).where(Tag.key == key)).first()
+    if existing is None:
+        return False
+    if exclude_id is not None and existing.id == exclude_id:
+        return False
+    return True
+
+
+def symbol_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
+    existing = session.exec(select(Symbol).where(Symbol.key == key)).first()
+    if existing is None:
+        return False
+    if exclude_id is not None and existing.id == exclude_id:
+        return False
+    return True
+
+
+def type_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
+    existing = session.exec(select(Type).where(Type.key == key)).first()
+    if existing is None:
+        return False
+    if exclude_id is not None and existing.id == exclude_id:
+        return False
+    return True
+
+
+def create_keyword(session: Session, *, key: str, label: str) -> Keyword:
+    row = Keyword(key=key, label=label)
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def create_tag(session: Session, *, key: str, label: str) -> Tag:
+    row = Tag(key=key, label=label)
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def create_type(session: Session, *, key: str, label: str) -> Type:
+    row = Type(key=key, label=label)
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def create_symbol(
+    session: Session,
+    *,
+    key: str,
+    label: str,
+    symbol_type: str,
+    detector_type: str,
+    detection_config_json: str,
+    reference_assets_json: str,
+    text_token: str,
+    enabled: bool,
+) -> Symbol:
+    row = Symbol(
+        key=key,
+        label=label,
+        symbol_type=symbol_type,
+        detector_type=detector_type,
+        detection_config_json=detection_config_json,
+        reference_assets_json=reference_assets_json,
+        text_token=text_token,
+        enabled=enabled,
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def update_keyword(
+    session: Session,
+    *,
+    entry_id: str,
+    updates: dict[str, object],
+) -> Keyword | None:
+    row = get_keyword(session, entry_id)
+    if row is None:
+        return None
+
+    for field_name, field_value in updates.items():
+        setattr(row, field_name, field_value)
+
+    row.updated_at = now_utc()
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def update_tag(
+    session: Session,
+    *,
+    entry_id: str,
+    updates: dict[str, object],
+) -> Tag | None:
+    row = get_tag(session, entry_id)
+    if row is None:
+        return None
+
+    for field_name, field_value in updates.items():
+        setattr(row, field_name, field_value)
+
+    row.updated_at = now_utc()
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def update_type(
+    session: Session,
+    *,
+    entry_id: str,
+    updates: dict[str, object],
+) -> Type | None:
+    row = get_type(session, entry_id)
+    if row is None:
+        return None
+
+    for field_name, field_value in updates.items():
+        setattr(row, field_name, field_value)
+
+    row.updated_at = now_utc()
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def update_symbol(
+    session: Session,
+    *,
+    entry_id: str,
+    updates: dict[str, object],
+) -> Symbol | None:
+    row = get_symbol(session, entry_id)
+    if row is None:
+        return None
+
+    for field_name, field_value in updates.items():
+        setattr(row, field_name, field_value)
+
+    row.updated_at = now_utc()
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def delete_keyword(session: Session, *, entry_id: str) -> bool:
+    row = get_keyword(session, entry_id)
+    if row is None:
+        return False
+    session.exec(delete(CardVersionKeyword).where(CardVersionKeyword.keyword_id == entry_id))
+    session.delete(row)
+    session.commit()
+    return True
+
+
+def delete_tag(session: Session, *, entry_id: str) -> bool:
+    row = get_tag(session, entry_id)
+    if row is None:
+        return False
+    session.exec(delete(CardVersionTag).where(CardVersionTag.tag_id == entry_id))
+    session.delete(row)
+    session.commit()
+    return True
+
+
+def delete_type(session: Session, *, entry_id: str) -> bool:
+    row = get_type(session, entry_id)
+    if row is None:
+        return False
+    session.exec(delete(CardVersionType).where(CardVersionType.type_id == entry_id))
+    session.delete(row)
+    session.commit()
+    return True
+
+
+def delete_symbol(session: Session, *, entry_id: str) -> bool:
+    row = get_symbol(session, entry_id)
+    if row is None:
+        return False
+    session.exec(delete(CardVersionSymbol).where(CardVersionSymbol.symbol_id == entry_id))
+    session.delete(row)
+    session.commit()
+    return True
 
 
 def replace_card_version_keywords(
@@ -109,6 +342,24 @@ def replace_card_version_types(
             continue
         seen.add(type_id)
         session.add(CardVersionType(card_version_id=card_version_id, type_id=type_id))
+
+    session.commit()
+
+
+def replace_card_version_symbols(
+    session: Session,
+    *,
+    card_version_id: str,
+    symbol_ids: list[str],
+) -> None:
+    session.exec(delete(CardVersionSymbol).where(CardVersionSymbol.card_version_id == card_version_id))
+
+    seen: set[str] = set()
+    for symbol_id in symbol_ids:
+        if symbol_id in seen:
+            continue
+        seen.add(symbol_id)
+        session.add(CardVersionSymbol(card_version_id=card_version_id, symbol_id=symbol_id))
 
     session.commit()
 

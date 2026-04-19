@@ -8,7 +8,6 @@ from typing import Callable
 from sqlmodel import Session
 
 import repositories as repositories
-from extractors import KeywordsExtractor, TagsExtractor, TypesExtractor
 from models import ImportJobStatus
 from parsers.card_parser import CardParser
 
@@ -19,14 +18,8 @@ class ImportProcessorService:
     def __init__(
         self,
         parser: CardParser,
-        keywords_extractor: KeywordsExtractor | None = None,
-        tags_extractor: TagsExtractor | None = None,
-        types_extractor: TypesExtractor | None = None,
     ) -> None:
         self._parser = parser
-        self._keywords_extractor = keywords_extractor or KeywordsExtractor()
-        self._tags_extractor = tags_extractor or TagsExtractor()
-        self._types_extractor = types_extractor or TypesExtractor()
 
     def process_job(
         self,
@@ -52,6 +45,7 @@ class ImportProcessorService:
         reparse_existing = self._to_bool(options.get("reparse_existing"), default=True)
         keyword_keys = self._parse_keyword_keys(options.get("keyword_keys"))
         known_keywords = repositories.list_keywords(session, keys=keyword_keys)
+        detectable_symbols = repositories.list_detectable_symbols(session)
         failed_items = 0
         shutdown_requested = False
 
@@ -67,7 +61,12 @@ class ImportProcessorService:
                 continue
 
             try:
-                parsed = self._parser.parse(Path(item.source_file), job.template_id)
+                parsed = self._parser.parse(
+                    Path(item.source_file),
+                    job.template_id,
+                    symbols=detectable_symbols,
+                    known_keywords=known_keywords,
+                )
                 version = repositories.save_parsed_card(
                     session,
                     item=item,
@@ -78,23 +77,18 @@ class ImportProcessorService:
                     raw_ocr=parsed.raw_ocr,
                     reparse_existing=reparse_existing,
                 )
-                keyword_source_text = self._build_keyword_source_text(parsed.normalized_fields)
-                keyword_ids = self._keywords_extractor.extract_keyword_ids(
-                    keyword_source_text,
-                    known_keywords,
-                )
                 repositories.replace_card_version_keywords(
                     session,
                     card_version_id=version.id,
-                    keyword_ids=keyword_ids,
+                    keyword_ids=parsed.keyword_ids,
                 )
-
-                middle_text = parsed.normalized_fields.get("type_line", "")
-                extracted_tags = self._tags_extractor.extract(middle_text)
-                extracted_types = self._types_extractor.extract(middle_text)
-
-                tag_rows = repositories.upsert_tags_by_labels(session, extracted_tags)
-                type_rows = repositories.upsert_types_by_labels(session, extracted_types)
+                repositories.replace_card_version_symbols(
+                    session,
+                    card_version_id=version.id,
+                    symbol_ids=parsed.symbol_ids,
+                )
+                tag_rows = repositories.upsert_tags_by_labels(session, parsed.tag_labels)
+                type_rows = repositories.upsert_types_by_labels(session, parsed.type_labels)
 
                 repositories.replace_card_version_tags(
                     session,
@@ -151,12 +145,3 @@ class ImportProcessorService:
             if key:
                 keys.add(key)
         return keys
-
-    def _build_keyword_source_text(self, normalized_fields: dict[str, str]) -> str:
-        return "\n".join(
-            [
-                normalized_fields.get("name", ""),
-                normalized_fields.get("type_line", ""),
-                normalized_fields.get("rules_text", ""),
-            ]
-        )

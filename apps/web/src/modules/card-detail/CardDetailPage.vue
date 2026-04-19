@@ -12,7 +12,12 @@
     </div>
 
     <div class="flex flex-wrap items-start gap-5">
-      <CardVersionGalleryItem v-for="version in versions" :key="version.id" :version="version" />
+      <CardVersionGalleryItem
+        v-for="version in versions"
+        :key="version.id"
+        :version="version"
+        :symbol-by-key="symbolByKey"
+      />
     </div>
 
     <div v-if="versions.length === 0" class="page-card text-sm text-slate-500">No versions found.</div>
@@ -26,6 +31,21 @@ import { ArrowLeft } from 'lucide-vue-next';
 import { api } from '@/api/client';
 import CardVersionGalleryItem, { type CardVersionGalleryItemModel } from '@/components/cards/CardVersionGalleryItem.vue';
 
+type MetadataOption = {
+  id: string;
+  key: string;
+  label: string;
+};
+
+type SymbolFilterOption = MetadataOption & {
+  text_token: string;
+  asset_url: string | null;
+};
+
+type CardFiltersResponse = {
+  symbols: SymbolFilterOption[];
+};
+
 type CardDetail = {
   id: string;
   label: string;
@@ -38,6 +58,7 @@ const route = useRoute();
 const router = useRouter();
 const card = ref<CardDetail | null>(null);
 const versions = ref<CardVersionDetail[]>([]);
+const symbolByKey = ref<Record<string, SymbolFilterOption>>({});
 
 const goBack = (): void => {
   if (window.history.length > 1) {
@@ -49,12 +70,16 @@ const goBack = (): void => {
 
 const loadCard = async (): Promise<void> => {
   const cardId = String(route.params.id);
-  const [cardResponse, versionsResponse] = await Promise.all([
+  const [cardResponse, versionsResponse, filtersResponse] = await Promise.all([
     api.get<CardDetail>(`/cards/${cardId}`),
-    api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`)
+    api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
+    api.get<CardFiltersResponse>('/cards/filters')
   ]);
   card.value = cardResponse.data;
   versions.value = versionsResponse.data;
+  symbolByKey.value = Object.fromEntries(
+    (filtersResponse.data.symbols ?? []).map((row) => [row.key, row])
+  );
 };
 
 onMounted(loadCard);

@@ -27,7 +27,10 @@
         <div class="grid grid-cols-2 gap-2 text-xs text-slate-700">
           <span>Version: {{ version.version_number }}</span>
           <span>Conf: {{ version.confidence.toFixed(2) }}</span>
-          <span>Mana: {{ version.mana_cost || '-' }}</span>
+          <span class="inline-flex items-center gap-1">
+            Mana:
+            <SymbolizedText :text="version.mana_cost" :symbol-by-key="symbolByKey" />
+          </span>
           <span>Date: {{ formatDate(version.created_at) }}</span>
           <span>ATK: {{ version.attack ?? '-' }}</span>
           <span>HP: {{ version.health ?? '-' }}</span>
@@ -59,14 +62,29 @@
 
         <p class="mt-3 text-xs text-slate-600 line-clamp-5">{{ version.rules_text || '-' }}</p>
       </aside>
+
+      <aside
+        v-if="showHoverPanel && isDev"
+        class="pointer-events-none z-30 hidden w-[28rem] rounded-xl border border-slate-300 bg-slate-950 p-4 text-slate-100 opacity-100 shadow-2xl lg:block"
+        :style="{ position: 'fixed', left: `${panelX + 340}px`, top: `${panelY}px` }"
+      >
+        <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">Debug (Raw Version)</h5>
+        <pre class="max-h-[22rem] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5">{{ debugJson }}</pre>
+      </aside>
     </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
-import { nextTick, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
+import SymbolizedText from '@/components/SymbolizedText.vue';
+
+type SymbolLookup = {
+  asset_url?: string | null;
+  text_token?: string;
+};
 
 export type CardVersionGalleryItemModel = {
   id: string;
@@ -86,8 +104,9 @@ export type CardVersionGalleryItemModel = {
   types: string[];
 };
 
-defineProps<{
+const props = defineProps<{
   version: CardVersionGalleryItemModel;
+  symbolByKey: Record<string, SymbolLookup>;
 }>();
 
 const referenceRef = ref<HTMLElement | null>(null);
@@ -95,8 +114,10 @@ const floatingRef = ref<HTMLElement | null>(null);
 const showHoverPanel = ref(false);
 const panelX = ref(0);
 const panelY = ref(0);
+const isDev = import.meta.env.DEV;
 
 let stopAutoUpdate: (() => void) | null = null;
+const debugJson = computed(() => JSON.stringify(props.version, null, 2));
 
 const updatePosition = async (): Promise<void> => {
   const reference = referenceRef.value;

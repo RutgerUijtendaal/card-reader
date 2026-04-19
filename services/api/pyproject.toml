@@ -30,6 +30,9 @@ py-modules = ["main", "database_migrations"]
 where = ["src"]
 include = ["controllers*", "dependencies*", "mappers*", "router*", "schemas*", "seeds*", "services*"]
 
+[tool.setuptools.package-data]
+"seeds" = ["*.txt", "*.json", "assets/**/*"]
+
 [project.optional-dependencies]
 dev = [
   "mypy>=1.11.2",

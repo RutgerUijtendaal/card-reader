@@ -1,0 +1,92 @@
+[
+  {
+    "key": "arcane-mana",
+    "label": "Arcane Mana",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{AM}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["arcane-mana.webp"]
+  },
+  {
+    "key": "dark-mana",
+    "label": "Dark Mana",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{DM}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["dark-mana.webp"]
+  },
+  {
+    "key": "divine-mana",
+    "label": "Divine Mana",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{DIVM}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["divine-mana.webp"]
+  },
+  {
+    "key": "martial-mana",
+    "label": "Martial Mana",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{MM}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["martial-mana.webp"]
+  },
+  {
+    "key": "occult-mana",
+    "label": "Occult Mana",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{OM}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["occult-mana.webp"]
+  },
+  {
+    "key": "primal-mana",
+    "label": "Primal Mana",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{PM}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["primal-mana.webp"]
+  },
+  {
+    "key": "colorless-mana-1",
+    "label": "Colorless Mana 1",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{C1}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["colorless-mana-1.webp"]
+  },
+  {
+    "key": "colorless-mana-2",
+    "label": "Colorless Mana 2",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{C2}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["colorless-mana-2.webp"]
+  },
+  {
+    "key": "colorless-mana-3",
+    "label": "Colorless Mana 3",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{C3}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25}",
+    "enabled": true,
+    "asset_files": ["colorless-mana-3.webp"]
+  }
+]

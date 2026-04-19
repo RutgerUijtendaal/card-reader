@@ -22,6 +22,12 @@ class Symbol(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     key: str = Field(default="", index=True, unique=True)
     label: str = ""
+    symbol_type: str = Field(default="generic", index=True)
+    detector_type: str = Field(default="template", index=True)
+    detection_config_json: str = "{}"
+    reference_assets_json: str = "[]"
+    text_token: str = ""
+    enabled: bool = Field(default=True, index=True)
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
 

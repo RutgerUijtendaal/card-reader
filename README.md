@@ -74,15 +74,21 @@ pnpm dev:all
 pnpm dev:desktop
 ```
 
-Known keywords are auto-seeded on first API boot (only when the `keyword` table is empty).
+Known defaults are auto-seeded on first API boot (only when target tables are empty):
+- `keywords` from `services/api/src/seeds/keywords.json`
+- `symbols` from `services/api/src/seeds/symbols.json` + `services/api/src/seeds/assets/symbols/`
 
 Manual reseed:
 
 ```bash
-pnpm --filter @card-reader/api run seed:keywords
+pnpm --filter @card-reader/api run seed
 ```
 
-Edit defaults in `services/core/seeds/keywords.txt` (one keyword label per line).
+You can still run only the keyword seeder:
+
+```bash
+pnpm --filter @card-reader/api run seed:keywords
+```
 
 ## Desktop (Tauri) Prerequisites
 

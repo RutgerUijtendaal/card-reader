@@ -10,3 +10,7 @@ class ParsedCard:
     normalized_fields: dict[str, str]
     confidence: dict[str, float]
     raw_ocr: dict[str, Any]
+    keyword_ids: list[str]
+    tag_labels: list[str]
+    type_labels: list[str]
+    symbol_ids: list[str]

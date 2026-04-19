@@ -41,6 +41,10 @@
     </div>
 
     <ul class="grid gap-2">
+      <li class="text-xs text-slate-500">
+        Live status: {{ isRefreshing ? 'refreshing...' : 'idle' }}
+        <span v-if="lastRefreshedAt"> (last update {{ lastRefreshedAt }})</span>
+      </li>
       <li
         v-for="job in jobs"
         :key="job.id"
@@ -53,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { api } from '@/api/client';
 
 type ImportJob = {
@@ -68,10 +72,20 @@ const pickerMode = ref<'single' | 'directory'>('single');
 const pickedFiles = ref<File[]>([]);
 const errorMessage = ref('');
 const jobs = ref<ImportJob[]>([]);
+const isRefreshing = ref(false);
+const lastRefreshedAt = ref<string | null>(null);
+
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const loadJobs = async (): Promise<void> => {
-  const response = await api.get<ImportJob[]>('/imports');
-  jobs.value = response.data;
+  isRefreshing.value = true;
+  try {
+    const response = await api.get<ImportJob[]>('/imports');
+    jobs.value = response.data;
+    lastRefreshedAt.value = new Date().toLocaleTimeString();
+  } finally {
+    isRefreshing.value = false;
+  }
 };
 
 const createJobFromPicker = async (): Promise<void> => {
@@ -145,5 +159,45 @@ const extractError = (error: unknown): string => {
   return 'Import request failed.';
 };
 
-onMounted(loadJobs);
+const hasActiveJobs = (): boolean =>
+  jobs.value.some((job) => job.status === 'queued' || job.status === 'running');
+
+const pollJobs = async (): Promise<void> => {
+  if (document.hidden) return;
+  if (!hasActiveJobs()) return;
+  try {
+    await loadJobs();
+  } catch (error) {
+    console.error('Polling imports failed', error);
+  }
+};
+
+const startPolling = (): void => {
+  if (pollTimer) return;
+  pollTimer = setInterval(() => {
+    void pollJobs();
+  }, 2000);
+};
+
+const stopPolling = (): void => {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+};
+
+const onVisibilityChange = (): void => {
+  if (document.hidden) return;
+  void pollJobs();
+};
+
+onMounted(async () => {
+  await loadJobs();
+  startPolling();
+  document.addEventListener('visibilitychange', onVisibilityChange);
+});
+
+onBeforeUnmount(() => {
+  stopPolling();
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+});
 </script>

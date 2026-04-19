@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from services import CardService, ExportService, ImportService, MaintenanceService
+from services import CardService, CatalogService, ExportService, ImportService, MaintenanceService
 
 _IMPORT_SERVICE = ImportService()
 _CARD_SERVICE = CardService()
 _EXPORT_SERVICE = ExportService()
 _MAINTENANCE_SERVICE = MaintenanceService()
+_CATALOG_SERVICE = CatalogService()
 
 
 def get_import_service() -> ImportService:
@@ -22,3 +23,7 @@ def get_export_service() -> ExportService:
 
 def get_maintenance_service() -> MaintenanceService:
     return _MAINTENANCE_SERVICE
+
+
+def get_catalog_service() -> CatalogService:
+    return _CATALOG_SERVICE

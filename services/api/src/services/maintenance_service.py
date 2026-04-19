@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import os
+import subprocess
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from database.connection import DATABASE_PATH, engine, initialize_database
 from database_migrations import run_migrations_to_head
-from seeds.keywords import ensure_default_keywords_seeded
+from seeds import run_registered_seeds
 from settings import settings
 
 
@@ -16,7 +19,37 @@ class MaintenanceResult:
     removed_paths: list[str]
 
 
+@dataclass(slots=True)
+class OpenStorageLocationResult:
+    message: str
+    path: str
+
+
 class MaintenanceService:
+    def open_storage_location(self) -> OpenStorageLocationResult:
+        target = settings.storage_root_dir.resolve()
+        target.mkdir(parents=True, exist_ok=True)
+        opened = False
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(str(target))  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(target)])
+            else:
+                subprocess.Popen(["xdg-open", str(target)])
+            opened = True
+        except Exception:
+            opened = False
+
+        return OpenStorageLocationResult(
+            message=(
+                "Opened storage location in file explorer."
+                if opened
+                else "Storage location resolved. Could not launch file explorer in this environment."
+            ),
+            path=str(target),
+        )
+
     def rebuild_database(self) -> MaintenanceResult:
         removed_paths: list[str] = []
 
@@ -34,7 +67,7 @@ class MaintenanceService:
 
         initialize_database()
         run_migrations_to_head()
-        ensure_default_keywords_seeded()
+        run_registered_seeds(force=False)
 
         return MaintenanceResult(
             message="Database rebuilt and migrated to latest schema.",

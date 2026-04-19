@@ -11,7 +11,7 @@ from router import build_api_router
 from database.connection import initialize_database
 from database_migrations import run_migrations_to_head
 from core_logging import configure_logging
-from seeds.keywords import ensure_default_keywords_seeded
+from seeds import run_registered_seeds
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -60,9 +60,9 @@ def on_startup() -> None:
     initialize_database()
     run_migrations_to_head()
     try:
-        ensure_default_keywords_seeded()
+        run_registered_seeds(force=False)
     except Exception:
-        logger.exception("Keyword seed initialization failed during startup")
+        logger.exception("Seed initialization failed during startup")
 
 
 if __name__ == "__main__":

@@ -38,7 +38,12 @@
     </div>
 
     <div class="flex flex-wrap items-start gap-5">
-      <CardGalleryItem v-for="card in cards" :key="card.id" :card="card" />
+      <CardGalleryItem
+        v-for="card in cards"
+        :key="card.id"
+        :card="card"
+        :symbol-by-key="symbolByKey"
+      />
     </div>
 
     <div v-if="cards.length === 0" class="page-card text-sm text-slate-500">
@@ -62,10 +67,15 @@ type MetadataOption = {
   label: string;
 };
 
+type SymbolFilterOption = MetadataOption & {
+  text_token: string;
+  asset_url: string | null;
+};
+
 type CardFiltersResponse = {
   keywords: MetadataOption[];
   tags: MetadataOption[];
-  symbols: MetadataOption[];
+  symbols: SymbolFilterOption[];
   types: MetadataOption[];
 };
 
@@ -92,6 +102,9 @@ const filters = ref<CardFiltersResponse>({
 const cards = ref<CardGalleryItemModel[]>([]);
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const { exportCardsCsv } = useCsvExport();
+const symbolByKey = computed<Record<string, SymbolFilterOption>>(() =>
+  Object.fromEntries((filters.value.symbols ?? []).map((row) => [row.key, row]))
+);
 
 const loadFilters = async (): Promise<void> => {
   const response = await api.get<CardFiltersResponse>('/cards/filters');

@@ -92,13 +92,65 @@ class MetadataOptionResponse(BaseModel):
     label: str
 
 
+class SymbolFilterOptionResponse(MetadataOptionResponse):
+    text_token: str = ""
+    asset_url: str | None = None
+
+
 class CardFiltersResponse(BaseModel):
     keywords: list[MetadataOptionResponse] = []
     tags: list[MetadataOptionResponse] = []
-    symbols: list[MetadataOptionResponse] = []
+    symbols: list[SymbolFilterOptionResponse] = []
     types: list[MetadataOptionResponse] = []
 
 
 class MaintenanceActionResponse(BaseModel):
     message: str
     removed_paths: list[str] = []
+
+
+class OpenStorageLocationResponse(BaseModel):
+    message: str
+    path: str
+
+
+class KeywordResponse(BaseModel):
+    id: str
+    key: str
+    label: str
+
+
+class TagResponse(BaseModel):
+    id: str
+    key: str
+    label: str
+
+
+class TypeResponse(BaseModel):
+    id: str
+    key: str
+    label: str
+
+
+class SymbolResponse(BaseModel):
+    id: str
+    key: str
+    label: str
+    symbol_type: str
+    detector_type: str
+    detection_config_json: str
+    reference_assets_json: str
+    text_token: str
+    enabled: bool
+
+
+class SymbolAssetUploadResponse(BaseModel):
+    relative_path: str
+    absolute_path: str
+
+
+class CatalogResponse(BaseModel):
+    keywords: list[KeywordResponse] = []
+    tags: list[TagResponse] = []
+    symbols: list[SymbolResponse] = []
+    types: list[TypeResponse] = []

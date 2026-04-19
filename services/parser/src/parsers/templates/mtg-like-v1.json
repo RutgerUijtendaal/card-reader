@@ -1,6 +1,6 @@
 {
   "id": "mtg-like-v1",
-  "version": 2,
+  "version": 3,
   "regions": {
     "top_bar": {
       "unit": "relative",
@@ -22,6 +22,20 @@
       "y": 0.62,
       "w": 0.86,
       "h": 0.30
+    },
+    "bottom_left": {
+      "unit": "relative",
+      "x": 0.03,
+      "y": 0.90,
+      "w": 0.18,
+      "h": 0.08
+    },
+    "bottom_right": {
+      "unit": "relative",
+      "x": 0.79,
+      "y": 0.90,
+      "w": 0.18,
+      "h": 0.08
     }
   }
 }

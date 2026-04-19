@@ -6,7 +6,7 @@
     "predev": "uv sync --project . --extra dev",
     "dev": "uv run --project . python -m watchfiles --ignore-permission-denied --filter python \"python -m main\" src ../core/src",
     "build": "echo \"Python service has no build step\"",
-    "test": "echo \"No parser tests yet\"",
+    "test": "uv run --project . --extra dev pytest -q",
     "lint": "uv run --project . ruff check src",
     "typecheck": "uv run --project . mypy src"
   }
