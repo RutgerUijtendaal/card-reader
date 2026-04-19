@@ -70,7 +70,7 @@ export const useCatalogSettings = () => {
     entryLabel: ''
   });
 
-  const newEntry = reactive({
+  const newEntry = reactive<CatalogFormEntry>({
     label: '',
     key: '',
     symbol_type: 'generic',
@@ -128,7 +128,7 @@ export const useCatalogSettings = () => {
           label: newEntry.label.trim(),
           key: newEntry.key.trim() || undefined,
           symbol_type: newEntry.symbol_type.trim() || 'generic',
-          detector_type: newEntry.detector_type.trim() || 'template',
+          detector_type: newEntry.detector_type,
           detection_config_json: newEntry.detection_config_json.trim() || '{}',
           reference_assets_json: newEntry.reference_assets_json.trim() || '[]',
           text_token: newEntry.text_token.trim(),
