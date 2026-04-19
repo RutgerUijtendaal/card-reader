@@ -35,7 +35,7 @@
     "symbol_type": "mana",
     "detector_type": "template",
     "text_token": "{MM}",
-    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.8,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
     "asset_files": ["martial-mana.webp"]
   },
@@ -170,14 +170,14 @@
     "asset_files": ["occult-affinity.webp"]
   },
   {
-    "key": "prima-affinity",
-    "label": "Prima Affinity",
+    "key": "primla-affinity",
+    "label": "Primal Affinity",
     "symbol_type": "affinity",
     "detector_type": "template",
-    "text_token": "{AFFINITY:PRIMA}",
+    "text_token": "{AFFINITY:PRIMAL}",
     "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
-    "asset_files": ["prima-affinity.webp"]
+    "asset_files": ["primal-affinity.webp"]
   },
   {
     "key": "sola-affinity",

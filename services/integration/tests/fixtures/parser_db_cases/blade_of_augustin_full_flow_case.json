@@ -1,0 +1,62 @@
+
+{
+  "image": "cards/blade-of-augustin.webp",
+  "template_id": "mtg-like-v1",
+  "job_options": {
+    "reparse_existing": true
+  },
+  "expected_db": {
+    "card": {
+      "key": "blade-of-augustin",
+      "label": "Blade of Augustin"
+    },
+    "latest_version": {
+      "template_id": "mtg-like-v1",
+      "name": "Blade of Augustin",
+      "type_line": "Unique 2h Equipment - Melee Weapon Sword",
+      "mana_cost": "8",
+      "mana_symbols": [
+        "martial-mana",
+        "martial-mana",
+        "divine-mana",
+        "divine-mana"
+      ],
+      "attack": 10,
+      "health": null,
+      "rules_text": "Setup: Blade of Augustin starts in your hand.\nYou require 4\nDevotion to play this card.\nYou have 2 permanent Attack.\nIf Blade of Augustin would leave play,\nput it into your hand instead.",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [
+        "Setup"
+      ],
+      "tags": [
+        "Melee",
+        "Sword",
+        "Weapon"
+      ],
+      "symbols": [
+        "divine-mana",
+        "martial-mana",
+        "sola-affinity"
+      ],
+      "types": [
+        "2h Equipment",
+        "Unique"
+      ],
+      "symbol_types": {
+        "divine-mana": "mana",
+        "martial-mana": "mana",
+        "sola-affinity": "affinity"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}
