@@ -2,6 +2,7 @@ from .requests import (
     ClearStorageRequest,
     KeywordUpsertRequest,
     SymbolUpsertRequest,
+    TemplateUpsertRequest,
     TagUpsertRequest,
     TypeUpsertRequest,
 )
@@ -21,6 +22,7 @@ from .responses import (
     SymbolFilterOptionResponse,
     SymbolResponse,
     SymbolAssetUploadResponse,
+    TemplateResponse,
     TagResponse,
     TypeResponse,
 )
@@ -47,5 +49,7 @@ __all__ = [
     "KeywordUpsertRequest",
     "TagUpsertRequest",
     "SymbolUpsertRequest",
+    "TemplateUpsertRequest",
     "TypeUpsertRequest",
+    "TemplateResponse",
 ]

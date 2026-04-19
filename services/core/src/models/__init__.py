@@ -12,6 +12,7 @@ from .metadata import (
     Tag,
     Type,
 )
+from .template import Template
 
 __all__ = [
     "now_utc",
@@ -30,6 +31,7 @@ __all__ = [
     "CardVersionSymbol",
     "CardVersionKeyword",
     "CardVersionType",
+    "Template",
 ]
 
 

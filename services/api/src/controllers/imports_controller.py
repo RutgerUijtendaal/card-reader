@@ -76,6 +76,8 @@ async def create_import_from_upload(
                 options=options_raw,
             )
             return to_import_job_response(job)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
     except HTTPException:
         raise
     except Exception:

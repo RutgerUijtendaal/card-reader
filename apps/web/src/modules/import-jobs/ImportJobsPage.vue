@@ -8,7 +8,11 @@
         <form class="grid gap-3" @submit.prevent="createJobFromPicker">
           <label class="field-label">
             Template
-            <input v-model="pickerTemplateId" class="input-base" required placeholder="mtg-like-v1" />
+            <select v-model="pickerTemplateId" class="input-base" required>
+              <option v-for="item in templates" :key="item.id" :value="item.key">
+                {{ item.label }} ({{ item.key }})
+              </option>
+            </select>
           </label>
 
           <label class="field-label">
@@ -30,8 +34,11 @@
           </label>
 
           <p class="text-sm text-slate-600">Selected files: {{ pickedFiles.length }}</p>
+          <p v-if="templates.length === 0" class="text-sm text-amber-700">
+            No templates available. Add one in Settings > Templates first.
+          </p>
 
-          <button class="btn-primary w-fit" type="submit" :disabled="pickedFiles.length === 0">
+          <button class="btn-primary w-fit" type="submit" :disabled="pickedFiles.length === 0 || templates.length === 0">
             Create import from picker
           </button>
         </form>
@@ -59,6 +66,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { api } from '@/api/client';
+import { fetchTemplates } from '@/modules/settings/api/templates';
+import type { TemplateRecord } from '@/modules/settings/types';
 
 type ImportJob = {
   id: string;
@@ -74,6 +83,7 @@ const errorMessage = ref('');
 const jobs = ref<ImportJob[]>([]);
 const isRefreshing = ref(false);
 const lastRefreshedAt = ref<string | null>(null);
+const templates = ref<TemplateRecord[]>([]);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -115,6 +125,18 @@ const createJobFromPicker = async (): Promise<void> => {
   } catch (error) {
     console.error('Refresh imports after upload create failed', error);
     errorMessage.value = 'Import was created, but refreshing the jobs list failed.';
+  }
+};
+
+const loadTemplates = async (): Promise<void> => {
+  templates.value = await fetchTemplates();
+  if (templates.value.length === 0) {
+    pickerTemplateId.value = '';
+    return;
+  }
+  const stillExists = templates.value.some((item) => item.key === pickerTemplateId.value);
+  if (!stillExists) {
+    pickerTemplateId.value = templates.value[0].key;
   }
 };
 
@@ -191,6 +213,7 @@ const onVisibilityChange = (): void => {
 };
 
 onMounted(async () => {
+  await loadTemplates();
   await loadJobs();
   startPolling();
   document.addEventListener('visibilitychange', onVisibilityChange);

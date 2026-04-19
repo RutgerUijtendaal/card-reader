@@ -62,6 +62,15 @@ from .metadata_repository import (
     upsert_tags_by_labels,
     upsert_types_by_labels,
 )
+from .templates_repository import (
+    create_template,
+    delete_template,
+    get_template,
+    get_template_by_key,
+    list_templates,
+    template_key_exists,
+    update_template,
+)
 
 __all__ = [
     "SUPPORTED_IMAGE_SUFFIXES",
@@ -122,4 +131,11 @@ __all__ = [
     "get_tags_for_card_version",
     "get_symbols_for_card_version",
     "get_types_for_card_version",
+    "list_templates",
+    "get_template",
+    "get_template_by_key",
+    "template_key_exists",
+    "create_template",
+    "update_template",
+    "delete_template",
 ]

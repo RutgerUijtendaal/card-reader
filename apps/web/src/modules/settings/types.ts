@@ -40,6 +40,13 @@ export type SymbolRecord = {
   enabled: boolean;
 };
 
+export type TemplateRecord = {
+  id: string;
+  key: string;
+  label: string;
+  definition_json: string;
+};
+
 export type CatalogResponse = {
   keywords: KeywordRecord[];
   tags: TagRecord[];
@@ -87,6 +94,12 @@ export type SymbolUpsertRequest = {
   reference_assets_json?: string;
   text_token?: string;
   enabled?: boolean;
+};
+
+export type TemplateUpsertRequest = {
+  label?: string;
+  key?: string;
+  definition_json?: string;
 };
 
 export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord;

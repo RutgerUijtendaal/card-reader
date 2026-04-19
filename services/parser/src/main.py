@@ -4,7 +4,6 @@ import logging
 import os
 import signal
 import time
-from pathlib import Path
 from threading import Event
 
 from database.connection import get_session, initialize_database
@@ -12,7 +11,7 @@ from core_logging import configure_logging
 from repositories import get_next_queued_job
 from parsers.card_parser import CardParser
 from services import ImportProcessorService
-from template_store import FileTemplateStore
+from template_store import DatabaseTemplateStore
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
     signal.signal(signal.SIGTERM, lambda signum, _frame: shutdown.request_stop(signum))
     signal.signal(signal.SIGINT, lambda signum, _frame: shutdown.request_stop(signum))
 
-    template_store = FileTemplateStore(Path(__file__).resolve().parent / "parsers" / "templates")
+    template_store = DatabaseTemplateStore()
     parser = CardParser(template_store)
     service = ImportProcessorService(parser)
     initialize_database()

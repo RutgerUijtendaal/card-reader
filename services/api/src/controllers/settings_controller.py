@@ -6,8 +6,8 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from database.connection import get_session
-from dependencies import get_catalog_service, get_maintenance_service
-from models import Keyword, Symbol, Tag, Type
+from dependencies import get_catalog_service, get_maintenance_service, get_template_service
+from models import Keyword, Symbol, Tag, Template, Type
 from settings import settings
 from schemas import (
     CatalogResponse,
@@ -19,12 +19,14 @@ from schemas import (
     SymbolResponse,
     SymbolAssetUploadResponse,
     SymbolUpsertRequest,
+    TemplateResponse,
+    TemplateUpsertRequest,
     TagResponse,
     TagUpsertRequest,
     TypeResponse,
     TypeUpsertRequest,
 )
-from services import CatalogService, MaintenanceService
+from services import CatalogService, MaintenanceService, TemplateService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -81,6 +83,81 @@ def get_catalog(
         symbols=[_to_symbol_response(item) for item in data["symbols"]],
         types=[_to_type_response(item) for item in data["types"]],
     )
+
+
+@router.get("/settings/templates", response_model=list[TemplateResponse])
+def get_templates(
+    template_service: TemplateService = Depends(get_template_service),
+) -> list[TemplateResponse]:
+    with get_session() as session:
+        templates = template_service.list_templates(session)
+    return [_to_template_response(item) for item in templates]
+
+
+@router.post("/settings/templates", response_model=TemplateResponse)
+def create_template(
+    request: TemplateUpsertRequest,
+    template_service: TemplateService = Depends(get_template_service),
+) -> TemplateResponse:
+    _require_label(request.label)
+    definition_json = request.definition_json
+    if definition_json is None:
+        raise HTTPException(status_code=400, detail="definition_json is required")
+
+    with get_session() as session:
+        try:
+            item = template_service.create_template(
+                session,
+                label=request.label or "",
+                key=request.key,
+                definition_json=definition_json,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        except Exception:
+            logger.exception("Create template failed")
+            raise HTTPException(status_code=500, detail="Failed to create template.") from None
+    return _to_template_response(item)
+
+
+@router.patch("/settings/templates/{entry_id}", response_model=TemplateResponse)
+def update_template(
+    entry_id: str,
+    request: TemplateUpsertRequest,
+    template_service: TemplateService = Depends(get_template_service),
+) -> TemplateResponse:
+    with get_session() as session:
+        try:
+            item = template_service.update_template(
+                session,
+                entry_id=entry_id,
+                label=request.label,
+                key=request.key,
+                definition_json=request.definition_json,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        except Exception:
+            logger.exception("Update template failed. entry_id=%s", entry_id)
+            raise HTTPException(status_code=500, detail="Failed to update template.") from None
+        if item is None:
+            raise HTTPException(status_code=404, detail="Template not found")
+    return _to_template_response(item)
+
+
+@router.delete("/settings/templates/{entry_id}", status_code=204)
+def delete_template(
+    entry_id: str,
+    template_service: TemplateService = Depends(get_template_service),
+) -> None:
+    with get_session() as session:
+        try:
+            deleted = template_service.delete_template(session, entry_id=entry_id)
+        except Exception:
+            logger.exception("Delete template failed. entry_id=%s", entry_id)
+            raise HTTPException(status_code=500, detail="Failed to delete template.") from None
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Template not found")
 
 
 @router.post("/settings/keywords", response_model=KeywordResponse)
@@ -387,4 +464,13 @@ def _to_symbol_response(item: Symbol) -> SymbolResponse:
         reference_assets_json=item.reference_assets_json,
         text_token=item.text_token,
         enabled=item.enabled,
+    )
+
+
+def _to_template_response(item: Template) -> TemplateResponse:
+    return TemplateResponse(
+        id=item.id,
+        key=item.key,
+        label=item.label,
+        definition_json=item.definition_json,
     )

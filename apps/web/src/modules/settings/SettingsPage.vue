@@ -5,7 +5,7 @@
         <Settings class="h-5 w-5 text-slate-500" />
         <span>Settings</span>
       </h2>
-      <p class="text-sm text-slate-600">Maintenance and catalog management.</p>
+      <p class="text-sm text-slate-600">Maintenance, metadata, and template management.</p>
     </div>
 
     <div class="page-card">
@@ -22,6 +22,15 @@
         <button
           class="btn-secondary inline-flex items-center gap-2"
           type="button"
+          :class="activeTab === 'templates' ? 'border-sky-300 bg-sky-50 text-sky-700' : ''"
+          @click="activeTab = 'templates'"
+        >
+          <LayoutTemplate class="h-4 w-4" />
+          <span>Templates</span>
+        </button>
+        <button
+          class="btn-secondary inline-flex items-center gap-2"
+          type="button"
           :class="activeTab === 'maintenance' ? 'border-sky-300 bg-sky-50 text-sky-700' : ''"
           @click="activeTab = 'maintenance'"
         >
@@ -31,15 +40,17 @@
       </div>
     </div>
     <MaintenanceSettingsView v-if="activeTab === 'maintenance'" />
+    <TemplatesSettingsView v-else-if="activeTab === 'templates'" />
     <CatalogSettingsView v-else />
   </section>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Database, Settings, Tags } from 'lucide-vue-next';
+import { Database, LayoutTemplate, Settings, Tags } from 'lucide-vue-next';
 import MaintenanceSettingsView from './views/MaintenanceSettingsView.vue';
 import CatalogSettingsView from './views/CatalogSettingsView.vue';
+import TemplatesSettingsView from './views/TemplatesSettingsView.vue';
 
-const activeTab = ref<'maintenance' | 'catalog'>('catalog');
+const activeTab = ref<'maintenance' | 'catalog' | 'templates'>('catalog');
 </script>

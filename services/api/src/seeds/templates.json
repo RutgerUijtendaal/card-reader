@@ -1,0 +1,47 @@
+[
+  {
+    "key": "mtg-like-v1",
+    "label": "MTG Like V1",
+    "definition": {
+      "id": "mtg-like-v1",
+      "version": 3,
+      "regions": {
+        "top_bar": {
+          "unit": "relative",
+          "x": 0.04,
+          "y": 0.02,
+          "w": 0.92,
+          "h": 0.07
+        },
+        "type_bar": {
+          "unit": "relative",
+          "x": 0.04,
+          "y": 0.54,
+          "w": 0.92,
+          "h": 0.05
+        },
+        "rules_text": {
+          "unit": "relative",
+          "x": 0.07,
+          "y": 0.62,
+          "w": 0.86,
+          "h": 0.3
+        },
+        "bottom_left": {
+          "unit": "relative",
+          "x": 0.01,
+          "y": 0.9,
+          "w": 0.14,
+          "h": 0.08
+        },
+        "bottom_right": {
+          "unit": "relative",
+          "x": 0.85,
+          "y": 0.9,
+          "w": 0.14,
+          "h": 0.08
+        }
+      }
+    }
+  }
+]

@@ -150,6 +150,13 @@ class SymbolAssetUploadResponse(BaseModel):
     absolute_path: str
 
 
+class TemplateResponse(BaseModel):
+    id: str
+    key: str
+    label: str
+    definition_json: str
+
+
 class CatalogResponse(BaseModel):
     keywords: list[KeywordResponse] = []
     tags: list[TagResponse] = []

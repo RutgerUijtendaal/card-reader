@@ -6,12 +6,14 @@ from database.connection import get_session, initialize_database
 from seeds.keywords import keyword_table_has_rows, seed_keywords
 from seeds.shared import SeedDefinition, SeedResult
 from seeds.symbols import seed_symbols, symbol_table_has_rows
+from seeds.templates import seed_templates, template_table_has_rows
 
 logger = logging.getLogger(__name__)
 
 SEED_REGISTRY: tuple[SeedDefinition, ...] = (
     SeedDefinition(name="keywords", model_has_rows=keyword_table_has_rows, run=seed_keywords),
     SeedDefinition(name="symbols", model_has_rows=symbol_table_has_rows, run=seed_symbols),
+    SeedDefinition(name="templates", model_has_rows=template_table_has_rows, run=seed_templates),
 )
 
 
@@ -45,4 +47,3 @@ def run_registered_seeds(*, force: bool = False) -> list[SeedResult]:
                 updated,
             )
     return results
-

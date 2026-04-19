@@ -30,3 +30,9 @@ class SymbolUpsertRequest(BaseModel):
     reference_assets_json: str | None = None
     text_token: str | None = None
     enabled: bool | None = None
+
+
+class TemplateUpsertRequest(BaseModel):
+    label: str | None = None
+    key: str | None = None
+    definition_json: str | None = None

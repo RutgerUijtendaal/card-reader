@@ -4,6 +4,7 @@ from .services import (
     get_export_service,
     get_import_service,
     get_maintenance_service,
+    get_template_service,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "get_export_service",
     "get_maintenance_service",
     "get_catalog_service",
+    "get_template_service",
 ]
