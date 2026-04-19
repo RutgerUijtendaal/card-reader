@@ -1,25 +1,45 @@
 <template>
-  <div v-if="kind === 'symbols'" class="grid gap-4 lg:grid-cols-2">
+  <div
+    v-if="kind === 'symbols'"
+    class="grid gap-4 lg:grid-cols-2"
+  >
     <div class="space-y-3">
       <label class="field-label">
         Label
-        <input v-model="entry.label" class="input-base" />
+        <input
+          v-model="labelModel"
+          class="input-base"
+        >
       </label>
       <label class="field-label">
         Key (optional)
-        <input v-model="entry.key" class="input-base" />
+        <input
+          v-model="keyModel"
+          class="input-base"
+        >
       </label>
       <label class="field-label">
         Text token
-        <input v-model="entry.text_token" class="input-base" placeholder="{DEVOTION}" />
+        <input
+          v-model="textTokenModel"
+          class="input-base"
+          placeholder="{DEVOTION}"
+        >
       </label>
       <label class="field-label">
         Symbol type
-        <input v-model="entry.symbol_type" class="input-base" placeholder="mana" />
+        <input
+          v-model="symbolTypeModel"
+          class="input-base"
+          placeholder="mana"
+        >
       </label>
       <label class="field-label">
         Detector type
-        <select v-model="entry.detector_type" class="input-base">
+        <select
+          v-model="detectorTypeModel"
+          class="input-base"
+        >
           <option
             v-for="option in detectorTypeOptions"
             :key="option.value"
@@ -30,12 +50,18 @@
         </select>
       </label>
       <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-        <input v-model="entry.enabled" type="checkbox" />
+        <input
+          v-model="enabledModel"
+          type="checkbox"
+        >
         <span>Enabled</span>
       </label>
     </div>
 
-    <div v-if="entry.detector_type === 'template'" class="space-y-3">
+    <div
+      v-if="entry.detector_type === 'template'"
+      class="space-y-3"
+    >
       <button
         v-if="showAdvancedToggle"
         class="btn-secondary w-fit"
@@ -49,7 +75,7 @@
         <label class="field-label">
           Detection config JSON
           <textarea
-            v-model="entry.detection_config_json"
+            v-model="detectionConfigModel"
             class="input-base min-h-24 font-mono"
             :placeholder="detectionConfigExample"
           />
@@ -58,7 +84,7 @@
         <label class="field-label">
           Reference assets JSON
           <textarea
-            v-model="entry.reference_assets_json"
+            v-model="referenceAssetsModel"
             class="input-base min-h-24 font-mono"
             :placeholder="referenceAssetsExample"
           />
@@ -76,25 +102,35 @@
     </div>
   </div>
 
-  <div v-else class="space-y-3">
+  <div
+    v-else
+    class="space-y-3"
+  >
     <div class="grid gap-3 md:grid-cols-2">
       <label class="field-label">
         Label
-        <input v-model="entry.label" class="input-base" />
+        <input
+          v-model="labelModel"
+          class="input-base"
+        >
       </label>
       <label class="field-label">
         Key (optional)
-        <input v-model="entry.key" class="input-base" />
+        <input
+          v-model="keyModel"
+          class="input-base"
+        >
       </label>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { CatalogFormEntry, CatalogKind } from '@/modules/settings/types';
 import type { SymbolDetectorOption } from '@/modules/settings/types';
 
-defineProps<{
+const props = defineProps<{
   kind: CatalogKind;
   entry: CatalogFormEntry;
   advancedOpen: boolean;
@@ -108,5 +144,50 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'toggle-advanced'): void;
   (e: 'upload-asset'): void;
+  (e: 'update:entry', entry: CatalogFormEntry): void;
 }>();
+
+const updateEntry = (patch: Partial<CatalogFormEntry>): void => {
+  emit('update:entry', { ...props.entry, ...patch });
+};
+
+const labelModel = computed({
+  get: () => props.entry.label,
+  set: (value: string) => updateEntry({ label: value })
+});
+
+const keyModel = computed({
+  get: () => props.entry.key,
+  set: (value: string) => updateEntry({ key: value })
+});
+
+const textTokenModel = computed({
+  get: () => props.entry.text_token,
+  set: (value: string) => updateEntry({ text_token: value })
+});
+
+const symbolTypeModel = computed({
+  get: () => props.entry.symbol_type,
+  set: (value: string) => updateEntry({ symbol_type: value })
+});
+
+const detectorTypeModel = computed({
+  get: () => props.entry.detector_type,
+  set: (value: CatalogFormEntry['detector_type']) => updateEntry({ detector_type: value })
+});
+
+const enabledModel = computed({
+  get: () => props.entry.enabled,
+  set: (value: boolean) => updateEntry({ enabled: value })
+});
+
+const detectionConfigModel = computed({
+  get: () => props.entry.detection_config_json,
+  set: (value: string) => updateEntry({ detection_config_json: value })
+});
+
+const referenceAssetsModel = computed({
+  get: () => props.entry.reference_assets_json,
+  set: (value: string) => updateEntry({ reference_assets_json: value })
+});
 </script>

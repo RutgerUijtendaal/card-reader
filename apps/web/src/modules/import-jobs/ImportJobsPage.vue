@@ -1,15 +1,30 @@
 <template>
   <section class="page-card space-y-5">
-    <h2 class="text-xl font-semibold text-slate-900">Import Jobs</h2>
+    <h2 class="text-xl font-semibold text-slate-900">
+      Import Jobs
+    </h2>
 
     <div class="grid gap-5">
       <div class="grid gap-3">
-        <h3 class="text-base font-semibold text-slate-800">Import with file picker</h3>
-        <form class="grid gap-3" @submit.prevent="createJobFromPicker">
+        <h3 class="text-base font-semibold text-slate-800">
+          Import with file picker
+        </h3>
+        <form
+          class="grid gap-3"
+          @submit.prevent="createJobFromPicker"
+        >
           <label class="field-label">
             Template
-            <select v-model="pickerTemplateId" class="input-base" required>
-              <option v-for="item in templates" :key="item.id" :value="item.key">
+            <select
+              v-model="pickerTemplateId"
+              class="input-base"
+              required
+            >
+              <option
+                v-for="item in templates"
+                :key="item.id"
+                :value="item.key"
+              >
                 {{ item.label }} ({{ item.key }})
               </option>
             </select>
@@ -17,34 +32,69 @@
 
           <label class="field-label">
             Pick mode
-            <select v-model="pickerMode" class="input-base">
+            <select
+              v-model="pickerMode"
+              class="input-base"
+            >
               <option value="single">Single file</option>
               <option value="directory">Directory</option>
             </select>
           </label>
 
-          <label v-if="pickerMode === 'single'" class="field-label">
+          <label
+            v-if="pickerMode === 'single'"
+            class="field-label"
+          >
             Select image file
-            <input class="input-base" type="file" accept=".png,.jpg,.jpeg,.webp,image/*" @change="onSingleFileSelected" />
+            <input
+              class="input-base"
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,image/*"
+              @change="onSingleFileSelected"
+            >
           </label>
 
-          <label v-else class="field-label">
+          <label
+            v-else
+            class="field-label"
+          >
             Select directory
-            <input class="input-base" type="file" multiple webkitdirectory directory @change="onDirectorySelected" />
+            <input
+              class="input-base"
+              type="file"
+              multiple
+              webkitdirectory
+              directory
+              @change="onDirectorySelected"
+            >
           </label>
 
-          <p class="text-sm text-slate-600">Selected files: {{ pickedFiles.length }}</p>
-          <p v-if="templates.length === 0" class="text-sm text-amber-700">
+          <p class="text-sm text-slate-600">
+            Selected files: {{ pickedFiles.length }}
+          </p>
+          <p
+            v-if="templates.length === 0"
+            class="text-sm text-amber-700"
+          >
             No templates available. Add one in Settings > Templates first.
           </p>
 
-          <button class="btn-primary w-fit" type="submit" :disabled="pickedFiles.length === 0 || templates.length === 0">
+          <button
+            class="btn-primary w-fit"
+            type="submit"
+            :disabled="pickedFiles.length === 0 || templates.length === 0"
+          >
             Create import from picker
           </button>
         </form>
       </div>
 
-      <p v-if="errorMessage" class="text-sm font-medium text-red-700">{{ errorMessage }}</p>
+      <p
+        v-if="errorMessage"
+        class="text-sm font-medium text-red-700"
+      >
+        {{ errorMessage }}
+      </p>
     </div>
 
     <ul class="grid gap-2">

@@ -29,7 +29,7 @@
             :max="max"
             @input="onInput"
             @keyup.enter="close"
-          />
+          >
         </label>
       </div>
     </Teleport>

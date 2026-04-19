@@ -9,6 +9,7 @@ import {
 } from '@/modules/settings/api/catalog';
 import { SYMBOL_DETECTOR_OPTIONS } from '@/modules/settings/types';
 import type {
+  CatalogFormEntry,
   CatalogKind,
   CatalogRow,
   KeywordRecord,
@@ -151,6 +152,17 @@ export const useCatalogSettings = () => {
     } finally {
       creatingEntry.value = false;
     }
+  };
+
+  const setNewEntry = (entry: CatalogFormEntry): void => {
+    Object.assign(newEntry, entry);
+  };
+
+  const replaceEntry = (kind: CatalogKind, entryId: string, nextEntry: CatalogFormEntry): void => {
+    const rows = catalog[kind] as CatalogRow[];
+    const index = rows.findIndex((row) => row.id === entryId);
+    if (index < 0) return;
+    rows[index] = { ...rows[index], ...nextEntry } as CatalogRow;
   };
 
   const updateEntry = async (kind: CatalogKind, entry: CatalogRow): Promise<void> => {
@@ -303,7 +315,9 @@ export const useCatalogSettings = () => {
     toggleEntryAdvanced,
     loadCatalog,
     createEntry,
+    setNewEntry,
     updateEntry,
+    replaceEntry,
     openDeleteModal,
     closeDeleteModal,
     confirmDeleteEntry,

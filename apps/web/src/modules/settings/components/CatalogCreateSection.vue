@@ -13,11 +13,17 @@
       :uploading-asset="uploadingCreateAsset"
       :detection-config-example="detectionConfigExample"
       :reference-assets-example="referenceAssetsExample"
+      @update:entry="emit('update:new-entry', $event)"
       @upload-asset="emit('upload-create-asset')"
     />
 
     <div class="mt-3">
-      <button class="btn-primary" type="button" :disabled="creatingEntry" @click="emit('create')">
+      <button
+        class="btn-primary"
+        type="button"
+        :disabled="creatingEntry"
+        @click="emit('create')"
+      >
         {{ creatingEntry ? 'Creating...' : 'Create Entry' }}
       </button>
     </div>
@@ -42,5 +48,6 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'create'): void;
   (e: 'upload-create-asset'): void;
+  (e: 'update:new-entry', entry: CatalogFormEntry): void;
 }>();
 </script>

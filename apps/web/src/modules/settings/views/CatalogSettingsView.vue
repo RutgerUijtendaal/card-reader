@@ -1,7 +1,11 @@
 <template>
   <div class="page-card space-y-4">
-    <h3 class="text-base font-semibold text-slate-800">Catalog</h3>
-    <p class="text-sm text-slate-600">Manage keywords, tags, symbols, and types.</p>
+    <h3 class="text-base font-semibold text-slate-800">
+      Catalog
+    </h3>
+    <p class="text-sm text-slate-600">
+      Manage keywords, tags, symbols, and types.
+    </p>
 
     <div class="grid grid-cols-[220px_minmax(0,1fr)] gap-4">
       <CatalogKindSidebar
@@ -22,6 +26,7 @@
           :detection-config-example="detectionConfigExample"
           :reference-assets-example="referenceAssetsExample"
           @create="createEntry"
+          @update:new-entry="setNewEntry"
           @upload-create-asset="pickAndUploadCreateAsset"
         />
 
@@ -40,6 +45,7 @@
           @request-delete="(entry) => openDeleteModal(selectedKind, entry)"
           @upload-entry-asset="pickAndUploadEntryAsset"
           @toggle-advanced="toggleEntryAdvanced"
+          @replace-entry="replaceEntry"
         />
       </div>
     </div>
@@ -89,7 +95,9 @@ const {
   toggleEntryAdvanced,
   loadCatalog,
   createEntry,
+  setNewEntry,
   updateEntry,
+  replaceEntry,
   openDeleteModal,
   closeDeleteModal,
   confirmDeleteEntry,

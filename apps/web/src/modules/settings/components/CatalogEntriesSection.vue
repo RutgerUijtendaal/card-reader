@@ -4,9 +4,17 @@
       Existing {{ kindLabel(selectedKind).toLowerCase() }}
     </h4>
 
-    <div v-if="currentRows.length === 0" class="text-sm text-slate-500">No entries.</div>
+    <div
+      v-if="currentRows.length === 0"
+      class="text-sm text-slate-500"
+    >
+      No entries.
+    </div>
 
-    <div v-else class="space-y-3">
+    <div
+      v-else
+      class="space-y-3"
+    >
       <div class="space-y-3 xl:hidden">
         <article
           v-for="entry in currentRows"
@@ -22,6 +30,7 @@
             :uploading-asset="uploadingEntryAssetIds.has(entry.id)"
             :detection-config-example="detectionConfigExample"
             :reference-assets-example="referenceAssetsExample"
+            @update:entry="emit('replace-entry', selectedKind, entry.id, $event)"
             @toggle-advanced="emit('toggle-advanced', entry.id)"
             @upload-asset="emit('upload-entry-asset', entry as SymbolRecord)"
           />
@@ -50,31 +59,85 @@
         <table class="w-full min-w-[980px] table-fixed border-collapse text-sm">
           <thead>
             <tr class="border-b border-slate-200 text-left text-slate-600">
-              <th class="px-2 py-2 font-semibold">Label</th>
-              <th class="px-2 py-2 font-semibold">Key</th>
-              <th v-if="selectedKind === 'symbols'" class="px-2 py-2 font-semibold">Type</th>
-              <th v-if="selectedKind === 'symbols'" class="px-2 py-2 font-semibold">Text Token</th>
-              <th v-if="selectedKind === 'symbols'" class="px-2 py-2 font-semibold">Detector</th>
-              <th v-if="selectedKind === 'symbols'" class="px-2 py-2 font-semibold">Enabled</th>
-              <th class="w-72 px-2 py-2 font-semibold">Action</th>
+              <th class="px-2 py-2 font-semibold">
+                Label
+              </th>
+              <th class="px-2 py-2 font-semibold">
+                Key
+              </th>
+              <th
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2 font-semibold"
+              >
+                Type
+              </th>
+              <th
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2 font-semibold"
+              >
+                Text Token
+              </th>
+              <th
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2 font-semibold"
+              >
+                Detector
+              </th>
+              <th
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2 font-semibold"
+              >
+                Enabled
+              </th>
+              <th class="w-72 px-2 py-2 font-semibold">
+                Action
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="entry in currentRows" :key="entry.id" class="border-b border-slate-100 align-middle">
+            <tr
+              v-for="entry in currentRows"
+              :key="entry.id"
+              class="border-b border-slate-100 align-middle"
+            >
               <td class="px-2 py-2">
-                <input v-model="entry.label" class="input-base" />
+                <input
+                  v-model="entry.label"
+                  class="input-base"
+                >
               </td>
               <td class="px-2 py-2">
-                <input v-model="entry.key" class="input-base" />
+                <input
+                  v-model="entry.key"
+                  class="input-base"
+                >
               </td>
-              <td v-if="selectedKind === 'symbols'" class="px-2 py-2">
-                <input v-model="(entry as SymbolRecord).symbol_type" class="input-base" />
+              <td
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2"
+              >
+                <input
+                  v-model="(entry as SymbolRecord).symbol_type"
+                  class="input-base"
+                >
               </td>
-              <td v-if="selectedKind === 'symbols'" class="px-2 py-2">
-                <input v-model="(entry as SymbolRecord).text_token" class="input-base" />
+              <td
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2"
+              >
+                <input
+                  v-model="(entry as SymbolRecord).text_token"
+                  class="input-base"
+                >
               </td>
-              <td v-if="selectedKind === 'symbols'" class="px-2 py-2">
-                <select v-model="(entry as SymbolRecord).detector_type" class="input-base">
+              <td
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2"
+              >
+                <select
+                  v-model="(entry as SymbolRecord).detector_type"
+                  class="input-base"
+                >
                   <option
                     v-for="option in detectorTypeOptions"
                     :key="option.value"
@@ -84,9 +147,15 @@
                   </option>
                 </select>
               </td>
-              <td v-if="selectedKind === 'symbols'" class="px-2 py-2 align-middle">
+              <td
+                v-if="selectedKind === 'symbols'"
+                class="px-2 py-2 align-middle"
+              >
                 <label class="inline-flex items-center gap-2">
-                  <input v-model="(entry as SymbolRecord).enabled" type="checkbox" />
+                  <input
+                    v-model="(entry as SymbolRecord).enabled"
+                    type="checkbox"
+                  >
                   <span class="text-xs text-slate-600">On</span>
                 </label>
               </td>
@@ -122,25 +191,28 @@
 
             <tr
               v-for="entry in currentRows"
-              :key="`${entry.id}-json`"
               v-show="
                 selectedKind === 'symbols' &&
-                (entry as SymbolRecord).detector_type === 'template' &&
-                isEntryAdvancedOpen(entry.id)
+                  (entry as SymbolRecord).detector_type === 'template' &&
+                  isEntryAdvancedOpen(entry.id)
               "
+              :key="`${entry.id}-json`"
               class="border-b border-slate-100"
             >
-              <td colspan="7" class="px-2 pb-3">
+              <td
+                colspan="7"
+                class="px-2 pb-3"
+              >
                 <div class="grid gap-2 md:grid-cols-2">
                   <div class="space-y-2">
                     <label class="field-label">
-                    Reference assets JSON
-                    <textarea
-                      v-model="(entry as SymbolRecord).reference_assets_json"
-                      class="input-base min-h-24 font-mono"
-                      :placeholder="referenceAssetsExample"
-                    />
-                  </label>
+                      Reference assets JSON
+                      <textarea
+                        v-model="(entry as SymbolRecord).reference_assets_json"
+                        class="input-base min-h-24 font-mono"
+                        :placeholder="referenceAssetsExample"
+                      />
+                    </label>
                     <button
                       class="btn-secondary w-fit"
                       type="button"
@@ -151,7 +223,10 @@
                     </button>
                   </div>
                   <div>
-                  <label v-if="(entry as SymbolRecord).detector_type === 'template'" class="field-label">
+                    <label
+                      v-if="(entry as SymbolRecord).detector_type === 'template'"
+                      class="field-label"
+                    >
                       Detection config JSON
                       <textarea
                         v-model="(entry as SymbolRecord).detection_config_json"
@@ -198,5 +273,6 @@ const emit = defineEmits<{
   (e: 'request-delete', entry: CatalogRow): void;
   (e: 'upload-entry-asset', entry: SymbolRecord): void;
   (e: 'toggle-advanced', entryId: string): void;
+  (e: 'replace-entry', kind: CatalogKind, entryId: string, next: CatalogFormEntry): void;
 }>();
 </script>

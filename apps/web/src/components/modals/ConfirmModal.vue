@@ -6,8 +6,12 @@
       @click.self="emit('cancel')"
     >
       <div class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
-        <h3 class="text-base font-semibold text-slate-900">{{ title }}</h3>
-        <p class="mt-2 whitespace-pre-line text-sm text-slate-600">{{ message }}</p>
+        <h3 class="text-base font-semibold text-slate-900">
+          {{ title }}
+        </h3>
+        <p class="mt-2 whitespace-pre-line text-sm text-slate-600">
+          {{ message }}
+        </p>
         <div class="mt-4 flex justify-end gap-2">
           <button
             class="btn-secondary"

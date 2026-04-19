@@ -1,13 +1,24 @@
 <template>
   <section class="space-y-5">
     <div class="flex items-center justify-between gap-3">
-      <button class="btn-secondary inline-flex items-center gap-2" type="button" @click="goBack">
+      <button
+        class="btn-secondary inline-flex items-center gap-2"
+        type="button"
+        @click="goBack"
+      >
         <ArrowLeft class="h-4 w-4" />
         <span>Back to Gallery</span>
       </button>
-      <div v-if="card" class="text-right">
-        <h2 class="text-xl font-semibold text-slate-900">{{ card.name }}</h2>
-        <p class="text-xs text-slate-500">{{ versions.length }} versions</p>
+      <div
+        v-if="card"
+        class="text-right"
+      >
+        <h2 class="text-xl font-semibold text-slate-900">
+          {{ card.name }}
+        </h2>
+        <p class="text-xs text-slate-500">
+          {{ versions.length }} versions
+        </p>
       </div>
     </div>
 
@@ -20,7 +31,12 @@
       />
     </div>
 
-    <div v-if="versions.length === 0" class="page-card text-sm text-slate-500">No versions found.</div>
+    <div
+      v-if="versions.length === 0"
+      class="page-card text-sm text-slate-500"
+    >
+      No versions found.
+    </div>
   </section>
 </template>
 

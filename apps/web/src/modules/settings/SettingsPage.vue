@@ -5,7 +5,9 @@
         <Settings class="h-5 w-5 text-slate-500" />
         <span>Settings</span>
       </h2>
-      <p class="text-sm text-slate-600">Maintenance, metadata, and template management.</p>
+      <p class="text-sm text-slate-600">
+        Maintenance, metadata, and template management.
+      </p>
     </div>
 
     <div class="page-card">

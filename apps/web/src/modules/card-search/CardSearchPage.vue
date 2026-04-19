@@ -8,27 +8,88 @@
 
       <div class="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center">
         <div class="order-2 flex flex-wrap gap-2 2xl:order-1">
-          <FilterMultiSelectPopover v-model="selectedKeywordIds" label="Keywords" :options="filters.keywords" empty-text="No keywords available." />
-          <FilterMultiSelectPopover v-model="selectedTagIds" label="Tags" :options="filters.tags" empty-text="No tags available." />
-          <FilterMultiSelectPopover v-model="selectedTypeIds" label="Types" :options="filters.types" empty-text="No types available." />
-          <FilterMultiSelectPopover v-model="selectedManaTypeSymbolIds" label="Mana Type" :options="manaTypeOptions" empty-text="No mana symbols available." />
-          <FilterMultiSelectPopover v-model="selectedAffinitySymbolIds" label="Affinity" :options="affinityTypeOptions" empty-text="No affinity symbols available." />
-          <FilterTextPopover v-model="manaCost" label="Mana Cost" placeholder="e.g. 3RR" />
-          <FilterTextPopover v-model="templateId" label="Template" placeholder="mtg-like-v1" />
-          <FilterTextPopover v-model="attackMin" label="Attack ≥" input-type="number" />
-          <FilterTextPopover v-model="attackMax" label="Attack ≤" input-type="number" />
-          <FilterTextPopover v-model="healthMin" label="Health ≥" input-type="number" />
-          <FilterTextPopover v-model="healthMax" label="Health ≤" input-type="number" />
+          <FilterMultiSelectPopover
+            v-model="selectedKeywordIds"
+            label="Keywords"
+            :options="filters.keywords"
+            empty-text="No keywords available."
+          />
+          <FilterMultiSelectPopover
+            v-model="selectedTagIds"
+            label="Tags"
+            :options="filters.tags"
+            empty-text="No tags available."
+          />
+          <FilterMultiSelectPopover
+            v-model="selectedTypeIds"
+            label="Types"
+            :options="filters.types"
+            empty-text="No types available."
+          />
+          <FilterMultiSelectPopover
+            v-model="selectedManaTypeSymbolIds"
+            label="Mana Type"
+            :options="manaTypeOptions"
+            empty-text="No mana symbols available."
+          />
+          <FilterMultiSelectPopover
+            v-model="selectedAffinitySymbolIds"
+            label="Affinity"
+            :options="affinityTypeOptions"
+            empty-text="No affinity symbols available."
+          />
+          <FilterTextPopover
+            v-model="manaCost"
+            label="Mana Cost"
+            placeholder="e.g. 3RR"
+          />
+          <FilterTextPopover
+            v-model="templateId"
+            label="Template"
+            placeholder="mtg-like-v1"
+          />
+          <FilterTextPopover
+            v-model="attackMin"
+            label="Attack ≥"
+            input-type="number"
+          />
+          <FilterTextPopover
+            v-model="attackMax"
+            label="Attack ≤"
+            input-type="number"
+          />
+          <FilterTextPopover
+            v-model="healthMin"
+            label="Health ≥"
+            input-type="number"
+          />
+          <FilterTextPopover
+            v-model="healthMax"
+            label="Health ≤"
+            input-type="number"
+          />
         </div>
 
         <div class="order-1 flex min-w-0 flex-nowrap items-center gap-2 2xl:order-2 2xl:min-w-[26rem] 2xl:justify-end">
-          <input v-model="query" class="input-base min-w-[14rem] flex-1 2xl:w-80 2xl:flex-none" placeholder="Search cards..." />
+          <input
+            v-model="query"
+            class="input-base min-w-[14rem] flex-1 2xl:w-80 2xl:flex-none"
+            placeholder="Search cards..."
+          >
           <span class="whitespace-nowrap text-xs text-slate-500">{{ cards.length }} results</span>
-          <button class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap" type="button" @click="exportCsv">
+          <button
+            class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+            type="button"
+            @click="exportCsv"
+          >
             <Download class="h-4 w-4" />
             <span>Export CSV</span>
           </button>
-          <button class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap" type="button" @click="resetFilters">
+          <button
+            class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+            type="button"
+            @click="resetFilters"
+          >
             <RotateCcw class="h-4 w-4" />
             <span>Reset</span>
           </button>
@@ -45,7 +106,10 @@
       />
     </div>
 
-    <div v-if="cards.length === 0" class="page-card text-sm text-slate-500">
+    <div
+      v-if="cards.length === 0"
+      class="page-card text-sm text-slate-500"
+    >
       No cards found for the current filters.
     </div>
   </section>

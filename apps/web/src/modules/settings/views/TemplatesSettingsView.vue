@@ -1,13 +1,21 @@
 <template>
   <div class="page-card space-y-4">
-    <h3 class="text-base font-semibold text-slate-800">Templates</h3>
-    <p class="text-sm text-slate-600">Manage parser templates as JSON definitions.</p>
+    <h3 class="text-base font-semibold text-slate-800">
+      Templates
+    </h3>
+    <p class="text-sm text-slate-600">
+      Manage parser templates as JSON definitions.
+    </p>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside class="rounded-lg border border-slate-200 p-3">
         <div class="mb-3 flex items-center justify-between">
           <span class="text-sm font-semibold text-slate-800">Entries</span>
-          <button class="btn-secondary px-2 py-1 text-xs" type="button" @click="startCreate">
+          <button
+            class="btn-secondary px-2 py-1 text-xs"
+            type="button"
+            @click="startCreate"
+          >
             New
           </button>
         </div>
@@ -25,10 +33,19 @@
             type="button"
             @click="selectTemplate(item.id)"
           >
-            <div class="truncate font-medium">{{ item.label }}</div>
-            <div class="truncate text-xs text-slate-500">{{ item.key }}</div>
+            <div class="truncate font-medium">
+              {{ item.label }}
+            </div>
+            <div class="truncate text-xs text-slate-500">
+              {{ item.key }}
+            </div>
           </button>
-          <p v-if="templates.length === 0" class="text-xs text-slate-500">No templates yet.</p>
+          <p
+            v-if="templates.length === 0"
+            class="text-xs text-slate-500"
+          >
+            No templates yet.
+          </p>
         </div>
       </aside>
 
@@ -36,11 +53,19 @@
         <div class="grid gap-3 md:grid-cols-2">
           <label class="field-label">
             Label
-            <input v-model="form.label" class="input-base" placeholder="MTG Like V1" />
+            <input
+              v-model="form.label"
+              class="input-base"
+              placeholder="MTG Like V1"
+            >
           </label>
           <label class="field-label">
             Key (optional)
-            <input v-model="form.key" class="input-base" placeholder="mtg-like-v1" />
+            <input
+              v-model="form.key"
+              class="input-base"
+              placeholder="mtg-like-v1"
+            >
           </label>
         </div>
 
@@ -54,10 +79,20 @@
         </label>
 
         <div class="mt-4 flex flex-wrap gap-2">
-          <button class="btn-primary" type="button" :disabled="saving" @click="saveTemplate">
+          <button
+            class="btn-primary"
+            type="button"
+            :disabled="saving"
+            @click="saveTemplate"
+          >
             {{ saving ? 'Saving...' : createMode ? 'Create Template' : 'Save Changes' }}
           </button>
-          <button class="btn-secondary" type="button" :disabled="saving" @click="resetForm">
+          <button
+            class="btn-secondary"
+            type="button"
+            :disabled="saving"
+            @click="resetForm"
+          >
             Reset
           </button>
           <button

@@ -1,17 +1,26 @@
 <template>
   <span class="inline-flex min-w-0 flex-wrap items-center gap-1 align-middle">
     <template v-if="segments.length > 0">
-      <template v-for="(segment, index) in segments" :key="`seg-${index}-${segment.raw}`">
+      <template
+        v-for="(segment, index) in segments"
+        :key="`seg-${index}-${segment.raw}`"
+      >
         <img
           v-if="segment.kind === 'symbol' && segment.assetUrl"
           :src="toAbsoluteApiUrl(segment.assetUrl)"
           :alt="segment.label"
           class="inline-block h-4 w-4 object-contain align-middle"
-        />
-        <span v-else class="inline-block">{{ segment.label }}</span>
+        >
+        <span
+          v-else
+          class="inline-block"
+        >{{ segment.label }}</span>
       </template>
     </template>
-    <span v-else class="text-slate-400">{{ emptyLabel }}</span>
+    <span
+      v-else
+      class="text-slate-400"
+    >{{ emptyLabel }}</span>
   </span>
 </template>
 

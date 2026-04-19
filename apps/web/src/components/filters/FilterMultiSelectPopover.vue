@@ -18,7 +18,11 @@
         :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
       >
         <div class="space-y-2">
-          <input v-model="searchTerm" class="input-base" :placeholder="`Search ${label.toLowerCase()}...`" />
+          <input
+            v-model="searchTerm"
+            class="input-base"
+            :placeholder="`Search ${label.toLowerCase()}...`"
+          >
 
           <div class="max-h-64 space-y-1 overflow-auto pr-1">
             <label
@@ -31,13 +35,23 @@
                 type="checkbox"
                 class="h-4 w-4 rounded border-slate-300 text-sky-600"
                 @change="toggleOption(option.id)"
-              />
+              >
               <span>{{ option.label }}</span>
             </label>
           </div>
 
-          <p v-if="options.length === 0" class="text-xs text-slate-400">{{ emptyText }}</p>
-          <p v-else-if="filteredOptions.length === 0" class="text-xs text-slate-400">No matches.</p>
+          <p
+            v-if="options.length === 0"
+            class="text-xs text-slate-400"
+          >
+            {{ emptyText }}
+          </p>
+          <p
+            v-else-if="filteredOptions.length === 0"
+            class="text-xs text-slate-400"
+          >
+            No matches.
+          </p>
         </div>
       </div>
     </Teleport>

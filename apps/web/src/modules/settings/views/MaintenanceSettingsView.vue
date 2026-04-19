@@ -1,7 +1,11 @@
 <template>
   <div class="page-card space-y-4">
-    <h3 class="text-base font-semibold text-slate-800">Maintenance</h3>
-    <p class="text-sm text-slate-600">These actions are destructive and cannot be undone.</p>
+    <h3 class="text-base font-semibold text-slate-800">
+      Maintenance
+    </h3>
+    <p class="text-sm text-slate-600">
+      These actions are destructive and cannot be undone.
+    </p>
 
     <button
       class="btn-secondary w-fit"
@@ -14,7 +18,12 @@
 
     <label class="field-label">
       Type <span class="font-semibold">RESET</span> to enable maintenance actions
-      <input v-model="confirmText" class="input-base" placeholder="RESET" autocomplete="off" />
+      <input
+        v-model="confirmText"
+        class="input-base"
+        placeholder="RESET"
+        autocomplete="off"
+      >
     </label>
 
     <div class="grid gap-3 md:grid-cols-2">
@@ -37,7 +46,10 @@
     </div>
 
     <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-      <input v-model="includeImages" type="checkbox" />
+      <input
+        v-model="includeImages"
+        type="checkbox"
+      >
       <span>Also remove imported images</span>
     </label>
 
@@ -45,8 +57,16 @@
       v-if="lastRemovedPaths.length > 0"
       class="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700"
     >
-      <li class="font-semibold text-slate-800">Last removed paths:</li>
-      <li v-for="path in lastRemovedPaths" :key="path" class="break-all">{{ path }}</li>
+      <li class="font-semibold text-slate-800">
+        Last removed paths:
+      </li>
+      <li
+        v-for="path in lastRemovedPaths"
+        :key="path"
+        class="break-all"
+      >
+        {{ path }}
+      </li>
     </ul>
   </div>
 </template>

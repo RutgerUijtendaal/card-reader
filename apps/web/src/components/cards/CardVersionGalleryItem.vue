@@ -10,9 +10,13 @@
       :src="toAbsoluteApiUrl(version.image_url)"
       alt="Card image"
       class="block w-full object-contain"
-    />
-    <p class="mt-2 text-center text-sm font-medium text-slate-700">Version {{ version.version_number }}</p>
-    <p class="text-center text-xs text-slate-500">{{ formatDate(version.created_at) }}</p>
+    >
+    <p class="mt-2 text-center text-sm font-medium text-slate-700">
+      Version {{ version.version_number }}
+    </p>
+    <p class="text-center text-xs text-slate-500">
+      {{ formatDate(version.created_at) }}
+    </p>
 
     <Teleport to="body">
       <aside
@@ -21,15 +25,23 @@
         class="pointer-events-none z-30 hidden w-96 rounded-xl border border-slate-200 bg-white p-4 opacity-100 shadow-2xl lg:block"
         :style="{ position: 'fixed', left: `${panelX}px`, top: `${panelY}px` }"
       >
-        <h4 class="text-base font-semibold text-slate-900">{{ version.name }}</h4>
-        <p class="mb-3 text-xs text-slate-500">{{ version.type_line || 'No type' }}</p>
+        <h4 class="text-base font-semibold text-slate-900">
+          {{ version.name }}
+        </h4>
+        <p class="mb-3 text-xs text-slate-500">
+          {{ version.type_line || 'No type' }}
+        </p>
 
         <div class="grid grid-cols-2 gap-2 text-xs text-slate-700">
           <span>Version: {{ version.version_number }}</span>
           <span>Conf: {{ version.confidence.toFixed(2) }}</span>
           <span class="inline-flex items-center gap-1">
             Mana:
-            <SymbolizedText :tokens="version.mana_symbols" :text="version.mana_cost" :symbol-by-key="symbolByKey" />
+            <SymbolizedText
+              :tokens="version.mana_symbols"
+              :text="version.mana_cost"
+              :symbol-by-key="symbolByKey"
+            />
           </span>
           <span>Date: {{ formatDate(version.created_at) }}</span>
           <span>ATK: {{ version.attack ?? '-' }}</span>
@@ -60,7 +72,9 @@
           </span>
         </div>
 
-        <p class="mt-3 whitespace-pre-line text-xs text-slate-600">{{ version.rules_text || '-' }}</p>
+        <p class="mt-3 whitespace-pre-line text-xs text-slate-600">
+          {{ version.rules_text || '-' }}
+        </p>
       </aside>
 
       <aside
@@ -68,7 +82,9 @@
         class="pointer-events-none z-30 hidden w-[28rem] rounded-xl border border-slate-300 bg-slate-950 p-4 text-slate-100 opacity-100 shadow-2xl lg:block"
         :style="{ position: 'fixed', left: `${panelX + 420}px`, top: `${panelY}px` }"
       >
-        <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">Debug (Raw Version)</h5>
+        <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
+          Debug (Raw Version)
+        </h5>
         <pre class="max-h-[22rem] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-5">{{ debugJson }}</pre>
       </aside>
     </Teleport>
