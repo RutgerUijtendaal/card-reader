@@ -24,11 +24,10 @@ card-reader-core = { path = "../core", editable = true }
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-py-modules = ["main", "database_migrations"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["controllers*", "dependencies*", "mappers*", "router*", "schemas*", "seeds*", "services*"]
+include = ["card_reader_api*"]
 
 [tool.setuptools.package-data]
 "seeds" = ["*.txt", "*.json", "assets/**/*"]
@@ -48,7 +47,7 @@ line-length = 100
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = ["src", "../core/src"]
+mypy_path = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

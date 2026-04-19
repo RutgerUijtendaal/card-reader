@@ -5,9 +5,8 @@
   "scripts": {
     "predev": "uv sync --project . --extra dev",
     "migrate": "uv run --project . alembic upgrade head",
-    "seed": "pnpm run migrate && uv run --project . python -m seeds",
-    "seed:keywords": "pnpm run migrate && uv run --project . python -m seeds.keywords",
-    "dev": "pnpm run migrate && uv run --project . uvicorn main:app --app-dir src --host 127.0.0.1 --port 8000 --reload --reload-dir src",
+    "seed:keywords": "pnpm run migrate && uv run --project . python -m card_reader_api.seeds.keywords",
+    "dev": "pnpm run migrate && uv run --project . uvicorn card_reader_api.main:app --app-dir src --host 127.0.0.1 --port 8000 --reload --reload-dir src",
     "build": "echo \"Python service has no build step\"",
     "test": "uv run --project . pytest -q",
     "lint": "uv run --project . ruff check src tests",

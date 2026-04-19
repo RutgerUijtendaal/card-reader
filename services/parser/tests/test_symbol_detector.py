@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from models import Symbol
-from parsers.symbol_detector import SymbolDetector
+from card_reader_core.models import Symbol
+from card_reader_parser.parsers.symbol_detector import SymbolDetector
 
 
 def _fixture_symbol_asset_path() -> Path:

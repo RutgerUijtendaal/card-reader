@@ -13,9 +13,9 @@ os.environ["CARD_READER_ENV"] = "test"
 
 @pytest.fixture(autouse=True)
 def reset_db() -> None:
-    from database.connection import DATABASE_PATH, engine, initialize_database
-    from database_migrations import run_migrations_to_head
-    from seeds import run_registered_seeds
+    from card_reader_core.database.connection import DATABASE_PATH, engine, initialize_database
+    from card_reader_api.database_migrations import run_migrations_to_head
+    from card_reader_api.seeds import run_registered_seeds
 
     engine.dispose()
     if DATABASE_PATH.exists():

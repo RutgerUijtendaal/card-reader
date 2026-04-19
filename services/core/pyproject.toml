@@ -21,11 +21,13 @@ dev = [
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-py-modules = ["core_logging", "settings", "storage", "templates"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["database*", "models*", "repositories*"]
+include = ["card_reader_core*"]
+
+[tool.setuptools.package-data]
+card_reader_core = ["py.typed"]
 
 [tool.ruff]
 line-length = 100

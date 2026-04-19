@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from main import app
+from card_reader_api.main import app
 
 
 def test_health_openapi() -> None:
@@ -30,4 +30,3 @@ def test_create_import_upload_rejects_unsupported_files() -> None:
         )
     assert response.status_code == 400
     assert response.json()["detail"] == "No supported image files found in upload"
-

@@ -10,6 +10,7 @@ echo "Nuking Linux/WSL build artifacts in: $ROOT_DIR"
 rm -rf services/core/.venv
 rm -rf services/api/.venv
 rm -rf services/parser/.venv
+rm -rf services/integration/.venv
 
 # Node artifacts that can contain wrong-platform binaries (e.g. esbuild ELF).
 find . -type d -name node_modules -prune -exec rm -rf {} +
@@ -30,3 +31,4 @@ echo "  pnpm install"
 echo "  uv sync --project services/core --extra dev"
 echo "  uv sync --project services/api --extra dev"
 echo "  uv sync --project services/parser --extra dev"
+echo "  uv sync --project services/integration --extra dev"

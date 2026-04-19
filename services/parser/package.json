@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "predev": "uv sync --project . --extra dev",
-    "dev": "uv run --project . python -m watchfiles --ignore-permission-denied --filter python \"python -m main\" src ../core/src",
+    "dev": "uv run --project . python -m card_reader_parser.main",
     "build": "echo \"Python service has no build step\"",
     "test": "uv run --project . --extra dev pytest -q",
     "lint": "uv run --project . ruff check src",

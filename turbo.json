@@ -1,5 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "scripts/build-sidecars.mjs",
+    "services/core/src/**",
+    "services/api/src/**",
+    "services/parser/src/**",
+    "services/*/pyproject.toml",
+    "services/*/uv.lock"
+  ],
   "tasks": {
     "dev": {
       "cache": false,
@@ -7,7 +15,7 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**", "src-tauri/target/**"]
+      "outputs": ["dist/**", "build/**", "src-tauri/target/**", "src-tauri/binaries/**"]
     },
     "test": {
       "dependsOn": ["^build"],

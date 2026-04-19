@@ -32,14 +32,16 @@ const clean = () => {
 };
 
 const buildApi = () => {
-  const apiEntry = join(repoRoot, 'services', 'api', 'src', 'main.py');
+  const apiEntry = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'main.py');
   const apiPath = join(repoRoot, 'services', 'api', 'src');
   const corePath = join(repoRoot, 'services', 'core', 'src');
-  const seedKeywordsFile = join(repoRoot, 'services', 'api', 'src', 'seeds', 'keywords.json');
-  const seedSymbolsFile = join(repoRoot, 'services', 'api', 'src', 'seeds', 'symbols.json');
-  const seedAssetsDir = join(repoRoot, 'services', 'api', 'src', 'seeds', 'assets');
+  const seedKeywordsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'keywords.json');
+  const seedSymbolsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'symbols.json');
+  const seedTemplatesFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'templates.json');
+  const seedAssetsDir = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'assets');
   const seedKeywordsDataSpec = `${seedKeywordsFile}${addDataSeparator}seeds`;
   const seedSymbolsDataSpec = `${seedSymbolsFile}${addDataSeparator}seeds`;
+  const seedTemplatesDataSpec = `${seedTemplatesFile}${addDataSeparator}seeds`;
   const seedAssetsDataSpec = `${seedAssetsDir}${addDataSeparator}seeds/assets`;
   const alembicDir = join(repoRoot, 'services', 'api', 'alembic');
   const alembicDataSpec = `${alembicDir}${addDataSeparator}alembic`;
@@ -73,17 +75,17 @@ const buildApi = () => {
     '--add-data',
     seedAssetsDataSpec,
     '--add-data',
+    seedTemplatesDataSpec,
+    '--add-data',
     alembicDataSpec,
     apiEntry
   ]);
 };
 
 const buildParser = () => {
-  const parserEntry = join(repoRoot, 'services', 'parser', 'src', 'main.py');
+  const parserEntry = join(repoRoot, 'services', 'parser', 'src', 'card_reader_parser', 'main.py');
   const parserPath = join(repoRoot, 'services', 'parser', 'src');
   const corePath = join(repoRoot, 'services', 'core', 'src');
-  const templateDir = join(repoRoot, 'services', 'parser', 'src', 'parsers', 'templates');
-  const dataSpec = `${templateDir}${addDataSeparator}parsers/templates`;
 
   run('uv', [
     'run',
@@ -137,8 +139,6 @@ const buildParser = () => {
     'python-bidi',
     '--copy-metadata',
     'shapely',
-    '--add-data',
-    dataSpec,
     parserEntry
   ]);
 };

@@ -6,18 +6,18 @@ from typing import Any
 
 from sqlmodel import select
 
-from database.connection import get_session
-from models import Card, CardVersion, ImportJobItem, Symbol
-from parsers.card_parser import CardParser
-from repositories import (
+from card_reader_core.database.connection import get_session
+from card_reader_core.models import Card, CardVersion, ImportJob, ImportJobItem, Symbol
+from card_reader_parser.parsers.card_parser import CardParser
+from card_reader_core.repositories import (
     create_import_job,
     get_keywords_for_card_version,
     get_symbols_for_card_version,
     get_tags_for_card_version,
     get_types_for_card_version,
 )
-from services.import_processor_service import ImportProcessorService
-from template_store import DatabaseTemplateStore
+from card_reader_parser.services.import_processor_service import ImportProcessorService
+from card_reader_parser.template_store import DatabaseTemplateStore
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures"
 
@@ -85,8 +85,6 @@ def _load_db_state(*, session: Any) -> dict[str, Any]:
         .order_by(CardVersion.version_number.desc())
     ).first()
     assert latest_version is not None, "Latest card version not found"
-
-    from models import ImportJob
 
     job = session.exec(select(ImportJob).order_by(ImportJob.created_at.desc())).first()
     assert job is not None, "Expected import job row but none exists"

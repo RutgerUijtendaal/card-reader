@@ -6,8 +6,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from database.connection import DATABASE_URL, initialize_database
-import models  # noqa: F401
+from card_reader_core.database.connection import DATABASE_URL, initialize_database
+import card_reader_core.models  # noqa: F401
 
 config = context.config
 

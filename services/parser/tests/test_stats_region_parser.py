@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from parsers.ocr_runner import OcrRunner
-from parsers.regions.stats_region_parser import StatsRegionParser
+from card_reader_parser.parsers.ocr_runner import OcrRunner
+from card_reader_parser.parsers.regions.stats_region_parser import StatsRegionParser
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "stats-region"
 
