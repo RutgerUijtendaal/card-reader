@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from sqlalchemy import delete
-from sqlmodel import Session, select
+from sqlalchemy import asc, delete
+from sqlmodel import Session, col, select
 
 from models import (
     CardVersionKeyword,
@@ -21,9 +21,9 @@ def list_keywords(session: Session, *, keys: set[str] | None = None) -> list[Key
     if keys is not None and not keys:
         return []
 
-    statement = select(Keyword).order_by(Keyword.label.asc())
+    statement = select(Keyword).order_by(asc(col(Keyword.label)))
     if keys is not None:
-        statement = statement.where(Keyword.key.in_(keys))
+        statement = statement.where(col(Keyword.key).in_(keys))
     return list(session.exec(statement))
 
 
@@ -31,9 +31,9 @@ def list_tags(session: Session, *, keys: set[str] | None = None) -> list[Tag]:
     if keys is not None and not keys:
         return []
 
-    statement = select(Tag).order_by(Tag.label.asc())
+    statement = select(Tag).order_by(asc(col(Tag.label)))
     if keys is not None:
-        statement = statement.where(Tag.key.in_(keys))
+        statement = statement.where(col(Tag.key).in_(keys))
     return list(session.exec(statement))
 
 
@@ -41,17 +41,17 @@ def list_symbols(session: Session, *, keys: set[str] | None = None) -> list[Symb
     if keys is not None and not keys:
         return []
 
-    statement = select(Symbol).order_by(Symbol.label.asc())
+    statement = select(Symbol).order_by(asc(col(Symbol.label)))
     if keys is not None:
-        statement = statement.where(Symbol.key.in_(keys))
+        statement = statement.where(col(Symbol.key).in_(keys))
     return list(session.exec(statement))
 
 
 def list_detectable_symbols(session: Session) -> list[Symbol]:
     statement = (
         select(Symbol)
-        .where(Symbol.enabled.is_(True), Symbol.detector_type == "template")
-        .order_by(Symbol.label.asc())
+        .where(col(Symbol.enabled).is_(True), col(Symbol.detector_type) == "template")
+        .order_by(asc(col(Symbol.label)))
     )
     return list(session.exec(statement))
 
@@ -60,9 +60,9 @@ def list_types(session: Session, *, keys: set[str] | None = None) -> list[Type]:
     if keys is not None and not keys:
         return []
 
-    statement = select(Type).order_by(Type.label.asc())
+    statement = select(Type).order_by(asc(col(Type.label)))
     if keys is not None:
-        statement = statement.where(Type.key.in_(keys))
+        statement = statement.where(col(Type.key).in_(keys))
     return list(session.exec(statement))
 
 
@@ -83,7 +83,7 @@ def get_type(session: Session, entry_id: str) -> Type | None:
 
 
 def keyword_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
-    existing = session.exec(select(Keyword).where(Keyword.key == key)).first()
+    existing = session.exec(select(Keyword).where(col(Keyword.key) == key)).first()
     if existing is None:
         return False
     if exclude_id is not None and existing.id == exclude_id:
@@ -92,7 +92,7 @@ def keyword_key_exists(session: Session, *, key: str, exclude_id: str | None = N
 
 
 def tag_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
-    existing = session.exec(select(Tag).where(Tag.key == key)).first()
+    existing = session.exec(select(Tag).where(col(Tag.key) == key)).first()
     if existing is None:
         return False
     if exclude_id is not None and existing.id == exclude_id:
@@ -101,7 +101,7 @@ def tag_key_exists(session: Session, *, key: str, exclude_id: str | None = None)
 
 
 def symbol_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
-    existing = session.exec(select(Symbol).where(Symbol.key == key)).first()
+    existing = session.exec(select(Symbol).where(col(Symbol.key) == key)).first()
     if existing is None:
         return False
     if exclude_id is not None and existing.id == exclude_id:
@@ -110,7 +110,7 @@ def symbol_key_exists(session: Session, *, key: str, exclude_id: str | None = No
 
 
 def type_key_exists(session: Session, *, key: str, exclude_id: str | None = None) -> bool:
-    existing = session.exec(select(Type).where(Type.key == key)).first()
+    existing = session.exec(select(Type).where(col(Type.key) == key)).first()
     if existing is None:
         return False
     if exclude_id is not None and existing.id == exclude_id:
@@ -254,7 +254,7 @@ def delete_keyword(session: Session, *, entry_id: str) -> bool:
     row = get_keyword(session, entry_id)
     if row is None:
         return False
-    session.exec(delete(CardVersionKeyword).where(CardVersionKeyword.keyword_id == entry_id))
+    session.exec(delete(CardVersionKeyword).where(col(CardVersionKeyword.keyword_id) == entry_id))
     session.delete(row)
     session.commit()
     return True
@@ -264,7 +264,7 @@ def delete_tag(session: Session, *, entry_id: str) -> bool:
     row = get_tag(session, entry_id)
     if row is None:
         return False
-    session.exec(delete(CardVersionTag).where(CardVersionTag.tag_id == entry_id))
+    session.exec(delete(CardVersionTag).where(col(CardVersionTag.tag_id) == entry_id))
     session.delete(row)
     session.commit()
     return True
@@ -274,7 +274,7 @@ def delete_type(session: Session, *, entry_id: str) -> bool:
     row = get_type(session, entry_id)
     if row is None:
         return False
-    session.exec(delete(CardVersionType).where(CardVersionType.type_id == entry_id))
+    session.exec(delete(CardVersionType).where(col(CardVersionType.type_id) == entry_id))
     session.delete(row)
     session.commit()
     return True
@@ -284,7 +284,7 @@ def delete_symbol(session: Session, *, entry_id: str) -> bool:
     row = get_symbol(session, entry_id)
     if row is None:
         return False
-    session.exec(delete(CardVersionSymbol).where(CardVersionSymbol.symbol_id == entry_id))
+    session.exec(delete(CardVersionSymbol).where(col(CardVersionSymbol.symbol_id) == entry_id))
     session.delete(row)
     session.commit()
     return True
@@ -297,7 +297,7 @@ def replace_card_version_keywords(
     keyword_ids: list[str],
 ) -> None:
     session.exec(
-        delete(CardVersionKeyword).where(CardVersionKeyword.card_version_id == card_version_id)
+        delete(CardVersionKeyword).where(col(CardVersionKeyword.card_version_id) == card_version_id)
     )
 
     seen: set[str] = set()
@@ -316,7 +316,7 @@ def replace_card_version_tags(
     card_version_id: str,
     tag_ids: list[str],
 ) -> None:
-    session.exec(delete(CardVersionTag).where(CardVersionTag.card_version_id == card_version_id))
+    session.exec(delete(CardVersionTag).where(col(CardVersionTag.card_version_id) == card_version_id))
 
     seen: set[str] = set()
     for tag_id in tag_ids:
@@ -334,7 +334,7 @@ def replace_card_version_types(
     card_version_id: str,
     type_ids: list[str],
 ) -> None:
-    session.exec(delete(CardVersionType).where(CardVersionType.card_version_id == card_version_id))
+    session.exec(delete(CardVersionType).where(col(CardVersionType.card_version_id) == card_version_id))
 
     seen: set[str] = set()
     for type_id in type_ids:
@@ -352,7 +352,7 @@ def replace_card_version_symbols(
     card_version_id: str,
     symbol_ids: list[str],
 ) -> None:
-    session.exec(delete(CardVersionSymbol).where(CardVersionSymbol.card_version_id == card_version_id))
+    session.exec(delete(CardVersionSymbol).where(col(CardVersionSymbol.card_version_id) == card_version_id))
 
     seen: set[str] = set()
     for symbol_id in symbol_ids:
@@ -370,7 +370,7 @@ def upsert_tags_by_labels(session: Session, labels: list[str]) -> list[Tag]:
         return []
 
     keys = {key for key, _ in entries}
-    existing_rows = session.exec(select(Tag).where(Tag.key.in_(keys)))
+    existing_rows = session.exec(select(Tag).where(col(Tag.key).in_(keys)))
     existing_by_key = {row.key: row for row in existing_rows}
 
     out: list[Tag] = []
@@ -399,7 +399,7 @@ def upsert_types_by_labels(session: Session, labels: list[str]) -> list[Type]:
         return []
 
     keys = {key for key, _ in entries}
-    existing_rows = session.exec(select(Type).where(Type.key.in_(keys)))
+    existing_rows = session.exec(select(Type).where(col(Type.key).in_(keys)))
     existing_by_key = {row.key: row for row in existing_rows}
 
     out: list[Type] = []
@@ -425,9 +425,9 @@ def upsert_types_by_labels(session: Session, labels: list[str]) -> list[Type]:
 def get_keywords_for_card_version(session: Session, card_version_id: str) -> list[Keyword]:
     statement = (
         select(Keyword)
-        .join(CardVersionKeyword, CardVersionKeyword.keyword_id == Keyword.id)
-        .where(CardVersionKeyword.card_version_id == card_version_id)
-        .order_by(Keyword.label.asc())
+        .join(CardVersionKeyword, col(CardVersionKeyword.keyword_id) == col(Keyword.id))
+        .where(col(CardVersionKeyword.card_version_id) == card_version_id)
+        .order_by(asc(col(Keyword.label)))
     )
     return list(session.exec(statement))
 
@@ -435,9 +435,9 @@ def get_keywords_for_card_version(session: Session, card_version_id: str) -> lis
 def get_tags_for_card_version(session: Session, card_version_id: str) -> list[Tag]:
     statement = (
         select(Tag)
-        .join(CardVersionTag, CardVersionTag.tag_id == Tag.id)
-        .where(CardVersionTag.card_version_id == card_version_id)
-        .order_by(Tag.label.asc())
+        .join(CardVersionTag, col(CardVersionTag.tag_id) == col(Tag.id))
+        .where(col(CardVersionTag.card_version_id) == card_version_id)
+        .order_by(asc(col(Tag.label)))
     )
     return list(session.exec(statement))
 
@@ -445,9 +445,9 @@ def get_tags_for_card_version(session: Session, card_version_id: str) -> list[Ta
 def get_symbols_for_card_version(session: Session, card_version_id: str) -> list[Symbol]:
     statement = (
         select(Symbol)
-        .join(CardVersionSymbol, CardVersionSymbol.symbol_id == Symbol.id)
-        .where(CardVersionSymbol.card_version_id == card_version_id)
-        .order_by(Symbol.label.asc())
+        .join(CardVersionSymbol, col(CardVersionSymbol.symbol_id) == col(Symbol.id))
+        .where(col(CardVersionSymbol.card_version_id) == card_version_id)
+        .order_by(asc(col(Symbol.label)))
     )
     return list(session.exec(statement))
 
@@ -455,9 +455,9 @@ def get_symbols_for_card_version(session: Session, card_version_id: str) -> list
 def get_types_for_card_version(session: Session, card_version_id: str) -> list[Type]:
     statement = (
         select(Type)
-        .join(CardVersionType, CardVersionType.type_id == Type.id)
-        .where(CardVersionType.card_version_id == card_version_id)
-        .order_by(Type.label.asc())
+        .join(CardVersionType, col(CardVersionType.type_id) == col(Type.id))
+        .where(col(CardVersionType.card_version_id) == card_version_id)
+        .order_by(asc(col(Type.label)))
     )
     return list(session.exec(statement))
 

@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from models import Template, now_utc
 from repositories import normalize_slug_key
@@ -77,7 +77,7 @@ def seed_templates(session: Session) -> tuple[int, int]:
     created = 0
     updated = 0
     keys = {entry.key for entry in entries}
-    existing_rows = session.exec(select(Template).where(Template.key.in_(keys)))
+    existing_rows = session.exec(select(Template).where(col(Template.key).in_(keys)))
     existing_by_key = {row.key: row for row in existing_rows}
 
     for entry in entries:

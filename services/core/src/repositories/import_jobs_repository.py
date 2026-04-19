@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlalchemy import desc
+from sqlmodel import Session, col, select
 
 from models import ImportJob, ImportJobItem, ImportJobStatus, now_utc
 
@@ -11,7 +12,7 @@ SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def list_import_jobs(session: Session) -> list[ImportJob]:
-    statement = select(ImportJob).order_by(ImportJob.created_at.desc())
+    statement = select(ImportJob).order_by(desc(col(ImportJob.created_at)))
     return list(session.exec(statement))
 
 
@@ -103,21 +104,21 @@ def fetch_job(session: Session, job_id: str) -> ImportJob | None:
 
 
 def fetch_items_for_job(session: Session, job_id: str) -> list[ImportJobItem]:
-    statement = select(ImportJobItem).where(ImportJobItem.job_id == job_id)
+    statement = select(ImportJobItem).where(col(ImportJobItem.job_id) == job_id)
     return list(session.exec(statement))
 
 
 def get_next_queued_job(session: Session) -> ImportJob | None:
     statement = (
         select(ImportJob)
-        .where(ImportJob.status == ImportJobStatus.queued)
-        .order_by(ImportJob.created_at)
+        .where(col(ImportJob.status) == ImportJobStatus.queued)
+        .order_by(col(ImportJob.created_at))
     )
     return session.exec(statement).first()
 
 
 def get_job_items(session: Session, job_id: str) -> list[ImportJobItem]:
-    statement = select(ImportJobItem).where(ImportJobItem.job_id == job_id)
+    statement = select(ImportJobItem).where(col(ImportJobItem.job_id) == job_id)
     return list(session.exec(statement))
 
 

@@ -39,3 +39,8 @@ dev = [
   "ruff>=0.6.9",
   "mypy>=1.11.2"
 ]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["src", "../core/src"]

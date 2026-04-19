@@ -13,9 +13,9 @@ except Exception:  # pragma: no cover
     np = None  # type: ignore[assignment]
 
 try:
-    from paddleocr import PaddleOCR
+    from paddleocr import PaddleOCR  # type: ignore[import-untyped]
 except Exception:  # pragma: no cover
-    PaddleOCR = None  # type: ignore[assignment]
+    PaddleOCR = None
 
 _PADDLEX_OCR_CONFIG: dict[str, Any] = {
     "pipeline_name": "OCR",

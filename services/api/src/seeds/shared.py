@@ -4,7 +4,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from sqlmodel import Session, select
 
@@ -35,6 +35,5 @@ def resolve_seed_file(relative_from_seed_root: str) -> Path:
     return Path(__file__).resolve().parent / relative_from_seed_root
 
 
-def model_has_any_rows(session: Session, model: type) -> bool:
-    return session.exec(select(model.id).limit(1)).first() is not None
-
+def model_has_any_rows(session: Session, model: type[Any]) -> bool:
+    return session.exec(select(getattr(model, "id")).limit(1)).first() is not None

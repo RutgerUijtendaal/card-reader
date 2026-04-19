@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from models import Keyword, now_utc
 from repositories import normalize_slug_key
@@ -71,7 +71,7 @@ def seed_keywords(session: Session, seed_file: Path = DEFAULT_KEYWORDS_FILE) -> 
     keys = {key for key, _ in entries}
     created = 0
     updated = 0
-    existing_rows = session.exec(select(Keyword).where(Keyword.key.in_(keys)))
+    existing_rows = session.exec(select(Keyword).where(col(Keyword.key).in_(keys)))
     existing_by_key = {row.key: row for row in existing_rows}
 
     for key, label in entries:

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from sqlmodel import Session, select
+from sqlalchemy import asc
+from sqlmodel import Session, col, select
 
 from models import Template, now_utc
 
 
 def list_templates(session: Session) -> list[Template]:
-    statement = select(Template).order_by(Template.label.asc())
+    statement = select(Template).order_by(asc(col(Template.label)))
     return list(session.exec(statement))
 
 
@@ -15,7 +16,7 @@ def get_template(session: Session, entry_id: str) -> Template | None:
 
 
 def get_template_by_key(session: Session, key: str) -> Template | None:
-    statement = select(Template).where(Template.key == key)
+    statement = select(Template).where(col(Template.key) == key)
     return session.exec(statement).first()
 
 

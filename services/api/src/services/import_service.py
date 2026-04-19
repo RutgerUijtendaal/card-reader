@@ -5,6 +5,7 @@ from pathlib import Path
 from sqlmodel import Session
 
 import repositories as repositories
+from models import ImportJob
 
 
 class ImportService:
@@ -15,7 +16,7 @@ class ImportService:
         source_path: str,
         template_id: str,
         options: dict[str, object],
-    ):
+    ) -> ImportJob:
         template = repositories.get_template_by_key(session, key=template_id)
         if template is None:
             raise ValueError(f"Unknown template_id '{template_id}'")

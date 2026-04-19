@@ -6,7 +6,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from models import Symbol, now_utc
 from repositories import normalize_slug_key
@@ -90,7 +90,7 @@ def seed_symbols(session: Session) -> tuple[int, int]:
     created = 0
     updated = 0
     keys = {entry.key for entry in entries}
-    existing_rows = session.exec(select(Symbol).where(Symbol.key.in_(keys)))
+    existing_rows = session.exec(select(Symbol).where(col(Symbol.key).in_(keys)))
     existing_by_key = {row.key: row for row in existing_rows}
 
     for entry in entries:
@@ -159,4 +159,3 @@ def _set_if_diff(instance: Symbol, field_name: str, value: object) -> bool:
         return False
     setattr(instance, field_name, value)
     return True
-

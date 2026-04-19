@@ -99,7 +99,7 @@ def create_template(
     request: TemplateUpsertRequest,
     template_service: TemplateService = Depends(get_template_service),
 ) -> TemplateResponse:
-    _require_label(request.label)
+    label = _require_label(request.label)
     definition_json = request.definition_json
     if definition_json is None:
         raise HTTPException(status_code=400, detail="definition_json is required")
@@ -108,7 +108,7 @@ def create_template(
         try:
             item = template_service.create_template(
                 session,
-                label=request.label or "",
+                label=label,
                 key=request.key,
                 definition_json=definition_json,
             )
@@ -165,10 +165,10 @@ def create_keyword(
     request: KeywordUpsertRequest,
     catalog_service: CatalogService = Depends(get_catalog_service),
 ) -> KeywordResponse:
-    _require_label(request.label)
+    label = _require_label(request.label)
     with get_session() as session:
         try:
-            item = catalog_service.create_keyword(session, label=request.label, key=request.key)
+            item = catalog_service.create_keyword(session, label=label, key=request.key)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from None
         except Exception:
@@ -221,10 +221,10 @@ def create_tag(
     request: TagUpsertRequest,
     catalog_service: CatalogService = Depends(get_catalog_service),
 ) -> TagResponse:
-    _require_label(request.label)
+    label = _require_label(request.label)
     with get_session() as session:
         try:
-            item = catalog_service.create_tag(session, label=request.label, key=request.key)
+            item = catalog_service.create_tag(session, label=label, key=request.key)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from None
         except Exception:
@@ -277,10 +277,10 @@ def create_type(
     request: TypeUpsertRequest,
     catalog_service: CatalogService = Depends(get_catalog_service),
 ) -> TypeResponse:
-    _require_label(request.label)
+    label = _require_label(request.label)
     with get_session() as session:
         try:
-            item = catalog_service.create_type(session, label=request.label, key=request.key)
+            item = catalog_service.create_type(session, label=label, key=request.key)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from None
         except Exception:
@@ -333,12 +333,12 @@ def create_symbol(
     request: SymbolUpsertRequest,
     catalog_service: CatalogService = Depends(get_catalog_service),
 ) -> SymbolResponse:
-    _require_label(request.label)
+    label = _require_label(request.label)
     with get_session() as session:
         try:
             item = catalog_service.create_symbol(
                 session,
-                label=request.label,
+                label=label,
                 key=request.key,
                 symbol_type=request.symbol_type,
                 detector_type=request.detector_type,

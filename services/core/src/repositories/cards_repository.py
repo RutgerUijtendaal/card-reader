@@ -4,8 +4,8 @@ import json
 import logging
 from pathlib import Path
 
-from sqlalchemy import or_, text
-from sqlmodel import Session, select
+from sqlalchemy import desc, or_, text
+from sqlmodel import Session, col, select
 
 from models import (
     Card,
@@ -43,7 +43,7 @@ def save_parsed_card(
 ) -> CardVersion:
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
     card_key = normalize_slug_key(parsed_name)
-    card = session.exec(select(Card).where(Card.key == card_key)).first()
+    card = session.exec(select(Card).where(col(Card.key) == card_key)).first()
     if card is None:
         card = Card(key=card_key, label=parsed_name)
         session.add(card)
@@ -162,69 +162,85 @@ def list_cards(
 ) -> list[tuple[Card, CardVersion]]:
     statement = (
         select(Card, CardVersion)
-        .join(CardVersion, CardVersion.card_id == Card.id)
-        .where(CardVersion.is_latest.is_(True))
-        .order_by(Card.updated_at.desc())
+        .join(CardVersion, col(CardVersion.card_id) == col(Card.id))
+        .where(col(CardVersion.is_latest).is_(True))
+        .order_by(desc(col(Card.updated_at)))
     )
 
     if query and query.strip():
         query_text = query.strip()
         like_pattern = _to_like_pattern(query_text)
         like_filter = or_(
-            CardVersion.name.like(like_pattern, escape="\\"),
-            CardVersion.type_line.like(like_pattern, escape="\\"),
-            CardVersion.rules_text.like(like_pattern, escape="\\"),
-            CardVersion.mana_cost.like(like_pattern, escape="\\"),
+            col(CardVersion.name).like(like_pattern, escape="\\"),
+            col(CardVersion.type_line).like(like_pattern, escape="\\"),
+            col(CardVersion.rules_text).like(like_pattern, escape="\\"),
+            col(CardVersion.mana_cost).like(like_pattern, escape="\\"),
         )
 
         matched_card_ids: list[str] = []
         try:
-            rows = session.exec(
+            rows = session.execute(
                 text("SELECT card_id FROM card_version_search WHERE card_version_search MATCH :query"),
-                params={"query": query_text},
+                {"query": query_text},
             )
             matched_card_ids = [row[0] for row in rows]
         except Exception:
             logger.exception("FTS query failed; falling back to LIKE search. query=%s", query_text)
 
         if matched_card_ids:
-            statement = statement.where(or_(Card.id.in_(matched_card_ids), like_filter))
+            statement = statement.where(or_(col(Card.id).in_(matched_card_ids), like_filter))
         else:
             statement = statement.where(like_filter)
 
     if max_confidence is not None:
         statement = statement.where(CardVersion.confidence <= max_confidence)
     if mana_cost:
-        statement = statement.where(CardVersion.mana_cost == mana_cost)
+        statement = statement.where(col(CardVersion.mana_cost) == mana_cost)
     if template_id:
-        statement = statement.where(CardVersion.template_id == template_id)
+        statement = statement.where(col(CardVersion.template_id) == template_id)
     if attack_min is not None:
-        statement = statement.where(CardVersion.attack.is_not(None), CardVersion.attack >= attack_min)
+        statement = statement.where(
+            col(CardVersion.attack).is_not(None),
+            col(CardVersion.attack) >= attack_min,
+        )
     if attack_max is not None:
-        statement = statement.where(CardVersion.attack.is_not(None), CardVersion.attack <= attack_max)
+        statement = statement.where(
+            col(CardVersion.attack).is_not(None),
+            col(CardVersion.attack) <= attack_max,
+        )
     if health_min is not None:
-        statement = statement.where(CardVersion.health.is_not(None), CardVersion.health >= health_min)
+        statement = statement.where(
+            col(CardVersion.health).is_not(None),
+            col(CardVersion.health) >= health_min,
+        )
     if health_max is not None:
-        statement = statement.where(CardVersion.health.is_not(None), CardVersion.health <= health_max)
+        statement = statement.where(
+            col(CardVersion.health).is_not(None),
+            col(CardVersion.health) <= health_max,
+        )
 
     if keyword_ids:
         keyword_subquery = (
             select(CardVersionKeyword.card_version_id)
-            .where(CardVersionKeyword.keyword_id.in_(keyword_ids))
+            .where(col(CardVersionKeyword.keyword_id).in_(keyword_ids))
         )
-        statement = statement.where(CardVersion.id.in_(keyword_subquery))
+        statement = statement.where(col(CardVersion.id).in_(keyword_subquery))
     if tag_ids:
-        tag_subquery = select(CardVersionTag.card_version_id).where(CardVersionTag.tag_id.in_(tag_ids))
-        statement = statement.where(CardVersion.id.in_(tag_subquery))
+        tag_subquery = select(CardVersionTag.card_version_id).where(
+            col(CardVersionTag.tag_id).in_(tag_ids)
+        )
+        statement = statement.where(col(CardVersion.id).in_(tag_subquery))
     if symbol_ids:
         symbol_subquery = (
             select(CardVersionSymbol.card_version_id)
-            .where(CardVersionSymbol.symbol_id.in_(symbol_ids))
+            .where(col(CardVersionSymbol.symbol_id).in_(symbol_ids))
         )
-        statement = statement.where(CardVersion.id.in_(symbol_subquery))
+        statement = statement.where(col(CardVersion.id).in_(symbol_subquery))
     if type_ids:
-        type_subquery = select(CardVersionType.card_version_id).where(CardVersionType.type_id.in_(type_ids))
-        statement = statement.where(CardVersion.id.in_(type_subquery))
+        type_subquery = select(CardVersionType.card_version_id).where(
+            col(CardVersionType.type_id).in_(type_ids)
+        )
+        statement = statement.where(col(CardVersion.id).in_(type_subquery))
 
     return list(session.exec(statement))
 
@@ -236,22 +252,22 @@ def get_card(session: Session, card_id: str) -> Card | None:
 def get_latest_card_version(session: Session, card_id: str) -> CardVersion | None:
     statement = (
         select(CardVersion)
-        .where(CardVersion.card_id == card_id, CardVersion.is_latest.is_(True))
-        .order_by(CardVersion.version_number.desc())
+        .where(col(CardVersion.card_id) == card_id, col(CardVersion.is_latest).is_(True))
+        .order_by(desc(col(CardVersion.version_number)))
     )
     return session.exec(statement).first()
 
 
 def get_card_image(session: Session, card_version_id: str) -> CardVersionImage | None:
-    statement = select(CardVersionImage).where(CardVersionImage.card_version_id == card_version_id)
+    statement = select(CardVersionImage).where(col(CardVersionImage.card_version_id) == card_version_id)
     return session.exec(statement).first()
 
 
 def list_card_generations(session: Session, card_id: str) -> list[CardVersion]:
     statement = (
         select(CardVersion)
-        .where(CardVersion.card_id == card_id)
-        .order_by(CardVersion.version_number.desc())
+        .where(col(CardVersion.card_id) == card_id)
+        .order_by(desc(col(CardVersion.version_number)))
     )
     return list(session.exec(statement))
 
@@ -314,16 +330,16 @@ def apply_parsed_fields_to_version(
 
 
 def upsert_card_search(session: Session, *, card_id: str, version: CardVersion) -> None:
-    session.exec(
+    session.execute(
         text("DELETE FROM card_version_search WHERE card_id = :card_id"),
-        params={"card_id": card_id},
+        {"card_id": card_id},
     )
-    session.exec(
+    session.execute(
         text(
             "INSERT INTO card_version_search(card_id, card_version_id, name, type_line, rules_text, mana_cost) "
             "VALUES (:card_id, :card_version_id, :name, :type_line, :rules_text, :mana_cost)"
         ),
-        params={
+        {
             "card_id": card_id,
             "card_version_id": version.id,
             "name": version.name,

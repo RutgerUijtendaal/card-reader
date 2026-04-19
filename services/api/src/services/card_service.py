@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+from typing import TypedDict
+
 from sqlmodel import Session
 
 import repositories as repositories
+from models import Card, CardVersion, CardVersionImage, Keyword, Symbol, Tag, Type
+
+
+class CardMetadata(TypedDict):
+    keywords: list[Keyword]
+    tags: list[Tag]
+    symbols: list[Symbol]
+    types: list[Type]
 
 
 class CardService:
@@ -22,7 +32,7 @@ class CardService:
         attack_max: int | None = None,
         health_min: int | None = None,
         health_max: int | None = None,
-    ):
+    ) -> list[tuple[Card, CardVersion]]:
         return repositories.list_cards(
             session,
             query=query,
@@ -39,10 +49,10 @@ class CardService:
             health_max=health_max,
         )
 
-    def list_card_generations(self, session: Session, card_id: str):
+    def list_card_generations(self, session: Session, card_id: str) -> list[CardVersion]:
         return repositories.list_card_generations(session, card_id)
 
-    def get_filter_metadata(self, session: Session):
+    def get_filter_metadata(self, session: Session) -> CardMetadata:
         return {
             "keywords": repositories.list_keywords(session),
             "tags": repositories.list_tags(session),
@@ -50,7 +60,9 @@ class CardService:
             "types": repositories.list_types(session),
         }
 
-    def get_card_with_image(self, session: Session, card_id: str):
+    def get_card_with_image(
+        self, session: Session, card_id: str
+    ) -> tuple[Card | None, CardVersion | None, CardVersionImage | None]:
         card = repositories.get_card(session, card_id)
         if card is None:
             return None, None, None
@@ -60,13 +72,15 @@ class CardService:
         image = repositories.get_card_image(session, version.id)
         return card, version, image
 
-    def get_card(self, session: Session, card_id: str):
+    def get_card(self, session: Session, card_id: str) -> Card | None:
         return repositories.get_card(session, card_id)
 
-    def get_card_image(self, session: Session, card_version_id: str):
+    def get_card_image(self, session: Session, card_version_id: str) -> CardVersionImage | None:
         return repositories.get_card_image(session, card_version_id)
 
-    def get_card_version_metadata(self, session: Session, card_version_id: str):
+    def get_card_version_metadata(
+        self, session: Session, card_version_id: str
+    ) -> CardMetadata:
         return {
             "keywords": repositories.get_keywords_for_card_version(session, card_version_id),
             "tags": repositories.get_tags_for_card_version(session, card_version_id),
@@ -83,7 +97,7 @@ class CardService:
         type_line: str | None,
         mana_cost: str | None,
         rules_text: str | None,
-    ):
+    ) -> tuple[Card, CardVersion] | None:
         return repositories.update_card(
             session,
             card_id=card_id,
@@ -92,4 +106,3 @@ class CardService:
             mana_cost=mana_cost,
             rules_text=rules_text,
         )
-

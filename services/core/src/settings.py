@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     def shared_app_data_dir(self) -> Path:
         if sys.platform.startswith("win"):
             base = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
-        return base / "Card Reader"
+            return base / "Card Reader"
         if sys.platform == "darwin":
             return Path.home() / "Library" / "Application Support" / "card-reader"
         return Path(os.getenv("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "card-reader"

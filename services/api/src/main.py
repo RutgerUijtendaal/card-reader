@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 from uuid import uuid4
 from contextlib import asynccontextmanager
 
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     initialize_database()
     run_migrations_to_head()

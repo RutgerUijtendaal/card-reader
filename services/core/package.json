@@ -7,6 +7,6 @@
     "build": "echo \"Core has no build step\"",
     "test": "echo \"No core tests yet\"",
     "lint": "uv run --project . ruff check src",
-    "typecheck": "PYTHONPATH=src uv run --project . mypy src"
+    "typecheck": "uv run --project . mypy src"
   }
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import TypedDict
 
 from sqlmodel import Session
 
@@ -10,8 +11,15 @@ from models import Keyword, Symbol, Tag, Type
 SUPPORTED_SYMBOL_DETECTOR_TYPES = {"template"}
 
 
+class CatalogData(TypedDict):
+    keywords: list[Keyword]
+    tags: list[Tag]
+    symbols: list[Symbol]
+    types: list[Type]
+
+
 class CatalogService:
-    def list_catalog(self, session: Session) -> dict[str, list[Keyword | Tag | Symbol | Type]]:
+    def list_catalog(self, session: Session) -> CatalogData:
         return {
             "keywords": repositories.list_keywords(session),
             "tags": repositories.list_tags(session),
