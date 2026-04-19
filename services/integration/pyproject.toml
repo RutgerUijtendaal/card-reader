@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "card-reader-integration"
+version = "0.1.0"
+description = "Cross-package integration tests for Card Reader"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.13.3",
+  "paddlepaddle>=3.1.0",
+  "paddleocr>=3.1.0",
+  "paddlex[ocr-core]>=3.1.0",
+  "pillow>=10.4.0",
+  "pydantic-settings>=2.5.2",
+  "sqlmodel>=0.0.22"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.3",
+  "ruff>=0.6.9"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests", "../parser/src", "../api/src", "../core/src"]
+
+[tool.ruff]
+line-length = 100

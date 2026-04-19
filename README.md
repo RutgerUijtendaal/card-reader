@@ -70,6 +70,7 @@ pnpm --filter @card-reader/api dev
 pnpm --filter @card-reader/parser dev
 pnpm --filter @card-reader/core lint
 pnpm --filter @card-reader/web dev
+pnpm --filter @card-reader/integration test
 pnpm dev:all
 pnpm dev:desktop
 ```

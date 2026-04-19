@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "sync:python": "pnpm --filter @card-reader/core exec uv sync --project . --extra dev && pnpm --filter @card-reader/api exec uv sync --project . --extra dev && pnpm --filter @card-reader/parser exec uv sync --project . --extra dev",
+    "sync:python": "pnpm --filter @card-reader/core exec uv sync --project . --extra dev && pnpm --filter @card-reader/api exec uv sync --project . --extra dev && pnpm --filter @card-reader/parser exec uv sync --project . --extra dev && pnpm --filter @card-reader/integration exec uv sync --project . --extra dev",
     "dev": "turbo run dev --parallel --filter=!@card-reader/desktop",
     "dev:all": "turbo run dev --parallel",
     "dev:desktop": "pnpm --filter @card-reader/desktop dev",

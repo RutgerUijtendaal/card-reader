@@ -1,0 +1,61 @@
+{
+  "image": "cards/silver-stake.webp",
+  "template_id": "mtg-like-v1",
+  "job_options": {
+    "reparse_existing": true
+  },
+  "expected_db": {
+    "card": {
+      "key": "silver-stake",
+      "label": "Silver Stake"
+    },
+    "latest_version": {
+      "template_id": "mtg-like-v1",
+      "name": "Silver Stake",
+      "type_line": "Equipment - Silver Weapon",
+      "mana_cost": "3",
+      "mana_symbols": [
+        "colorless-mana-1",
+        "divine-mana",
+        "occult-mana"
+      ],
+      "attack": 2,
+      "health": null,
+      "rules_text": "Attach to target exhausted enemy Creature.\nYou cannot activate this card to gain its stats.\nWhile Attached to a non-Boss creature,\nattached creature is silenced, and cannot strike or ready.\nTurn Start: If this card is attached to a Blood, Darkness or\nUndead creature, deal this cards Attack as damage to\nattached creature. If this card is attached to a Boss creature,\ndeal this cards Attack as damage to attached creature.",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [
+        "Attach",
+        "Turn Start"
+      ],
+      "tags": [
+        "Silver",
+        "Weapon"
+      ],
+      "symbols": [
+        "colorless-mana-1",
+        "divine-mana",
+        "luna-affinity",
+        "occult-mana"
+      ],
+      "types": [
+        "Equipment"
+      ],
+      "symbol_types": {
+        "colorless-mana-1": "mana",
+        "divine-mana": "mana",
+        "occult-mana": "mana",
+        "luna-affinity": "affinity"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}

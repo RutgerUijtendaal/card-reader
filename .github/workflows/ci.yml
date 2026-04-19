@@ -28,6 +28,8 @@ jobs:
         run: uv sync --project services/api --extra dev
       - name: Install parser deps
         run: uv sync --project services/parser --extra dev
+      - name: Install integration deps
+        run: uv sync --project services/integration --extra dev
       - name: Lint
         run: pnpm lint
       - name: Typecheck

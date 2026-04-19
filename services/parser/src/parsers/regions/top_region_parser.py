@@ -6,6 +6,7 @@ from typing import Any
 
 from models import Symbol
 from PIL import Image
+from settings import settings
 
 from parsers.ocr_runner import OcrRunner
 from parsers.symbol_detector import SymbolDetector
@@ -36,10 +37,14 @@ class TopRegionParser:
         region_spec: dict[str, Any],
         symbols: list[Symbol],
     ) -> RegionParseResult:
-        _ = region_spec
-        width, _ = image.size
         ocr_data = self._ocr_runner.run(image)
-        full_text = str(ocr_data.get("text", ""))
+        min_ocr_confidence = self._resolve_min_ocr_confidence(region_spec)
+        filtered_lines = self._filter_ocr_lines(
+            raw_lines=self._safe_lines(ocr_data.get("lines", [])),
+            min_confidence=min_ocr_confidence,
+        )
+        full_text = self._join_line_texts(filtered_lines)
+
         candidate_symbols = self._select_mana_candidate_symbols(symbols)
         detected_symbols_all = self._symbol_detector.detect(
             image=image,
@@ -110,14 +115,17 @@ class TopRegionParser:
         return RegionParseResult(
             region_name=region_name,
             text=full_text,
-            confidence=self._safe_confidence(ocr_data.get("confidence", 0.0)),
-            lines=self._safe_lines(ocr_data.get("lines", [])),
+            confidence=self._average_line_confidence(filtered_lines),
+            lines=filtered_lines,
             detected_symbols=detected_symbols,
             normalized_fields=normalized_fields,
             debug={
                 "expected_symbol_types": sorted(self._EXPECTED_SYMBOL_TYPES),
                 "full_ocr_text": full_text,
                 "candidate_symbol_count": len(candidate_symbols),
+                "ocr_min_confidence": min_ocr_confidence,
+                "ocr_line_count_raw": len(self._safe_lines(ocr_data.get("lines", []))),
+                "ocr_line_count_filtered": len(filtered_lines),
             },
         )
 
@@ -230,3 +238,35 @@ class TopRegionParser:
 
     def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
         return raw if isinstance(raw, list) else []
+
+    def _resolve_min_ocr_confidence(self, region_spec: dict[str, Any]) -> float:
+        raw = region_spec.get("ocr_min_confidence", settings.low_confidence_threshold)
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return settings.low_confidence_threshold
+        return max(0.0, min(1.0, value))
+
+    def _filter_ocr_lines(
+        self,
+        *,
+        raw_lines: list[dict[str, Any]],
+        min_confidence: float,
+    ) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for row in raw_lines:
+            text = str(row.get("text", "")).strip()
+            conf = self._safe_confidence(row.get("confidence", 0.0))
+            if not text or conf < min_confidence:
+                continue
+            out.append({"text": text, "confidence": conf})
+        return out
+
+    def _join_line_texts(self, lines: list[dict[str, Any]]) -> str:
+        return "\n".join(str(row.get("text", "")).strip() for row in lines if row.get("text")).strip()
+
+    def _average_line_confidence(self, lines: list[dict[str, Any]]) -> float:
+        if not lines:
+            return 0.0
+        values = [self._safe_confidence(row.get("confidence", 0.0)) for row in lines]
+        return float(sum(values) / len(values))

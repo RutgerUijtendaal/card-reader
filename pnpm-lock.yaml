@@ -118,6 +118,8 @@ importers:
 
   services/core: {}
 
+  services/integration: {}
+
   services/parser: {}
 
 packages:
