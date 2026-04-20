@@ -78,7 +78,7 @@ wheels = [
 
 [[package]]
 name = "card-reader-core"
-version = "0.1.0"
+version = "0.1.7"
 source = { editable = "../core" }
 dependencies = [
     { name = "pydantic-settings" },
@@ -96,7 +96,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "card-reader-parser"
-version = "0.1.0"
+version = "0.1.7"
 source = { editable = "." }
 dependencies = [
     { name = "card-reader-core" },

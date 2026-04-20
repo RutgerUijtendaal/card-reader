@@ -4,8 +4,8 @@ import sys
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# services/core/src/settings.py -> parents[3] is repo root
-REPO_ROOT = Path(__file__).resolve().parents[3]
+# services/core/src/settings.py -> parents[4] is repo root
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 class Settings(BaseSettings):

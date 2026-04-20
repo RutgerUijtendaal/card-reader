@@ -92,7 +92,7 @@ wheels = [
 
 [[package]]
 name = "card-reader-integration"
-version = "0.1.0"
+version = "0.1.7"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

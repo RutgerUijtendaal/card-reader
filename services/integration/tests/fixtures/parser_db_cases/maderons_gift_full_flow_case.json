@@ -1,0 +1,56 @@
+{
+  "image": "cards/maderons-gift.webp",
+  "template_id": "mtg-like-v1",
+  "job_options": {
+    "reparse_existing": true
+  },
+  "expected_db": {
+    "card": {
+      "key": "maderon-s-gift",
+      "label": "Maderon's Gift"
+    },
+    "latest_version": {
+      "template_id": "mtg-like-v1",
+      "name": "Maderon's Gift",
+      "type_line": "Spell - Madness Evocation",
+      "mana_cost": "3",
+      "mana_symbols": [
+        "colorless-mana-1",
+        "dark-mana",
+        "occult-mana"
+      ],
+      "attack": null,
+      "health": null,
+      "rules_text": "Choose either Draw or Play.\nThen shuffle your discard pile and\nrandomly choose a card from it.\nIf you chose Draw, put that card into your hand and draw\na number of cards equal to its cost.\nIf you chose Play, instantly play the chosen card without\npaying its cost and put a number of damage counters on\nyourself equal to its cost.",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [],
+      "tags": [
+        "Evocation",
+        "Madness"
+      ],
+      "symbols": [
+        "colorless-mana-1",
+        "dark-mana",
+        "occult-mana"
+      ],
+      "types": [
+        "Spell"
+      ],
+      "symbol_types": {
+        "colorless-mana-1": "mana",
+        "dark-mana": "mana",
+        "occult-mana": "mana"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}

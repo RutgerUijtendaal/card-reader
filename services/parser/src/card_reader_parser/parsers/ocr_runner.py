@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, TypedDict
 
 from PIL import Image
 
@@ -27,8 +27,8 @@ _PADDLEX_OCR_CONFIG: dict[str, Any] = {
             "module_name": "text_detection",
             "model_name": "PP-OCRv5_server_det",
             "model_dir": None,
-            "limit_side_len": 64,
-            "limit_type": "min",
+            "limit_side_len": 736,
+            "limit_type": "max",
             "max_side_limit": 4000,
             "thresh": 0.3,
             "box_thresh": 0.6,
@@ -43,6 +43,18 @@ _PADDLEX_OCR_CONFIG: dict[str, Any] = {
         },
     },
 }
+
+
+Point = tuple[float, float]
+Polygon = list[Point]
+
+
+class OcrLineItem(TypedDict):
+    text: str
+    confidence: float
+    x: float
+    y: float
+    box: Polygon
 
 
 class OcrRunner:
@@ -71,22 +83,65 @@ class OcrRunner:
         if not isinstance(json_payload, dict):
             return {"text": "", "confidence": 0.0, "lines": []}
 
-        lines_data: list[dict[str, Any]] = []
+        lines_data: list[OcrLineItem] = []
         confidences: list[float] = []
-        texts: list[str] = []
 
-        for text_value, conf_value in self._extract_text_conf_pairs(json_payload):
+        for poly, text_value, conf_value in self._extract_text_conf_pairs(json_payload):
             if not text_value:
                 continue
-            texts.append(text_value)
-            confidences.append(conf_value)
-            lines_data.append({"text": text_value, "confidence": conf_value})
 
-        combined = "\n".join(texts).strip()
+            # compute a simple center point
+            ys = [p[1] for p in poly]
+            xs = [p[0] for p in poly]
+
+            lines_data.append({
+                "text": text_value,
+                "confidence": conf_value,
+                "x": sum(xs) / len(xs),
+                "y": sum(ys) / len(ys),
+                "box": poly,
+            })
+            confidences.append(conf_value)
+
+        grouped_lines = self._group_by_lines(lines_data)
+        final_lines: list[str] = []
+        for line in grouped_lines:
+            line = sorted(line, key=lambda x: x["x"])
+            final_lines.append(" ".join([w["text"] for w in line]))
+
+        combined = "\n".join(final_lines).strip()
         avg_conf = float(sum(confidences) / len(confidences)) if confidences else 0.0
         return {"text": combined, "confidence": avg_conf, "lines": lines_data}
 
-    def _extract_text_conf_pairs(self, result_json: Any) -> list[tuple[str, float]]:
+    def _group_by_lines(
+        self,
+        items: list[OcrLineItem],
+        y_threshold: float = 12,
+    ) -> list[list[OcrLineItem]]:
+        # sort top → bottom
+        sorted_items = sorted(items, key=lambda x: x["y"])
+
+        lines: list[list[OcrLineItem]] = []
+        current_line: list[OcrLineItem] = []
+
+        for item in sorted_items:
+            if not current_line:
+                current_line.append(item)
+                continue
+
+            # compare with last item in current line
+            if abs(item["y"] - current_line[-1]["y"]) < y_threshold:
+                current_line.append(item)
+            else:
+                lines.append(current_line)
+                current_line = [item]
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines
+
+    def _extract_text_conf_pairs(self, result_json: Any) -> list[tuple[Polygon, str, float]]:
         if not isinstance(result_json, dict):
             return []
 
@@ -96,26 +151,45 @@ class OcrRunner:
 
         rec_texts = payload.get("rec_texts")
         rec_scores = payload.get("rec_scores")
-        if rec_texts is None or rec_scores is None:
-            return []
-        if not isinstance(rec_texts, list):
+        rec_polys = payload.get("rec_polys")
+
+        if not (isinstance(rec_texts, list) and isinstance(rec_scores, list) and isinstance(rec_polys, list)):
             return []
 
-        try:
-            score_values = list(rec_scores)
-        except TypeError:
-            return []
+        pairs: list[tuple[Polygon, str, float]] = []
 
-        pairs: list[tuple[str, float]] = []
-        for text_item, score_item in zip(rec_texts, score_values):
+        for text_item, score_item, poly in zip(rec_texts, rec_scores, rec_polys):
             text_value = str(text_item).strip()
             if not text_value:
                 continue
+
             try:
                 conf_value = float(score_item)
             except (TypeError, ValueError):
                 continue
-            pairs.append((text_value, conf_value))
+
+            if not isinstance(poly, list):
+                continue
+
+            normalized_poly: Polygon = []
+            valid_poly = True
+            for point in poly:
+                if not isinstance(point, (list, tuple)) or len(point) < 2:
+                    valid_poly = False
+                    break
+                try:
+                    px = float(point[0])
+                    py = float(point[1])
+                except (TypeError, ValueError):
+                    valid_poly = False
+                    break
+                normalized_poly.append((px, py))
+
+            if not valid_poly or not normalized_poly:
+                continue
+
+            pairs.append((normalized_poly, text_value, conf_value))
+
         return pairs
 
     def _get_ocr_engine(self) -> Any:
@@ -140,4 +214,3 @@ class OcrRunner:
             self._ocr_init_failed = True
             self._ocr_engine = None
         return self._ocr_engine
-

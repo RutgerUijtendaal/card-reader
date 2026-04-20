@@ -23,7 +23,7 @@
       ],
       "attack": 10,
       "health": null,
-      "rules_text": "Setup: Blade of Augustin starts in your hand.\nYou require 4\nDevotion to play this card.\nYou have 2 permanent Attack.\nIf Blade of Augustin would leave play,\nput it into your hand instead.",
+      "rules_text": "Setup: Blade of Augustin starts in your hand.\nYou require 4 Devotion to play this card.\nYou have 2 permanent Attack.\nIf Blade of Augustin would leave play,\nput it into your hand instead.",
       "version_number": 1
     },
     "metadata": {

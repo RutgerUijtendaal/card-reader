@@ -13,7 +13,7 @@ from .types import RegionParseResult
 
 
 class BottomRegionParser:
-    _EXPECTED_SYMBOL_TYPES = {"rules"}
+    _EXPECTED_SYMBOL_TYPES = {"rules", "devotion"}
 
     def __init__(
         self,

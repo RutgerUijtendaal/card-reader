@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 
 from sqlmodel import Session
 
 from .cards_repository import list_cards
 from .metadata_repository import (
+    list_symbols,
     get_keywords_for_card_version,
     get_symbols_for_card_version,
     get_tags_for_card_version,
@@ -52,6 +54,7 @@ def export_cards_csv(
             "card_key",
             "name",
             "mana_cost",
+            "mana_symbols",
             "attack",
             "health",
             "rules_text",
@@ -66,20 +69,22 @@ def export_cards_csv(
     for card, version in cards:
         type_labels = [item.label for item in get_types_for_card_version(session, version.id)]
         tag_labels = [item.label for item in get_tags_for_card_version(session, version.id)]
-        symbol_labels = [item.label for item in get_symbols_for_card_version(session, version.id)]
+        symbol_text_tokens = [item.text_token for item in get_symbols_for_card_version(session, version.id)]
         keyword_labels = [item.label for item in get_keywords_for_card_version(session, version.id)]
+        mana_symbols = json.loads(version.mana_symbols_json)
 
         writer.writerow(
             {
                 "card_key": _sanitize_csv_text(card.key),
                 "name": _sanitize_csv_text(version.name),
                 "mana_cost": _sanitize_csv_text(version.mana_cost),
+                "mana_symbols": _replace_symbol_keys(session, _join_labels(mana_symbols)),
                 "attack": version.attack,
                 "health": version.health,
                 "rules_text": _sanitize_csv_text(version.rules_text),
                 "types": _join_labels(type_labels),
                 "tags": _join_labels(tag_labels),
-                "symbols": _join_labels(symbol_labels),
+                "symbols": _join_labels(symbol_text_tokens),
                 "keywords": _join_labels(keyword_labels),
                 "confidence": version.confidence,
             }
@@ -94,3 +99,8 @@ def _sanitize_csv_text(value: str) -> str:
 def _join_labels(labels: list[str]) -> str:
     clean = [_sanitize_csv_text(label) for label in labels if label.strip()]
     return ";".join(clean)
+
+def _replace_symbol_keys(session: Session, text: str) -> str:
+    for symbol in list_symbols(session):
+        text = text.replace(symbol.key, symbol.text_token)
+    return text
