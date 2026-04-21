@@ -63,8 +63,10 @@ class OcrRunner:
         self._ocr_init_failed = False
 
     def run(self, image: Image.Image) -> dict[str, Any]:
+        logger.info("OCR run started. image_size=%sx%s", image.width, image.height)
         engine = self._get_ocr_engine()
         if engine is None or np is None:
+            logger.warning("OCR run skipped. engine_available=%s numpy_available=%s", engine is not None, np is not None)
             return {"text": "", "confidence": 0.0, "lines": []}
 
         try:
@@ -76,11 +78,13 @@ class OcrRunner:
             return {"text": "", "confidence": 0.0, "lines": []}
 
         if not prediction:
+            logger.info("OCR run finished with empty prediction.")
             return {"text": "", "confidence": 0.0, "lines": []}
 
         first = prediction[0]
         json_payload = getattr(first, "json", None)
         if not isinstance(json_payload, dict):
+            logger.warning("OCR run finished with non-dict payload.")
             return {"text": "", "confidence": 0.0, "lines": []}
 
         lines_data: list[OcrLineItem] = []
@@ -111,6 +115,12 @@ class OcrRunner:
 
         combined = "\n".join(final_lines).strip()
         avg_conf = float(sum(confidences) / len(confidences)) if confidences else 0.0
+        logger.info(
+            "OCR run finished. text_len=%s lines=%s avg_conf=%.3f",
+            len(combined),
+            len(lines_data),
+            avg_conf,
+        )
         return {"text": combined, "confidence": avg_conf, "lines": lines_data}
 
     def _group_by_lines(

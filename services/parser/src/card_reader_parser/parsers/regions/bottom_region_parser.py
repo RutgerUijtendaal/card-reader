@@ -39,14 +39,41 @@ class BottomRegionParser:
     ) -> RegionParseResult:
         _ = region_spec
         logger.info("Bottom region parse started. region=%s image_size=%sx%s", region_name, image.width, image.height)
+        logger.info("Bottom region OCR step started. region=%s", region_name)
         ocr_data = self._ocr_runner.run(image)
+        logger.info(
+            "Bottom region OCR step finished. region=%s conf=%.3f",
+            region_name,
+            self._safe_confidence(ocr_data.get("confidence", 0.0)),
+        )
         text = str(ocr_data.get("text", ""))
+        logger.info(
+            "Bottom region symbol detection step started. region=%s symbol_candidates=%s expected_types=%s",
+            region_name,
+            len(symbols),
+            sorted(self._EXPECTED_SYMBOL_TYPES),
+        )
         detected_symbols = self._symbol_detector.detect(
             image=image,
             symbols=symbols,
             expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
         )
+        logger.info(
+            "Bottom region symbol detection step finished. region=%s symbols=%s",
+            region_name,
+            len(detected_symbols),
+        )
+        logger.info(
+            "Bottom region keyword extraction step started. region=%s known_keywords=%s",
+            region_name,
+            len(known_keywords),
+        )
         keyword_ids = self._keywords_extractor.extract_keyword_ids(text, known_keywords)
+        logger.info(
+            "Bottom region keyword extraction step finished. region=%s keywords=%s",
+            region_name,
+            len(keyword_ids),
+        )
         confidence = self._safe_confidence(ocr_data.get("confidence", 0.0))
         lines = self._safe_lines(ocr_data.get("lines", []))
         logger.info(
@@ -78,6 +105,4 @@ class BottomRegionParser:
 
     def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
         return raw if isinstance(raw, list) else []
-
-
 

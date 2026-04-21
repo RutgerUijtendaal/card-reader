@@ -58,12 +58,19 @@ class SymbolDetector:
         symbols: list[Symbol],
         expected_symbol_types: set[str] | None = None,
     ) -> list[DetectedSymbol]:
+        logger.info(
+            "Symbol detector started. symbol_candidates=%s expected_types=%s",
+            len(symbols),
+            sorted(expected_symbol_types) if expected_symbol_types is not None else None,
+        )
         if not symbols:
+            logger.info("Symbol detector finished early (no symbols).")
             return []
 
         image_gray = self._to_gray_numpy(image)
         height, width = image_gray.shape[:2]
         if height == 0 or width == 0:
+            logger.warning("Symbol detector finished early (empty image).")
             return []
 
         detections: list[DetectedSymbol] = []
@@ -110,6 +117,10 @@ class SymbolDetector:
             detections.extend(symbol_matches[: config.max_detections_per_symbol])
 
         detections.sort(key=lambda row: row.confidence, reverse=True)
+        logger.info(
+            "Symbol detector finished. detections=%s",
+            len(detections),
+        )
         return detections
 
     def _to_gray_numpy(self, image: Image.Image | np.ndarray) -> np.ndarray:
