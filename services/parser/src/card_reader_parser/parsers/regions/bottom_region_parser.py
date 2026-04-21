@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from card_reader_core.models import Keyword, Symbol
@@ -10,6 +11,8 @@ from ..ocr_runner import OcrRunner
 from ..symbol_detector import SymbolDetector
 
 from .types import RegionParseResult
+
+logger = logging.getLogger(__name__)
 
 
 class BottomRegionParser:
@@ -35,6 +38,7 @@ class BottomRegionParser:
         known_keywords: list[Keyword],
     ) -> RegionParseResult:
         _ = region_spec
+        logger.info("Bottom region parse started. region=%s image_size=%sx%s", region_name, image.width, image.height)
         ocr_data = self._ocr_runner.run(image)
         text = str(ocr_data.get("text", ""))
         detected_symbols = self._symbol_detector.detect(
@@ -43,12 +47,23 @@ class BottomRegionParser:
             expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
         )
         keyword_ids = self._keywords_extractor.extract_keyword_ids(text, known_keywords)
+        confidence = self._safe_confidence(ocr_data.get("confidence", 0.0))
+        lines = self._safe_lines(ocr_data.get("lines", []))
+        logger.info(
+            "Bottom region parse finished. region=%s conf=%.3f text_len=%s lines=%s symbols=%s keywords=%s",
+            region_name,
+            confidence,
+            len(text),
+            len(lines),
+            len(detected_symbols),
+            len(keyword_ids),
+        )
 
         return RegionParseResult(
             region_name=region_name,
             text=text,
-            confidence=self._safe_confidence(ocr_data.get("confidence", 0.0)),
-            lines=self._safe_lines(ocr_data.get("lines", [])),
+            confidence=confidence,
+            lines=lines,
             detected_symbols=detected_symbols,
             normalized_fields={"rules_text": text},
             extracted_keyword_ids=keyword_ids,
@@ -63,7 +78,6 @@ class BottomRegionParser:
 
     def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
         return raw if isinstance(raw, list) else []
-
 
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -9,6 +10,8 @@ from PIL import ImageOps
 from ..ocr_runner import OcrRunner
 
 from .types import RegionParseResult
+
+logger = logging.getLogger(__name__)
 
 
 class StatsRegionParser:
@@ -26,6 +29,13 @@ class StatsRegionParser:
         region_spec: dict[str, Any],
     ) -> RegionParseResult:
         _ = region_spec
+        logger.info(
+            "Stats region parse started. region=%s field=%s image_size=%sx%s",
+            region_name,
+            field_name,
+            image.width,
+            image.height,
+        )
         attempts = self._build_ocr_attempts()
 
         chosen_ocr_data: dict[str, Any] | None = None
@@ -33,6 +43,13 @@ class StatsRegionParser:
         value: int | None = None
 
         for attempt_scale, attempt_grayscale in attempts:
+            logger.info(
+                "Stats OCR attempt. region=%s field=%s scale=%.2f grayscale=%s",
+                region_name,
+                field_name,
+                attempt_scale,
+                attempt_grayscale,
+            )
             preprocessed_image = self._preprocess_image(
                 image,
                 scale=attempt_scale,
@@ -41,6 +58,14 @@ class StatsRegionParser:
             ocr_data = self._ocr_runner.run(preprocessed_image)
             text = str(ocr_data.get("text", ""))
             parsed_value = self._extract_number(text)
+            logger.info(
+                "Stats OCR attempt result. region=%s field=%s text=%r parsed_value=%s conf=%.3f",
+                region_name,
+                field_name,
+                text,
+                parsed_value,
+                self._safe_confidence(ocr_data.get("confidence", 0.0)),
+            )
 
             if chosen_ocr_data is None:
                 chosen_ocr_data = ocr_data
@@ -57,6 +82,13 @@ class StatsRegionParser:
         normalized_fields: dict[str, str] = {}
         if value is not None:
             normalized_fields[field_name] = str(value)
+        logger.info(
+            "Stats region parse finished. region=%s field=%s value=%s conf=%.3f",
+            region_name,
+            field_name,
+            value,
+            self._safe_confidence(chosen_ocr_data.get("confidence", 0.0)),
+        )
 
         return RegionParseResult(
             region_name=region_name,
@@ -112,5 +144,4 @@ class StatsRegionParser:
             seen.add(candidate)
             out.append(candidate)
         return out
-
 

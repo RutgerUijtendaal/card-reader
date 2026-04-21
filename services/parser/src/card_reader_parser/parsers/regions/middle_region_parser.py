@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from PIL import Image
@@ -8,6 +9,8 @@ from ...extractors import TagsExtractor, TypesExtractor
 from ..ocr_runner import OcrRunner
 
 from .types import RegionParseResult
+
+logger = logging.getLogger(__name__)
 
 
 class MiddleRegionParser:
@@ -29,16 +32,28 @@ class MiddleRegionParser:
         region_spec: dict[str, Any],
     ) -> RegionParseResult:
         _ = region_spec
+        logger.info("Middle region parse started. region=%s image_size=%sx%s", region_name, image.width, image.height)
         ocr_data = self._ocr_runner.run(image)
         text = str(ocr_data.get("text", ""))
         tags = self._tags_extractor.extract(text)
         types = self._types_extractor.extract(text)
+        confidence = self._safe_confidence(ocr_data.get("confidence", 0.0))
+        lines = self._safe_lines(ocr_data.get("lines", []))
+        logger.info(
+            "Middle region parse finished. region=%s conf=%.3f text_len=%s lines=%s tags=%s types=%s",
+            region_name,
+            confidence,
+            len(text),
+            len(lines),
+            len(tags),
+            len(types),
+        )
 
         return RegionParseResult(
             region_name=region_name,
             text=text,
-            confidence=self._safe_confidence(ocr_data.get("confidence", 0.0)),
-            lines=self._safe_lines(ocr_data.get("lines", [])),
+            confidence=confidence,
+            lines=lines,
             normalized_fields={"type_line": text},
             extracted_tags=tags,
             extracted_types=types,
@@ -52,7 +67,6 @@ class MiddleRegionParser:
 
     def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
         return raw if isinstance(raw, list) else []
-
 
 
 

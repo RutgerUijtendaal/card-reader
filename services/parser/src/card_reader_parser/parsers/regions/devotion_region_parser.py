@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from card_reader_core.models import Symbol
@@ -8,6 +9,8 @@ from PIL import Image
 from ..symbol_detector import SymbolDetector
 
 from .types import RegionParseResult
+
+logger = logging.getLogger(__name__)
 
 
 class AffinityRegionParser:
@@ -25,12 +28,25 @@ class AffinityRegionParser:
         symbols: list[Symbol],
     ) -> RegionParseResult:
         _ = region_spec
+        logger.info(
+            "Affinity region parse started. region=%s image_size=%sx%s expected_symbol_types=%s",
+            region_name,
+            image.width,
+            image.height,
+            sorted(self._EXPECTED_SYMBOL_TYPES),
+        )
         detected_symbols = self._symbol_detector.detect(
             image=image,
             symbols=symbols,
             expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
         )
         affinity_keys = [row.key for row in sorted(detected_symbols, key=lambda row: row.bbox.x)]
+        logger.info(
+            "Affinity region parse finished. region=%s symbols=%s affinity_keys=%s",
+            region_name,
+            len(detected_symbols),
+            affinity_keys,
+        )
 
         return RegionParseResult(
             region_name=region_name,

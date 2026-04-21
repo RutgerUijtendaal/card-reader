@@ -89,11 +89,28 @@ class CardParser:
                 region_spec=regions_spec.get("top_bar", {}),
                 symbols=symbols,
             )
+            top_result = region_results["top_bar"]
+            logger.info(
+                "Region parsed successfully. region=top_bar conf=%.3f text_len=%s fields=%s symbols=%s",
+                top_result.confidence,
+                len(top_result.text),
+                sorted(top_result.normalized_fields.keys()),
+                len(top_result.detected_symbols),
+            )
         if "type_bar" in region_crops:
             region_results["type_bar"] = self._middle_region_parser.parse(
                 region_name="type_bar",
                 image=region_crops["type_bar"]["image"],
                 region_spec=regions_spec.get("type_bar", {}),
+            )
+            middle_result = region_results["type_bar"]
+            logger.info(
+                "Region parsed successfully. region=type_bar conf=%.3f text_len=%s tags=%s types=%s fields=%s",
+                middle_result.confidence,
+                len(middle_result.text),
+                len(middle_result.extracted_tags),
+                len(middle_result.extracted_types),
+                sorted(middle_result.normalized_fields.keys()),
             )
         if "rules_text" in region_crops:
             region_results["rules_text"] = self._bottom_region_parser.parse(
@@ -103,12 +120,28 @@ class CardParser:
                 symbols=symbols,
                 known_keywords=known_keywords,
             )
+            bottom_result = region_results["rules_text"]
+            logger.info(
+                "Region parsed successfully. region=rules_text conf=%.3f text_len=%s keywords=%s symbols=%s fields=%s",
+                bottom_result.confidence,
+                len(bottom_result.text),
+                len(bottom_result.extracted_keyword_ids),
+                len(bottom_result.detected_symbols),
+                sorted(bottom_result.normalized_fields.keys()),
+            )
         if "bottom_middle" in region_crops:
             region_results["bottom_middle"] = self._affinity_region_parser.parse(
                 region_name="bottom_middle",
                 image=region_crops["bottom_middle"]["image"],
                 region_spec=regions_spec.get("bottom_middle", {}),
                 symbols=symbols,
+            )
+            affinity_result = region_results["bottom_middle"]
+            logger.info(
+                "Region parsed successfully. region=bottom_middle conf=%.3f symbols=%s fields=%s",
+                affinity_result.confidence,
+                len(affinity_result.detected_symbols),
+                sorted(affinity_result.normalized_fields.keys()),
             )
         if "bottom_left" in region_crops:
             region_results["bottom_left"] = self._stats_region_parser.parse(
@@ -117,12 +150,26 @@ class CardParser:
                 image=region_crops["bottom_left"]["image"],
                 region_spec=regions_spec.get("bottom_left", {}),
             )
+            attack_result = region_results["bottom_left"]
+            logger.info(
+                "Region parsed successfully. region=bottom_left conf=%.3f text_len=%s fields=%s",
+                attack_result.confidence,
+                len(attack_result.text),
+                sorted(attack_result.normalized_fields.keys()),
+            )
         if "bottom_right" in region_crops:
             region_results["bottom_right"] = self._stats_region_parser.parse(
                 region_name="bottom_right",
                 field_name="health",
                 image=region_crops["bottom_right"]["image"],
                 region_spec=regions_spec.get("bottom_right", {}),
+            )
+            health_result = region_results["bottom_right"]
+            logger.info(
+                "Region parsed successfully. region=bottom_right conf=%.3f text_len=%s fields=%s",
+                health_result.confidence,
+                len(health_result.text),
+                sorted(health_result.normalized_fields.keys()),
             )
 
         normalized_fields = self._merge_normalized_fields(region_results, image_path)

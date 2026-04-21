@@ -37,6 +37,13 @@ class TopRegionParser:
         region_spec: dict[str, Any],
         symbols: list[Symbol],
     ) -> RegionParseResult:
+        logger.info(
+            "Top region parse started. region=%s image_size=%sx%s expected_symbol_types=%s",
+            region_name,
+            image.width,
+            image.height,
+            sorted(self._EXPECTED_SYMBOL_TYPES),
+        )
         ocr_data = self._ocr_runner.run(image)
         min_ocr_confidence = self._resolve_min_ocr_confidence(region_spec)
         filtered_lines = self._filter_ocr_lines(
@@ -104,6 +111,14 @@ class TopRegionParser:
             )
         else:
             logger.info("Top parse symbols_all_details=[]")
+        logger.info(
+            "Top region parse finished. region=%s conf=%.3f name=%r mana_cost=%r mana_symbols=%s",
+            region_name,
+            self._average_line_confidence(filtered_lines),
+            name,
+            mana_cost,
+            mana_symbol_keys,
+        )
 
         normalized_fields: dict[str, str] = {
             "name": name,
