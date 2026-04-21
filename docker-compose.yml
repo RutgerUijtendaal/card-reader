@@ -1,0 +1,54 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    container_name: card-reader-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CARD_READER_ENV: ${CARD_READER_ENV:-production}
+      CARD_READER_API_HOST: 0.0.0.0
+      CARD_READER_API_PORT: 8000
+      CARD_READER_APP_DATA_DIR: ${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}
+      CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
+      CARD_READER_SAVE_DEBUG_CROPS: ${CARD_READER_SAVE_DEBUG_CROPS:-false}
+      CARD_READER_CORS_ORIGINS: '${CARD_READER_CORS_ORIGINS:-["http://localhost:5173"]}'
+    ports:
+      - "${CARD_READER_API_BIND:-127.0.0.1}:8000:8000"
+    volumes:
+      - card_reader_data:/var/lib/card-reader
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\"",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  parser:
+    build:
+      context: .
+      dockerfile: services/parser/Dockerfile
+    container_name: card-reader-parser
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CARD_READER_ENV: ${CARD_READER_ENV:-production}
+      CARD_READER_APP_DATA_DIR: ${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}
+      CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
+      CARD_READER_SAVE_DEBUG_CROPS: ${CARD_READER_SAVE_DEBUG_CROPS:-false}
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: ${PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK:-True}
+    volumes:
+      - card_reader_data:/var/lib/card-reader
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  card_reader_data:

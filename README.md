@@ -75,6 +75,34 @@ pnpm dev:all
 pnpm dev:desktop
 ```
 
+## Server Deploy (Dockerized API + Parser)
+
+Use this when you host the web app separately behind your own Nginx.
+
+1. Copy env template and adjust values:
+
+```bash
+cp .env.example .env
+```
+
+2. Build and start backend services:
+
+```bash
+docker compose up -d --build
+```
+
+3. Check health:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Notes:
+- `api` and `parser` share one Docker volume: `card_reader_data`.
+- Runtime data (DB, uploads, images, logs) is stored at `/var/lib/card-reader` in containers.
+- API is only published on `127.0.0.1:8000` by default. Change `CARD_READER_API_BIND` in `.env` if needed.
+- CORS for your external web app should be set via `CARD_READER_CORS_ORIGINS` in `.env` as a JSON array.
+
 Known defaults are auto-seeded on first API boot (only when target tables are empty):
 - `keywords` from `services/api/src/seeds/keywords.json`
 - `symbols` from `services/api/src/seeds/symbols.json` + `services/api/src/seeds/assets/symbols/`
@@ -108,7 +136,7 @@ sudo apt install -y pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev
 - Production (`CARD_READER_ENV=production`): runtime data is written to OS app data:
 - Linux: `~/.local/share/card-reader`
 - macOS: `~/Library/Application Support/card-reader`
-- Windows: `%LOCALAPPDATA%/CardReader`
+- Windows: `%LOCALAPPDATA%/Card Reader`
 
 Optional override:
 - Set `CARD_READER_APP_DATA_DIR=/custom/path` to force a specific storage root in any environment.
