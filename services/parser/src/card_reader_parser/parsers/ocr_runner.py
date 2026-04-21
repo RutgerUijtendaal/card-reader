@@ -64,15 +64,21 @@ class OcrRunner:
 
     def run(self, image: Image.Image) -> dict[str, Any]:
         logger.info("OCR run started. image_size=%sx%s", image.width, image.height)
+        logger.info("OCR run step: resolve engine")
         engine = self._get_ocr_engine()
+        logger.info("OCR run step: engine resolved. available=%s numpy_available=%s", engine is not None, np is not None)
         if engine is None or np is None:
             logger.warning("OCR run skipped. engine_available=%s numpy_available=%s", engine is not None, np is not None)
             return {"text": "", "confidence": 0.0, "lines": []}
 
         try:
+            logger.info("OCR run step: convert PIL->RGB")
             image_rgb = image.convert("RGB")
+            logger.info("OCR run step: convert RGB->numpy")
             image_np = np.asarray(image_rgb)
+            logger.info("OCR run step: call engine.predict")
             prediction = list(engine.predict(image_np))
+            logger.info("OCR run step: engine.predict returned. predictions=%s", len(prediction))
         except Exception:
             logger.exception("OCR execution failed")
             return {"text": "", "confidence": 0.0, "lines": []}
