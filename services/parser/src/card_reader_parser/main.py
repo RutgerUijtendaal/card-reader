@@ -55,6 +55,7 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
     parser = CardParser(template_store)
     service = ImportProcessorService(parser)
     initialize_database()
+    logger.info("Parser loop started. interval_seconds=%.2f", interval_seconds)
 
     while not shutdown.should_stop():
         try:
@@ -63,8 +64,16 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
                 if job is None:
                     shutdown.interruptible_sleep(interval_seconds)
                     continue
+                logger.info(
+                    "Queued job claimed for processing. job_id=%s template_id=%s total_items=%s processed_items=%s",
+                    job.id,
+                    job.template_id,
+                    job.total_items,
+                    job.processed_items,
+                )
                 try:
                     service.process_job(session, job.id, should_stop=shutdown.should_stop)
+                    logger.info("process_job returned. job_id=%s", job.id)
                 except Exception:
                     logger.exception("Unhandled parser error while processing job_id=%s", job.id)
         except Exception:

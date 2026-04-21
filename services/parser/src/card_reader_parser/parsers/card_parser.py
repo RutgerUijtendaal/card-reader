@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from ..extractors import KeywordsExtractor, TagsExtractor, TypesExtractor
@@ -20,6 +21,8 @@ from .regions import (
 from .region_cropper import RegionCropper
 from .symbol_detector import SymbolDetector
 from .types import ParsedCard
+
+logger = logging.getLogger(__name__)
 
 
 class CardParser:
@@ -48,9 +51,22 @@ class CardParser:
         symbols: list[Symbol] | None = None,
         known_keywords: list[Keyword] | None = None,
     ) -> ParsedCard:
+        logger.info(
+            "Card parse started. image_path=%s template_id=%s symbols=%s known_keywords=%s",
+            image_path,
+            template_id,
+            0 if symbols is None else len(symbols),
+            0 if known_keywords is None else len(known_keywords),
+        )
         template = self._template_store.get_template(template_id)
         checksum = calculate_checksum(image_path)
         region_crops = self._cropper.crop_regions(image_path=image_path, template=template)
+        logger.info(
+            "Card regions cropped. image_path=%s template_id=%s regions=%s",
+            image_path,
+            template_id,
+            sorted(region_crops.keys()),
+        )
 
         if settings.save_debug_crops:
             self._cropper.write_debug_crops(
@@ -143,6 +159,17 @@ class CardParser:
             "notes": "PaddleOCR region OCR",
         }
 
+        logger.info(
+            "Card parse finished. image_path=%s checksum=%s overall_conf=%.3f fields=%s symbols=%s keywords=%s tags=%s types=%s",
+            image_path,
+            checksum,
+            float(confidence.get("overall", 0.0)),
+            sorted(normalized_fields.keys()),
+            len(symbol_ids),
+            len(keyword_ids),
+            len(tag_labels),
+            len(type_labels),
+        )
         return ParsedCard(
             checksum=checksum,
             normalized_fields=normalized_fields,
