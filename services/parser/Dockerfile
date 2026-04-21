@@ -3,7 +3,11 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 ENV UV_LINK_MODE=copy \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    FLAGS_use_mkldnn=0
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 libgl1 libglib2.0-0 \

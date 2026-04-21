@@ -44,6 +44,10 @@ services:
       CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
       CARD_READER_SAVE_DEBUG_CROPS: ${CARD_READER_SAVE_DEBUG_CROPS:-false}
       PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: ${PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK:-True}
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-1}
+      MKL_NUM_THREADS: ${MKL_NUM_THREADS:-1}
+      OPENBLAS_NUM_THREADS: ${OPENBLAS_NUM_THREADS:-1}
+      FLAGS_use_mkldnn: ${FLAGS_use_mkldnn:-0}
     volumes:
       - card_reader_data:/var/lib/card-reader
     depends_on:

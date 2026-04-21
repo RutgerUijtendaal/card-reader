@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import faulthandler
 import logging
 import os
 import signal
@@ -46,6 +47,8 @@ class ShutdownController:
 
 
 def run_parser_loop(interval_seconds: float = 1.5) -> None:
+    # Emit Python stack traces if native extensions crash (SIGSEGV/SIGABRT).
+    faulthandler.enable(all_threads=True)
     configure_logging()
     shutdown = ShutdownController()
     signal.signal(signal.SIGTERM, lambda signum, _frame: shutdown.request_stop(signum))
