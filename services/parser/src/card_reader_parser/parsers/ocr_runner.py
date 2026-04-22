@@ -27,9 +27,9 @@ _PADDLEX_OCR_CONFIG: dict[str, Any] = {
             "module_name": "text_detection",
             "model_name": "PP-OCRv5_server_det",
             "model_dir": None,
-            "limit_side_len": 736,
+            "limit_side_len": 512,
             "limit_type": "max",
-            "max_side_limit": 4000,
+            "max_side_limit": 1536,
             "thresh": 0.3,
             "box_thresh": 0.6,
             "unclip_ratio": 1.5,
@@ -38,7 +38,7 @@ _PADDLEX_OCR_CONFIG: dict[str, Any] = {
             "module_name": "text_recognition",
             "model_name": "PP-OCRv5_server_rec",
             "model_dir": None,
-            "batch_size": 6,
+            "batch_size": 3,
             "score_thresh": 0.0,
         },
     },
@@ -92,7 +92,9 @@ class OcrRunner:
         if not isinstance(json_payload, dict):
             logger.warning("OCR run finished with non-dict payload.")
             return {"text": "", "confidence": 0.0, "lines": []}
+        return self._finalize_from_json_payload(json_payload)
 
+    def _finalize_from_json_payload(self, json_payload: dict[str, Any]) -> dict[str, Any]:
         lines_data: list[OcrLineItem] = []
         confidences: list[float] = []
 
@@ -128,6 +130,7 @@ class OcrRunner:
             avg_conf,
         )
         return {"text": combined, "confidence": avg_conf, "lines": lines_data}
+
 
     def _group_by_lines(
         self,

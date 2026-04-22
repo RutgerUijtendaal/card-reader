@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "echo \"Integration test package has no build step\"",
-    "test": "uv run --project . --extra dev pytest -q",
+    "test": "uv run --project . --extra dev pytest --tb=long -vv",
     "lint": "uv run --project . ruff check tests",
     "typecheck": "echo \"No integration typecheck step\""
   }

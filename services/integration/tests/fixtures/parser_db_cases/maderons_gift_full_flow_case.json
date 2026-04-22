@@ -21,7 +21,7 @@
       ],
       "attack": null,
       "health": null,
-      "rules_text": "Choose either Draw or Play.\nThen shuffle your discard pile and\nrandomly choose a card from it.\nIf you chose Draw, put that card into your hand and draw\na number of cards equal to its cost.\nIf you chose Play, instantly play the chosen card without\npaying its cost and put a number of damage counters on\nyourself equal to its cost.",
+      "rules_text": "Choose either Draw or Play.\nThen shuffle your discard pile and\nrandomly choose a card from it.\nIf you chose Draw, put that : card into your hand and draw\na number of cards equal to its cost.\nIf you chose Play, instantly play the chosen card without\npaying its cost and put a number of damage counters on\nyourself equal to its cost.",
       "version_number": 1
     },
     "metadata": {
