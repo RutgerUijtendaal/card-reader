@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -13,11 +13,12 @@ const binariesDir = join(repoRoot, 'apps', 'desktop', 'src-tauri', 'binaries');
 const pyinstallerTmpDir = join(repoRoot, '.tmp', 'pyinstaller');
 const addDataSeparator = process.platform === 'win32' ? ';' : ':';
 
-const run = (command, args, cwd = repoRoot) => {
+const run = (command, args, cwd = repoRoot, env = {}) => {
   const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
-    shell: false
+    shell: false,
+    env: { ...process.env, ...env }
   });
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
@@ -43,17 +44,19 @@ const buildApi = () => {
     'card_reader_core',
     'migrations'
   );
-  const seedKeywordsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'keywords.json');
-  const seedSymbolsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'symbols.json');
-  const seedTemplatesFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'templates.json');
+  const seedKeywordsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-keywords.json');
+  const seedSymbolsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-symbols.json');
+  const seedTemplatesFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-templates.json');
+  const seedUsersFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-users.local.json');
   const seedAssetsDir = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'assets');
   const coreMigrationsDataSpec = `${coreMigrationsDir}${addDataSeparator}card_reader_core/migrations`;
   const seedKeywordsDataSpec = `${seedKeywordsFile}${addDataSeparator}seeds`;
   const seedSymbolsDataSpec = `${seedSymbolsFile}${addDataSeparator}seeds`;
   const seedTemplatesDataSpec = `${seedTemplatesFile}${addDataSeparator}seeds`;
+  const seedUsersDataSpec = `${seedUsersFile}${addDataSeparator}seeds`;
   const seedAssetsDataSpec = `${seedAssetsDir}${addDataSeparator}seeds/assets`;
 
-  run('uv', [
+  const pyinstallerArgs = [
     'run',
     '--project',
     'services/api',
@@ -86,7 +89,15 @@ const buildApi = () => {
     '--add-data',
     seedTemplatesDataSpec,
     apiEntry
-  ]);
+  ];
+
+  if (existsSync(seedUsersFile)) {
+    pyinstallerArgs.splice(pyinstallerArgs.length - 1, 0, '--add-data', seedUsersDataSpec);
+  }
+
+  run('uv', pyinstallerArgs, repoRoot, {
+    DJANGO_SETTINGS_MODULE: 'card_reader_api.project.settings'
+  });
 };
 
 const buildParser = () => {
@@ -147,7 +158,9 @@ const buildParser = () => {
     '--copy-metadata',
     'shapely',
     parserEntry
-  ]);
+  ], repoRoot, {
+    DJANGO_SETTINGS_MODULE: 'card_reader_core.django_settings'
+  });
 };
 
 clean();

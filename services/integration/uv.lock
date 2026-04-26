@@ -114,6 +114,12 @@ requires-dist = [
 ]
 provides-extras = ["dev"]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "django-stubs", specifier = ">=6.0.3" },
+    { name = "djangorestframework-stubs", specifier = ">=3.16.9" },
+]
+
 [[package]]
 name = "card-reader-core"
 version = "0.1.7"
@@ -131,6 +137,9 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.9" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "django-stubs", specifier = ">=6.0.3" }]
 
 [[package]]
 name = "card-reader-integration"
@@ -173,6 +182,7 @@ name = "card-reader-parser"
 version = "0.1.7"
 source = { editable = "../parser" }
 dependencies = [
+    { name = "card-reader-api" },
     { name = "card-reader-core" },
     { name = "paddleocr" },
     { name = "paddlepaddle" },
@@ -184,6 +194,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "card-reader-api", editable = "../api" },
     { name = "card-reader-core", editable = "../core" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "paddleocr", specifier = ">=3.1.0" },
@@ -196,6 +207,9 @@ requires-dist = [
     { name = "watchfiles", specifier = ">=0.24.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "django-stubs", specifier = ">=6.0.3" }]
 
 [[package]]
 name = "certifi"
