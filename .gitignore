@@ -34,3 +34,4 @@ apps/desktop/src-tauri/binaries/
 .tmp/
 *.spec
 TODO.local.md
+services/api/src/card_reader_api/seeds/seed-users.local.json

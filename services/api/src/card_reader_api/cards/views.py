@@ -4,6 +4,7 @@ from pathlib import Path
 
 from django.http import FileResponse, Http404
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,6 +15,8 @@ from card_reader_core.settings import settings
 
 
 class CardListView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request: Request) -> Response:
         service = CardService()
         cards = service.list_cards(**_card_filters(request))
@@ -33,6 +36,8 @@ class CardListView(APIView):
 
 
 class CardFiltersView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, _request: Request) -> Response:
         metadata = CardService().get_filter_metadata()
         return Response(
@@ -89,6 +94,8 @@ class CardGenerationsView(APIView):
 
 
 class CardImageView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, _request: Request, card_id: str) -> FileResponse:
         card, _version, image = CardService().get_card_with_image(card_id)
         if card is None or image is None:
@@ -108,6 +115,8 @@ class CardVersionImageView(APIView):
 
 
 class SymbolAssetView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, _request: Request, asset_path: str) -> FileResponse:
         symbols_root = settings.storage_root_dir.resolve() / "symbols"
         requested_path = (symbols_root / asset_path).resolve()

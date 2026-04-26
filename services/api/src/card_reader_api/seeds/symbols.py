@@ -14,7 +14,7 @@ from .shared import resolve_seed_file
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SYMBOLS_FILE = resolve_seed_file("symbols.json")
+DEFAULT_SYMBOLS_FILE = resolve_seed_file("seed-symbols.json")
 DEFAULT_SYMBOLS_ASSET_DIR = resolve_seed_file("assets/symbols")
 
 

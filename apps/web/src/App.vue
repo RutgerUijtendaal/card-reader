@@ -14,6 +14,7 @@
         </RouterLink>
 
         <RouterLink
+          v-if="auth.canAccessStaffRoutes"
           class="nav-link"
           to="/import-jobs"
         >
@@ -22,6 +23,7 @@
         </RouterLink>
 
         <RouterLink
+          v-if="auth.canAccessStaffRoutes"
           class="nav-link"
           to="/review"
         >
@@ -30,6 +32,7 @@
         </RouterLink>
 
         <RouterLink
+          v-if="auth.canAccessStaffRoutes"
           class="nav-link"
           to="/settings"
         >
@@ -37,6 +40,27 @@
           <span>Settings</span>
         </RouterLink>
       </nav>
+
+      <div class="mt-6 border-t border-white/10 pt-4">
+        <RouterLink
+          v-if="auth.authEnabled && !auth.authenticated"
+          class="nav-link"
+          to="/login"
+        >
+          <LogIn class="h-4 w-4" />
+          <span>Sign in</span>
+        </RouterLink>
+
+        <button
+          v-if="auth.authEnabled && auth.authenticated"
+          class="nav-link w-full"
+          type="button"
+          @click="signOut"
+        >
+          <LogOut class="h-4 w-4" />
+          <span>Sign out</span>
+        </button>
+      </div>
     </aside>
 
     <main class="h-full overflow-y-auto p-4 sm:p-6">
@@ -50,6 +74,16 @@
 </template>
 
 <script setup lang="ts">
-import { ClipboardCheck, Images, Settings, Upload } from 'lucide-vue-next';
+import { ClipboardCheck, Images, LogIn, LogOut, Settings, Upload } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/modules/auth/authStore';
+
+const auth = useAuthStore();
+const router = useRouter();
+
+const signOut = async (): Promise<void> => {
+  await auth.logout();
+  await router.push('/cards');
+};
 </script>

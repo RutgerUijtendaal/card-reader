@@ -31,6 +31,7 @@
           <span>Templates</span>
         </button>
         <button
+          v-if="auth.canAccessMaintenance"
           class="btn-secondary inline-flex items-center gap-2"
           type="button"
           :class="activeTab === 'maintenance' ? 'border-sky-300 bg-sky-50 text-sky-700' : ''"
@@ -50,9 +51,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Database, LayoutTemplate, Settings, Tags } from 'lucide-vue-next';
+import { useAuthStore } from '@/modules/auth/authStore';
 import MaintenanceSettingsView from './views/MaintenanceSettingsView.vue';
 import CatalogSettingsView from './views/CatalogSettingsView.vue';
 import TemplatesSettingsView from './views/TemplatesSettingsView.vue';
 
+const auth = useAuthStore();
 const activeTab = ref<'maintenance' | 'catalog' | 'templates'>('catalog');
 </script>

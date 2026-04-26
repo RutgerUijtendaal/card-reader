@@ -24,4 +24,4 @@ RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uv run --no-dev python manage.py migrate_card_reader && uv run --no-dev python manage.py seed_defaults && uv run --no-dev gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000"]
+CMD ["sh", "-c", "uv run --no-dev python manage.py migrate_card_reader && uv run --no-dev python manage.py seed_users && uv run --no-dev python manage.py seed_defaults && uv run --no-dev gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000"]

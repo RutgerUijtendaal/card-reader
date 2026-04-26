@@ -31,7 +31,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "card_reader_api.common.permissions.AuthEnabledOrReadWriteAllowed",
+        "card_reader_api.common.permissions.AuthEnabledOrStaffAllowed",
     ],
 }
 

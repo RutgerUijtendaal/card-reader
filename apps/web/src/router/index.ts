@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '@/modules/auth/authStore';
+import LoginPage from '@/modules/auth/LoginPage.vue';
 import ImportJobsPage from '@/modules/import-jobs/ImportJobsPage.vue';
 import CardSearchPage from '@/modules/card-search/CardSearchPage.vue';
 import CardDetailPage from '@/modules/card-detail/CardDetailPage.vue';
@@ -10,9 +12,33 @@ export const router = createRouter({
   routes: [
     { path: '/', redirect: '/cards' },
     { path: '/cards', component: CardSearchPage },
-    { path: '/import-jobs', component: ImportJobsPage },
-    { path: '/cards/:id', component: CardDetailPage, props: true },
-    { path: '/review', component: ReviewQueuePage },
-    { path: '/settings', component: SettingsPage },
+    { path: '/login', component: LoginPage, meta: { public: true } },
+    { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true } },
+    { path: '/cards/:id', component: CardDetailPage, props: true, meta: { requiresStaff: true } },
+    { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true } },
+    { path: '/settings', component: SettingsPage, meta: { requiresStaff: true } },
   ],
+});
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore();
+  if (!auth.initialized) {
+    await auth.fetchCurrentUser();
+  }
+
+  if (to.path === '/login' && auth.canAccessStaffRoutes) {
+    return '/import-jobs';
+  }
+
+  if (to.meta.requiresStaff && !auth.canAccessStaffRoutes) {
+    if (auth.authEnabled && auth.authenticated) {
+      return '/cards';
+    }
+    return {
+      path: '/login',
+      query: { redirect: to.fullPath },
+    };
+  }
+
+  return true;
 });

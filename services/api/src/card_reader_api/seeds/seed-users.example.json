@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "password": "change-me",
+      "is_staff": true,
+      "is_superuser": true
+    },
+    {
+      "username": "manager",
+      "password": "change-me-too",
+      "is_staff": true,
+      "is_superuser": false
+    }
+  ]
+}

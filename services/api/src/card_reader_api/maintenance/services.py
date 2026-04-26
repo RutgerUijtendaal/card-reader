@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from django.core.management import call_command
+from django.db import connection, connections
 
 from card_reader_api.seeds import run_registered_seeds
 from card_reader_core.database.connection import DATABASE_PATH, initialize_database
@@ -28,18 +29,18 @@ class OpenStorageLocationResult:
 
 class MaintenanceService:
     def rebuild_database(self) -> MaintenanceResult:
-        removed_paths = self._remove_database_files()
+        reset_paths = self._reset_database()
         initialize_database()
         call_command("migrate", interactive=False, verbosity=0)
         run_registered_seeds(force=False)
         return MaintenanceResult(
             message="Database rebuilt and migrated to latest schema.",
-            removed_paths=removed_paths,
+            removed_paths=reset_paths,
         )
 
     def clear_storage_data(self, *, include_images: bool) -> MaintenanceResult:
         storage_root = settings.storage_root_dir.resolve()
-        candidate_paths = [storage_root / "uploads", settings.debug_crops_dir.resolve(), storage_root / "logs"]
+        candidate_paths = [storage_root / "uploads", settings.debug_crops_dir.resolve()]
         if include_images:
             candidate_paths.append(settings.image_store_dir.resolve())
 
@@ -47,8 +48,8 @@ class MaintenanceService:
         for path in candidate_paths:
             safe_path = path.resolve()
             if self._is_within_storage_root(storage_root, safe_path) and safe_path.exists():
-                shutil.rmtree(safe_path)
-                removed_paths.append(str(safe_path))
+                if self._safe_remove_tree(safe_path):
+                    removed_paths.append(str(safe_path))
 
         initialize_database()
         (settings.storage_root_dir / "uploads").mkdir(parents=True, exist_ok=True)
@@ -72,17 +73,29 @@ class MaintenanceService:
             path=str(target),
         )
 
-    def _remove_database_files(self) -> list[str]:
-        removed_paths: list[str] = []
-        for path in [
-            DATABASE_PATH,
-            DATABASE_PATH.with_name(f"{DATABASE_PATH.name}-shm"),
-            DATABASE_PATH.with_name(f"{DATABASE_PATH.name}-wal"),
-        ]:
-            if path.exists():
-                path.unlink()
-                removed_paths.append(str(path))
-        return removed_paths
+    def _reset_database(self) -> list[str]:
+        self._drop_database_schema()
+        return [f"{DATABASE_PATH} (schema reset)"]
+
+    @staticmethod
+    def _drop_database_schema() -> None:
+        with connection.cursor() as cursor:
+            cursor.execute("PRAGMA foreign_keys = OFF")
+            table_names = connection.introspection.table_names(cursor)
+            for table_name in table_names:
+                if table_name.startswith("sqlite_"):
+                    continue
+                cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+            cursor.execute("PRAGMA foreign_keys = ON")
+        connections.close_all()
+
+    @staticmethod
+    def _safe_remove_tree(path: Path) -> bool:
+        try:
+            shutil.rmtree(path)
+        except PermissionError:
+            return False
+        return True
 
     @staticmethod
     def _is_within_storage_root(storage_root: Path, target: Path) -> bool:

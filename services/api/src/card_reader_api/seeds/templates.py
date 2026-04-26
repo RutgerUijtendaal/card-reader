@@ -11,7 +11,7 @@ from card_reader_core.repositories import normalize_slug_key
 from .shared import resolve_seed_file
 
 logger = logging.getLogger(__name__)
-DEFAULT_TEMPLATES_FILE = resolve_seed_file("templates.json")
+DEFAULT_TEMPLATES_FILE = resolve_seed_file("seed-templates.json")
 
 
 @dataclass(slots=True)

@@ -10,7 +10,7 @@ from card_reader_core.models import Keyword, now_utc
 from card_reader_core.repositories import normalize_slug_key
 from .shared import resolve_seed_file
 
-DEFAULT_KEYWORDS_FILE = resolve_seed_file("keywords.json")
+DEFAULT_KEYWORDS_FILE = resolve_seed_file("seed-keywords.json")
 logger = logging.getLogger(__name__)
 
 
