@@ -16,7 +16,7 @@ class SimpleCorsMiddleware:
 
         if settings.DEBUG and origin:
             response["Access-Control-Allow-Origin"] = origin
-        elif origin in getattr(settings, "CARD_READER_CORS_ORIGINS", []):
+        elif origin and origin in getattr(settings, "CARD_READER_CORS_ORIGINS", []):
             response["Access-Control-Allow-Origin"] = origin
 
         response["Vary"] = "Origin"

@@ -8,7 +8,7 @@ from django.db import connection
 class Command(BaseCommand):
     help = "Adopt an existing domain schema when needed, then run Django migrations."
 
-    def handle(self, *args, **options) -> None:
+    def handle(self, *args: object, **options: object) -> None:
         tables = set(connection.introspection.table_names())
         applied_core_migrations = self._applied_core_migrations()
         if "card" in tables and not applied_core_migrations:

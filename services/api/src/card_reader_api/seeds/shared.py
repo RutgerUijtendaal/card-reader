@@ -31,4 +31,4 @@ def resolve_seed_file(relative_from_seed_root: str) -> Path:
 
 
 def model_has_any_rows(_session: Any, model: type[Any]) -> bool:
-    return model.objects.exists()
+    return bool(model.objects.exists())

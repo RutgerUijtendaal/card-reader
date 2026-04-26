@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
+from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -74,7 +75,7 @@ def _parse_options(options_json: str) -> dict[str, object] | Response:
     return options_raw
 
 
-def _save_supported_uploads(files) -> Path | None:
+def _save_supported_uploads(files: list[UploadedFile]) -> Path | None:
     upload_dir = settings.storage_root_dir / "uploads" / str(uuid4())
     upload_dir.mkdir(parents=True, exist_ok=True)
     saved_count = 0

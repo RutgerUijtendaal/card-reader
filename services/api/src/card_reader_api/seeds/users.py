@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import CommandError
@@ -52,7 +52,9 @@ def seed_users(seed_path: Path) -> UserSeedResult:
     created_count = 0
     existing_count = 0
     for seed_user in seed_entries:
-        user, created = user_model.objects.get_or_create(username=seed_user.username)
+        user_result = user_model.objects.get_or_create(username=seed_user.username)
+        user = cast(Any, user_result[0])
+        created = bool(user_result[1])
         changed_fields: list[str] = []
 
         if created:

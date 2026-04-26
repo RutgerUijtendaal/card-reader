@@ -15,8 +15,8 @@ def uuid_str() -> str:
 
 
 class TimestampedModel(models.Model):
-    created_at = models.DateTimeField(default=now_utc)
-    updated_at = models.DateTimeField(default=now_utc)
+    created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(default=now_utc)
+    updated_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(default=now_utc)
 
     class Meta:
         abstract = True

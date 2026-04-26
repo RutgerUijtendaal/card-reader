@@ -1,47 +1,14 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from rest_framework import serializers
+from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
 
-from card_reader_core.models import Card, CardVersion, Symbol
+if TYPE_CHECKING:
+    from card_reader_core.services.cards import CardMetadata
 
-
-class MetadataOptionSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    key = serializers.CharField()
-    label = serializers.CharField()
-
-
-class SymbolFilterOptionSerializer(MetadataOptionSerializer):
-    symbol_type = serializers.CharField(default="generic")
-    text_token = serializers.CharField(default="")
-    asset_url = serializers.CharField(allow_null=True, required=False)
-
-
-class CardSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    key = serializers.CharField()
-    label = serializers.CharField()
-    name = serializers.CharField()
-    template_id = serializers.CharField()
-    version_id = serializers.CharField()
-    version_number = serializers.IntegerField()
-    previous_version_id = serializers.CharField(allow_null=True)
-    is_latest = serializers.BooleanField()
-    type_line = serializers.CharField()
-    mana_cost = serializers.CharField()
-    mana_symbols = serializers.ListField(child=serializers.CharField())
-    attack = serializers.IntegerField(allow_null=True)
-    health = serializers.IntegerField(allow_null=True)
-    rules_text = serializers.CharField()
-    confidence = serializers.FloatField()
-    created_at = serializers.CharField()
-    image_url = serializers.CharField(allow_null=True)
-    keywords = serializers.ListField(child=serializers.CharField(), default=list)
-    tags = MetadataOptionSerializer(many=True, default=list)
-    symbols = SymbolFilterOptionSerializer(many=True, default=list)
-    types = MetadataOptionSerializer(many=True, default=list)
+MetadataOption = Keyword | Tag | Type
 
 
 def card_payload(
@@ -49,9 +16,9 @@ def card_payload(
     version: CardVersion,
     *,
     image_url: str | None,
-    metadata: dict[str, list[object]] | None = None,
+    metadata: CardMetadata | None = None,
 ) -> dict[str, object]:
-    payload = {
+    payload: dict[str, object] = {
         "id": card.id,
         "key": card.key,
         "label": card.label,
@@ -77,10 +44,10 @@ def card_payload(
     }
     if metadata is not None:
         payload.update(metadata_payload(metadata))
-    return CardSerializer(payload).data
+    return payload
 
 
-def metadata_payload(metadata: dict[str, list[object]]) -> dict[str, object]:
+def metadata_payload(metadata: CardMetadata) -> dict[str, object]:
     return {
         "keywords": [row.label for row in metadata["keywords"]],
         "tags": [metadata_option(row) for row in metadata["tags"]],
@@ -89,7 +56,7 @@ def metadata_payload(metadata: dict[str, list[object]]) -> dict[str, object]:
     }
 
 
-def metadata_option(row: object) -> dict[str, str]:
+def metadata_option(row: MetadataOption) -> dict[str, str]:
     return {"id": str(row.id), "key": str(row.key), "label": str(row.label)}
 
 

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import card_reader_core.models.base
+from typing import ClassVar
+
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
     initial = True
-    dependencies: list[tuple[str, str]] = []
+    dependencies: ClassVar[list[tuple[str, str]]] = []
 
     operations = [
         migrations.CreateModel(

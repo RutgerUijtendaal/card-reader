@@ -1,18 +1,28 @@
 # Card Reader Monorepo
 
-Backend-first card parsing platform with Vue/Tauri frontend scaffolding.
+Card Reader is a Django-backed card parsing platform with a Vue web app, a Tauri desktop shell,
+and a background OCR/parser process.
+
+## Stack
+
+- Monorepo tooling: `pnpm` workspaces + `turbo`
+- Web app: Vue 3 + Vite + TypeScript
+- Desktop shell: Tauri
+- Backend API: Django + Django REST Framework
+- Shared backend core: Django models, migrations, repositories, services, settings, and storage
+- Parser: Python background process using the core Django data layer
+- Persistence: SQLite by default
+- OCR/CV: PaddleOCR + OpenCV
 
 ## Prerequisites
-Install these before running bootstrap:
 
 - `Node.js` 22+
 - `pnpm` 10+
 - `Python` 3.12+
 - `uv` (Astral)
-- `Rust` + `cargo` (required only for Tauri desktop)
-- OCR runtime note: `bootstrap` installs OCR deps for parser (`paddleocr`, `paddlepaddle`) and shared deps for core/API.
+- `Rust` + `cargo` for Tauri desktop development
 
-Linux/WSL install examples:
+Linux/WSL install example:
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
@@ -26,29 +36,14 @@ curl https://sh.rustup.rs -sSf | sh
 source "$HOME/.cargo/env"
 ```
 
-Verify:
-
-```bash
-node --version
-pnpm --version
-python --version
-uv --version
-cargo --version
-pkg-config --modversion glib-2.0
-```
-
-Optional sanity check after bootstrap:
-
-```bash
-cd services/parser
-uv run --project . python -c "import paddle, paddleocr; print('ok')"
-```
-
 ## Bootstrap
 
 ```bash
 ./scripts/bootstrap.sh --node --python
 ```
+
+The bootstrap installs Node dependencies and syncs the Python environments for core, API, parser,
+and integration tests.
 
 ## Development
 
@@ -56,14 +51,9 @@ uv run --project . python -c "import paddle, paddleocr; print('ok')"
 ./scripts/dev.sh
 ```
 
-This starts API + parser + web (desktop excluded).
-It also re-syncs Python dependencies for core/API/parser before starting.
-Hot reload behavior in dev:
-- Web (Vite): HMR enabled with polling watch (WSL-safe).
-- API (Uvicorn): `--reload` enabled with polling-based file watch.
-- Parser: auto-restarts on Python file changes via `watchfiles`.
+This starts the Django API, parser, and Vue web app. Desktop is excluded from the default dev loop.
 
-Or run specific services:
+Useful targeted commands:
 
 ```bash
 pnpm --filter @card-reader/api dev
@@ -75,74 +65,130 @@ pnpm dev:all
 pnpm dev:desktop
 ```
 
-## Server Deploy (Dockerized API + Parser)
+## Backend Runtime
 
-Use this when you host the web app separately behind your own Nginx.
+The API service is a Django project in `services/api`. Domain models and migrations live in
+`services/core` so both the API and parser use the same data layer.
 
-1. Copy env template and adjust values:
+The API startup sequence runs:
+
+```bash
+python manage.py migrate_card_reader
+python manage.py seed_users
+python manage.py seed_defaults
+python manage.py runserver 127.0.0.1:8000
+```
+
+Auth is enabled by default. The public card gallery remains accessible without login. Import jobs,
+review, settings, catalog, templates, and exports require a staff user. Maintenance actions require a
+superuser.
+
+## Seed Files
+
+Default catalog/template seeds live in `services/api/src/card_reader_api/seeds`:
+
+- `seed-keywords.json`
+- `seed-symbols.json`
+- `seed-templates.json`
+
+Local development users live in:
+
+```text
+services/api/src/card_reader_api/seeds/seed-users.local.json
+```
+
+That file is gitignored. Use `seed-users.example.json` in the same directory as the schema reference.
+
+User seed entries use:
+
+```json
+{
+  "users": [
+    {
+      "username": "admin",
+      "password": "change-me",
+      "is_staff": true,
+      "is_superuser": true
+    }
+  ]
+}
+```
+
+`seed_users` creates missing users and updates `is_staff` / `is_superuser` for existing users. It does
+not overwrite passwords for existing users.
+
+## Docker Deploy
+
+Copy the environment template and set production values:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Build and start backend services:
+Start the backend services:
 
 ```bash
 docker compose up -d --build
 ```
 
-3. Check health:
+The compose stack runs:
+
+- `api`: Django migrations, user seeds, default seeds, then Gunicorn on `0.0.0.0:8000`
+- `parser`: background parser process with `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`
+
+Both services share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
+
+Production settings are controlled through `.env`:
+
+- `CARD_READER_DJANGO_SECRET_KEY`
+- `CARD_READER_ALLOWED_HOSTS`
+- `CARD_READER_CSRF_TRUSTED_ORIGINS`
+- `CARD_READER_CORS_ORIGINS`
+- `CARD_READER_AUTH_ENABLED`
+
+Health check:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Notes:
-- `api` and `parser` share one Docker volume: `card_reader_data`.
-- Runtime data (DB, uploads, images, logs) is stored at `/var/lib/card-reader` in containers.
-- API is only published on `127.0.0.1:8000` by default. Change `CARD_READER_API_BIND` in `.env` if needed.
-- CORS for your external web app should be set via `CARD_READER_CORS_ORIGINS` in `.env` as a JSON array.
+## Ansible Deploy
 
-Known defaults are auto-seeded on first API boot (only when target tables are empty):
-- `keywords` from `services/api/src/seeds/keywords.json`
-- `symbols` from `services/api/src/seeds/symbols.json` + `services/api/src/seeds/assets/symbols/`
+The webserver Ansible role owns the production user seed file:
 
-Manual reseed:
-
-```bash
-pnpm --filter @card-reader/api run seed
+```text
+../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.json
 ```
 
-You can still run only the keyword seeder:
+The tracked schema example is:
 
-```bash
-pnpm --filter @card-reader/api run seed:keywords
+```text
+../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.example.json
 ```
 
-## Desktop (Tauri) Prerequisites
+During deploy, the role copies the private production file into the deployed app at:
 
-Desktop dev requires Rust/Cargo and GTK/WebKit system libraries on Linux/WSL:
-
-```bash
-curl https://sh.rustup.rs -sSf | sh
-source "$HOME/.cargo/env"
-cargo --version
-sudo apt install -y pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+```text
+services/api/src/card_reader_api/seeds/seed-users.local.json
 ```
 
-## Storage Behavior
+The generic Docker Compose deploy task only handles environment rendering, required environment
+validation, and deployment file copying. Card Reader-specific file paths are declared in the
+Card Reader deployment item.
 
-- Development (default): runtime data is written to `storage/` in the repo.
-- Production (`CARD_READER_ENV=production`): runtime data is written to OS app data:
-- Linux: `~/.local/share/card-reader`
-- macOS: `~/Library/Application Support/card-reader`
-- Windows: `%LOCALAPPDATA%/Card Reader`
+## Storage
 
-Optional override:
-- Set `CARD_READER_APP_DATA_DIR=/custom/path` to force a specific storage root in any environment.
+- Development storage root: `storage/`
+- Docker storage root: `/var/lib/card-reader`
+- Production native storage root:
+  - Linux: `~/.local/share/card-reader`
+  - macOS: `~/Library/Application Support/card-reader`
+  - Windows: `%LOCALAPPDATA%/Card Reader`
 
-## API Logs
+Set `CARD_READER_APP_DATA_DIR` to force a storage root.
 
-- API logs are written to `<storage_root>/logs/api.log`.
-- In development defaults, that is `storage/logs/api.log`.
-- Use this file to diagnose backend-side import failures.
+API logs are written to:
+
+```text
+<storage_root>/logs/api.log
+```

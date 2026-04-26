@@ -34,9 +34,13 @@ def _export_filters(request: Request) -> dict[str, object]:
 
 def _float_param(request: Request, name: str) -> float | None:
     value = request.query_params.get(name)
-    return None if value in (None, "") else float(value)
+    if value is None or value == "":
+        return None
+    return float(value)
 
 
 def _int_param(request: Request, name: str) -> int | None:
     value = request.query_params.get(name)
-    return None if value in (None, "") else int(value)
+    if value is None or value == "":
+        return None
+    return int(value)

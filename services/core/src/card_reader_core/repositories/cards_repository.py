@@ -256,7 +256,7 @@ def _mark_item_completed(item: ImportJobItem) -> None:
     item.save(update_fields=["status", "error_message", "updated_at"])
 
 
-def _apply_card_filters(queryset: QuerySet[CardVersion], **filters) -> QuerySet[CardVersion]:
+def _apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> QuerySet[CardVersion]:
     if filters["max_confidence"] is not None:
         queryset = queryset.filter(confidence__lte=filters["max_confidence"])
     if filters["mana_cost"]:
@@ -276,7 +276,7 @@ def _apply_card_filters(queryset: QuerySet[CardVersion], **filters) -> QuerySet[
 
 def _filter_by_links(
     queryset: QuerySet[CardVersion],
-    link_model: type,
+    link_model: Any,
     link_field: str,
     values: list[str] | None,
 ) -> QuerySet[CardVersion]:

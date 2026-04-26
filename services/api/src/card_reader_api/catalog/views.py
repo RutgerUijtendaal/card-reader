@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
+from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.catalog.serializers import (
-    keyword_payload,
-    symbol_payload,
-    tag_payload,
-    type_payload,
-)
+from card_reader_api.catalog.serializers import keyword_payload, symbol_payload, tag_payload, type_payload
 from card_reader_core.services import CatalogService
 from card_reader_core.settings import settings
 
@@ -142,7 +140,11 @@ class SymbolAssetUploadView(APIView):
         )
 
 
-def _create_simple(request: Request, kind: str, payload) -> Response:
+def _create_simple(
+    request: Request,
+    kind: str,
+    payload: Callable[[Any], dict[str, object]],
+) -> Response:
     label = request.data.get("label")
     if label is None:
         return _bad_request("label is required")
@@ -153,7 +155,12 @@ def _create_simple(request: Request, kind: str, payload) -> Response:
     return Response(payload(row))
 
 
-def _update_simple(request: Request, entry_id: str, kind: str, payload) -> Response:
+def _update_simple(
+    request: Request,
+    entry_id: str,
+    kind: str,
+    payload: Callable[[Any], dict[str, object]],
+) -> Response:
     try:
         row = getattr(CatalogService(), f"update_{kind}")(
             entry_id=entry_id,
@@ -174,7 +181,7 @@ def _delete_simple(entry_id: str, kind: str, label: str) -> Response:
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def _store_symbol_asset(upload, filename: str, suffix: str) -> Path:
+def _store_symbol_asset(upload: UploadedFile, filename: str, suffix: str) -> Path:
     uploads_dir = settings.storage_root_dir / "symbols" / "uploads"
     uploads_dir.mkdir(parents=True, exist_ok=True)
     stem = Path(filename).stem.strip().lower()

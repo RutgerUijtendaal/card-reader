@@ -1,69 +1,111 @@
 # AGENTS.md - Card Reader Monorepo
 
+## Operating Rules
+- Always read this file before working.
+- Read `TODO.local.md` for local task context.
+- Ask before editing `AGENTS.md`; update it when project guidance changes.
+- Update `.gitignore` when adding generated, private, or machine-local files.
+- Write scalable, readable code. Fix underlying issues cleanly instead of layering quick fixes.
+
 ## Purpose
-This repository is a backend-first card parsing platform with a Vue web UI and Tauri desktop shell.
+Card Reader is a Django-backed card parsing platform with a Vue web UI, a Tauri desktop shell, and a
+background OCR/parser process.
 
 Core stack:
 - Monorepo tooling: `pnpm` workspaces + `turbo`
 - Frontend: Vue 3 + Vite + TypeScript
 - Desktop shell: Tauri (Rust)
-- Shared Core: Python service package for runtime/data foundations
-- Backend API: Python + FastAPI + SQLModel + SQLite (FTS5)
-- Parser: Python background parsing processor
+- Shared core: Python package with Django models, migrations, settings, repositories, services, and storage
+- Backend API: Django + Django REST Framework + SQLite
+- Parser: Python background process using the core Django data layer
 - OCR/CV target: PaddleOCR + OpenCV
 
 ## Repo Structure
-- `apps/web`: Vue app (`/import-jobs`, `/cards`, `/settings`)
-- `apps/desktop`: Tauri wrapper; starts sidecar binaries (`card-reader-api`, `card-reader-parser`)
-- `services/core`: shared runtime/data modules in `src/`
-  - `settings.py`, `core_logging.py`, `storage.py`, `templates.py`
-  - `database/`, `models/`, `repositories/`
-- `services/api`: FastAPI service
-  - `main.py` (lifespan startup)
-  - `controllers/`, `dependencies/`, `mappers/`, `router/`, `schemas/`, `services/`, `seeds/`
-  - `database_migrations.py` + Alembic migrations under `alembic/`
-- `services/parser`: async polling parser process
-  - `main.py` loop
-  - `parsers/` (region parsers, OCR runner, symbol detector)
-  - `extractors/` + `services/` + `template_store.py` (DB-backed template store)
-- `services/integration`: cross-service integration tests (real OCR full-flow fixture cases)
-- `scripts`: shell scripts for bootstrap/dev/release
+- `apps/web`: Vue app for card gallery, imports, review, settings, and login.
+- `apps/desktop`: Tauri wrapper around the web/backend experience.
+- `services/core`: shared runtime and domain package.
+  - Django models and migrations
+  - database connection/adoption helpers
+  - repositories and business services
+  - shared storage/settings/template utilities
+  - `card_reader_core.django_settings` for non-HTTP Django processes
+- `services/api`: Django/DRF HTTP service.
+  - Django project: `card_reader_api.project`
+  - auth endpoints, API views/serializers, URL routing, management commands, seeds
+  - API-specific settings extend core Django settings
+- `services/parser`: async polling parser process.
+  - OCR runner, region parsers, symbol detector, extractors
+  - boots Django with `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`
+- `services/integration`: cross-service integration tests for parser/core/API behavior.
+- `scripts`: bootstrap/dev/release scripts.
 
 ## Architectural Rules
 - Keep service boundaries strict:
-  - `api` depends on `core`; never imports parser modules
-  - `parser` depends on `core`; never imports api modules
-  - `core` contains shared runtime/data foundations only
-- Import flow must remain async:
-  - API creates jobs and items
-  - Parser claims queued jobs and processes files
+  - `api` depends on `core`; it must not import parser modules.
+  - `parser` depends on `core`; it must not import API views, serializers, URLs, DRF settings, or API-only services.
+  - `core` contains shared domain/runtime foundations only.
+- Django owns the domain schema through migrations in `services/core`.
+- SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
+- Import flow remains async:
+  - API creates jobs and items.
+  - Parser claims queued work.
+  - Parser writes results through core repositories/services.
 - Persist imported images under the configured storage root using hash-based filenames.
-- Keep parser provider-agnostic: PaddleOCR is default behind parser-owned adapter boundaries.
+- Keep parser provider-agnostic. PaddleOCR is the default behind parser-owned adapter boundaries.
+- Keep Vue API compatibility stable unless a requested change explicitly requires a contract change.
+
+## Auth Rules
+- Auth is enabled by default.
+- Card gallery and card assets are public.
+- Import jobs, review, settings, catalog, templates, and exports require `is_staff=true`.
+- Maintenance endpoints require `is_superuser=true`.
+- The Vue app uses Django session auth with CSRF protection.
+- `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.
+
+## Seed Files
+- Default seed JSON files live in `services/api/src/card_reader_api/seeds`:
+  - `seed-keywords.json`
+  - `seed-symbols.json`
+  - `seed-templates.json`
+  - `seed-users.example.json`
+- Local development users live in:
+  - `services/api/src/card_reader_api/seeds/seed-users.local.json`
+- `seed-users.local.json` is gitignored.
+- Production users are owned by the Ansible webserver role:
+  - `../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.json`
+  - tracked example: `../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.example.json`
+- Deploy copies the production users file into the deployed app as `seed-users.local.json`.
+
+## Docker And Runtime
+- `api` and `parser` share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
+- API container startup runs migrations, user seeds, default seeds, then Gunicorn.
+- Parser container waits for the API health check and assumes the schema is ready.
+- Parser container uses `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`.
+- Runtime settings are provided through `CARD_READER_*` environment variables.
 
 ## Development Commands
 From repo root:
 - Install deps: `./scripts/bootstrap.sh --node --python`
-- Dev default (no desktop): `./scripts/dev.sh`
-- Dev all (including desktop): `pnpm dev:all`
-- Desktop dev: `pnpm dev:desktop` (requires Rust/Cargo)
+- Dev default: `./scripts/dev.sh`
+- Dev all: `pnpm dev:all`
+- Desktop dev: `pnpm dev:desktop`
 - Build all: `pnpm build`
 - Lint all: `pnpm lint`
 - Typecheck all: `pnpm typecheck`
 - Test all: `pnpm test`
 
-Targeted dev commands:
+Targeted commands:
 - API: `pnpm --filter @card-reader/api dev`
 - Parser: `pnpm --filter @card-reader/parser dev`
-- Core: `pnpm --filter @card-reader/core lint` / `typecheck`
+- Core: `pnpm --filter @card-reader/core lint` / `pnpm --filter @card-reader/core typecheck`
 - Web: `pnpm --filter @card-reader/web dev`
 - Integration tests: `pnpm --filter @card-reader/integration test`
-- Desktop: `pnpm dev:desktop`
 
 ## Coding Standards
 - Python:
   - dependency/runtime via `uv`
   - lint: `ruff`
-  - typing: `mypy` (strict)
+  - typing: `mypy`
   - tests: `pytest`
 - TypeScript/Vue:
   - lint: `eslint`
@@ -71,7 +113,7 @@ Targeted dev commands:
   - typecheck: `vue-tsc`
   - tests: `vitest`
 
-## API Surface (v1)
+## API Surface
 - `POST /imports/upload`
 - `GET /imports`
 - `GET /imports/{job_id}`
@@ -83,12 +125,15 @@ Targeted dev commands:
 - `GET /cards/{card_id}/versions/{version_id}/image`
 - `GET /symbols/assets/{asset_path}`
 - `GET /exports/csv`
-- `GET/POST/PATCH/DELETE /settings/*` (catalog metadata, templates, maintenance, symbol assets)
+- `GET/POST/PATCH/DELETE /settings/*`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
+- `GET /health`
 
-## Notes for Future Agents
-- No auth/multi-user assumptions in v1.
-- SQLite is default persistence; do not introduce Postgres-only behavior without explicit request.
-- Preserve idempotent import behavior by image hash.
-- Keep search index (`card_version_search` FTS5) in sync when card text fields change.
-- Template definitions are DB-backed (`template` table) and seeded from `services/api/src/seeds/templates.json`.
-- Keep template loading behind `core.templates.TemplateStore`.
+## Notes For Future Agents
+- Do not revert unrelated user changes in this dirty worktree.
+- Treat the backend as Django/DRF with Django-owned models and migrations.
+- Keep README files declarative and current-state focused.
+- Do not store real credentials in the app repo.
+- Do not read or expose private seed user files unless the user explicitly asks.

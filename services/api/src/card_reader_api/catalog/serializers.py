@@ -1,45 +1,40 @@
 from __future__ import annotations
 
-from rest_framework import serializers
+from card_reader_core.models import Keyword, Symbol, Tag, Type
 
 
-class KeywordSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    key = serializers.CharField()
-    label = serializers.CharField()
+CatalogOption = Keyword | Tag | Type
 
 
-class TagSerializer(KeywordSerializer):
-    pass
+def _catalog_option_payload(row: CatalogOption) -> dict[str, object]:
+    return {
+        "id": row.id,
+        "key": row.key,
+        "label": row.label,
+    }
 
 
-class TypeSerializer(KeywordSerializer):
-    pass
+def keyword_payload(row: Keyword) -> dict[str, object]:
+    return _catalog_option_payload(row)
 
 
-class SymbolSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    key = serializers.CharField()
-    label = serializers.CharField()
-    symbol_type = serializers.CharField()
-    detector_type = serializers.CharField()
-    detection_config_json = serializers.CharField()
-    reference_assets_json = serializers.CharField()
-    text_token = serializers.CharField(allow_blank=True)
-    enabled = serializers.BooleanField()
+def tag_payload(row: Tag) -> dict[str, object]:
+    return _catalog_option_payload(row)
 
 
-def keyword_payload(row: object) -> dict[str, object]:
-    return KeywordSerializer(row).data
+def type_payload(row: Type) -> dict[str, object]:
+    return _catalog_option_payload(row)
 
 
-def tag_payload(row: object) -> dict[str, object]:
-    return TagSerializer(row).data
-
-
-def type_payload(row: object) -> dict[str, object]:
-    return TypeSerializer(row).data
-
-
-def symbol_payload(row: object) -> dict[str, object]:
-    return SymbolSerializer(row).data
+def symbol_payload(row: Symbol) -> dict[str, object]:
+    return {
+        "id": row.id,
+        "key": row.key,
+        "label": row.label,
+        "symbol_type": row.symbol_type,
+        "detector_type": row.detector_type,
+        "detection_config_json": row.detection_config_json,
+        "reference_assets_json": row.reference_assets_json,
+        "text_token": row.text_token,
+        "enabled": row.enabled,
+    }

@@ -49,3 +49,9 @@ mypy_path = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "django-stubs>=6.0.3",
+    "djangorestframework-stubs>=3.16.9",
+]

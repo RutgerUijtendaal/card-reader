@@ -6,10 +6,14 @@ from .base import TimestampedModel, uuid_str
 
 
 class Card(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    key = models.TextField(default="", db_index=True, unique=True)
-    label = models.TextField(default="")
-    latest_version_id = models.TextField(default=None, null=True, db_index=True)
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    label: models.TextField[str, str] = models.TextField(default="")
+    latest_version_id: models.TextField[str | None, str | None] = models.TextField(
+        default=None,
+        null=True,
+        db_index=True,
+    )
 
     class Meta:
         db_table = "card"

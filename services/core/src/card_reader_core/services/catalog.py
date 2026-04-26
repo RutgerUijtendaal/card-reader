@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TypedDict
+from typing import Any, TypedDict, cast
 
 import card_reader_core.repositories as repositories
 from card_reader_core.models import Keyword, Symbol, Tag, Type
@@ -26,13 +26,13 @@ class CatalogService:
         }
 
     def create_keyword(self, *, label: str, key: str | None = None) -> Keyword:
-        return self._create_simple("keyword", label=label, key=key)
+        return cast(Keyword, self._create_simple("keyword", label=label, key=key))
 
     def create_tag(self, *, label: str, key: str | None = None) -> Tag:
-        return self._create_simple("tag", label=label, key=key)
+        return cast(Tag, self._create_simple("tag", label=label, key=key))
 
     def create_type(self, *, label: str, key: str | None = None) -> Type:
-        return self._create_simple("type", label=label, key=key)
+        return cast(Type, self._create_simple("type", label=label, key=key))
 
     def update_keyword(
         self,
@@ -41,7 +41,7 @@ class CatalogService:
         label: str | None = None,
         key: str | None = None,
     ) -> Keyword | None:
-        return self._update_simple("keyword", entry_id=entry_id, label=label, key=key)
+        return cast(Keyword | None, self._update_simple("keyword", entry_id=entry_id, label=label, key=key))
 
     def update_tag(
         self,
@@ -50,7 +50,7 @@ class CatalogService:
         label: str | None = None,
         key: str | None = None,
     ) -> Tag | None:
-        return self._update_simple("tag", entry_id=entry_id, label=label, key=key)
+        return cast(Tag | None, self._update_simple("tag", entry_id=entry_id, label=label, key=key))
 
     def update_type(
         self,
@@ -59,7 +59,7 @@ class CatalogService:
         label: str | None = None,
         key: str | None = None,
     ) -> Type | None:
-        return self._update_simple("type", entry_id=entry_id, label=label, key=key)
+        return cast(Type | None, self._update_simple("type", entry_id=entry_id, label=label, key=key))
 
     def create_symbol(
         self,
@@ -139,7 +139,7 @@ class CatalogService:
     def delete_symbol(self, *, entry_id: str) -> bool:
         return repositories.delete_symbol(None, entry_id=entry_id)
 
-    def _create_simple(self, kind: str, *, label: str, key: str | None):
+    def _create_simple(self, kind: str, *, label: str, key: str | None) -> Any:
         normalized_label = self._normalize_label(label)
         normalized_key = self._normalize_key(key=key, label=normalized_label)
         self._ensure_unique(kind, normalized_key)
@@ -156,7 +156,7 @@ class CatalogService:
         entry_id: str,
         label: str | None,
         key: str | None,
-    ):
+    ) -> Any | None:
         getter = getattr(repositories, f"get_{kind}")
         row = getter(None, entry_id)
         if row is None:
@@ -175,25 +175,35 @@ class CatalogService:
         updater = getattr(repositories, f"update_{kind}")
         return updater(None, entry_id=entry_id, updates=updates)
 
-    def _apply_symbol_updates(self, updates: dict[str, object], **values) -> None:
-        if values["symbol_type"] is not None:
-            updates["symbol_type"] = self._normalize_symbol_type(values["symbol_type"])
-        if values["detector_type"] is not None:
-            updates["detector_type"] = self._normalize_detector_type(values["detector_type"])
-        if values["detection_config_json"] is not None:
-            self._validate_symbol_config_json(values["detection_config_json"], None)
+    def _apply_symbol_updates(
+        self,
+        updates: dict[str, object],
+        *,
+        symbol_type: str | None,
+        detector_type: str | None,
+        detection_config_json: str | None,
+        reference_assets_json: str | None,
+        text_token: str | None,
+        enabled: bool | None,
+    ) -> None:
+        if symbol_type is not None:
+            updates["symbol_type"] = self._normalize_symbol_type(symbol_type)
+        if detector_type is not None:
+            updates["detector_type"] = self._normalize_detector_type(detector_type)
+        if detection_config_json is not None:
+            self._validate_symbol_config_json(detection_config_json, None)
             updates["detection_config_json"] = self._normalize_object_json(
-                values["detection_config_json"],
+                detection_config_json,
             )
-        if values["reference_assets_json"] is not None:
-            self._validate_symbol_config_json(None, values["reference_assets_json"])
+        if reference_assets_json is not None:
+            self._validate_symbol_config_json(None, reference_assets_json)
             updates["reference_assets_json"] = self._normalize_array_json(
-                values["reference_assets_json"],
+                reference_assets_json,
             )
-        if values["text_token"] is not None:
-            updates["text_token"] = values["text_token"].strip()
-        if values["enabled"] is not None:
-            updates["enabled"] = values["enabled"]
+        if text_token is not None:
+            updates["text_token"] = text_token.strip()
+        if enabled is not None:
+            updates["enabled"] = enabled
 
     def _ensure_unique(self, kind: str, key: str, exclude_id: str | None = None) -> None:
         exists = getattr(repositories, f"{kind}_key_exists")

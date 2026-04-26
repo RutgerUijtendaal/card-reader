@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from rest_framework import serializers
+from card_reader_core.models import Template
 
 
-class TemplateSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    key = serializers.CharField()
-    label = serializers.CharField()
-    definition_json = serializers.CharField()
-
-
-def template_payload(row: object) -> dict[str, object]:
-    return TemplateSerializer(row).data
+def template_payload(row: Template) -> dict[str, object]:
+    return {
+        "id": row.id,
+        "key": row.key,
+        "label": row.label,
+        "definition_json": row.definition_json,
+    }

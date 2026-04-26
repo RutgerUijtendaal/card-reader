@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import card_reader_core.repositories as repositories
 from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, Symbol, Tag, Type
@@ -14,7 +14,7 @@ class CardMetadata(TypedDict):
 
 
 class CardService:
-    def list_cards(self, **filters) -> list[tuple[Card, CardVersion]]:
+    def list_cards(self, **filters: Any) -> list[tuple[Card, CardVersion]]:
         return repositories.list_cards(None, **filters)
 
     def list_card_generations(self, card_id: str) -> list[CardVersion]:

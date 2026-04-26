@@ -6,51 +6,51 @@ from .base import TimestampedModel, uuid_str
 
 
 class Tag(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    key = models.TextField(default="", db_index=True, unique=True)
-    label = models.TextField(default="")
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    label: models.TextField[str, str] = models.TextField(default="")
 
     class Meta:
         db_table = "tag"
 
 
 class Symbol(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    key = models.TextField(default="", db_index=True, unique=True)
-    label = models.TextField(default="")
-    symbol_type = models.TextField(default="generic", db_index=True)
-    detector_type = models.TextField(default="template", db_index=True)
-    detection_config_json = models.TextField(default="{}")
-    reference_assets_json = models.TextField(default="[]")
-    text_token = models.TextField(default="")
-    enabled = models.BooleanField(default=True, db_index=True)
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    label: models.TextField[str, str] = models.TextField(default="")
+    symbol_type: models.TextField[str, str] = models.TextField(default="generic", db_index=True)
+    detector_type: models.TextField[str, str] = models.TextField(default="template", db_index=True)
+    detection_config_json: models.TextField[str, str] = models.TextField(default="{}")
+    reference_assets_json: models.TextField[str, str] = models.TextField(default="[]")
+    text_token: models.TextField[str, str] = models.TextField(default="")
+    enabled: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         db_table = "symbol"
 
 
 class Keyword(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    key = models.TextField(default="", db_index=True, unique=True)
-    label = models.TextField(default="")
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    label: models.TextField[str, str] = models.TextField(default="")
 
     class Meta:
         db_table = "keyword"
 
 
 class Type(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    key = models.TextField(default="", db_index=True, unique=True)
-    label = models.TextField(default="")
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    label: models.TextField[str, str] = models.TextField(default="")
 
     class Meta:
         db_table = "type"
 
 
 class CardVersionTag(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    card_version_id = models.TextField(db_index=True)
-    tag_id = models.TextField(db_index=True)
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id: models.TextField[str, str] = models.TextField(db_index=True)
+    tag_id: models.TextField[str, str] = models.TextField(db_index=True)
 
     class Meta:
         db_table = "card_version_tag"
@@ -60,9 +60,9 @@ class CardVersionTag(TimestampedModel):
 
 
 class CardVersionSymbol(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    card_version_id = models.TextField(db_index=True)
-    symbol_id = models.TextField(db_index=True)
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id: models.TextField[str, str] = models.TextField(db_index=True)
+    symbol_id: models.TextField[str, str] = models.TextField(db_index=True)
 
     class Meta:
         db_table = "card_version_symbol"
@@ -72,9 +72,9 @@ class CardVersionSymbol(TimestampedModel):
 
 
 class CardVersionKeyword(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    card_version_id = models.TextField(db_index=True)
-    keyword_id = models.TextField(db_index=True)
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id: models.TextField[str, str] = models.TextField(db_index=True)
+    keyword_id: models.TextField[str, str] = models.TextField(db_index=True)
 
     class Meta:
         db_table = "card_version_keyword"
@@ -84,9 +84,9 @@ class CardVersionKeyword(TimestampedModel):
 
 
 class CardVersionType(TimestampedModel):
-    id = models.TextField(default=uuid_str, primary_key=True)
-    card_version_id = models.TextField(db_index=True)
-    type_id = models.TextField(db_index=True)
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id: models.TextField[str, str] = models.TextField(db_index=True)
+    type_id: models.TextField[str, str] = models.TextField(db_index=True)
 
     class Meta:
         db_table = "card_version_type"

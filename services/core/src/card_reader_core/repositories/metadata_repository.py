@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
-from django.db.models import QuerySet
+from typing import Any, TypeVar
 
 from .helpers import normalize_slug_key
 from card_reader_core.models import (
@@ -17,11 +15,14 @@ from card_reader_core.models import (
     now_utc,
 )
 
+MetadataModel = Keyword | Tag | Symbol | Type
+MetadataRow = TypeVar("MetadataRow", bound=MetadataModel)
 
-def _list(model: type, *, keys: set[str] | None = None) -> list:
+
+def _list(model: Any, *, keys: set[str] | None = None) -> list[Any]:
     if keys is not None and not keys:
         return []
-    query: QuerySet = model.objects.order_by("label")
+    query = model.objects.order_by("label")
     if keys is not None:
         query = query.filter(key__in=keys)
     return list(query)
@@ -63,11 +64,11 @@ def get_type(_session: Any, entry_id: str) -> Type | None:
     return Type.objects.filter(id=entry_id).first()
 
 
-def _key_exists(model: type, *, key: str, exclude_id: str | None = None) -> bool:
+def _key_exists(model: Any, *, key: str, exclude_id: str | None = None) -> bool:
     query = model.objects.filter(key=key)
     if exclude_id is not None:
         query = query.exclude(id=exclude_id)
-    return query.exists()
+    return bool(query.exists())
 
 
 def keyword_key_exists(_session: Any, *, key: str, exclude_id: str | None = None) -> bool:
@@ -122,7 +123,7 @@ def create_symbol(
     )
 
 
-def _update(row, updates: dict[str, object]):
+def _update(row: MetadataRow, updates: dict[str, object]) -> MetadataRow:
     for field_name, field_value in updates.items():
         setattr(row, field_name, field_value)
     row.updated_at = now_utc()
@@ -174,10 +175,10 @@ def delete_symbol(_session: Any, *, entry_id: str) -> bool:
     return deleted > 0
 
 
-def _replace_links(link_model: type, card_version_id: str, field_name: str, ids: list[str]) -> None:
+def _replace_links(link_model: Any, card_version_id: str, field_name: str, ids: list[str]) -> None:
     link_model.objects.filter(card_version_id=card_version_id).delete()
     seen: set[str] = set()
-    rows = []
+    rows: list[Any] = []
     for row_id in ids:
         if row_id in seen:
             continue
@@ -210,8 +211,8 @@ def upsert_types_by_labels(_session: Any, labels: list[str]) -> list[Type]:
     return _upsert_labels(Type, labels)
 
 
-def _upsert_labels(model: type, labels: list[str]) -> list:
-    out = []
+def _upsert_labels(model: Any, labels: list[str]) -> list[Any]:
+    out: list[Any] = []
     for key, label in _normalize_label_entries(labels):
         row, created = model.objects.get_or_create(key=key, defaults={"label": label})
         if not created and row.label != label:

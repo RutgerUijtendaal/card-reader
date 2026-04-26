@@ -1,18 +1,29 @@
 # Card Reader Integration Tests
 
-Cross-package test suite that exercises parser + core data layer + API migrations/seeds.
+`services/integration` contains cross-package tests for the parser, core data layer, migrations,
+seeds, and API-compatible persistence behavior.
 
 ## Commands
 
-From repo root:
+From the repo root:
 
-- `pnpm --filter @card-reader/integration test`
+```bash
+pnpm --filter @card-reader/integration test
+```
 
-## Test Scope
+## Scope
 
-- Full-flow integration tests only: real OCR + real symbol detection + real DB writes.
-- Fixture cases assert exact final DB state, including:
-  - card identity fields
-  - all parsed latest-version properties
-  - all attached metadata (`symbols`, `types`, `tags`, `keywords`)
-  - import job/item status fields
+Integration tests exercise:
+
+- Django migrations and seed setup
+- Parser job processing
+- Core repositories and services
+- Real OCR and symbol detection fixture flows
+- Final database state for cards, versions, metadata, images, import jobs, and import items
+
+Fixture cases assert exact stored data, including:
+
+- card identity fields
+- latest-version parsed properties
+- attached metadata (`symbols`, `types`, `tags`, `keywords`)
+- import job and item statuses

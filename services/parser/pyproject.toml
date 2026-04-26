@@ -42,3 +42,8 @@ dev = [
 python_version = "3.12"
 strict = true
 mypy_path = ["src"]
+
+[dependency-groups]
+dev = [
+    "django-stubs>=6.0.3",
+]

@@ -9,7 +9,7 @@ from card_reader_core.db.schema_check import check_existing_schema
 class Command(BaseCommand):
     help = "Verify an existing schema and fake-apply the initial Django migrations."
 
-    def handle(self, *args, **options) -> None:
+    def handle(self, *args: object, **options: object) -> None:
         result = check_existing_schema()
         if not result.ok:
             raise CommandError(
