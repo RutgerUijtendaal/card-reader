@@ -8,9 +8,9 @@ import SettingsPage from '@/modules/settings/SettingsPage.vue';
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/import-jobs' },
-    { path: '/import-jobs', component: ImportJobsPage },
+    { path: '/', redirect: '/cards' },
     { path: '/cards', component: CardSearchPage },
+    { path: '/import-jobs', component: ImportJobsPage },
     { path: '/cards/:id', component: CardDetailPage, props: true },
     { path: '/review', component: ReviewQueuePage },
     { path: '/settings', component: SettingsPage },

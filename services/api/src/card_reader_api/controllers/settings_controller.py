@@ -365,13 +365,13 @@ async def upload_symbol_asset(file: UploadFile = File(...)) -> SymbolAssetUpload
             detail="Unsupported symbol asset file type. Use png/jpg/jpeg/webp/bmp/tif/tiff.",
         )
 
-    symbols_dir = settings.storage_root_dir / "symbols"
-    symbols_dir.mkdir(parents=True, exist_ok=True)
+    uploads_dir = settings.storage_root_dir / "symbols" / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
 
     stem = Path(filename).stem.strip().lower()
     safe_stem = re.sub(r"[^a-z0-9_-]+", "-", stem).strip("-") or "symbol"
     stored_name = f"{safe_stem}-{uuid4().hex[:8]}{suffix}"
-    target_path = symbols_dir / stored_name
+    target_path = uploads_dir / stored_name
 
     try:
         content = await file.read()
@@ -385,7 +385,7 @@ async def upload_symbol_asset(file: UploadFile = File(...)) -> SymbolAssetUpload
         await file.close()
 
     return SymbolAssetUploadResponse(
-        relative_path=str(Path("symbols") / stored_name).replace("\\", "/"),
+        relative_path=str(Path("uploads") / stored_name).replace("\\", "/"),
         absolute_path=str(target_path),
     )
 

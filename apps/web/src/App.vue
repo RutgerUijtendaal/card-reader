@@ -7,18 +7,20 @@
       <nav class="grid gap-2">
         <RouterLink
           class="nav-link"
-          to="/import-jobs"
-        >
-          <Upload class="h-4 w-4" />
-          <span>Import Jobs</span>
-        </RouterLink>
-        <RouterLink
-          class="nav-link"
           to="/cards"
         >
           <Images class="h-4 w-4" />
           <span>Card Gallery</span>
         </RouterLink>
+
+        <RouterLink
+          class="nav-link"
+          to="/import-jobs"
+        >
+          <Upload class="h-4 w-4" />
+          <span>Import Jobs</span>
+        </RouterLink>
+
         <RouterLink
           class="nav-link"
           to="/review"
@@ -26,6 +28,7 @@
           <ClipboardCheck class="h-4 w-4" />
           <span>Review Queue</span>
         </RouterLink>
+
         <RouterLink
           class="nav-link"
           to="/settings"

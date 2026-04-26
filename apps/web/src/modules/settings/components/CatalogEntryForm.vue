@@ -79,7 +79,6 @@
             class="input-base min-h-24 font-mono"
             :placeholder="detectionConfigExample"
           />
-          <span class="text-xs text-slate-500"> Example: {{ detectionConfigExample }} </span>
         </label>
         <label class="field-label">
           Reference assets JSON
@@ -88,7 +87,6 @@
             class="input-base min-h-24 font-mono"
             :placeholder="referenceAssetsExample"
           />
-          <span class="text-xs text-slate-500"> Example: {{ referenceAssetsExample }} </span>
           <button
             class="btn-secondary mt-2 w-fit"
             type="button"
