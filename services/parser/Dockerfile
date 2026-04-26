@@ -19,10 +19,12 @@ WORKDIR /app
 # Copy only dependency manifests first to maximize cache hits.
 COPY services/core/pyproject.toml services/core/uv.lock services/core/README.md ./services/core/
 COPY services/parser/pyproject.toml services/parser/uv.lock services/parser/README.md ./services/parser/
+COPY services/api/pyproject.toml services/parser/uv.lock services/parser/README.md ./services/api/
 
 # Copy source after manifests.
 COPY services/core/src ./services/core/src
 COPY services/parser/src ./services/parser/src
+COPY services/api/src ./services/api/src
 
 WORKDIR /app/services/parser
 RUN uv sync --frozen --no-dev
