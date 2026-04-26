@@ -1,88 +1,97 @@
 from __future__ import annotations
 
-from datetime import datetime
-from uuid import uuid4
+from django.db import models
 
-from sqlmodel import Field, SQLModel
-
-from .base import now_utc
+from .base import TimestampedModel, uuid_str
 
 
-class Tag(SQLModel, table=True):
-    __tablename__ = "tag"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    key: str = Field(default="", index=True, unique=True)
-    label: str = ""
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class Tag(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    key = models.TextField(default="", db_index=True, unique=True)
+    label = models.TextField(default="")
+
+    class Meta:
+        db_table = "tag"
 
 
-class Symbol(SQLModel, table=True):
-    __tablename__ = "symbol"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    key: str = Field(default="", index=True, unique=True)
-    label: str = ""
-    symbol_type: str = Field(default="generic", index=True)
-    detector_type: str = Field(default="template", index=True)
-    detection_config_json: str = "{}"
-    reference_assets_json: str = "[]"
-    text_token: str = ""
-    enabled: bool = Field(default=True, index=True)
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class Symbol(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    key = models.TextField(default="", db_index=True, unique=True)
+    label = models.TextField(default="")
+    symbol_type = models.TextField(default="generic", db_index=True)
+    detector_type = models.TextField(default="template", db_index=True)
+    detection_config_json = models.TextField(default="{}")
+    reference_assets_json = models.TextField(default="[]")
+    text_token = models.TextField(default="")
+    enabled = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "symbol"
 
 
-class Keyword(SQLModel, table=True):
-    __tablename__ = "keyword"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    key: str = Field(default="", index=True, unique=True)
-    label: str = ""
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class Keyword(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    key = models.TextField(default="", db_index=True, unique=True)
+    label = models.TextField(default="")
+
+    class Meta:
+        db_table = "keyword"
 
 
-class Type(SQLModel, table=True):
-    __tablename__ = "type"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    key: str = Field(default="", index=True, unique=True)
-    label: str = ""
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class Type(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    key = models.TextField(default="", db_index=True, unique=True)
+    label = models.TextField(default="")
+
+    class Meta:
+        db_table = "type"
 
 
-class CardVersionTag(SQLModel, table=True):
-    __tablename__ = "card_version_tag"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    card_version_id: str = Field(index=True)
-    tag_id: str = Field(index=True)
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class CardVersionTag(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id = models.TextField(db_index=True)
+    tag_id = models.TextField(db_index=True)
+
+    class Meta:
+        db_table = "card_version_tag"
+        constraints = [
+            models.UniqueConstraint(fields=("card_version_id", "tag_id"), name="ux_card_version_tag_pair")
+        ]
 
 
-class CardVersionSymbol(SQLModel, table=True):
-    __tablename__ = "card_version_symbol"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    card_version_id: str = Field(index=True)
-    symbol_id: str = Field(index=True)
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class CardVersionSymbol(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id = models.TextField(db_index=True)
+    symbol_id = models.TextField(db_index=True)
+
+    class Meta:
+        db_table = "card_version_symbol"
+        constraints = [
+            models.UniqueConstraint(fields=("card_version_id", "symbol_id"), name="ux_card_version_symbol_pair")
+        ]
 
 
-class CardVersionKeyword(SQLModel, table=True):
-    __tablename__ = "card_version_keyword"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    card_version_id: str = Field(index=True)
-    keyword_id: str = Field(index=True)
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class CardVersionKeyword(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id = models.TextField(db_index=True)
+    keyword_id = models.TextField(db_index=True)
+
+    class Meta:
+        db_table = "card_version_keyword"
+        constraints = [
+            models.UniqueConstraint(fields=("card_version_id", "keyword_id"), name="ux_card_version_keyword_pair")
+        ]
 
 
-class CardVersionType(SQLModel, table=True):
-    __tablename__ = "card_version_type"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    card_version_id: str = Field(index=True)
-    type_id: str = Field(index=True)
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class CardVersionType(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id = models.TextField(db_index=True)
+    type_id = models.TextField(db_index=True)
+
+    class Meta:
+        db_table = "card_version_type"
+        constraints = [
+            models.UniqueConstraint(fields=("card_version_id", "type_id"), name="ux_card_version_type_pair")
+        ]
 
 

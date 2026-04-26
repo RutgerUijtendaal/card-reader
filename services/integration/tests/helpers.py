@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sqlmodel import select
-
 from card_reader_core.database.connection import get_session
 from card_reader_core.models import Card, CardVersion, ImportJob, ImportJobItem, Symbol
 from card_reader_parser.parsers.card_parser import CardParser
@@ -16,7 +14,7 @@ from card_reader_core.repositories import (
     get_tags_for_card_version,
     get_types_for_card_version,
 )
-from card_reader_parser.services.import_processor_service import ImportProcessorService
+from card_reader_core.services import ImportProcessorService
 from card_reader_parser.template_store import DatabaseTemplateStore
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures"
@@ -74,30 +72,28 @@ def assert_recursive_exact(expected: Any, actual: Any, path: str = "root") -> No
 
 
 def _load_db_state(*, session: Any) -> dict[str, Any]:
-    cards = list(session.exec(select(Card).order_by(Card.updated_at.desc())))
+    cards = list(Card.objects.order_by("-updated_at"))
     assert cards, "No card rows found after import processing"
     assert len(cards) == 1, f"Expected exactly one card row, found {len(cards)}"
     card = cards[0]
 
-    latest_version = session.exec(
-        select(CardVersion)
-        .where(CardVersion.card_id == card.id, CardVersion.is_latest.is_(True))
-        .order_by(CardVersion.version_number.desc())
-    ).first()
+    latest_version = (
+        CardVersion.objects.filter(card_id=card.id, is_latest=True)
+        .order_by("-version_number")
+        .first()
+    )
     assert latest_version is not None, "Latest card version not found"
 
-    job = session.exec(select(ImportJob).order_by(ImportJob.created_at.desc())).first()
+    job = ImportJob.objects.order_by("-created_at").first()
     assert job is not None, "Expected import job row but none exists"
-    item_rows: list[ImportJobItem] = list(
-        session.exec(select(ImportJobItem).where(ImportJobItem.job_id == job.id))
-    )
+    item_rows: list[ImportJobItem] = list(ImportJobItem.objects.filter(job_id=job.id))
 
     keywords = sorted(row.label for row in get_keywords_for_card_version(session, latest_version.id))
     tags = sorted(row.label for row in get_tags_for_card_version(session, latest_version.id))
     symbols = sorted(row.key for row in get_symbols_for_card_version(session, latest_version.id))
     types = sorted(row.label for row in get_types_for_card_version(session, latest_version.id))
 
-    all_symbol_types = {row.key: row.symbol_type for row in session.exec(select(Symbol))}
+    all_symbol_types = {row.key: row.symbol_type for row in Symbol.objects.all()}
 
     return {
         "card": {

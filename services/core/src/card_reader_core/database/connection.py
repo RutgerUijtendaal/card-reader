@@ -1,6 +1,8 @@
-from pathlib import Path
+from __future__ import annotations
 
-from sqlmodel import Session, create_engine
+from contextlib import nullcontext
+from pathlib import Path
+from typing import Any
 
 from ..settings import settings
 
@@ -13,8 +15,6 @@ def _resolve_database_path() -> Path:
 
 
 DATABASE_PATH = _resolve_database_path()
-DATABASE_URL = f"sqlite:///{DATABASE_PATH.as_posix()}"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 
 def initialize_database() -> None:
@@ -23,7 +23,5 @@ def initialize_database() -> None:
     settings.image_store_dir.mkdir(parents=True, exist_ok=True)
 
 
-def get_session() -> Session:
-    return Session(engine)
-
-
+def get_session() -> Any:
+    return nullcontext(None)

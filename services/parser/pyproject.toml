@@ -15,7 +15,6 @@ dependencies = [
   "paddlex[ocr-core]>=3.1.0",
   "pillow>=10.4.0",
   "pydantic-settings>=2.5.2",
-  "sqlmodel>=0.0.22",
   "watchfiles>=0.24.0"
 ]
 

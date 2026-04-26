@@ -10,13 +10,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "card-reader-core",
-  "alembic>=1.13.3",
-  "fastapi>=0.115.0",
-  "pydantic>=2.9.2",
+  "django>=5.1.0",
+  "djangorestframework>=3.15.2",
+  "gunicorn>=23.0.0",
   "pydantic-settings>=2.5.2",
-  "python-multipart>=0.0.12",
-  "sqlmodel>=0.0.22",
-  "uvicorn>=0.31.0"
+  "python-multipart>=0.0.12"
 ]
 
 [tool.uv.sources]
@@ -30,7 +28,7 @@ where = ["src"]
 include = ["card_reader_api*"]
 
 [tool.setuptools.package-data]
-"seeds" = ["*.txt", "*.json", "assets/**/*"]
+card_reader_api = ["seeds/*.json", "seeds/assets/**/*"]
 
 [project.optional-dependencies]
 dev = [

@@ -9,14 +9,20 @@ description = "Cross-package integration tests for Card Reader"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "alembic>=1.13.3",
+  "card-reader-api",
+  "card-reader-core",
+  "card-reader-parser",
   "paddlepaddle>=3.1.0",
   "paddleocr>=3.1.0",
   "paddlex[ocr-core]>=3.1.0",
   "pillow>=10.4.0",
-  "pydantic-settings>=2.5.2",
-  "sqlmodel>=0.0.22"
+  "pydantic-settings>=2.5.2"
 ]
+
+[tool.uv.sources]
+card-reader-api = { path = "../api", editable = true }
+card-reader-core = { path = "../core", editable = true }
+card-reader-parser = { path = "../parser", editable = true }
 
 [project.optional-dependencies]
 dev = [

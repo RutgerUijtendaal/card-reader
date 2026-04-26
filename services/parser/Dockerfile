@@ -1,6 +1,7 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ENV UV_LINK_MODE=copy \
+    DJANGO_SETTINGS_MODULE=card_reader_core.django_settings \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True \

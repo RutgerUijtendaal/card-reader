@@ -23,23 +23,25 @@ def run_registered_seeds(*, force: bool = False) -> list[SeedResult]:
     with get_session() as session:
         for seed in SEED_REGISTRY:
             if not force and seed.model_has_rows(session):
-                result = SeedResult(
-                    name=seed.name,
-                    skipped=True,
-                    message="table already has rows",
+                results.append(
+                    SeedResult(
+                        name=seed.name,
+                        skipped=True,
+                        message="table already has rows",
+                    )
                 )
-                results.append(result)
                 continue
 
             created, updated = seed.run(session)
-            result = SeedResult(
-                name=seed.name,
-                skipped=False,
-                created=created,
-                updated=updated,
-                message="ok",
+            results.append(
+                SeedResult(
+                    name=seed.name,
+                    skipped=False,
+                    created=created,
+                    updated=updated,
+                    message="ok",
+                )
             )
-            results.append(result)
             logger.info(
                 "Seed finished. seed=%s created=%s updated=%s",
                 seed.name,
@@ -47,8 +49,3 @@ def run_registered_seeds(*, force: bool = False) -> list[SeedResult]:
                 updated,
             )
     return results
-
-
-
-
-

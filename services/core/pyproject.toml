@@ -9,8 +9,8 @@ description = "Shared core runtime and data layer for Card Reader services"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "pydantic-settings>=2.5.2",
-  "sqlmodel>=0.0.22"
+  "django>=5.1.0",
+  "pydantic-settings>=2.5.2"
 ]
 
 [project.optional-dependencies]

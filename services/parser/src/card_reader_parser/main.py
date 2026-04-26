@@ -8,12 +8,18 @@ import time
 from pathlib import Path
 from threading import Event
 
-from card_reader_core.core_logging import configure_logging
-from card_reader_core.database.connection import get_session, initialize_database
-from card_reader_core.repositories import get_next_queued_job, requeue_running_import_jobs
-from card_reader_parser.parsers.card_parser import CardParser
-from card_reader_parser.services import ImportProcessorService
-from card_reader_parser.template_store import DatabaseTemplateStore
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_core.django_settings")
+import django
+
+django.setup()
+
+# Django-backed modules import models, so they must load after django.setup().
+from card_reader_core.core_logging import configure_logging  # noqa: E402
+from card_reader_core.database.connection import get_session, initialize_database  # noqa: E402
+from card_reader_core.repositories import get_next_queued_job, requeue_running_import_jobs  # noqa: E402
+from card_reader_core.services import ImportProcessorService  # noqa: E402
+from card_reader_parser.parsers.card_parser import CardParser  # noqa: E402
+from card_reader_parser.template_store import DatabaseTemplateStore  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

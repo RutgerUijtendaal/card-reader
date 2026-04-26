@@ -5,8 +5,7 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-
-from sqlmodel import Session, col, select
+from typing import Any
 
 from card_reader_core.models import Symbol, now_utc
 from card_reader_core.repositories import normalize_slug_key
@@ -82,32 +81,28 @@ def read_symbol_entries(seed_file: Path = DEFAULT_SYMBOLS_FILE) -> list[SymbolSe
     return out
 
 
-def seed_symbols(session: Session) -> tuple[int, int]:
+def seed_symbols(_session: Any) -> tuple[int, int]:
     entries = read_symbol_entries()
     if not entries:
         return 0, 0
 
     created = 0
     updated = 0
-    keys = {entry.key for entry in entries}
-    existing_rows = session.exec(select(Symbol).where(col(Symbol.key).in_(keys)))
-    existing_by_key = {row.key: row for row in existing_rows}
+    existing_by_key = {row.key: row for row in Symbol.objects.filter(key__in=[entry.key for entry in entries])}
 
     for entry in entries:
         reference_assets_json = _copy_assets_and_build_references(entry.asset_files)
         existing = existing_by_key.get(entry.key)
         if existing is None:
-            session.add(
-                Symbol(
-                    key=entry.key,
-                    label=entry.label,
-                    symbol_type=entry.symbol_type,
-                    detector_type=entry.detector_type,
-                    detection_config_json=entry.detection_config_json,
-                    reference_assets_json=reference_assets_json,
-                    text_token=entry.text_token,
-                    enabled=entry.enabled,
-                )
+            Symbol.objects.create(
+                key=entry.key,
+                label=entry.label,
+                symbol_type=entry.symbol_type,
+                detector_type=entry.detector_type,
+                detection_config_json=entry.detection_config_json,
+                reference_assets_json=reference_assets_json,
+                text_token=entry.text_token,
+                enabled=entry.enabled,
             )
             created += 1
             continue
@@ -122,15 +117,14 @@ def seed_symbols(session: Session) -> tuple[int, int]:
         changed |= _set_if_diff(existing, "enabled", entry.enabled)
         if changed:
             existing.updated_at = now_utc()
-            session.add(existing)
+            existing.save()
             updated += 1
 
-    session.commit()
     return created, updated
 
 
-def symbol_table_has_rows(session: Session) -> bool:
-    return session.exec(select(Symbol.id).limit(1)).first() is not None
+def symbol_table_has_rows(_session: Any) -> bool:
+    return Symbol.objects.exists()
 
 
 def _copy_assets_and_build_references(asset_files: list[str]) -> str:
@@ -159,5 +153,3 @@ def _set_if_diff(instance: Symbol, field_name: str, value: object) -> bool:
         return False
     setattr(instance, field_name, value)
     return True
-
-

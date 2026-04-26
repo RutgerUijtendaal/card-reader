@@ -35,16 +35,23 @@ const buildApi = () => {
   const apiEntry = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'main.py');
   const apiPath = join(repoRoot, 'services', 'api', 'src');
   const corePath = join(repoRoot, 'services', 'core', 'src');
+  const coreMigrationsDir = join(
+    repoRoot,
+    'services',
+    'core',
+    'src',
+    'card_reader_core',
+    'migrations'
+  );
   const seedKeywordsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'keywords.json');
   const seedSymbolsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'symbols.json');
   const seedTemplatesFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'templates.json');
   const seedAssetsDir = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'assets');
+  const coreMigrationsDataSpec = `${coreMigrationsDir}${addDataSeparator}card_reader_core/migrations`;
   const seedKeywordsDataSpec = `${seedKeywordsFile}${addDataSeparator}seeds`;
   const seedSymbolsDataSpec = `${seedSymbolsFile}${addDataSeparator}seeds`;
   const seedTemplatesDataSpec = `${seedTemplatesFile}${addDataSeparator}seeds`;
   const seedAssetsDataSpec = `${seedAssetsDir}${addDataSeparator}seeds/assets`;
-  const alembicDir = join(repoRoot, 'services', 'api', 'alembic');
-  const alembicDataSpec = `${alembicDir}${addDataSeparator}alembic`;
 
   run('uv', [
     'run',
@@ -69,6 +76,8 @@ const buildApi = () => {
     '--paths',
     corePath,
     '--add-data',
+    coreMigrationsDataSpec,
+    '--add-data',
     seedKeywordsDataSpec,
     '--add-data',
     seedSymbolsDataSpec,
@@ -76,8 +85,6 @@ const buildApi = () => {
     seedAssetsDataSpec,
     '--add-data',
     seedTemplatesDataSpec,
-    '--add-data',
-    alembicDataSpec,
     apiEntry
   ]);
 };

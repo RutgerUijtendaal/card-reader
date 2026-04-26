@@ -3,21 +3,20 @@ from __future__ import annotations
 import csv
 import io
 import json
-
-from sqlmodel import Session
+from typing import Any
 
 from .cards_repository import list_cards
 from .metadata_repository import (
-    list_symbols,
     get_keywords_for_card_version,
     get_symbols_for_card_version,
     get_tags_for_card_version,
     get_types_for_card_version,
+    list_symbols,
 )
 
 
 def export_cards_csv(
-    session: Session,
+    _session: Any,
     *,
     query: str | None,
     max_confidence: float | None = None,
@@ -33,7 +32,7 @@ def export_cards_csv(
     health_max: int | None = None,
 ) -> str:
     cards = list_cards(
-        session,
+        None,
         query=query,
         max_confidence=max_confidence,
         keyword_ids=keyword_ids,
@@ -67,10 +66,10 @@ def export_cards_csv(
     )
     writer.writeheader()
     for card, version in cards:
-        type_labels = [item.label for item in get_types_for_card_version(session, version.id)]
-        tag_labels = [item.label for item in get_tags_for_card_version(session, version.id)]
-        symbol_text_tokens = [item.text_token for item in get_symbols_for_card_version(session, version.id)]
-        keyword_labels = [item.label for item in get_keywords_for_card_version(session, version.id)]
+        type_labels = [item.label for item in get_types_for_card_version(None, version.id)]
+        tag_labels = [item.label for item in get_tags_for_card_version(None, version.id)]
+        symbol_text_tokens = [item.text_token for item in get_symbols_for_card_version(None, version.id)]
+        keyword_labels = [item.label for item in get_keywords_for_card_version(None, version.id)]
         mana_symbols = json.loads(version.mana_symbols_json)
 
         writer.writerow(
@@ -78,7 +77,7 @@ def export_cards_csv(
                 "card_key": _sanitize_csv_text(card.key),
                 "name": _sanitize_csv_text(version.name),
                 "mana_cost": _sanitize_csv_text(version.mana_cost),
-                "mana_symbols": _replace_symbol_keys(session, _join_labels(mana_symbols)),
+                "mana_symbols": _replace_symbol_keys(_join_labels(mana_symbols)),
                 "attack": version.attack,
                 "health": version.health,
                 "rules_text": _sanitize_csv_text(version.rules_text),
@@ -100,7 +99,8 @@ def _join_labels(labels: list[str]) -> str:
     clean = [_sanitize_csv_text(label) for label in labels if label.strip()]
     return ";".join(clean)
 
-def _replace_symbol_keys(session: Session, text: str) -> str:
-    for symbol in list_symbols(session):
+
+def _replace_symbol_keys(text: str) -> str:
+    for symbol in list_symbols(None):
         text = text.replace(symbol.key, symbol.text_token)
     return text

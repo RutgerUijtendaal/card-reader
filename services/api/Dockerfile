@@ -17,12 +17,11 @@ COPY services/api/pyproject.toml services/api/uv.lock services/api/README.md ./s
 # Copy source after manifests.
 COPY services/core/src ./services/core/src
 COPY services/api/src ./services/api/src
-COPY services/api/alembic ./services/api/alembic
-COPY services/api/alembic.ini ./services/api/alembic.ini
+COPY services/api/manage.py ./services/api/manage.py
 
 WORKDIR /app/services/api
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
 
-CMD ["uv", "run", "--no-dev", "uvicorn", "card_reader_api.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uv run --no-dev python manage.py migrate_card_reader && uv run --no-dev python manage.py seed_defaults && uv run --no-dev gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000"]

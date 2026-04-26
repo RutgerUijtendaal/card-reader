@@ -1,56 +1,60 @@
 from __future__ import annotations
 
-from datetime import datetime
-from uuid import uuid4
+from django.db import models
 
-from sqlmodel import Field, SQLModel
-
-from .base import now_utc
+from .base import TimestampedModel, uuid_str
 
 
-class CardVersion(SQLModel, table=True):
-    __tablename__ = "card_version"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    card_id: str = Field(index=True)
-    version_number: int = Field(default=1, index=True)
-    template_id: str = Field(index=True)
-    image_hash: str = Field(index=True)
-    name: str = ""
-    type_line: str = ""
-    mana_cost: str = ""
-    mana_symbols_json: str = "[]"
-    attack: int | None = None
-    health: int | None = None
-    rules_text: str = ""
-    confidence: float = 0.0
-    parse_result_id: str | None = Field(default=None, index=True)
-    is_latest: bool = Field(default=True, index=True)
-    previous_version_id: str | None = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class CardVersion(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    card_id = models.TextField(db_index=True)
+    version_number = models.IntegerField(default=1, db_index=True)
+    template_id = models.TextField(db_index=True)
+    image_hash = models.TextField(db_index=True)
+    name = models.TextField(default="")
+    type_line = models.TextField(default="")
+    mana_cost = models.TextField(default="")
+    mana_symbols_json = models.TextField(default="[]")
+    attack = models.IntegerField(default=None, null=True)
+    health = models.IntegerField(default=None, null=True)
+    rules_text = models.TextField(default="")
+    confidence = models.FloatField(default=0.0)
+    parse_result_id = models.TextField(default=None, null=True, db_index=True)
+    is_latest = models.BooleanField(default=True, db_index=True)
+    previous_version_id = models.TextField(default=None, null=True, db_index=True)
+
+    class Meta:
+        db_table = "card_version"
+        indexes = [models.Index(fields=["card_id", "is_latest"], name="ix_card_version_card_latest")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("card_id", "version_number"),
+                name="ux_card_version_card_version",
+            )
+        ]
 
 
-class CardVersionImage(SQLModel, table=True):
-    __tablename__ = "card_version_image"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    card_version_id: str = Field(index=True)
-    source_file: str
-    stored_path: str
-    width: int = 0
-    height: int = 0
-    checksum: str = Field(index=True)
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class CardVersionImage(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id = models.TextField(db_index=True)
+    source_file = models.TextField()
+    stored_path = models.TextField()
+    width = models.IntegerField(default=0)
+    height = models.IntegerField(default=0)
+    checksum = models.TextField(db_index=True)
+
+    class Meta:
+        db_table = "card_version_image"
 
 
-class ParseResult(SQLModel, table=True):
-    __tablename__ = "parse_result"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    card_version_id: str = Field(index=True)
-    raw_ocr_json: str
-    normalized_fields_json: str
-    confidence_json: str
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class ParseResult(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    card_version_id = models.TextField(db_index=True)
+    raw_ocr_json = models.TextField()
+    normalized_fields_json = models.TextField()
+    confidence_json = models.TextField()
+
+    class Meta:
+        db_table = "parse_result"
 
 

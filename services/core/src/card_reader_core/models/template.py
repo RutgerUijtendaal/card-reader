@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
-from uuid import uuid4
+from django.db import models
 
-from sqlmodel import Field, SQLModel
-
-from .base import now_utc
+from .base import TimestampedModel, uuid_str
 
 
-class Template(SQLModel, table=True):
-    __tablename__ = "template"
-    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
-    key: str = Field(default="", index=True, unique=True)
-    label: str = ""
-    definition_json: str = "{}"
-    created_at: datetime = Field(default_factory=now_utc)
-    updated_at: datetime = Field(default_factory=now_utc)
+class Template(TimestampedModel):
+    id = models.TextField(default=uuid_str, primary_key=True)
+    key = models.TextField(default="", db_index=True, unique=True)
+    label = models.TextField(default="")
+    definition_json = models.TextField(default="{}")
+
+    class Meta:
+        db_table = "template"

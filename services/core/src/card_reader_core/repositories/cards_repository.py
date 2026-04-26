@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
+from typing import Any
 
-from sqlalchemy import desc, or_, text
-from sqlmodel import Session, col, select
+from django.db import transaction
+from django.db.models import QuerySet
 
-from ..models import (
+from ..storage import store_image
+from .helpers import extract_mana_symbols, normalize_slug_key, to_int_or_none
+from card_reader_core.models import (
     Card,
     CardVersion,
     CardVersionImage,
@@ -20,18 +22,11 @@ from ..models import (
     ParseResult,
     now_utc,
 )
-from .helpers import (
-    extract_mana_symbols,
-    normalize_slug_key,
-    to_int_or_none,
-)
-from ..storage import store_image
-
-logger = logging.getLogger(__name__)
+from card_reader_core.search.cards import apply_card_search
 
 
 def save_parsed_card(
-    session: Session,
+    _session: Any,
     *,
     item: ImportJobItem,
     template_id: str,
@@ -43,109 +38,30 @@ def save_parsed_card(
 ) -> CardVersion:
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
     card_key = normalize_slug_key(parsed_name)
-    card = session.exec(select(Card).where(col(Card.key) == card_key)).first()
-    if card is None:
-        card = Card(key=card_key, label=parsed_name)
-        session.add(card)
-        session.flush()
 
-    latest_version = get_latest_card_version(session, card.id)
+    with transaction.atomic():
+        card = Card.objects.filter(key=card_key).first()
+        if card is None:
+            card = Card.objects.create(key=card_key, label=parsed_name)
 
-    if latest_version and latest_version.image_hash == checksum and reparse_existing:
-        apply_parsed_fields_to_version(latest_version, normalized_fields=normalized_fields, confidence=confidence)
-        parse_result = ParseResult(
-            card_version_id=latest_version.id,
-            raw_ocr_json=json.dumps(raw_ocr),
-            normalized_fields_json=json.dumps(normalized_fields),
-            confidence_json=json.dumps(confidence),
-        )
-        session.add(parse_result)
-        session.flush()
-        latest_version.parse_result_id = parse_result.id
-        latest_version.updated_at = now_utc()
-        session.add(latest_version)
-        upsert_card_search(session, card_id=card.id, version=latest_version)
+        latest = get_latest_card_version(None, card.id)
+        if latest and latest.image_hash == checksum and reparse_existing:
+            return _update_existing_version(item, latest, normalized_fields, confidence, raw_ocr)
 
-        item.status = ImportJobStatus.completed
-        item.error_message = None
-        item.updated_at = now_utc()
-        session.add(item)
-        session.commit()
-        session.refresh(latest_version)
-        return latest_version
+        version = _create_new_version(item, card, template_id, checksum, normalized_fields, confidence)
+        _save_parse_result(version, raw_ocr, normalized_fields, confidence)
+        _save_image_record(version, item.source_file, checksum)
+        _mark_item_completed(item)
 
-    source_file_path = Path(item.source_file)
-    stored_path = store_image(source_file_path, checksum)
-
-    if latest_version is not None:
-        latest_version.is_latest = False
-        latest_version.updated_at = now_utc()
-        session.add(latest_version)
-        version_number = latest_version.version_number + 1
-        previous_version_id = latest_version.id
-    else:
-        version_number = 1
-        previous_version_id = None
-
-    version = CardVersion(
-        card_id=card.id,
-        version_number=version_number,
-        template_id=template_id,
-        image_hash=checksum,
-        name=parsed_name,
-        type_line=normalized_fields.get("type_line", ""),
-        mana_cost=normalized_fields.get("mana_cost", ""),
-        mana_symbols_json=json.dumps(extract_mana_symbols(normalized_fields)),
-        attack=to_int_or_none(normalized_fields.get("attack")),
-        health=to_int_or_none(normalized_fields.get("health")),
-        rules_text=normalized_fields.get("rules_text", ""),
-        confidence=float(confidence.get("overall", 0.0)),
-        is_latest=True,
-        previous_version_id=previous_version_id,
-    )
-    session.add(version)
-    session.flush()
-
-    parse_result = ParseResult(
-        card_version_id=version.id,
-        raw_ocr_json=json.dumps(raw_ocr),
-        normalized_fields_json=json.dumps(normalized_fields),
-        confidence_json=json.dumps(confidence),
-    )
-    session.add(parse_result)
-    session.flush()
-
-    version.parse_result_id = parse_result.id
-    session.add(version)
-
-    image_record = CardVersionImage(
-        card_version_id=version.id,
-        source_file=item.source_file,
-        stored_path=str(stored_path),
-        checksum=checksum,
-        updated_at=now_utc(),
-    )
-    session.add(image_record)
-
-    card.label = parsed_name
-    card.latest_version_id = version.id
-    card.updated_at = now_utc()
-    session.add(card)
-
-    item.status = ImportJobStatus.completed
-    item.error_message = None
-    item.updated_at = now_utc()
-    session.add(item)
-
-    upsert_card_search(session, card_id=card.id, version=version)
-
-    session.commit()
-    session.refresh(version)
-    return version
+        card.label = parsed_name
+        card.latest_version_id = version.id
+        card.updated_at = now_utc()
+        card.save(update_fields=["label", "latest_version_id", "updated_at"])
+        return version
 
 
 def list_cards(
-    session: Session,
+    _session: Any = None,
     *,
     query: str | None,
     max_confidence: float | None,
@@ -160,120 +76,51 @@ def list_cards(
     health_min: int | None = None,
     health_max: int | None = None,
 ) -> list[tuple[Card, CardVersion]]:
-    statement = (
-        select(Card, CardVersion)
-        .join(CardVersion, col(CardVersion.card_id) == col(Card.id))
-        .where(col(CardVersion.is_latest).is_(True))
-        .order_by(desc(col(Card.updated_at)))
+    versions = CardVersion.objects.filter(is_latest=True).order_by("-updated_at")
+    versions = apply_card_search(versions, query)
+    versions = _apply_card_filters(
+        versions,
+        max_confidence=max_confidence,
+        mana_cost=mana_cost,
+        template_id=template_id,
+        attack_min=attack_min,
+        attack_max=attack_max,
+        health_min=health_min,
+        health_max=health_max,
+    )
+    versions = _filter_by_links(versions, CardVersionKeyword, "keyword_id", keyword_ids)
+    versions = _filter_by_links(versions, CardVersionTag, "tag_id", tag_ids)
+    versions = _filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
+    versions = _filter_by_links(versions, CardVersionType, "type_id", type_ids)
+
+    version_rows = list(versions)
+    cards = Card.objects.filter(id__in=[version.card_id for version in version_rows])
+    cards_by_id = {card.id: card for card in cards}
+    return [(cards_by_id[version.card_id], version) for version in version_rows]
+
+
+def get_card(_session: Any, card_id: str) -> Card | None:
+    return Card.objects.filter(id=card_id).first()
+
+
+def get_latest_card_version(_session: Any, card_id: str) -> CardVersion | None:
+    return (
+        CardVersion.objects.filter(card_id=card_id, is_latest=True)
+        .order_by("-version_number")
+        .first()
     )
 
-    if query and query.strip():
-        query_text = query.strip()
-        like_pattern = _to_like_pattern(query_text)
-        like_filter = or_(
-            col(CardVersion.name).like(like_pattern, escape="\\"),
-            col(CardVersion.type_line).like(like_pattern, escape="\\"),
-            col(CardVersion.rules_text).like(like_pattern, escape="\\"),
-            col(CardVersion.mana_cost).like(like_pattern, escape="\\"),
-        )
 
-        matched_card_ids: list[str] = []
-        try:
-            rows = session.execute(
-                text("SELECT card_id FROM card_version_search WHERE card_version_search MATCH :query"),
-                {"query": query_text},
-            )
-            matched_card_ids = [row[0] for row in rows]
-        except Exception:
-            logger.exception("FTS query failed; falling back to LIKE search. query=%s", query_text)
-
-        if matched_card_ids:
-            statement = statement.where(or_(col(Card.id).in_(matched_card_ids), like_filter))
-        else:
-            statement = statement.where(like_filter)
-
-    if max_confidence is not None:
-        statement = statement.where(CardVersion.confidence <= max_confidence)
-    if mana_cost:
-        statement = statement.where(col(CardVersion.mana_cost) == mana_cost)
-    if template_id:
-        statement = statement.where(col(CardVersion.template_id) == template_id)
-    if attack_min is not None:
-        statement = statement.where(
-            col(CardVersion.attack).is_not(None),
-            col(CardVersion.attack) >= attack_min,
-        )
-    if attack_max is not None:
-        statement = statement.where(
-            col(CardVersion.attack).is_not(None),
-            col(CardVersion.attack) <= attack_max,
-        )
-    if health_min is not None:
-        statement = statement.where(
-            col(CardVersion.health).is_not(None),
-            col(CardVersion.health) >= health_min,
-        )
-    if health_max is not None:
-        statement = statement.where(
-            col(CardVersion.health).is_not(None),
-            col(CardVersion.health) <= health_max,
-        )
-
-    if keyword_ids:
-        keyword_subquery = (
-            select(CardVersionKeyword.card_version_id)
-            .where(col(CardVersionKeyword.keyword_id).in_(keyword_ids))
-        )
-        statement = statement.where(col(CardVersion.id).in_(keyword_subquery))
-    if tag_ids:
-        tag_subquery = select(CardVersionTag.card_version_id).where(
-            col(CardVersionTag.tag_id).in_(tag_ids)
-        )
-        statement = statement.where(col(CardVersion.id).in_(tag_subquery))
-    if symbol_ids:
-        symbol_subquery = (
-            select(CardVersionSymbol.card_version_id)
-            .where(col(CardVersionSymbol.symbol_id).in_(symbol_ids))
-        )
-        statement = statement.where(col(CardVersion.id).in_(symbol_subquery))
-    if type_ids:
-        type_subquery = select(CardVersionType.card_version_id).where(
-            col(CardVersionType.type_id).in_(type_ids)
-        )
-        statement = statement.where(col(CardVersion.id).in_(type_subquery))
-
-    return list(session.exec(statement))
+def get_card_image(_session: Any, card_version_id: str) -> CardVersionImage | None:
+    return CardVersionImage.objects.filter(card_version_id=card_version_id).first()
 
 
-def get_card(session: Session, card_id: str) -> Card | None:
-    return session.get(Card, card_id)
-
-
-def get_latest_card_version(session: Session, card_id: str) -> CardVersion | None:
-    statement = (
-        select(CardVersion)
-        .where(col(CardVersion.card_id) == card_id, col(CardVersion.is_latest).is_(True))
-        .order_by(desc(col(CardVersion.version_number)))
-    )
-    return session.exec(statement).first()
-
-
-def get_card_image(session: Session, card_version_id: str) -> CardVersionImage | None:
-    statement = select(CardVersionImage).where(col(CardVersionImage.card_version_id) == card_version_id)
-    return session.exec(statement).first()
-
-
-def list_card_generations(session: Session, card_id: str) -> list[CardVersion]:
-    statement = (
-        select(CardVersion)
-        .where(col(CardVersion.card_id) == card_id)
-        .order_by(desc(col(CardVersion.version_number)))
-    )
-    return list(session.exec(statement))
+def list_card_generations(_session: Any, card_id: str) -> list[CardVersion]:
+    return list(CardVersion.objects.filter(card_id=card_id).order_by("-version_number"))
 
 
 def update_card(
-    session: Session,
+    _session: Any,
     *,
     card_id: str,
     name: str | None,
@@ -281,12 +128,9 @@ def update_card(
     mana_cost: str | None,
     rules_text: str | None,
 ) -> tuple[Card, CardVersion] | None:
-    card = get_card(session, card_id)
-    if card is None:
-        return None
-
-    version = get_latest_card_version(session, card.id)
-    if version is None:
+    card = get_card(None, card_id)
+    version = get_latest_card_version(None, card_id)
+    if card is None or version is None:
         return None
 
     if name is not None:
@@ -302,14 +146,8 @@ def update_card(
 
     card.updated_at = now_utc()
     version.updated_at = now_utc()
-    session.add(card)
-    session.add(version)
-
-    upsert_card_search(session, card_id=card.id, version=version)
-
-    session.commit()
-    session.refresh(card)
-    session.refresh(version)
+    card.save()
+    version.save()
     return card, version
 
 
@@ -329,32 +167,123 @@ def apply_parsed_fields_to_version(
     version.confidence = float(confidence.get("overall", 0.0))
 
 
-def upsert_card_search(session: Session, *, card_id: str, version: CardVersion) -> None:
-    session.execute(
-        text("DELETE FROM card_version_search WHERE card_id = :card_id"),
-        {"card_id": card_id},
-    )
-    session.execute(
-        text(
-            "INSERT INTO card_version_search(card_id, card_version_id, name, type_line, rules_text, mana_cost) "
-            "VALUES (:card_id, :card_version_id, :name, :type_line, :rules_text, :mana_cost)"
-        ),
-        {
-            "card_id": card_id,
-            "card_version_id": version.id,
-            "name": version.name,
-            "type_line": version.type_line,
-            "rules_text": version.rules_text,
-            "mana_cost": version.mana_cost,
-        },
+def upsert_card_search(_session: Any, *, card_id: str, version: CardVersion) -> None:
+    return None
+
+
+def _update_existing_version(
+    item: ImportJobItem,
+    version: CardVersion,
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+    raw_ocr: dict[str, object],
+) -> CardVersion:
+    apply_parsed_fields_to_version(version, normalized_fields=normalized_fields, confidence=confidence)
+    _save_parse_result(version, raw_ocr, normalized_fields, confidence)
+    version.updated_at = now_utc()
+    version.save()
+    _mark_item_completed(item)
+    return version
+
+
+def _create_new_version(
+    item: ImportJobItem,
+    card: Card,
+    template_id: str,
+    checksum: str,
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+) -> CardVersion:
+    latest = get_latest_card_version(None, card.id)
+    previous_version_id = None
+    version_number = 1
+    if latest is not None:
+        latest.is_latest = False
+        latest.updated_at = now_utc()
+        latest.save(update_fields=["is_latest", "updated_at"])
+        previous_version_id = latest.id
+        version_number = latest.version_number + 1
+
+    return CardVersion.objects.create(
+        card_id=card.id,
+        version_number=version_number,
+        template_id=template_id,
+        image_hash=checksum,
+        name=normalized_fields.get("name", "").strip() or Path(item.source_file).stem,
+        type_line=normalized_fields.get("type_line", ""),
+        mana_cost=normalized_fields.get("mana_cost", ""),
+        mana_symbols_json=json.dumps(extract_mana_symbols(normalized_fields)),
+        attack=to_int_or_none(normalized_fields.get("attack")),
+        health=to_int_or_none(normalized_fields.get("health")),
+        rules_text=normalized_fields.get("rules_text", ""),
+        confidence=float(confidence.get("overall", 0.0)),
+        is_latest=True,
+        previous_version_id=previous_version_id,
     )
 
 
-def _to_like_pattern(query: str) -> str:
-    escaped = (
-        query.replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-        .replace("[", "\\[")
+def _save_parse_result(
+    version: CardVersion,
+    raw_ocr: dict[str, object],
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+) -> None:
+    parse_result = ParseResult.objects.create(
+        card_version_id=version.id,
+        raw_ocr_json=json.dumps(raw_ocr),
+        normalized_fields_json=json.dumps(normalized_fields),
+        confidence_json=json.dumps(confidence),
     )
-    return f"%{escaped}%"
+    version.parse_result_id = parse_result.id
+    version.save(update_fields=["parse_result_id"])
+
+
+def _save_image_record(version: CardVersion, source_file: str, checksum: str) -> None:
+    stored_path = store_image(Path(source_file), checksum)
+    CardVersionImage.objects.create(
+        card_version_id=version.id,
+        source_file=source_file,
+        stored_path=str(stored_path),
+        checksum=checksum,
+        updated_at=now_utc(),
+    )
+
+
+def _mark_item_completed(item: ImportJobItem) -> None:
+    item.status = ImportJobStatus.completed
+    item.error_message = None
+    item.updated_at = now_utc()
+    item.save(update_fields=["status", "error_message", "updated_at"])
+
+
+def _apply_card_filters(queryset: QuerySet[CardVersion], **filters) -> QuerySet[CardVersion]:
+    if filters["max_confidence"] is not None:
+        queryset = queryset.filter(confidence__lte=filters["max_confidence"])
+    if filters["mana_cost"]:
+        queryset = queryset.filter(mana_cost=filters["mana_cost"])
+    if filters["template_id"]:
+        queryset = queryset.filter(template_id=filters["template_id"])
+    if filters["attack_min"] is not None:
+        queryset = queryset.filter(attack__isnull=False, attack__gte=filters["attack_min"])
+    if filters["attack_max"] is not None:
+        queryset = queryset.filter(attack__isnull=False, attack__lte=filters["attack_max"])
+    if filters["health_min"] is not None:
+        queryset = queryset.filter(health__isnull=False, health__gte=filters["health_min"])
+    if filters["health_max"] is not None:
+        queryset = queryset.filter(health__isnull=False, health__lte=filters["health_max"])
+    return queryset
+
+
+def _filter_by_links(
+    queryset: QuerySet[CardVersion],
+    link_model: type,
+    link_field: str,
+    values: list[str] | None,
+) -> QuerySet[CardVersion]:
+    if not values:
+        return queryset
+    version_ids = link_model.objects.filter(**{f"{link_field}__in": values}).values_list(
+        "card_version_id",
+        flat=True,
+    )
+    return queryset.filter(id__in=version_ids)
