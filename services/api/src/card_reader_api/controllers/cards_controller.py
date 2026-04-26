@@ -6,25 +6,22 @@ from fastapi.responses import FileResponse
 from card_reader_core.database.connection import get_session
 from card_reader_core.settings import settings
 from ..services import CardService
+from ..services.card_service import CardMetadata
 from ..dependencies import get_card_service
 from ..mappers import (
-    to_card_detail_response,
-    to_card_generation_response,
+    to_card_response,
     to_metadata_option_response,
-    to_card_summary_response,
     to_symbol_filter_option_response,
 )
 from ..schemas import (
     CardFiltersResponse,
-    CardDetailResponse,
-    CardGenerationResponse,
-    CardSummaryResponse,
+    CardResponse,
 )
 
 router = APIRouter()
 
 
-@router.get("/cards", response_model=list[CardSummaryResponse])
+@router.get("/cards", response_model=list[CardResponse])
 def list_cards(
     q: str | None = None,
     max_confidence: float | None = None,
@@ -39,7 +36,7 @@ def list_cards(
     health_min: int | None = None,
     health_max: int | None = None,
     card_service: CardService = Depends(get_card_service),
-) -> list[CardSummaryResponse]:
+) -> list[CardResponse]:
     with get_session() as session:
         cards = card_service.list_cards(
             session,
@@ -56,16 +53,13 @@ def list_cards(
             health_min=health_min,
             health_max=health_max,
         )
-        out: list[CardSummaryResponse] = []
+        out: list[CardResponse] = []
         for card, version in cards:
-            item = to_card_summary_response(card, version)
             image = card_service.get_card_image(session, version.id)
+            image_url = f"/cards/{card.id}/image" if image is not None else None
+            item = to_card_response(card, version, image_url=image_url)
             meta = card_service.get_card_version_metadata(session, version.id)
-            item.image_url = f"/cards/{card.id}/image" if image is not None else None
-            item.keywords = [row.label for row in meta["keywords"]]
-            item.tags = [row.label for row in meta["tags"]]
-            item.symbols = [row.label for row in meta["symbols"]]
-            item.types = [row.label for row in meta["types"]]
+            _apply_card_metadata(item, meta)
             out.append(item)
         return out
 
@@ -82,34 +76,39 @@ def get_card_filters(card_service: CardService = Depends(get_card_service)) -> C
         )
 
 
-@router.get("/cards/{card_id}", response_model=CardDetailResponse)
-def get_card(card_id: str, card_service: CardService = Depends(get_card_service)) -> CardDetailResponse:
+@router.get("/cards/{card_id}", response_model=CardResponse)
+def get_card(card_id: str, card_service: CardService = Depends(get_card_service)) -> CardResponse:
     with get_session() as session:
         card, version, image = card_service.get_card_with_image(session, card_id)
         if card is None or version is None:
             raise HTTPException(status_code=404, detail="Card not found")
-        return to_card_detail_response(card, version, has_image=image is not None)
+        image_url = f"/cards/{card.id}/image" if image is not None else None
+        item = to_card_response(card, version, image_url=image_url)
+        meta = card_service.get_card_version_metadata(session, version.id)
+        _apply_card_metadata(item, meta)
+        return item
 
 
-@router.get("/cards/{card_id}/generations", response_model=list[CardGenerationResponse])
+@router.get("/cards/{card_id}/generations", response_model=list[CardResponse])
 def get_card_generations(
     card_id: str,
     card_service: CardService = Depends(get_card_service),
-) -> list[CardGenerationResponse]:
+) -> list[CardResponse]:
     with get_session() as session:
+        card = card_service.get_card(session, card_id)
+        if card is None:
+            raise HTTPException(status_code=404, detail="Card not found")
+
         generations = card_service.list_card_generations(session, card_id)
         if not generations:
             raise HTTPException(status_code=404, detail="Card not found")
-        out: list[CardGenerationResponse] = []
+        out: list[CardResponse] = []
         for version in generations:
-            row = to_card_generation_response(version)
             image = card_service.get_card_image(session, version.id)
+            image_url = f"/cards/{card_id}/versions/{version.id}/image" if image is not None else None
+            row = to_card_response(card, version, image_url=image_url)
             meta = card_service.get_card_version_metadata(session, version.id)
-            row.image_url = f"/cards/{card_id}/versions/{version.id}/image" if image is not None else None
-            row.keywords = [item.label for item in meta["keywords"]]
-            row.tags = [item.label for item in meta["tags"]]
-            row.symbols = [item.label for item in meta["symbols"]]
-            row.types = [item.label for item in meta["types"]]
+            _apply_card_metadata(row, meta)
             out.append(row)
         return out
 
@@ -162,6 +161,16 @@ def get_symbol_asset(asset_path: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Symbol asset not found")
 
     return FileResponse(path=requested_path)
+
+
+def _apply_card_metadata(
+    item: CardResponse,
+    meta: CardMetadata,
+) -> None:
+    item.keywords = [row.label for row in meta["keywords"]]
+    item.tags = [to_metadata_option_response(row) for row in meta["tags"]]
+    item.symbols = [to_symbol_filter_option_response(row) for row in meta["symbols"]]
+    item.types = [to_metadata_option_response(row) for row in meta["types"]]
 
 
 

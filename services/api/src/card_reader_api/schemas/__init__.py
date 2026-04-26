@@ -8,9 +8,7 @@ from .requests import (
 )
 from .responses import (
     CardFiltersResponse,
-    CardDetailResponse,
-    CardGenerationResponse,
-    CardSummaryResponse,
+    CardResponse,
     CatalogResponse,
     ImportJobDetailResponse,
     ImportJobItemResponse,
@@ -31,9 +29,7 @@ __all__ = [
     "ImportJobResponse",
     "ImportJobItemResponse",
     "ImportJobDetailResponse",
-    "CardSummaryResponse",
-    "CardDetailResponse",
-    "CardGenerationResponse",
+    "CardResponse",
     "MetadataOptionResponse",
     "SymbolFilterOptionResponse",
     "CardFiltersResponse",

@@ -27,66 +27,6 @@ class ImportJobDetailResponse(BaseModel):
     items: list[ImportJobItemResponse]
 
 
-class CardSummaryResponse(BaseModel):
-    id: str
-    key: str
-    label: str
-    name: str
-    template_id: str
-    version_id: str
-    version_number: int
-    is_latest: bool
-    type_line: str
-    mana_cost: str
-    mana_symbols: list[str] = []
-    attack: int | None = None
-    health: int | None = None
-    confidence: float
-    image_url: str | None = None
-    keywords: list[str] = []
-    tags: list[str] = []
-    symbols: list[str] = []
-    types: list[str] = []
-
-
-class CardDetailResponse(BaseModel):
-    id: str
-    key: str
-    label: str
-    version_id: str
-    version_number: int
-    name: str
-    previous_version_id: str | None = None
-    is_latest: bool
-    type_line: str
-    mana_cost: str
-    mana_symbols: list[str] = []
-    attack: int | None = None
-    health: int | None = None
-    rules_text: str
-    confidence: float
-    image_url: str | None = None
-
-
-class CardGenerationResponse(BaseModel):
-    id: str
-    version_number: int
-    name: str
-    type_line: str
-    mana_cost: str
-    mana_symbols: list[str] = []
-    attack: int | None = None
-    health: int | None = None
-    rules_text: str
-    confidence: float
-    created_at: str
-    image_url: str | None = None
-    keywords: list[str] = []
-    tags: list[str] = []
-    symbols: list[str] = []
-    types: list[str] = []
-
-
 class MetadataOptionResponse(BaseModel):
     id: str
     key: str
@@ -97,6 +37,31 @@ class SymbolFilterOptionResponse(MetadataOptionResponse):
     symbol_type: str = "generic"
     text_token: str = ""
     asset_url: str | None = None
+
+
+class CardResponse(BaseModel):
+    id: str
+    key: str
+    label: str
+    name: str
+    template_id: str
+    version_id: str
+    version_number: int
+    previous_version_id: str | None = None
+    is_latest: bool
+    type_line: str
+    mana_cost: str
+    mana_symbols: list[str] = []
+    attack: int | None = None
+    health: int | None = None
+    rules_text: str
+    confidence: float
+    created_at: str
+    image_url: str | None = None
+    keywords: list[str] = []
+    tags: list[MetadataOptionResponse] = []
+    symbols: list[SymbolFilterOptionResponse] = []
+    types: list[MetadataOptionResponse] = []
 
 
 class CardFiltersResponse(BaseModel):

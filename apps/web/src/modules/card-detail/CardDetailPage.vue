@@ -25,7 +25,7 @@
     <div class="flex flex-wrap items-start gap-5">
       <CardVersionGalleryItem
         v-for="version in versions"
-        :key="version.id"
+        :key="version.version_id"
         :version="version"
         :symbol-by-key="symbolByKey"
       />
@@ -56,6 +56,7 @@ type MetadataOption = {
 };
 
 type SymbolFilterOption = MetadataOption & {
+  symbol_type: string;
   text_token: string;
   asset_url: string | null;
 };

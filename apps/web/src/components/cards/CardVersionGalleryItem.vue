@@ -3,7 +3,7 @@
     ref="referenceRef"
     class="relative w-full sm:w-80"
     @mouseenter="openHoverPanel"
-    @mouseleave="closeHoverPanel"
+    @mouseleave="scheduleCloseHoverPanel"
   >
     <img
       v-if="version.image_url"
@@ -22,65 +22,23 @@
       <aside
         v-if="showHoverPanel"
         ref="floatingRef"
-        class="pointer-events-none z-30 hidden w-96 rounded-xl border border-slate-200 bg-white p-4 opacity-100 shadow-2xl lg:block"
-        :style="{ position: 'fixed', left: `${panelX}px`, top: `${panelY}px` }"
+        class="pointer-events-auto z-30 hidden w-96 rounded-xl border border-slate-200 bg-white p-4 opacity-100 shadow-2xl lg:block"
+        :style="floatingPanelStyle"
+        @mouseenter="cancelCloseHoverPanel"
+        @mouseleave="scheduleCloseHoverPanel"
       >
-        <h4 class="text-base font-semibold text-slate-900">
-          {{ version.name }}
-        </h4>
-        <p class="mb-3 text-xs text-slate-500">
-          {{ version.type_line || 'No type' }}
-        </p>
-
-        <div class="grid grid-cols-2 gap-2 text-xs text-slate-700">
-          <span>Version: {{ version.version_number }}</span>
-          <span>Conf: {{ version.confidence.toFixed(2) }}</span>
-          <span class="inline-flex items-center gap-1">
-            Mana:
-            <SymbolizedText
-              :tokens="version.mana_symbols"
-              :text="version.mana_cost"
-              :symbol-by-key="symbolByKey"
-            />
-          </span>
-          <span>Date: {{ formatDate(version.created_at) }}</span>
-          <span>ATK: {{ version.attack ?? '-' }}</span>
-          <span>HP: {{ version.health ?? '-' }}</span>
-        </div>
-
-        <div class="mt-3 flex flex-wrap gap-1 text-[11px]">
-          <span
-            v-for="keyword in version.keywords"
-            :key="`kw-${version.id}-${keyword}`"
-            class="rounded bg-sky-100 px-2 py-0.5 text-sky-800"
-          >
-            {{ keyword }}
-          </span>
-          <span
-            v-for="tag in version.tags"
-            :key="`tag-${version.id}-${tag}`"
-            class="rounded bg-emerald-100 px-2 py-0.5 text-emerald-800"
-          >
-            {{ tag }}
-          </span>
-          <span
-            v-for="type in version.types"
-            :key="`type-${version.id}-${type}`"
-            class="rounded bg-amber-100 px-2 py-0.5 text-amber-800"
-          >
-            {{ type }}
-          </span>
-        </div>
-
-        <p class="mt-3 whitespace-pre-line text-xs text-slate-600">
-          {{ version.rules_text || '-' }}
-        </p>
+        <CardHoverTooltip
+          :item="version"
+          :symbol-by-key="symbolByKey"
+        />
       </aside>
 
       <aside
         v-if="showHoverPanel && isDev"
-        class="pointer-events-none z-30 hidden w-[28rem] rounded-xl border border-slate-300 bg-slate-950 p-4 text-slate-100 opacity-100 shadow-2xl lg:block"
-        :style="{ position: 'fixed', left: `${panelX + 420}px`, top: `${panelY}px` }"
+        class="pointer-events-auto z-30 hidden w-[28rem] rounded-xl border border-slate-300 bg-slate-950 p-4 text-slate-100 opacity-100 shadow-2xl lg:block"
+        :style="debugPanelStyle"
+        @mouseenter="cancelCloseHoverPanel"
+        @mouseleave="scheduleCloseHoverPanel"
       >
         <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
           Debug (Raw Version)
@@ -94,92 +52,78 @@
 </template>
 
 <script setup lang="ts">
-import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
-import SymbolizedText from '@/components/SymbolizedText.vue';
+import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
+import type {
+  CardHoverTooltipModel,
+  CardTooltipSymbolLookup,
+} from '@/components/cards/CardHoverTooltip.vue';
 
-type SymbolLookup = {
-  asset_url?: string | null;
-  text_token?: string;
-};
-
-export type CardVersionGalleryItemModel = {
-  id: string;
-  version_number: number;
-  name: string;
-  type_line: string;
-  mana_cost: string;
-  mana_symbols: string[];
-  attack: number | null;
-  health: number | null;
-  rules_text: string;
-  confidence: number;
-  created_at: string;
+export type CardVersionGalleryItemModel = CardHoverTooltipModel & {
   image_url: string | null;
-  keywords: string[];
-  tags: string[];
-  symbols: string[];
-  types: string[];
 };
 
 const props = defineProps<{
   version: CardVersionGalleryItemModel;
-  symbolByKey: Record<string, SymbolLookup>;
+  symbolByKey: Record<string, CardTooltipSymbolLookup>;
 }>();
 
 const referenceRef = ref<HTMLElement | null>(null);
 const floatingRef = ref<HTMLElement | null>(null);
 const showHoverPanel = ref(false);
-const panelX = ref(0);
-const panelY = ref(0);
 const isDev = import.meta.env.DEV;
 
-let stopAutoUpdate: (() => void) | null = null;
+let closeHoverPanelTimer: number | null = null;
 const debugJson = computed(() => JSON.stringify(props.version, null, 2));
 
-const updatePosition = async (): Promise<void> => {
-  const reference = referenceRef.value;
-  const floating = floatingRef.value;
-  if (!reference || !floating) return;
+const { x, y, strategy } = useFloating(referenceRef, floatingRef, {
+  open: showHoverPanel,
+  placement: 'right-start',
+  strategy: 'fixed',
+  transform: false,
+  middleware: [offset(12), flip(), shift({ padding: 8 })],
+  whileElementsMounted: autoUpdate,
+});
 
-  const position = await computePosition(reference, floating, {
-    placement: 'right-start',
-    middleware: [offset(12), flip(), shift({ padding: 8 })],
-  });
-  panelX.value = position.x;
-  panelY.value = position.y;
+const floatingPanelStyle = computed(() => ({
+  position: strategy.value,
+  left: `${x.value ?? 0}px`,
+  top: `${y.value ?? 0}px`,
+}));
+
+const debugPanelStyle = computed(() => ({
+  position: strategy.value,
+  left: `${(x.value ?? 0) + 420}px`,
+  top: `${y.value ?? 0}px`,
+}));
+
+const openHoverPanel = (): void => {
+  cancelCloseHoverPanel();
+  showHoverPanel.value = true;
 };
 
-const openHoverPanel = async (): Promise<void> => {
-  showHoverPanel.value = true;
-  await nextTick();
-  if (!showHoverPanel.value) return;
-  await updatePosition();
-  if (!showHoverPanel.value) return;
+const cancelCloseHoverPanel = (): void => {
+  if (closeHoverPanelTimer === null) return;
+  window.clearTimeout(closeHoverPanelTimer);
+  closeHoverPanelTimer = null;
+};
 
-  const reference = referenceRef.value;
-  const floating = floatingRef.value;
-  if (!reference || !floating) return;
-
-  stopAutoUpdate = autoUpdate(reference, floating, () => {
-    void updatePosition();
-  });
+const scheduleCloseHoverPanel = (): void => {
+  cancelCloseHoverPanel();
+  closeHoverPanelTimer = window.setTimeout(() => {
+    closeHoverPanel();
+  }, 30);
 };
 
 const closeHoverPanel = (): void => {
+  cancelCloseHoverPanel();
   showHoverPanel.value = false;
-  if (stopAutoUpdate) {
-    stopAutoUpdate();
-    stopAutoUpdate = null;
-  }
 };
 
 onBeforeUnmount(() => {
-  if (stopAutoUpdate) {
-    stopAutoUpdate();
-    stopAutoUpdate = null;
-  }
+  cancelCloseHoverPanel();
 });
 
 const toAbsoluteApiUrl = (urlPath: string): string => {

@@ -41,7 +41,8 @@
         "sola-affinity"
       ],
       "types": [
-        "2h Equipment",
+        "2h",
+        "Equipment",
         "Unique"
       ],
       "symbol_types": {

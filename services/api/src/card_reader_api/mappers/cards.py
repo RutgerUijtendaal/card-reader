@@ -4,16 +4,19 @@ import json
 
 from card_reader_core.models import Card, CardVersion, Symbol
 from ..schemas import (
-    CardDetailResponse,
-    CardGenerationResponse,
-    CardSummaryResponse,
+    CardResponse,
     MetadataOptionResponse,
     SymbolFilterOptionResponse,
 )
 
 
-def to_card_summary_response(card: Card, version: CardVersion) -> CardSummaryResponse:
-    return CardSummaryResponse(
+def to_card_response(
+    card: Card,
+    version: CardVersion,
+    *,
+    image_url: str | None = None,
+) -> CardResponse:
+    return CardResponse(
         id=card.id,
         key=card.key,
         label=card.label,
@@ -21,29 +24,6 @@ def to_card_summary_response(card: Card, version: CardVersion) -> CardSummaryRes
         template_id=version.template_id,
         version_id=version.id,
         version_number=version.version_number,
-        is_latest=version.is_latest,
-        type_line=version.type_line,
-        mana_cost=version.mana_cost,
-        mana_symbols=_decode_mana_symbols(version.mana_symbols_json),
-        attack=version.attack,
-        health=version.health,
-        confidence=version.confidence,
-    )
-
-
-def to_card_detail_response(
-    card: Card,
-    version: CardVersion,
-    *,
-    has_image: bool,
-) -> CardDetailResponse:
-    return CardDetailResponse(
-        id=card.id,
-        key=card.key,
-        label=card.label,
-        version_id=version.id,
-        version_number=version.version_number,
-        name=version.name,
         previous_version_id=version.previous_version_id,
         is_latest=version.is_latest,
         type_line=version.type_line,
@@ -53,23 +33,8 @@ def to_card_detail_response(
         health=version.health,
         rules_text=version.rules_text,
         confidence=version.confidence,
-        image_url=f"/cards/{card.id}/image" if has_image else None,
-    )
-
-
-def to_card_generation_response(version: CardVersion) -> CardGenerationResponse:
-    return CardGenerationResponse(
-        id=version.id,
-        version_number=version.version_number,
-        name=version.name,
-        type_line=version.type_line,
-        mana_cost=version.mana_cost,
-        mana_symbols=_decode_mana_symbols(version.mana_symbols_json),
-        attack=version.attack,
-        health=version.health,
-        rules_text=version.rules_text,
-        confidence=version.confidence,
         created_at=version.created_at.isoformat(),
+        image_url=image_url,
     )
 
 
@@ -117,5 +82,3 @@ def _first_symbol_asset_url(raw: str) -> str | None:
             continue
         return f"/symbols/assets/{relative}"
     return None
-
-
