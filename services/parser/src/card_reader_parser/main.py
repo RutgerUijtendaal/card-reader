@@ -8,9 +8,9 @@ import time
 from pathlib import Path
 from threading import Event
 
-from card_reader_core.database.connection import get_session, initialize_database
 from card_reader_core.core_logging import configure_logging
-from card_reader_core.repositories import get_next_queued_job
+from card_reader_core.database.connection import get_session, initialize_database
+from card_reader_core.repositories import get_next_queued_job, requeue_running_import_jobs
 from card_reader_parser.parsers.card_parser import CardParser
 from card_reader_parser.services import ImportProcessorService
 from card_reader_parser.template_store import DatabaseTemplateStore
@@ -46,6 +46,18 @@ class ShutdownController:
             elapsed += wait_for
 
 
+def recover_interrupted_jobs() -> None:
+    with get_session() as session:
+        recovered_jobs, recovered_items = requeue_running_import_jobs(session)
+
+    if recovered_jobs or recovered_items:
+        logger.warning(
+            "Recovered interrupted import work. jobs=%s items=%s",
+            recovered_jobs,
+            recovered_items,
+        )
+
+
 def run_parser_loop(interval_seconds: float = 1.5) -> None:
     # Emit Python stack traces if native extensions crash (SIGSEGV/SIGABRT).
     faulthandler.enable(all_threads=True)
@@ -58,6 +70,7 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
     parser = CardParser(template_store)
     service = ImportProcessorService(parser)
     initialize_database()
+    recover_interrupted_jobs()
     logger.info("Parser loop started. interval_seconds=%.2f", interval_seconds)
 
     while not shutdown.should_stop():
@@ -83,6 +96,7 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
             logger.exception("Parser loop iteration failed; attempting recovery")
             try:
                 initialize_database()
+                recover_interrupted_jobs()
             except Exception:
                 logger.exception("Parser recovery initialize_database failed")
             shutdown.interruptible_sleep(interval_seconds)

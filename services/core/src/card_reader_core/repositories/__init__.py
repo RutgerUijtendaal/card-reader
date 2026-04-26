@@ -24,6 +24,7 @@ from .import_jobs_repository import (
     mark_job_item_failed,
     mark_job_queued,
     mark_job_running,
+    requeue_running_import_jobs,
 )
 from .metadata_repository import (
     create_keyword,
@@ -87,6 +88,7 @@ __all__ = [
     "get_next_queued_job",
     "get_job_items",
     "mark_job_item_failed",
+    "requeue_running_import_jobs",
     "save_parsed_card",
     "list_cards",
     "get_card",

@@ -78,6 +78,35 @@ def mark_job_queued(session: Session, job: ImportJob) -> None:
     session.commit()
 
 
+def requeue_running_import_jobs(session: Session) -> tuple[int, int]:
+    statement = select(ImportJob).where(col(ImportJob.status) == ImportJobStatus.running)
+    jobs = list(session.exec(statement))
+    if not jobs:
+        return 0, 0
+
+    timestamp = now_utc()
+    recovered_item_count = 0
+    processed_statuses = {ImportJobStatus.completed, ImportJobStatus.failed}
+
+    for job in jobs:
+        items = get_job_items(session, job.id)
+        for item in items:
+            if item.status == ImportJobStatus.running:
+                item.status = ImportJobStatus.queued
+                item.error_message = None
+                item.updated_at = timestamp
+                session.add(item)
+                recovered_item_count += 1
+
+        job.status = ImportJobStatus.queued
+        job.processed_items = sum(1 for item in items if item.status in processed_statuses)
+        job.updated_at = timestamp
+        session.add(job)
+
+    session.commit()
+    return len(jobs), recovered_item_count
+
+
 def mark_job_complete(session: Session, job: ImportJob) -> None:
     job.status = ImportJobStatus.completed
     job.updated_at = now_utc()
