@@ -91,8 +91,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build desktop sidecars
-        run: pnpm --filter @card-reader/desktop run build:sidecars
+      - name: Build desktop Python runtime
+        run: pnpm --filter @card-reader/desktop run build:python
 
       - name: Build desktop bundle
         run: pnpm --filter @card-reader/desktop exec tauri build --bundles ${{ matrix.platform.bundles }}

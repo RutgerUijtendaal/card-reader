@@ -23,7 +23,7 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "binaries/*"
+      "python/**/*"
     ],
     "icon": [
       "icons/icon.ico",

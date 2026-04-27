@@ -12,7 +12,7 @@ Tauri desktop shell.
 - `services/api`: Django + DRF API service
 - `services/parser`: background OCR/parser worker
 - `services/integration`: integration tests across API, parser, and core
-- `scripts`: project-specific automation for desktop sidecars and repo versioning
+- `scripts`: project-specific automation for desktop Python packaging and repo versioning
 
 ## Stack
 
@@ -55,6 +55,10 @@ That starts:
 
 Desktop is excluded from the default loop. Use `pnpm dev:desktop` when needed.
 
+Desktop production bundles package a managed Python runtime plus installed backend packages. The
+desktop app launches the API and parser with `python -m ...` rather than frozen PyInstaller
+executables.
+
 ## Local Development
 
 Useful commands from the repo root:
@@ -78,6 +82,7 @@ Targeted commands:
 pnpm --filter @card-reader/web dev
 pnpm --filter @card-reader/api dev
 pnpm --filter @card-reader/parser dev
+pnpm --filter @card-reader/desktop run build:python
 pnpm --filter @card-reader/integration test
 pnpm --filter @card-reader/core lint
 ```

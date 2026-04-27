@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build:sidecars": "node ../../scripts/build-sidecars.mjs",
-    "build": "pnpm run build:sidecars && tauri build",
+    "build:python": "node ../../scripts/build-desktop-python.mjs",
+    "build": "pnpm run build:python && node ../../scripts/build-target.mjs",
     "lint": "echo \"Desktop lint delegated to Rust clippy in CI\"",
     "test": "echo \"No desktop tests yet\"",
     "typecheck": "echo \"No desktop typecheck step\""

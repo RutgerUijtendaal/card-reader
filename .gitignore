@@ -17,6 +17,8 @@ htmlcov/
 *.pyo
 *.pyd
 *.egg-info/
+*/build/
+services/*/build/
 *.log
 *.sqlite
 *.sqlite3
@@ -32,6 +34,9 @@ htmlcov/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/python/runtime/
+apps/desktop/src-tauri/python/site-packages/
+!apps/desktop/src-tauri/python/placeholder.txt
 .tmp/
 *.spec
 TODO.local.md
