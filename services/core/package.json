@@ -1,6 +1,6 @@
 {
   "name": "@card-reader/core",
-  "version": "0.1.7",
+  "version": "0.1.10",
   "private": true,
   "scripts": {
     "dev": "echo \"Core has no standalone dev process\"",

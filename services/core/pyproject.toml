@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "card-reader-core"
-version = "0.1.7"
+version = "0.1.10"
 description = "Shared core runtime and data layer for Card Reader services"
 readme = "README.md"
 requires-python = ">=3.12"

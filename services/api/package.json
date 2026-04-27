@@ -1,6 +1,6 @@
 {
   "name": "@card-reader/api",
-  "version": "0.1.7",
+  "version": "0.1.10",
   "private": true,
   "scripts": {
     "predev": "uv --cache-dir ../../.uv-cache sync --project ../.. --all-packages --all-groups --locked",

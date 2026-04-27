@@ -24,6 +24,8 @@ jobs:
         uses: astral-sh/setup-uv@v3
       - name: Sync Python workspace
         run: uv --cache-dir ./.uv-cache sync --project . --all-packages --all-groups --locked
+      - name: Check repo version consistency
+        run: pnpm version:check
       - name: Lint
         run: pnpm lint
       - name: Typecheck

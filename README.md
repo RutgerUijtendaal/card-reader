@@ -45,6 +45,19 @@ source "$HOME/.cargo/env"
 The bootstrap installs Node dependencies and syncs the Python environments for core, API, parser,
 and integration tests into a single workspace `.venv` at the repo root.
 
+Repo versioning uses the root `VERSION` file as the single source of truth. Update all manifest
+versions together with:
+
+```bash
+pnpm version:repo 0.1.8
+```
+
+Verify consistency with:
+
+```bash
+pnpm version:check
+```
+
 ## Development
 
 ```bash

@@ -4,6 +4,8 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "sync:python": "uv --cache-dir ./.uv-cache sync --project . --all-packages --all-groups --locked",
+    "version:repo": "uv --cache-dir ./.uv-cache run --no-project python scripts/set-version.py",
+    "version:check": "uv --cache-dir ./.uv-cache run --no-project python scripts/check-version.py",
     "dev": "turbo run dev --parallel --filter=!@card-reader/desktop",
     "dev:all": "turbo run dev --parallel",
     "dev:desktop": "pnpm --filter @card-reader/desktop dev",
