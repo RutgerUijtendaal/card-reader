@@ -22,14 +22,8 @@ jobs:
         run: pnpm install
       - name: Setup uv
         uses: astral-sh/setup-uv@v3
-      - name: Install Core deps
-        run: uv sync --project services/core --extra dev
-      - name: Install API deps
-        run: uv sync --project services/api --extra dev
-      - name: Install parser deps
-        run: uv sync --project services/parser --extra dev
-      - name: Install integration deps
-        run: uv sync --project services/integration --extra dev
+      - name: Sync Python workspace
+        run: uv --cache-dir ./.uv-cache sync --project . --all-packages --all-groups --locked
       - name: Lint
         run: pnpm lint
       - name: Typecheck
