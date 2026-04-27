@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-card-reader-core = { path = "../core", editable = true }
+card-reader-core = { workspace = true }
 
 [tool.setuptools]
 package-dir = { "" = "src" }
