@@ -162,6 +162,11 @@ fn spawn_sidecar(app: &AppHandle, executable: &str, app_data_dir: Option<&str>) 
     command
         .env("CARD_READER_ENV", runtime_env)
         .env("CARD_READER_API_PORT", DESKTOP_API_PORT);
+    if executable == "card-reader-api" {
+        // The packaged desktop app runs as a local single-user experience and does not bundle
+        // deployment-specific seed users, so disable Django auth for the embedded API.
+        command.env("CARD_READER_AUTH_ENABLED", "false");
+    }
     if executable == "card-reader-parser" {
         if let Some(path) = parser_shutdown_marker_path(app_data_dir) {
             command.env("CARD_READER_SHUTDOWN_FILE", path.to_string_lossy().to_string());

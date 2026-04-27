@@ -100,7 +100,7 @@ wheels = [
 
 [[package]]
 name = "card-reader-api"
-version = "0.1.7"
+version = "0.1.10"
 source = { editable = "services/api" }
 dependencies = [
     { name = "card-reader-core" },
@@ -145,7 +145,7 @@ dev = [
 
 [[package]]
 name = "card-reader-core"
-version = "0.1.7"
+version = "0.1.10"
 source = { editable = "services/core" }
 dependencies = [
     { name = "django" },
@@ -174,7 +174,7 @@ dev = [
 
 [[package]]
 name = "card-reader-integration"
-version = "0.1.7"
+version = "0.1.10"
 source = { editable = "services/integration" }
 dependencies = [
     { name = "card-reader-api" },
@@ -213,7 +213,7 @@ dev = [
 
 [[package]]
 name = "card-reader-parser"
-version = "0.1.7"
+version = "0.1.10"
 source = { editable = "services/parser" }
 dependencies = [
     { name = "card-reader-core" },

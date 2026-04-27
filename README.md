@@ -1,173 +1,149 @@
-# Card Reader Monorepo
+# Card Reader
 
-Card Reader is a Django-backed card parsing platform with a Vue web app, a Tauri desktop shell,
-and a background OCR/parser process.
+Card Reader is a monorepo for importing, parsing, reviewing, and browsing card data.
+It combines a Django API, a shared Python domain layer, an OCR/parser worker, a Vue web app, and a
+Tauri desktop shell.
+
+## What is in this repo
+
+- `apps/web`: Vue 3 + Vite frontend for gallery, imports, review, settings, and auth flows
+- `apps/desktop`: Tauri wrapper for the web/backend experience
+- `services/core`: shared Django models, migrations, repositories, services, settings, and storage
+- `services/api`: Django + DRF API service
+- `services/parser`: background OCR/parser worker
+- `services/integration`: integration tests across API, parser, and core
+- `scripts`: bootstrap, dev, build, and release helpers
 
 ## Stack
 
-- Monorepo tooling: `pnpm` workspaces + `turbo`
-- Web app: Vue 3 + Vite + TypeScript
-- Desktop shell: Tauri
-- Backend API: Django + Django REST Framework
-- Shared backend core: Django models, migrations, repositories, services, settings, and storage
-- Parser: Python background process using the core Django data layer
-- Persistence: SQLite by default
-- OCR/CV: PaddleOCR + OpenCV
+- Monorepo: `pnpm` workspaces + `turbo`
+- Frontend: Vue 3, Vite, TypeScript
+- Backend: Django, Django REST Framework
+- Python tooling: `uv`, `pytest`, `ruff`, `mypy`
+- OCR/CV: PaddleOCR, PaddleX, OpenCV
+- Desktop: Tauri + Rust
+- Default persistence: SQLite
 
 ## Prerequisites
 
-- `Node.js` 22+
+- Node.js 22+
 - `pnpm` 10+
-- `Python` 3.12+
-- `uv` (Astral)
-- `Rust` + `cargo` for Tauri desktop development
+- Python 3.12+
+- `uv`
+- Rust + Cargo for desktop development only
+- Docker for containerized API/parser runs
 
-Linux/WSL install example:
+## Quick Start
 
-```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y \
-  nodejs python3.12 python3.12-venv python3-pip \
-  pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev \
-  libayatana-appindicator3-dev librsvg2-dev
-npm install -g pnpm
-curl -LsSf https://astral.sh/uv/install.sh | sh
-curl https://sh.rustup.rs -sSf | sh
-source "$HOME/.cargo/env"
-```
-
-## Bootstrap
+Install dependencies:
 
 ```bash
 ./scripts/bootstrap.sh --node --python
 ```
 
-The bootstrap installs Node dependencies and syncs the Python environments for core, API, parser,
-and integration tests into a single workspace `.venv` at the repo root.
-
-Repo versioning uses the root `VERSION` file as the single source of truth. Update all manifest
-versions together with:
-
-```bash
-pnpm version:repo 0.1.8
-```
-
-Verify consistency with:
-
-```bash
-pnpm version:check
-```
-
-## Development
+Start the default development stack:
 
 ```bash
 ./scripts/dev.sh
 ```
 
-This starts the Django API, parser, and Vue web app. Desktop is excluded from the default dev loop.
+That starts:
 
-Useful targeted commands:
+- the API
+- the parser worker
+- the web app
+
+Desktop is excluded from the default loop. Use `pnpm dev:desktop` when needed.
+
+## Local Development
+
+Useful commands from the repo root:
 
 ```bash
-pnpm --filter @card-reader/api dev
-pnpm --filter @card-reader/parser dev
-pnpm --filter @card-reader/core lint
-pnpm --filter @card-reader/web dev
-pnpm --filter @card-reader/integration test
+pnpm dev
 pnpm dev:all
 pnpm dev:desktop
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm check
 ```
 
-Python workspace notes:
-
-- Run `uv sync --all-packages --all-groups` from the repo root to refresh the shared environment.
-- The repo uses `.uv-cache/` to keep `uv` cache writes inside the workspace instead of user-global
-  cache directories.
-- Use `uv run --package card-reader-api ...` or `uv run --package card-reader-parser ...` when you
-  need to target one Python service from the workspace environment.
-
-## Backend Runtime
-
-The API service is a Django project in `services/api`. Domain models and migrations live in
-`services/core` so both the API and parser use the same data layer.
-
-The API startup sequence runs:
+Targeted commands:
 
 ```bash
-python manage.py migrate_card_reader
-python manage.py seed_users
-python manage.py seed_defaults
-python manage.py runserver 127.0.0.1:8000
+pnpm --filter @card-reader/web dev
+pnpm --filter @card-reader/api dev
+pnpm --filter @card-reader/parser dev
+pnpm --filter @card-reader/integration test
+pnpm --filter @card-reader/core lint
 ```
 
-Auth is enabled by default. The public card gallery remains accessible without login. Import jobs,
-review, settings, catalog, templates, and exports require a staff user. Maintenance actions require a
-superuser.
+## Python Workspace
 
-## Seed Files
+Python services use one shared workspace environment at the repo root.
 
-Default catalog/template seeds live in `services/api/src/card_reader_api/seeds`:
+- Sync everything: `pnpm sync:python`
+- The shared virtualenv lives at `.venv/`
+- `uv` cache is stored in `.uv-cache/`
 
-- `seed-keywords.json`
-- `seed-symbols.json`
-- `seed-templates.json`
+When you need to run a specific Python package directly:
 
-Local development users live in:
-
-```text
-services/api/src/card_reader_api/seeds/seed-users.local.json
+```bash
+uv --cache-dir ./.uv-cache run --project . --package card-reader-api python manage.py check
+uv --cache-dir ./.uv-cache run --project . --package card-reader-parser python -m card_reader_parser.main
 ```
 
-That file is gitignored. Use `seed-users.example.json` in the same directory as the schema reference.
+## Configuration
 
-User seed entries use:
+Runtime configuration is provided through `CARD_READER_*` environment variables.
 
-```json
-{
-  "users": [
-    {
-      "username": "admin",
-      "password": "change-me",
-      "is_staff": true,
-      "is_superuser": true
-    }
-  ]
-}
-```
-
-`seed_users` creates missing users and updates `is_staff` / `is_superuser` for existing users. It does
-not overwrite passwords for existing users.
-
-## Docker Deploy
-
-Copy the environment template and set production values:
+For Docker or production-style local runs:
 
 ```bash
 cp .env.example .env
 ```
 
-Start the backend services:
-
-```bash
-docker compose up -d --build
-```
-
-The compose stack runs:
-
-- `api`: Django migrations, user seeds, default seeds, then Gunicorn on `0.0.0.0:8000`
-- `parser`: background parser process with `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`
-
-Both services share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
-The Docker builds install workspace dependencies in a cacheable layer from the root `pyproject.toml`
-and `uv.lock`, then copy service source code in a later layer.
-
-Production settings are controlled through `.env`:
+Important settings in [.env.example](C:/Users/rutge/Documents/projects/card-reader/.env.example):
 
 - `CARD_READER_DJANGO_SECRET_KEY`
 - `CARD_READER_ALLOWED_HOSTS`
 - `CARD_READER_CSRF_TRUSTED_ORIGINS`
 - `CARD_READER_CORS_ORIGINS`
 - `CARD_READER_AUTH_ENABLED`
+- `CARD_READER_APP_DATA_DIR`
+- `CARD_READER_DATABASE_PATH`
+
+## Auth Model
+
+Auth is enabled by default.
+
+- Card gallery and card assets are public
+- Import jobs, review, settings, catalog, templates, and exports require a staff user
+- Maintenance endpoints require a superuser
+
+Local user seed data lives at:
+
+```text
+services/api/src/card_reader_api/seeds/seed-users.local.json
+```
+
+That file is gitignored. Use `seed-users.example.json` in the same directory as the format reference.
+
+## Docker
+
+Start the API and parser with Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+
+Current container behavior:
+
+- `api`: runs migrations, seeds users/default data, then starts Gunicorn
+- `parser`: starts the background parser and waits for the API health check
+
+The API and parser share a Docker volume mounted at `/var/lib/card-reader`.
 
 Health check:
 
@@ -175,43 +151,29 @@ Health check:
 curl http://127.0.0.1:8000/health
 ```
 
-## Ansible Deploy
-
-The webserver Ansible role owns the production user seed file:
-
-```text
-../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.json
-```
-
-The tracked schema example is:
-
-```text
-../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.example.json
-```
-
-During deploy, the role copies the private production file into the deployed app at:
-
-```text
-services/api/src/card_reader_api/seeds/seed-users.local.json
-```
-
-The generic Docker Compose deploy task only handles environment rendering, required environment
-validation, and deployment file copying. Card Reader-specific file paths are declared in the
-Card Reader deployment item.
-
 ## Storage
 
-- Development storage root: `storage/`
-- Docker storage root: `/var/lib/card-reader`
-- Production native storage root:
-  - Linux: `~/.local/share/card-reader`
-  - macOS: `~/Library/Application Support/card-reader`
-  - Windows: `%LOCALAPPDATA%/Card Reader`
+Default storage locations:
 
-Set `CARD_READER_APP_DATA_DIR` to force a storage root.
+- local development: `storage/`
+- Docker: `/var/lib/card-reader`
 
-API logs are written to:
+Set `CARD_READER_APP_DATA_DIR` to override the storage root.
 
-```text
-<storage_root>/logs/api.log
+## Versioning
+
+The root [VERSION](C:/Users/rutge/Documents/projects/card-reader/VERSION) file is the single source of truth for repo versioning.
+
+Update every tracked manifest version together:
+
+```bash
+pnpm version:repo 0.1.8
 ```
+
+Verify that all manifests match:
+
+```bash
+pnpm version:check
+```
+
+Release tags should use the `vX.Y.Z` format and match `VERSION`.
