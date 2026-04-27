@@ -4,7 +4,6 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from card_reader_core.models import Template, now_utc
 from card_reader_core.repositories import normalize_slug_key
@@ -49,7 +48,7 @@ def read_template_entries(seed_file: Path = DEFAULT_TEMPLATES_FILE) -> list[Temp
     return out
 
 
-def seed_templates(_session: Any) -> tuple[int, int]:
+def seed_templates() -> tuple[int, int]:
     entries = read_template_entries()
     if not entries:
         return 0, 0
@@ -76,7 +75,7 @@ def seed_templates(_session: Any) -> tuple[int, int]:
     return created, updated
 
 
-def template_table_has_rows(_session: Any) -> bool:
+def template_table_has_rows() -> bool:
     return Template.objects.exists()
 
 

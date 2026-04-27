@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from card_reader_core.database.connection import get_session
 from card_reader_core.models import Card, CardVersion, ImportJob, ImportJobItem, Symbol
 from card_reader_parser.parsers.card_parser import CardParser
 from card_reader_core.repositories import (
@@ -15,7 +14,6 @@ from card_reader_core.repositories import (
     get_types_for_card_version,
 )
 from card_reader_core.services import ImportProcessorService
-from card_reader_parser.template_store import DatabaseTemplateStore
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures"
 
@@ -35,20 +33,17 @@ def run_case(case_path: Path) -> dict[str, Any]:
     image_path = (FIXTURES_ROOT / case["image"]).resolve()
     assert image_path.exists(), f"Fixture image does not exist: {image_path}"
 
-    parser = CardParser(DatabaseTemplateStore())
+    parser = CardParser()
 
     processor = ImportProcessorService(parser)
-    with get_session() as session:
-        job = create_import_job(
-            session,
-            source_path=image_path,
-            template_id=str(case["template_id"]),
-            options=case.get("job_options", {}),
-        )
-        processor.process_job(session, job.id)
+    job = create_import_job(
+        source_path=image_path,
+        template_id=str(case["template_id"]),
+        options=case.get("job_options", {}),
+    )
+    processor.process_job(job.id)
 
-    with get_session() as session:
-        return _load_db_state(session=session)
+    return _load_db_state()
 
 
 def assert_recursive_exact(expected: Any, actual: Any, path: str = "root") -> None:
@@ -71,7 +66,7 @@ def assert_recursive_exact(expected: Any, actual: Any, path: str = "root") -> No
     assert actual == expected, f"{path}: expected {expected!r}, got {actual!r}"
 
 
-def _load_db_state(*, session: Any) -> dict[str, Any]:
+def _load_db_state() -> dict[str, object]:
     cards = list(Card.objects.order_by("-updated_at"))
     assert cards, "No card rows found after import processing"
     assert len(cards) == 1, f"Expected exactly one card row, found {len(cards)}"
@@ -88,10 +83,10 @@ def _load_db_state(*, session: Any) -> dict[str, Any]:
     assert job is not None, "Expected import job row but none exists"
     item_rows: list[ImportJobItem] = list(ImportJobItem.objects.filter(job_id=job.id))
 
-    keywords = sorted(row.label for row in get_keywords_for_card_version(session, latest_version.id))
-    tags = sorted(row.label for row in get_tags_for_card_version(session, latest_version.id))
-    symbols = sorted(row.key for row in get_symbols_for_card_version(session, latest_version.id))
-    types = sorted(row.label for row in get_types_for_card_version(session, latest_version.id))
+    keywords = sorted(row.label for row in get_keywords_for_card_version(latest_version.id))
+    tags = sorted(row.label for row in get_tags_for_card_version(latest_version.id))
+    symbols = sorted(row.key for row in get_symbols_for_card_version(latest_version.id))
+    types = sorted(row.label for row in get_types_for_card_version(latest_version.id))
 
     all_symbol_types = {row.key: row.symbol_type for row in Symbol.objects.all()}
 

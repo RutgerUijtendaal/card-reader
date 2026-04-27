@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import io
 import json
-from typing import Any
 
 from .cards_repository import list_cards
 from .metadata_repository import (
@@ -16,7 +15,6 @@ from .metadata_repository import (
 
 
 def export_cards_csv(
-    _session: Any,
     *,
     query: str | None,
     max_confidence: float | None = None,
@@ -32,7 +30,6 @@ def export_cards_csv(
     health_max: int | None = None,
 ) -> str:
     cards = list_cards(
-        None,
         query=query,
         max_confidence=max_confidence,
         keyword_ids=keyword_ids,
@@ -66,10 +63,10 @@ def export_cards_csv(
     )
     writer.writeheader()
     for card, version in cards:
-        type_labels = [item.label for item in get_types_for_card_version(None, version.id)]
-        tag_labels = [item.label for item in get_tags_for_card_version(None, version.id)]
-        symbol_text_tokens = [item.text_token for item in get_symbols_for_card_version(None, version.id)]
-        keyword_labels = [item.label for item in get_keywords_for_card_version(None, version.id)]
+        type_labels = [item.label for item in get_types_for_card_version(version.id)]
+        tag_labels = [item.label for item in get_tags_for_card_version(version.id)]
+        symbol_text_tokens = [item.text_token for item in get_symbols_for_card_version(version.id)]
+        keyword_labels = [item.label for item in get_keywords_for_card_version(version.id)]
         mana_symbols = json.loads(version.mana_symbols_json)
 
         writer.writerow(
@@ -101,6 +98,6 @@ def _join_labels(labels: list[str]) -> str:
 
 
 def _replace_symbol_keys(text: str) -> str:
-    for symbol in list_symbols(None):
+    for symbol in list_symbols():
         text = text.replace(symbol.key, symbol.text_token)
     return text

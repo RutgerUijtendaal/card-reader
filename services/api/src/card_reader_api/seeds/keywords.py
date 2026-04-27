@@ -4,7 +4,6 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import Any
 
 from card_reader_core.models import Keyword, now_utc
 from card_reader_core.repositories import normalize_slug_key
@@ -52,7 +51,7 @@ def normalize_labels(labels: list[str]) -> list[tuple[str, str]]:
     return out
 
 
-def seed_keywords(_session: Any, seed_file: Path = DEFAULT_KEYWORDS_FILE) -> tuple[int, int]:
+def seed_keywords(seed_file: Path = DEFAULT_KEYWORDS_FILE) -> tuple[int, int]:
     entries = normalize_labels(read_keyword_labels(seed_file))
     if not entries:
         return 0, 0
@@ -73,17 +72,16 @@ def seed_keywords(_session: Any, seed_file: Path = DEFAULT_KEYWORDS_FILE) -> tup
     return created, updated
 
 
-def keyword_table_has_rows(_session: Any) -> bool:
+def keyword_table_has_rows() -> bool:
     return Keyword.objects.exists()
 
 
 def main() -> None:
-    from card_reader_core.database.connection import get_session, initialize_database
+    from card_reader_core.database.connection import initialize_database
 
     args = parse_args()
     initialize_database()
-    with get_session() as session:
-        created, updated = seed_keywords(session, args.file)
+    created, updated = seed_keywords(args.file)
     print(f"Keyword seed complete. file={args.file} created={created} updated={updated}")
 
 

@@ -52,12 +52,11 @@ class ImportProcessorService:
 
     def process_job(
         self,
-        _session: object,
         job_id: str,
         *,
         should_stop: Callable[[], bool] | None = None,
     ) -> None:
-        job = repositories.fetch_job(None, job_id)
+        job = repositories.fetch_job(job_id)
         if job is None:
             logger.warning("process_job called for missing job. job_id=%s", job_id)
             return
@@ -68,22 +67,22 @@ class ImportProcessorService:
         failed_items = 0
         shutdown_requested = False
 
-        repositories.mark_job_running(None, job)
-        for item in repositories.get_job_items(None, job.id):
+        repositories.mark_job_running(job)
+        for item in repositories.get_job_items(job.id):
             if stop_requested():
                 shutdown_requested = True
                 break
             if item.status != ImportJobStatus.queued:
                 continue
             failed_items += self._process_item_with_failure_tracking(job, item, options, resources)
-            repositories.bump_job_processed(None, job)
+            repositories.bump_job_processed(job)
 
         if failed_items > 0:
-            repositories.mark_job_failed(None, job)
+            repositories.mark_job_failed(job)
         elif shutdown_requested:
-            repositories.mark_job_queued(None, job)
+            repositories.mark_job_queued(job)
         else:
-            repositories.mark_job_complete(None, job)
+            repositories.mark_job_complete(job)
 
     def _process_item_with_failure_tracking(
         self,
@@ -97,7 +96,7 @@ class ImportProcessorService:
             self._log_item_processed(job, item, result)
             return 0
         except Exception as exc:
-            repositories.mark_job_item_failed(None, item, str(exc))
+            repositories.mark_job_item_failed(item, str(exc))
             logger.exception(
                 "Failed to parse import item. job_id=%s item_id=%s source_file=%s",
                 job.id,
@@ -120,7 +119,6 @@ class ImportProcessorService:
             known_keywords=resources.known_keywords,
         )
         version = repositories.save_parsed_card(
-            None,
             item=item,
             template_id=job.template_id,
             checksum=parsed.checksum,
@@ -156,30 +154,26 @@ class ImportProcessorService:
 
     def _load_parser_resources(self, options: JobOptions) -> ParserResources:
         return ParserResources(
-            known_keywords=repositories.list_keywords(None, keys=options.keyword_keys),
-            detectable_symbols=repositories.list_detectable_symbols(None),
+            known_keywords=repositories.list_keywords(keys=options.keyword_keys),
+            detectable_symbols=repositories.list_detectable_symbols(),
         )
 
     def _replace_metadata_links(self, card_version_id: str, parsed: Any) -> tuple[int, int]:
         repositories.replace_card_version_keywords(
-            None,
             card_version_id=card_version_id,
             keyword_ids=parsed.keyword_ids,
         )
         repositories.replace_card_version_symbols(
-            None,
             card_version_id=card_version_id,
             symbol_ids=parsed.symbol_ids,
         )
-        tag_rows = repositories.upsert_tags_by_labels(None, parsed.tag_labels)
-        type_rows = repositories.upsert_types_by_labels(None, parsed.type_labels)
+        tag_rows = repositories.upsert_tags_by_labels(parsed.tag_labels)
+        type_rows = repositories.upsert_types_by_labels(parsed.type_labels)
         repositories.replace_card_version_tags(
-            None,
             card_version_id=card_version_id,
             tag_ids=[row.id for row in tag_rows],
         )
         repositories.replace_card_version_types(
-            None,
             card_version_id=card_version_id,
             type_ids=[row.id for row in type_rows],
         )

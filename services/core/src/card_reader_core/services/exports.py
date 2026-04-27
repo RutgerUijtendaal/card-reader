@@ -7,4 +7,4 @@ import card_reader_core.repositories as repositories
 
 class ExportService:
     def export_cards_csv(self, **filters: Any) -> str:
-        return repositories.export_cards_csv(None, **filters)
+        return repositories.export_cards_csv(**filters)

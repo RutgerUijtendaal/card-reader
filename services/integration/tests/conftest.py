@@ -9,7 +9,7 @@ import pytest
 TEST_STORAGE_ROOT = Path(tempfile.mkdtemp(prefix="card-reader-integration-tests-"))
 os.environ["CARD_READER_APP_DATA_DIR"] = str(TEST_STORAGE_ROOT)
 os.environ["CARD_READER_ENV"] = "test"
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_core.django_settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_api.project.settings")
 
 import django  # noqa: E402
 from django.core.management import call_command  # noqa: E402

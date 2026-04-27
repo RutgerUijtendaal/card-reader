@@ -10,11 +10,13 @@ os.environ["CARD_READER_ENV"] = "test"
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_api.project.settings")
 
 import django  # noqa: E402
+from card_reader_core.database.connection import initialize_database  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
 from django.core.management import call_command  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from django.test import Client, override_settings  # noqa: E402
 
+initialize_database()
 django.setup()
 
 from card_reader_api.seeds.users import seed_users  # noqa: E402

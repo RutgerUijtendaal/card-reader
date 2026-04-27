@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 from django.db import transaction
 from django.db.models import QuerySet
@@ -26,7 +25,6 @@ from card_reader_core.search.cards import apply_card_search
 
 
 def save_parsed_card(
-    _session: Any,
     *,
     item: ImportJobItem,
     template_id: str,
@@ -44,7 +42,7 @@ def save_parsed_card(
         if card is None:
             card = Card.objects.create(key=card_key, label=parsed_name)
 
-        latest = get_latest_card_version(None, card.id)
+        latest = get_latest_card_version(card.id)
         if latest and latest.image_hash == checksum and reparse_existing:
             return _update_existing_version(item, latest, normalized_fields, confidence, raw_ocr)
 
@@ -61,7 +59,6 @@ def save_parsed_card(
 
 
 def list_cards(
-    _session: Any = None,
     *,
     query: str | None,
     max_confidence: float | None,
@@ -99,11 +96,11 @@ def list_cards(
     return [(cards_by_id[version.card_id], version) for version in version_rows]
 
 
-def get_card(_session: Any, card_id: str) -> Card | None:
+def get_card(card_id: str) -> Card | None:
     return Card.objects.filter(id=card_id).first()
 
 
-def get_latest_card_version(_session: Any, card_id: str) -> CardVersion | None:
+def get_latest_card_version(card_id: str) -> CardVersion | None:
     return (
         CardVersion.objects.filter(card_id=card_id, is_latest=True)
         .order_by("-version_number")
@@ -111,16 +108,15 @@ def get_latest_card_version(_session: Any, card_id: str) -> CardVersion | None:
     )
 
 
-def get_card_image(_session: Any, card_version_id: str) -> CardVersionImage | None:
+def get_card_image(card_version_id: str) -> CardVersionImage | None:
     return CardVersionImage.objects.filter(card_version_id=card_version_id).first()
 
 
-def list_card_generations(_session: Any, card_id: str) -> list[CardVersion]:
+def list_card_generations(card_id: str) -> list[CardVersion]:
     return list(CardVersion.objects.filter(card_id=card_id).order_by("-version_number"))
 
 
 def update_card(
-    _session: Any,
     *,
     card_id: str,
     name: str | None,
@@ -128,8 +124,8 @@ def update_card(
     mana_cost: str | None,
     rules_text: str | None,
 ) -> tuple[Card, CardVersion] | None:
-    card = get_card(None, card_id)
-    version = get_latest_card_version(None, card_id)
+    card = get_card(card_id)
+    version = get_latest_card_version(card_id)
     if card is None or version is None:
         return None
 
@@ -167,7 +163,7 @@ def apply_parsed_fields_to_version(
     version.confidence = float(confidence.get("overall", 0.0))
 
 
-def upsert_card_search(_session: Any, *, card_id: str, version: CardVersion) -> None:
+def upsert_card_search(*, card_id: str, version: CardVersion) -> None:
     return None
 
 
@@ -194,7 +190,7 @@ def _create_new_version(
     normalized_fields: dict[str, str],
     confidence: dict[str, float],
 ) -> CardVersion:
-    latest = get_latest_card_version(None, card.id)
+    latest = get_latest_card_version(card.id)
     previous_version_id = None
     version_number = 1
     if latest is not None:
@@ -276,7 +272,7 @@ def _apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> Q
 
 def _filter_by_links(
     queryset: QuerySet[CardVersion],
-    link_model: Any,
+    link_model: type[CardVersionKeyword] | type[CardVersionTag] | type[CardVersionSymbol] | type[CardVersionType],
     link_field: str,
     values: list[str] | None,
 ) -> QuerySet[CardVersion]:

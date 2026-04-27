@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 from django.db import transaction
 
@@ -23,12 +22,11 @@ def collect_supported_files(source_path: Path) -> list[Path]:
     )
 
 
-def list_import_jobs(_session: Any = None) -> list[ImportJob]:
+def list_import_jobs() -> list[ImportJob]:
     return list(ImportJob.objects.order_by("-created_at"))
 
 
 def create_import_job(
-    _session: Any = None,
     *,
     source_path: Path,
     template_id: str,
@@ -56,52 +54,52 @@ def create_import_job(
     return job
 
 
-def fetch_job(_session: Any, job_id: str) -> ImportJob | None:
+def fetch_job(job_id: str) -> ImportJob | None:
     return ImportJob.objects.filter(id=job_id).first()
 
 
-def fetch_items_for_job(_session: Any, job_id: str) -> list[ImportJobItem]:
+def fetch_items_for_job(job_id: str) -> list[ImportJobItem]:
     return list(ImportJobItem.objects.filter(job_id=job_id).order_by("created_at"))
 
 
-def get_job_items(_session: Any, job_id: str) -> list[ImportJobItem]:
-    return fetch_items_for_job(None, job_id)
+def get_job_items(job_id: str) -> list[ImportJobItem]:
+    return fetch_items_for_job(job_id)
 
 
-def get_next_queued_job(_session: Any = None) -> ImportJob | None:
+def get_next_queued_job() -> ImportJob | None:
     return ImportJob.objects.filter(status=ImportJobStatus.queued).order_by("created_at").first()
 
 
-def mark_job_running(_session: Any, job: ImportJob) -> None:
+def mark_job_running(job: ImportJob) -> None:
     _set_job_status(job, ImportJobStatus.running)
 
 
-def mark_job_queued(_session: Any, job: ImportJob) -> None:
+def mark_job_queued(job: ImportJob) -> None:
     _set_job_status(job, ImportJobStatus.queued)
 
 
-def mark_job_complete(_session: Any, job: ImportJob) -> None:
+def mark_job_complete(job: ImportJob) -> None:
     _set_job_status(job, ImportJobStatus.completed)
 
 
-def mark_job_failed(_session: Any, job: ImportJob) -> None:
+def mark_job_failed(job: ImportJob) -> None:
     _set_job_status(job, ImportJobStatus.failed)
 
 
-def bump_job_processed(_session: Any, job: ImportJob) -> None:
+def bump_job_processed(job: ImportJob) -> None:
     job.processed_items += 1
     job.updated_at = now_utc()
     job.save(update_fields=["processed_items", "updated_at"])
 
 
-def mark_job_item_failed(_session: Any, item: ImportJobItem, error_message: str) -> None:
+def mark_job_item_failed(item: ImportJobItem, error_message: str) -> None:
     item.status = ImportJobStatus.failed
     item.error_message = error_message[:2000]
     item.updated_at = now_utc()
     item.save(update_fields=["status", "error_message", "updated_at"])
 
 
-def requeue_running_import_jobs(_session: Any = None) -> tuple[int, int]:
+def requeue_running_import_jobs() -> tuple[int, int]:
     jobs = list(ImportJob.objects.filter(status=ImportJobStatus.running))
     recovered_item_count = 0
     processed_statuses = {ImportJobStatus.completed, ImportJobStatus.failed}

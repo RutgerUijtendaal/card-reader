@@ -5,7 +5,6 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from card_reader_core.models import Symbol, now_utc
 from card_reader_core.repositories import normalize_slug_key
@@ -81,7 +80,7 @@ def read_symbol_entries(seed_file: Path = DEFAULT_SYMBOLS_FILE) -> list[SymbolSe
     return out
 
 
-def seed_symbols(_session: Any) -> tuple[int, int]:
+def seed_symbols() -> tuple[int, int]:
     entries = read_symbol_entries()
     if not entries:
         return 0, 0
@@ -123,7 +122,7 @@ def seed_symbols(_session: Any) -> tuple[int, int]:
     return created, updated
 
 
-def symbol_table_has_rows(_session: Any) -> bool:
+def symbol_table_has_rows() -> bool:
     return Symbol.objects.exists()
 
 

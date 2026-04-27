@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from card_reader_core.database.connection import get_session, initialize_database
+from card_reader_core.database.connection import initialize_database
 from .keywords import keyword_table_has_rows, seed_keywords
 from .shared import SeedDefinition, SeedResult
 from .symbols import seed_symbols, symbol_table_has_rows
@@ -20,32 +20,31 @@ SEED_REGISTRY: tuple[SeedDefinition, ...] = (
 def run_registered_seeds(*, force: bool = False) -> list[SeedResult]:
     initialize_database()
     results: list[SeedResult] = []
-    with get_session() as session:
-        for seed in SEED_REGISTRY:
-            if not force and seed.model_has_rows(session):
-                results.append(
-                    SeedResult(
-                        name=seed.name,
-                        skipped=True,
-                        message="table already has rows",
-                    )
-                )
-                continue
-
-            created, updated = seed.run(session)
+    for seed in SEED_REGISTRY:
+        if not force and seed.model_has_rows():
             results.append(
                 SeedResult(
                     name=seed.name,
-                    skipped=False,
-                    created=created,
-                    updated=updated,
-                    message="ok",
+                    skipped=True,
+                    message="table already has rows",
                 )
             )
-            logger.info(
-                "Seed finished. seed=%s created=%s updated=%s",
-                seed.name,
-                created,
-                updated,
+            continue
+
+        created, updated = seed.run()
+        results.append(
+            SeedResult(
+                name=seed.name,
+                skipped=False,
+                created=created,
+                updated=updated,
+                message="ok",
             )
+        )
+        logger.info(
+            "Seed finished. seed=%s created=%s updated=%s",
+            seed.name,
+            created,
+            updated,
+        )
     return results

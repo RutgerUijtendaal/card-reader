@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from card_reader_core.database.connection import DATABASE_PATH, initialize_database
+from card_reader_core.database.connection import DATABASE_PATH
 from card_reader_core.settings import settings as core_settings
 
 
@@ -80,7 +80,6 @@ TEMPLATES = [
     }
 ]
 
-initialize_database()
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

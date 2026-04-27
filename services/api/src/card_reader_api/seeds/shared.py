@@ -18,8 +18,8 @@ class SeedResult:
 @dataclass(slots=True)
 class SeedDefinition:
     name: str
-    model_has_rows: Callable[[Any], bool]
-    run: Callable[[Any], tuple[int, int]]
+    model_has_rows: Callable[[], bool]
+    run: Callable[[], tuple[int, int]]
 
 
 def resolve_seed_file(relative_from_seed_root: str) -> Path:
@@ -30,5 +30,5 @@ def resolve_seed_file(relative_from_seed_root: str) -> Path:
     return Path(__file__).resolve().parent / relative_from_seed_root
 
 
-def model_has_any_rows(_session: Any, model: type[Any]) -> bool:
+def model_has_any_rows(model: type[Any]) -> bool:
     return bool(model.objects.exists())

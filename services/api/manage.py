@@ -7,8 +7,10 @@ import sys
 
 def main() -> None:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_api.project.settings")
+    from card_reader_core.database.connection import initialize_database
     from django.core.management import execute_from_command_line
 
+    initialize_database()
     execute_from_command_line(sys.argv)
 
 

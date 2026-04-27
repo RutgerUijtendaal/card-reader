@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ImportListView(APIView):
     def get(self, _request: Request) -> Response:
-        jobs = repositories.list_import_jobs(None)
+        jobs = repositories.list_import_jobs()
         return Response([import_job_payload(job) for job in jobs])
 
 
@@ -59,10 +59,10 @@ class ImportUploadView(APIView):
 
 class ImportDetailView(APIView):
     def get(self, _request: Request, job_id: str) -> Response:
-        job = repositories.fetch_job(None, job_id)
+        job = repositories.fetch_job(job_id)
         if job is None:
             return Response({"detail": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(import_detail_payload(job, repositories.fetch_items_for_job(None, job_id)))
+        return Response(import_detail_payload(job, repositories.fetch_items_for_job(job_id)))
 
 
 def _parse_options(options_json: str) -> dict[str, object] | Response:

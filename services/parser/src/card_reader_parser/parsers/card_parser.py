@@ -5,9 +5,9 @@ from pathlib import Path
 
 from ..extractors import KeywordsExtractor, TagsExtractor, TypesExtractor
 from card_reader_core.models import Keyword, Symbol
+from card_reader_core.services import TemplateService
 from card_reader_core.settings import settings
 from card_reader_core.storage import calculate_checksum
-from card_reader_core.templates import TemplateStore
 
 from .ocr_runner import OcrRunner
 from .regions import (
@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class CardParser:
-    def __init__(self, template_store: TemplateStore) -> None:
-        self._template_store = template_store
+    def __init__(self) -> None:
+        self._template_service = TemplateService()
         self._cropper = RegionCropper()
         self._ocr_runner = OcrRunner()
         self._symbol_detector = SymbolDetector()
@@ -58,7 +58,7 @@ class CardParser:
             0 if symbols is None else len(symbols),
             0 if known_keywords is None else len(known_keywords),
         )
-        template = self._template_store.get_template(template_id)
+        template = self._template_service.get_template_definition(template_id)
         checksum = calculate_checksum(image_path)
         region_crops = self._cropper.crop_regions(image_path=image_path, template=template)
         logger.info(
@@ -312,5 +312,4 @@ class CardParser:
                 seen.add(row.symbol_id)
                 out.append(row.symbol_id)
         return out
-
 

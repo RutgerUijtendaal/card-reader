@@ -19,10 +19,10 @@ class CatalogData(TypedDict):
 class CatalogService:
     def list_catalog(self) -> CatalogData:
         return {
-            "keywords": repositories.list_keywords(None),
-            "tags": repositories.list_tags(None),
-            "symbols": repositories.list_symbols(None),
-            "types": repositories.list_types(None),
+            "keywords": repositories.list_keywords(),
+            "tags": repositories.list_tags(),
+            "symbols": repositories.list_symbols(),
+            "types": repositories.list_types(),
         }
 
     def create_keyword(self, *, label: str, key: str | None = None) -> Keyword:
@@ -78,7 +78,6 @@ class CatalogService:
         self._ensure_unique("symbol", normalized_key)
         self._validate_symbol_config_json(detection_config_json, reference_assets_json)
         return repositories.create_symbol(
-            None,
             key=normalized_key,
             label=normalized_label,
             symbol_type=self._normalize_symbol_type(symbol_type),
@@ -102,7 +101,7 @@ class CatalogService:
         text_token: str | None = None,
         enabled: bool | None = None,
     ) -> Symbol | None:
-        row = repositories.get_symbol(None, entry_id)
+        row = repositories.get_symbol(entry_id)
         if row is None:
             return None
 
@@ -125,26 +124,25 @@ class CatalogService:
             text_token=text_token,
             enabled=enabled,
         )
-        return repositories.update_symbol(None, entry_id=entry_id, updates=updates)
+        return repositories.update_symbol(entry_id=entry_id, updates=updates)
 
     def delete_keyword(self, *, entry_id: str) -> bool:
-        return repositories.delete_keyword(None, entry_id=entry_id)
+        return repositories.delete_keyword(entry_id=entry_id)
 
     def delete_tag(self, *, entry_id: str) -> bool:
-        return repositories.delete_tag(None, entry_id=entry_id)
+        return repositories.delete_tag(entry_id=entry_id)
 
     def delete_type(self, *, entry_id: str) -> bool:
-        return repositories.delete_type(None, entry_id=entry_id)
+        return repositories.delete_type(entry_id=entry_id)
 
     def delete_symbol(self, *, entry_id: str) -> bool:
-        return repositories.delete_symbol(None, entry_id=entry_id)
+        return repositories.delete_symbol(entry_id=entry_id)
 
     def _create_simple(self, kind: str, *, label: str, key: str | None) -> Any:
         normalized_label = self._normalize_label(label)
         normalized_key = self._normalize_key(key=key, label=normalized_label)
         self._ensure_unique(kind, normalized_key)
         return getattr(repositories, f"create_{kind}")(
-            None,
             key=normalized_key,
             label=normalized_label,
         )
@@ -158,7 +156,7 @@ class CatalogService:
         key: str | None,
     ) -> Any | None:
         getter = getattr(repositories, f"get_{kind}")
-        row = getter(None, entry_id)
+        row = getter(entry_id)
         if row is None:
             return None
 
@@ -173,7 +171,7 @@ class CatalogService:
             updates["key"] = normalized_key
 
         updater = getattr(repositories, f"update_{kind}")
-        return updater(None, entry_id=entry_id, updates=updates)
+        return updater(entry_id=entry_id, updates=updates)
 
     def _apply_symbol_updates(
         self,
@@ -207,7 +205,7 @@ class CatalogService:
 
     def _ensure_unique(self, kind: str, key: str, exclude_id: str | None = None) -> None:
         exists = getattr(repositories, f"{kind}_key_exists")
-        if exists(None, key=key, exclude_id=exclude_id):
+        if exists(key=key, exclude_id=exclude_id):
             raise ValueError(f"Key '{key}' already exists")
 
     def _normalize_label(self, label: str) -> str:
