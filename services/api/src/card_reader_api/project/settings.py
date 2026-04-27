@@ -13,7 +13,7 @@ for setting_name in dir(core_django_settings):
 INSTALLED_APPS = [
     *core_django_settings.INSTALLED_APPS,
     "rest_framework",
-    "card_reader_api.apps.CardReaderApiConfig",
+    "card_reader_api",
 ]
 
 MIDDLEWARE = [

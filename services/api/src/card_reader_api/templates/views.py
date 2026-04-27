@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.templates.serializers import template_payload
-from card_reader_core.services import TemplateService
+from card_reader_core.services.templates import TemplateService
 
 
 class TemplateListCreateView(APIView):

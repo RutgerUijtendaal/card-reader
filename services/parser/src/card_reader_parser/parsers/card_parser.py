@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ..extractors import KeywordsExtractor, TagsExtractor, TypesExtractor
 from card_reader_core.models import Keyword, Symbol
-from card_reader_core.services import TemplateService
+from card_reader_core.services.templates import TemplateService
 from card_reader_core.settings import settings
 from card_reader_core.storage import calculate_checksum
 
@@ -312,4 +312,3 @@ class CardParser:
                 seen.add(row.symbol_id)
                 out.append(row.symbol_id)
         return out
-

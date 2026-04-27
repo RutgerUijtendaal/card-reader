@@ -12,6 +12,7 @@ const repoRoot = resolve(__dirname, '..');
 const binariesDir = join(repoRoot, 'apps', 'desktop', 'src-tauri', 'binaries');
 const pyinstallerTmpDir = join(repoRoot, '.tmp', 'pyinstaller');
 const addDataSeparator = process.platform === 'win32' ? ';' : ':';
+const pyinstallerHooksDir = join(repoRoot, 'scripts', 'pyinstaller-hooks');
 
 const run = (command, args, cwd = repoRoot, env = {}) => {
   const result = spawnSync(command, args, {
@@ -34,27 +35,8 @@ const clean = () => {
 
 const buildApi = () => {
   const apiEntry = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'main.py');
-  const apiPath = join(repoRoot, 'services', 'api', 'src');
-  const corePath = join(repoRoot, 'services', 'core', 'src');
-  const coreMigrationsDir = join(
-    repoRoot,
-    'services',
-    'core',
-    'src',
-    'card_reader_core',
-    'migrations'
-  );
-  const seedKeywordsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-keywords.json');
-  const seedSymbolsFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-symbols.json');
-  const seedTemplatesFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-templates.json');
   const seedUsersFile = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'seed-users.local.json');
-  const seedAssetsDir = join(repoRoot, 'services', 'api', 'src', 'card_reader_api', 'seeds', 'assets');
-  const coreMigrationsDataSpec = `${coreMigrationsDir}${addDataSeparator}card_reader_core/migrations`;
-  const seedKeywordsDataSpec = `${seedKeywordsFile}${addDataSeparator}seeds`;
-  const seedSymbolsDataSpec = `${seedSymbolsFile}${addDataSeparator}seeds`;
-  const seedTemplatesDataSpec = `${seedTemplatesFile}${addDataSeparator}seeds`;
   const seedUsersDataSpec = `${seedUsersFile}${addDataSeparator}seeds`;
-  const seedAssetsDataSpec = `${seedAssetsDir}${addDataSeparator}seeds/assets`;
 
   const pyinstallerArgs = [
     'run',
@@ -74,24 +56,8 @@ const buildApi = () => {
     join(pyinstallerTmpDir, 'api'),
     '--specpath',
     join(pyinstallerTmpDir, 'spec'),
-    '--paths',
-    apiPath,
-    '--paths',
-    corePath,
-    '--hidden-import',
-    'card_reader_api.apps',
-    '--hidden-import',
-    'card_reader_core.apps',
-    '--add-data',
-    coreMigrationsDataSpec,
-    '--add-data',
-    seedKeywordsDataSpec,
-    '--add-data',
-    seedSymbolsDataSpec,
-    '--add-data',
-    seedAssetsDataSpec,
-    '--add-data',
-    seedTemplatesDataSpec,
+    '--additional-hooks-dir',
+    pyinstallerHooksDir,
     apiEntry
   ];
 
@@ -106,8 +72,6 @@ const buildApi = () => {
 
 const buildParser = () => {
   const parserEntry = join(repoRoot, 'services', 'parser', 'src', 'card_reader_parser', 'main.py');
-  const parserPath = join(repoRoot, 'services', 'parser', 'src');
-  const corePath = join(repoRoot, 'services', 'core', 'src');
 
   run('uv', [
     'run',
@@ -127,12 +91,8 @@ const buildParser = () => {
     join(pyinstallerTmpDir, 'parser'),
     '--specpath',
     join(pyinstallerTmpDir, 'spec'),
-    '--paths',
-    parserPath,
-    '--paths',
-    corePath,
-    '--hidden-import',
-    'card_reader_core.apps',
+    '--additional-hooks-dir',
+    pyinstallerHooksDir,
     '--collect-all',
     'paddleocr',
     '--collect-all',

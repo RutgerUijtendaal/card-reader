@@ -6,8 +6,28 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-import card_reader_core.repositories as repositories
 from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus, Keyword, Symbol
+from card_reader_core.repositories.import_jobs_repository import (
+    bump_job_processed,
+    fetch_job,
+    get_job_items,
+    mark_job_complete,
+    mark_job_failed,
+    mark_job_item_failed,
+    mark_job_queued,
+    mark_job_running,
+)
+from card_reader_core.repositories.metadata_repository import (
+    list_detectable_symbols,
+    list_keywords,
+    replace_card_version_keywords,
+    replace_card_version_symbols,
+    replace_card_version_tags,
+    replace_card_version_types,
+    upsert_tags_by_labels,
+    upsert_types_by_labels,
+)
+from card_reader_core.repositories.cards_repository import save_parsed_card
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +76,7 @@ class ImportProcessorService:
         *,
         should_stop: Callable[[], bool] | None = None,
     ) -> None:
-        job = repositories.fetch_job(job_id)
+        job = fetch_job(job_id)
         if job is None:
             logger.warning("process_job called for missing job. job_id=%s", job_id)
             return
@@ -67,22 +87,22 @@ class ImportProcessorService:
         failed_items = 0
         shutdown_requested = False
 
-        repositories.mark_job_running(job)
-        for item in repositories.get_job_items(job.id):
+        mark_job_running(job)
+        for item in get_job_items(job.id):
             if stop_requested():
                 shutdown_requested = True
                 break
             if item.status != ImportJobStatus.queued:
                 continue
             failed_items += self._process_item_with_failure_tracking(job, item, options, resources)
-            repositories.bump_job_processed(job)
+            bump_job_processed(job)
 
         if failed_items > 0:
-            repositories.mark_job_failed(job)
+            mark_job_failed(job)
         elif shutdown_requested:
-            repositories.mark_job_queued(job)
+            mark_job_queued(job)
         else:
-            repositories.mark_job_complete(job)
+            mark_job_complete(job)
 
     def _process_item_with_failure_tracking(
         self,
@@ -90,13 +110,13 @@ class ImportProcessorService:
         item: ImportJobItem,
         options: JobOptions,
         resources: ParserResources,
-    ) -> int:
+        ) -> int:
         try:
             result = self._process_queued_item(job, item, options, resources)
             self._log_item_processed(job, item, result)
             return 0
         except Exception as exc:
-            repositories.mark_job_item_failed(item, str(exc))
+            mark_job_item_failed(item, str(exc))
             logger.exception(
                 "Failed to parse import item. job_id=%s item_id=%s source_file=%s",
                 job.id,
@@ -118,7 +138,7 @@ class ImportProcessorService:
             symbols=resources.detectable_symbols,
             known_keywords=resources.known_keywords,
         )
-        version = repositories.save_parsed_card(
+        version = save_parsed_card(
             item=item,
             template_id=job.template_id,
             checksum=parsed.checksum,
@@ -154,26 +174,26 @@ class ImportProcessorService:
 
     def _load_parser_resources(self, options: JobOptions) -> ParserResources:
         return ParserResources(
-            known_keywords=repositories.list_keywords(keys=options.keyword_keys),
-            detectable_symbols=repositories.list_detectable_symbols(),
+            known_keywords=list_keywords(keys=options.keyword_keys),
+            detectable_symbols=list_detectable_symbols(),
         )
 
     def _replace_metadata_links(self, card_version_id: str, parsed: Any) -> tuple[int, int]:
-        repositories.replace_card_version_keywords(
+        replace_card_version_keywords(
             card_version_id=card_version_id,
             keyword_ids=parsed.keyword_ids,
         )
-        repositories.replace_card_version_symbols(
+        replace_card_version_symbols(
             card_version_id=card_version_id,
             symbol_ids=parsed.symbol_ids,
         )
-        tag_rows = repositories.upsert_tags_by_labels(parsed.tag_labels)
-        type_rows = repositories.upsert_types_by_labels(parsed.type_labels)
-        repositories.replace_card_version_tags(
+        tag_rows = upsert_tags_by_labels(parsed.tag_labels)
+        type_rows = upsert_types_by_labels(parsed.type_labels)
+        replace_card_version_tags(
             card_version_id=card_version_id,
             tag_ids=[row.id for row in tag_rows],
         )
-        repositories.replace_card_version_types(
+        replace_card_version_types(
             card_version_id=card_version_id,
             type_ids=[row.id for row in type_rows],
         )

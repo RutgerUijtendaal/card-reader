@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "card_reader_core.apps.CardReaderCoreConfig",
+    "card_reader_core",
 ]
 
 MIDDLEWARE = [

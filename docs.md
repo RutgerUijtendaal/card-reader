@@ -1,7 +1,7 @@
 # Running Locally
 
-1. `./scripts/bootstrap.sh --node --python`
-2. `./scripts/dev.sh`
+1. `pnpm setup`
+2. `pnpm dev`
 
 ## Services
 - API: `pnpm --filter @card-reader/api dev`

@@ -21,7 +21,7 @@ django.setup()
 @pytest.fixture(autouse=True)
 def reset_db() -> None:
     from card_reader_core.database.connection import DATABASE_PATH, initialize_database
-    from card_reader_api.seeds import run_registered_seeds
+    from card_reader_api.seeds.runner import run_registered_seeds
 
     connections.close_all()
     if DATABASE_PATH.exists():

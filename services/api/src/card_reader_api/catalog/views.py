@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.catalog.serializers import keyword_payload, symbol_payload, tag_payload, type_payload
-from card_reader_core.services import CatalogService
+from card_reader_core.services.catalog import CatalogService
 from card_reader_core.settings import settings
 
 _ALLOWED_SYMBOL_ASSET_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}

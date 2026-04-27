@@ -2,8 +2,25 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
-import card_reader_core.repositories as repositories
 from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, Symbol, Tag, Type
+from card_reader_core.repositories.cards_repository import (
+    get_card,
+    get_card_image,
+    get_latest_card_version,
+    list_card_generations,
+    list_cards,
+    update_card,
+)
+from card_reader_core.repositories.metadata_repository import (
+    get_keywords_for_card_version,
+    get_symbols_for_card_version,
+    get_tags_for_card_version,
+    get_types_for_card_version,
+    list_keywords,
+    list_symbols,
+    list_tags,
+    list_types,
+)
 
 
 class CardMetadata(TypedDict):
@@ -15,44 +32,44 @@ class CardMetadata(TypedDict):
 
 class CardService:
     def list_cards(self, **filters: Any) -> list[tuple[Card, CardVersion]]:
-        return repositories.list_cards(**filters)
+        return list_cards(**filters)
 
     def list_card_generations(self, card_id: str) -> list[CardVersion]:
-        return repositories.list_card_generations(card_id)
+        return list_card_generations(card_id)
 
     def get_filter_metadata(self) -> CardMetadata:
         return {
-            "keywords": repositories.list_keywords(),
-            "tags": repositories.list_tags(),
-            "symbols": repositories.list_symbols(),
-            "types": repositories.list_types(),
+            "keywords": list_keywords(),
+            "tags": list_tags(),
+            "symbols": list_symbols(),
+            "types": list_types(),
         }
 
     def get_card_with_image(
         self,
         card_id: str,
     ) -> tuple[Card | None, CardVersion | None, CardVersionImage | None]:
-        card = repositories.get_card(card_id)
+        card = get_card(card_id)
         if card is None:
             return None, None, None
-        version = repositories.get_latest_card_version(card_id)
+        version = get_latest_card_version(card_id)
         if version is None:
             return card, None, None
-        image = repositories.get_card_image(version.id)
+        image = get_card_image(version.id)
         return card, version, image
 
     def get_card(self, card_id: str) -> Card | None:
-        return repositories.get_card(card_id)
+        return get_card(card_id)
 
     def get_card_image(self, card_version_id: str) -> CardVersionImage | None:
-        return repositories.get_card_image(card_version_id)
+        return get_card_image(card_version_id)
 
     def get_card_version_metadata(self, card_version_id: str) -> CardMetadata:
         return {
-            "keywords": repositories.get_keywords_for_card_version(card_version_id),
-            "tags": repositories.get_tags_for_card_version(card_version_id),
-            "symbols": repositories.get_symbols_for_card_version(card_version_id),
-            "types": repositories.get_types_for_card_version(card_version_id),
+            "keywords": get_keywords_for_card_version(card_version_id),
+            "tags": get_tags_for_card_version(card_version_id),
+            "symbols": get_symbols_for_card_version(card_version_id),
+            "types": get_types_for_card_version(card_version_id),
         }
 
     def update_card(
@@ -64,7 +81,7 @@ class CardService:
         mana_cost: str | None,
         rules_text: str | None,
     ) -> tuple[Card, CardVersion] | None:
-        return repositories.update_card(
+        return update_card(
             card_id=card_id,
             name=name,
             type_line=type_line,

@@ -12,7 +12,7 @@ Tauri desktop shell.
 - `services/api`: Django + DRF API service
 - `services/parser`: background OCR/parser worker
 - `services/integration`: integration tests across API, parser, and core
-- `scripts`: bootstrap, dev, build, and release helpers
+- `scripts`: project-specific automation for desktop sidecars and repo versioning
 
 ## Stack
 
@@ -38,13 +38,13 @@ Tauri desktop shell.
 Install dependencies:
 
 ```bash
-./scripts/bootstrap.sh --node --python
+pnpm setup
 ```
 
 Start the default development stack:
 
 ```bash
-./scripts/dev.sh
+pnpm dev
 ```
 
 That starts:
@@ -60,6 +60,9 @@ Desktop is excluded from the default loop. Use `pnpm dev:desktop` when needed.
 Useful commands from the repo root:
 
 ```bash
+pnpm setup
+pnpm deps:js
+pnpm deps:py
 pnpm dev
 pnpm dev:all
 pnpm dev:desktop
@@ -83,15 +86,14 @@ pnpm --filter @card-reader/core lint
 
 Python services use one shared workspace environment at the repo root.
 
-- Sync everything: `pnpm sync:python`
+- Sync everything: `pnpm deps:py`
 - The shared virtualenv lives at `.venv/`
-- `uv` cache is stored in `.uv-cache/`
 
 When you need to run a specific Python package directly:
 
 ```bash
-uv --cache-dir ./.uv-cache run --project . --package card-reader-api python manage.py check
-uv --cache-dir ./.uv-cache run --project . --package card-reader-parser python -m card_reader_parser.main
+uv run --project . --package card-reader-api python manage.py check
+uv run --project . --package card-reader-parser python -m card_reader_parser.main
 ```
 
 ## Configuration

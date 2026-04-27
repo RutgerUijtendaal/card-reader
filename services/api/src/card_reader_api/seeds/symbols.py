@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from card_reader_core.models import Symbol, now_utc
-from card_reader_core.repositories import normalize_slug_key
+from card_reader_core.repositories.helpers import normalize_slug_key
 from card_reader_core.settings import settings
 from .shared import resolve_seed_file
 

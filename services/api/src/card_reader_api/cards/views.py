@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.cards.serializers import card_payload, metadata_option, symbol_option
-from card_reader_core.services import CardService
+from card_reader_core.services.cards import CardService
 from card_reader_core.settings import settings
 
 

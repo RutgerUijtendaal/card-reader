@@ -11,9 +11,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-import card_reader_core.repositories as repositories
 from card_reader_api.imports.serializers import import_detail_payload, import_job_payload
-from card_reader_core.services import ImportService
+from card_reader_core.repositories.import_jobs_repository import (
+    SUPPORTED_IMAGE_SUFFIXES,
+    fetch_items_for_job,
+    fetch_job,
+    list_import_jobs,
+)
+from card_reader_core.services.imports import ImportService
 from card_reader_core.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -21,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class ImportListView(APIView):
     def get(self, _request: Request) -> Response:
-        jobs = repositories.list_import_jobs()
+        jobs = list_import_jobs()
         return Response([import_job_payload(job) for job in jobs])
 
 
@@ -59,10 +64,10 @@ class ImportUploadView(APIView):
 
 class ImportDetailView(APIView):
     def get(self, _request: Request, job_id: str) -> Response:
-        job = repositories.fetch_job(job_id)
+        job = fetch_job(job_id)
         if job is None:
             return Response({"detail": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(import_detail_payload(job, repositories.fetch_items_for_job(job_id)))
+        return Response(import_detail_payload(job, fetch_items_for_job(job_id)))
 
 
 def _parse_options(options_json: str) -> dict[str, object] | Response:
@@ -82,7 +87,7 @@ def _save_supported_uploads(files: list[UploadedFile]) -> Path | None:
 
     for index, upload in enumerate(files):
         original_name = Path(upload.name or f"upload-{index}.img").name
-        if Path(original_name).suffix.lower() not in repositories.SUPPORTED_IMAGE_SUFFIXES:
+        if Path(original_name).suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
             continue
         target_file = upload_dir / f"{index:04d}-{original_name}"
         with target_file.open("wb") as stream:

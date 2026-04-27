@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from card_reader_core.models import Template, now_utc
-from card_reader_core.repositories import normalize_slug_key
+from card_reader_core.repositories.helpers import normalize_slug_key
 from .shared import resolve_seed_file
 
 logger = logging.getLogger(__name__)

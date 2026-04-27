@@ -3,14 +3,14 @@
   "version": "0.1.10",
   "private": true,
   "scripts": {
-    "predev": "uv --cache-dir ../../.uv-cache sync --project ../.. --all-packages --all-groups --locked",
-    "migrate": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py migrate_card_reader",
-    "seed": "pnpm run migrate && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py seed_users && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py seed_defaults",
+    "predev": "uv sync --project ../.. --all-packages --all-groups --locked",
+    "migrate": "uv run --project ../.. --package card-reader-api python manage.py migrate_card_reader",
+    "seed": "pnpm run migrate && uv run --project ../.. --package card-reader-api python manage.py seed_users && uv run --project ../.. --package card-reader-api python manage.py seed_defaults",
     "seed:keywords": "pnpm run seed",
-    "dev": "pnpm run migrate && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py seed_users && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py seed_defaults && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py runserver 127.0.0.1:8000",
+    "dev": "pnpm run migrate && uv run --project ../.. --package card-reader-api python manage.py seed_users && uv run --project ../.. --package card-reader-api python manage.py seed_defaults && uv run --project ../.. --package card-reader-api python manage.py runserver 127.0.0.1:8000",
     "build": "echo \"Python service has no build step\"",
-    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api pytest -q",
-    "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api ruff check src tests",
-    "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api mypy src"
+    "test": "uv run --project ../.. --package card-reader-api pytest -q",
+    "lint": "uv run --project ../.. --package card-reader-api ruff check src tests",
+    "typecheck": "uv run --project ../.. --package card-reader-api mypy src"
   }
 }

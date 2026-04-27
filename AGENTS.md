@@ -85,8 +85,10 @@ Core stack:
 
 ## Development Commands
 From repo root:
-- Install deps: `./scripts/bootstrap.sh --node --python`
-- Dev default: `./scripts/dev.sh`
+- Install deps: `pnpm setup`
+- Install Node deps only: `pnpm deps:js`
+- Install Python deps only: `pnpm deps:py`
+- Dev default: `pnpm dev`
 - Dev all: `pnpm dev:all`
 - Desktop dev: `pnpm dev:desktop`
 - Build all: `pnpm build`

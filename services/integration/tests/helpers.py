@@ -5,15 +5,15 @@ from pathlib import Path
 from typing import Any
 
 from card_reader_core.models import Card, CardVersion, ImportJob, ImportJobItem, Symbol
-from card_reader_parser.parsers.card_parser import CardParser
-from card_reader_core.repositories import (
-    create_import_job,
+from card_reader_core.repositories.import_jobs_repository import create_import_job
+from card_reader_core.repositories.metadata_repository import (
     get_keywords_for_card_version,
     get_symbols_for_card_version,
     get_tags_for_card_version,
     get_types_for_card_version,
 )
-from card_reader_core.services import ImportProcessorService
+from card_reader_core.services.parser_jobs import ImportProcessorService
+from card_reader_parser.parsers.card_parser import CardParser
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures"
 

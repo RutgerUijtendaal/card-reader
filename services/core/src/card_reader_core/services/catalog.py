@@ -3,8 +3,35 @@ from __future__ import annotations
 import json
 from typing import Any, TypedDict, cast
 
-import card_reader_core.repositories as repositories
 from card_reader_core.models import Keyword, Symbol, Tag, Type
+from card_reader_core.repositories.helpers import normalize_slug_key
+from card_reader_core.repositories.metadata_repository import (
+    create_keyword,
+    create_symbol,
+    create_tag,
+    create_type,
+    delete_keyword,
+    delete_symbol,
+    delete_tag,
+    delete_type,
+    get_keyword,
+    get_symbol,
+    get_tag,
+    get_type,
+    keyword_key_exists,
+    list_detectable_symbols,
+    list_keywords,
+    list_symbols,
+    list_tags,
+    list_types,
+    symbol_key_exists,
+    tag_key_exists,
+    type_key_exists,
+    update_keyword,
+    update_symbol,
+    update_tag,
+    update_type,
+)
 
 SUPPORTED_SYMBOL_DETECTOR_TYPES = {"template"}
 
@@ -19,10 +46,10 @@ class CatalogData(TypedDict):
 class CatalogService:
     def list_catalog(self) -> CatalogData:
         return {
-            "keywords": repositories.list_keywords(),
-            "tags": repositories.list_tags(),
-            "symbols": repositories.list_symbols(),
-            "types": repositories.list_types(),
+            "keywords": list_keywords(),
+            "tags": list_tags(),
+            "symbols": list_symbols(),
+            "types": list_types(),
         }
 
     def create_keyword(self, *, label: str, key: str | None = None) -> Keyword:
@@ -77,7 +104,7 @@ class CatalogService:
         normalized_key = self._normalize_key(key=key, label=normalized_label)
         self._ensure_unique("symbol", normalized_key)
         self._validate_symbol_config_json(detection_config_json, reference_assets_json)
-        return repositories.create_symbol(
+        return create_symbol(
             key=normalized_key,
             label=normalized_label,
             symbol_type=self._normalize_symbol_type(symbol_type),
@@ -101,7 +128,7 @@ class CatalogService:
         text_token: str | None = None,
         enabled: bool | None = None,
     ) -> Symbol | None:
-        row = repositories.get_symbol(entry_id)
+        row = get_symbol(entry_id)
         if row is None:
             return None
 
@@ -124,25 +151,30 @@ class CatalogService:
             text_token=text_token,
             enabled=enabled,
         )
-        return repositories.update_symbol(entry_id=entry_id, updates=updates)
+        return update_symbol(entry_id=entry_id, updates=updates)
 
     def delete_keyword(self, *, entry_id: str) -> bool:
-        return repositories.delete_keyword(entry_id=entry_id)
+        return delete_keyword(entry_id=entry_id)
 
     def delete_tag(self, *, entry_id: str) -> bool:
-        return repositories.delete_tag(entry_id=entry_id)
+        return delete_tag(entry_id=entry_id)
 
     def delete_type(self, *, entry_id: str) -> bool:
-        return repositories.delete_type(entry_id=entry_id)
+        return delete_type(entry_id=entry_id)
 
     def delete_symbol(self, *, entry_id: str) -> bool:
-        return repositories.delete_symbol(entry_id=entry_id)
+        return delete_symbol(entry_id=entry_id)
 
     def _create_simple(self, kind: str, *, label: str, key: str | None) -> Any:
         normalized_label = self._normalize_label(label)
         normalized_key = self._normalize_key(key=key, label=normalized_label)
         self._ensure_unique(kind, normalized_key)
-        return getattr(repositories, f"create_{kind}")(
+        creators = {
+            "keyword": create_keyword,
+            "tag": create_tag,
+            "type": create_type,
+        }
+        return creators[kind](
             key=normalized_key,
             label=normalized_label,
         )
@@ -155,7 +187,12 @@ class CatalogService:
         label: str | None,
         key: str | None,
     ) -> Any | None:
-        getter = getattr(repositories, f"get_{kind}")
+        getters = {
+            "keyword": get_keyword,
+            "tag": get_tag,
+            "type": get_type,
+        }
+        getter = getters[kind]
         row = getter(entry_id)
         if row is None:
             return None
@@ -170,7 +207,12 @@ class CatalogService:
             self._ensure_unique(kind, normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
 
-        updater = getattr(repositories, f"update_{kind}")
+        updaters = {
+            "keyword": update_keyword,
+            "tag": update_tag,
+            "type": update_type,
+        }
+        updater = updaters[kind]
         return updater(entry_id=entry_id, updates=updates)
 
     def _apply_symbol_updates(
@@ -204,7 +246,13 @@ class CatalogService:
             updates["enabled"] = enabled
 
     def _ensure_unique(self, kind: str, key: str, exclude_id: str | None = None) -> None:
-        exists = getattr(repositories, f"{kind}_key_exists")
+        exists_checks = {
+            "keyword": keyword_key_exists,
+            "tag": tag_key_exists,
+            "type": type_key_exists,
+            "symbol": symbol_key_exists,
+        }
+        exists = exists_checks[kind]
         if exists(key=key, exclude_id=exclude_id):
             raise ValueError(f"Key '{key}' already exists")
 
@@ -216,7 +264,7 @@ class CatalogService:
 
     def _normalize_key(self, *, key: str | None, label: str) -> str:
         source = key if key is not None and key.strip() else label
-        normalized = repositories.normalize_slug_key(source)
+        normalized = normalize_slug_key(source)
         if not normalized:
             raise ValueError("Key is invalid")
         return normalized
@@ -246,7 +294,7 @@ class CatalogService:
         return detector_type
 
     def _normalize_symbol_type(self, value: str | None) -> str:
-        symbol_type = repositories.normalize_slug_key((value or "generic").strip())
+        symbol_type = normalize_slug_key((value or "generic").strip())
         if not symbol_type:
             raise ValueError("symbol_type is invalid")
         return symbol_type

@@ -3,16 +3,25 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import card_reader_core.repositories as repositories
 from card_reader_core.models import Template
+from card_reader_core.repositories.helpers import normalize_slug_key
+from card_reader_core.repositories.templates_repository import (
+    create_template,
+    delete_template,
+    get_template,
+    get_template_by_key,
+    list_templates,
+    template_key_exists,
+    update_template,
+)
 
 
 class TemplateService:
     def list_templates(self) -> list[Template]:
-        return repositories.list_templates()
+        return list_templates()
 
     def get_template_by_key(self, key: str) -> Template | None:
-        return repositories.get_template_by_key(key=key)
+        return get_template_by_key(key=key)
 
     def get_template_definition(self, key: str) -> dict[str, Any]:
         row = self.get_template_by_key(key)
@@ -37,7 +46,7 @@ class TemplateService:
         normalized_label = self._normalize_label(label)
         normalized_key = self._normalize_key(key=key, label=normalized_label)
         self._ensure_unique_template_key(normalized_key)
-        return repositories.create_template(
+        return create_template(
             key=normalized_key,
             label=normalized_label,
             definition_json=self._normalize_definition_json(definition_json),
@@ -51,7 +60,7 @@ class TemplateService:
         key: str | None = None,
         definition_json: str | None = None,
     ) -> Template | None:
-        row = repositories.get_template(entry_id)
+        row = get_template(entry_id)
         if row is None:
             return None
 
@@ -67,18 +76,18 @@ class TemplateService:
         if definition_json is not None:
             updates["definition_json"] = self._normalize_definition_json(definition_json)
 
-        return repositories.update_template(entry_id=entry_id, updates=updates)
+        return update_template(entry_id=entry_id, updates=updates)
 
     def delete_template(self, *, entry_id: str) -> bool:
-        return repositories.delete_template(entry_id=entry_id)
+        return delete_template(entry_id=entry_id)
 
     def _ensure_unique_template_key(self, key: str, exclude_id: str | None = None) -> None:
-        if repositories.template_key_exists(key=key, exclude_id=exclude_id):
+        if template_key_exists(key=key, exclude_id=exclude_id):
             raise ValueError(f"Key '{key}' already exists")
 
     def _normalize_key(self, *, key: str | None, label: str) -> str:
         source = key if key is not None and key.strip() else label
-        normalized = repositories.normalize_slug_key(source)
+        normalized = normalize_slug_key(source)
         if not normalized:
             raise ValueError("Key is invalid")
         return normalized

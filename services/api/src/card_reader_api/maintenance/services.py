@@ -10,7 +10,7 @@ from pathlib import Path
 from django.core.management import call_command
 from django.db import connection, connections
 
-from card_reader_api.seeds import run_registered_seeds
+from card_reader_api.seeds.runner import run_registered_seeds
 from card_reader_core.database.connection import DATABASE_PATH, initialize_database
 from card_reader_core.settings import settings
 

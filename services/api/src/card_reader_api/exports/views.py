@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
-from card_reader_core.services import ExportService
+from card_reader_core.services.exports import ExportService
 
 
 class ExportCsvView(APIView):

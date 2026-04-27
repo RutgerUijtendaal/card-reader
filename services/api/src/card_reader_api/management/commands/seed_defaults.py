@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 from django.core.management.base import BaseCommand
 
-from card_reader_api.seeds import run_registered_seeds
+from card_reader_api.seeds.runner import run_registered_seeds
 
 
 class Command(BaseCommand):
