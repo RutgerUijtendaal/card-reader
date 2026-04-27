@@ -13,12 +13,6 @@ dependencies = [
   "pydantic-settings>=2.5.2"
 ]
 
-[project.optional-dependencies]
-dev = [
-  "mypy>=1.11.2",
-  "ruff>=0.6.9"
-]
-
 [tool.setuptools]
 package-dir = { "" = "src" }
 
@@ -38,5 +32,7 @@ strict = true
 
 [dependency-groups]
 dev = [
+    "mypy>=1.11.2",
+    "ruff>=0.6.9",
     "django-stubs>=6.0.3",
 ]

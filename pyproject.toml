@@ -2,5 +2,11 @@
 members = [
   "services/api",
   "services/core",
+  "services/integration",
   "services/parser",
 ]
+
+[tool.uv.sources]
+card-reader-api = { workspace = true }
+card-reader-core = { workspace = true }
+card-reader-parser = { workspace = true }

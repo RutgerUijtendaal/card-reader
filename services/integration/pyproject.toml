@@ -19,19 +19,14 @@ dependencies = [
   "pydantic-settings>=2.5.2"
 ]
 
-[tool.uv.sources]
-card-reader-api = { path = "../api", editable = true }
-card-reader-core = { path = "../core", editable = true }
-card-reader-parser = { path = "../parser", editable = true }
-
-[project.optional-dependencies]
-dev = [
-  "pytest>=8.3.3",
-  "ruff>=0.6.9"
-]
-
 [tool.pytest.ini_options]
 pythonpath = ["src", "tests", "../parser/src", "../api/src", "../core/src"]
 
 [tool.ruff]
 line-length = 100
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.3",
+    "ruff>=0.6.9",
+]

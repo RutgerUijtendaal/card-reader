@@ -3,11 +3,11 @@
   "version": "0.1.7",
   "private": true,
   "scripts": {
-    "predev": "uv sync --project . --extra dev",
-    "dev": "uv run --project . python -m card_reader_parser.main",
+    "predev": "uv --cache-dir ../../.uv-cache sync --project ../.. --all-packages --all-groups --locked",
+    "dev": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser python -m card_reader_parser.main",
     "build": "echo \"Python service has no build step\"",
-    "test": "uv run --project . --extra dev pytest -q",
-    "lint": "uv run --project . ruff check src",
-    "typecheck": "uv run --project . mypy src"
+    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser pytest -q",
+    "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser ruff check src",
+    "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser mypy src"
   }
 }

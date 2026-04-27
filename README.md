@@ -43,7 +43,7 @@ source "$HOME/.cargo/env"
 ```
 
 The bootstrap installs Node dependencies and syncs the Python environments for core, API, parser,
-and integration tests.
+and integration tests into a single workspace `.venv` at the repo root.
 
 ## Development
 
@@ -64,6 +64,14 @@ pnpm --filter @card-reader/integration test
 pnpm dev:all
 pnpm dev:desktop
 ```
+
+Python workspace notes:
+
+- Run `uv sync --all-packages --all-groups` from the repo root to refresh the shared environment.
+- The repo uses `.uv-cache/` to keep `uv` cache writes inside the workspace instead of user-global
+  cache directories.
+- Use `uv run --package card-reader-api ...` or `uv run --package card-reader-parser ...` when you
+  need to target one Python service from the workspace environment.
 
 ## Backend Runtime
 
@@ -137,6 +145,8 @@ The compose stack runs:
 - `parser`: background parser process with `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`
 
 Both services share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
+The Docker builds install workspace dependencies in a cacheable layer from the root `pyproject.toml`
+and `uv.lock`, then copy service source code in a later layer.
 
 Production settings are controlled through `.env`:
 

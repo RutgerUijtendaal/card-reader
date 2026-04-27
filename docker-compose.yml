@@ -2,7 +2,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: services/api/Dockerfile
+      dockerfile: docker/api.Dockerfile
     container_name: card-reader-api
     restart: unless-stopped
     env_file:
@@ -34,7 +34,7 @@ services:
   parser:
     build:
       context: .
-      dockerfile: services/parser/Dockerfile
+      dockerfile: docker/parser.Dockerfile
     container_name: card-reader-parser
     restart: unless-stopped
     env_file:

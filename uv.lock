@@ -23,6 +23,7 @@ resolution-markers = [
 members = [
     "card-reader-api",
     "card-reader-core",
+    "card-reader-integration",
     "card-reader-parser",
 ]
 
@@ -110,19 +111,15 @@ dependencies = [
     { name = "python-multipart" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
+    { name = "django-stubs" },
+    { name = "djangorestframework-stubs" },
     { name = "httpx" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "watchfiles" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "django-stubs" },
-    { name = "djangorestframework-stubs" },
 ]
 
 [package.metadata]
@@ -131,20 +128,19 @@ requires-dist = [
     { name = "django", specifier = ">=5.1.0" },
     { name = "djangorestframework", specifier = ">=3.15.2" },
     { name = "gunicorn", specifier = ">=23.0.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.2" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "pydantic-settings", specifier = ">=2.5.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.3" },
     { name = "python-multipart", specifier = ">=0.0.12" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.9" },
-    { name = "watchfiles", marker = "extra == 'dev'", specifier = ">=0.24.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "django-stubs", specifier = ">=6.0.3" },
     { name = "djangorestframework-stubs", specifier = ">=3.16.9" },
+    { name = "httpx", specifier = ">=0.27.2" },
+    { name = "mypy", specifier = ">=1.11.2" },
+    { name = "pytest", specifier = ">=8.3.3" },
+    { name = "ruff", specifier = ">=0.6.9" },
+    { name = "watchfiles", specifier = ">=0.24.0" },
 ]
 
 [[package]]
@@ -156,28 +152,64 @@ dependencies = [
     { name = "pydantic-settings" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "ruff" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "django-stubs" },
+    { name = "mypy" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "django", specifier = ">=5.1.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "pydantic-settings", specifier = ">=2.5.2" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.9" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "django-stubs", specifier = ">=6.0.3" }]
+dev = [
+    { name = "django-stubs", specifier = ">=6.0.3" },
+    { name = "mypy", specifier = ">=1.11.2" },
+    { name = "ruff", specifier = ">=0.6.9" },
+]
+
+[[package]]
+name = "card-reader-integration"
+version = "0.1.7"
+source = { editable = "services/integration" }
+dependencies = [
+    { name = "card-reader-api" },
+    { name = "card-reader-core" },
+    { name = "card-reader-parser" },
+    { name = "paddleocr" },
+    { name = "paddlepaddle" },
+    { name = "paddlex", extra = ["ocr-core"] },
+    { name = "pillow" },
+    { name = "pydantic-settings" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "card-reader-api", editable = "services/api" },
+    { name = "card-reader-core", editable = "services/core" },
+    { name = "card-reader-parser", editable = "services/parser" },
+    { name = "paddleocr", specifier = ">=3.1.0" },
+    { name = "paddlepaddle", specifier = ">=3.1.0" },
+    { name = "paddlex", extras = ["ocr-core"], specifier = ">=3.1.0" },
+    { name = "pillow", specifier = ">=10.4.0" },
+    { name = "pydantic-settings", specifier = ">=2.5.2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.3.3" },
+    { name = "ruff", specifier = ">=0.6.9" },
+]
 
 [[package]]
 name = "card-reader-parser"
@@ -193,35 +225,32 @@ dependencies = [
     { name = "watchfiles" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
+    { name = "django-stubs" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "django-stubs" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "card-reader-core", editable = "services/core" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "paddleocr", specifier = ">=3.1.0" },
     { name = "paddlepaddle", specifier = ">=3.1.0" },
     { name = "paddlex", extras = ["ocr-core"], specifier = ">=3.1.0" },
     { name = "pillow", specifier = ">=10.4.0" },
     { name = "pydantic-settings", specifier = ">=2.5.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.3" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.9" },
     { name = "watchfiles", specifier = ">=0.24.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "django-stubs", specifier = ">=6.0.3" }]
+dev = [
+    { name = "django-stubs", specifier = ">=6.0.3" },
+    { name = "mypy", specifier = ">=1.11.2" },
+    { name = "pytest", specifier = ">=8.3.3" },
+    { name = "ruff", specifier = ">=0.6.9" },
+]
 
 [[package]]
 name = "certifi"

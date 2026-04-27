@@ -6,7 +6,7 @@
     "dev": "echo \"Core has no standalone dev process\"",
     "build": "echo \"Core has no build step\"",
     "test": "echo \"No core tests yet\"",
-    "lint": "uv run --project . ruff check src",
-    "typecheck": "uv run --project . mypy src"
+    "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-core ruff check src",
+    "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-core mypy src"
   }
 }
