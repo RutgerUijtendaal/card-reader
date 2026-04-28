@@ -33,6 +33,7 @@ class Keyword(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
+    identifiers_json: models.TextField[str, str] = models.TextField(default="[]")
 
     class Meta:
         db_table = "keyword"

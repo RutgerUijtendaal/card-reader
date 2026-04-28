@@ -14,6 +14,8 @@ export type KeywordRecord = {
   id: string;
   key: string;
   label: string;
+  identifiers: string[];
+  identifiers_text: string;
 };
 
 export type TagRecord = {
@@ -62,6 +64,7 @@ export type SymbolAssetUploadResponse = {
 export type KeywordUpsertRequest = {
   label?: string;
   key?: string;
+  identifiers?: string[];
 };
 
 export type TagUpsertRequest = {
@@ -107,6 +110,7 @@ export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord;
 export type CatalogFormEntry = {
   label: string;
   key: string;
+  identifiers_text?: string;
   symbol_type: string;
   detector_type: SymbolDetectorType;
   detection_config_json: string;

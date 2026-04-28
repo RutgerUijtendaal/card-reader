@@ -87,8 +87,8 @@ def type_key_exists(*, key: str, exclude_id: str | None = None) -> bool:
     return _key_exists(Type, key=key, exclude_id=exclude_id)
 
 
-def create_keyword(*, key: str, label: str) -> Keyword:
-    return Keyword.objects.create(key=key, label=label)
+def create_keyword(*, key: str, label: str, identifiers_json: str = "[]") -> Keyword:
+    return Keyword.objects.create(key=key, label=label, identifiers_json=identifiers_json)
 
 
 def create_tag(*, key: str, label: str) -> Tag:

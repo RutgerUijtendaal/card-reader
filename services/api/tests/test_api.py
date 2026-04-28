@@ -134,6 +134,29 @@ def test_staff_can_manage_catalog_entries() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_create_keyword_identifiers() -> None:
+    username = "staff-keyword-alias-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/settings/keywords",
+        data={
+            "label": "Turn Start",
+            "key": "turn-start-alias-test",
+            "identifiers": ["At the beginning of your turn", "  TURN START  "],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["identifiers"] == ["turn start", "at the beginning of your turn"]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_manage_templates() -> None:
     username = "staff-template-user"
     password = "password"

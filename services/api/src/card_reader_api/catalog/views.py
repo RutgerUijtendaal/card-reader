@@ -34,12 +34,12 @@ class CatalogView(APIView):
 
 class KeywordCreateView(APIView):
     def post(self, request: Request) -> Response:
-        return _create_simple(request, "keyword", keyword_payload)
+        return _create_simple(request, "keyword", keyword_payload, include_identifiers=True)
 
 
 class KeywordDetailView(APIView):
     def patch(self, request: Request, entry_id: str) -> Response:
-        return _update_simple(request, entry_id, "keyword", keyword_payload)
+        return _update_simple(request, entry_id, "keyword", keyword_payload, include_identifiers=True)
 
     def delete(self, _request: Request, entry_id: str) -> Response:
         return _delete_simple(entry_id, "keyword", "Keyword")
@@ -144,12 +144,25 @@ def _create_simple(
     request: Request,
     kind: str,
     payload: Callable[[Any], dict[str, object]],
+    *,
+    include_identifiers: bool = False,
 ) -> Response:
     label = request.data.get("label")
     if label is None:
         return _bad_request("label is required")
+    identifiers = None
+    if include_identifiers:
+        identifiers = request.data.get("identifiers")
+        if identifiers is not None and not isinstance(identifiers, list):
+            return _bad_request("identifiers must be an array of strings")
+        if isinstance(identifiers, list) and not all(isinstance(item, str) for item in identifiers):
+            return _bad_request("identifiers must be an array of strings")
     try:
-        row = getattr(CatalogService(), f"create_{kind}")(label=str(label), key=request.data.get("key"))
+        row = getattr(CatalogService(), f"create_{kind}")(
+            label=str(label),
+            key=request.data.get("key"),
+            identifiers=identifiers,
+        )
     except ValueError as exc:
         return _bad_request(str(exc))
     return Response(payload(row))
@@ -160,12 +173,22 @@ def _update_simple(
     entry_id: str,
     kind: str,
     payload: Callable[[Any], dict[str, object]],
+    *,
+    include_identifiers: bool = False,
 ) -> Response:
+    identifiers = None
+    if include_identifiers and "identifiers" in request.data:
+        identifiers = request.data.get("identifiers")
+        if identifiers is not None and not isinstance(identifiers, list):
+            return _bad_request("identifiers must be an array of strings")
+        if isinstance(identifiers, list) and not all(isinstance(item, str) for item in identifiers):
+            return _bad_request("identifiers must be an array of strings")
     try:
         row = getattr(CatalogService(), f"update_{kind}")(
             entry_id=entry_id,
             label=request.data.get("label"),
             key=request.data.get("key"),
+            identifiers=identifiers,
         )
     except ValueError as exc:
         return _bad_request(str(exc))

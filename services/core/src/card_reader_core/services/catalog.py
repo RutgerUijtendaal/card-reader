@@ -51,8 +51,17 @@ class CatalogService:
             "types": list_types(),
         }
 
-    def create_keyword(self, *, label: str, key: str | None = None) -> Keyword:
-        return cast(Keyword, self._create_simple("keyword", label=label, key=key))
+    def create_keyword(
+        self,
+        *,
+        label: str,
+        key: str | None = None,
+        identifiers: list[str] | None = None,
+    ) -> Keyword:
+        return cast(
+            Keyword,
+            self._create_simple("keyword", label=label, key=key, identifiers=identifiers),
+        )
 
     def create_tag(self, *, label: str, key: str | None = None) -> Tag:
         return cast(Tag, self._create_simple("tag", label=label, key=key))
@@ -66,8 +75,12 @@ class CatalogService:
         entry_id: str,
         label: str | None = None,
         key: str | None = None,
+        identifiers: list[str] | None = None,
     ) -> Keyword | None:
-        return cast(Keyword | None, self._update_simple("keyword", entry_id=entry_id, label=label, key=key))
+        return cast(
+            Keyword | None,
+            self._update_simple("keyword", entry_id=entry_id, label=label, key=key, identifiers=identifiers),
+        )
 
     def update_tag(
         self,
@@ -164,19 +177,26 @@ class CatalogService:
     def delete_symbol(self, *, entry_id: str) -> bool:
         return delete_symbol(entry_id=entry_id)
 
-    def _create_simple(self, kind: str, *, label: str, key: str | None) -> Any:
+    def _create_simple(
+        self,
+        kind: str,
+        *,
+        label: str,
+        key: str | None,
+        identifiers: list[str] | None = None,
+    ) -> Any:
         normalized_label = self._normalize_label(label)
         normalized_key = self._normalize_key(key=key, label=normalized_label)
         self._ensure_unique(kind, normalized_key)
-        creators = {
-            "keyword": create_keyword,
-            "tag": create_tag,
-            "type": create_type,
-        }
-        return creators[kind](
-            key=normalized_key,
-            label=normalized_label,
-        )
+        if kind == "keyword":
+            return create_keyword(
+                key=normalized_key,
+                label=normalized_label,
+                identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
+            )
+        if kind == "tag":
+            return create_tag(key=normalized_key, label=normalized_label)
+        return create_type(key=normalized_key, label=normalized_label)
 
     def _update_simple(
         self,
@@ -185,6 +205,7 @@ class CatalogService:
         entry_id: str,
         label: str | None,
         key: str | None,
+        identifiers: list[str] | None = None,
     ) -> Any | None:
         getters = {
             "keyword": get_keyword,
@@ -205,6 +226,8 @@ class CatalogService:
             normalized_key = self._normalize_key(key=key, label=current_label)
             self._ensure_unique(kind, normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
+        if kind == "keyword" and identifiers is not None:
+            updates["identifiers_json"] = self._normalize_identifiers_json(current_label, identifiers)
 
         updaters = {
             "keyword": update_keyword,
@@ -267,6 +290,30 @@ class CatalogService:
         if not normalized:
             raise ValueError("Key is invalid")
         return normalized
+
+    def _normalize_identifiers_json(self, label: str, identifiers: list[str] | None) -> str:
+        normalized_identifiers = self._normalize_identifiers(label, identifiers)
+        return json.dumps(normalized_identifiers)
+
+    def _normalize_identifiers(self, label: str, identifiers: list[str] | None) -> list[str]:
+        out: list[str] = []
+        seen: set[str] = set()
+
+        canonical_identifier = " ".join(label.split()).strip().lower()
+        if canonical_identifier:
+            seen.add(canonical_identifier)
+            out.append(canonical_identifier)
+
+        if identifiers is None:
+            return out
+
+        for raw_identifier in identifiers:
+            compact = " ".join(str(raw_identifier).split()).strip().lower()
+            if not compact or compact in seen:
+                continue
+            seen.add(compact)
+            out.append(compact)
+        return out
 
     def _validate_symbol_config_json(self, object_json: str | None, array_json: str | None) -> None:
         if object_json is not None and not isinstance(json.loads(self._normalize_object_json(object_json)), dict):

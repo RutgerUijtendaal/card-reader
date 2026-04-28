@@ -120,6 +120,20 @@
         >
       </label>
     </div>
+    <label
+      v-if="kind === 'keywords'"
+      class="field-label"
+    >
+      Identifiers
+      <textarea
+        v-model="identifiersTextModel"
+        class="input-base min-h-24 font-mono"
+        placeholder="turn start&#10;at the beginning of your turn"
+      />
+      <span class="text-xs font-normal text-slate-500">
+        One identifier per line. Matching is case-insensitive.
+      </span>
+    </label>
   </div>
 </template>
 
@@ -157,6 +171,11 @@ const labelModel = computed({
 const keyModel = computed({
   get: () => props.entry.key,
   set: (value: string) => updateEntry({ key: value }),
+});
+
+const identifiersTextModel = computed({
+  get: () => props.entry.identifiers_text ?? '',
+  set: (value: string) => updateEntry({ identifiers_text: value }),
 });
 
 const textTokenModel = computed({

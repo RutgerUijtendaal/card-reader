@@ -66,6 +66,12 @@
                 Key
               </th>
               <th
+                v-if="selectedKind === 'keywords'"
+                class="px-2 py-2 font-semibold"
+              >
+                Identifiers
+              </th>
+              <th
                 v-if="selectedKind === 'symbols'"
                 class="px-2 py-2 font-semibold"
               >
@@ -111,6 +117,16 @@
                     v-model="entry.key"
                     class="input-base"
                   >
+                </td>
+                <td
+                  v-if="selectedKind === 'keywords'"
+                  class="px-2 py-2"
+                >
+                  <textarea
+                    v-model="(entry as KeywordRecord).identifiers_text"
+                    class="input-base min-h-24 font-mono"
+                    placeholder="turn start&#10;at the beginning of your turn"
+                  />
                 </td>
                 <td
                   v-if="selectedKind === 'symbols'"
@@ -266,6 +282,7 @@ import type {
   CatalogFormEntry,
   CatalogKind,
   CatalogRow,
+  KeywordRecord,
   SymbolDetectorOption,
   SymbolRecord,
 } from '@/modules/settings/types';

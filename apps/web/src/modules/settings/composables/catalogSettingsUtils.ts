@@ -2,6 +2,7 @@ import type {
   CatalogFormEntry,
   CatalogKind,
   CatalogRow,
+  KeywordRecord,
   KeywordUpsertRequest,
   SymbolRecord,
   SymbolUpsertRequest,
@@ -18,6 +19,21 @@ export const kindLabel = (kind: CatalogKind): string => {
   return 'Types';
 };
 
+export const formatIdentifiersText = (identifiers: string[]): string =>
+  identifiers.filter((item) => item.trim().length > 0).join('\n');
+
+export const parseIdentifiersText = (rawText: string): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const segment of rawText.split(/\r?\n|,/)) {
+    const normalized = segment.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+};
+
 export const detectionConfigExample =
   '{"threshold":0.9,"scales":[1.0,0.9,1.1],"max_candidates_per_asset":40,"max_detections_per_symbol":8,"nms_iou_threshold":0.25,"center_crop_ratio":0.7}';
 export const referenceAssetsExample = '["mana/fire.png","mana/fire_alt.png"]';
@@ -25,6 +41,7 @@ export const referenceAssetsExample = '["mana/fire.png","mana/fire_alt.png"]';
 export const createEmptyCatalogEntry = (): CatalogFormEntry => ({
   label: '',
   key: '',
+  identifiers_text: '',
   symbol_type: 'generic',
   detector_type: 'template',
   detection_config_json: detectionConfigExample,
@@ -37,6 +54,14 @@ export const buildCreatePayload = (
   kind: CatalogKind,
   entry: CatalogFormEntry,
 ): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest => {
+  if (kind === 'keywords') {
+    return {
+      label: entry.label.trim(),
+      key: entry.key.trim() || undefined,
+      identifiers: parseIdentifiersText(entry.identifiers_text ?? ''),
+    };
+  }
+
   if (kind === 'symbols') {
     return {
       label: entry.label.trim(),
@@ -60,6 +85,15 @@ export const buildUpdatePayload = (
   kind: CatalogKind,
   entry: CatalogRow,
 ): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest => {
+  if (kind === 'keywords') {
+    const keyword = entry as KeywordRecord;
+    return {
+      label: keyword.label,
+      key: keyword.key,
+      identifiers: parseIdentifiersText(keyword.identifiers_text),
+    };
+  }
+
   if (kind === 'symbols') {
     const symbol = entry as SymbolRecord;
     return {
