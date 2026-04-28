@@ -17,6 +17,14 @@ class RebuildDatabaseView(APIView):
         return Response({"message": result.message, "removed_paths": result.removed_paths})
 
 
+class QueueLatestReparseView(APIView):
+    permission_classes = [AuthEnabledOrSuperuserAllowed]
+
+    def post(self, _request: Request) -> Response:
+        result = MaintenanceService().queue_reparse_latest_versions()
+        return Response({"message": result.message, "removed_paths": result.removed_paths})
+
+
 class ClearStorageView(APIView):
     permission_classes = [AuthEnabledOrSuperuserAllowed]
 

@@ -33,6 +33,21 @@ def create_import_job(
     options: dict[str, object],
 ) -> ImportJob:
     files = collect_supported_files(source_path)
+    return create_import_job_with_files(
+        source_path=source_path,
+        template_id=template_id,
+        options=options,
+        files=files,
+    )
+
+
+def create_import_job_with_files(
+    *,
+    source_path: Path,
+    template_id: str,
+    options: dict[str, object],
+    files: list[Path],
+) -> ImportJob:
     with transaction.atomic():
         job = ImportJob.objects.create(
             source_path=str(source_path),

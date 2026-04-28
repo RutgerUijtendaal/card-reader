@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from django.db import transaction
@@ -22,6 +23,13 @@ from card_reader_core.models import (
     now_utc,
 )
 from card_reader_core.search.cards import apply_card_search
+
+
+@dataclass(frozen=True)
+class LatestCardVersionReparseSource:
+    card_version_id: str
+    template_id: str
+    image_path: Path
 
 
 def save_parsed_card(
@@ -110,6 +118,48 @@ def get_latest_card_version(card_id: str) -> CardVersion | None:
 
 def get_card_image(card_version_id: str) -> CardVersionImage | None:
     return CardVersionImage.objects.filter(card_version_id=card_version_id).first()
+
+
+def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseSource]:
+    latest_version_ids = list(
+        Card.objects.exclude(latest_version_id__isnull=True)
+        .exclude(latest_version_id="")
+        .values_list("latest_version_id", flat=True)
+    )
+    if not latest_version_ids:
+        return []
+
+    versions = list(
+        CardVersion.objects.filter(id__in=latest_version_ids)
+        .only("id", "template_id")
+        .order_by("id")
+    )
+    if not versions:
+        return []
+
+    images_by_version_id = {
+        row.card_version_id: row
+        for row in CardVersionImage.objects.filter(
+            card_version_id__in=[version.id for version in versions]
+        ).only("card_version_id", "source_file", "stored_path")
+    }
+
+    out: list[LatestCardVersionReparseSource] = []
+    for version in versions:
+        image = images_by_version_id.get(version.id)
+        if image is None:
+            continue
+        image_path = _resolve_reparse_image_path(image)
+        if image_path is None:
+            continue
+        out.append(
+            LatestCardVersionReparseSource(
+                card_version_id=version.id,
+                template_id=version.template_id,
+                image_path=image_path,
+            )
+        )
+    return out
 
 
 def list_card_generations(card_id: str) -> list[CardVersion]:
@@ -283,3 +333,15 @@ def _filter_by_links(
         flat=True,
     )
     return queryset.filter(id__in=version_ids)
+
+
+def _resolve_reparse_image_path(image: CardVersionImage) -> Path | None:
+    stored_path = Path(image.stored_path)
+    if stored_path.exists():
+        return stored_path
+
+    source_path = Path(image.source_file)
+    if source_path.exists():
+        return source_path
+
+    return None
