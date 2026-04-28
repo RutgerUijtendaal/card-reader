@@ -33,7 +33,6 @@ jobs:
             os: ubuntu-22.04
             artifact_name: linux-desktop-bundle
             artifact_paths: |
-              apps/desktop/src-tauri/target/release/bundle/appimage/*
               apps/desktop/src-tauri/target/release/bundle/deb/*
 
     steps:
@@ -109,12 +108,6 @@ jobs:
           RUST_BACKTRACE: 1
         run: pnpm --filter @card-reader/desktop exec tauri build --bundles deb --verbose
 
-      - name: Build Linux AppImage bundle
-        if: runner.os == 'Linux'
-        env:
-          RUST_BACKTRACE: 1
-        run: pnpm --filter @card-reader/desktop exec tauri build --bundles appimage --verbose
-
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -140,7 +133,7 @@ jobs:
         run: |
           find release-assets -type f \
             ! -name "*.exe" \
-            ! -name "*.AppImage" \
+            ! -name "*.deb" \
             -delete
 
       - name: Publish GitHub release

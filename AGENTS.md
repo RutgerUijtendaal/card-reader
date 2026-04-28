@@ -71,10 +71,6 @@ Core stack:
 - Local development users live in:
   - `services/api/src/card_reader_api/seeds/seed-users.local.json`
 - `seed-users.local.json` is gitignored.
-- Production users are owned by the Ansible webserver role:
-  - `../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.json`
-  - tracked example: `../rutgeruijtendaal.com/infra/roles/webserver/files/card-reader-users.example.json`
-- Deploy copies the production users file into the deployed app as `seed-users.local.json`.
 
 ## Docker And Runtime
 - `api` and `parser` share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
