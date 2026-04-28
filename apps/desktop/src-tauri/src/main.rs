@@ -157,7 +157,7 @@ fn find_python_executable(root: &Path) -> Option<PathBuf> {
     let candidates: &[&str] = if cfg!(target_os = "windows") {
         &["python.exe"]
     } else {
-        &["python3", "python"]
+        &["python3.12", "python3", "python"]
     };
 
     while let Some(current_dir) = stack.pop() {

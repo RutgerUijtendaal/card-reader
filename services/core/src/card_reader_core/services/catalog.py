@@ -19,7 +19,6 @@ from card_reader_core.repositories.metadata_repository import (
     get_tag,
     get_type,
     keyword_key_exists,
-    list_detectable_symbols,
     list_keywords,
     list_symbols,
     list_tags,

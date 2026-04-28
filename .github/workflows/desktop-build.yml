@@ -31,7 +31,6 @@ jobs:
               apps/desktop/src-tauri/target/release/bundle/nsis/*
           - name: linux
             os: ubuntu-22.04
-            bundles: appimage,deb
             artifact_name: linux-desktop-bundle
             artifact_paths: |
               apps/desktop/src-tauri/target/release/bundle/appimage/*
@@ -84,8 +83,14 @@ jobs:
           sudo apt-get install -y \
             libgtk-3-dev \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
             patchelf
 
       - name: Install dependencies
@@ -94,8 +99,21 @@ jobs:
       - name: Build desktop Python runtime
         run: pnpm --filter @card-reader/desktop run build:python
 
-      - name: Build desktop bundle
-        run: pnpm --filter @card-reader/desktop exec tauri build --bundles ${{ matrix.platform.bundles }}
+      - name: Build Windows desktop bundle
+        if: runner.os == 'Windows'
+        run: pnpm --filter @card-reader/desktop exec tauri build --bundles nsis --verbose
+
+      - name: Build Linux Debian bundle
+        if: runner.os == 'Linux'
+        env:
+          RUST_BACKTRACE: 1
+        run: pnpm --filter @card-reader/desktop exec tauri build --bundles deb --verbose
+
+      - name: Build Linux AppImage bundle
+        if: runner.os == 'Linux'
+        env:
+          RUST_BACKTRACE: 1
+        run: pnpm --filter @card-reader/desktop exec tauri build --bundles appimage --verbose
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v6

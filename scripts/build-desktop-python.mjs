@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { mkdirSync, rmSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -13,8 +13,8 @@ const pythonVersion = process.env.CARD_READER_DESKTOP_PYTHON_VERSION ?? "3.12";
 const desktopPythonDir = join(repoRoot, "apps", "desktop", "src-tauri", "python");
 const runtimeDir = join(desktopPythonDir, "runtime");
 const sitePackagesDir = join(desktopPythonDir, "site-packages");
-const placeholderFile = join(desktopPythonDir, "placeholder.txt");
 const tmpDir = join(repoRoot, ".tmp", "desktop-python");
+const runtimeInstallDir = join(tmpDir, "runtime-install");
 const requirementsFile = join(tmpDir, "requirements.txt");
 
 const run = (command, args, cwd = repoRoot, env = {}) => {
@@ -33,14 +33,17 @@ const clean = () => {
   rmSync(desktopPythonDir, { recursive: true, force: true });
   rmSync(tmpDir, { recursive: true, force: true });
   rmSync(distDir, { recursive: true, force: true });
-  mkdirSync(runtimeDir, { recursive: true });
+  mkdirSync(desktopPythonDir, { recursive: true });
   mkdirSync(sitePackagesDir, { recursive: true });
   mkdirSync(tmpDir, { recursive: true });
+  mkdirSync(runtimeInstallDir, { recursive: true });
   mkdirSync(distDir, { recursive: true });
 };
 
 const findPythonExecutable = (rootDir) => {
-  const candidates = process.platform === "win32" ? ["python.exe"] : ["python3", "python"];
+  const candidates = process.platform === "win32"
+    ? ["python.exe"]
+    : ["python3.12", "python3", "python"];
   const stack = [rootDir];
 
   while (stack.length > 0) {
@@ -51,7 +54,7 @@ const findPythonExecutable = (rootDir) => {
         stack.push(fullPath);
         continue;
       }
-      if (entry.isFile() && candidates.includes(entry.name)) {
+      if ((entry.isFile() || entry.isSymbolicLink()) && candidates.includes(entry.name)) {
         return fullPath;
       }
     }
@@ -71,6 +74,48 @@ const findWheel = (prefix) => {
   return join(distDir, match);
 };
 
+const derivePythonHome = (pythonExecutable) => {
+  const parent = dirname(pythonExecutable);
+  return basename(parent) === "bin"
+    ? dirname(parent)
+    : parent;
+};
+
+const removeIfExists = (targetPath) => {
+  if (!existsSync(targetPath)) {
+    return;
+  }
+  rmSync(targetPath, { recursive: true, force: true });
+};
+
+const pruneUnusedRuntimeFiles = () => {
+  const dynloadDir = join(runtimeDir, "lib", `python${pythonVersion}`, "lib-dynload");
+  const removalTargets = [
+    join(runtimeDir, "tcl"),
+    join(runtimeDir, "DLLs", "_tkinter.pyd"),
+    join(runtimeDir, "Lib", "tkinter"),
+    join(runtimeDir, "Lib", "idlelib"),
+    join(runtimeDir, "Lib", "turtledemo"),
+    join(runtimeDir, "lib", `python${pythonVersion}`, "tkinter"),
+    join(runtimeDir, "lib", `python${pythonVersion}`, "idlelib"),
+    join(runtimeDir, "lib", `python${pythonVersion}`, "turtledemo"),
+    join(runtimeDir, "lib", "libtcl9.0.so"),
+    join(runtimeDir, "lib", "libtk9.0.so"),
+  ];
+
+  for (const targetPath of removalTargets) {
+    removeIfExists(targetPath);
+  }
+
+  if (existsSync(dynloadDir)) {
+    for (const entry of readdirSync(dynloadDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.startsWith("_tkinter.")) {
+        removeIfExists(join(dynloadDir, entry.name));
+      }
+    }
+  }
+};
+
 const buildInternalPackages = () => {
   run("uv", ["build", "services/api"]);
   run("uv", ["build", "services/core"]);
@@ -78,7 +123,15 @@ const buildInternalPackages = () => {
 };
 
 const installRuntime = () => {
-  run("uv", ["python", "install", pythonVersion, "--install-dir", runtimeDir, "--force"]);
+  run("uv", ["python", "install", pythonVersion, "--install-dir", runtimeInstallDir, "--force"]);
+  const pythonExecutable = findPythonExecutable(runtimeInstallDir);
+  const pythonHome = derivePythonHome(pythonExecutable);
+  cpSync(pythonHome, runtimeDir, {
+    recursive: true,
+    force: true,
+    dereference: true,
+  });
+  pruneUnusedRuntimeFiles();
   return findPythonExecutable(runtimeDir);
 };
 
