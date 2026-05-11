@@ -47,12 +47,12 @@ class KeywordDetailView(APIView):
 
 class TagCreateView(APIView):
     def post(self, request: Request) -> Response:
-        return _create_simple(request, "tag", tag_payload)
+        return _create_simple(request, "tag", tag_payload, include_identifiers=True)
 
 
 class TagDetailView(APIView):
     def patch(self, request: Request, entry_id: str) -> Response:
-        return _update_simple(request, entry_id, "tag", tag_payload)
+        return _update_simple(request, entry_id, "tag", tag_payload, include_identifiers=True)
 
     def delete(self, _request: Request, entry_id: str) -> Response:
         return _delete_simple(entry_id, "tag", "Tag")
@@ -60,12 +60,12 @@ class TagDetailView(APIView):
 
 class TypeCreateView(APIView):
     def post(self, request: Request) -> Response:
-        return _create_simple(request, "type", type_payload)
+        return _create_simple(request, "type", type_payload, include_identifiers=True)
 
 
 class TypeDetailView(APIView):
     def patch(self, request: Request, entry_id: str) -> Response:
-        return _update_simple(request, entry_id, "type", type_payload)
+        return _update_simple(request, entry_id, "type", type_payload, include_identifiers=True)
 
     def delete(self, _request: Request, entry_id: str) -> Response:
         return _delete_simple(entry_id, "type", "Type")

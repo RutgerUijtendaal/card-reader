@@ -57,8 +57,6 @@ _EXPORTS = {
     "replace_card_version_symbols": ".metadata_repository",
     "replace_card_version_tags": ".metadata_repository",
     "replace_card_version_types": ".metadata_repository",
-    "upsert_tags_by_labels": ".metadata_repository",
-    "upsert_types_by_labels": ".metadata_repository",
     "get_keywords_for_card_version": ".metadata_repository",
     "get_tags_for_card_version": ".metadata_repository",
     "get_symbols_for_card_version": ".metadata_repository",

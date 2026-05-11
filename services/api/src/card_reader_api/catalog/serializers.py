@@ -23,11 +23,15 @@ def keyword_payload(row: Keyword) -> dict[str, object]:
 
 
 def tag_payload(row: Tag) -> dict[str, object]:
-    return _catalog_option_payload(row)
+    payload = _catalog_option_payload(row)
+    payload["identifiers"] = json.loads(row.identifiers_json or "[]")
+    return payload
 
 
 def type_payload(row: Type) -> dict[str, object]:
-    return _catalog_option_payload(row)
+    payload = _catalog_option_payload(row)
+    payload["identifiers"] = json.loads(row.identifiers_json or "[]")
+    return payload
 
 
 def symbol_payload(row: Symbol) -> dict[str, object]:

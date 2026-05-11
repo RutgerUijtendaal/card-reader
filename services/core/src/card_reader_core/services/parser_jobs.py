@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus, Keyword, Symbol
+from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus, Keyword, Symbol, Tag, Type
 from card_reader_core.repositories.import_jobs_repository import (
     bump_job_processed,
     fetch_job,
@@ -20,12 +20,12 @@ from card_reader_core.repositories.import_jobs_repository import (
 from card_reader_core.repositories.metadata_repository import (
     list_detectable_symbols,
     list_keywords,
+    list_tags,
+    list_types,
     replace_card_version_keywords,
     replace_card_version_symbols,
     replace_card_version_tags,
     replace_card_version_types,
-    upsert_tags_by_labels,
-    upsert_types_by_labels,
 )
 from card_reader_core.repositories.cards_repository import save_parsed_card
 
@@ -40,6 +40,8 @@ class CardParserProtocol(Protocol):
         *,
         symbols: list[Symbol],
         known_keywords: list[Keyword],
+        known_tags: list[Tag],
+        known_types: list[Type],
     ) -> Any:
         pass
 
@@ -53,6 +55,8 @@ class JobOptions:
 @dataclass(frozen=True)
 class ParserResources:
     known_keywords: list[Keyword]
+    known_tags: list[Tag]
+    known_types: list[Type]
     detectable_symbols: list[Symbol]
 
 
@@ -137,6 +141,8 @@ class ImportProcessorService:
             job.template_id,
             symbols=resources.detectable_symbols,
             known_keywords=resources.known_keywords,
+            known_tags=resources.known_tags,
+            known_types=resources.known_types,
         )
         version = save_parsed_card(
             item=item,
@@ -175,6 +181,8 @@ class ImportProcessorService:
     def _load_parser_resources(self, options: JobOptions) -> ParserResources:
         return ParserResources(
             known_keywords=list_keywords(keys=options.keyword_keys),
+            known_tags=list_tags(),
+            known_types=list_types(),
             detectable_symbols=list_detectable_symbols(),
         )
 
@@ -187,17 +195,15 @@ class ImportProcessorService:
             card_version_id=card_version_id,
             symbol_ids=parsed.symbol_ids,
         )
-        tag_rows = upsert_tags_by_labels(parsed.tag_labels)
-        type_rows = upsert_types_by_labels(parsed.type_labels)
         replace_card_version_tags(
             card_version_id=card_version_id,
-            tag_ids=[row.id for row in tag_rows],
+            tag_ids=parsed.tag_ids,
         )
         replace_card_version_types(
             card_version_id=card_version_id,
-            type_ids=[row.id for row in type_rows],
+            type_ids=parsed.type_ids,
         )
-        return len(tag_rows), len(type_rows)
+        return len(parsed.tag_ids), len(parsed.type_ids)
 
     def _log_item_processed(
         self,

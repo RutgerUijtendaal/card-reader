@@ -1,6 +1,4 @@
-from .keywords_extractor import KeywordsExtractor
-from .tags_extractor import TagsExtractor
-from .types_extractor import TypesExtractor
+from .known_metadata_extractor import KnownMetadataExtractor
 
-__all__ = ["KeywordsExtractor", "TagsExtractor", "TypesExtractor"]
+__all__ = ["KnownMetadataExtractor"]
 

@@ -11,7 +11,7 @@ class ParsedCard:
     confidence: dict[str, float]
     raw_ocr: dict[str, Any]
     keyword_ids: list[str]
-    tag_labels: list[str]
-    type_labels: list[str]
+    tag_ids: list[str]
+    type_ids: list[str]
     symbol_ids: list[str]
 

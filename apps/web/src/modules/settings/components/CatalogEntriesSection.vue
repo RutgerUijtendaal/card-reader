@@ -66,7 +66,7 @@
                 Key
               </th>
               <th
-                v-if="selectedKind === 'keywords'"
+                v-if="selectedKind !== 'symbols'"
                 class="px-2 py-2 font-semibold"
               >
                 Identifiers
@@ -119,7 +119,7 @@
                   >
                 </td>
                 <td
-                  v-if="selectedKind === 'keywords'"
+                  v-if="selectedKind !== 'symbols'"
                   class="px-2 py-2"
                 >
                   <textarea

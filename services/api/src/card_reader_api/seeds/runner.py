@@ -6,14 +6,18 @@ from card_reader_core.database.connection import initialize_database
 from .keywords import keyword_table_has_rows, seed_keywords
 from .shared import SeedDefinition, SeedResult
 from .symbols import seed_symbols, symbol_table_has_rows
+from .tags import seed_tags, tag_table_has_rows
 from .templates import seed_templates, template_table_has_rows
+from .types import seed_types, type_table_has_rows
 
 logger = logging.getLogger(__name__)
 
 SEED_REGISTRY: tuple[SeedDefinition, ...] = (
     SeedDefinition(name="keywords", model_has_rows=keyword_table_has_rows, run=seed_keywords),
+    SeedDefinition(name="tags", model_has_rows=tag_table_has_rows, run=seed_tags),
     SeedDefinition(name="symbols", model_has_rows=symbol_table_has_rows, run=seed_symbols),
     SeedDefinition(name="templates", model_has_rows=template_table_has_rows, run=seed_templates),
+    SeedDefinition(name="types", model_has_rows=type_table_has_rows, run=seed_types),
 )
 
 

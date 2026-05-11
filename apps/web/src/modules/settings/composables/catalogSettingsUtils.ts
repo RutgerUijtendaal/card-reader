@@ -78,6 +78,7 @@ export const buildCreatePayload = (
   return {
     label: entry.label.trim(),
     key: entry.key.trim() || undefined,
+    identifiers: parseIdentifiersText(entry.identifiers_text ?? ''),
   };
 };
 
@@ -85,7 +86,7 @@ export const buildUpdatePayload = (
   kind: CatalogKind,
   entry: CatalogRow,
 ): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest => {
-  if (kind === 'keywords') {
+  if (kind === 'keywords' || kind === 'tags' || kind === 'types') {
     const keyword = entry as KeywordRecord;
     return {
       label: keyword.label,

@@ -22,12 +22,16 @@ export type TagRecord = {
   id: string;
   key: string;
   label: string;
+  identifiers: string[];
+  identifiers_text: string;
 };
 
 export type TypeRecord = {
   id: string;
   key: string;
   label: string;
+  identifiers: string[];
+  identifiers_text: string;
 };
 
 export type SymbolRecord = {
@@ -70,11 +74,13 @@ export type KeywordUpsertRequest = {
 export type TagUpsertRequest = {
   label?: string;
   key?: string;
+  identifiers?: string[];
 };
 
 export type TypeUpsertRequest = {
   label?: string;
   key?: string;
+  identifiers?: string[];
 };
 
 export type SymbolDetectorType = 'template';

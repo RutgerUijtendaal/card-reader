@@ -157,6 +157,41 @@ def test_staff_can_create_keyword_identifiers() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_create_tag_and_type_identifiers() -> None:
+    username = "staff-tag-type-identifiers-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    tag_response = client.post(
+        "/settings/tags",
+        data={
+            "label": "Weapon",
+            "key": "weapon-identifiers-test",
+            "identifiers": ["arms", "  WEAPON  "],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    type_response = client.post(
+        "/settings/types",
+        data={
+            "label": "Persistent",
+            "key": "persistent-identifiers-test",
+            "identifiers": ["ongoing", "  PERSISTENT  "],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert tag_response.status_code == 200
+    assert tag_response.json()["identifiers"] == ["weapon", "arms"]
+    assert type_response.status_code == 200
+    assert type_response.json()["identifiers"] == ["persistent", "ongoing"]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_manage_templates() -> None:
     username = "staff-template-user"
     password = "password"
