@@ -5,9 +5,13 @@
     @mouseenter="openHoverPanel"
     @mouseleave="scheduleCloseHoverPanel"
   >
-    <RouterLink
-      :to="`/cards/${card.id}`"
-      class="block transition hover:drop-shadow-lg"
+    <component
+      :is="canOpenCardDetail ? 'RouterLink' : 'div'"
+      v-bind="canOpenCardDetail ? { to: `/cards/${card.id}` } : {}"
+      :class="[
+        'block',
+        canOpenCardDetail ? 'transition hover:drop-shadow-lg' : 'cursor-default',
+      ]"
     >
       <img
         v-if="card.image_url"
@@ -15,7 +19,7 @@
         alt="Card image"
         class="block w-full object-contain"
       >
-    </RouterLink>
+    </component>
 
     <Teleport to="body">
       <aside
@@ -55,6 +59,7 @@ import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
+import { useAuthStore } from '@/modules/auth/authStore';
 import type {
   CardHoverTooltipModel,
   CardTooltipSymbolLookup,
@@ -73,9 +78,11 @@ const referenceRef = ref<HTMLElement | null>(null);
 const floatingRef = ref<HTMLElement | null>(null);
 const showHoverPanel = ref(false);
 const isDev = import.meta.env.DEV;
+const auth = useAuthStore();
 
 let closeHoverPanelTimer: number | null = null;
 const debugJson = computed(() => JSON.stringify(props.card, null, 2));
+const canOpenCardDetail = computed(() => auth.canAccessStaffRoutes);
 
 const { x, y, strategy } = useFloating(referenceRef, floatingRef, {
   open: showHoverPanel,

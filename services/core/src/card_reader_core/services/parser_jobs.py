@@ -22,10 +22,6 @@ from card_reader_core.repositories.metadata_repository import (
     list_keywords,
     list_tags,
     list_types,
-    replace_card_version_keywords,
-    replace_card_version_symbols,
-    replace_card_version_tags,
-    replace_card_version_types,
 )
 from card_reader_core.repositories.cards_repository import save_parsed_card
 
@@ -144,16 +140,21 @@ class ImportProcessorService:
             known_tags=resources.known_tags,
             known_types=resources.known_types,
         )
-        version = save_parsed_card(
+        save_parsed_card(
             item=item,
             template_id=job.template_id,
             checksum=parsed.checksum,
             normalized_fields=parsed.normalized_fields,
             confidence=parsed.confidence,
             raw_ocr=parsed.raw_ocr,
+            keyword_ids=parsed.keyword_ids,
+            tag_ids=parsed.tag_ids,
+            type_ids=parsed.type_ids,
+            symbol_ids=parsed.symbol_ids,
             reparse_existing=options.reparse_existing,
         )
-        tag_count, type_count = self._replace_metadata_links(version.id, parsed)
+        tag_count = len(parsed.tag_ids)
+        type_count = len(parsed.type_ids)
         return ItemProcessingResult(
             checksum=parsed.checksum,
             confidence=float(parsed.confidence.get("overall", 0.0)),
@@ -185,25 +186,6 @@ class ImportProcessorService:
             known_types=list_types(),
             detectable_symbols=list_detectable_symbols(),
         )
-
-    def _replace_metadata_links(self, card_version_id: str, parsed: Any) -> tuple[int, int]:
-        replace_card_version_keywords(
-            card_version_id=card_version_id,
-            keyword_ids=parsed.keyword_ids,
-        )
-        replace_card_version_symbols(
-            card_version_id=card_version_id,
-            symbol_ids=parsed.symbol_ids,
-        )
-        replace_card_version_tags(
-            card_version_id=card_version_id,
-            tag_ids=parsed.tag_ids,
-        )
-        replace_card_version_types(
-            card_version_id=card_version_id,
-            type_ids=parsed.type_ids,
-        )
-        return len(parsed.tag_ids), len(parsed.type_ids)
 
     def _log_item_processed(
         self,

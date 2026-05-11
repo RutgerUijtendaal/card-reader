@@ -2,14 +2,20 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
-from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, Symbol, Tag, Type
+from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
 from card_reader_core.repositories.cards_repository import (
+    FieldSourcesPayload,
+    ParsedSnapshotPayload,
+    decode_field_sources,
+    decode_parsed_snapshot,
     get_card,
     get_card_image,
     get_latest_card_version,
+    get_parse_result,
     list_card_generations,
     list_cards,
     update_card,
+    update_latest_card_version,
 )
 from card_reader_core.repositories.metadata_repository import (
     get_keywords_for_card_version,
@@ -28,6 +34,12 @@ class CardMetadata(TypedDict):
     tags: list[Tag]
     symbols: list[Symbol]
     types: list[Type]
+
+
+class CardEditState(TypedDict):
+    field_sources: FieldSourcesPayload
+    parsed_snapshot: ParsedSnapshotPayload
+    parse_result: ParseResult | None
 
 
 class CardService:
@@ -72,6 +84,13 @@ class CardService:
             "types": get_types_for_card_version(card_version_id),
         }
 
+    def get_card_version_edit_state(self, version: CardVersion) -> CardEditState:
+        return {
+            "field_sources": decode_field_sources(version.field_sources_json),
+            "parsed_snapshot": decode_parsed_snapshot(version.parsed_snapshot_json),
+            "parse_result": get_parse_result(version.parse_result_id),
+        }
+
     def update_card(
         self,
         *,
@@ -87,4 +106,23 @@ class CardService:
             type_line=type_line,
             mana_cost=mana_cost,
             rules_text=rules_text,
+        )
+
+    def update_latest_card_version(
+        self,
+        *,
+        card_id: str,
+        updates: dict[str, object],
+        restore_fields: list[str],
+        restore_metadata_groups: list[str],
+        unlock_fields: list[str],
+        unlock_metadata_groups: list[str],
+    ) -> tuple[Card, CardVersion] | None:
+        return update_latest_card_version(
+            card_id=card_id,
+            updates=updates,
+            restore_fields=restore_fields,
+            restore_metadata_groups=restore_metadata_groups,
+            unlock_fields=unlock_fields,
+            unlock_metadata_groups=unlock_metadata_groups,
         )
