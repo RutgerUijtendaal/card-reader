@@ -1,0 +1,56 @@
+
+{
+  "image": "cards/amulet-of-solandria.webp",
+  "template_id": "mtg-like-v1",
+  "job_options": {
+    "reparse_existing": true
+  },
+  "expected_db": {
+    "card": {
+      "key": "amulet-of-solandria",
+      "label": "Amulet of Solandria"
+    },
+    "latest_version": {
+      "template_id": "mtg-like-v1",
+      "name": "Amulet of Solandria",
+      "type_line": "Equipment - Amulet (1), Fire",
+      "mana_cost": "2",
+      "mana_symbols": [
+        "divine-mana",
+        "martial-mana"
+      ],
+      "attack": null,
+      "health": null,
+      "rules_text": ": Deal damaget to target attacking\ncreature equal to half your  devotion.\nBury",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [],
+      "tags": [
+        "Amulet (1)",
+        "Fire"
+      ],
+      "symbols": [
+        "divine-mana",
+        "martial-mana",
+        "sola-affinity"
+      ],
+      "types": [
+        "Equipment"
+      ],
+      "symbol_types": {
+        "divine-mana": "mana",
+        "martial-mana": "mana",
+        "sola-affinity": "affinity"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}

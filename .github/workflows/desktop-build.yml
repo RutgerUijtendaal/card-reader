@@ -28,7 +28,7 @@ jobs:
             bundles: nsis
             artifact_name: windows-desktop-bundle
             artifact_paths: |
-              apps/desktop/src-tauri/target/release/bundle/nsis/*
+              apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
           - name: linux
             os: ubuntu-22.04
             artifact_name: linux-desktop-bundle
@@ -132,7 +132,7 @@ jobs:
       - name: Keep executable artifacts only
         run: |
           find release-assets -type f \
-            ! -name "*.exe" \
+            ! -name "*-setup.exe" \
             ! -name "*.deb" \
             -delete
 
