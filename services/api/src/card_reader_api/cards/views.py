@@ -26,7 +26,7 @@ class CardListView(APIView):
                 card_payload(
                     row.version.card,
                     row.version,
-                    image_url=f"/cards/{row.version.card_id}/image" if row.image else None,
+                    image_url=f"/cards/{row.version.card.id}/image" if row.image else None,
                     metadata={
                         "keywords": row.keywords,
                         "tags": row.tags,

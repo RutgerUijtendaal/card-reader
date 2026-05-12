@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
 
+if TYPE_CHECKING:
+    from .card import Card
+    from .template import Template
+
 
 class CardVersion(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    card = models.ForeignKey("Card", on_delete=models.CASCADE, related_name="versions", db_column="card_id")
+    card: models.ForeignKey[Card, Card] = models.ForeignKey(
+        "Card", on_delete=models.CASCADE, related_name="versions", db_column="card_id"
+    )
     version_number: models.IntegerField[int, int] = models.IntegerField(default=1, db_index=True)
-    template = models.ForeignKey(
+    template: models.ForeignKey[Template, Template] = models.ForeignKey(
         "Template",
         on_delete=models.PROTECT,
         related_name="card_versions",
@@ -33,7 +41,7 @@ class CardVersion(TimestampedModel):
     field_sources_json: models.TextField[str, str] = models.TextField(default="{}")
     parsed_snapshot_json: models.TextField[str, str] = models.TextField(default="{}")
     is_latest: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)
-    previous_version = models.ForeignKey(
+    previous_version: models.ForeignKey[CardVersion | None, CardVersion | None] = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
         related_name="next_versions",
@@ -56,7 +64,7 @@ class CardVersion(TimestampedModel):
 
 class CardVersionImage(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    card_version = models.ForeignKey(
+    card_version: models.ForeignKey[CardVersion, CardVersion] = models.ForeignKey(
         "CardVersion",
         on_delete=models.CASCADE,
         related_name="images",
@@ -74,7 +82,7 @@ class CardVersionImage(TimestampedModel):
 
 class ParseResult(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    card_version = models.ForeignKey(
+    card_version: models.ForeignKey[CardVersion, CardVersion] = models.ForeignKey(
         "CardVersion",
         on_delete=models.CASCADE,
         related_name="parse_results",

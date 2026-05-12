@@ -39,6 +39,7 @@ def relativize_storage_path(
     *,
     allowed_roots: tuple[str, ...] = _KNOWN_STORAGE_ROOTS,
     default_root: str | None = None,
+    preserve_unmatched_absolute: bool = False,
 ) -> str:
     raw_path = str(storage_path)
     if not _looks_absolute_path(raw_path):
@@ -54,6 +55,8 @@ def relativize_storage_path(
     indexes = [index for index, part in enumerate(parts) if part.lower() in {root.lower() for root in allowed_roots}]
     if indexes:
         return PurePosixPath(*parts[indexes[-1] :]).as_posix()
+    if preserve_unmatched_absolute:
+        return raw_path
     if default_root is not None and parts:
         return PurePosixPath(default_root, parts[-1]).as_posix()
     return PurePosixPath(*parts).as_posix()

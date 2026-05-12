@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 from django.db import migrations
 
@@ -46,7 +47,7 @@ def _relativize_symbol_asset_path(value: str) -> str:
     return _normalize_relative_storage_path(value)
 
 
-def forwards(apps, schema_editor) -> None:
+def forwards(apps: Any, schema_editor: Any) -> None:
     Symbol = apps.get_model("card_reader_core", "Symbol")
     for symbol in Symbol.objects.only("id", "reference_assets_json").iterator():
         try:
@@ -66,7 +67,7 @@ def forwards(apps, schema_editor) -> None:
         Symbol.objects.filter(id=symbol.id).update(reference_assets_json=normalized_json)
 
 
-def backwards(apps, schema_editor) -> None:
+def backwards(apps: Any, schema_editor: Any) -> None:
     return None
 
 

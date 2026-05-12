@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, cast, TypedDict
 
 from django.db import transaction
 from django.db.models import Prefetch, QuerySet
@@ -246,14 +246,19 @@ def list_cards(
 
     results: list[CardListRow] = []
     for version in version_rows:
+        images = cast(Any, version).images.all()
+        keywords = cast(Any, version).card_version_keywords.all()
+        tags = cast(Any, version).card_version_tags.all()
+        symbols = cast(Any, version).card_version_symbols.all()
+        types = cast(Any, version).card_version_types.all()
         results.append(
             CardListRow(
                 version=version,
-                image=next(iter(version.images.all()), None),
-                keywords=[row.keyword for row in version.card_version_keywords.all()],
-                tags=[row.tag for row in version.card_version_tags.all()],
-                symbols=[row.symbol for row in version.card_version_symbols.all()],
-                types=[row.type for row in version.card_version_types.all()],
+                image=next(iter(images), None),
+                keywords=[row.keyword for row in keywords],
+                tags=[row.tag for row in tags],
+                symbols=[row.symbol for row in symbols],
+                types=[row.type for row in types],
             )
         )
 
@@ -302,7 +307,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
 
     out: list[LatestCardVersionReparseSource] = []
     for version in versions:
-        image = next(iter(version.images.all()), None)
+        image = next(iter(cast(Any, version).images.all()), None)
         if image is None:
             continue
         image_path = _resolve_reparse_image_path(image)
@@ -311,7 +316,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
         out.append(
             LatestCardVersionReparseSource(
                 card_version_id=version.id,
-                template_id=version.template_id,
+                template_id=version.template.key,
                 image_path=image_path,
             )
         )
@@ -573,7 +578,7 @@ def _update_existing_version(
     version.updated_at = now_utc()
     version.save()
     if version.name != previous_name:
-        card = Card.objects.filter(id=version.card_id).first()
+        card = Card.objects.filter(id=version.card.id).first()
         if card is not None:
             card.label = version.name
             card.key = normalize_slug_key(version.name)
@@ -663,7 +668,11 @@ def _save_image_record(version: CardVersion, source_file: str, checksum: str) ->
     stored_path = store_image(resolved_source_file, checksum)
     CardVersionImage.objects.create(
         card_version=version,
-        source_file=relativize_storage_path(source_file, default_root="uploads"),
+        source_file=relativize_storage_path(
+            source_file,
+            default_root="uploads",
+            preserve_unmatched_absolute=True,
+        ),
         stored_path=stored_path,
         checksum=checksum,
         updated_at=now_utc(),

@@ -52,7 +52,11 @@ def create_import_job_with_files(
 ) -> ImportJob:
     with transaction.atomic():
         job = ImportJob.objects.create(
-            source_path=relativize_storage_path(source_path, default_root="uploads"),
+            source_path=relativize_storage_path(
+                source_path,
+                default_root="uploads",
+                preserve_unmatched_absolute=True,
+            ),
             template_id=template_id,
             options_json=json.dumps(options),
             total_items=len(files),
@@ -62,7 +66,11 @@ def create_import_job_with_files(
             [
                 ImportJobItem(
                     job_id=job.id,
-                    source_file=relativize_storage_path(image_file, default_root="uploads"),
+                    source_file=relativize_storage_path(
+                        image_file,
+                        default_root="uploads",
+                        preserve_unmatched_absolute=True,
+                    ),
                     status=ImportJobStatus.queued,
                 )
                 for image_file in files

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 from django.db import migrations
 
@@ -40,7 +41,7 @@ def _relativize_storage_path(value: str, *, roots: tuple[str, ...], default_root
     return PurePosixPath(*parts).as_posix()
 
 
-def forwards(apps, schema_editor) -> None:
+def forwards(apps: Any, schema_editor: Any) -> None:
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
     ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
 
@@ -65,7 +66,7 @@ def forwards(apps, schema_editor) -> None:
         ImportJobItem.objects.filter(id=item.id).update(source_file=relative_path)
 
 
-def backwards(apps, schema_editor) -> None:
+def backwards(apps: Any, schema_editor: Any) -> None:
     return None
 
 

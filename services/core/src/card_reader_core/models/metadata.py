@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
+
+if TYPE_CHECKING:
+    from .card_version import CardVersion
 
 
 class Tag(TimestampedModel):
@@ -52,13 +57,15 @@ class Type(TimestampedModel):
 
 class CardVersionTag(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    card_version = models.ForeignKey(
+    card_version: models.ForeignKey[CardVersion, CardVersion] = models.ForeignKey(
         "CardVersion",
         on_delete=models.CASCADE,
         related_name="card_version_tags",
         db_column="card_version_id",
     )
-    tag = models.ForeignKey("Tag", on_delete=models.CASCADE, related_name="card_version_tags", db_column="tag_id")
+    tag: models.ForeignKey[Tag, Tag] = models.ForeignKey(
+        "Tag", on_delete=models.CASCADE, related_name="card_version_tags", db_column="tag_id"
+    )
 
     class Meta:
         db_table = "card_version_tag"
@@ -69,13 +76,13 @@ class CardVersionTag(TimestampedModel):
 
 class CardVersionSymbol(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    card_version = models.ForeignKey(
+    card_version: models.ForeignKey[CardVersion, CardVersion] = models.ForeignKey(
         "CardVersion",
         on_delete=models.CASCADE,
         related_name="card_version_symbols",
         db_column="card_version_id",
     )
-    symbol = models.ForeignKey(
+    symbol: models.ForeignKey[Symbol, Symbol] = models.ForeignKey(
         "Symbol",
         on_delete=models.CASCADE,
         related_name="card_version_symbols",
@@ -91,13 +98,13 @@ class CardVersionSymbol(TimestampedModel):
 
 class CardVersionKeyword(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    card_version = models.ForeignKey(
+    card_version: models.ForeignKey[CardVersion, CardVersion] = models.ForeignKey(
         "CardVersion",
         on_delete=models.CASCADE,
         related_name="card_version_keywords",
         db_column="card_version_id",
     )
-    keyword = models.ForeignKey(
+    keyword: models.ForeignKey[Keyword, Keyword] = models.ForeignKey(
         "Keyword",
         on_delete=models.CASCADE,
         related_name="card_version_keywords",
@@ -113,13 +120,15 @@ class CardVersionKeyword(TimestampedModel):
 
 class CardVersionType(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    card_version = models.ForeignKey(
+    card_version: models.ForeignKey[CardVersion, CardVersion] = models.ForeignKey(
         "CardVersion",
         on_delete=models.CASCADE,
         related_name="card_version_types",
         db_column="card_version_id",
     )
-    type = models.ForeignKey("Type", on_delete=models.CASCADE, related_name="card_version_types", db_column="type_id")
+    type: models.ForeignKey[Type, Type] = models.ForeignKey(
+        "Type", on_delete=models.CASCADE, related_name="card_version_types", db_column="type_id"
+    )
 
     class Meta:
         db_table = "card_version_type"
