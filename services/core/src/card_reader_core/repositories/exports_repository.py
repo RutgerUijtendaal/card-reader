@@ -70,7 +70,7 @@ def export_cards_csv(
             mana_symbols = json.loads(row.version.mana_symbols_json)
             writer.writerow(
                 {
-                    "card_key": _sanitize_csv_text(row.card.key),
+                    "card_key": _sanitize_csv_text(row.version.card.key),
                     "name": _sanitize_csv_text(row.version.name),
                     "mana_cost": _sanitize_csv_text(row.version.mana_cost),
                     "mana_symbols": _replace_symbol_keys(_join_labels(mana_symbols)),

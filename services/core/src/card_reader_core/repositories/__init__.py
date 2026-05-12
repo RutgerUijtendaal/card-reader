@@ -24,6 +24,7 @@ _EXPORTS = {
     "get_card": ".cards_repository",
     "get_latest_card_version": ".cards_repository",
     "get_card_image": ".cards_repository",
+    "resolve_image_file_path": ".cards_repository",
     "get_parse_result": ".cards_repository",
     "list_card_generations": ".cards_repository",
     "update_card": ".cards_repository",

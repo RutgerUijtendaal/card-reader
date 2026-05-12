@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from card_reader_api.catalog.views import _store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
-from card_reader_core.models import Card, CardVersion, CardVersionImage, ImportJob, ImportJobItem
+from card_reader_core.models import Card, CardVersion, CardVersionImage, ImportJob, ImportJobItem, Template
 from card_reader_core.settings import settings
 
 
@@ -86,6 +86,10 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     CardVersionImage.objects.all().delete()
     CardVersion.objects.all().delete()
     Card.objects.all().delete()
+    Template.objects.filter(key__in=["mtg-like-v1", "sorcery-v1"]).delete()
+
+    Template.objects.create(key="mtg-like-v1", label="MTG", definition_json="{}")
+    Template.objects.create(key="sorcery-v1", label="Sorcery", definition_json="{}")
 
     card_a = Card.objects.create(key="card-a", label="Card A")
     card_b = Card.objects.create(key="card-b", label="Card B")
@@ -119,9 +123,9 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     card_a.latest_version_id = version_a.id
     card_b.latest_version_id = version_b.id
     card_c.latest_version_id = version_c.id
-    card_a.save(update_fields=["latest_version_id"])
-    card_b.save(update_fields=["latest_version_id"])
-    card_c.save(update_fields=["latest_version_id"])
+    card_a.save(update_fields=["latest_version"])
+    card_b.save(update_fields=["latest_version"])
+    card_c.save(update_fields=["latest_version"])
 
     CardVersionImage.objects.create(
         card_version_id=version_a.id,

@@ -24,9 +24,9 @@ class CardListView(APIView):
         for row in cards.results:
             payloads.append(
                 card_payload(
-                    row.card,
+                    row.version.card,
                     row.version,
-                    image_url=f"/cards/{row.card.id}/image" if row.image else None,
+                    image_url=f"/cards/{row.version.card_id}/image" if row.image else None,
                     metadata={
                         "keywords": row.keywords,
                         "tags": row.tags,

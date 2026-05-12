@@ -281,6 +281,23 @@ def test_cards_list_returns_paginated_payload() -> None:
     assert second_card.id in result_ids
 
 
+def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None:
+    card, version = _create_editable_card_version(name="Image Card")
+    image_path = tmp_path / "image-card.png"
+    image_path.write_bytes(b"fake-image")
+    CardVersionImage.objects.create(
+        card_version=version,
+        source_file=str(image_path),
+        stored_path=str(image_path),
+        checksum=f"checksum-{version.id}",
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/cards/{card.id}/image")
+
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content) == b"fake-image"
+
+
 def test_cards_list_pagination_honors_page_and_page_size() -> None:
     created = []
     for index in range(3):
@@ -616,15 +633,13 @@ def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
         is_latest=True,
     )
     parse_result = ParseResult.objects.create(
-        card_version_id=version.id,
+        card_version=version,
         raw_ocr_json="{}",
         normalized_fields_json="{}",
         confidence_json="{}",
     )
-    version.parse_result_id = parse_result.id
-    version.save(update_fields=["parse_result_id"])
     card.latest_version_id = version.id
-    card.save(update_fields=["latest_version_id"])
+    card.save(update_fields=["latest_version"])
     return card, version
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Prefetch, QuerySet
 
 from ..storage import store_image
 from .helpers import extract_mana_symbols, normalize_slug_key, to_int_or_none
@@ -34,12 +34,6 @@ from card_reader_core.models import (
     now_utc,
 )
 from card_reader_core.search.cards import apply_card_search
-from .metadata_repository import (
-    get_keywords_for_card_versions,
-    get_symbols_for_card_versions,
-    get_tags_for_card_versions,
-    get_types_for_card_versions,
-)
 
 
 @dataclass(frozen=True)
@@ -51,7 +45,6 @@ class LatestCardVersionReparseSource:
 
 @dataclass(frozen=True)
 class CardListRow:
-    card: Card
     version: CardVersion
     image: CardVersionImage | None
     keywords: list[Keyword]
@@ -175,9 +168,9 @@ def save_parsed_card(
         _mark_item_completed(item)
 
         card.label = parsed_name
-        card.latest_version_id = version.id
+        card.latest_version = version
         card.updated_at = now_utc()
-        card.save(update_fields=["label", "latest_version_id", "updated_at"])
+        card.save(update_fields=["label", "latest_version", "updated_at"])
         return version
 
 
@@ -200,7 +193,30 @@ def list_cards(
 ) -> PaginatedCardList:
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
-    versions = CardVersion.objects.filter(is_latest=True).order_by("-updated_at")
+    versions = (
+        CardVersion.objects.filter(is_latest=True)
+        .select_related("card", "template", "previous_version")
+        .prefetch_related(
+            "images",
+            Prefetch(
+                "card_version_keywords",
+                queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
+            ),
+            Prefetch(
+                "card_version_tags",
+                queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
+            ),
+            Prefetch(
+                "card_version_symbols",
+                queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
+            ),
+            Prefetch(
+                "card_version_types",
+                queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
+            ),
+        )
+        .order_by("-updated_at")
+    )
     versions = apply_card_search(versions, query)
     versions = _apply_card_filters(
         versions,
@@ -228,32 +244,16 @@ def list_cards(
             results=[],
         )
 
-    version_ids = [version.id for version in version_rows]
-    cards = Card.objects.filter(id__in=[version.card_id for version in version_rows])
-    cards_by_id = {card.id: card for card in cards}
-    images_by_version_id = {
-        image.card_version_id: image
-        for image in CardVersionImage.objects.filter(card_version_id__in=version_ids)
-    }
-    keywords_by_version_id = get_keywords_for_card_versions(version_ids)
-    tags_by_version_id = get_tags_for_card_versions(version_ids)
-    symbols_by_version_id = get_symbols_for_card_versions(version_ids)
-    types_by_version_id = get_types_for_card_versions(version_ids)
-
     results: list[CardListRow] = []
     for version in version_rows:
-        card = cards_by_id.get(version.card_id)
-        if card is None:
-            continue
         results.append(
             CardListRow(
-                card=card,
                 version=version,
-                image=images_by_version_id.get(version.id),
-                keywords=keywords_by_version_id.get(version.id, []),
-                tags=tags_by_version_id.get(version.id, []),
-                symbols=symbols_by_version_id.get(version.id, []),
-                types=types_by_version_id.get(version.id, []),
+                image=next(iter(version.images.all()), None),
+                keywords=[row.keyword for row in version.card_version_keywords.all()],
+                tags=[row.tag for row in version.card_version_tags.all()],
+                symbols=[row.symbol for row in version.card_version_symbols.all()],
+                types=[row.type for row in version.card_version_types.all()],
             )
         )
 
@@ -271,43 +271,38 @@ def get_card(card_id: str) -> Card | None:
 
 def get_latest_card_version(card_id: str) -> CardVersion | None:
     return (
-        CardVersion.objects.filter(card_id=card_id, is_latest=True)
+        CardVersion.objects.filter(card_id=card_id, is_latest=True).select_related("card", "template", "previous_version")
         .order_by("-version_number")
         .first()
     )
 
 
 def get_card_image(card_version_id: str) -> CardVersionImage | None:
-    return CardVersionImage.objects.filter(card_version_id=card_version_id).first()
+    images = CardVersionImage.objects.filter(card_version_id=card_version_id).order_by("-created_at")
+    first_image: CardVersionImage | None = None
+    for image in images:
+        if first_image is None:
+            first_image = image
+        if resolve_image_file_path(image) is not None:
+            return image
+    return first_image
 
 
 def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseSource]:
-    latest_version_ids = list(
-        Card.objects.exclude(latest_version_id__isnull=True)
-        .exclude(latest_version_id="")
-        .values_list("latest_version_id", flat=True)
-    )
-    if not latest_version_ids:
-        return []
-
-    versions = list(
-        CardVersion.objects.filter(id__in=latest_version_ids)
-        .only("id", "template_id")
+    versions = [
+        card.latest_version
+        for card in Card.objects.exclude(latest_version__isnull=True)
+        .select_related("latest_version__template")
+        .prefetch_related("latest_version__images")
         .order_by("id")
-    )
+        if card.latest_version is not None
+    ]
     if not versions:
         return []
 
-    images_by_version_id = {
-        row.card_version_id: row
-        for row in CardVersionImage.objects.filter(
-            card_version_id__in=[version.id for version in versions]
-        ).only("card_version_id", "source_file", "stored_path")
-    }
-
     out: list[LatestCardVersionReparseSource] = []
     for version in versions:
-        image = images_by_version_id.get(version.id)
+        image = next(iter(version.images.all()), None)
         if image is None:
             continue
         image_path = _resolve_reparse_image_path(image)
@@ -324,7 +319,17 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
 
 
 def list_card_generations(card_id: str) -> list[CardVersion]:
-    return list(CardVersion.objects.filter(card_id=card_id).order_by("-version_number"))
+    return list(
+        CardVersion.objects.filter(card_id=card_id)
+        .select_related("card", "template", "previous_version")
+        .order_by("-version_number")
+    )
+
+
+def get_parse_result(parse_result_id: str | None) -> ParseResult | None:
+    if not parse_result_id:
+        return None
+    return ParseResult.objects.filter(id=parse_result_id).first()
 
 
 def update_card(
@@ -356,12 +361,6 @@ def update_card(
     card.save()
     version.save()
     return card, version
-
-
-def get_parse_result(parse_result_id: str | None) -> ParseResult | None:
-    if not parse_result_id:
-        return None
-    return ParseResult.objects.filter(id=parse_result_id).first()
 
 
 def decode_field_sources(raw: str) -> FieldSourcesPayload:
@@ -603,7 +602,7 @@ def _create_new_version(
         version_number = latest.version_number + 1
 
     return CardVersion.objects.create(
-        card_id=card.id,
+        card=card,
         version_number=version_number,
         template_id=template_id,
         image_hash=checksum,
@@ -629,7 +628,7 @@ def _save_parse_result(
     confidence: dict[str, float],
 ) -> None:
     parse_result = ParseResult.objects.create(
-        card_version_id=version.id,
+        card_version=version,
         raw_ocr_json=json.dumps(raw_ocr),
         normalized_fields_json=json.dumps(normalized_fields),
         confidence_json=json.dumps(confidence),
@@ -662,7 +661,7 @@ def _save_parsed_snapshot(
 def _save_image_record(version: CardVersion, source_file: str, checksum: str) -> None:
     stored_path = store_image(Path(source_file), checksum)
     CardVersionImage.objects.create(
-        card_version_id=version.id,
+        card_version=version,
         source_file=source_file,
         stored_path=str(stored_path),
         checksum=checksum,
@@ -711,6 +710,10 @@ def _filter_by_links(
 
 
 def _resolve_reparse_image_path(image: CardVersionImage) -> Path | None:
+    return resolve_image_file_path(image)
+
+
+def resolve_image_file_path(image: CardVersionImage) -> Path | None:
     stored_path = Path(image.stored_path)
     if stored_path.exists():
         return stored_path
