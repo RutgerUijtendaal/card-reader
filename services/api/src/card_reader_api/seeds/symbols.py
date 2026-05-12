@@ -8,7 +8,7 @@ from pathlib import Path
 
 from card_reader_core.models import Symbol, now_utc
 from card_reader_core.repositories.helpers import normalize_slug_key
-from card_reader_core.settings import settings
+from card_reader_core.storage import resolve_storage_path
 from .shared import resolve_seed_file
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ def _copy_assets_and_build_references(asset_files: list[str]) -> str:
     if not asset_files:
         return "[]"
 
-    destination_root = settings.storage_root_dir / "symbols" / "defaults"
+    destination_root = resolve_storage_path("symbols/defaults")
     destination_root.mkdir(parents=True, exist_ok=True)
 
     for asset_name in asset_files:

@@ -10,6 +10,7 @@ from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
 from card_reader_core.models import Card, CardVersion, CardVersionImage, ImportJob, ImportJobItem, Template
 from card_reader_core.settings import settings
+from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 
 def test_upload_symbol_asset_stores_under_uploads(tmp_path: Path, monkeypatch) -> None:
@@ -75,10 +76,11 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
 ) -> None:
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
 
-    image_a = tmp_path / "image-a.webp"
-    image_b = tmp_path / "image-b.webp"
-    image_c = tmp_path / "image-c.webp"
+    image_a = resolve_storage_path("images/image-a.webp")
+    image_b = resolve_storage_path("images/image-b.webp")
+    image_c = resolve_storage_path("images/image-c.webp")
     for image_path in [image_a, image_b, image_c]:
+        image_path.parent.mkdir(parents=True, exist_ok=True)
         image_path.write_bytes(b"image")
 
     ImportJobItem.objects.all().delete()
@@ -129,20 +131,20 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
 
     CardVersionImage.objects.create(
         card_version_id=version_a.id,
-        source_file=str(image_a),
-        stored_path=str(image_a),
+        source_file=build_storage_relative_path("images", image_a.name),
+        stored_path=build_storage_relative_path("images", image_a.name),
         checksum="hash-a",
     )
     CardVersionImage.objects.create(
         card_version_id=version_b.id,
-        source_file=str(image_b),
-        stored_path=str(image_b),
+        source_file=build_storage_relative_path("images", image_b.name),
+        stored_path=build_storage_relative_path("images", image_b.name),
         checksum="hash-b",
     )
     CardVersionImage.objects.create(
         card_version_id=version_c.id,
-        source_file=str(image_c),
-        stored_path=str(image_c),
+        source_file=build_storage_relative_path("images", image_c.name),
+        stored_path=build_storage_relative_path("images", image_c.name),
         checksum="hash-c",
     )
 
@@ -156,4 +158,8 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     assert len(jobs) == 2
     assert {job.template_id for job in jobs} == {"mtg-like-v1", "sorcery-v1"}
     assert all(job.total_items >= 1 for job in jobs)
-    assert {item.source_file for item in items} == {str(image_a), str(image_b), str(image_c)}
+    assert {item.source_file for item in items} == {
+        build_storage_relative_path("images", image_a.name),
+        build_storage_relative_path("images", image_b.name),
+        build_storage_relative_path("images", image_c.name),
+    }

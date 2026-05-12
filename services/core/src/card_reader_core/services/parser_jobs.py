@@ -24,6 +24,7 @@ from card_reader_core.repositories.metadata_repository import (
     list_types,
 )
 from card_reader_core.repositories.cards_repository import save_parsed_card
+from card_reader_core.storage import resolve_storage_path
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ class ImportProcessorService:
         resources: ParserResources,
     ) -> ItemProcessingResult:
         parsed = self._parser.parse(
-            Path(item.source_file),
+            resolve_storage_path(item.source_file),
             job.template_id,
             symbols=resources.detectable_symbols,
             known_keywords=resources.known_keywords,

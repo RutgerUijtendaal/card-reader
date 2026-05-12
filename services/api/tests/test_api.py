@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type  # noqa: E402
+from card_reader_core.models import Card, CardVersion, CardVersionImage, ImportJob, ImportJobItem, Keyword, ParseResult, Symbol, Tag, Type  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
 from card_reader_core.repositories.metadata_repository import (  # noqa: E402
     get_tags_for_card_version,
@@ -10,6 +10,8 @@ from card_reader_core.repositories.metadata_repository import (  # noqa: E402
     replace_card_version_tags,
     replace_card_version_types,
 )
+from card_reader_core.settings import settings  # noqa: E402
+from card_reader_core.storage import build_storage_relative_path, relativize_image_storage_path, resolve_storage_path  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
 from django.db import connection  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
@@ -46,6 +48,24 @@ def test_create_import_upload_rejects_unsupported_files() -> None:
         data={"template_id": "mtg-like-v1", "options_json": "{}"},
     )
     assert response.status_code == 400
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_create_import_upload_stores_relative_paths() -> None:
+    response = Client(HTTP_HOST="localhost").post(
+        "/imports/upload",
+        data={
+            "template_id": "mtg-like-v1",
+            "options_json": "{}",
+            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+        },
+    )
+
+    assert response.status_code == 201
+    job = ImportJob.objects.get(id=response.json()["id"])
+    item = ImportJobItem.objects.get(job_id=job.id)
+    assert job.source_path.startswith("uploads/")
+    assert item.source_file.startswith(f"{job.source_path}/")
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -283,12 +303,13 @@ def test_cards_list_returns_paginated_payload() -> None:
 
 def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None:
     card, version = _create_editable_card_version(name="Image Card")
-    image_path = tmp_path / "image-card.png"
+    image_path = settings.image_store_dir / f"checksum-{version.id}.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
     image_path.write_bytes(b"fake-image")
     CardVersionImage.objects.create(
         card_version=version,
-        source_file=str(image_path),
-        stored_path=str(image_path),
+        source_file=build_storage_relative_path("images", image_path.name),
+        stored_path=build_storage_relative_path("images", image_path.name),
         checksum=f"checksum-{version.id}",
     )
 
@@ -296,6 +317,18 @@ def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None
 
     assert response.status_code == 200
     assert b"".join(response.streaming_content) == b"fake-image"
+
+
+def test_storage_paths_resolve_relative_to_storage_root(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+
+    resolved = resolve_storage_path("images/example-card.png")
+    from_dev_absolute = relativize_image_storage_path(str(tmp_path / "images" / "example-card.png"))
+    from_prd_absolute = relativize_image_storage_path("/var/lib/card-reader/images/example-card.png")
+
+    assert resolved == tmp_path / "images" / "example-card.png"
+    assert from_dev_absolute == "images/example-card.png"
+    assert from_prd_absolute == "images/example-card.png"
 
 
 def test_cards_list_pagination_honors_page_and_page_size() -> None:
@@ -644,9 +677,12 @@ def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
 
 
 def _create_card_image(version: CardVersion) -> CardVersionImage:
+    image_path = settings.image_store_dir / f"checksum-{version.id}.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"gallery-image")
     return CardVersionImage.objects.create(
         card_version_id=version.id,
-        source_file=f"/tmp/{version.id}.png",
-        stored_path=f"/tmp/{version.id}.png",
+        source_file=build_storage_relative_path("images", image_path.name),
+        stored_path=build_storage_relative_path("images", image_path.name),
         checksum=f"checksum-{version.id}",
     )

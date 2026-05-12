@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, TypedDict
 
 from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
@@ -15,6 +16,7 @@ from card_reader_core.repositories.cards_repository import (
     get_parse_result,
     list_card_generations,
     list_cards,
+    resolve_image_file_path,
     update_card,
     update_latest_card_version,
 )
@@ -80,6 +82,9 @@ class CardService:
 
     def get_card_image(self, card_version_id: str) -> CardVersionImage | None:
         return get_card_image(card_version_id)
+
+    def resolve_card_image_path(self, image: CardVersionImage) -> Path | None:
+        return resolve_image_file_path(image)
 
     def get_card_version_metadata(self, card_version_id: str) -> CardMetadata:
         return {

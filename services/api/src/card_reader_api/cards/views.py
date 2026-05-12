@@ -157,10 +157,14 @@ class CardImageView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, _request: Request, card_id: str) -> FileResponse:
-        card, _version, image = CardService().get_card_with_image(card_id)
+        service = CardService()
+        card, _version, image = service.get_card_with_image(card_id)
         if card is None or image is None:
             raise Http404("Card image not found")
-        return _file_response(Path(image.stored_path), "Card image file is missing")
+        image_path = service.resolve_card_image_path(image)
+        if image_path is None:
+            raise Http404("Card image file is missing")
+        return _file_response(image_path, "Card image file is missing")
 
 
 class CardVersionImageView(APIView):
@@ -171,7 +175,10 @@ class CardVersionImageView(APIView):
         image = service.get_card_image(version_id)
         if image is None:
             raise Http404("Card image not found")
-        return _file_response(Path(image.stored_path), "Card image file is missing")
+        image_path = service.resolve_card_image_path(image)
+        if image_path is None:
+            raise Http404("Card image file is missing")
+        return _file_response(image_path, "Card image file is missing")
 
 
 class SymbolAssetView(APIView):

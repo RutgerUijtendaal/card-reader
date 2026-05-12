@@ -8,7 +8,7 @@ from typing import Any, TypedDict
 from django.db import transaction
 from django.db.models import Prefetch, QuerySet
 
-from ..storage import store_image
+from ..storage import relativize_storage_path, resolve_storage_path, store_image
 from .helpers import extract_mana_symbols, normalize_slug_key, to_int_or_none
 from .metadata_repository import (
     replace_card_version_keywords,
@@ -659,11 +659,12 @@ def _save_parsed_snapshot(
 
 
 def _save_image_record(version: CardVersion, source_file: str, checksum: str) -> None:
-    stored_path = store_image(Path(source_file), checksum)
+    resolved_source_file = resolve_storage_path(source_file)
+    stored_path = store_image(resolved_source_file, checksum)
     CardVersionImage.objects.create(
         card_version=version,
-        source_file=source_file,
-        stored_path=str(stored_path),
+        source_file=relativize_storage_path(source_file, default_root="uploads"),
+        stored_path=stored_path,
         checksum=checksum,
         updated_at=now_utc(),
     )
@@ -714,11 +715,11 @@ def _resolve_reparse_image_path(image: CardVersionImage) -> Path | None:
 
 
 def resolve_image_file_path(image: CardVersionImage) -> Path | None:
-    stored_path = Path(image.stored_path)
+    stored_path = resolve_storage_path(image.stored_path)
     if stored_path.exists():
         return stored_path
 
-    source_path = Path(image.source_file)
+    source_path = resolve_storage_path(image.source_file)
     if source_path.exists():
         return source_path
 

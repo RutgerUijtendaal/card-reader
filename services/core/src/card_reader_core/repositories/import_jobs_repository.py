@@ -6,11 +6,13 @@ from pathlib import Path
 from django.db import transaction
 
 from ..models import ImportJob, ImportJobItem, ImportJobStatus, now_utc
+from ..storage import relativize_storage_path, resolve_storage_path
 
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def collect_supported_files(source_path: Path) -> list[Path]:
+    source_path = resolve_storage_path(source_path)
     if source_path.is_file():
         return [source_path] if source_path.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES else []
     if not source_path.is_dir():
@@ -50,7 +52,7 @@ def create_import_job_with_files(
 ) -> ImportJob:
     with transaction.atomic():
         job = ImportJob.objects.create(
-            source_path=str(source_path),
+            source_path=relativize_storage_path(source_path, default_root="uploads"),
             template_id=template_id,
             options_json=json.dumps(options),
             total_items=len(files),
@@ -60,7 +62,7 @@ def create_import_job_with_files(
             [
                 ImportJobItem(
                     job_id=job.id,
-                    source_file=str(image_file),
+                    source_file=relativize_storage_path(image_file, default_root="uploads"),
                     status=ImportJobStatus.queued,
                 )
                 for image_file in files

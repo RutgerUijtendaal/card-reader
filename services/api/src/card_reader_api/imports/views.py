@@ -19,7 +19,7 @@ from card_reader_core.repositories.import_jobs_repository import (
     list_import_jobs,
 )
 from card_reader_core.services.imports import ImportService
-from card_reader_core.settings import settings
+from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 logger = logging.getLogger(__name__)
 
@@ -80,16 +80,18 @@ def _parse_options(options_json: str) -> dict[str, object] | Response:
     return options_raw
 
 
-def _save_supported_uploads(files: list[UploadedFile]) -> Path | None:
-    upload_dir = settings.storage_root_dir / "uploads" / str(uuid4())
-    upload_dir.mkdir(parents=True, exist_ok=True)
+def _save_supported_uploads(files: list[UploadedFile]) -> str | None:
+    upload_dir = build_storage_relative_path("uploads", str(uuid4()))
+    resolve_storage_path(upload_dir).mkdir(parents=True, exist_ok=True)
     saved_count = 0
 
     for index, upload in enumerate(files):
         original_name = Path(upload.name or f"upload-{index}.img").name
         if Path(original_name).suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
             continue
-        target_file = upload_dir / f"{index:04d}-{original_name}"
+        target_file = resolve_storage_path(
+            build_storage_relative_path(upload_dir, f"{index:04d}-{original_name}")
+        )
         with target_file.open("wb") as stream:
             for chunk in upload.chunks():
                 stream.write(chunk)
