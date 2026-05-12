@@ -665,7 +665,7 @@ def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
         ),
         is_latest=True,
     )
-    parse_result = ParseResult.objects.create(
+    ParseResult.objects.create(
         card_version=version,
         raw_ocr_json="{}",
         normalized_fields_json="{}",
