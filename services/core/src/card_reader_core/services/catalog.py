@@ -63,11 +63,23 @@ class CatalogService:
             self._create_simple("keyword", label=label, key=key, identifiers=identifiers),
         )
 
-    def create_tag(self, *, label: str, key: str | None = None) -> Tag:
-        return cast(Tag, self._create_simple("tag", label=label, key=key))
+    def create_tag(
+        self,
+        *,
+        label: str,
+        key: str | None = None,
+        identifiers: list[str] | None = None,
+    ) -> Tag:
+        return cast(Tag, self._create_simple("tag", label=label, key=key, identifiers=identifiers))
 
-    def create_type(self, *, label: str, key: str | None = None) -> Type:
-        return cast(Type, self._create_simple("type", label=label, key=key))
+    def create_type(
+        self,
+        *,
+        label: str,
+        key: str | None = None,
+        identifiers: list[str] | None = None,
+    ) -> Type:
+        return cast(Type, self._create_simple("type", label=label, key=key, identifiers=identifiers))
 
     def update_keyword(
         self,
@@ -88,8 +100,12 @@ class CatalogService:
         entry_id: str,
         label: str | None = None,
         key: str | None = None,
+        identifiers: list[str] | None = None,
     ) -> Tag | None:
-        return cast(Tag | None, self._update_simple("tag", entry_id=entry_id, label=label, key=key))
+        return cast(
+            Tag | None,
+            self._update_simple("tag", entry_id=entry_id, label=label, key=key, identifiers=identifiers),
+        )
 
     def update_type(
         self,
@@ -97,8 +113,12 @@ class CatalogService:
         entry_id: str,
         label: str | None = None,
         key: str | None = None,
+        identifiers: list[str] | None = None,
     ) -> Type | None:
-        return cast(Type | None, self._update_simple("type", entry_id=entry_id, label=label, key=key))
+        return cast(
+            Type | None,
+            self._update_simple("type", entry_id=entry_id, label=label, key=key, identifiers=identifiers),
+        )
 
     def create_symbol(
         self,
@@ -195,8 +215,16 @@ class CatalogService:
                 identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
             )
         if kind == "tag":
-            return create_tag(key=normalized_key, label=normalized_label)
-        return create_type(key=normalized_key, label=normalized_label)
+            return create_tag(
+                key=normalized_key,
+                label=normalized_label,
+                identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
+            )
+        return create_type(
+            key=normalized_key,
+            label=normalized_label,
+            identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
+        )
 
     def _update_simple(
         self,
@@ -226,7 +254,7 @@ class CatalogService:
             normalized_key = self._normalize_key(key=key, label=current_label)
             self._ensure_unique(kind, normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
-        if kind == "keyword" and identifiers is not None:
+        if kind in {"keyword", "tag", "type"} and identifiers is not None:
             updates["identifiers_json"] = self._normalize_identifiers_json(current_label, identifiers)
 
         updaters = {

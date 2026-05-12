@@ -6,7 +6,7 @@ from typing import Any
 from card_reader_core.models import Keyword, Symbol
 from PIL import Image
 
-from ...extractors import KeywordsExtractor
+from ...extractors import KnownMetadataExtractor
 from ..ocr_runner import OcrRunner
 from ..symbol_detector import SymbolDetector
 
@@ -22,11 +22,11 @@ class BottomRegionParser:
         self,
         ocr_runner: OcrRunner,
         symbol_detector: SymbolDetector,
-        keywords_extractor: KeywordsExtractor,
+        metadata_extractor: KnownMetadataExtractor,
     ) -> None:
         self._ocr_runner = ocr_runner
         self._symbol_detector = symbol_detector
-        self._keywords_extractor = keywords_extractor
+        self._metadata_extractor = metadata_extractor
 
     def parse(
         self,
@@ -68,7 +68,7 @@ class BottomRegionParser:
             region_name,
             len(known_keywords),
         )
-        keyword_ids = self._keywords_extractor.extract_keyword_ids(text, known_keywords)
+        keyword_ids = self._metadata_extractor.extract_ids(text, known_keywords)
         logger.info(
             "Bottom region keyword extraction step finished. region=%s keywords=%s",
             region_name,
@@ -105,4 +105,3 @@ class BottomRegionParser:
 
     def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
         return raw if isinstance(raw, list) else []
-

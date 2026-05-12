@@ -57,12 +57,14 @@ class CardDetailView(APIView):
         if card is None or version is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
         metadata = service.get_card_version_metadata(version.id)
+        edit_state = service.get_card_version_edit_state(version)
         return Response(
             card_payload(
                 card,
                 version,
                 image_url=f"/cards/{card.id}/image" if image else None,
                 metadata=metadata,
+                edit_state=edit_state,
             )
         )
 
@@ -82,15 +84,61 @@ class CardGenerationsView(APIView):
         for version in versions:
             image = service.get_card_image(version.id)
             metadata = service.get_card_version_metadata(version.id)
+            edit_state = service.get_card_version_edit_state(version)
             payloads.append(
                 card_payload(
                     card,
                     version,
                     image_url=f"/cards/{card_id}/versions/{version.id}/image" if image else None,
                     metadata=metadata,
+                    edit_state=edit_state,
                 )
             )
         return Response(payloads)
+
+
+class LatestCardVersionUpdateView(APIView):
+    def patch(self, request: Request, card_id: str) -> Response:
+        try:
+            updates = _extract_latest_version_updates(request)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        restore_fields = _string_list(request.data.get("restore_fields"))
+        restore_metadata_groups = _string_list(request.data.get("restore_metadata_groups"))
+        unlock_fields = _string_list(request.data.get("unlock_fields"))
+        unlock_metadata_groups = _string_list(request.data.get("unlock_metadata_groups"))
+
+        if not _names_are_valid(restore_fields + unlock_fields, _SCALAR_FIELDS):
+            return Response({"detail": "Invalid scalar field name."}, status=status.HTTP_400_BAD_REQUEST)
+        if not _names_are_valid(restore_metadata_groups + unlock_metadata_groups, _METADATA_GROUPS):
+            return Response({"detail": "Invalid metadata group name."}, status=status.HTTP_400_BAD_REQUEST)
+
+        service = CardService()
+        updated = service.update_latest_card_version(
+            card_id=card_id,
+            updates=updates,
+            restore_fields=restore_fields,
+            restore_metadata_groups=restore_metadata_groups,
+            unlock_fields=unlock_fields,
+            unlock_metadata_groups=unlock_metadata_groups,
+        )
+        if updated is None:
+            return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        card, version = updated
+        image = service.get_card_image(version.id)
+        metadata = service.get_card_version_metadata(version.id)
+        edit_state = service.get_card_version_edit_state(version)
+        return Response(
+            card_payload(
+                card,
+                version,
+                image_url=f"/cards/{card_id}/versions/{version.id}/image" if image else None,
+                metadata=metadata,
+                edit_state=edit_state,
+            )
+        )
 
 
 class CardImageView(APIView):
@@ -162,3 +210,35 @@ def _file_response(path: Path, detail: str) -> FileResponse:
     if not path.exists() or not path.is_file():
         raise Http404(detail)
     return FileResponse(path.open("rb"))
+
+
+_SCALAR_FIELDS = {"name", "type_line", "mana_cost", "attack", "health", "rules_text"}
+_METADATA_GROUPS = {"keywords", "tags", "types", "symbols"}
+
+
+def _extract_latest_version_updates(request: Request) -> dict[str, object]:
+    updates: dict[str, object] = {}
+    for field_name in _SCALAR_FIELDS:
+        if field_name in request.data:
+            value = request.data.get(field_name)
+            if field_name == "name" and (not isinstance(value, str) or not value.strip()):
+                raise ValueError("name is required")
+            updates[field_name] = value
+    for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):
+        if field_name not in request.data:
+            continue
+        value = request.data.get(field_name)
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise ValueError(f"{field_name} must be an array of strings")
+        updates[field_name] = value
+    return updates
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if isinstance(item, str)]
+
+
+def _names_are_valid(values: list[str], allowed: set[str]) -> bool:
+    return all(value in allowed for value in values)

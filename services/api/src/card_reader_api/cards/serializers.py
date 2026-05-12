@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
 
 if TYPE_CHECKING:
-    from card_reader_core.services.cards import CardMetadata
+    from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MetadataOption = Keyword | Tag | Type
 
@@ -17,6 +17,7 @@ def card_payload(
     *,
     image_url: str | None,
     metadata: CardMetadata | None = None,
+    edit_state: CardEditState | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "id": card.id,
@@ -37,6 +38,14 @@ def card_payload(
         "confidence": version.confidence,
         "created_at": version.created_at.isoformat(),
         "image_url": image_url,
+        "editable": version.is_latest,
+        "keyword_ids": [],
+        "tag_ids": [],
+        "symbol_ids": [],
+        "type_ids": [],
+        "field_sources": {},
+        "parsed_snapshot": {},
+        "parse_result": None,
         "keywords": [],
         "tags": [],
         "symbols": [],
@@ -44,15 +53,35 @@ def card_payload(
     }
     if metadata is not None:
         payload.update(metadata_payload(metadata))
+    if edit_state is not None:
+        payload.update(edit_state_payload(edit_state))
     return payload
 
 
 def metadata_payload(metadata: CardMetadata) -> dict[str, object]:
     return {
         "keywords": [row.label for row in metadata["keywords"]],
+        "keyword_ids": [row.id for row in metadata["keywords"]],
         "tags": [metadata_option(row) for row in metadata["tags"]],
+        "tag_ids": [row.id for row in metadata["tags"]],
         "symbols": [symbol_option(row) for row in metadata["symbols"]],
+        "symbol_ids": [row.id for row in metadata["symbols"]],
         "types": [metadata_option(row) for row in metadata["types"]],
+        "type_ids": [row.id for row in metadata["types"]],
+    }
+
+
+def edit_state_payload(edit_state: CardEditState) -> dict[str, object]:
+    parse_result = edit_state["parse_result"]
+    return {
+        "field_sources": edit_state["field_sources"],
+        "parsed_snapshot": edit_state["parsed_snapshot"],
+        "parse_result": None
+        if parse_result is None
+        else {
+            "id": parse_result.id,
+            "created_at": parse_result.created_at.isoformat(),
+        },
     }
 
 

@@ -1,28 +1,20 @@
-from __future__ import annotations
-
-import os
-import tempfile
+import json
 from pathlib import Path
 
-TEST_STORAGE_ROOT = Path(tempfile.mkdtemp(prefix="card-reader-api-tests-"))
-os.environ["CARD_READER_APP_DATA_DIR"] = str(TEST_STORAGE_ROOT)
-os.environ["CARD_READER_ENV"] = "test"
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_api.project.settings")
-
-import django  # noqa: E402
-from card_reader_core.database.connection import initialize_database  # noqa: E402
+from card_reader_core.models import Card, CardVersion, Keyword, ParseResult, Symbol, Tag, Type  # noqa: E402
+from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
+from card_reader_core.repositories.metadata_repository import (  # noqa: E402
+    get_tags_for_card_version,
+    replace_card_version_keywords,
+    replace_card_version_symbols,
+    replace_card_version_tags,
+    replace_card_version_types,
+)
 from django.contrib.auth import get_user_model  # noqa: E402
-from django.core.management import call_command  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from django.test import Client, override_settings  # noqa: E402
 
-initialize_database()
-django.setup()
-
 from card_reader_api.seeds.users import seed_users  # noqa: E402
-
-call_command("migrate", interactive=False, verbosity=0)
-call_command("seed_defaults", verbosity=0)
 
 
 def test_health() -> None:
@@ -157,6 +149,41 @@ def test_staff_can_create_keyword_identifiers() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_create_tag_and_type_identifiers() -> None:
+    username = "staff-tag-type-identifiers-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    tag_response = client.post(
+        "/settings/tags",
+        data={
+            "label": "Weapon",
+            "key": "weapon-identifiers-test",
+            "identifiers": ["arms", "  WEAPON  "],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    type_response = client.post(
+        "/settings/types",
+        data={
+            "label": "Persistent",
+            "key": "persistent-identifiers-test",
+            "identifiers": ["ongoing", "  PERSISTENT  "],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert tag_response.status_code == 200
+    assert tag_response.json()["identifiers"] == ["weapon", "arms"]
+    assert type_response.status_code == 200
+    assert type_response.json()["identifiers"] == ["persistent", "ongoing"]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_manage_templates() -> None:
     username = "staff-template-user"
     password = "password"
@@ -272,6 +299,138 @@ def test_seed_users_creates_missing_configured_users(
     assert viewer_user.is_superuser is False
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
+    username = "staff-card-editor-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    keyword = Keyword.objects.first()
+    tag = Tag.objects.first()
+    type_row = Type.objects.first()
+    symbol = Symbol.objects.first()
+    assert keyword is not None and tag is not None and type_row is not None and symbol is not None
+
+    card, version = _create_editable_card_version(name="Editable Card")
+    replace_card_version_keywords(card_version_id=version.id, keyword_ids=[keyword.id])
+    replace_card_version_tags(card_version_id=version.id, tag_ids=[tag.id])
+    replace_card_version_types(card_version_id=version.id, type_ids=[type_row.id])
+    replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={
+            "name": "Manual Card Name",
+            "rules_text": "Manual rules text",
+            "tag_ids": [],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["name"] == "Manual Card Name"
+    assert payload["rules_text"] == "Manual rules text"
+    assert payload["tag_ids"] == []
+    assert payload["field_sources"]["fields"]["name"] == "manual"
+    assert payload["field_sources"]["fields"]["rules_text"] == "manual"
+    assert payload["field_sources"]["metadata"]["tags"] == "manual"
+
+    latest = get_latest_card_version(card.id)
+    assert latest is not None
+    assert latest.name == "Manual Card Name"
+    assert latest.rules_text == "Manual rules text"
+    assert [row.id for row in get_tags_for_card_version(latest.id)] == []
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_version_patch_can_restore_and_unlock() -> None:
+    username = "staff-card-restore-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    keyword = Keyword.objects.first()
+    tag = Tag.objects.first()
+    type_row = Type.objects.first()
+    symbol = Symbol.objects.first()
+    assert keyword is not None and tag is not None and type_row is not None and symbol is not None
+
+    card, version = _create_editable_card_version(name="Restorable Card")
+    replace_card_version_keywords(card_version_id=version.id, keyword_ids=[keyword.id])
+    replace_card_version_tags(card_version_id=version.id, tag_ids=[])
+    replace_card_version_types(card_version_id=version.id, type_ids=[type_row.id])
+    replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
+    version.rules_text = "Manual override"
+    version.type_line = "Manual Type"
+    version.field_sources_json = json.dumps(
+        {
+            "fields": {
+                "name": "auto",
+                "type_line": "manual",
+                "mana_cost": "auto",
+                "attack": "auto",
+                "health": "auto",
+                "rules_text": "manual",
+            },
+            "metadata": {
+                "keywords": "auto",
+                "tags": "manual",
+                "types": "auto",
+                "symbols": "auto",
+            },
+        }
+    )
+    version.parsed_snapshot_json = json.dumps(
+        {
+            "fields": {
+                "name": "Restorable Card",
+                "type_line": "Parsed Type",
+                "mana_cost": "3",
+                "attack": None,
+                "health": None,
+                "rules_text": "Parsed rules",
+            },
+            "metadata": {
+                "keyword_ids": [keyword.id],
+                "tag_ids": [tag.id],
+                "type_ids": [type_row.id],
+                "symbol_ids": [symbol.id],
+            },
+        }
+    )
+    version.save(update_fields=["rules_text", "type_line", "field_sources_json", "parsed_snapshot_json"])
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={
+            "restore_fields": ["rules_text"],
+            "restore_metadata_groups": ["tags"],
+            "unlock_fields": ["type_line"],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["rules_text"] == "Parsed rules"
+    assert payload["tag_ids"] == [tag.id]
+    assert payload["field_sources"]["fields"]["rules_text"] == "auto"
+    assert payload["field_sources"]["fields"]["type_line"] == "auto"
+    assert payload["field_sources"]["metadata"]["tags"] == "auto"
+
+    latest = get_latest_card_version(card.id)
+    assert latest is not None
+    assert latest.type_line == "Manual Type"
+    assert latest.rules_text == "Parsed rules"
+    assert [row.id for row in get_tags_for_card_version(latest.id)] == [tag.id]
+
+
 def _create_user(
     username: str,
     password: str,
@@ -298,3 +457,67 @@ def _login_and_get_csrf_token(client: Client, username: str, password: str) -> s
     csrf_token = response.json()["csrf_token"]
     assert isinstance(csrf_token, str)
     return csrf_token
+
+
+def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
+    card = Card.objects.create(key=name.lower().replace(" ", "-"), label=name)
+    version = CardVersion.objects.create(
+        card_id=card.id,
+        version_number=1,
+        template_id="mtg-like-v1",
+        image_hash=f"hash-{name}",
+        name=name,
+        type_line="Base Type",
+        mana_cost="2",
+        mana_symbols_json="[]",
+        rules_text="Base rules",
+        confidence=0.9,
+        field_sources_json=json.dumps(
+            {
+                "fields": {
+                    "name": "auto",
+                    "type_line": "auto",
+                    "mana_cost": "auto",
+                    "attack": "auto",
+                    "health": "auto",
+                    "rules_text": "auto",
+                },
+                "metadata": {
+                    "keywords": "auto",
+                    "tags": "auto",
+                    "types": "auto",
+                    "symbols": "auto",
+                },
+            }
+        ),
+        parsed_snapshot_json=json.dumps(
+            {
+                "fields": {
+                    "name": name,
+                    "type_line": "Base Type",
+                    "mana_cost": "2",
+                    "attack": None,
+                    "health": None,
+                    "rules_text": "Base rules",
+                },
+                "metadata": {
+                    "keyword_ids": [],
+                    "tag_ids": [],
+                    "type_ids": [],
+                    "symbol_ids": [],
+                },
+            }
+        ),
+        is_latest=True,
+    )
+    parse_result = ParseResult.objects.create(
+        card_version_id=version.id,
+        raw_ocr_json="{}",
+        normalized_fields_json="{}",
+        confidence_json="{}",
+    )
+    version.parse_result_id = parse_result.id
+    version.save(update_fields=["parse_result_id"])
+    card.latest_version_id = version.id
+    card.save(update_fields=["latest_version_id"])
+    return card, version

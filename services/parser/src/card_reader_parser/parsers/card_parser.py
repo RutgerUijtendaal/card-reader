@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ..extractors import KeywordsExtractor, TagsExtractor, TypesExtractor
-from card_reader_core.models import Keyword, Symbol
+from ..extractors import KnownMetadataExtractor
+from card_reader_core.models import Keyword, Symbol, Tag, Type
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.settings import settings
 from card_reader_core.storage import calculate_checksum
@@ -31,15 +31,11 @@ class CardParser:
         self._cropper = RegionCropper()
         self._ocr_runner = OcrRunner()
         self._symbol_detector = SymbolDetector()
-        self._keywords_extractor = KeywordsExtractor()
-        self._tags_extractor = TagsExtractor()
-        self._types_extractor = TypesExtractor()
+        self._metadata_extractor = KnownMetadataExtractor()
         self._top_region_parser = TopRegionParser(self._ocr_runner, self._symbol_detector)
-        self._middle_region_parser = MiddleRegionParser(
-            self._ocr_runner, self._tags_extractor, self._types_extractor
-        )
+        self._middle_region_parser = MiddleRegionParser(self._ocr_runner, self._metadata_extractor)
         self._bottom_region_parser = BottomRegionParser(
-            self._ocr_runner, self._symbol_detector, self._keywords_extractor
+            self._ocr_runner, self._symbol_detector, self._metadata_extractor
         )
         self._affinity_region_parser = AffinityRegionParser(self._symbol_detector)
         self._stats_region_parser = StatsRegionParser(self._ocr_runner)
@@ -50,6 +46,8 @@ class CardParser:
         template_id: str,
         symbols: list[Symbol] | None = None,
         known_keywords: list[Keyword] | None = None,
+        known_tags: list[Tag] | None = None,
+        known_types: list[Type] | None = None,
     ) -> ParsedCard:
         logger.info(
             "Card parse started. image_path=%s template_id=%s symbols=%s known_keywords=%s",
@@ -78,6 +76,8 @@ class CardParser:
 
         symbols = symbols or []
         known_keywords = known_keywords or []
+        known_tags = known_tags or []
+        known_types = known_types or []
         regions_spec = template.get("regions", {})
 
         region_results: dict[str, RegionParseResult] = {}
@@ -102,14 +102,16 @@ class CardParser:
                 region_name="type_bar",
                 image=region_crops["type_bar"]["image"],
                 region_spec=regions_spec.get("type_bar", {}),
+                known_tags=known_tags,
+                known_types=known_types,
             )
             middle_result = region_results["type_bar"]
             logger.info(
                 "Region parsed successfully. region=type_bar conf=%.3f text_len=%s tags=%s types=%s fields=%s",
                 middle_result.confidence,
                 len(middle_result.text),
-                len(middle_result.extracted_tags),
-                len(middle_result.extracted_types),
+                len(middle_result.extracted_tag_ids),
+                len(middle_result.extracted_type_ids),
                 sorted(middle_result.normalized_fields.keys()),
             )
         if "rules_text" in region_crops:
@@ -175,8 +177,8 @@ class CardParser:
         normalized_fields = self._merge_normalized_fields(region_results, image_path)
         confidence = self._confidence_breakdown(region_results)
         keyword_ids = self._merge_keyword_ids(region_results)
-        tag_labels = self._merge_tags(region_results)
-        type_labels = self._merge_types(region_results)
+        tag_ids = self._merge_tag_ids(region_results)
+        type_ids = self._merge_type_ids(region_results)
         symbol_ids = self._merge_symbol_ids(region_results)
 
         raw_ocr = {
@@ -214,8 +216,8 @@ class CardParser:
             sorted(normalized_fields.keys()),
             len(symbol_ids),
             len(keyword_ids),
-            len(tag_labels),
-            len(type_labels),
+            len(tag_ids),
+            len(type_ids),
         )
         return ParsedCard(
             checksum=checksum,
@@ -223,8 +225,8 @@ class CardParser:
             confidence=confidence,
             raw_ocr=raw_ocr,
             keyword_ids=keyword_ids,
-            tag_labels=tag_labels,
-            type_labels=type_labels,
+            tag_ids=tag_ids,
+            type_ids=type_ids,
             symbol_ids=symbol_ids,
         )
 
@@ -278,28 +280,26 @@ class CardParser:
                 out.append(keyword_id)
         return out
 
-    def _merge_tags(self, region_results: dict[str, RegionParseResult]) -> list[str]:
+    def _merge_tag_ids(self, region_results: dict[str, RegionParseResult]) -> list[str]:
         out: list[str] = []
         seen: set[str] = set()
         for result in region_results.values():
-            for label in result.extracted_tags:
-                key = label.strip().lower()
-                if not key or key in seen:
+            for tag_id in result.extracted_tag_ids:
+                if tag_id in seen:
                     continue
-                seen.add(key)
-                out.append(label)
+                seen.add(tag_id)
+                out.append(tag_id)
         return out
 
-    def _merge_types(self, region_results: dict[str, RegionParseResult]) -> list[str]:
+    def _merge_type_ids(self, region_results: dict[str, RegionParseResult]) -> list[str]:
         out: list[str] = []
         seen: set[str] = set()
         for result in region_results.values():
-            for label in result.extracted_types:
-                key = label.strip().lower()
-                if not key or key in seen:
+            for type_id in result.extracted_type_ids:
+                if type_id in seen:
                     continue
-                seen.add(key)
-                out.append(label)
+                seen.add(type_id)
+                out.append(type_id)
         return out
 
     def _merge_symbol_ids(self, region_results: dict[str, RegionParseResult]) -> list[str]:

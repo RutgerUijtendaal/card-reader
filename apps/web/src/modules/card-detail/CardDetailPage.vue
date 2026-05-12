@@ -1,5 +1,5 @@
 <template>
-  <section class="space-y-5">
+  <section class="space-y-5 xl:h-[calc(100vh-8rem)]">
     <div class="flex items-center justify-between gap-3">
       <button
         class="btn-secondary inline-flex items-center gap-2"
@@ -22,17 +22,57 @@
       </div>
     </div>
 
-    <div class="flex flex-wrap items-start gap-5">
-      <CardVersionGalleryItem
-        v-for="version in versions"
-        :key="version.version_id"
-        :version="version"
-        :symbol-by-key="symbolByKey"
-      />
+    <div
+      v-if="selectedVersion"
+      class="grid items-start gap-5 xl:h-full xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"
+    >
+      <div class="space-y-4 xl:h-full xl:overflow-y-auto xl:pr-2">
+        <div>
+          <CardVersionPreviewPane
+            :version="selectedVersion"
+            :symbol-by-key="symbolByKey"
+            :to-absolute-api-url="toAbsoluteApiUrl"
+            :format-date="formatDate"
+          />
+        </div>
+        <CardVersionSelectorGrid
+          :versions="versions"
+          :selected-version-id="selectedVersionId"
+          :to-absolute-api-url="toAbsoluteApiUrl"
+          :format-date="formatDate"
+          @select="selectVersion"
+        />
+      </div>
+      <div class="xl:h-full xl:min-h-0">
+        <CardVersionEditorPane
+          :version="selectedVersion"
+          :form="form"
+          :is-busy="isBusy"
+          :is-saving="isSaving"
+          :save-message="saveMessage"
+          :field-source="fieldSource"
+          :metadata-source="metadataSource"
+          :field-source-label="fieldSourceLabel"
+          :metadata-source-label="metadataSourceLabel"
+          :field-has-parsed-suggestion="fieldHasParsedSuggestion"
+          :format-parsed-field-value="formatParsedFieldValue"
+          :metadata-has-parsed-suggestion="metadataHasParsedSuggestion"
+          :selected-ids="selectedIds"
+          :parsed-metadata-labels="parsedMetadataLabels"
+          :options-for-group="optionsForGroup"
+          @save="saveEdits"
+          @restore-field="restoreField"
+          @unlock-field="unlockField"
+          @restore-group="restoreMetadataGroup"
+          @unlock-group="unlockMetadataGroup"
+          @toggle-group="toggleMetadataSelection"
+          @update-field="updateField"
+        />
+      </div>
     </div>
 
     <div
-      v-if="versions.length === 0"
+      v-else
       class="page-card text-sm text-slate-500"
     >
       No versions found.
@@ -41,66 +81,50 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { onMounted } from 'vue';
 import { ArrowLeft } from 'lucide-vue-next';
-import { api } from '@/api/client';
-import CardVersionGalleryItem, {
-  type CardVersionGalleryItemModel,
-} from '@/components/cards/CardVersionGalleryItem.vue';
+import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
+import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
+import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
+import { useCardDetailState } from '@/modules/card-detail/composables/useCardDetailState';
+import type { ScalarFieldName } from '@/modules/card-detail/types';
 
-type MetadataOption = {
-  id: string;
-  key: string;
-  label: string;
-};
+const {
+  card,
+  versions,
+  selectedVersionId,
+  symbolByKey,
+  isSaving,
+  saveMessage,
+  form,
+  selectedVersion,
+  isBusy,
+  goBack,
+  loadCard,
+  selectVersion,
+  saveEdits,
+  restoreField,
+  unlockField,
+  restoreMetadataGroup,
+  unlockMetadataGroup,
+  fieldSource,
+  metadataSource,
+  fieldSourceLabel,
+  metadataSourceLabel,
+  fieldHasParsedSuggestion,
+  formatParsedFieldValue,
+  metadataHasParsedSuggestion,
+  selectedIds,
+  parsedMetadataLabels,
+  optionsForGroup,
+  toggleMetadataSelection,
+  toAbsoluteApiUrl,
+  formatDate,
+} = useCardDetailState();
 
-type SymbolFilterOption = MetadataOption & {
-  symbol_type: string;
-  text_token: string;
-  asset_url: string | null;
-};
-
-type CardFiltersResponse = {
-  symbols: SymbolFilterOption[];
-};
-
-type CardDetail = {
-  id: string;
-  label: string;
-  name: string;
-};
-
-type CardVersionDetail = CardVersionGalleryItemModel;
-
-const route = useRoute();
-const router = useRouter();
-const card = ref<CardDetail | null>(null);
-const versions = ref<CardVersionDetail[]>([]);
-const symbolByKey = ref<Record<string, SymbolFilterOption>>({});
-
-const goBack = (): void => {
-  if (window.history.length > 1) {
-    router.back();
-    return;
-  }
-  void router.push('/cards');
-};
-
-const loadCard = async (): Promise<void> => {
-  const cardId = String(route.params.id);
-  const [cardResponse, versionsResponse, filtersResponse] = await Promise.all([
-    api.get<CardDetail>(`/cards/${cardId}`),
-    api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
-    api.get<CardFiltersResponse>('/cards/filters'),
-  ]);
-  card.value = cardResponse.data;
-  versions.value = versionsResponse.data;
-  symbolByKey.value = Object.fromEntries(
-    (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
-  );
+const updateField = (fieldName: ScalarFieldName, value: string): void => {
+  form[fieldName] = value;
 };
 
 onMounted(loadCard);
-watch(() => route.params.id, loadCard);
 </script>

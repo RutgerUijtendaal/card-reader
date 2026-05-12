@@ -1,0 +1,56 @@
+
+{
+  "image": "cards/aura-of-light.webp",
+  "template_id": "mtg-like-v1",
+  "job_options": {
+    "reparse_existing": true
+  },
+  "expected_db": {
+    "card": {
+      "key": "aura-of-light",
+      "label": "Aura of Light"
+    },
+    "latest_version": {
+      "template_id": "mtg-like-v1",
+      "name": "Aura of Light",
+      "type_line": "Persistent Spell - Light Abjuration Aura",
+      "mana_cost": "2",
+      "mana_symbols": [
+        "dark-mana",
+        "divine-mana"
+      ],
+      "attack": null,
+      "health": null,
+      "rules_text": "X\nAe",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [],
+      "tags": [
+        "Abjuration",
+        "Aura",
+        "Light"
+      ],
+      "symbols": [
+        "dark-mana",
+        "divine-mana"
+      ],
+      "types": [
+        "Persistent",
+        "Spell"
+      ],
+      "symbol_types": {
+        "divine-mana": "mana",
+        "dark-mana": "mana"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}

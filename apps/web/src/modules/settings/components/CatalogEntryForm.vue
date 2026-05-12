@@ -120,10 +120,7 @@
         >
       </label>
     </div>
-    <label
-      v-if="kind === 'keywords'"
-      class="field-label"
-    >
+    <label class="field-label">
       Identifiers
       <textarea
         v-model="identifiersTextModel"

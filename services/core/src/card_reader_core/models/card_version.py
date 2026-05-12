@@ -24,6 +24,8 @@ class CardVersion(TimestampedModel):
         null=True,
         db_index=True,
     )
+    field_sources_json: models.TextField[str, str] = models.TextField(default="{}")
+    parsed_snapshot_json: models.TextField[str, str] = models.TextField(default="{}")
     is_latest: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)
     previous_version_id: models.TextField[str | None, str | None] = models.TextField(
         default=None,

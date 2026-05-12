@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, TypeVar
 
-from .helpers import normalize_slug_key
 from card_reader_core.models import (
     CardVersionKeyword,
     CardVersionSymbol,
@@ -91,12 +90,12 @@ def create_keyword(*, key: str, label: str, identifiers_json: str = "[]") -> Key
     return Keyword.objects.create(key=key, label=label, identifiers_json=identifiers_json)
 
 
-def create_tag(*, key: str, label: str) -> Tag:
-    return Tag.objects.create(key=key, label=label)
+def create_tag(*, key: str, label: str, identifiers_json: str = "[]") -> Tag:
+    return Tag.objects.create(key=key, label=label, identifiers_json=identifiers_json)
 
 
-def create_type(*, key: str, label: str) -> Type:
-    return Type.objects.create(key=key, label=label)
+def create_type(*, key: str, label: str, identifiers_json: str = "[]") -> Type:
+    return Type.objects.create(key=key, label=label, identifiers_json=identifiers_json)
 
 
 def create_symbol(
@@ -202,26 +201,6 @@ def replace_card_version_symbols(*, card_version_id: str, symbol_ids: list[str])
     _replace_links(CardVersionSymbol, card_version_id, "symbol_id", symbol_ids)
 
 
-def upsert_tags_by_labels(labels: list[str]) -> list[Tag]:
-    return _upsert_labels(Tag, labels)
-
-
-def upsert_types_by_labels(labels: list[str]) -> list[Type]:
-    return _upsert_labels(Type, labels)
-
-
-def _upsert_labels(model: Any, labels: list[str]) -> list[Any]:
-    out: list[Any] = []
-    for key, label in _normalize_label_entries(labels):
-        row, created = model.objects.get_or_create(key=key, defaults={"label": label})
-        if not created and row.label != label:
-            row.label = label
-            row.updated_at = now_utc()
-            row.save(update_fields=["label", "updated_at"])
-        out.append(row)
-    return out
-
-
 def get_keywords_for_card_version(card_version_id: str) -> list[Keyword]:
     ids = CardVersionKeyword.objects.filter(card_version_id=card_version_id).values_list("keyword_id", flat=True)
     return list(Keyword.objects.filter(id__in=ids).order_by("label"))
@@ -240,18 +219,3 @@ def get_symbols_for_card_version(card_version_id: str) -> list[Symbol]:
 def get_types_for_card_version(card_version_id: str) -> list[Type]:
     ids = CardVersionType.objects.filter(card_version_id=card_version_id).values_list("type_id", flat=True)
     return list(Type.objects.filter(id__in=ids).order_by("label"))
-
-
-def _normalize_label_entries(labels: list[str]) -> list[tuple[str, str]]:
-    out: list[tuple[str, str]] = []
-    seen: set[str] = set()
-    for raw in labels:
-        label = " ".join(raw.split()).strip()
-        if not label:
-            continue
-        key = normalize_slug_key(label)
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        out.append((key, label))
-    return out

@@ -38,9 +38,15 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
       ...row,
       identifiers_text: formatIdentifiersText(row.identifiers ?? []),
     }));
-    catalog.tags = data.tags ?? [];
+    catalog.tags = (data.tags ?? []).map((row) => ({
+      ...row,
+      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
+    }));
     catalog.symbols = data.symbols ?? [];
-    catalog.types = data.types ?? [];
+    catalog.types = (data.types ?? []).map((row) => ({
+      ...row,
+      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
+    }));
   };
 
   const replaceEntry = (kind: CatalogKind, entryId: string, nextEntry: CatalogFormEntry): void => {

@@ -2,26 +2,30 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Pattern, Sequence
-
-from card_reader_core.models import Keyword
+from typing import Pattern, Protocol, Sequence
 
 
-class KeywordsExtractor:
+class KnownMetadataEntry(Protocol):
+    id: str
+    label: str
+    identifiers_json: str
+
+
+class KnownMetadataExtractor:
     def __init__(self) -> None:
         self._pattern_cache: dict[str, Pattern[str]] = {}
 
-    def extract_keyword_ids(self, text: str, keywords: Sequence[Keyword]) -> list[str]:
+    def extract_ids(self, text: str, entries: Sequence[KnownMetadataEntry]) -> list[str]:
         if not text.strip():
             return []
 
         matched_ids: list[str] = []
-        for keyword in keywords:
-            terms = self._terms_for_keyword(keyword)
+        for entry in entries:
+            terms = self._terms_for_entry(entry)
             if not terms:
                 continue
             if any(self._pattern_for_label(term).search(text) for term in terms):
-                matched_ids.append(keyword.id)
+                matched_ids.append(entry.id)
         return matched_ids
 
     def _pattern_for_label(self, label: str) -> Pattern[str]:
@@ -38,10 +42,10 @@ class KeywordsExtractor:
         self._pattern_cache[label] = compiled
         return compiled
 
-    def _terms_for_keyword(self, keyword: Keyword) -> list[str]:
+    def _terms_for_entry(self, entry: KnownMetadataEntry) -> list[str]:
         terms: list[str] = []
         seen: set[str] = set()
-        for raw_term in [keyword.label, *self._load_identifiers(keyword)]:
+        for raw_term in [entry.label, *self._load_identifiers(entry)]:
             term = raw_term.strip()
             if not term:
                 continue
@@ -52,12 +56,11 @@ class KeywordsExtractor:
             terms.append(term)
         return terms
 
-    def _load_identifiers(self, keyword: Keyword) -> list[str]:
+    def _load_identifiers(self, entry: KnownMetadataEntry) -> list[str]:
         try:
-            payload = json.loads(keyword.identifiers_json or "[]")
+            payload = json.loads(entry.identifiers_json or "[]")
         except json.JSONDecodeError:
             return []
         if not isinstance(payload, list):
             return []
         return [item for item in payload if isinstance(item, str)]
-

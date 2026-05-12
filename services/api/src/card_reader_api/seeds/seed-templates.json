@@ -24,9 +24,9 @@
         "rules_text": {
           "unit": "relative",
           "x": 0.07,
-          "y": 0.62,
+          "y": 0.60,
           "w": 0.86,
-          "h": 0.3
+          "h": 0.32
         },
         "bottom_left": {
           "unit": "relative",
