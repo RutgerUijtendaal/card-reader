@@ -100,7 +100,7 @@ def _load_db_state() -> dict[str, object]:
             "name": latest_version.name,
             "type_line": latest_version.type_line,
             "mana_cost": latest_version.mana_cost,
-            "mana_symbols": json.loads(latest_version.mana_symbols_json or "[]"),
+            "mana_symbols": latest_version.mana_symbols_json,
             "attack": latest_version.attack,
             "health": latest_version.health,
             "rules_text": latest_version.rules_text,

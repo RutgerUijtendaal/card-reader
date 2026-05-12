@@ -1,5 +1,11 @@
 export type CatalogKind = 'keywords' | 'tags' | 'symbols' | 'types';
 
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export type JsonObject = {
+  [key: string]: JsonValue;
+};
+
 export type MaintenanceActionResponse = {
   message: string;
   removed_paths: string[];
@@ -65,6 +71,32 @@ export type SymbolAssetUploadResponse = {
   absolute_path: string;
 };
 
+export type SymbolApiRecord = {
+  id: string;
+  key: string;
+  label: string;
+  symbol_type: string;
+  detector_type: SymbolDetectorType;
+  detection_config_json: JsonObject;
+  reference_assets_json: string[];
+  text_token: string;
+  enabled: boolean;
+};
+
+export type TemplateApiRecord = {
+  id: string;
+  key: string;
+  label: string;
+  definition_json: JsonObject;
+};
+
+export type CatalogApiResponse = {
+  keywords: KeywordRecord[];
+  tags: TagRecord[];
+  symbols: SymbolApiRecord[];
+  types: TypeRecord[];
+};
+
 export type KeywordUpsertRequest = {
   label?: string;
   key?: string;
@@ -99,8 +131,8 @@ export type SymbolUpsertRequest = {
   key?: string;
   symbol_type?: string;
   detector_type?: SymbolDetectorType;
-  detection_config_json?: string;
-  reference_assets_json?: string;
+  detection_config_json?: JsonObject;
+  reference_assets_json?: string[];
   text_token?: string;
   enabled?: boolean;
 };
@@ -108,7 +140,7 @@ export type SymbolUpsertRequest = {
 export type TemplateUpsertRequest = {
   label?: string;
   key?: string;
-  definition_json?: string;
+  definition_json?: JsonObject;
 };
 
 export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord;

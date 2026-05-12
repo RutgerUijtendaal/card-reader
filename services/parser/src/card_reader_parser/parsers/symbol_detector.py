@@ -136,15 +136,15 @@ class SymbolDetector:
 
         raise ValueError("Unsupported image shape for symbol detection")
 
-    def _parse_config(self, raw: str) -> TemplateDetectorConfig:
-        if not raw:
+    def _parse_config(self, raw: object) -> TemplateDetectorConfig:
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError:
+                return TemplateDetectorConfig()
+        if not isinstance(raw, dict):
             return TemplateDetectorConfig()
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            return TemplateDetectorConfig()
-        if not isinstance(data, dict):
-            return TemplateDetectorConfig()
+        data = raw
 
         threshold = self._clamp_float(data.get("threshold"), 0.0, 1.0, 0.9)
         scales = self._parse_scales(data.get("scales"))
@@ -161,19 +161,18 @@ class SymbolDetector:
             center_crop_ratio=center_crop_ratio,
         )
 
-    def _resolve_template_assets(self, raw: str) -> list[Path]:
-        if not raw:
-            return []
-        try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError:
-            return []
-        if not isinstance(payload, list):
+    def _resolve_template_assets(self, raw: object) -> list[Path]:
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError:
+                return []
+        if not isinstance(raw, list):
             return []
 
         out: list[Path] = []
         symbols_root = settings.storage_root_dir / "symbols"
-        for item in payload:
+        for item in raw:
             if not isinstance(item, str):
                 continue
             value = item.strip()

@@ -3,19 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .cards import CardMetadata, CardService
+    from .cards import CardEditState, CardMetadata
     from .catalog import CatalogData, CatalogService
-    from .exports import ExportService
     from .imports import ImportService
     from .parser_jobs import ImportProcessorService, ItemProcessingResult, JobOptions, ParserResources
     from .templates import TemplateService
 
 __all__ = [
+    "CardEditState",
     "CardMetadata",
-    "CardService",
     "CatalogData",
     "CatalogService",
-    "ExportService",
     "ImportService",
     "ImportProcessorService",
     "ItemProcessingResult",
@@ -26,12 +24,12 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    if name in {"CardMetadata", "CardService"}:
-        from .cards import CardMetadata, CardService
+    if name in {"CardEditState", "CardMetadata"}:
+        from .cards import CardEditState, CardMetadata
 
         values = {
+            "CardEditState": CardEditState,
             "CardMetadata": CardMetadata,
-            "CardService": CardService,
         }
         return values[name]
     if name in {"CatalogData", "CatalogService"}:
@@ -42,10 +40,6 @@ def __getattr__(name: str) -> Any:
             "CatalogService": CatalogService,
         }
         return values[name]
-    if name == "ExportService":
-        from .exports import ExportService
-
-        return ExportService
     if name == "ImportService":
         from .imports import ImportService
 

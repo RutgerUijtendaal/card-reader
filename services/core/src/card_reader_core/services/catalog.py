@@ -319,9 +319,9 @@ class CatalogService:
             raise ValueError("Key is invalid")
         return normalized
 
-    def _normalize_identifiers_json(self, label: str, identifiers: list[str] | None) -> str:
+    def _normalize_identifiers_json(self, label: str, identifiers: list[str] | None) -> list[str]:
         normalized_identifiers = self._normalize_identifiers(label, identifiers)
-        return json.dumps(normalized_identifiers)
+        return normalized_identifiers
 
     def _normalize_identifiers(self, label: str, identifiers: list[str] | None) -> list[str]:
         out: list[str] = []
@@ -344,21 +344,36 @@ class CatalogService:
         return out
 
     def _validate_symbol_config_json(self, object_json: str | None, array_json: str | None) -> None:
-        if object_json is not None and not isinstance(json.loads(self._normalize_object_json(object_json)), dict):
+        if object_json is not None and not isinstance(self._normalize_object_json(object_json), dict):
             raise ValueError("detection_config_json must be a JSON object")
         if array_json is None:
             return
-        parsed = json.loads(self._normalize_array_json(array_json))
+        parsed = self._normalize_array_json(array_json)
         if not isinstance(parsed, list):
             raise ValueError("reference_assets_json must be a JSON array")
         if not all(isinstance(item, str) for item in parsed):
             raise ValueError("reference_assets_json entries must be strings")
 
-    def _normalize_object_json(self, value: str | None) -> str:
-        return (value or "").strip() or "{}"
+    def _normalize_object_json(self, value: str | None) -> dict[str, object]:
+        raw = (value or "").strip() or "{}"
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError("detection_config_json must be a JSON object")
+        return {str(key): parsed[key] for key in parsed}
 
-    def _normalize_array_json(self, value: str | None) -> str:
-        return (value or "").strip() or "[]"
+    def _normalize_array_json(self, value: str | None) -> list[str]:
+        raw = (value or "").strip() or "[]"
+        parsed = json.loads(raw)
+        if not isinstance(parsed, list):
+            raise ValueError("reference_assets_json must be a JSON array")
+        out: list[str] = []
+        for item in parsed:
+            if not isinstance(item, str):
+                raise ValueError("reference_assets_json entries must be strings")
+            compact = item.strip()
+            if compact:
+                out.append(compact)
+        return out
 
     def _normalize_detector_type(self, value: str | None) -> str:
         detector_type = (value or "template").strip().lower() or "template"

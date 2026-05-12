@@ -43,7 +43,6 @@ EXPECTED_TABLE_COLUMNS = {
         "health",
         "rules_text",
         "confidence",
-        "parse_result_id",
         "field_sources_json",
         "parsed_snapshot_json",
         "is_latest",

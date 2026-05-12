@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from django.db import transaction
 
 from ..models import ImportJob, ImportJobItem, ImportJobStatus, now_utc
+from ..storage import relativize_storage_path, resolve_storage_path
 
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def collect_supported_files(source_path: Path) -> list[Path]:
+    source_path = resolve_storage_path(source_path)
     if source_path.is_file():
         return [source_path] if source_path.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES else []
     if not source_path.is_dir():
@@ -50,17 +51,25 @@ def create_import_job_with_files(
 ) -> ImportJob:
     with transaction.atomic():
         job = ImportJob.objects.create(
-            source_path=str(source_path),
+            source_path=relativize_storage_path(
+                source_path,
+                default_root="uploads",
+                preserve_unmatched_absolute=True,
+            ),
             template_id=template_id,
-            options_json=json.dumps(options),
+            options_json=options,
             total_items=len(files),
             processed_items=0,
         )
         ImportJobItem.objects.bulk_create(
             [
                 ImportJobItem(
-                    job_id=job.id,
-                    source_file=str(image_file),
+                    job=job,
+                    source_file=relativize_storage_path(
+                        image_file,
+                        default_root="uploads",
+                        preserve_unmatched_absolute=True,
+                    ),
                     status=ImportJobStatus.queued,
                 )
                 for image_file in files
@@ -75,12 +84,6 @@ def fetch_job(job_id: str) -> ImportJob | None:
 
 def fetch_items_for_job(job_id: str) -> list[ImportJobItem]:
     return list(ImportJobItem.objects.filter(job_id=job_id).order_by("created_at"))
-
-
-def get_job_items(job_id: str) -> list[ImportJobItem]:
-    return fetch_items_for_job(job_id)
-
-
 def get_next_queued_job() -> ImportJob | None:
     return ImportJob.objects.filter(status=ImportJobStatus.queued).order_by("created_at").first()
 

@@ -49,6 +49,7 @@
           :form="form"
           :is-busy="isBusy"
           :is-saving="isSaving"
+          :is-queuing-reparse="isQueuingReparse"
           :save-message="saveMessage"
           :field-source="fieldSource"
           :metadata-source="metadataSource"
@@ -65,6 +66,8 @@
           @unlock-field="unlockField"
           @restore-group="restoreMetadataGroup"
           @unlock-group="unlockMetadataGroup"
+          @reset-whole-card="resetWholeCardToAuto"
+          @queue-reparse="queueLatestCardReparse"
           @toggle-group="toggleMetadataSelection"
           @update-field="updateField"
         />
@@ -95,6 +98,7 @@ const {
   selectedVersionId,
   symbolByKey,
   isSaving,
+  isQueuingReparse,
   saveMessage,
   form,
   selectedVersion,
@@ -107,6 +111,8 @@ const {
   unlockField,
   restoreMetadataGroup,
   unlockMetadataGroup,
+  resetWholeCardToAuto,
+  queueLatestCardReparse,
   fieldSource,
   metadataSource,
   fieldSourceLabel,

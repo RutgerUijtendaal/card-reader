@@ -132,7 +132,7 @@ import {
   fetchTemplates,
   updateTemplate,
 } from '@/modules/settings/api/templates';
-import type { TemplateRecord } from '@/modules/settings/types';
+import type { JsonObject, TemplateRecord } from '@/modules/settings/types';
 
 type TemplateForm = {
   label: string;
@@ -175,7 +175,7 @@ const selectTemplate = (id: string): void => {
   selectedId.value = row.id;
   form.label = row.label;
   form.key = row.key;
-  form.definition_json = prettyJson(row.definition_json);
+  form.definition_json = row.definition_json;
 };
 
 const startCreate = (): void => {
@@ -252,18 +252,9 @@ const confirmDelete = async (): Promise<void> => {
   }
 };
 
-const prettyJson = (raw: string): string => {
-  try {
-    const parsed = JSON.parse(raw);
-    return JSON.stringify(parsed, null, 2);
-  } catch {
-    return raw || '{}';
-  }
-};
-
 const normalizeDefinitionJson = (
   raw: string,
-): { ok: true; value: string } | { ok: false; message: string } => {
+): { ok: true; value: JsonObject } | { ok: false; message: string } => {
   const trimmed = raw.trim();
   if (!trimmed) {
     return { ok: false, message: 'Definition JSON is required.' };
@@ -273,7 +264,7 @@ const normalizeDefinitionJson = (
     if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
       return { ok: false, message: 'Definition JSON must be an object.' };
     }
-    return { ok: true, value: JSON.stringify(parsed) };
+    return { ok: true, value: parsed as JsonObject };
   } catch {
     return { ok: false, message: 'Definition JSON must be valid JSON.' };
   }

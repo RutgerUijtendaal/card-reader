@@ -24,6 +24,9 @@
     "lint": {
       "outputs": []
     },
+    "fix": {
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"],
       "outputs": []

@@ -3,6 +3,17 @@ from __future__ import annotations
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
+# Import model modules eagerly so Django registers every model class when the
+# app loads. The lazy export mechanism below is fine for attribute access, but
+# not sufficient for ORM relation resolution across modules.
+_REGISTERED_MODEL_MODULES = (
+    import_module(".card", __name__),
+    import_module(".card_version", __name__),
+    import_module(".import_job", __name__),
+    import_module(".metadata", __name__),
+    import_module(".template", __name__),
+)
+
 if TYPE_CHECKING:
     from .base import now_utc
     from .card import Card

@@ -8,7 +8,7 @@ from typing import Pattern, Protocol, Sequence
 class KnownMetadataEntry(Protocol):
     id: str
     label: str
-    identifiers_json: str
+    identifiers_json: list[str] | str
 
 
 class KnownMetadataExtractor:
@@ -57,10 +57,12 @@ class KnownMetadataExtractor:
         return terms
 
     def _load_identifiers(self, entry: KnownMetadataEntry) -> list[str]:
-        try:
-            payload = json.loads(entry.identifiers_json or "[]")
-        except json.JSONDecodeError:
-            return []
+        payload = entry.identifiers_json or []
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError:
+                return []
         if not isinstance(payload, list):
             return []
         return [item for item in payload if isinstance(item, str)]

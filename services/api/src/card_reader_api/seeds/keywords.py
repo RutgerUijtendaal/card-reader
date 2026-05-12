@@ -60,8 +60,8 @@ def read_keyword_entries(file_path: Path) -> list[dict[str, object]]:
     return out
 
 
-def normalize_entries(entries: list[dict[str, object]]) -> list[tuple[str, str, str]]:
-    out: list[tuple[str, str, str]] = []
+def normalize_entries(entries: list[dict[str, object]]) -> list[tuple[str, str, list[str]]]:
+    out: list[tuple[str, str, list[str]]] = []
     seen: set[str] = set()
     for entry in entries:
         label = str(entry["label"])
@@ -70,7 +70,7 @@ def normalize_entries(entries: list[dict[str, object]]) -> list[tuple[str, str, 
             continue
         seen.add(key)
         identifiers = _normalize_identifiers(label, entry.get("identifiers"))
-        out.append((key, label, json.dumps(identifiers)))
+        out.append((key, label, identifiers))
     return out
 
 

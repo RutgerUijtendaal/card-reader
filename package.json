@@ -16,6 +16,7 @@
     "build:desktop": "pnpm --filter @card-reader/desktop run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
+    "fix": "turbo run fix",
     "typecheck": "turbo run typecheck",
     "check": "turbo run typecheck && turbo run lint && turbo run test",
     "format": "turbo run format"

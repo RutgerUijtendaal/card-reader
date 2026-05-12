@@ -26,7 +26,7 @@ def create_template(
     *,
     key: str,
     label: str,
-    definition_json: str,
+    definition_json: dict[str, object],
 ) -> Template:
     return Template.objects.create(key=key, label=label, definition_json=definition_json)
 

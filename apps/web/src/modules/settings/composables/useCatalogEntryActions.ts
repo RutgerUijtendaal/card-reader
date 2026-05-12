@@ -111,12 +111,17 @@ export const useCatalogEntryActions = ({
     deleteModal.open = true;
   };
 
-  const closeDeleteModal = (): void => {
-    if (deleteModal.loading) return;
+  const resetDeleteModal = (): void => {
     deleteModal.open = false;
+    deleteModal.loading = false;
     deleteModal.kind = null;
     deleteModal.entryId = null;
     deleteModal.entryLabel = '';
+  };
+
+  const closeDeleteModal = (): void => {
+    if (deleteModal.loading) return;
+    resetDeleteModal();
   };
 
   const confirmDeleteEntry = async (): Promise<void> => {
@@ -132,8 +137,8 @@ export const useCatalogEntryActions = ({
 
     try {
       await deleteCatalogEntry(kind, entryId);
+      resetDeleteModal();
       toast.success('Entry deleted.');
-      closeDeleteModal();
       await loadCatalog();
     } catch (error) {
       console.error('Delete entry failed', error);
@@ -142,7 +147,9 @@ export const useCatalogEntryActions = ({
       const done = new Set(deletingEntryIds.value);
       done.delete(entryId);
       deletingEntryIds.value = done;
-      deleteModal.loading = false;
+      if (deleteModal.entryId === entryId) {
+        deleteModal.loading = false;
+      }
     }
   };
 

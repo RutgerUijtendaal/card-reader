@@ -28,13 +28,11 @@ class TemplateService:
         if row is None:
             raise FileNotFoundError(f"Template '{key}' does not exist")
 
-        try:
-            parsed = json.loads(row.definition_json)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Template '{key}' has invalid definition_json") from exc
-        if not isinstance(parsed, dict):
+        if isinstance(row.definition_json, str):
+            return self._normalize_definition_json(row.definition_json)
+        if not isinstance(row.definition_json, dict):
             raise ValueError(f"Template '{key}' definition_json must be a JSON object")
-        return parsed
+        return row.definition_json
 
     def create_template(
         self,
@@ -98,7 +96,7 @@ class TemplateService:
             raise ValueError("Label is required")
         return compact
 
-    def _normalize_definition_json(self, definition_json: str) -> str:
+    def _normalize_definition_json(self, definition_json: str) -> dict[str, Any]:
         raw = definition_json.strip()
         if not raw:
             raise ValueError("definition_json is required")
@@ -108,4 +106,4 @@ class TemplateService:
             raise ValueError("definition_json must be valid JSON") from exc
         if not isinstance(parsed, dict):
             raise ValueError("definition_json must be a JSON object")
-        return json.dumps(parsed)
+        return parsed

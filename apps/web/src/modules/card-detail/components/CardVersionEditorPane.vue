@@ -150,6 +150,22 @@
         {{ saveMessage }}
       </p>
       <button
+        class="btn-secondary"
+        type="button"
+        :disabled="!version.editable || isBusy"
+        @click="$emit('reset-whole-card')"
+      >
+        Reset Whole Card to Auto
+      </button>
+      <button
+        class="btn-secondary"
+        type="button"
+        :disabled="!version.editable || isBusy"
+        @click="$emit('queue-reparse')"
+      >
+        {{ isQueuingReparse ? 'Queueing Reparse...' : 'Queue Reparse' }}
+      </button>
+      <button
         class="btn-primary"
         type="button"
         :disabled="!version.editable || isBusy"
@@ -177,6 +193,7 @@ defineProps<{
   form: EditorForm;
   isBusy: boolean;
   isSaving: boolean;
+  isQueuingReparse: boolean;
   saveMessage: string;
   fieldSource: (fieldName: ScalarFieldName) => 'auto' | 'manual';
   metadataSource: (groupName: MetadataGroupName) => 'auto' | 'manual';
@@ -196,6 +213,8 @@ defineEmits<{
   (e: 'unlock-field', fieldName: ScalarFieldName): void;
   (e: 'restore-group', groupName: MetadataGroupName): void;
   (e: 'unlock-group', groupName: MetadataGroupName): void;
+  (e: 'reset-whole-card'): void;
+  (e: 'queue-reparse'): void;
   (e: 'toggle-group', groupName: MetadataGroupName, optionId: string, checked: boolean): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
 }>();

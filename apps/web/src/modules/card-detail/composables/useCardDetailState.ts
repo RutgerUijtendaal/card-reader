@@ -13,6 +13,7 @@ import type {
   SymbolFilterOption,
   SymbolLookupMap,
 } from '@/modules/card-detail/types';
+import { metadataGroups, scalarFields } from '@/modules/card-detail/types';
 
 export const useCardDetailState = () => {
   const route = useRoute();
@@ -23,6 +24,7 @@ export const useCardDetailState = () => {
   const filterOptions = ref<CardFiltersResponse>({ keywords: [], tags: [], symbols: [], types: [] });
   const symbolByKey = ref<SymbolLookupMap>({});
   const isSaving = ref(false);
+  const isQueuingReparse = ref(false);
   const saveMessage = ref('');
 
   const form = reactive<EditorForm>({
@@ -53,7 +55,7 @@ export const useCardDetailState = () => {
     ),
   );
 
-  const isBusy = computed(() => isSaving.value);
+  const isBusy = computed(() => isSaving.value || isQueuingReparse.value);
 
   const goBack = (): void => {
     if (window.history.length > 1) {
@@ -132,19 +134,13 @@ export const useCardDetailState = () => {
   const saveEdits = async (): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
+    const updates = buildManualUpdatePayload(form, version);
+    if (Object.keys(updates).length === 0) {
+      saveMessage.value = 'No changes to save.';
+      return;
+    }
     await patchLatestVersion(
-      {
-        name: form.name,
-        type_line: form.type_line,
-        mana_cost: form.mana_cost,
-        attack: form.attack,
-        health: form.health,
-        rules_text: form.rules_text,
-        keyword_ids: form.keyword_ids,
-        tag_ids: form.tag_ids,
-        type_ids: form.type_ids,
-        symbol_ids: form.symbol_ids,
-      },
+      updates,
       'Changes saved. Edited fields and metadata are now locked to manual ownership.',
     );
   };
@@ -163,6 +159,29 @@ export const useCardDetailState = () => {
 
   const unlockMetadataGroup = async (groupName: MetadataGroupName): Promise<void> => {
     await patchLatestVersion({ unlock_metadata_groups: [groupName] });
+  };
+
+  const resetWholeCardToAuto = async (): Promise<void> => {
+    await patchLatestVersion(
+      {
+        restore_fields: scalarFields.map((field) => field.name),
+        restore_metadata_groups: metadataGroups.map((group) => group.name),
+      },
+      'Whole card reset to parsed values and auto ownership.',
+    );
+  };
+
+  const queueLatestCardReparse = async (): Promise<void> => {
+    const version = selectedVersion.value;
+    if (!version?.editable) return;
+    isQueuingReparse.value = true;
+    saveMessage.value = '';
+    try {
+      const response = await api.post<{ message: string }>(`/cards/${version.id}/reparse`);
+      saveMessage.value = response.data.message;
+    } finally {
+      isQueuingReparse.value = false;
+    }
   };
 
   const fieldSource = (fieldName: ScalarFieldName): FieldSourceValue =>
@@ -251,6 +270,7 @@ export const useCardDetailState = () => {
     filterOptions,
     symbolByKey,
     isSaving,
+    isQueuingReparse,
     saveMessage,
     form,
     selectedVersion,
@@ -263,6 +283,8 @@ export const useCardDetailState = () => {
     unlockField,
     restoreMetadataGroup,
     unlockMetadataGroup,
+    resetWholeCardToAuto,
+    queueLatestCardReparse,
     fieldSource,
     metadataSource,
     fieldSourceLabel,
@@ -307,3 +329,37 @@ const parsedIds = (groupName: MetadataGroupName, selectedVersion?: CardVersionDe
 };
 
 const sortedIds = (ids: string[]): string[] => [...ids].sort((a, b) => a.localeCompare(b));
+
+const buildManualUpdatePayload = (
+  form: EditorForm,
+  version: CardVersionDetail,
+): Record<string, unknown> => {
+  const updates: Record<string, unknown> = {};
+
+  for (const fieldName of ['name', 'type_line', 'mana_cost', 'attack', 'health', 'rules_text'] as const) {
+    if (normalizeFormFieldValue(form, fieldName) !== normalizeFieldValue(version, fieldName)) {
+      updates[fieldName] = form[fieldName];
+    }
+  }
+
+  if (!sameIds(form.keyword_ids, version.keyword_ids)) {
+    updates.keyword_ids = form.keyword_ids;
+  }
+  if (!sameIds(form.tag_ids, version.tag_ids)) {
+    updates.tag_ids = form.tag_ids;
+  }
+  if (!sameIds(form.type_ids, version.type_ids)) {
+    updates.type_ids = form.type_ids;
+  }
+  if (!sameIds(form.symbol_ids, version.symbol_ids)) {
+    updates.symbol_ids = form.symbol_ids;
+  }
+
+  return updates;
+};
+
+const normalizeFormFieldValue = (form: EditorForm, fieldName: ScalarFieldName): string =>
+  String(form[fieldName] ?? '');
+
+const sameIds = (left: string[], right: string[]): boolean =>
+  JSON.stringify(sortedIds(left)) === JSON.stringify(sortedIds(right));
