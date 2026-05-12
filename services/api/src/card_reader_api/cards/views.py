@@ -21,7 +21,6 @@ from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards_repository import (
     get_card,
     get_card_image,
-    get_latest_card_version,
     list_card_generations,
     list_cards,
     update_latest_card_version,

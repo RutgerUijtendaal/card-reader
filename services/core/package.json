@@ -7,6 +7,7 @@
     "build": "echo \"Core has no build step\"",
     "test": "echo \"No core tests yet\"",
     "lint": "uv run --project ../.. --package card-reader-core ruff check src",
+    "fix": "uv run --project ../.. --package card-reader-core ruff check src --fix",
     "typecheck": "uv run --project ../.. --package card-reader-core mypy src"
   }
 }

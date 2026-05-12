@@ -45,5 +45,5 @@ class CardActionService:
         )
         return CardReparseQueueResult(
             job_id=job.id,
-            message=f"Queued reparse job for the latest card image.",
+            message="Queued reparse job for the latest card image.",
         )

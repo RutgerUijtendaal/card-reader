@@ -8,6 +8,7 @@
     "build": "echo \"Python service has no build step\"",
     "test": "uv run --project ../.. --package card-reader-parser pytest -q",
     "lint": "uv run --project ../.. --package card-reader-parser ruff check src",
+    "fix": "uv run --project ../.. --package card-reader-parser ruff check src --fix",
     "typecheck": "uv run --project ../.. --package card-reader-parser mypy src"
   }
 }
