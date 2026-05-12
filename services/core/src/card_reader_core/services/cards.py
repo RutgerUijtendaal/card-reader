@@ -5,6 +5,7 @@ from typing import Any, TypedDict
 from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
 from card_reader_core.repositories.cards_repository import (
     FieldSourcesPayload,
+    PaginatedCardList,
     ParsedSnapshotPayload,
     decode_field_sources,
     decode_parsed_snapshot,
@@ -19,9 +20,13 @@ from card_reader_core.repositories.cards_repository import (
 )
 from card_reader_core.repositories.metadata_repository import (
     get_keywords_for_card_version,
+    get_keywords_for_card_versions,
     get_symbols_for_card_version,
+    get_symbols_for_card_versions,
     get_tags_for_card_version,
+    get_tags_for_card_versions,
     get_types_for_card_version,
+    get_types_for_card_versions,
     list_keywords,
     list_symbols,
     list_tags,
@@ -43,7 +48,7 @@ class CardEditState(TypedDict):
 
 
 class CardService:
-    def list_cards(self, **filters: Any) -> list[tuple[Card, CardVersion]]:
+    def list_cards(self, **filters: Any) -> PaginatedCardList:
         return list_cards(**filters)
 
     def list_card_generations(self, card_id: str) -> list[CardVersion]:
@@ -82,6 +87,21 @@ class CardService:
             "tags": get_tags_for_card_version(card_version_id),
             "symbols": get_symbols_for_card_version(card_version_id),
             "types": get_types_for_card_version(card_version_id),
+        }
+
+    def get_card_versions_metadata(self, card_version_ids: list[str]) -> dict[str, CardMetadata]:
+        keywords = get_keywords_for_card_versions(card_version_ids)
+        tags = get_tags_for_card_versions(card_version_ids)
+        symbols = get_symbols_for_card_versions(card_version_ids)
+        types = get_types_for_card_versions(card_version_ids)
+        return {
+            card_version_id: {
+                "keywords": keywords.get(card_version_id, []),
+                "tags": tags.get(card_version_id, []),
+                "symbols": symbols.get(card_version_id, []),
+                "types": types.get(card_version_id, []),
+            }
+            for card_version_id in card_version_ids
         }
 
     def get_card_version_edit_state(self, version: CardVersion) -> CardEditState:

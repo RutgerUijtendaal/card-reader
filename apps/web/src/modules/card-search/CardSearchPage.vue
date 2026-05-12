@@ -78,7 +78,7 @@
             class="input-base min-w-[14rem] flex-1 2xl:w-80 2xl:flex-none"
             placeholder="Search cards..."
           >
-          <span class="whitespace-nowrap text-xs text-slate-500">{{ cards.length }} results</span>
+          <span class="whitespace-nowrap text-xs text-slate-500">{{ totalCount }} results</span>
           <button
             class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
             type="button"
@@ -109,7 +109,17 @@
     </div>
 
     <div
-      v-if="cards.length === 0"
+      v-if="cards.length > 0"
+      ref="loadMoreSentinelRef"
+      class="flex justify-center py-4 text-sm text-slate-500"
+    >
+      <span v-if="isLoadingPage">Loading more cards...</span>
+      <span v-else-if="nextPage === null">All cards loaded.</span>
+      <span v-else>Scroll to load more.</span>
+    </div>
+
+    <div
+      v-if="!isLoadingInitial && cards.length === 0"
       class="page-card text-sm text-slate-500"
     >
       No cards found for the current filters.
@@ -125,25 +135,18 @@ import { useCsvExport } from '@/composables/useCsvExport';
 import FilterMultiSelectPopover from '@/components/filters/FilterMultiSelectPopover.vue';
 import FilterTextPopover from '@/components/filters/FilterTextPopover.vue';
 import CardGalleryItem, { type CardGalleryItemModel } from '@/components/cards/CardGalleryItem.vue';
-
-type MetadataOption = {
-  id: string;
-  key: string;
-  label: string;
-};
-
-type SymbolFilterOption = MetadataOption & {
-  symbol_type: string;
-  text_token: string;
-  asset_url: string | null;
-};
-
-type CardFiltersResponse = {
-  keywords: MetadataOption[];
-  tags: MetadataOption[];
-  symbols: SymbolFilterOption[];
-  types: MetadataOption[];
-};
+import type {
+  CardFiltersResponse,
+  MetadataOption,
+  PaginatedCardsResponse,
+  SymbolFilterOption,
+} from '@/modules/card-detail/types';
+import {
+  appendGalleryPage,
+  createEmptyGalleryPageState,
+  isLatestGalleryRequest,
+  replaceGalleryPage,
+} from '@/modules/card-search/galleryState';
 
 const query = ref('');
 const manaCost = ref('');
@@ -165,8 +168,16 @@ const filters = ref<CardFiltersResponse>({
   symbols: [],
   types: [],
 });
-const cards = ref<CardGalleryItemModel[]>([]);
+const galleryState = ref(createEmptyGalleryPageState<CardGalleryItemModel>());
+const cards = computed(() => galleryState.value.cards);
+const totalCount = computed(() => galleryState.value.count);
+const nextPage = computed(() => galleryState.value.nextPage);
+const isLoadingInitial = ref(false);
+const isLoadingPage = ref(false);
+const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let latestSearchRequestId = 0;
+let loadMoreObserver: IntersectionObserver | null = null;
 const { exportCardsCsv } = useCsvExport();
 const symbolByKey = computed<Record<string, SymbolFilterOption>>(() =>
   Object.fromEntries((filters.value.symbols ?? []).map((row) => [row.key, row])),
@@ -207,11 +218,44 @@ const buildSearchParams = (): URLSearchParams => {
   return params;
 };
 
+const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
+  const requestId = ++latestSearchRequestId;
+  const params = buildSearchParams();
+  params.set('page', String(page));
+  params.set('page_size', '72');
+  if (mode === 'replace') {
+    isLoadingInitial.value = true;
+  } else {
+    isLoadingPage.value = true;
+  }
+
+  try {
+    const response = await api.get<PaginatedCardsResponse<CardGalleryItemModel>>(`/cards?${params.toString()}`);
+    if (!isLatestGalleryRequest(requestId, latestSearchRequestId)) {
+      return;
+    }
+    galleryState.value =
+      mode === 'replace'
+        ? replaceGalleryPage(response.data)
+        : appendGalleryPage(galleryState.value, response.data);
+  } finally {
+    if (isLatestGalleryRequest(requestId, latestSearchRequestId)) {
+      isLoadingInitial.value = false;
+      isLoadingPage.value = false;
+    }
+  }
+};
+
 const searchCards = async (): Promise<void> => {
-  const params = buildSearchParams().toString();
-  const path = params ? `/cards?${params}` : '/cards';
-  const response = await api.get<CardGalleryItemModel[]>(path);
-  cards.value = response.data;
+  galleryState.value = createEmptyGalleryPageState<CardGalleryItemModel>();
+  await loadCardsPage(1, 'replace');
+};
+
+const loadNextPage = async (): Promise<void> => {
+  if (isLoadingInitial.value || isLoadingPage.value || nextPage.value === null) {
+    return;
+  }
+  await loadCardsPage(nextPage.value, 'append');
 };
 
 const exportCsv = async (): Promise<void> => {
@@ -225,6 +269,19 @@ const debouncedSearch = (): void => {
   searchDebounceTimer = setTimeout(() => {
     void searchCards();
   }, 250);
+};
+
+const setupLoadMoreObserver = (): void => {
+  loadMoreObserver?.disconnect();
+  if (typeof window === 'undefined' || !('IntersectionObserver' in window) || !loadMoreSentinelRef.value) {
+    return;
+  }
+  loadMoreObserver = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      void loadNextPage();
+    }
+  }, { rootMargin: '400px 0px' });
+  loadMoreObserver.observe(loadMoreSentinelRef.value);
 };
 
 const observedFilterState = computed(() => ({
@@ -250,6 +307,10 @@ watch(
   { deep: true },
 );
 
+watch(loadMoreSentinelRef, () => {
+  setupLoadMoreObserver();
+});
+
 const resetFilters = (): void => {
   query.value = '';
   manaCost.value = '';
@@ -268,11 +329,13 @@ const resetFilters = (): void => {
 onMounted(async () => {
   await loadFilters();
   await searchCards();
+  setupLoadMoreObserver();
 });
 
 onBeforeUnmount(() => {
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer);
   }
+  loadMoreObserver?.disconnect();
 });
 </script>

@@ -21,18 +21,30 @@ class CardListView(APIView):
         service = CardService()
         cards = service.list_cards(**_card_filters(request))
         payloads = []
-        for card, version in cards:
-            image = service.get_card_image(version.id)
-            metadata = service.get_card_version_metadata(version.id)
+        for row in cards.results:
             payloads.append(
                 card_payload(
-                    card,
-                    version,
-                    image_url=f"/cards/{card.id}/image" if image else None,
-                    metadata=metadata,
+                    row.card,
+                    row.version,
+                    image_url=f"/cards/{row.card.id}/image" if row.image else None,
+                    metadata={
+                        "keywords": row.keywords,
+                        "tags": row.tags,
+                        "symbols": row.symbols,
+                        "types": row.types,
+                    },
                 )
             )
-        return Response(payloads)
+        return Response(
+            {
+                "count": cards.count,
+                "next_page": cards.page + 1 if cards.page * cards.page_size < cards.count else None,
+                "previous_page": cards.page - 1 if cards.page > 1 else None,
+                "page": cards.page,
+                "page_size": cards.page_size,
+                "results": payloads,
+            }
+        )
 
 
 class CardFiltersView(APIView):
@@ -189,6 +201,8 @@ def _card_filters(request: Request) -> dict[str, object]:
         "attack_max": _int_param(request, "attack_max"),
         "health_min": _int_param(request, "health_min"),
         "health_max": _int_param(request, "health_max"),
+        "page": _int_param(request, "page") or 1,
+        "page_size": _int_param(request, "page_size") or 72,
     }
 
 

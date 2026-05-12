@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from card_reader_core.models import Card, CardVersion, Keyword, ParseResult, Symbol, Tag, Type  # noqa: E402
+from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
 from card_reader_core.repositories.metadata_repository import (  # noqa: E402
     get_tags_for_card_version,
@@ -11,7 +11,9 @@ from card_reader_core.repositories.metadata_repository import (  # noqa: E402
     replace_card_version_types,
 )
 from django.contrib.auth import get_user_model  # noqa: E402
+from django.db import connection  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
+from django.test.utils import CaptureQueriesContext  # noqa: E402
 from django.test import Client, override_settings  # noqa: E402
 
 from card_reader_api.seeds.users import seed_users  # noqa: E402
@@ -257,6 +259,109 @@ def test_current_user_reports_unauthenticated_when_no_session() -> None:
     assert payload["auth_enabled"] is True
     assert payload["authenticated"] is False
     assert isinstance(payload["csrf_token"], str)
+
+
+def test_cards_list_returns_paginated_payload() -> None:
+    first_card, first_version = _create_editable_card_version(name="Paged One")
+    second_card, second_version = _create_editable_card_version(name="Paged Two")
+    _create_card_image(first_version)
+    _create_card_image(second_version)
+
+    response = Client(HTTP_HOST="localhost").get("/cards")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] >= 2
+    assert payload["page"] == 1
+    assert payload["page_size"] == 72
+    assert payload["previous_page"] is None
+    assert isinstance(payload["results"], list)
+    result_ids = {row["id"] for row in payload["results"]}
+    assert first_card.id in result_ids
+    assert second_card.id in result_ids
+
+
+def test_cards_list_pagination_honors_page_and_page_size() -> None:
+    created = []
+    for index in range(3):
+        card, version = _create_editable_card_version(name=f"Page Card {index}")
+        _create_card_image(version)
+        created.append(card.id)
+
+    client = Client(HTTP_HOST="localhost")
+    first_response = client.get("/cards", {"page": 1, "page_size": 2})
+    second_response = client.get("/cards", {"page": 2, "page_size": 2})
+    capped_response = client.get("/cards", {"page": 1, "page_size": 200})
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert capped_response.status_code == 200
+    assert first_response.json()["page_size"] == 2
+    assert len(first_response.json()["results"]) == 2
+    assert second_response.json()["page"] == 2
+    assert second_response.json()["previous_page"] == 1
+    assert capped_response.json()["page_size"] == 100
+    returned_ids = {row["id"] for row in first_response.json()["results"] + second_response.json()["results"]}
+    assert set(created).issubset(returned_ids)
+
+
+def test_cards_list_pagination_handles_empty_pages() -> None:
+    response = Client(HTTP_HOST="localhost").get("/cards", {"page": 999, "page_size": 10})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 999
+    assert payload["results"] == []
+    assert payload["next_page"] is None
+
+
+def test_cards_list_filters_preserve_count() -> None:
+    keyword = Keyword.objects.first()
+    other_keyword = Keyword.objects.exclude(id=keyword.id).first() if keyword is not None else None
+    assert keyword is not None and other_keyword is not None
+
+    card_a, version_a = _create_editable_card_version(name="Keyword Match A")
+    card_b, version_b = _create_editable_card_version(name="Keyword Match B")
+    _card_c, version_c = _create_editable_card_version(name="Keyword Miss")
+    _create_card_image(version_a)
+    _create_card_image(version_b)
+    _create_card_image(version_c)
+    replace_card_version_keywords(card_version_id=version_a.id, keyword_ids=[keyword.id])
+    replace_card_version_keywords(card_version_id=version_b.id, keyword_ids=[keyword.id])
+    replace_card_version_keywords(card_version_id=version_c.id, keyword_ids=[other_keyword.id])
+
+    response = Client(HTTP_HOST="localhost").get("/cards", {"keyword_ids": [keyword.id], "page_size": 1})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert len(payload["results"]) == 1
+    assert payload["next_page"] == 2
+    returned_ids = {card_a.id, card_b.id}
+    assert payload["results"][0]["id"] in returned_ids
+
+
+def test_cards_list_query_count_does_not_scale_linearly() -> None:
+    keyword = Keyword.objects.first()
+    tag = Tag.objects.first()
+    type_row = Type.objects.first()
+    symbol = Symbol.objects.first()
+    assert keyword is not None and tag is not None and type_row is not None and symbol is not None
+
+    for index in range(5):
+        _card, version = _create_editable_card_version(name=f"Query Budget {index}")
+        _create_card_image(version)
+        replace_card_version_keywords(card_version_id=version.id, keyword_ids=[keyword.id])
+        replace_card_version_tags(card_version_id=version.id, tag_ids=[tag.id])
+        replace_card_version_types(card_version_id=version.id, type_ids=[type_row.id])
+        replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
+
+    client = Client(HTTP_HOST="localhost")
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get("/cards", {"page": 1, "page_size": 5})
+
+    assert response.status_code == 200
+    assert len(queries) <= 12
 
 
 def test_seed_users_creates_missing_configured_users(
@@ -521,3 +626,12 @@ def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
     card.latest_version_id = version.id
     card.save(update_fields=["latest_version_id"])
     return card, version
+
+
+def _create_card_image(version: CardVersion) -> CardVersionImage:
+    return CardVersionImage.objects.create(
+        card_version_id=version.id,
+        source_file=f"/tmp/{version.id}.png",
+        stored_path=f"/tmp/{version.id}.png",
+        checksum=f"checksum-{version.id}",
+    )
