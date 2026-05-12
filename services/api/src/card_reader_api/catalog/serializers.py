@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from card_reader_core.models import Keyword, Symbol, Tag, Type
 
 
@@ -18,19 +16,19 @@ def _catalog_option_payload(row: CatalogOption) -> dict[str, object]:
 
 def keyword_payload(row: Keyword) -> dict[str, object]:
     payload = _catalog_option_payload(row)
-    payload["identifiers"] = json.loads(row.identifiers_json or "[]")
+    payload["identifiers"] = row.identifiers_json
     return payload
 
 
 def tag_payload(row: Tag) -> dict[str, object]:
     payload = _catalog_option_payload(row)
-    payload["identifiers"] = json.loads(row.identifiers_json or "[]")
+    payload["identifiers"] = row.identifiers_json
     return payload
 
 
 def type_payload(row: Type) -> dict[str, object]:
     payload = _catalog_option_payload(row)
-    payload["identifiers"] = json.loads(row.identifiers_json or "[]")
+    payload["identifiers"] = row.identifiers_json
     return payload
 
 

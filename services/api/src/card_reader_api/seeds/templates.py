@@ -17,7 +17,7 @@ DEFAULT_TEMPLATES_FILE = resolve_seed_file("seed-templates.json")
 class TemplateSeedEntry:
     key: str
     label: str
-    definition_json: str
+    definition_json: dict[str, object]
 
 
 def read_template_entries(seed_file: Path = DEFAULT_TEMPLATES_FILE) -> list[TemplateSeedEntry]:
@@ -43,7 +43,7 @@ def read_template_entries(seed_file: Path = DEFAULT_TEMPLATES_FILE) -> list[Temp
         definition = item.get("definition")
         if not label or not key or key in seen_keys or not isinstance(definition, dict):
             continue
-        out.append(TemplateSeedEntry(key=key, label=label, definition_json=json.dumps(definition)))
+        out.append(TemplateSeedEntry(key=key, label=label, definition_json=definition))
         seen_keys.add(key)
     return out
 

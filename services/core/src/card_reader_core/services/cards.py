@@ -13,7 +13,6 @@ from card_reader_core.repositories.cards_repository import (
     get_card,
     get_card_image,
     get_latest_card_version,
-    get_parse_result,
     list_card_generations,
     list_cards,
     resolve_image_file_path,
@@ -113,7 +112,7 @@ class CardService:
         return {
             "field_sources": decode_field_sources(version.field_sources_json),
             "parsed_snapshot": decode_parsed_snapshot(version.parsed_snapshot_json),
-            "parse_result": get_parse_result(version.parse_result_id),
+            "parse_result": version.parse_result,
         }
 
     def update_card(

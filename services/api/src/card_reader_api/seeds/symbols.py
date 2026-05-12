@@ -24,7 +24,7 @@ class SymbolSeedEntry:
     symbol_type: str
     text_token: str
     detector_type: str
-    detection_config_json: str
+    detection_config_json: dict[str, object]
     enabled: bool
     asset_files: list[str]
 
@@ -55,7 +55,8 @@ def read_symbol_entries(seed_file: Path = DEFAULT_SYMBOLS_FILE) -> list[SymbolSe
         symbol_type = normalize_slug_key(str(item.get("symbol_type", "generic")).strip() or "generic")
         detector_type = str(item.get("detector_type", "template")).strip().lower() or "template"
         text_token = str(item.get("text_token", "")).strip()
-        detection_config_json = str(item.get("detection_config_json", "{}")).strip() or "{}"
+        raw_detection_config = item.get("detection_config_json", {})
+        detection_config_json = raw_detection_config if isinstance(raw_detection_config, dict) else {}
         enabled = bool(item.get("enabled", True))
         raw_assets = item.get("asset_files", [])
         asset_files = [
@@ -126,10 +127,10 @@ def symbol_table_has_rows() -> bool:
     return Symbol.objects.exists()
 
 
-def _copy_assets_and_build_references(asset_files: list[str]) -> str:
+def _copy_assets_and_build_references(asset_files: list[str]) -> list[str]:
     references: list[str] = []
     if not asset_files:
-        return "[]"
+        return []
 
     destination_root = resolve_storage_path("symbols/defaults")
     destination_root.mkdir(parents=True, exist_ok=True)
@@ -144,7 +145,7 @@ def _copy_assets_and_build_references(asset_files: list[str]) -> str:
             shutil.copy2(source, target)
         references.append(f"defaults/{source.name}")
 
-    return json.dumps(references)
+    return references
 
 
 def _set_if_diff(instance: Symbol, field_name: str, value: object) -> bool:

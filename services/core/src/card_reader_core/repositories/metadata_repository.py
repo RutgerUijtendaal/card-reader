@@ -86,16 +86,16 @@ def type_key_exists(*, key: str, exclude_id: str | None = None) -> bool:
     return _key_exists(Type, key=key, exclude_id=exclude_id)
 
 
-def create_keyword(*, key: str, label: str, identifiers_json: str = "[]") -> Keyword:
-    return Keyword.objects.create(key=key, label=label, identifiers_json=identifiers_json)
+def create_keyword(*, key: str, label: str, identifiers_json: list[str] | None = None) -> Keyword:
+    return Keyword.objects.create(key=key, label=label, identifiers_json=identifiers_json or [])
 
 
-def create_tag(*, key: str, label: str, identifiers_json: str = "[]") -> Tag:
-    return Tag.objects.create(key=key, label=label, identifiers_json=identifiers_json)
+def create_tag(*, key: str, label: str, identifiers_json: list[str] | None = None) -> Tag:
+    return Tag.objects.create(key=key, label=label, identifiers_json=identifiers_json or [])
 
 
-def create_type(*, key: str, label: str, identifiers_json: str = "[]") -> Type:
-    return Type.objects.create(key=key, label=label, identifiers_json=identifiers_json)
+def create_type(*, key: str, label: str, identifiers_json: list[str] | None = None) -> Type:
+    return Type.objects.create(key=key, label=label, identifiers_json=identifiers_json or [])
 
 
 def create_symbol(
@@ -104,8 +104,8 @@ def create_symbol(
     label: str,
     symbol_type: str,
     detector_type: str,
-    detection_config_json: str,
-    reference_assets_json: str,
+    detection_config_json: dict[str, object],
+    reference_assets_json: list[str],
     text_token: str,
     enabled: bool,
 ) -> Symbol:

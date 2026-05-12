@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from django.db import transaction
@@ -58,14 +57,14 @@ def create_import_job_with_files(
                 preserve_unmatched_absolute=True,
             ),
             template_id=template_id,
-            options_json=json.dumps(options),
+            options_json=options,
             total_items=len(files),
             processed_items=0,
         )
         ImportJobItem.objects.bulk_create(
             [
                 ImportJobItem(
-                    job_id=job.id,
+                    job=job,
                     source_file=relativize_storage_path(
                         image_file,
                         default_root="uploads",
@@ -85,12 +84,6 @@ def fetch_job(job_id: str) -> ImportJob | None:
 
 def fetch_items_for_job(job_id: str) -> list[ImportJobItem]:
     return list(ImportJobItem.objects.filter(job_id=job_id).order_by("created_at"))
-
-
-def get_job_items(job_id: str) -> list[ImportJobItem]:
-    return fetch_items_for_job(job_id)
-
-
 def get_next_queued_job() -> ImportJob | None:
     return ImportJob.objects.filter(status=ImportJobStatus.queued).order_by("created_at").first()
 

@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import json
 from typing import TYPE_CHECKING
 
 from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
@@ -100,24 +98,16 @@ def symbol_option(symbol: Symbol) -> dict[str, object]:
     }
 
 
-def _decode_mana_symbols(value: str) -> list[str]:
-    try:
-        payload = json.loads(value)
-    except Exception:
+def _decode_mana_symbols(value: object) -> list[str]:
+    if not isinstance(value, list):
         return []
-    if not isinstance(payload, list):
-        return []
-    return [str(item) for item in payload]
+    return [str(item) for item in value]
 
 
-def _first_symbol_asset_url(raw: str) -> str | None:
-    try:
-        payload = json.loads(raw)
-    except Exception:
+def _first_symbol_asset_url(raw: object) -> str | None:
+    if not isinstance(raw, list):
         return None
-    if not isinstance(payload, list):
-        return None
-    for item in payload:
+    for item in raw:
         if isinstance(item, str) and item.strip():
             return f"/symbols/assets/{item.strip().replace('\\', '/')}"
     return None

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 
 from .cards_repository import list_cards
 from .metadata_repository import (
@@ -67,7 +66,7 @@ def export_cards_csv(
         )
         total_count = cards.count
         for row in cards.results:
-            mana_symbols = json.loads(row.version.mana_symbols_json)
+            mana_symbols = [str(item) for item in row.version.mana_symbols_json if isinstance(item, str)]
             writer.writerow(
                 {
                     "card_key": _sanitize_csv_text(row.version.card.key),

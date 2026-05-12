@@ -16,7 +16,6 @@ _EXPORTS = {
     "fetch_job": ".import_jobs_repository",
     "fetch_items_for_job": ".import_jobs_repository",
     "get_next_queued_job": ".import_jobs_repository",
-    "get_job_items": ".import_jobs_repository",
     "mark_job_item_failed": ".import_jobs_repository",
     "requeue_running_import_jobs": ".import_jobs_repository",
     "save_parsed_card": ".cards_repository",

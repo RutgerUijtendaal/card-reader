@@ -29,7 +29,7 @@ def test_reparse_preserves_manual_fields_and_metadata_groups() -> None:
 
     latest = get_latest_card_version(_latest_card_id())
     assert latest is not None
-    original_snapshot = json.loads(latest.parsed_snapshot_json)
+    original_snapshot = latest.parsed_snapshot_json
     original_tag_ids = original_snapshot["metadata"]["tag_ids"]
     assert original_tag_ids
 
@@ -54,7 +54,7 @@ def test_reparse_preserves_manual_fields_and_metadata_groups() -> None:
 
     reparsed = get_latest_card_version(latest.card_id)
     assert reparsed is not None
-    reparsed_snapshot = json.loads(reparsed.parsed_snapshot_json)
+    reparsed_snapshot = reparsed.parsed_snapshot_json
 
     assert reparsed.rules_text == "Manual lock text"
     assert [row.id for row in get_tags_for_card_version(reparsed.id)] == [original_tag_ids[0]]

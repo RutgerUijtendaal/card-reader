@@ -14,7 +14,7 @@ class Tag(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
-    identifiers_json: models.TextField[str, str] = models.TextField(default="[]")
+    identifiers_json = models.JSONField(default=list)
 
     class Meta:
         db_table = "tag"
@@ -26,8 +26,8 @@ class Symbol(TimestampedModel):
     label: models.TextField[str, str] = models.TextField(default="")
     symbol_type: models.TextField[str, str] = models.TextField(default="generic", db_index=True)
     detector_type: models.TextField[str, str] = models.TextField(default="template", db_index=True)
-    detection_config_json: models.TextField[str, str] = models.TextField(default="{}")
-    reference_assets_json: models.TextField[str, str] = models.TextField(default="[]")
+    detection_config_json = models.JSONField(default=dict)
+    reference_assets_json = models.JSONField(default=list)
     text_token: models.TextField[str, str] = models.TextField(default="")
     enabled: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)
 
@@ -39,7 +39,7 @@ class Keyword(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
-    identifiers_json: models.TextField[str, str] = models.TextField(default="[]")
+    identifiers_json = models.JSONField(default=list)
 
     class Meta:
         db_table = "keyword"
@@ -49,7 +49,7 @@ class Type(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
-    identifiers_json: models.TextField[str, str] = models.TextField(default="[]")
+    identifiers_json = models.JSONField(default=list)
 
     class Meta:
         db_table = "type"

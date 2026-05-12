@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +9,7 @@ from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus, K
 from card_reader_core.repositories.import_jobs_repository import (
     bump_job_processed,
     fetch_job,
-    get_job_items,
+    fetch_items_for_job,
     mark_job_complete,
     mark_job_failed,
     mark_job_item_failed,
@@ -89,7 +88,7 @@ class ImportProcessorService:
         shutdown_requested = False
 
         mark_job_running(job)
-        for item in get_job_items(job.id):
+        for item in fetch_items_for_job(job.id):
             if stop_requested():
                 shutdown_requested = True
                 break
@@ -167,13 +166,10 @@ class ImportProcessorService:
 
     def _load_job_options(self, job: ImportJob) -> JobOptions:
         raw_options: dict[str, object] = {}
-        if job.options_json:
-            try:
-                parsed_options = json.loads(job.options_json)
-                if isinstance(parsed_options, dict):
-                    raw_options = parsed_options
-            except json.JSONDecodeError:
-                logger.warning("Ignoring invalid job options JSON. job_id=%s", job.id)
+        if isinstance(job.options_json, dict):
+            raw_options = job.options_json
+        elif job.options_json:
+            logger.warning("Ignoring invalid job options JSON. job_id=%s", job.id)
 
         return JobOptions(
             reparse_existing=self._to_bool(raw_options.get("reparse_existing"), default=True),
