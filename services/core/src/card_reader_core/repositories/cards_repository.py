@@ -27,9 +27,19 @@ from card_reader_core.models import (
     ImportJobItem,
     ImportJobStatus,
     ParseResult,
+    Keyword,
+    Symbol,
+    Tag,
+    Type,
     now_utc,
 )
 from card_reader_core.search.cards import apply_card_search
+from .metadata_repository import (
+    get_keywords_for_card_versions,
+    get_symbols_for_card_versions,
+    get_tags_for_card_versions,
+    get_types_for_card_versions,
+)
 
 
 @dataclass(frozen=True)
@@ -37,6 +47,25 @@ class LatestCardVersionReparseSource:
     card_version_id: str
     template_id: str
     image_path: Path
+
+
+@dataclass(frozen=True)
+class CardListRow:
+    card: Card
+    version: CardVersion
+    image: CardVersionImage | None
+    keywords: list[Keyword]
+    tags: list[Tag]
+    symbols: list[Symbol]
+    types: list[Type]
+
+
+@dataclass(frozen=True)
+class PaginatedCardList:
+    count: int
+    page: int
+    page_size: int
+    results: list[CardListRow]
 
 
 DEFAULT_FIELD_SOURCES = {
@@ -166,7 +195,11 @@ def list_cards(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
-) -> list[tuple[Card, CardVersion]]:
+    page: int = 1,
+    page_size: int = 72,
+) -> PaginatedCardList:
+    normalized_page = max(page, 1)
+    normalized_page_size = max(1, min(page_size, 100))
     versions = CardVersion.objects.filter(is_latest=True).order_by("-updated_at")
     versions = apply_card_search(versions, query)
     versions = _apply_card_filters(
@@ -184,10 +217,52 @@ def list_cards(
     versions = _filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
     versions = _filter_by_links(versions, CardVersionType, "type_id", type_ids)
 
-    version_rows = list(versions)
+    total_count = versions.count()
+    offset = (normalized_page - 1) * normalized_page_size
+    version_rows = list(versions[offset : offset + normalized_page_size])
+    if not version_rows:
+        return PaginatedCardList(
+            count=total_count,
+            page=normalized_page,
+            page_size=normalized_page_size,
+            results=[],
+        )
+
+    version_ids = [version.id for version in version_rows]
     cards = Card.objects.filter(id__in=[version.card_id for version in version_rows])
     cards_by_id = {card.id: card for card in cards}
-    return [(cards_by_id[version.card_id], version) for version in version_rows]
+    images_by_version_id = {
+        image.card_version_id: image
+        for image in CardVersionImage.objects.filter(card_version_id__in=version_ids)
+    }
+    keywords_by_version_id = get_keywords_for_card_versions(version_ids)
+    tags_by_version_id = get_tags_for_card_versions(version_ids)
+    symbols_by_version_id = get_symbols_for_card_versions(version_ids)
+    types_by_version_id = get_types_for_card_versions(version_ids)
+
+    results: list[CardListRow] = []
+    for version in version_rows:
+        card = cards_by_id.get(version.card_id)
+        if card is None:
+            continue
+        results.append(
+            CardListRow(
+                card=card,
+                version=version,
+                image=images_by_version_id.get(version.id),
+                keywords=keywords_by_version_id.get(version.id, []),
+                tags=tags_by_version_id.get(version.id, []),
+                symbols=symbols_by_version_id.get(version.id, []),
+                types=types_by_version_id.get(version.id, []),
+            )
+        )
+
+    return PaginatedCardList(
+        count=total_count,
+        page=normalized_page,
+        page_size=normalized_page_size,
+        results=results,
+    )
 
 
 def get_card(card_id: str) -> Card | None:

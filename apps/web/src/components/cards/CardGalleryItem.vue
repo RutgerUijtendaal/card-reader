@@ -18,6 +18,8 @@
         :src="toAbsoluteApiUrl(card.image_url)"
         alt="Card image"
         class="block w-full object-contain"
+        loading="lazy"
+        decoding="async"
       >
     </component>
 

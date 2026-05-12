@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any, TypeVar
 
 from card_reader_core.models import (
@@ -219,3 +220,76 @@ def get_symbols_for_card_version(card_version_id: str) -> list[Symbol]:
 def get_types_for_card_version(card_version_id: str) -> list[Type]:
     ids = CardVersionType.objects.filter(card_version_id=card_version_id).values_list("type_id", flat=True)
     return list(Type.objects.filter(id__in=ids).order_by("label"))
+
+
+def get_keywords_for_card_versions(card_version_ids: list[str]) -> dict[str, list[Keyword]]:
+    return _get_metadata_for_card_versions(
+        card_version_ids,
+        CardVersionKeyword,
+        "keyword_id",
+        Keyword,
+    )
+
+
+def get_tags_for_card_versions(card_version_ids: list[str]) -> dict[str, list[Tag]]:
+    return _get_metadata_for_card_versions(
+        card_version_ids,
+        CardVersionTag,
+        "tag_id",
+        Tag,
+    )
+
+
+def get_symbols_for_card_versions(card_version_ids: list[str]) -> dict[str, list[Symbol]]:
+    return _get_metadata_for_card_versions(
+        card_version_ids,
+        CardVersionSymbol,
+        "symbol_id",
+        Symbol,
+    )
+
+
+def get_types_for_card_versions(card_version_ids: list[str]) -> dict[str, list[Type]]:
+    return _get_metadata_for_card_versions(
+        card_version_ids,
+        CardVersionType,
+        "type_id",
+        Type,
+    )
+
+
+def _get_metadata_for_card_versions(
+    card_version_ids: list[str],
+    link_model: Any,
+    metadata_field_name: str,
+    metadata_model: Any,
+) -> dict[str, list[Any]]:
+    if not card_version_ids:
+        return {}
+
+    link_rows = list(
+        link_model.objects.filter(card_version_id__in=card_version_ids)
+        .values("card_version_id", metadata_field_name)
+    )
+    metadata_ids = {str(row[metadata_field_name]) for row in link_rows if row.get(metadata_field_name)}
+    if not metadata_ids:
+        return {card_version_id: [] for card_version_id in card_version_ids}
+
+    metadata_by_id = {
+        str(row.id): row
+        for row in metadata_model.objects.filter(id__in=metadata_ids).order_by("label")
+    }
+    grouped_ids: dict[str, set[str]] = defaultdict(set)
+    for row in link_rows:
+        card_version_id = str(row["card_version_id"])
+        metadata_id = str(row[metadata_field_name])
+        if metadata_id in metadata_by_id:
+            grouped_ids[card_version_id].add(metadata_id)
+
+    out: dict[str, list[Any]] = {}
+    for card_version_id in card_version_ids:
+        ordered_rows = [
+            row for row in metadata_by_id.values() if str(row.id) in grouped_ids.get(card_version_id, set())
+        ]
+        out[card_version_id] = ordered_rows
+    return out

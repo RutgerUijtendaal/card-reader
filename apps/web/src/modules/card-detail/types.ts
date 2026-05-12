@@ -69,6 +69,19 @@ export type CardVersionDetail = CardHoverTooltipModel & {
   parse_result: ParseResultSummary;
 };
 
+export type CardListItem = CardHoverTooltipModel & {
+  image_url: string | null;
+};
+
+export type PaginatedCardsResponse<TCard = CardListItem> = {
+  count: number;
+  next_page: number | null;
+  previous_page: number | null;
+  page: number;
+  page_size: number;
+  results: TCard[];
+};
+
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
 
