@@ -7,19 +7,43 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
-from card_reader_api.cards.serializers import card_payload, metadata_option, symbol_option
-from card_reader_core.services.cards import CardService
+from card_reader_api.cards.serializers import (
+    CardFiltersQuerySerializer,
+    LatestVersionUpdateSerializer,
+    card_payload,
+    metadata_option,
+    symbol_option,
+)
+from card_reader_api.cards.services import CardActionService, CardReparseError
+from card_reader_core.repositories.cards_repository import (
+    get_card,
+    get_card_image,
+    get_latest_card_version,
+    list_card_generations,
+    list_cards,
+    update_latest_card_version,
+)
 from card_reader_core.settings import settings
+from card_reader_core.services.cards import (
+    get_card_version_edit_state,
+    get_card_version_metadata,
+    get_card_with_image,
+    get_filter_metadata,
+    resolve_card_image_path,
+)
 
 
 class CardListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        service = CardService()
-        cards = service.list_cards(**_card_filters(request))
+        serializer = CardFiltersQuerySerializer(data=_query_data(request, include_paging=True))
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
+        cards = list_cards(**serializer.validated_filters())
         payloads = []
         for row in cards.results:
             payloads.append(
@@ -51,7 +75,7 @@ class CardFiltersView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, _request: Request) -> Response:
-        metadata = CardService().get_filter_metadata()
+        metadata = get_filter_metadata()
         return Response(
             {
                 "keywords": [metadata_option(row) for row in metadata["keywords"]],
@@ -64,12 +88,11 @@ class CardFiltersView(APIView):
 
 class CardDetailView(APIView):
     def get(self, _request: Request, card_id: str) -> Response:
-        service = CardService()
-        card, version, image = service.get_card_with_image(card_id)
+        card, version, image = get_card_with_image(card_id)
         if card is None or version is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
-        metadata = service.get_card_version_metadata(version.id)
-        edit_state = service.get_card_version_edit_state(version)
+        metadata = get_card_version_metadata(version.id)
+        edit_state = get_card_version_edit_state(version)
         return Response(
             card_payload(
                 card,
@@ -83,20 +106,19 @@ class CardDetailView(APIView):
 
 class CardGenerationsView(APIView):
     def get(self, _request: Request, card_id: str) -> Response:
-        service = CardService()
-        card = service.get_card(card_id)
+        card = get_card(card_id)
         if card is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        versions = service.list_card_generations(card_id)
+        versions = list_card_generations(card_id)
         if not versions:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
 
         payloads = []
         for version in versions:
-            image = service.get_card_image(version.id)
-            metadata = service.get_card_version_metadata(version.id)
-            edit_state = service.get_card_version_edit_state(version)
+            image = get_card_image(version.id)
+            metadata = get_card_version_metadata(version.id)
+            edit_state = get_card_version_edit_state(version)
             payloads.append(
                 card_payload(
                     card,
@@ -111,37 +133,25 @@ class CardGenerationsView(APIView):
 
 class LatestCardVersionUpdateView(APIView):
     def patch(self, request: Request, card_id: str) -> Response:
-        try:
-            updates = _extract_latest_version_updates(request)
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = LatestVersionUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
 
-        restore_fields = _string_list(request.data.get("restore_fields"))
-        restore_metadata_groups = _string_list(request.data.get("restore_metadata_groups"))
-        unlock_fields = _string_list(request.data.get("unlock_fields"))
-        unlock_metadata_groups = _string_list(request.data.get("unlock_metadata_groups"))
-
-        if not _names_are_valid(restore_fields + unlock_fields, _SCALAR_FIELDS):
-            return Response({"detail": "Invalid scalar field name."}, status=status.HTTP_400_BAD_REQUEST)
-        if not _names_are_valid(restore_metadata_groups + unlock_metadata_groups, _METADATA_GROUPS):
-            return Response({"detail": "Invalid metadata group name."}, status=status.HTTP_400_BAD_REQUEST)
-
-        service = CardService()
-        updated = service.update_latest_card_version(
+        updated = update_latest_card_version(
             card_id=card_id,
-            updates=updates,
-            restore_fields=restore_fields,
-            restore_metadata_groups=restore_metadata_groups,
-            unlock_fields=unlock_fields,
-            unlock_metadata_groups=unlock_metadata_groups,
+            updates=serializer.validated_update_payload(),
+            restore_fields=serializer.validated_data["restore_fields"],
+            restore_metadata_groups=serializer.validated_data["restore_metadata_groups"],
+            unlock_fields=serializer.validated_data["unlock_fields"],
+            unlock_metadata_groups=serializer.validated_data["unlock_metadata_groups"],
         )
         if updated is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
 
         card, version = updated
-        image = service.get_card_image(version.id)
-        metadata = service.get_card_version_metadata(version.id)
-        edit_state = service.get_card_version_edit_state(version)
+        image = get_card_image(version.id)
+        metadata = get_card_version_metadata(version.id)
+        edit_state = get_card_version_edit_state(version)
         return Response(
             card_payload(
                 card,
@@ -153,15 +163,33 @@ class LatestCardVersionUpdateView(APIView):
         )
 
 
+class LatestCardReparseView(APIView):
+    def post(self, _request: Request, card_id: str) -> Response:
+        try:
+            result = CardActionService().queue_latest_version_reparse(card_id)
+        except CardReparseError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if result is None:
+            return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(
+            {
+                "job_id": result.job_id,
+                "message": result.message,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
 class CardImageView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, _request: Request, card_id: str) -> FileResponse:
-        service = CardService()
-        card, _version, image = service.get_card_with_image(card_id)
+        card, _version, image = get_card_with_image(card_id)
         if card is None or image is None:
             raise Http404("Card image not found")
-        image_path = service.resolve_card_image_path(image)
+        image_path = resolve_card_image_path(image)
         if image_path is None:
             raise Http404("Card image file is missing")
         return _file_response(image_path, "Card image file is missing")
@@ -169,13 +197,12 @@ class CardImageView(APIView):
 
 class CardVersionImageView(APIView):
     def get(self, _request: Request, card_id: str, version_id: str) -> FileResponse:
-        service = CardService()
-        if service.get_card(card_id) is None:
+        if get_card(card_id) is None:
             raise Http404("Card not found")
-        image = service.get_card_image(version_id)
+        image = get_card_image(version_id)
         if image is None:
             raise Http404("Card image not found")
-        image_path = service.resolve_card_image_path(image)
+        image_path = resolve_card_image_path(image)
         if image_path is None:
             raise Http404("Card image file is missing")
         return _file_response(image_path, "Card image file is missing")
@@ -194,72 +221,39 @@ class SymbolAssetView(APIView):
         return _file_response(requested_path, "Symbol asset not found")
 
 
-def _card_filters(request: Request) -> dict[str, object]:
-    return {
-        "query": request.query_params.get("q"),
-        "max_confidence": _float_param(request, "max_confidence"),
-        "keyword_ids": request.query_params.getlist("keyword_ids") or None,
-        "tag_ids": request.query_params.getlist("tag_ids") or None,
-        "symbol_ids": request.query_params.getlist("symbol_ids") or None,
-        "type_ids": request.query_params.getlist("type_ids") or None,
-        "mana_cost": request.query_params.get("mana_cost"),
-        "template_id": request.query_params.get("template_id"),
-        "attack_min": _int_param(request, "attack_min"),
-        "attack_max": _int_param(request, "attack_max"),
-        "health_min": _int_param(request, "health_min"),
-        "health_max": _int_param(request, "health_max"),
-        "page": _int_param(request, "page") or 1,
-        "page_size": _int_param(request, "page_size") or 72,
-    }
-
-
-def _float_param(request: Request, name: str) -> float | None:
-    value = request.query_params.get(name)
-    if value is None or value == "":
-        return None
-    return float(value)
-
-
-def _int_param(request: Request, name: str) -> int | None:
-    value = request.query_params.get(name)
-    if value is None or value == "":
-        return None
-    return int(value)
-
-
 def _file_response(path: Path, detail: str) -> FileResponse:
     if not path.exists() or not path.is_file():
         raise Http404(detail)
     return FileResponse(path.open("rb"))
 
 
-_SCALAR_FIELDS = {"name", "type_line", "mana_cost", "attack", "health", "rules_text"}
-_METADATA_GROUPS = {"keywords", "tags", "types", "symbols"}
+def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
+    data: dict[str, object] = {
+        "query": request.query_params.get("q"),
+        "max_confidence": request.query_params.get("max_confidence"),
+        "keyword_ids": request.query_params.getlist("keyword_ids"),
+        "tag_ids": request.query_params.getlist("tag_ids"),
+        "symbol_ids": request.query_params.getlist("symbol_ids"),
+        "type_ids": request.query_params.getlist("type_ids"),
+        "mana_cost": request.query_params.get("mana_cost"),
+        "template_id": request.query_params.get("template_id"),
+        "attack_min": request.query_params.get("attack_min"),
+        "attack_max": request.query_params.get("attack_max"),
+        "health_min": request.query_params.get("health_min"),
+        "health_max": request.query_params.get("health_max"),
+    }
+    if include_paging:
+        page = request.query_params.get("page")
+        page_size = request.query_params.get("page_size")
+        if page is not None:
+            data["page"] = page
+        if page_size is not None:
+            data["page_size"] = page_size
+    return data
 
 
-def _extract_latest_version_updates(request: Request) -> dict[str, object]:
-    updates: dict[str, object] = {}
-    for field_name in _SCALAR_FIELDS:
-        if field_name in request.data:
-            value = request.data.get(field_name)
-            if field_name == "name" and (not isinstance(value, str) or not value.strip()):
-                raise ValueError("name is required")
-            updates[field_name] = value
-    for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):
-        if field_name not in request.data:
-            continue
-        value = request.data.get(field_name)
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-            raise ValueError(f"{field_name} must be an array of strings")
-        updates[field_name] = value
-    return updates
-
-
-def _string_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value if isinstance(item, str)]
-
-
-def _names_are_valid(values: list[str], allowed: set[str]) -> bool:
-    return all(value in allowed for value in values)
+def _serializer_error(serializer: Serializer[object]) -> Response:
+    detail = next(iter(serializer.errors.values()))
+    if isinstance(detail, list):
+        detail = detail[0]
+    return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)

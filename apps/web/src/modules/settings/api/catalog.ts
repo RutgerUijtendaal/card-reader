@@ -1,5 +1,6 @@
 import { api } from '@/api/client';
 import type {
+  CatalogApiResponse,
   CatalogKind,
   CatalogResponse,
   KeywordUpsertRequest,
@@ -8,6 +9,7 @@ import type {
   TagUpsertRequest,
   TypeUpsertRequest,
 } from '@/modules/settings/types';
+import { normalizeCatalogResponse } from '@/modules/settings/composables/catalogSettingsUtils';
 
 const createPathByKind: Record<CatalogKind, string> = {
   keywords: '/settings/keywords',
@@ -20,8 +22,8 @@ const pathForKindAndId = (kind: CatalogKind, id: string): string =>
   `${createPathByKind[kind]}/${id}`;
 
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
-  const response = await api.get<CatalogResponse>('/settings/catalog');
-  return response.data;
+  const response = await api.get<CatalogApiResponse>('/settings/catalog');
+  return normalizeCatalogResponse(response.data);
 };
 
 export const createCatalogEntry = async (

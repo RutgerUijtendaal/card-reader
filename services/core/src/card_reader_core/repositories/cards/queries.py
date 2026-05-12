@@ -13,7 +13,6 @@ from card_reader_core.models import (
     CardVersionTag,
     CardVersionType,
     Keyword,
-    ParseResult,
     Symbol,
     Tag,
     Type,
@@ -180,12 +179,6 @@ def list_card_generations(card_id: str) -> list[CardVersion]:
         .select_related("card", "template", "previous_version", "parse_result")
         .order_by("-version_number")
     )
-
-
-def get_parse_result(parse_result_id: str | None) -> ParseResult | None:
-    if not parse_result_id:
-        return None
-    return ParseResult.objects.filter(id=parse_result_id).first()
 
 
 def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> QuerySet[CardVersion]:

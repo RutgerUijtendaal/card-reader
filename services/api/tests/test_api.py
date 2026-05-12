@@ -586,6 +586,39 @@ def test_latest_version_patch_can_restore_and_unlock() -> None:
     assert [row.id for row in get_tags_for_card_version(latest.id)] == [tag.id]
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_card_reparse_queues_import_job() -> None:
+    username = "staff-card-reparse-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    card, version = _create_editable_card_version(name="Reparse Target")
+    _create_card_image(version)
+
+    response = client.post(
+        f"/cards/{card.id}/reparse",
+        data={},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["job_id"]
+    assert "Queued reparse job" in payload["message"]
+
+    job = ImportJob.objects.get(id=payload["job_id"])
+    assert job.template_id == version.template_id
+    assert job.options_json == {"reparse_existing": True}
+    assert job.total_items == 1
+
+    items = list(ImportJobItem.objects.filter(job_id=job.id))
+    assert len(items) == 1
+    assert items[0].status == "queued"
+
+
 def _create_user(
     username: str,
     password: str,

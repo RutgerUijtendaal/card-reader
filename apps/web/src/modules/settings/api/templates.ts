@@ -1,9 +1,10 @@
 import { api } from '@/api/client';
-import type { TemplateRecord, TemplateUpsertRequest } from '@/modules/settings/types';
+import { normalizeTemplateRecord } from '@/modules/settings/composables/catalogSettingsUtils';
+import type { TemplateApiRecord, TemplateRecord, TemplateUpsertRequest } from '@/modules/settings/types';
 
 export const fetchTemplates = async (): Promise<TemplateRecord[]> => {
-  const response = await api.get<TemplateRecord[]>('/settings/templates');
-  return response.data;
+  const response = await api.get<TemplateApiRecord[]>('/settings/templates');
+  return response.data.map(normalizeTemplateRecord);
 };
 
 export const createTemplate = async (payload: TemplateUpsertRequest): Promise<void> => {

@@ -15,13 +15,11 @@ from .cards import (
     get_card,
     get_card_image,
     get_latest_card_version,
-    get_parse_result,
     list_card_generations,
     list_cards,
     list_latest_card_version_reparse_sources,
     resolve_image_file_path,
     save_parsed_card,
-    update_card,
     update_latest_card_version,
 )
 
@@ -42,12 +40,10 @@ __all__ = [
     "get_card",
     "get_card_image",
     "get_latest_card_version",
-    "get_parse_result",
     "list_card_generations",
     "list_cards",
     "list_latest_card_version_reparse_sources",
     "resolve_image_file_path",
     "save_parsed_card",
-    "update_card",
     "update_latest_card_version",
 ]

@@ -9,7 +9,6 @@ import type {
   TagRecord,
   TypeRecord,
 } from '@/modules/settings/types';
-import { formatIdentifiersText } from './catalogSettingsUtils';
 
 export const useCatalogData = (resetNewEntryForm: () => void) => {
   const selectedKind = ref<CatalogKind>('keywords');
@@ -34,19 +33,10 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
 
   const loadCatalog = async (): Promise<void> => {
     const data = await fetchCatalog();
-    catalog.keywords = (data.keywords ?? []).map((row) => ({
-      ...row,
-      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
-    }));
-    catalog.tags = (data.tags ?? []).map((row) => ({
-      ...row,
-      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
-    }));
+    catalog.keywords = data.keywords ?? [];
+    catalog.tags = data.tags ?? [];
     catalog.symbols = data.symbols ?? [];
-    catalog.types = (data.types ?? []).map((row) => ({
-      ...row,
-      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
-    }));
+    catalog.types = data.types ?? [];
   };
 
   const replaceEntry = (kind: CatalogKind, entryId: string, nextEntry: CatalogFormEntry): void => {

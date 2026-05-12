@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -9,9 +8,10 @@ from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
-from card_reader_api.imports.serializers import import_detail_payload, import_job_payload
+from card_reader_api.imports.serializers import ImportUploadSerializer, import_detail_payload, import_job_payload
 from card_reader_core.repositories.import_jobs_repository import (
     SUPPORTED_IMAGE_SUFFIXES,
     fetch_items_for_job,
@@ -32,24 +32,25 @@ class ImportListView(APIView):
 
 class ImportUploadView(APIView):
     def post(self, request: Request) -> Response:
-        files = request.FILES.getlist("files")
-        if not files:
-            return _bad_request("At least one file is required")
+        serializer = ImportUploadSerializer(
+            data={
+                "template_id": request.data.get("template_id", ""),
+                "options_json": request.data.get("options_json", "{}"),
+                "files": request.FILES.getlist("files"),
+            }
+        )
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
 
-        options_json = str(request.data.get("options_json", "{}"))
-        options_or_error = _parse_options(options_json)
-        if isinstance(options_or_error, Response):
-            return options_or_error
-
-        upload_dir = _save_supported_uploads(files)
+        upload_dir = _save_supported_uploads(serializer.validated_data["files"])
         if upload_dir is None:
             return _bad_request("No supported image files found in upload")
 
         try:
             job = ImportService().create_job(
                 source_path=str(upload_dir),
-                template_id=str(request.data.get("template_id", "")),
-                options=options_or_error,
+                template_id=serializer.validated_data["template_id"],
+                options=serializer.validated_data["options_json"],
             )
         except ValueError as exc:
             return _bad_request(str(exc))
@@ -68,16 +69,6 @@ class ImportDetailView(APIView):
         if job is None:
             return Response({"detail": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(import_detail_payload(job, fetch_items_for_job(job_id)))
-
-
-def _parse_options(options_json: str) -> dict[str, object] | Response:
-    try:
-        options_raw = json.loads(options_json)
-    except json.JSONDecodeError:
-        return _bad_request("options_json must be valid JSON")
-    if not isinstance(options_raw, dict):
-        return _bad_request("options_json must decode to an object")
-    return options_raw
 
 
 def _save_supported_uploads(files: list[UploadedFile]) -> str | None:
@@ -102,3 +93,10 @@ def _save_supported_uploads(files: list[UploadedFile]) -> str | None:
 
 def _bad_request(detail: str) -> Response:
     return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _serializer_error(serializer: Serializer[object]) -> Response:
+    detail = next(iter(serializer.errors.values()))
+    if isinstance(detail, list):
+        detail = detail[0]
+    return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)

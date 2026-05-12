@@ -109,37 +109,6 @@ def save_parsed_card(
         return version
 
 
-def update_card(
-    *,
-    card_id: str,
-    name: str | None,
-    type_line: str | None,
-    mana_cost: str | None,
-    rules_text: str | None,
-) -> tuple[Card, CardVersion] | None:
-    card = get_card(card_id)
-    version = get_latest_card_version(card_id)
-    if card is None or version is None:
-        return None
-
-    if name is not None:
-        card.label = name
-        card.key = normalize_slug_key(name)
-        version.name = name
-    if type_line is not None:
-        version.type_line = type_line
-    if mana_cost is not None:
-        version.mana_cost = mana_cost
-    if rules_text is not None:
-        version.rules_text = rules_text
-
-    card.updated_at = now_utc()
-    version.updated_at = now_utc()
-    card.save()
-    version.save()
-    return card, version
-
-
 def update_latest_card_version(
     *,
     card_id: str,

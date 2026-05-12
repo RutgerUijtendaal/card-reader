@@ -10,9 +10,18 @@ from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
-from card_reader_api.catalog.serializers import keyword_payload, symbol_payload, tag_payload, type_payload
+from card_reader_api.catalog.serializers import (
+    CatalogEntryWriteSerializer,
+    SymbolAssetUploadSerializer,
+    SymbolWriteSerializer,
+    keyword_payload,
+    symbol_payload,
+    tag_payload,
+    type_payload,
+)
 from card_reader_core.services.catalog import CatalogService
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
@@ -73,19 +82,19 @@ class TypeDetailView(APIView):
 
 class SymbolCreateView(APIView):
     def post(self, request: Request) -> Response:
-        label = request.data.get("label")
-        if label is None:
-            return _bad_request("label is required")
+        serializer = SymbolWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
         try:
             symbol = CatalogService().create_symbol(
-                label=str(label),
-                key=request.data.get("key"),
-                symbol_type=request.data.get("symbol_type"),
-                detector_type=request.data.get("detector_type"),
-                detection_config_json=request.data.get("detection_config_json"),
-                reference_assets_json=request.data.get("reference_assets_json"),
-                text_token=request.data.get("text_token"),
-                enabled=request.data.get("enabled"),
+                label=serializer.validated_data["label"],
+                key=serializer.validated_data.get("key"),
+                symbol_type=serializer.validated_data.get("symbol_type"),
+                detector_type=serializer.validated_data.get("detector_type"),
+                detection_config_json=serializer.validated_data.get("detection_config_json"),
+                reference_assets_json=serializer.validated_data.get("reference_assets_json"),
+                text_token=serializer.validated_data.get("text_token"),
+                enabled=serializer.validated_data.get("enabled"),
             )
         except ValueError as exc:
             return _bad_request(str(exc))
@@ -94,17 +103,20 @@ class SymbolCreateView(APIView):
 
 class SymbolDetailView(APIView):
     def patch(self, request: Request, entry_id: str) -> Response:
+        serializer = SymbolWriteSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
         try:
             symbol = CatalogService().update_symbol(
                 entry_id=entry_id,
-                label=request.data.get("label"),
-                key=request.data.get("key"),
-                symbol_type=request.data.get("symbol_type"),
-                detector_type=request.data.get("detector_type"),
-                detection_config_json=request.data.get("detection_config_json"),
-                reference_assets_json=request.data.get("reference_assets_json"),
-                text_token=request.data.get("text_token"),
-                enabled=request.data.get("enabled"),
+                label=serializer.validated_data.get("label"),
+                key=serializer.validated_data.get("key"),
+                symbol_type=serializer.validated_data.get("symbol_type"),
+                detector_type=serializer.validated_data.get("detector_type"),
+                detection_config_json=serializer.validated_data.get("detection_config_json"),
+                reference_assets_json=serializer.validated_data.get("reference_assets_json"),
+                text_token=serializer.validated_data.get("text_token"),
+                enabled=serializer.validated_data.get("enabled"),
             )
         except ValueError as exc:
             return _bad_request(str(exc))
@@ -118,9 +130,10 @@ class SymbolDetailView(APIView):
 
 class SymbolAssetUploadView(APIView):
     def post(self, request: Request) -> Response:
-        upload = request.FILES.get("file")
-        if upload is None:
-            return _bad_request("file is required")
+        serializer = SymbolAssetUploadSerializer(data={"file": request.FILES.get("file")})
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
+        upload = serializer.validated_data["file"]
 
         filename = Path(upload.name or "").name
         suffix = Path(filename).suffix.lower()
@@ -147,20 +160,14 @@ def _create_simple(
     *,
     include_identifiers: bool = False,
 ) -> Response:
-    label = request.data.get("label")
-    if label is None:
-        return _bad_request("label is required")
-    identifiers = None
-    if include_identifiers:
-        identifiers = request.data.get("identifiers")
-        if identifiers is not None and not isinstance(identifiers, list):
-            return _bad_request("identifiers must be an array of strings")
-        if isinstance(identifiers, list) and not all(isinstance(item, str) for item in identifiers):
-            return _bad_request("identifiers must be an array of strings")
+    serializer = CatalogEntryWriteSerializer(data=request.data)
+    if not serializer.is_valid():
+        return _serializer_error(serializer)
+    identifiers = serializer.validated_data.get("identifiers") if include_identifiers else None
     try:
         row = getattr(CatalogService(), f"create_{kind}")(
-            label=str(label),
-            key=request.data.get("key"),
+            label=serializer.validated_data["label"],
+            key=serializer.validated_data.get("key"),
             identifiers=identifiers,
         )
     except ValueError as exc:
@@ -176,18 +183,15 @@ def _update_simple(
     *,
     include_identifiers: bool = False,
 ) -> Response:
-    identifiers = None
-    if include_identifiers and "identifiers" in request.data:
-        identifiers = request.data.get("identifiers")
-        if identifiers is not None and not isinstance(identifiers, list):
-            return _bad_request("identifiers must be an array of strings")
-        if isinstance(identifiers, list) and not all(isinstance(item, str) for item in identifiers):
-            return _bad_request("identifiers must be an array of strings")
+    serializer = CatalogEntryWriteSerializer(data=request.data, partial=True)
+    if not serializer.is_valid():
+        return _serializer_error(serializer)
+    identifiers = serializer.validated_data.get("identifiers") if include_identifiers else None
     try:
         row = getattr(CatalogService(), f"update_{kind}")(
             entry_id=entry_id,
-            label=request.data.get("label"),
-            key=request.data.get("key"),
+            label=serializer.validated_data.get("label"),
+            key=serializer.validated_data.get("key"),
             identifiers=identifiers,
         )
     except ValueError as exc:
@@ -222,3 +226,10 @@ def _bad_request(detail: str) -> Response:
 
 def _not_found(detail: str) -> Response:
     return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
+
+
+def _serializer_error(serializer: Serializer[object]) -> Response:
+    detail = next(iter(serializer.errors.values()))
+    if isinstance(detail, list):
+        detail = detail[0]
+    return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)
