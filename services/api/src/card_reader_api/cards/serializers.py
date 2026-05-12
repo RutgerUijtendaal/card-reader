@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from rest_framework import serializers
 
@@ -11,6 +11,26 @@ if TYPE_CHECKING:
 MetadataOption = Keyword | Tag | Type
 SCALAR_FIELDS = {"name", "type_line", "mana_cost", "attack", "health", "rules_text"}
 METADATA_GROUPS = {"keywords", "tags", "types", "symbols"}
+
+
+class CardFilterParams(TypedDict):
+    query: str | None
+    max_confidence: float | None
+    keyword_ids: list[str] | None
+    tag_ids: list[str] | None
+    symbol_ids: list[str] | None
+    type_ids: list[str] | None
+    mana_cost: str | None
+    template_id: str | None
+    attack_min: int | None
+    attack_max: int | None
+    health_min: int | None
+    health_max: int | None
+
+
+class CardListFilterParams(CardFilterParams):
+    page: int
+    page_size: int
 
 
 def card_payload(
@@ -133,12 +153,52 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(required=False, min_value=1, default=72)
 
-    def validated_filters(self) -> dict[str, object]:
-        data = dict(self.validated_data)
-        for key in ("keyword_ids", "tag_ids", "symbol_ids", "type_ids"):
-            if not data.get(key):
-                data[key] = None
-        return data
+    def validated_filters(self) -> CardFilterParams:
+        return {
+            "query": self._string_or_none("query"),
+            "max_confidence": self._float_or_none("max_confidence"),
+            "keyword_ids": self._string_list_or_none("keyword_ids"),
+            "tag_ids": self._string_list_or_none("tag_ids"),
+            "symbol_ids": self._string_list_or_none("symbol_ids"),
+            "type_ids": self._string_list_or_none("type_ids"),
+            "mana_cost": self._string_or_none("mana_cost"),
+            "template_id": self._string_or_none("template_id"),
+            "attack_min": self._int_or_none("attack_min"),
+            "attack_max": self._int_or_none("attack_max"),
+            "health_min": self._int_or_none("health_min"),
+            "health_max": self._int_or_none("health_max"),
+        }
+
+    def validated_list_filters(self) -> CardListFilterParams:
+        filters = self.validated_filters()
+        return {
+            **filters,
+            "page": self._required_int("page"),
+            "page_size": self._required_int("page_size"),
+        }
+
+    def _string_or_none(self, key: str) -> str | None:
+        value = self.validated_data.get(key)
+        return value if isinstance(value, str) else None
+
+    def _float_or_none(self, key: str) -> float | None:
+        value = self.validated_data.get(key)
+        return value if isinstance(value, float) else None
+
+    def _int_or_none(self, key: str) -> int | None:
+        value = self.validated_data.get(key)
+        return value if isinstance(value, int) else None
+
+    def _required_int(self, key: str) -> int:
+        value = self.validated_data.get(key)
+        return value if isinstance(value, int) else 0
+
+    def _string_list_or_none(self, key: str) -> list[str] | None:
+        value = self.validated_data.get(key)
+        if not isinstance(value, list):
+            return None
+        out = [item for item in value if isinstance(item, str)]
+        return out or None
 
 
 class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):

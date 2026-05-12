@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any, cast
+
 from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.serializers import Serializer
+from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
@@ -53,8 +56,9 @@ def _query_data(request: Request) -> dict[str, object]:
     }
 
 
-def _serializer_error(serializer: Serializer[object]) -> Response:
-    detail = next(iter(serializer.errors.values()))
+def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
+    errors = serializer.errors
+    detail = next(iter(cast(Mapping[str, object], errors).values()), "Invalid request.")
     if isinstance(detail, list):
         detail = detail[0]
     return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)

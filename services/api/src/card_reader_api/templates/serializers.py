@@ -17,7 +17,7 @@ def template_payload(row: Template) -> dict[str, object]:
 
 
 class TemplateWriteSerializer(serializers.Serializer[dict[str, object]]):
-    label = serializers.CharField(required=True, allow_blank=False)
+    label = serializers.CharField(required=True, allow_blank=False)  # type: ignore[assignment]
     key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     definition_json = serializers.JSONField(required=True)
 

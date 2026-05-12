@@ -52,7 +52,7 @@ def symbol_payload(row: Symbol) -> dict[str, object]:
 
 
 class CatalogEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
-    label = serializers.CharField(required=True, allow_blank=False)
+    label = serializers.CharField(required=True, allow_blank=False)  # type: ignore[assignment]
     key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     identifiers = serializers.ListField(
         child=serializers.CharField(),
@@ -63,7 +63,7 @@ class CatalogEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 
 class SymbolWriteSerializer(serializers.Serializer[dict[str, object]]):
-    label = serializers.CharField(required=True, allow_blank=False)
+    label = serializers.CharField(required=True, allow_blank=False)  # type: ignore[assignment]
     key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     symbol_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     detector_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)

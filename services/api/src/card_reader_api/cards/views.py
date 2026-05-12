@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any, cast
 
 from django.http import FileResponse, Http404
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.serializers import Serializer
+from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
 from card_reader_api.cards.serializers import (
@@ -42,7 +44,7 @@ class CardListView(APIView):
         serializer = CardFiltersQuerySerializer(data=_query_data(request, include_paging=True))
         if not serializer.is_valid():
             return _serializer_error(serializer)
-        cards = list_cards(**serializer.validated_filters())
+        cards = list_cards(**serializer.validated_list_filters())
         payloads = []
         for row in cards.results:
             payloads.append(
@@ -251,8 +253,9 @@ def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
     return data
 
 
-def _serializer_error(serializer: Serializer[object]) -> Response:
-    detail = next(iter(serializer.errors.values()))
+def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
+    errors = serializer.errors
+    detail = next(iter(cast(Mapping[str, object], errors).values()), "Invalid request.")
     if isinstance(detail, list):
         detail = detail[0]
     return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)
