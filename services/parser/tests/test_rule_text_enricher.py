@@ -204,3 +204,49 @@ def test_rule_text_enricher_supports_regex_anchors_against_mutated_text() -> Non
 
     assert result.enriched_text == "[E]: Gain [[symbol:divine-mana]] or [[symbol:martial-mana]]"
     assert result.rendered_text == "[E]: Gain {DM} or {MM}"
+
+
+def test_rule_text_enricher_regex_before_anchor_advances_past_existing_placeholder() -> None:
+    symbol = Symbol(
+        id="symbol-1",
+        key="exhaust",
+        label="Exhaust",
+        symbol_type="generic",
+        text_token="{E}",
+        text_enrichment_json={
+            "pattern_anchors": [
+                {
+                    "match_regex": r"(?m)^:\s",
+                    "position": "before",
+                }
+            ]
+        },
+    )
+
+    result = RuleTextEnricher().enrich(
+        raw_text=": Gain\n: Draw",
+        detected_symbols=[
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="exhaust",
+                symbol_type="generic",
+                confidence=0.95,
+                bbox=DetectionBBox(x=5, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            ),
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="exhaust",
+                symbol_type="generic",
+                confidence=0.94,
+                bbox=DetectionBBox(x=5, y=15, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            ),
+        ],
+        symbols=[symbol],
+    )
+
+    assert result.enriched_text == "[[symbol:exhaust]]: Gain\n[[symbol:exhaust]]: Draw"
+    assert result.rendered_text == "{E}: Gain\n{E}: Draw"

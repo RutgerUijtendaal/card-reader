@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -8,6 +9,8 @@ from card_reader_core.models import Symbol
 from card_reader_core.rule_text import build_symbol_placeholder, render_enriched_rule_text
 
 from ..symbol_detector import DetectedSymbol
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -27,10 +30,22 @@ class RuleTextEnricher:
         detected_symbols: list[DetectedSymbol],
         symbols: list[Symbol],
     ) -> RuleTextEnrichmentResult:
+        logger.info(
+            "Rule text enrichment started. raw_len=%s detected_symbols=%s catalog_symbols=%s",
+            len(raw_text),
+            len(detected_symbols),
+            len(symbols),
+        )
         cleaned_text = _normalize_ocr_text(raw_text)
         symbols_by_id = {symbol.id: symbol for symbol in symbols}
         symbol_tokens_by_key = {symbol.key: symbol.text_token for symbol in symbols}
         detections_by_symbol_id = _group_detections_by_symbol_id(detected_symbols)
+        logger.info(
+            "Rule text enrichment normalized text. raw_len=%s cleaned_len=%s grouped_symbol_ids=%s",
+            len(raw_text),
+            len(cleaned_text),
+            len(detections_by_symbol_id),
+        )
 
         enriched_text = cleaned_text
         applied_aliases: list[dict[str, object]] = []
@@ -39,20 +54,45 @@ class RuleTextEnricher:
         for symbol_id, symbol_detections in detections_by_symbol_id.items():
             symbol = symbols_by_id.get(symbol_id)
             if symbol is None:
+                logger.warning(
+                    "Rule text enrichment skipped unmatched detection group. symbol_id=%s detection_count=%s",
+                    symbol_id,
+                    len(symbol_detections),
+                )
                 continue
 
             remaining_occurrences = len(symbol_detections)
             placeholder = build_symbol_placeholder(symbol.key)
             config = _parse_text_enrichment_config(symbol.text_enrichment_json)
+            logger.info(
+                "Rule text enrichment processing symbol. symbol_id=%s key=%s detections=%s aliases=%s anchors=%s",
+                symbol.id,
+                symbol.key,
+                remaining_occurrences,
+                len(config["ocr_aliases"]),
+                len(config["pattern_anchors"]),
+            )
 
             for alias in config["ocr_aliases"]:
                 if remaining_occurrences <= 0:
                     break
+                logger.info(
+                    "Rule text enrichment alias pass started. symbol_key=%s remaining=%s rule=%s",
+                    symbol.key,
+                    remaining_occurrences,
+                    alias,
+                )
                 enriched_text, replacements = _replace_alias_occurrences(
                     enriched_text,
                     alias=alias,
                     placeholder=placeholder,
                     max_replacements=remaining_occurrences,
+                )
+                logger.info(
+                    "Rule text enrichment alias pass finished. symbol_key=%s replacements=%s new_text_len=%s",
+                    symbol.key,
+                    replacements,
+                    len(enriched_text),
                 )
                 if replacements > 0:
                     remaining_occurrences -= replacements
@@ -73,6 +113,12 @@ class RuleTextEnricher:
                 after_text = anchor.get("after_text", "")
                 if not match_text and not match_regex:
                     continue
+                logger.info(
+                    "Rule text enrichment anchor pass started. symbol_key=%s remaining=%s rule=%s",
+                    symbol.key,
+                    remaining_occurrences,
+                    anchor,
+                )
                 enriched_text, insertions = _insert_anchor_occurrences(
                     enriched_text,
                     match_text=match_text,
@@ -82,6 +128,12 @@ class RuleTextEnricher:
                     before_text=before_text,
                     after_text=after_text,
                     max_insertions=remaining_occurrences,
+                )
+                logger.info(
+                    "Rule text enrichment anchor pass finished. symbol_key=%s insertions=%s new_text_len=%s",
+                    symbol.key,
+                    insertions,
+                    len(enriched_text),
                 )
                 if insertions > 0:
                     remaining_occurrences -= insertions
@@ -100,6 +152,13 @@ class RuleTextEnricher:
         rendered_text = render_enriched_rule_text(
             enriched_text,
             symbol_tokens_by_key=symbol_tokens_by_key,
+        )
+        logger.info(
+            "Rule text enrichment finished. enriched_len=%s rendered_len=%s alias_rules_applied=%s anchor_rules_applied=%s",
+            len(enriched_text),
+            len(rendered_text),
+            len(applied_aliases),
+            len(applied_anchors),
         )
         return RuleTextEnrichmentResult(
             raw_text=raw_text,
@@ -209,6 +268,7 @@ def _replace_alias_occurrences(
         replace_group = 0
 
     while replaced < max_replacements:
+        previous_text = next_text
         match_bounds = _find_alias_match(
             next_text,
             match_text=match_text,
@@ -219,6 +279,16 @@ def _replace_alias_occurrences(
             break
         start, end = match_bounds
         next_text = f"{next_text[:start]}{placeholder}{next_text[end:]}"
+        if next_text == previous_text:
+            logger.warning(
+                "Rule text alias replacement made no progress. rule=%s match_regex=%s replace_group=%s bounds=(%s,%s)",
+                match_text,
+                match_regex,
+                replace_group,
+                start,
+                end,
+            )
+            break
         replaced += 1
     return next_text, replaced
 
@@ -266,6 +336,8 @@ def _insert_anchor_occurrences(
     search_start = 0
 
     while inserted < max_insertions:
+        previous_text = next_text
+        previous_search_start = search_start
         match_bounds = _find_anchor_match(
             next_text,
             match_text=match_text,
@@ -285,7 +357,7 @@ def _insert_anchor_occurrences(
             insertion_index = match_index
             existing_start = max(0, insertion_index - len(insertion_text))
             if next_text[existing_start:insertion_index] == insertion_text:
-                search_start = match_index + len(match_text)
+                search_start = match_end
                 continue
         else:
             insertion_text = _normalize_insertion_boundaries(
@@ -301,6 +373,16 @@ def _insert_anchor_occurrences(
         next_text = f"{next_text[:insertion_index]}{insertion_text}{next_text[insertion_index:]}"
         inserted += 1
         search_start = insertion_index + len(insertion_text)
+        if next_text == previous_text or search_start <= previous_search_start:
+            logger.warning(
+                "Rule text anchor insertion made no progress. match=%s match_regex=%s insertion_index=%s search_start=%s previous_search_start=%s",
+                match_text,
+                match_regex,
+                insertion_index,
+                search_start,
+                previous_search_start,
+            )
+            break
 
     return next_text, inserted
 
