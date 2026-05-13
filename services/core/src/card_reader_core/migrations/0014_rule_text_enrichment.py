@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 from django.db import migrations, models
 
 
-def backfill_rule_text_fields(apps, _schema_editor) -> None:
+def backfill_rule_text_fields(apps: Any, _schema_editor: Any) -> None:
     CardVersion = apps.get_model("card_reader_core", "CardVersion")
     for version in CardVersion.objects.all().only("id", "rules_text"):
         version.rules_text_raw = version.rules_text

@@ -255,7 +255,7 @@
     "symbol_type": "generic",
     "detector_type": "template",
     "text_token": "{EXHAUST}",
-    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.85,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
     "enabled": true,
     "asset_files": ["exhaust-icon.webp"]
   },
