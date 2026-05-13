@@ -38,10 +38,22 @@
             :options="affinityTypeOptions"
             empty-text="No affinity symbols available."
           />
+          <FilterMultiSelectPopover
+            v-model="selectedDevotionSymbolIds"
+            label="Devotion"
+            :options="devotionTypeOptions"
+            empty-text="No devotion symbols available."
+          />
+          <FilterMultiSelectPopover
+            v-model="selectedOtherSymbolIds"
+            label="Other Symbols"
+            :options="otherSymbolOptions"
+            empty-text="No non-mana symbols available."
+          />
           <FilterTextPopover
             v-model="manaCost"
             label="Mana Cost"
-            placeholder="e.g. 3RR"
+            placeholder="e.g. 3"
           />
           <FilterTextPopover
             v-model="templateId"
@@ -160,6 +172,8 @@ const selectedKeywordIds = ref<string[]>([]);
 const selectedTagIds = ref<string[]>([]);
 const selectedManaTypeSymbolIds = ref<string[]>([]);
 const selectedAffinitySymbolIds = ref<string[]>([]);
+const selectedDevotionSymbolIds = ref<string[]>([]);
+const selectedOtherSymbolIds = ref<string[]>([]);
 const selectedTypeIds = ref<string[]>([]);
 
 const filters = ref<CardFiltersResponse>({
@@ -191,6 +205,16 @@ const affinityTypeOptions = computed<MetadataOption[]>(() =>
   (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'affinity'),
 );
 
+const devotionTypeOptions = computed<MetadataOption[]>(() =>
+  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'devotion'),
+);
+
+const otherSymbolOptions = computed<MetadataOption[]>(() =>
+  (filters.value.symbols ?? []).filter(
+    (row) => !['mana', 'devotion', 'affinity'].includes(row.symbol_type),
+  ),
+);
+
 const loadFilters = async (): Promise<void> => {
   const response = await api.get<CardFiltersResponse>('/cards/filters');
   filters.value = response.data;
@@ -211,6 +235,8 @@ const buildSearchParams = (): URLSearchParams => {
   const selectedSymbolIds = new Set<string>([
     ...selectedManaTypeSymbolIds.value,
     ...selectedAffinitySymbolIds.value,
+    ...selectedDevotionSymbolIds.value,
+    ...selectedOtherSymbolIds.value,
   ]);
   selectedSymbolIds.forEach((id) => params.append('symbol_ids', id));
   selectedTypeIds.value.forEach((id) => params.append('type_ids', id));
@@ -296,6 +322,8 @@ const observedFilterState = computed(() => ({
   tagIds: [...selectedTagIds.value].sort(),
   manaTypeSymbolIds: [...selectedManaTypeSymbolIds.value].sort(),
   affinitySymbolIds: [...selectedAffinitySymbolIds.value].sort(),
+  devotionSymbolIds: [...selectedDevotionSymbolIds.value].sort(),
+  otherSymbolIds: [...selectedOtherSymbolIds.value].sort(),
   typeIds: [...selectedTypeIds.value].sort(),
 }));
 
@@ -323,6 +351,8 @@ const resetFilters = (): void => {
   selectedTagIds.value = [];
   selectedManaTypeSymbolIds.value = [];
   selectedAffinitySymbolIds.value = [];
+  selectedDevotionSymbolIds.value = [];
+  selectedOtherSymbolIds.value = [];
   selectedTypeIds.value = [];
 };
 
