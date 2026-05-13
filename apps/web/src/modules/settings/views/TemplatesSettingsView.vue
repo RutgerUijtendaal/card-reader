@@ -3,9 +3,6 @@
     <h3 class="text-base font-semibold text-slate-800">
       Templates
     </h3>
-    <p class="text-sm text-slate-600">
-      Manage parser templates as JSON definitions.
-    </p>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside class="rounded-lg border border-slate-200 p-3">

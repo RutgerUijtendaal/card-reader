@@ -1,7 +1,9 @@
-import { SYMBOL_DETECTOR_OPTIONS } from '@/modules/settings/types';
+import { computed, ref, watch } from 'vue';
 import {
   CATALOG_KINDS,
+  catalogRowToFormEntry,
   detectionConfigExample,
+  kindItemLabel,
   kindLabel,
   referenceAssetsExample,
 } from './catalogSettingsUtils';
@@ -10,18 +12,57 @@ import { useCatalogEntryActions } from './useCatalogEntryActions';
 import { useCatalogEntryForm } from './useCatalogEntryForm';
 import { useSymbolAssetUpload } from './useSymbolAssetUpload';
 
-export { detectionConfigExample, kindLabel, referenceAssetsExample };
+export { detectionConfigExample, kindItemLabel, kindLabel, referenceAssetsExample };
 
 export const useCatalogSettings = () => {
-  const { newEntry, resetNewEntryForm, setNewEntry } = useCatalogEntryForm();
-  const catalogData = useCatalogData(resetNewEntryForm);
+  const { newEntry: editorEntry, resetNewEntryForm: resetEditorEntry, setNewEntry: setEditorEntry } =
+    useCatalogEntryForm();
+  const catalogData = useCatalogData(resetEditorEntry);
+  const selectedEntryId = ref<string | null>(null);
+  const isCreatingNew = computed(() => selectedEntryId.value === null);
+
+  const selectedRow = computed(() =>
+    selectedEntryId.value
+      ? catalogData.allCurrentRows.value.find((row) => row.id === selectedEntryId.value) ?? null
+      : null,
+  );
+
+  const startCreateEntry = (): void => {
+    selectedEntryId.value = null;
+    resetEditorEntry();
+  };
+
+  const selectEntry = (entryId: string): void => {
+    const row = catalogData.allCurrentRows.value.find((item) => item.id === entryId);
+    if (!row) return;
+    selectedEntryId.value = row.id;
+    setEditorEntry(catalogRowToFormEntry(row));
+  };
+
+  const selectKind = (kind: (typeof CATALOG_KINDS)[number]): void => {
+    catalogData.selectKind(kind);
+    startCreateEntry();
+  };
+
+  watch(selectedRow, (row) => {
+    if (row) {
+      setEditorEntry(catalogRowToFormEntry(row));
+      return;
+    }
+
+    if (selectedEntryId.value) {
+      startCreateEntry();
+    }
+  });
+
   const entryActions = useCatalogEntryActions({
     selectedKind: catalogData.selectedKind,
-    newEntry,
+    editorEntry,
+    selectedEntryId,
     loadCatalog: catalogData.loadCatalog,
-    resetNewEntryForm,
+    resetEditorEntry,
   });
-  const symbolAssetUpload = useSymbolAssetUpload(newEntry);
+  const symbolAssetUpload = useSymbolAssetUpload(editorEntry);
 
   return {
     catalogKinds: CATALOG_KINDS,
@@ -30,30 +71,29 @@ export const useCatalogSettings = () => {
     currentSearchTerm: catalogData.currentSearchTerm,
     allCurrentRows: catalogData.allCurrentRows,
     currentRows: catalogData.currentRows,
-    newEntry,
+    selectedEntryId,
+    selectedRow,
+    isCreatingNew,
+    editorEntry,
     savingEntryIds: entryActions.savingEntryIds,
     deletingEntryIds: entryActions.deletingEntryIds,
     creatingEntry: entryActions.creatingEntry,
-    uploadingCreateAsset: symbolAssetUpload.uploadingCreateAsset,
-    uploadingEntryAssetIds: symbolAssetUpload.uploadingEntryAssetIds,
-    detectorTypeOptions: SYMBOL_DETECTOR_OPTIONS,
-    advancedEntryIds: entryActions.advancedEntryIds,
+    uploadingAsset: symbolAssetUpload.uploadingAsset,
     deleteModal: entryActions.deleteModal,
     deleteModalMessage: entryActions.deleteModalMessage,
+    kindItemLabel,
     kindLabel,
-    selectKind: catalogData.selectKind,
+    selectKind,
     setSearchTerm: catalogData.setSearchTerm,
-    isEntryAdvancedOpen: entryActions.isEntryAdvancedOpen,
-    toggleEntryAdvanced: entryActions.toggleEntryAdvanced,
     loadCatalog: catalogData.loadCatalog,
+    startCreateEntry,
+    selectEntry,
     createEntry: entryActions.createEntry,
-    setNewEntry,
-    updateEntry: entryActions.updateEntry,
-    replaceEntry: catalogData.replaceEntry,
+    setEditorEntry,
+    updateSelectedEntry: entryActions.updateSelectedEntry,
     openDeleteModal: entryActions.openDeleteModal,
     closeDeleteModal: entryActions.closeDeleteModal,
     confirmDeleteEntry: entryActions.confirmDeleteEntry,
-    pickAndUploadCreateAsset: symbolAssetUpload.pickAndUploadCreateAsset,
-    pickAndUploadEntryAsset: symbolAssetUpload.pickAndUploadEntryAsset,
+    pickAndUploadAsset: symbolAssetUpload.pickAndUploadAsset,
   };
 };

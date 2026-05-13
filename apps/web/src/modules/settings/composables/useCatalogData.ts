@@ -1,7 +1,6 @@
 import { computed, reactive, ref } from 'vue';
 import { fetchCatalog } from '@/modules/settings/api/catalog';
 import type {
-  CatalogFormEntry,
   CatalogKind,
   CatalogRow,
   CatalogSearchState,
@@ -59,13 +58,6 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     catalog.types = data.types ?? [];
   };
 
-  const replaceEntry = (kind: CatalogKind, entryId: string, nextEntry: CatalogFormEntry): void => {
-    const rows = catalog[kind] as CatalogRow[];
-    const index = rows.findIndex((row) => row.id === entryId);
-    if (index < 0) return;
-    rows[index] = { ...rows[index], ...nextEntry } as CatalogRow;
-  };
-
   return {
     selectedKind,
     catalog,
@@ -75,7 +67,6 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     selectKind,
     setSearchTerm,
     loadCatalog,
-    replaceEntry,
   };
 };
 

@@ -1,16 +1,25 @@
 <template>
-  <div class="rounded-lg border border-slate-200 p-3">
-    <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h4 class="text-sm font-semibold text-slate-800">
-          Existing {{ kindLabel(selectedKind).toLowerCase() }}
-        </h4>
-        <p class="mt-1 text-xs text-slate-500">
-          {{ currentRows.length }} of {{ totalCount }} shown
-        </p>
+  <section class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4">
+    <div class="flex flex-col gap-3 border-b border-slate-200 pb-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h4 class="text-sm font-semibold text-slate-900">
+            {{ kindLabel(selectedKind) }}
+          </h4>
+          <p class="mt-1 text-xs text-slate-500">
+            {{ currentRows.length }} of {{ totalCount }} shown
+          </p>
+        </div>
+        <button
+          class="btn-secondary px-3 py-2"
+          type="button"
+          @click="emit('create-new')"
+        >
+          New {{ kindItemLabel(selectedKind) }}
+        </button>
       </div>
 
-      <label class="block w-full max-w-sm">
+      <label class="block">
         <span class="mb-1 block text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
           Filter entries
         </span>
@@ -25,324 +34,112 @@
 
     <div
       v-if="totalCount === 0"
-      class="text-sm text-slate-500"
+      class="py-8 text-sm text-slate-500"
     >
-      No entries.
+      No entries yet. Create the first {{ kindItemLabel(selectedKind).toLowerCase() }} from here.
     </div>
 
     <div
       v-else-if="currentRows.length === 0"
-      class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500"
+      class="py-8 text-sm text-slate-500"
     >
       No matching entries.
     </div>
 
     <div
       v-else
-      class="space-y-3"
+      class="mt-4 min-h-0 space-y-2 overflow-y-auto pr-1"
     >
-      <div class="space-y-3 xl:hidden">
-        <article
-          v-for="entry in currentRows"
-          :key="entry.id"
-          class="rounded-lg border border-slate-200 p-3"
-        >
-          <CatalogEntryForm
-            :kind="selectedKind"
-            :entry="entry as CatalogFormEntry"
-            :advanced-open="isEntryAdvancedOpen(entry.id)"
-            :show-advanced-toggle="true"
-            :detector-type-options="detectorTypeOptions"
-            :uploading-asset="uploadingEntryAssetIds.has(entry.id)"
-            :detection-config-example="detectionConfigExample"
-            :reference-assets-example="referenceAssetsExample"
-            @update:entry="emit('replace-entry', selectedKind, entry.id, $event)"
-            @toggle-advanced="emit('toggle-advanced', entry.id)"
-            @upload-asset="emit('upload-entry-asset', entry as SymbolRecord)"
-          />
-          <div class="mt-3 flex gap-2">
-            <button
-              class="btn-secondary flex-1"
-              type="button"
-              :disabled="savingEntryIds.has(entry.id)"
-              @click="emit('save', entry)"
-            >
-              {{ savingEntryIds.has(entry.id) ? 'Saving...' : 'Save' }}
-            </button>
-            <button
-              class="rounded-md border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              :disabled="deletingEntryIds.has(entry.id)"
-              @click="emit('request-delete', entry)"
-            >
-              {{ deletingEntryIds.has(entry.id) ? 'Deleting...' : 'Delete' }}
-            </button>
+      <button
+        v-for="entry in currentRows"
+        :key="entry.id"
+        class="w-full rounded-xl border px-3 py-3 text-left transition"
+        :class="
+          selectedEntryId === entry.id
+            ? 'border-sky-300 bg-sky-50 shadow-sm'
+            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+        "
+        type="button"
+        @click="emit('select-entry', entry.id)"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="truncate text-sm font-semibold text-slate-900">
+              {{ entry.label || entry.key || 'Untitled entry' }}
+            </div>
           </div>
-        </article>
-      </div>
-
-      <div class="hidden overflow-x-auto xl:block">
-        <table class="w-full min-w-[980px] table-fixed border-collapse text-sm">
-          <thead>
-            <tr class="border-b border-slate-200 text-left text-slate-600">
-              <th class="px-2 py-2 font-semibold">
-                Label
-              </th>
-              <th class="px-2 py-2 font-semibold">
-                Key
-              </th>
-              <th
-                v-if="selectedKind !== 'symbols'"
-                class="px-2 py-2 font-semibold"
-              >
-                Identifiers
-              </th>
-              <th
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2 font-semibold"
-              >
-                Type
-              </th>
-              <th
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2 font-semibold"
-              >
-                Text Token
-              </th>
-              <th
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2 font-semibold"
-              >
-                Detector
-              </th>
-              <th
-                v-if="selectedKind === 'symbols'"
-                class="px-2 py-2 font-semibold"
-              >
-                Enabled
-              </th>
-              <th class="w-72 px-2 py-2 font-semibold">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <template
-              v-for="entry in currentRows"
-              :key="entry.id"
+          <div class="flex items-center justify-end gap-2">
+            <span
+              v-for="badge in entryBadges(entry)"
+              :key="badge.label"
+              class="rounded-full px-2 py-1 text-[11px] font-medium"
+              :class="badge.tone"
             >
-              <tr class="border-b border-slate-100 align-middle">
-                <td class="px-2 py-2">
-                  <input
-                    v-model="entry.label"
-                    class="input-base"
-                  >
-                </td>
-                <td class="px-2 py-2">
-                  <input
-                    v-model="entry.key"
-                    class="input-base cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500"
-                    disabled
-                  >
-                </td>
-                <td
-                  v-if="selectedKind !== 'symbols'"
-                  class="px-2 py-2"
-                >
-                  <textarea
-                    v-model="(entry as KeywordRecord).identifiers_text"
-                    class="input-base min-h-24 font-mono"
-                    placeholder="turn start&#10;at the beginning of your turn"
-                  />
-                </td>
-                <td
-                  v-if="selectedKind === 'symbols'"
-                  class="px-2 py-2"
-                >
-                  <input
-                    v-model="(entry as SymbolRecord).symbol_type"
-                    class="input-base"
-                  >
-                </td>
-                <td
-                  v-if="selectedKind === 'symbols'"
-                  class="px-2 py-2"
-                >
-                  <input
-                    v-model="(entry as SymbolRecord).text_token"
-                    class="input-base"
-                  >
-                </td>
-                <td
-                  v-if="selectedKind === 'symbols'"
-                  class="px-2 py-2"
-                >
-                  <select
-                    v-model="(entry as SymbolRecord).detector_type"
-                    class="input-base"
-                  >
-                    <option
-                      v-for="option in detectorTypeOptions"
-                      :key="option.value"
-                      :value="option.value"
-                    >
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </td>
-                <td
-                  v-if="selectedKind === 'symbols'"
-                  class="px-2 py-2 align-middle"
-                >
-                  <label class="inline-flex items-center gap-2">
-                    <input
-                      v-model="(entry as SymbolRecord).enabled"
-                      type="checkbox"
-                    >
-                    <span class="text-xs text-slate-600">On</span>
-                  </label>
-                </td>
-                <td class="px-2 py-2 align-middle">
-                  <div class="flex items-center gap-2">
-                    <button
-                      v-if="
-                        selectedKind === 'symbols' &&
-                          (entry as SymbolRecord).detector_type === 'template'
-                      "
-                      class="btn-secondary h-10"
-                      type="button"
-                      @click="emit('toggle-advanced', entry.id)"
-                    >
-                      <span>Advanced</span>
-                      <ChevronDown
-                        v-if="!isEntryAdvancedOpen(entry.id)"
-                        class="pl-1 h-4 w-4"
-                      />
-                      <ChevronUp
-                        v-if="isEntryAdvancedOpen(entry.id)"
-                        class="pl-1 h-4 w-4"
-                      />
-                    </button>
-                    <button
-                      class="btn-secondary h-10 flex-1"
-                      type="button"
-                      :disabled="savingEntryIds.has(entry.id)"
-                      @click="emit('save', entry)"
-                    >
-                      {{ savingEntryIds.has(entry.id) ? 'Saving...' : 'Save' }}
-                    </button>
-                    <button
-                      class="h-10 rounded-md border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      type="button"
-                      :disabled="deletingEntryIds.has(entry.id)"
-                      @click="emit('request-delete', entry)"
-                    >
-                      {{ deletingEntryIds.has(entry.id) ? 'Deleting...' : 'Delete' }}
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              {{ badge.label }}
+            </span>
+          </div>
+        </div>
 
-              <tr
-                v-show="
-                  selectedKind === 'symbols' &&
-                    (entry as SymbolRecord).detector_type === 'template' &&
-                    isEntryAdvancedOpen(entry.id)
-                "
-                class="border-b border-slate-100"
-              >
-                <td
-                  colspan="7"
-                  class="px-2 pb-3"
-                >
-                  <div class="grid gap-2 md:grid-cols-2">
-                    <div class="space-y-2">
-                      <label class="field-label">
-                        Reference assets JSON
-                        <textarea
-                          v-model="(entry as SymbolRecord).reference_assets_json"
-                          class="input-base min-h-24 font-mono"
-                          :placeholder="referenceAssetsExample"
-                        />
-                      </label>
-                      <button
-                        class="btn-secondary w-fit"
-                        type="button"
-                        :disabled="uploadingEntryAssetIds.has(entry.id)"
-                        @click="emit('upload-entry-asset', entry as SymbolRecord)"
-                      >
-                        {{
-                          uploadingEntryAssetIds.has(entry.id)
-                            ? 'Uploading...'
-                            : 'Add Asset From File'
-                        }}
-                      </button>
-                    </div>
-                    <div class="space-y-2">
-                      <label
-                        v-if="(entry as SymbolRecord).detector_type === 'template'"
-                        class="field-label"
-                      >
-                        Detection config JSON
-                        <textarea
-                          v-model="(entry as SymbolRecord).detection_config_json"
-                          class="input-base min-h-24 font-mono"
-                          :placeholder="detectionConfigExample"
-                        />
-                      </label>
-                      <label class="field-label">
-                        Text enrichment JSON
-                        <textarea
-                          v-model="(entry as SymbolRecord).text_enrichment_json"
-                          class="input-base min-h-24 font-mono"
-                          placeholder="{&quot;ocr_aliases&quot;:[],&quot;pattern_anchors&quot;:[]}"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+        <p class="mt-3 text-xs text-slate-600">
+          {{ entryPreview(entry) }}
+        </p>
+      </button>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import CatalogEntryForm from '@/modules/settings/components/CatalogEntryForm.vue';
-import { ChevronUp, ChevronDown } from 'lucide-vue-next';
-import type {
-  CatalogFormEntry,
-  CatalogKind,
-  CatalogRow,
-  KeywordRecord,
-  SymbolDetectorOption,
-  SymbolRecord,
-} from '@/modules/settings/types';
+import type { CatalogKind, CatalogRow } from '@/modules/settings/types';
 
 defineProps<{
   selectedKind: CatalogKind;
   searchTerm: string;
   totalCount: number;
   currentRows: CatalogRow[];
+  selectedEntryId: string | null;
   kindLabel: (kind: CatalogKind) => string;
-  savingEntryIds: Set<string>;
-  deletingEntryIds: Set<string>;
-  uploadingEntryAssetIds: Set<string>;
-  detectorTypeOptions: SymbolDetectorOption[];
-  detectionConfigExample: string;
-  referenceAssetsExample: string;
-  isEntryAdvancedOpen: (entryId: string) => boolean;
+  kindItemLabel: (kind: CatalogKind) => string;
 }>();
 
 const emit = defineEmits<{
   (e: 'update:search-term', value: string): void;
-  (e: 'save', entry: CatalogRow): void;
-  (e: 'request-delete', entry: CatalogRow): void;
-  (e: 'upload-entry-asset', entry: SymbolRecord): void;
-  (e: 'toggle-advanced', entryId: string): void;
-  (e: 'replace-entry', kind: CatalogKind, entryId: string, next: CatalogFormEntry): void;
+  (e: 'create-new'): void;
+  (e: 'select-entry', entryId: string): void;
 }>();
+
+const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
+  if ('symbol_type' in entry) {
+    return [
+      {
+        label: entry.enabled ? 'Enabled' : 'Disabled',
+        tone: entry.enabled
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-amber-100 text-amber-700',
+      },
+      {
+        label: entry.symbol_type || 'symbol',
+        tone: 'bg-slate-100 text-slate-600',
+      },
+    ];
+  }
+
+  return [
+    {
+      label: `${entry.identifiers.length} identifiers`,
+      tone: 'bg-slate-100 text-slate-600',
+    },
+  ];
+};
+
+const entryPreview = (entry: CatalogRow): string => {
+  if ('symbol_type' in entry) {
+    return [entry.text_token ? `Token ${entry.text_token}` : 'No text token'].join(' • ');
+  }
+
+  if (entry.identifiers.length === 0) {
+    return 'No identifiers configured.';
+  }
+
+  return entry.identifiers.slice(0, 3).join(', ');
+};
 </script>

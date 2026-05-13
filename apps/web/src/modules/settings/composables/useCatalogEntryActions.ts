@@ -8,27 +8,29 @@ import {
 import type { CatalogFormEntry, CatalogKind, CatalogRow } from '@/modules/settings/types';
 import {
   buildCreatePayload,
+  catalogFormEntryToRow,
   buildUpdatePayload,
   extractErrorMessage,
 } from './catalogSettingsUtils';
 
 type CatalogEntryActionsOptions = {
   selectedKind: { value: CatalogKind };
-  newEntry: CatalogFormEntry;
+  editorEntry: CatalogFormEntry;
+  selectedEntryId: { value: string | null };
   loadCatalog: () => Promise<void>;
-  resetNewEntryForm: () => void;
+  resetEditorEntry: () => void;
 };
 
 export const useCatalogEntryActions = ({
   selectedKind,
-  newEntry,
+  editorEntry,
+  selectedEntryId,
   loadCatalog,
-  resetNewEntryForm,
+  resetEditorEntry,
 }: CatalogEntryActionsOptions) => {
   const savingEntryIds = ref<Set<string>>(new Set());
   const deletingEntryIds = ref<Set<string>>(new Set());
   const creatingEntry = ref(false);
-  const advancedEntryIds = ref<Set<string>>(new Set());
 
   const deleteModal = reactive<{
     open: boolean;
@@ -49,21 +51,9 @@ export const useCatalogEntryActions = ({
       `Delete "${deleteModal.entryLabel || 'this entry'}"?\n\nThis also removes existing relations from card versions and cannot be undone.`,
   );
 
-  const isEntryAdvancedOpen = (entryId: string): boolean => advancedEntryIds.value.has(entryId);
-
-  const toggleEntryAdvanced = (entryId: string): void => {
-    const next = new Set(advancedEntryIds.value);
-    if (next.has(entryId)) {
-      next.delete(entryId);
-    } else {
-      next.add(entryId);
-    }
-    advancedEntryIds.value = next;
-  };
-
   const createEntry = async (): Promise<void> => {
     if (creatingEntry.value) return;
-    if (!newEntry.label.trim()) {
+    if (!editorEntry.label.trim()) {
       toast.error('Label is required.');
       return;
     }
@@ -72,9 +62,9 @@ export const useCatalogEntryActions = ({
     const kind = selectedKind.value;
 
     try {
-      await createCatalogEntry(kind, buildCreatePayload(kind, newEntry));
+      await createCatalogEntry(kind, buildCreatePayload(kind, editorEntry));
       toast.success('Entry created.');
-      resetNewEntryForm();
+      resetEditorEntry();
       await loadCatalog();
     } catch (error) {
       console.error('Create entry failed', error);
@@ -84,7 +74,11 @@ export const useCatalogEntryActions = ({
     }
   };
 
-  const updateEntry = async (kind: CatalogKind, entry: CatalogRow): Promise<void> => {
+  const updateSelectedEntry = async (): Promise<void> => {
+    const entryId = selectedEntryId.value;
+    if (!entryId) return;
+    const kind = selectedKind.value;
+    const entry = catalogFormEntryToRow(kind, entryId, editorEntry);
     const next = new Set(savingEntryIds.value);
     next.add(entry.id);
     savingEntryIds.value = next;
@@ -157,13 +151,10 @@ export const useCatalogEntryActions = ({
     savingEntryIds,
     deletingEntryIds,
     creatingEntry,
-    advancedEntryIds,
     deleteModal,
     deleteModalMessage,
-    isEntryAdvancedOpen,
-    toggleEntryAdvanced,
     createEntry,
-    updateEntry,
+    updateSelectedEntry,
     openDeleteModal,
     closeDeleteModal,
     confirmDeleteEntry,

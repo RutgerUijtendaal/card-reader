@@ -1,114 +1,96 @@
 <template>
   <div
     v-if="kind === 'symbols'"
-    class="grid gap-4 lg:grid-cols-2"
+    class="grid gap-4 xl:grid-cols-2"
   >
-    <div class="space-y-3">
-      <label class="field-label">
-        Label
-        <input
-          v-model="labelModel"
-          class="input-base"
-        >
-      </label>
-      <label class="field-label">
-        Key (optional)
-        <input
-          v-model="keyModel"
-          class="input-base"
-        >
-      </label>
-      <label class="field-label">
-        Text token
-        <input
-          v-model="textTokenModel"
-          class="input-base"
-          placeholder="{DEVOTION}"
-        >
-      </label>
-      <label class="field-label">
-        Symbol type
-        <input
-          v-model="symbolTypeModel"
-          class="input-base"
-          placeholder="mana"
-        >
-      </label>
-      <label class="field-label">
-        Detector type
-        <select
-          v-model="detectorTypeModel"
-          class="input-base"
-        >
-          <option
-            v-for="option in detectorTypeOptions"
-            :key="option.value"
-            :value="option.value"
+    <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <div class="grid gap-3">
+        <label class="field-label">
+          Label
+          <input
+            v-model="labelModel"
+            class="input-base"
           >
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
-      <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-        <input
-          v-model="enabledModel"
-          type="checkbox"
-        >
-        <span>Enabled</span>
-      </label>
+        </label>
+        <label class="field-label">
+          Key (optional)
+          <input
+            v-model="keyModel"
+            class="input-base"
+            :class="keyDisabled ? 'cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500' : ''"
+            :disabled="keyDisabled"
+          >
+        </label>
+        <label class="field-label">
+          Text token
+          <input
+            v-model="textTokenModel"
+            class="input-base"
+            placeholder="{DEVOTION}"
+          >
+        </label>
+        <label class="field-label">
+          Symbol type
+          <input
+            v-model="symbolTypeModel"
+            class="input-base"
+            placeholder="mana"
+          >
+        </label>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+          <input
+            v-model="enabledModel"
+            type="checkbox"
+          >
+          <span>Enabled</span>
+        </label>
+      </div>
     </div>
 
-    <div
-      v-if="entry.detector_type === 'template'"
-      class="space-y-3"
-    >
-      <button
-        v-if="showAdvancedToggle"
-        class="btn-secondary w-fit"
-        type="button"
-        @click="emit('toggle-advanced')"
-      >
-        {{ advancedOpen ? 'Hide Config' : 'Show Config' }}
-      </button>
+    <template v-if="entry.detector_type === 'template' && advancedOpen">
+      <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+        <JsonEditorField
+          v-model="detectionConfigModel"
+          label="Detection config JSON"
+          hint="Configure detection thresholds and matching behavior for this symbol."
+          example-title="Detection config example"
+          :example-json="formattedDetectionConfigExample"
+          min-height="14rem"
+        />
+      </div>
 
-      <template v-if="advancedOpen">
-        <label class="field-label">
-          Detection config JSON
-          <textarea
-            v-model="detectionConfigModel"
-            class="input-base min-h-24 font-mono"
-            :placeholder="detectionConfigExample"
-          />
-        </label>
-        <label class="field-label">
-          Text enrichment JSON
-          <textarea
-            v-model="textEnrichmentModel"
-            class="input-base min-h-24 font-mono"
-            placeholder="{&quot;ocr_aliases&quot;:[],&quot;pattern_anchors&quot;:[]}"
-          />
-          <span class="text-xs font-normal text-slate-500">
-            Define OCR aliases and literal anchor matches used to insert this symbol into rule text.
-          </span>
-        </label>
-        <label class="field-label">
-          Reference assets JSON
-          <textarea
+      <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+        <JsonEditorField
+          v-model="textEnrichmentModel"
+          label="Text enrichment JSON"
+          hint="Define OCR aliases and anchor matches used when inserting this symbol into normalized text."
+          example-title="Text enrichment example"
+          :example-json="textEnrichmentExample"
+          min-height="14rem"
+        />
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+        <div class="space-y-2">
+          <JsonEditorField
             v-model="referenceAssetsModel"
-            class="input-base min-h-24 font-mono"
-            :placeholder="referenceAssetsExample"
+            label="Reference assets JSON"
+            hint="List the asset paths used as visual references for this symbol."
+            example-title="Reference assets example"
+            :example-json="formattedReferenceAssetsExample"
+            min-height="14rem"
           />
           <button
-            class="btn-secondary mt-2 w-fit"
+            class="btn-secondary w-fit"
             type="button"
             :disabled="uploadingAsset"
             @click="emit('upload-asset')"
           >
             {{ uploadingAsset ? 'Uploading...' : 'Add Asset From File' }}
           </button>
-        </label>
-      </template>
-    </div>
+        </div>
+      </div>
+    </template>
   </div>
 
   <div
@@ -128,6 +110,8 @@
         <input
           v-model="keyModel"
           class="input-base"
+          :class="keyDisabled ? 'cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500' : ''"
+          :disabled="keyDisabled"
         >
       </label>
     </div>
@@ -147,15 +131,16 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import JsonEditorField from '@/modules/settings/components/JsonEditorField.vue';
 import type { CatalogFormEntry, CatalogKind } from '@/modules/settings/types';
-import type { SymbolDetectorOption } from '@/modules/settings/types';
+import { textEnrichmentExample } from '@/modules/settings/composables/catalogSettingsUtils';
 
 const props = defineProps<{
   kind: CatalogKind;
   entry: CatalogFormEntry;
   advancedOpen: boolean;
   showAdvancedToggle: boolean;
-  detectorTypeOptions: SymbolDetectorOption[];
+  keyDisabled?: boolean;
   uploadingAsset: boolean;
   detectionConfigExample: string;
   referenceAssetsExample: string;
@@ -196,11 +181,6 @@ const symbolTypeModel = computed({
   set: (value: string) => updateEntry({ symbol_type: value }),
 });
 
-const detectorTypeModel = computed({
-  get: () => props.entry.detector_type,
-  set: (value: CatalogFormEntry['detector_type']) => updateEntry({ detector_type: value }),
-});
-
 const enabledModel = computed({
   get: () => props.entry.enabled,
   set: (value: boolean) => updateEntry({ enabled: value }),
@@ -220,4 +200,13 @@ const referenceAssetsModel = computed({
   get: () => props.entry.reference_assets_json,
   set: (value: string) => updateEntry({ reference_assets_json: value }),
 });
+
+const formattedDetectionConfigExample = computed(() =>
+  JSON.stringify(JSON.parse(props.detectionConfigExample), null, 2),
+);
+
+const formattedReferenceAssetsExample = computed(() =>
+  JSON.stringify(JSON.parse(props.referenceAssetsExample), null, 2),
+);
+
 </script>

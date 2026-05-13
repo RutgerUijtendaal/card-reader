@@ -4,9 +4,6 @@
       <h3 class="text-base font-semibold text-slate-800">
         Maintenance
       </h3>
-      <p class="text-sm text-slate-600">
-        Admin actions for storage, reparsing, and database recovery.
-      </p>
     </div>
 
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
