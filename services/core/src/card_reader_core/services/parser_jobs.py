@@ -10,9 +10,11 @@ from card_reader_core.repositories.import_jobs_repository import (
     bump_job_processed,
     fetch_job,
     fetch_items_for_job,
+    mark_job_cancelled,
     mark_job_complete,
     mark_job_failed,
     mark_job_item_failed,
+    mark_job_item_running,
     mark_job_queued,
     mark_job_running,
 )
@@ -86,18 +88,34 @@ class ImportProcessorService:
         resources = self._load_parser_resources(options)
         failed_items = 0
         shutdown_requested = False
+        cancel_requested = False
 
         mark_job_running(job)
         for item in fetch_items_for_job(job.id):
+            current_job = fetch_job(job.id)
+            if current_job is None:
+                logger.warning("Stopping processing for missing job during run. job_id=%s", job.id)
+                return
+            if current_job.status in {ImportJobStatus.canceling, ImportJobStatus.cancelled}:
+                cancel_requested = True
+                break
             if stop_requested():
                 shutdown_requested = True
                 break
+            item.refresh_from_db(fields=["status", "error_message", "updated_at"])
             if item.status != ImportJobStatus.queued:
                 continue
+            mark_job_item_running(item)
             failed_items += self._process_item_with_failure_tracking(job, item, options, resources)
             bump_job_processed(job)
+            current_job = fetch_job(job.id)
+            if current_job is not None and current_job.status == ImportJobStatus.canceling:
+                cancel_requested = True
+                break
 
-        if failed_items > 0:
+        if cancel_requested:
+            mark_job_cancelled(job)
+        elif failed_items > 0:
             mark_job_failed(job)
         elif shutdown_requested:
             mark_job_queued(job)

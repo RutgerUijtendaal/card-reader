@@ -73,6 +73,14 @@ class ImportDetailView(APIView):
         return Response(import_detail_payload(job, fetch_items_for_job(job_id)))
 
 
+class ImportCancelView(APIView):
+    def post(self, _request: Request, job_id: str) -> Response:
+        job = ImportService().cancel_job(job_id=job_id)
+        if job is None:
+            return Response({"detail": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(import_job_payload(job), status=status.HTTP_202_ACCEPTED)
+
+
 def _save_supported_uploads(files: list[UploadedFile]) -> str | None:
     upload_dir = build_storage_relative_path("uploads", str(uuid4()))
     resolve_storage_path(upload_dir).mkdir(parents=True, exist_ok=True)

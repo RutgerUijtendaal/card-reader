@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from card_reader_core.models import Card, CardVersion, CardVersionImage, ImportJob, ImportJobItem, Keyword, ParseResult, Symbol, Tag, Type  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
+from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata_repository import (  # noqa: E402
     get_tags_for_card_version,
     replace_card_version_keywords,
@@ -10,6 +12,8 @@ from card_reader_core.repositories.metadata_repository import (  # noqa: E402
     replace_card_version_tags,
     replace_card_version_types,
 )
+from card_reader_core.services.imports import ImportService  # noqa: E402
+from card_reader_core.services.parser_jobs import ImportProcessorService  # noqa: E402
 from card_reader_core.settings import settings  # noqa: E402
 from card_reader_core.storage import build_storage_relative_path, relativize_image_storage_path, resolve_storage_path  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
@@ -66,6 +70,80 @@ def test_create_import_upload_stores_relative_paths() -> None:
     item = ImportJobItem.objects.get(job_id=job.id)
     assert job.source_path.startswith("uploads/")
     assert item.source_file.startswith(f"{job.source_path}/")
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_cancel_queued_import_job_marks_it_cancelled() -> None:
+    job = ImportJob.objects.create(
+        source_path="uploads/test-job",
+        template_id="mtg-like-v1",
+        options_json={},
+        total_items=2,
+        processed_items=0,
+    )
+    ImportJobItem.objects.create(job=job, source_file="uploads/test-job/0001.png")
+    ImportJobItem.objects.create(job=job, source_file="uploads/test-job/0002.png")
+
+    response = Client(HTTP_HOST="localhost").post(f"/imports/{job.id}/cancel", data={}, content_type="application/json")
+
+    assert response.status_code == 202
+    job.refresh_from_db()
+    assert job.status == "cancelled"
+    assert job.processed_items == 2
+    assert list(ImportJobItem.objects.filter(job_id=job.id).values_list("status", flat=True)) == [
+        "cancelled",
+        "cancelled",
+    ]
+
+
+def test_processor_honors_running_job_cancellation_after_current_item() -> None:
+    image_one = settings.storage_root_dir / "uploads" / "interrupt-job" / "0001.png"
+    image_two = settings.storage_root_dir / "uploads" / "interrupt-job" / "0002.png"
+    image_one.parent.mkdir(parents=True, exist_ok=True)
+    image_one.write_bytes(b"image-one")
+    image_two.write_bytes(b"image-two")
+
+    job = create_import_job_with_files(
+        source_path=image_one.parent,
+        template_id="mtg-like-v1",
+        options={},
+        files=[image_one, image_two],
+    )
+
+    class InterruptingParser:
+        def __init__(self) -> None:
+            self.call_count = 0
+
+        def parse(self, image_path: Path, template_id: str, **_: object) -> SimpleNamespace:
+            self.call_count += 1
+            if self.call_count == 1:
+                ImportService().cancel_job(job_id=job.id)
+            return SimpleNamespace(
+                checksum=f"checksum-{self.call_count}",
+                normalized_fields={
+                    "name": f"Interrupt Test {self.call_count}",
+                    "type_line": "Type",
+                    "mana_cost": "",
+                    "attack": "",
+                    "health": "",
+                    "rules_text": "",
+                },
+                confidence={"overall": 0.9},
+                raw_ocr={"source": str(image_path), "template_id": template_id},
+                keyword_ids=[],
+                tag_ids=[],
+                type_ids=[],
+                symbol_ids=[],
+            )
+
+    processor = ImportProcessorService(InterruptingParser())
+    processor.process_job(job.id)
+
+    job.refresh_from_db()
+    items = list(ImportJobItem.objects.filter(job_id=job.id).order_by("created_at"))
+    assert job.status == "cancelled"
+    assert job.processed_items == 2
+    assert [item.status for item in items] == ["completed", "cancelled"]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

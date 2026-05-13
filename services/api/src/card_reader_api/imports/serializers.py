@@ -16,6 +16,8 @@ def import_job_payload(job: ImportJob) -> dict[str, object]:
         "status": job.status,
         "total_items": job.total_items,
         "processed_items": job.processed_items,
+        "created_at": job.created_at.isoformat(),
+        "updated_at": job.updated_at.isoformat(),
     }
 
 

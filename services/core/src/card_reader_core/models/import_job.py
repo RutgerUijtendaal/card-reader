@@ -10,6 +10,8 @@ from .base import TimestampedModel, uuid_str
 class ImportJobStatus(StrEnum):
     queued = "queued"
     running = "running"
+    canceling = "canceling"
+    cancelled = "cancelled"
     completed = "completed"
     failed = "failed"
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from card_reader_core.models import ImportJob
-from card_reader_core.repositories.import_jobs_repository import create_import_job
+from card_reader_core.repositories.import_jobs_repository import cancel_import_job, create_import_job
 from card_reader_core.repositories.templates_repository import get_template_by_key
 
 
@@ -24,3 +24,6 @@ class ImportService:
             template_id=template_id,
             options=options,
         )
+
+    def cancel_job(self, *, job_id: str) -> ImportJob | None:
+        return cancel_import_job(job_id)
