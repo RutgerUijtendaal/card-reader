@@ -66,14 +66,24 @@ class BottomRegionParser:
             len(detected_symbols),
         )
         logger.info(
-            "Bottom region keyword extraction step started. region=%s known_keywords=%s",
-            region_name,
-            len(known_keywords),
+            "Bottom region rule text enrichment step started. text=%s symbols=%s",
+            raw_text,
+            len(detected_symbols),
         )
         enrichment = self._rule_text_enricher.enrich(
             raw_text=raw_text,
             detected_symbols=detected_symbols,
             symbols=symbols,
+        )
+        logger.info(
+            "Bottom region rule text enrichment step finished. text=%s symbols=%s",
+            raw_text,
+            len(detected_symbols),
+        )
+        logger.info(
+            "Bottom region keyword extraction step started. region=%s known_keywords=%s",
+            region_name,
+            len(known_keywords),
         )
         keyword_ids = self._metadata_extractor.extract_ids(enrichment.cleaned_text, known_keywords)
         logger.info(
