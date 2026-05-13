@@ -72,6 +72,45 @@ def test_rule_text_enricher_can_replace_only_a_captured_part_of_ocr_alias_match(
     assert result.rendered_text == "Gain {FM}, then draw a card."
 
 
+def test_rule_text_enricher_ocr_alias_can_add_spacing_around_replaced_group() -> None:
+    symbol = Symbol(
+        id="symbol-1",
+        key="fire-mana",
+        label="Fire Mana",
+        symbol_type="mana",
+        text_token="{FM}",
+        text_enrichment_json={
+            "ocr_aliases": [
+                {
+                    "match_regex": r"(Gain)(X)(\.)",
+                    "replace_group": 2,
+                    "before_text": " ",
+                    "after_text": "",
+                }
+            ]
+        },
+    )
+    result = RuleTextEnricher().enrich(
+        raw_text="GainX.",
+        detected_symbols=[
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="fire-mana",
+                symbol_type="mana",
+                confidence=0.92,
+                bbox=DetectionBBox(x=4, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            )
+        ],
+        symbols=[symbol],
+    )
+
+    assert result.cleaned_text == "GainX."
+    assert result.enriched_text == "Gain [[symbol:fire-mana]]."
+    assert result.rendered_text == "Gain {FM}."
+
+
 def test_rule_text_enricher_inserts_placeholder_from_anchor_pattern() -> None:
     symbol = Symbol(
         id="symbol-1",

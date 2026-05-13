@@ -213,11 +213,15 @@ def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
         replace_group = item.get("replace_group", 0)
         if not isinstance(replace_group, int) or replace_group < 0:
             replace_group = 0
+        before_text = item.get("before_text")
+        after_text = item.get("after_text")
         aliases.append(
             {
                 "match": normalized_match,
                 "match_regex": normalized_match_regex,
                 "replace_group": replace_group,
+                "before_text": before_text if isinstance(before_text, str) else "",
+                "after_text": after_text if isinstance(after_text, str) else "",
             }
         )
 
@@ -260,12 +264,18 @@ def _replace_alias_occurrences(
     match_text = alias.get("match", "")
     match_regex = alias.get("match_regex", "")
     replace_group = alias.get("replace_group", 0)
+    before_text = alias.get("before_text", "")
+    after_text = alias.get("after_text", "")
     if not isinstance(match_text, str):
         match_text = ""
     if not isinstance(match_regex, str):
         match_regex = ""
     if not isinstance(replace_group, int):
         replace_group = 0
+    if not isinstance(before_text, str):
+        before_text = ""
+    if not isinstance(after_text, str):
+        after_text = ""
 
     while replaced < max_replacements:
         previous_text = next_text
@@ -278,7 +288,13 @@ def _replace_alias_occurrences(
         if match_bounds is None:
             break
         start, end = match_bounds
-        next_text = f"{next_text[:start]}{placeholder}{next_text[end:]}"
+        replacement_text = _normalize_replacement_boundaries(
+            text=next_text,
+            start=start,
+            end=end,
+            replacement_text=f"{before_text}{placeholder}{after_text}",
+        )
+        next_text = f"{next_text[:start]}{replacement_text}{next_text[end:]}"
         if next_text == previous_text:
             logger.warning(
                 "Rule text alias replacement made no progress. rule=%s match_regex=%s replace_group=%s bounds=(%s,%s)",
@@ -414,12 +430,27 @@ def _normalize_insertion_boundaries(
     insertion_index: int,
     insertion_text: str,
 ) -> str:
-    normalized = insertion_text
-    if normalized.startswith(" ") and insertion_index > 0 and text[insertion_index - 1].isspace():
+    return _normalize_replacement_boundaries(
+        text=text,
+        start=insertion_index,
+        end=insertion_index,
+        replacement_text=insertion_text,
+    )
+
+
+def _normalize_replacement_boundaries(
+    *,
+    text: str,
+    start: int,
+    end: int,
+    replacement_text: str,
+) -> str:
+    normalized = replacement_text
+    if normalized.startswith(" ") and start > 0 and text[start - 1].isspace():
         normalized = normalized.lstrip(" ")
     if normalized.endswith(" "):
-        if insertion_index >= len(text):
+        if end >= len(text):
             normalized = normalized.rstrip(" ")
-        elif text[insertion_index].isspace():
+        elif text[end].isspace():
             normalized = normalized.rstrip(" ")
     return normalized
