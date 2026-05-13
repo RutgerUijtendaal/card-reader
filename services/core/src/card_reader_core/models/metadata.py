@@ -27,6 +27,7 @@ class Symbol(TimestampedModel):
     symbol_type: models.TextField[str, str] = models.TextField(default="generic", db_index=True)
     detector_type: models.TextField[str, str] = models.TextField(default="template", db_index=True)
     detection_config_json = models.JSONField(default=dict)
+    text_enrichment_json = models.JSONField(default=dict)
     reference_assets_json = models.JSONField(default=list)
     text_token: models.TextField[str, str] = models.TextField(default="")
     enabled: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)

@@ -60,6 +60,7 @@ export type CardDetail = {
 export type CardVersionDetail = CardHoverTooltipModel & {
   image_url: string | null;
   editable: boolean;
+  rules_text_enriched: string;
   keyword_ids: string[];
   tag_ids: string[];
   symbol_ids: string[];

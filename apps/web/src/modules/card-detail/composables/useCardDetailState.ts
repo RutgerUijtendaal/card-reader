@@ -101,7 +101,7 @@ export const useCardDetailState = () => {
     form.mana_cost = version.mana_cost ?? '';
     form.attack = version.attack === null ? '' : String(version.attack);
     form.health = version.health === null ? '' : String(version.health);
-    form.rules_text = version.rules_text ?? '';
+    form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
@@ -320,6 +320,9 @@ export const useCardDetailState = () => {
 };
 
 const normalizeFieldValue = (version: CardVersionDetail, fieldName: ScalarFieldName): string => {
+  if (fieldName === 'rules_text') {
+    return String(version.rules_text_enriched ?? '');
+  }
   if (fieldName === 'attack' || fieldName === 'health') {
     return String(version[fieldName] ?? '');
   }
@@ -356,7 +359,7 @@ const buildManualUpdatePayload = (
 
   for (const fieldName of ['name', 'type_line', 'mana_cost', 'attack', 'health', 'rules_text'] as const) {
     if (normalizeFormFieldValue(form, fieldName) !== normalizeFieldValue(version, fieldName)) {
-      updates[fieldName] = form[fieldName];
+      updates[fieldName === 'rules_text' ? 'rules_text_enriched' : fieldName] = form[fieldName];
     }
   }
 

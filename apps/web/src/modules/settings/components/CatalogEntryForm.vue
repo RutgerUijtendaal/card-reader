@@ -81,6 +81,17 @@
           />
         </label>
         <label class="field-label">
+          Text enrichment JSON
+          <textarea
+            v-model="textEnrichmentModel"
+            class="input-base min-h-24 font-mono"
+            placeholder="{&quot;ocr_aliases&quot;:[],&quot;pattern_anchors&quot;:[]}"
+          />
+          <span class="text-xs font-normal text-slate-500">
+            Define OCR aliases and literal anchor matches used to insert this symbol into rule text.
+          </span>
+        </label>
+        <label class="field-label">
           Reference assets JSON
           <textarea
             v-model="referenceAssetsModel"
@@ -198,6 +209,11 @@ const enabledModel = computed({
 const detectionConfigModel = computed({
   get: () => props.entry.detection_config_json,
   set: (value: string) => updateEntry({ detection_config_json: value }),
+});
+
+const textEnrichmentModel = computed({
+  get: () => props.entry.text_enrichment_json,
+  set: (value: string) => updateEntry({ text_enrichment_json: value }),
 });
 
 const referenceAssetsModel = computed({

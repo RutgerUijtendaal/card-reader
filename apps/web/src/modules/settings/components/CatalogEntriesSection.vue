@@ -278,7 +278,7 @@
                         }}
                       </button>
                     </div>
-                    <div>
+                    <div class="space-y-2">
                       <label
                         v-if="(entry as SymbolRecord).detector_type === 'template'"
                         class="field-label"
@@ -288,6 +288,14 @@
                           v-model="(entry as SymbolRecord).detection_config_json"
                           class="input-base min-h-24 font-mono"
                           :placeholder="detectionConfigExample"
+                        />
+                      </label>
+                      <label class="field-label">
+                        Text enrichment JSON
+                        <textarea
+                          v-model="(entry as SymbolRecord).text_enrichment_json"
+                          class="input-base min-h-24 font-mono"
+                          placeholder="{&quot;ocr_aliases&quot;:[],&quot;pattern_anchors&quot;:[]}"
                         />
                       </label>
                     </div>

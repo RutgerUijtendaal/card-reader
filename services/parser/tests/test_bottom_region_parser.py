@@ -12,9 +12,9 @@ from card_reader_parser.parsers.symbol_detector import DetectedSymbol, Detection
 class StubOcrRunner:
     def run(self, _image: Image.Image) -> dict[str, object]:
         return {
-            "text": "Exhaust target creature and gain devotion.",
+            "text": ": target creature and gain devotion.",
             "confidence": 0.91,
-            "lines": [{"text": "Exhaust target creature and gain devotion.", "confidence": 0.91}],
+            "lines": [{"text": ": target creature and gain devotion.", "confidence": 0.91}],
         }
 
 
@@ -43,7 +43,7 @@ class StubMetadataExtractor:
         return ["keyword-1"]
 
 
-def test_bottom_region_parser_detects_mana_devotion_and_misc_symbols_in_rules_text() -> None:
+def test_bottom_region_parser_detects_mana_devotion_and_generic_symbols_in_rules_text() -> None:
     detections = [
         DetectedSymbol(
             symbol_id="mana-1",
@@ -66,7 +66,7 @@ def test_bottom_region_parser_detects_mana_devotion_and_misc_symbols_in_rules_te
         DetectedSymbol(
             symbol_id="misc-1",
             key="exhaust",
-            symbol_type="misc",
+            symbol_type="generic",
             confidence=0.93,
             bbox=DetectionBBox(x=50, y=5, w=12, h=12),
             detector_type="template",
@@ -89,13 +89,24 @@ def test_bottom_region_parser_detects_mana_devotion_and_misc_symbols_in_rules_te
                 label="Grimmothy Devotion",
                 symbol_type="devotion",
             ),
-            Symbol(id="misc-1", key="exhaust", label="Exhaust", symbol_type="misc"),
+            Symbol(
+                id="misc-1",
+                key="exhaust",
+                label="Exhaust",
+                symbol_type="generic",
+                text_token="{EXHAUST}",
+                text_enrichment_json={"pattern_anchors": [{"match": ": ", "position": "before"}]},
+            ),
             Symbol(id="affinity-1", key="affinity-sola", label="Affinity Sola", symbol_type="affinity"),
         ],
         known_keywords=[Keyword(id="keyword-1", key="exhaust", label="Exhaust")],
     )
 
-    assert symbol_detector.last_expected_symbol_types == {"mana", "devotion", "misc"}
-    assert result.normalized_fields == {"rules_text": "Exhaust target creature and gain devotion."}
+    assert symbol_detector.last_expected_symbol_types == {"mana", "devotion", "generic"}
+    assert result.normalized_fields == {
+        "rules_text_raw": ": target creature and gain devotion.",
+        "rules_text_enriched": "[[symbol:exhaust]]: target creature and gain devotion.",
+        "rules_text": "{EXHAUST}: target creature and gain devotion.",
+    }
     assert result.extracted_keyword_ids == ["keyword-1"]
     assert [row.symbol_id for row in result.detected_symbols] == ["mana-1", "devotion-1", "misc-1"]

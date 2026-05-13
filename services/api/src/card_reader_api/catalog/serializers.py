@@ -45,6 +45,7 @@ def symbol_payload(row: Symbol) -> dict[str, object]:
         "symbol_type": row.symbol_type,
         "detector_type": row.detector_type,
         "detection_config_json": row.detection_config_json,
+        "text_enrichment_json": row.text_enrichment_json,
         "reference_assets_json": row.reference_assets_json,
         "text_token": row.text_token,
         "enabled": row.enabled,
@@ -68,6 +69,7 @@ class SymbolWriteSerializer(serializers.Serializer[dict[str, object]]):
     symbol_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     detector_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     detection_config_json = serializers.JSONField(required=False)
+    text_enrichment_json = serializers.JSONField(required=False)
     reference_assets_json = serializers.JSONField(required=False)
     text_token = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     enabled = serializers.BooleanField(required=False, allow_null=True)
@@ -82,6 +84,11 @@ class SymbolWriteSerializer(serializers.Serializer[dict[str, object]]):
             raise serializers.ValidationError("reference_assets_json must be a JSON array")
         if not all(isinstance(item, str) for item in value):
             raise serializers.ValidationError("reference_assets_json entries must be strings")
+        return json.dumps(value)
+
+    def validate_text_enrichment_json(self, value: object) -> str:
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("text_enrichment_json must be a JSON object")
         return json.dumps(value)
 
 

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, TypedDict
 from rest_framework import serializers
 
 from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
+from card_reader_core.rule_text import render_enriched_rule_text
 
 if TYPE_CHECKING:
     from card_reader_core.services.cards import CardEditState, CardMetadata
@@ -41,6 +42,7 @@ def card_payload(
     metadata: CardMetadata | None = None,
     edit_state: CardEditState | None = None,
 ) -> dict[str, object]:
+    rendered_rule_text = _render_card_rule_text(version, metadata)
     payload: dict[str, object] = {
         "id": card.id,
         "key": card.key,
@@ -56,7 +58,8 @@ def card_payload(
         "mana_symbols": _decode_mana_symbols(version.mana_symbols_json),
         "attack": version.attack,
         "health": version.health,
-        "rules_text": version.rules_text,
+        "rules_text_enriched": version.rules_text_enriched or version.rules_text,
+        "rules_text": rendered_rule_text,
         "confidence": version.confidence,
         "created_at": version.created_at.isoformat(),
         "image_url": image_url,
@@ -120,6 +123,21 @@ def symbol_option(symbol: Symbol) -> dict[str, object]:
         "text_token": symbol.text_token,
         "asset_url": _first_symbol_asset_url(symbol.reference_assets_json),
     }
+
+
+def _render_card_rule_text(version: CardVersion, metadata: CardMetadata | None) -> str:
+    if not version.rules_text_enriched:
+        return version.rules_text
+    if metadata is None:
+        return version.rules_text
+    symbol_tokens_by_key = {
+        symbol.key: symbol.text_token
+        for symbol in metadata["symbols"]
+    }
+    return render_enriched_rule_text(
+        version.rules_text_enriched,
+        symbol_tokens_by_key=symbol_tokens_by_key,
+    )
 
 
 def _decode_mana_symbols(value: object) -> list[str]:
@@ -208,6 +226,7 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     attack = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     health = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -234,6 +253,8 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
         for field_name in SCALAR_FIELDS:
             if field_name in self.validated_data:
                 updates[field_name] = self.validated_data[field_name]
+        if "rules_text_enriched" in self.validated_data:
+            updates["rules_text"] = self.validated_data["rules_text_enriched"]
         for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):
             if field_name in self.validated_data:
                 updates[field_name] = self.validated_data[field_name]
