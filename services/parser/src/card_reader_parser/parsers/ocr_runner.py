@@ -39,7 +39,7 @@ _PADDLEX_OCR_CONFIG: dict[str, Any] = {
             "model_name": "PP-OCRv5_server_rec",
             "model_dir": None,
             "batch_size": 1,
-            "score_thresh": 0.0,
+            "score_thresh": 0.8,
         },
     },
 }

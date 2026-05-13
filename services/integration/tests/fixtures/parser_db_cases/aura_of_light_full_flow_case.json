@@ -21,7 +21,7 @@
       ],
       "attack": null,
       "health": null,
-      "rules_text": "X\nAe",
+      "rules_text": ": All allied creatures gain 1 armor.",
       "version_number": 1
     },
     "metadata": {

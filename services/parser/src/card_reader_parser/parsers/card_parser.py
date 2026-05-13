@@ -131,6 +131,23 @@ class CardParser:
                 len(bottom_result.detected_symbols),
                 sorted(bottom_result.normalized_fields.keys()),
             )
+        if "rules_text_fallback" in region_crops and "rules_text" in region_results and len(region_results["rules_text"].text) == 0:
+            region_results["rules_text_fallback"] = self._bottom_region_parser.parse(
+                region_name="rules_text_fallback",
+                image=region_crops["rules_text_fallback"]["image"],
+                region_spec=regions_spec.get("rules_text_fallback", {}),
+                symbols=symbols,
+                known_keywords=known_keywords,
+            )
+            bottom_result = region_results["rules_text_fallback"]
+            logger.info(
+                "Region parsed successfully. region=rules_text_fallback conf=%.3f text_len=%s keywords=%s symbols=%s fields=%s",
+                bottom_result.confidence,
+                len(bottom_result.text),
+                len(bottom_result.extracted_keyword_ids),
+                len(bottom_result.detected_symbols),
+                sorted(bottom_result.normalized_fields.keys()),
+            )
         if "bottom_middle" in region_crops:
             region_results["bottom_middle"] = self._affinity_region_parser.parse(
                 region_name="bottom_middle",
