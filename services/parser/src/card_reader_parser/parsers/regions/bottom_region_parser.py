@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class BottomRegionParser:
-    _EXPECTED_SYMBOL_TYPES = {"rules", "devotion"}
+    _EXPECTED_SYMBOL_TYPES = {"mana", "devotion", "generic"}
 
     def __init__(
         self,
