@@ -84,6 +84,7 @@ export type PaginatedCardsResponse<TCard = CardListItem> = {
 
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
+export type MetadataSearchState = Record<MetadataGroupName, string>;
 
 export type EditorForm = {
   name: string;

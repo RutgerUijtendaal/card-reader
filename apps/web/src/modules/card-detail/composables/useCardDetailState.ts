@@ -9,6 +9,7 @@ import type {
   FieldSourceValue,
   MetadataGroupName,
   MetadataOption,
+  MetadataSearchState,
   ScalarFieldName,
   SymbolFilterOption,
   SymbolLookupMap,
@@ -38,6 +39,12 @@ export const useCardDetailState = () => {
     tag_ids: [],
     type_ids: [],
     symbol_ids: [],
+  });
+  const metadataSearch = reactive<MetadataSearchState>({
+    keywords: '',
+    tags: '',
+    types: '',
+    symbols: '',
   });
 
   const selectedVersion = computed<CardVersionDetail | null>(
@@ -228,10 +235,19 @@ export const useCardDetailState = () => {
       .sort((a, b) => a.localeCompare(b));
 
   const optionsForGroup = (groupName: MetadataGroupName): Array<MetadataOption | SymbolFilterOption> => {
-    if (groupName === 'keywords') return filterOptions.value.keywords ?? [];
-    if (groupName === 'tags') return filterOptions.value.tags ?? [];
-    if (groupName === 'types') return filterOptions.value.types ?? [];
-    return filterOptions.value.symbols ?? [];
+    const options =
+      groupName === 'keywords'
+        ? (filterOptions.value.keywords ?? [])
+        : groupName === 'tags'
+          ? (filterOptions.value.tags ?? [])
+          : groupName === 'types'
+            ? (filterOptions.value.types ?? [])
+            : (filterOptions.value.symbols ?? []);
+    return filterMetadataOptions(options, metadataSearch[groupName]);
+  };
+
+  const setMetadataSearch = (groupName: MetadataGroupName, value: string): void => {
+    metadataSearch[groupName] = value;
   };
 
   const toggleMetadataSelection = (groupName: MetadataGroupName, id: string, checked: boolean): void => {
@@ -273,6 +289,7 @@ export const useCardDetailState = () => {
     isQueuingReparse,
     saveMessage,
     form,
+    metadataSearch,
     selectedVersion,
     isBusy,
     goBack,
@@ -295,6 +312,7 @@ export const useCardDetailState = () => {
     selectedIds,
     parsedMetadataLabels,
     optionsForGroup,
+    setMetadataSearch,
     toggleMetadataSelection,
     toAbsoluteApiUrl,
     formatDate,
@@ -363,3 +381,21 @@ const normalizeFormFieldValue = (form: EditorForm, fieldName: ScalarFieldName): 
 
 const sameIds = (left: string[], right: string[]): boolean =>
   JSON.stringify(sortedIds(left)) === JSON.stringify(sortedIds(right));
+
+const filterMetadataOptions = <T extends MetadataOption | SymbolFilterOption>(
+  options: T[],
+  query: string,
+): T[] => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return options;
+  }
+
+  return options.filter((option) => {
+    const haystacks = [option.label, option.key];
+    if ('text_token' in option) {
+      haystacks.push(option.text_token);
+    }
+    return haystacks.some((value) => value.toLowerCase().includes(normalizedQuery));
+  });
+};

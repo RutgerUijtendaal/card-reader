@@ -1,5 +1,7 @@
 export type CatalogKind = 'keywords' | 'tags' | 'symbols' | 'types';
 
+export type CatalogSearchState = Record<CatalogKind, string>;
+
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 export type JsonObject = {
