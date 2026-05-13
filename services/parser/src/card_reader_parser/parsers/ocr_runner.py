@@ -39,7 +39,7 @@ _PADDLEX_OCR_CONFIG: dict[str, Any] = {
             "model_name": "PP-OCRv5_server_rec",
             "model_dir": None,
             "batch_size": 1,
-            "score_thresh": 0.0,
+            "score_thresh": 0.8,
         },
     },
 }
@@ -113,6 +113,7 @@ class OcrRunner:
         grouped_lines = self._group_by_lines(lines_data)
         final_lines: list[str] = []
         for line in grouped_lines:
+            logger.info("Line data: %s", line)
             line = sorted(line, key=lambda x: x["x"])
             final_lines.append(" ".join([w["text"] for w in line]))
 

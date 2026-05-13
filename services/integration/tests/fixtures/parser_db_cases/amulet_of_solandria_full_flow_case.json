@@ -21,7 +21,7 @@
       ],
       "attack": null,
       "health": null,
-      "rules_text": ": Deal damaget to target attacking\ncreature equal to half your devotion.\nBury",
+      "rules_text": ": Deal damaget to target attacking\ncreature equal to half your devotion.",
       "version_number": 1
     },
     "metadata": {
