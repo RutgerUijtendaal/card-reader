@@ -35,6 +35,43 @@ def test_rule_text_enricher_replaces_known_ocr_aliases_for_detected_symbols() ->
     assert result.rendered_text == "{EXHAUST} target unit."
 
 
+def test_rule_text_enricher_can_replace_only_a_captured_part_of_ocr_alias_match() -> None:
+    symbol = Symbol(
+        id="symbol-1",
+        key="fire-mana",
+        label="Fire Mana",
+        symbol_type="mana",
+        text_token="{FM}",
+        text_enrichment_json={
+            "ocr_aliases": [
+                {
+                    "match_regex": r"(X)(,)",
+                    "replace_group": 1,
+                }
+            ]
+        },
+    )
+    result = RuleTextEnricher().enrich(
+        raw_text="Gain X, then draw a card.",
+        detected_symbols=[
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="fire-mana",
+                symbol_type="mana",
+                confidence=0.92,
+                bbox=DetectionBBox(x=4, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            )
+        ],
+        symbols=[symbol],
+    )
+
+    assert result.cleaned_text == "Gain X, then draw a card."
+    assert result.enriched_text == "Gain [[symbol:fire-mana]], then draw a card."
+    assert result.rendered_text == "Gain {FM}, then draw a card."
+
+
 def test_rule_text_enricher_inserts_placeholder_from_anchor_pattern() -> None:
     symbol = Symbol(
         id="symbol-1",
