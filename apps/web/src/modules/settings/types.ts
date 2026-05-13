@@ -1,5 +1,7 @@
 export type CatalogKind = 'keywords' | 'tags' | 'symbols' | 'types';
 
+export type CatalogSearchState = Record<CatalogKind, string>;
+
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 export type JsonObject = {
@@ -47,6 +49,7 @@ export type SymbolRecord = {
   symbol_type: string;
   detector_type: SymbolDetectorType;
   detection_config_json: string;
+  text_enrichment_json: string;
   reference_assets_json: string;
   text_token: string;
   enabled: boolean;
@@ -78,6 +81,7 @@ export type SymbolApiRecord = {
   symbol_type: string;
   detector_type: SymbolDetectorType;
   detection_config_json: JsonObject;
+  text_enrichment_json: JsonObject;
   reference_assets_json: string[];
   text_token: string;
   enabled: boolean;
@@ -132,6 +136,7 @@ export type SymbolUpsertRequest = {
   symbol_type?: string;
   detector_type?: SymbolDetectorType;
   detection_config_json?: JsonObject;
+  text_enrichment_json?: JsonObject;
   reference_assets_json?: string[];
   text_token?: string;
   enabled?: boolean;
@@ -152,6 +157,7 @@ export type CatalogFormEntry = {
   symbol_type: string;
   detector_type: SymbolDetectorType;
   detection_config_json: string;
+  text_enrichment_json: string;
   reference_assets_json: string;
   text_token: string;
   enabled: boolean;

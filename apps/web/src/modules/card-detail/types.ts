@@ -60,6 +60,7 @@ export type CardDetail = {
 export type CardVersionDetail = CardHoverTooltipModel & {
   image_url: string | null;
   editable: boolean;
+  rules_text_enriched: string;
   keyword_ids: string[];
   tag_ids: string[];
   symbol_ids: string[];
@@ -84,6 +85,7 @@ export type PaginatedCardsResponse<TCard = CardListItem> = {
 
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
+export type MetadataSearchState = Record<MetadataGroupName, string>;
 
 export type EditorForm = {
   name: string;

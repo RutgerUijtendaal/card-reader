@@ -7,6 +7,7 @@ from card_reader_core.models import Keyword, Symbol
 from PIL import Image
 
 from ...extractors import KnownMetadataExtractor
+from ..rule_text import RuleTextEnricher
 from ..ocr_runner import OcrRunner
 from ..symbol_detector import SymbolDetector
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class BottomRegionParser:
-    _EXPECTED_SYMBOL_TYPES = {"rules", "devotion"}
+    _EXPECTED_SYMBOL_TYPES = {"mana", "devotion", "generic"}
 
     def __init__(
         self,
@@ -27,6 +28,7 @@ class BottomRegionParser:
         self._ocr_runner = ocr_runner
         self._symbol_detector = symbol_detector
         self._metadata_extractor = metadata_extractor
+        self._rule_text_enricher = RuleTextEnricher()
 
     def parse(
         self,
@@ -46,7 +48,7 @@ class BottomRegionParser:
             region_name,
             self._safe_confidence(ocr_data.get("confidence", 0.0)),
         )
-        text = str(ocr_data.get("text", ""))
+        raw_text = str(ocr_data.get("text", ""))
         logger.info(
             "Bottom region symbol detection step started. region=%s symbol_candidates=%s expected_types=%s",
             region_name,
@@ -68,7 +70,12 @@ class BottomRegionParser:
             region_name,
             len(known_keywords),
         )
-        keyword_ids = self._metadata_extractor.extract_ids(text, known_keywords)
+        enrichment = self._rule_text_enricher.enrich(
+            raw_text=raw_text,
+            detected_symbols=detected_symbols,
+            symbols=symbols,
+        )
+        keyword_ids = self._metadata_extractor.extract_ids(enrichment.cleaned_text, known_keywords)
         logger.info(
             "Bottom region keyword extraction step finished. region=%s keywords=%s",
             region_name,
@@ -80,7 +87,7 @@ class BottomRegionParser:
             "Bottom region parse finished. region=%s conf=%.3f text_len=%s lines=%s symbols=%s keywords=%s",
             region_name,
             confidence,
-            len(text),
+            len(enrichment.rendered_text),
             len(lines),
             len(detected_symbols),
             len(keyword_ids),
@@ -88,13 +95,20 @@ class BottomRegionParser:
 
         return RegionParseResult(
             region_name=region_name,
-            text=text,
+            text=enrichment.rendered_text,
             confidence=confidence,
             lines=lines,
             detected_symbols=detected_symbols,
-            normalized_fields={"rules_text": text},
+            normalized_fields={
+                "rules_text_raw": enrichment.raw_text,
+                "rules_text_enriched": enrichment.enriched_text,
+                "rules_text": enrichment.rendered_text,
+            },
             extracted_keyword_ids=keyword_ids,
-            debug={"expected_symbol_types": sorted(self._EXPECTED_SYMBOL_TYPES)},
+            debug={
+                "expected_symbol_types": sorted(self._EXPECTED_SYMBOL_TYPES),
+                "rule_text_enrichment": enrichment.debug,
+            },
         )
 
     def _safe_confidence(self, raw: Any) -> float:

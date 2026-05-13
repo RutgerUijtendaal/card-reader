@@ -118,7 +118,7 @@ def build_parsed_snapshot(
             "mana_cost": normalized_fields.get("mana_cost", ""),
             "attack": to_int_or_none(normalized_fields.get("attack")),
             "health": to_int_or_none(normalized_fields.get("health")),
-            "rules_text": normalized_fields.get("rules_text", ""),
+            "rules_text": normalized_fields.get("rules_text_enriched", normalized_fields.get("rules_text", "")),
         },
         "metadata": {
             "keyword_ids": keyword_ids,

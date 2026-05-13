@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from card_reader_core.models import Symbol
+from card_reader_parser.parsers.rule_text import RuleTextEnricher
+from card_reader_parser.parsers.symbol_detector import DetectedSymbol, DetectionBBox
+
+
+def test_rule_text_enricher_replaces_known_ocr_aliases_for_detected_symbols() -> None:
+    symbol = Symbol(
+        id="symbol-1",
+        key="exhaust",
+        label="Exhaust",
+        symbol_type="misc",
+        text_token="{EXHAUST}",
+        text_enrichment_json={"ocr_aliases": ["Exbaust"]},
+    )
+    result = RuleTextEnricher().enrich(
+        raw_text="Exbaust target unit.",
+        detected_symbols=[
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="exhaust",
+                symbol_type="misc",
+                confidence=0.92,
+                bbox=DetectionBBox(x=4, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            )
+        ],
+        symbols=[symbol],
+    )
+
+    assert result.cleaned_text == "Exbaust target unit."
+    assert result.enriched_text == "[[symbol:exhaust]] target unit."
+    assert result.rendered_text == "{EXHAUST} target unit."
+
+
+def test_rule_text_enricher_inserts_placeholder_from_anchor_pattern() -> None:
+    symbol = Symbol(
+        id="symbol-1",
+        key="exhaust",
+        label="Exhaust",
+        symbol_type="misc",
+        text_token="{EXHAUST}",
+        text_enrichment_json={"pattern_anchors": [{"match": ": ", "position": "before"}]},
+    )
+    result = RuleTextEnricher().enrich(
+        raw_text=": Draw a card.",
+        detected_symbols=[
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="exhaust",
+                symbol_type="misc",
+                confidence=0.93,
+                bbox=DetectionBBox(x=4, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            )
+        ],
+        symbols=[symbol],
+    )
+
+    assert result.cleaned_text == ": Draw a card."
+    assert result.enriched_text == "[[symbol:exhaust]]: Draw a card."
+    assert result.rendered_text == "{EXHAUST}: Draw a card."
+
+
+def test_rule_text_enricher_can_insert_spacing_around_anchor_matches() -> None:
+    symbol = Symbol(
+        id="symbol-1",
+        key="fire-mana",
+        label="Fire Mana",
+        symbol_type="mana",
+        text_token="{FM}",
+        text_enrichment_json={
+            "pattern_anchors": [
+                {
+                    "match": "Gain",
+                    "position": "after",
+                    "before_text": " ",
+                    "after_text": " ",
+                }
+            ]
+        },
+    )
+    result = RuleTextEnricher().enrich(
+        raw_text="Gain 2 life.",
+        detected_symbols=[
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="fire-mana",
+                symbol_type="mana",
+                confidence=0.93,
+                bbox=DetectionBBox(x=4, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            )
+        ],
+        symbols=[symbol],
+    )
+
+    assert result.cleaned_text == "Gain 2 life."
+    assert result.enriched_text == "Gain [[symbol:fire-mana]] 2 life."
+    assert result.rendered_text == "Gain {FM} 2 life."

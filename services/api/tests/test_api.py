@@ -556,7 +556,7 @@ def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
         f"/cards/{card.id}/latest-version",
         data={
             "name": "Manual Card Name",
-            "rules_text": "Manual rules text",
+            "rules_text_enriched": "[[symbol:manual-symbol]]: Manual rules text",
             "tag_ids": [],
         },
         content_type="application/json",
@@ -566,7 +566,8 @@ def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["name"] == "Manual Card Name"
-    assert payload["rules_text"] == "Manual rules text"
+    assert payload["rules_text_enriched"] == "[[symbol:manual-symbol]]: Manual rules text"
+    assert payload["rules_text"] == "manual-symbol: Manual rules text"
     assert payload["tag_ids"] == []
     assert payload["field_sources"]["fields"]["name"] == "manual"
     assert payload["field_sources"]["fields"]["rules_text"] == "manual"
@@ -575,7 +576,8 @@ def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
     latest = get_latest_card_version(card.id)
     assert latest is not None
     assert latest.name == "Manual Card Name"
-    assert latest.rules_text == "Manual rules text"
+    assert latest.rules_text_enriched == "[[symbol:manual-symbol]]: Manual rules text"
+    assert latest.rules_text == "manual-symbol: Manual rules text"
     assert [row.id for row in get_tags_for_card_version(latest.id)] == []
 
 
@@ -665,6 +667,41 @@ def test_latest_version_patch_can_restore_and_unlock() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_symbol_text_token_update_refreshes_rendered_rule_text_for_linked_cards() -> None:
+    username = "staff-symbol-refresh-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    symbol = Symbol.objects.create(
+        key="exhaust-refresh-test",
+        label="Exhaust Refresh Test",
+        symbol_type="generic",
+        text_token="{EXHAUST}",
+    )
+    card, version = _create_editable_card_version(name="Symbol Refresh Card")
+    version.rules_text_enriched = "[[symbol:exhaust-refresh-test]]: Deal 2 damage."
+    version.rules_text = "{EXHAUST}: Deal 2 damage."
+    version.save(update_fields=["rules_text_enriched", "rules_text"])
+    replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
+
+    response = client.patch(
+        f"/settings/symbols/{symbol.id}",
+        data={"text_token": "{TAP}"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+
+    latest = get_latest_card_version(card.id)
+    assert latest is not None
+    assert latest.rules_text_enriched == "[[symbol:exhaust-refresh-test]]: Deal 2 damage."
+    assert latest.rules_text == "{TAP}: Deal 2 damage."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_card_reparse_queues_import_job() -> None:
     username = "staff-card-reparse-user"
     password = "password"
@@ -736,6 +773,8 @@ def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
         type_line="Base Type",
         mana_cost="2",
         mana_symbols_json="[]",
+        rules_text_raw="Base rules",
+        rules_text_enriched="Base rules",
         rules_text="Base rules",
         confidence=0.9,
         field_sources_json=json.dumps(

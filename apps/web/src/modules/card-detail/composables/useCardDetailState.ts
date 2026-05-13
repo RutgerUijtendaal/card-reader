@@ -9,6 +9,7 @@ import type {
   FieldSourceValue,
   MetadataGroupName,
   MetadataOption,
+  MetadataSearchState,
   ScalarFieldName,
   SymbolFilterOption,
   SymbolLookupMap,
@@ -38,6 +39,12 @@ export const useCardDetailState = () => {
     tag_ids: [],
     type_ids: [],
     symbol_ids: [],
+  });
+  const metadataSearch = reactive<MetadataSearchState>({
+    keywords: '',
+    tags: '',
+    types: '',
+    symbols: '',
   });
 
   const selectedVersion = computed<CardVersionDetail | null>(
@@ -94,7 +101,7 @@ export const useCardDetailState = () => {
     form.mana_cost = version.mana_cost ?? '';
     form.attack = version.attack === null ? '' : String(version.attack);
     form.health = version.health === null ? '' : String(version.health);
-    form.rules_text = version.rules_text ?? '';
+    form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
@@ -228,10 +235,19 @@ export const useCardDetailState = () => {
       .sort((a, b) => a.localeCompare(b));
 
   const optionsForGroup = (groupName: MetadataGroupName): Array<MetadataOption | SymbolFilterOption> => {
-    if (groupName === 'keywords') return filterOptions.value.keywords ?? [];
-    if (groupName === 'tags') return filterOptions.value.tags ?? [];
-    if (groupName === 'types') return filterOptions.value.types ?? [];
-    return filterOptions.value.symbols ?? [];
+    const options =
+      groupName === 'keywords'
+        ? (filterOptions.value.keywords ?? [])
+        : groupName === 'tags'
+          ? (filterOptions.value.tags ?? [])
+          : groupName === 'types'
+            ? (filterOptions.value.types ?? [])
+            : (filterOptions.value.symbols ?? []);
+    return filterMetadataOptions(options, metadataSearch[groupName]);
+  };
+
+  const setMetadataSearch = (groupName: MetadataGroupName, value: string): void => {
+    metadataSearch[groupName] = value;
   };
 
   const toggleMetadataSelection = (groupName: MetadataGroupName, id: string, checked: boolean): void => {
@@ -273,6 +289,7 @@ export const useCardDetailState = () => {
     isQueuingReparse,
     saveMessage,
     form,
+    metadataSearch,
     selectedVersion,
     isBusy,
     goBack,
@@ -295,6 +312,7 @@ export const useCardDetailState = () => {
     selectedIds,
     parsedMetadataLabels,
     optionsForGroup,
+    setMetadataSearch,
     toggleMetadataSelection,
     toAbsoluteApiUrl,
     formatDate,
@@ -302,6 +320,9 @@ export const useCardDetailState = () => {
 };
 
 const normalizeFieldValue = (version: CardVersionDetail, fieldName: ScalarFieldName): string => {
+  if (fieldName === 'rules_text') {
+    return String(version.rules_text_enriched ?? '');
+  }
   if (fieldName === 'attack' || fieldName === 'health') {
     return String(version[fieldName] ?? '');
   }
@@ -338,7 +359,7 @@ const buildManualUpdatePayload = (
 
   for (const fieldName of ['name', 'type_line', 'mana_cost', 'attack', 'health', 'rules_text'] as const) {
     if (normalizeFormFieldValue(form, fieldName) !== normalizeFieldValue(version, fieldName)) {
-      updates[fieldName] = form[fieldName];
+      updates[fieldName === 'rules_text' ? 'rules_text_enriched' : fieldName] = form[fieldName];
     }
   }
 
@@ -363,3 +384,21 @@ const normalizeFormFieldValue = (form: EditorForm, fieldName: ScalarFieldName): 
 
 const sameIds = (left: string[], right: string[]): boolean =>
   JSON.stringify(sortedIds(left)) === JSON.stringify(sortedIds(right));
+
+const filterMetadataOptions = <T extends MetadataOption | SymbolFilterOption>(
+  options: T[],
+  query: string,
+): T[] => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return options;
+  }
+
+  return options.filter((option) => {
+    const haystacks = [option.label, option.key];
+    if ('text_token' in option) {
+      haystacks.push(option.text_token);
+    }
+    return haystacks.some((value) => value.toLowerCase().includes(normalizedQuery));
+  });
+};

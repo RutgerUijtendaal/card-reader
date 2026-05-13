@@ -3,12 +3,12 @@
   "version": "0.1.10",
   "private": true,
   "scripts": {
-    "predev": "uv sync --project ../.. --all-packages --all-groups --locked",
-    "dev": "uv run --project ../.. --package card-reader-parser python -m card_reader_parser.main",
+    "predev": "uv --cache-dir ../../.uv-cache sync --project ../.. --all-packages --all-groups --locked",
+    "dev": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser python -m card_reader_parser.main",
     "build": "echo \"Python service has no build step\"",
-    "test": "uv run --project ../.. --package card-reader-parser pytest -q",
-    "lint": "uv run --project ../.. --package card-reader-parser ruff check src",
-    "fix": "uv run --project ../.. --package card-reader-parser ruff check src --fix",
-    "typecheck": "uv run --project ../.. --package card-reader-parser mypy src"
+    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser pytest -q",
+    "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser ruff check src",
+    "fix": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser ruff check src --fix",
+    "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser mypy src"
   }
 }

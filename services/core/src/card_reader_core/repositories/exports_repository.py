@@ -3,6 +3,9 @@ from __future__ import annotations
 import csv
 import io
 
+from card_reader_core.models import Symbol
+from card_reader_core.rule_text import render_enriched_rule_text
+
 from .cards_repository import list_cards
 from .metadata_repository import (
     list_symbols,
@@ -75,7 +78,13 @@ def export_cards_csv(
                     "mana_symbols": _replace_symbol_keys(_join_labels(mana_symbols)),
                     "attack": row.version.attack,
                     "health": row.version.health,
-                    "rules_text": _sanitize_csv_text(row.version.rules_text),
+                    "rules_text": _sanitize_csv_text(
+                        _render_rules_text(
+                            row.version.rules_text_enriched,
+                            row.version.rules_text,
+                            row.symbols,
+                        )
+                    ),
                     "types": _join_labels([item.label for item in row.types]),
                     "tags": _join_labels([item.label for item in row.tags]),
                     "symbols": _join_labels([item.text_token for item in row.symbols]),
@@ -103,3 +112,17 @@ def _replace_symbol_keys(text: str) -> str:
     for symbol in list_symbols():
         text = text.replace(symbol.key, symbol.text_token)
     return text
+
+
+def _render_rules_text(enriched_text: str, fallback_text: str, symbols: list[Symbol]) -> str:
+    if not enriched_text:
+        return fallback_text
+    symbol_tokens_by_key = {
+        getattr(symbol, "key", ""): getattr(symbol, "text_token", "")
+        for symbol in symbols
+        if getattr(symbol, "key", "")
+    }
+    return render_enriched_rule_text(
+        enriched_text,
+        symbol_tokens_by_key=symbol_tokens_by_key,
+    )

@@ -33,7 +33,8 @@
       ],
       "symbols": [
         "dark-mana",
-        "divine-mana"
+        "divine-mana",
+        "exhaust"
       ],
       "types": [
         "Persistent",
@@ -41,7 +42,8 @@
       ],
       "symbol_types": {
         "divine-mana": "mana",
-        "dark-mana": "mana"
+        "dark-mana": "mana",
+        "exhaust": "generic"
       }
     },
     "job": {

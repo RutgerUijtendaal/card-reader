@@ -58,6 +58,7 @@
           :field-has-parsed-suggestion="fieldHasParsedSuggestion"
           :format-parsed-field-value="formatParsedFieldValue"
           :metadata-has-parsed-suggestion="metadataHasParsedSuggestion"
+          :metadata-search="metadataSearch"
           :selected-ids="selectedIds"
           :parsed-metadata-labels="parsedMetadataLabels"
           :options-for-group="optionsForGroup"
@@ -69,6 +70,7 @@
           @reset-whole-card="resetWholeCardToAuto"
           @queue-reparse="queueLatestCardReparse"
           @toggle-group="toggleMetadataSelection"
+          @update-group-search="setMetadataSearch"
           @update-field="updateField"
         />
       </div>
@@ -120,9 +122,11 @@ const {
   fieldHasParsedSuggestion,
   formatParsedFieldValue,
   metadataHasParsedSuggestion,
+  metadataSearch,
   selectedIds,
   parsedMetadataLabels,
   optionsForGroup,
+  setMetadataSearch,
   toggleMetadataSelection,
   toAbsoluteApiUrl,
   formatDate,

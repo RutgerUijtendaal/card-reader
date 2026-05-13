@@ -60,6 +60,7 @@ export const createEmptyCatalogEntry = (): CatalogFormEntry => ({
   symbol_type: 'generic',
   detector_type: 'template',
   detection_config_json: detectionConfigExample,
+  text_enrichment_json: '{"ocr_aliases":[],"pattern_anchors":[]}',
   reference_assets_json: '[]',
   text_token: '',
   enabled: true,
@@ -118,6 +119,10 @@ export const buildCreatePayload = (
         entry.detection_config_json.trim() || '{}',
         'Detection config JSON',
       ),
+      text_enrichment_json: parseJsonObjectText(
+        entry.text_enrichment_json.trim() || '{}',
+        'Text enrichment JSON',
+      ),
       reference_assets_json: parseStringArrayText(
         entry.reference_assets_json.trim() || '[]',
         'Reference assets JSON',
@@ -157,6 +162,10 @@ export const buildUpdatePayload = (
       detection_config_json: parseJsonObjectText(
         symbol.detection_config_json,
         'Detection config JSON',
+      ),
+      text_enrichment_json: parseJsonObjectText(
+        symbol.text_enrichment_json,
+        'Text enrichment JSON',
       ),
       reference_assets_json: parseStringArrayText(
         symbol.reference_assets_json,
@@ -207,6 +216,7 @@ export const appendAssetPath = (rawJson: string, path: string): string => {
 const normalizeSymbolRecord = (row: SymbolApiRecord): SymbolRecord => ({
   ...row,
   detection_config_json: formatJsonText(row.detection_config_json, '{}'),
+  text_enrichment_json: formatJsonText(row.text_enrichment_json, '{}'),
   reference_assets_json: formatJsonText(row.reference_assets_json, '[]'),
 });
 

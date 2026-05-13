@@ -31,6 +31,8 @@ class CardVersion(TimestampedModel):
     mana_symbols_json = models.JSONField(default=list)
     attack: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True)
     health: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True)
+    rules_text_raw: models.TextField[str, str] = models.TextField(default="")
+    rules_text_enriched: models.TextField[str, str] = models.TextField(default="")
     rules_text: models.TextField[str, str] = models.TextField(default="")
     confidence: models.FloatField[float, float] = models.FloatField(default=0.0)
     parse_result: models.ForeignKey[ParseResult | None, ParseResult | None] = models.ForeignKey(

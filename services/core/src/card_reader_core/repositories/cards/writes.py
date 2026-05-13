@@ -5,9 +5,11 @@ from pathlib import Path
 from django.db import transaction
 
 from card_reader_core.models import Card, CardVersion, ImportJobItem, ImportJobStatus, ParseResult, now_utc
+from card_reader_core.rule_text import render_enriched_rule_text
 
 from ..helpers import extract_mana_symbols, normalize_slug_key, to_int_or_none
 from ..metadata_repository import (
+    get_symbols_for_card_version,
     replace_card_version_keywords,
     replace_card_version_symbols,
     replace_card_version_tags,
@@ -128,6 +130,7 @@ def update_latest_card_version(
 
     with transaction.atomic():
         restored_name = False
+        symbol_links_changed = False
         for field_name in unlock_fields:
             if field_name in field_sources["fields"]:
                 field_sources["fields"][field_name] = FIELD_SOURCE_AUTO
@@ -138,7 +141,10 @@ def update_latest_card_version(
         for field_name in restore_fields:
             if field_name not in field_sources["fields"]:
                 continue
-            apply_scalar_value(version, field_name, snapshot["fields"].get(field_name))
+            if field_name == "rules_text":
+                apply_manual_rule_text(version, snapshot["fields"].get(field_name))
+            else:
+                apply_scalar_value(version, field_name, snapshot["fields"].get(field_name))
             field_sources["fields"][field_name] = FIELD_SOURCE_AUTO
             if field_name == "name":
                 restored_name = True
@@ -147,11 +153,16 @@ def update_latest_card_version(
                 continue
             restore_metadata_group_from_snapshot(version.id, group_name, snapshot)
             field_sources["metadata"][group_name] = FIELD_SOURCE_AUTO
+            if group_name == "symbols":
+                symbol_links_changed = True
 
         for field_name in SCALAR_FIELD_NAMES:
             if field_name not in updates:
                 continue
-            apply_scalar_value(version, field_name, updates[field_name])
+            if field_name == "rules_text":
+                apply_manual_rule_text(version, updates[field_name])
+            else:
+                apply_scalar_value(version, field_name, updates[field_name])
             field_sources["fields"][field_name] = FIELD_SOURCE_MANUAL
             if field_name == "name":
                 restored_name = True
@@ -180,6 +191,10 @@ def update_latest_card_version(
                 symbol_ids=string_list(updates.get("symbol_ids")),
             )
             field_sources["metadata"]["symbols"] = FIELD_SOURCE_MANUAL
+            symbol_links_changed = True
+
+        if symbol_links_changed:
+            apply_manual_rule_text(version, version.rules_text_enriched)
 
         if restored_name or "name" in updates:
             card.label = version.name
@@ -206,6 +221,8 @@ def apply_parsed_fields_to_version(
     version.mana_symbols_json = extract_mana_symbols(normalized_fields)
     version.attack = to_int_or_none(normalized_fields.get("attack"))
     version.health = to_int_or_none(normalized_fields.get("health"))
+    version.rules_text_raw = normalized_fields.get("rules_text_raw", "")
+    version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
     version.rules_text = normalized_fields.get("rules_text", "")
     version.confidence = float(confidence.get("overall", 0.0))
 
@@ -283,6 +300,8 @@ def create_new_version(
         mana_symbols_json=extract_mana_symbols(normalized_fields),
         attack=to_int_or_none(normalized_fields.get("attack")),
         health=to_int_or_none(normalized_fields.get("health")),
+        rules_text_raw=normalized_fields.get("rules_text_raw", ""),
+        rules_text_enriched=normalized_fields.get("rules_text_enriched", ""),
         rules_text=normalized_fields.get("rules_text", ""),
         confidence=float(confidence.get("overall", 0.0)),
         field_sources_json=DEFAULT_FIELD_SOURCES,
@@ -357,7 +376,11 @@ def apply_parsed_output_to_version(
     if field_sources["fields"]["health"] == FIELD_SOURCE_AUTO:
         version.health = to_int_or_none(normalized_fields.get("health"))
     if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
+        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
         version.rules_text = normalized_fields.get("rules_text", "")
+    version.rules_text_raw = normalized_fields.get("rules_text_raw", "")
+    if field_sources["fields"]["rules_text"] == FIELD_SOURCE_AUTO:
+        version.rules_text_enriched = normalized_fields.get("rules_text_enriched", "")
 
     if field_sources["metadata"]["keywords"] == FIELD_SOURCE_AUTO:
         replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids)
@@ -369,3 +392,15 @@ def apply_parsed_output_to_version(
         replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids)
 
     version.confidence = float(confidence.get("overall", 0.0))
+
+
+def apply_manual_rule_text(version: CardVersion, value: object) -> None:
+    enriched_text = str(value or "")
+    version.rules_text_enriched = enriched_text
+    version.rules_text = render_enriched_rule_text(
+        enriched_text,
+        symbol_tokens_by_key={
+            symbol.key: symbol.text_token
+            for symbol in get_symbols_for_card_version(version.id)
+        },
+    )

@@ -246,6 +246,8 @@ class CardParser:
         merged.setdefault("mana_cost", "")
         merged.setdefault("mana_symbols", "")
         merged.setdefault("mana_total", "")
+        merged.setdefault("rules_text_raw", "")
+        merged.setdefault("rules_text_enriched", "")
         merged.setdefault("rules_text", "")
         return merged
 

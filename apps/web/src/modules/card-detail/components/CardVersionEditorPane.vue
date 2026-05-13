@@ -115,6 +115,17 @@
             </div>
           </div>
 
+          <label class="field-label mb-3">
+            Search {{ group.label.toLowerCase() }}
+            <input
+              :value="metadataSearch[group.name]"
+              class="input-base"
+              :disabled="isBusy"
+              placeholder="Filter by label, key, or token"
+              @input="$emit('update-group-search', group.name, ($event.target as HTMLInputElement).value)"
+            >
+          </label>
+
           <div class="grid gap-2 sm:grid-cols-2">
             <label
               v-for="option in optionsForGroup(group.name)"
@@ -130,6 +141,13 @@
               <span>{{ option.label }}</span>
             </label>
           </div>
+
+          <p
+            v-if="optionsForGroup(group.name).length === 0"
+            class="rounded-lg border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500"
+          >
+            No {{ group.label.toLowerCase() }} match this filter.
+          </p>
 
           <p
             v-if="metadataHasParsedSuggestion(group.name)"
@@ -183,6 +201,7 @@ import type {
   EditorForm,
   MetadataGroupName,
   MetadataOption,
+  MetadataSearchState,
   ScalarFieldName,
   SymbolFilterOption,
 } from '@/modules/card-detail/types';
@@ -202,6 +221,7 @@ defineProps<{
   fieldHasParsedSuggestion: (fieldName: ScalarFieldName) => boolean;
   formatParsedFieldValue: (fieldName: ScalarFieldName) => string;
   metadataHasParsedSuggestion: (groupName: MetadataGroupName) => boolean;
+  metadataSearch: MetadataSearchState;
   selectedIds: (groupName: MetadataGroupName) => string[];
   parsedMetadataLabels: (groupName: MetadataGroupName) => string[];
   optionsForGroup: (groupName: MetadataGroupName) => Array<MetadataOption | SymbolFilterOption>;
@@ -216,6 +236,7 @@ defineEmits<{
   (e: 'reset-whole-card'): void;
   (e: 'queue-reparse'): void;
   (e: 'toggle-group', groupName: MetadataGroupName, optionId: string, checked: boolean): void;
+  (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
 }>();
 </script>

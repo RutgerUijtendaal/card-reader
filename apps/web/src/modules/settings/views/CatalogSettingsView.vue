@@ -32,6 +32,8 @@
 
         <CatalogEntriesSection
           :selected-kind="selectedKind"
+          :search-term="currentSearchTerm"
+          :total-count="allCurrentRows.length"
           :current-rows="currentRows"
           :kind-label="kindLabel"
           :saving-entry-ids="savingEntryIds"
@@ -41,6 +43,7 @@
           :detection-config-example="detectionConfigExample"
           :reference-assets-example="referenceAssetsExample"
           :is-entry-advanced-open="isEntryAdvancedOpen"
+          @update:search-term="setSearchTerm"
           @save="(entry) => updateEntry(selectedKind, entry)"
           @request-delete="(entry) => openDeleteModal(selectedKind, entry)"
           @upload-entry-asset="pickAndUploadEntryAsset"
@@ -80,7 +83,9 @@ import {
 const {
   catalogKinds,
   selectedKind,
+  allCurrentRows,
   currentRows,
+  currentSearchTerm,
   newEntry,
   savingEntryIds,
   deletingEntryIds,
@@ -91,6 +96,7 @@ const {
   deleteModal,
   deleteModalMessage,
   selectKind,
+  setSearchTerm,
   isEntryAdvancedOpen,
   toggleEntryAdvanced,
   loadCatalog,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, TypeVar
 
 from card_reader_core.models import (
+    CardVersion,
     CardVersionKeyword,
     CardVersionSymbol,
     CardVersionTag,
@@ -13,6 +14,7 @@ from card_reader_core.models import (
     Type,
     now_utc,
 )
+from card_reader_core.rule_text import render_enriched_rule_text, replace_symbol_placeholder_key
 
 MetadataModel = Keyword | Tag | Symbol | Type
 MetadataRow = TypeVar("MetadataRow", bound=MetadataModel)
@@ -105,6 +107,7 @@ def create_symbol(
     symbol_type: str,
     detector_type: str,
     detection_config_json: dict[str, object],
+    text_enrichment_json: dict[str, object],
     reference_assets_json: list[str],
     text_token: str,
     enabled: bool,
@@ -115,6 +118,7 @@ def create_symbol(
         symbol_type=symbol_type,
         detector_type=detector_type,
         detection_config_json=detection_config_json,
+        text_enrichment_json=text_enrichment_json,
         reference_assets_json=reference_assets_json,
         text_token=text_token,
         enabled=enabled,
@@ -195,6 +199,51 @@ def replace_card_version_types(*, card_version_id: str, type_ids: list[str]) -> 
 
 def replace_card_version_symbols(*, card_version_id: str, symbol_ids: list[str]) -> None:
     _replace_links(CardVersionSymbol, card_version_id, "symbol_id", symbol_ids)
+
+
+def refresh_rule_text_for_symbol(
+    *,
+    symbol_id: str,
+    old_key: str | None = None,
+    new_key: str | None = None,
+) -> int:
+    versions = list(
+        CardVersion.objects.filter(card_version_symbols__symbol_id=symbol_id)
+        .distinct()
+    )
+    changed_versions: list[CardVersion] = []
+
+    for version in versions:
+        enriched_text = version.rules_text_enriched
+        if old_key and new_key and old_key != new_key:
+            enriched_text = replace_symbol_placeholder_key(
+                enriched_text,
+                old_symbol_key=old_key,
+                new_symbol_key=new_key,
+            )
+
+        symbol_tokens_by_key = {
+            symbol.key: symbol.text_token
+            for symbol in get_symbols_for_card_version(version.id)
+        }
+        rendered_text = render_enriched_rule_text(
+            enriched_text,
+            symbol_tokens_by_key=symbol_tokens_by_key,
+        )
+        if enriched_text == version.rules_text_enriched and rendered_text == version.rules_text:
+            continue
+
+        version.rules_text_enriched = enriched_text
+        version.rules_text = rendered_text
+        version.updated_at = now_utc()
+        changed_versions.append(version)
+
+    if changed_versions:
+        CardVersion.objects.bulk_update(
+            changed_versions,
+            ["rules_text_enriched", "rules_text", "updated_at"],
+        )
+    return len(changed_versions)
 
 
 def get_keywords_for_card_version(card_version_id: str) -> list[Keyword]:

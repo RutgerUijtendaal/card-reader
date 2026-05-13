@@ -21,7 +21,7 @@
       ],
       "attack": null,
       "health": null,
-      "rules_text": ": Deal damaget to target attacking\ncreature equal to half your  devotion.\nBury",
+      "rules_text": ": Deal damaget to target attacking\ncreature equal to half your devotion.\nBury",
       "version_number": 1
     },
     "metadata": {
@@ -32,6 +32,7 @@
       ],
       "symbols": [
         "divine-mana",
+        "exhaust",
         "martial-mana",
         "sola-affinity"
       ],
@@ -40,6 +41,7 @@
       ],
       "symbol_types": {
         "divine-mana": "mana",
+        "exhaust": "generic",
         "martial-mana": "mana",
         "sola-affinity": "affinity"
       }

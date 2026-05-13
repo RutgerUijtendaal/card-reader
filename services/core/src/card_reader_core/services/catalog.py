@@ -27,6 +27,7 @@ from card_reader_core.repositories.metadata_repository import (
     tag_key_exists,
     type_key_exists,
     update_keyword,
+    refresh_rule_text_for_symbol,
     update_symbol,
     update_tag,
     update_type,
@@ -128,6 +129,7 @@ class CatalogService:
         symbol_type: str | None = None,
         detector_type: str | None = None,
         detection_config_json: str | None = None,
+        text_enrichment_json: str | None = None,
         reference_assets_json: str | None = None,
         text_token: str | None = None,
         enabled: bool | None = None,
@@ -136,12 +138,18 @@ class CatalogService:
         normalized_key = self._normalize_key(key=key, label=normalized_label)
         self._ensure_unique("symbol", normalized_key)
         self._validate_symbol_config_json(detection_config_json, reference_assets_json)
+        self._validate_symbol_config_json(
+            text_enrichment_json,
+            None,
+            field_name="text_enrichment_json",
+        )
         return create_symbol(
             key=normalized_key,
             label=normalized_label,
             symbol_type=self._normalize_symbol_type(symbol_type),
             detector_type=self._normalize_detector_type(detector_type),
             detection_config_json=self._normalize_object_json(detection_config_json),
+            text_enrichment_json=self._normalize_object_json(text_enrichment_json),
             reference_assets_json=self._normalize_array_json(reference_assets_json),
             text_token=(text_token or "").strip(),
             enabled=enabled if enabled is not None else True,
@@ -156,6 +164,7 @@ class CatalogService:
         symbol_type: str | None = None,
         detector_type: str | None = None,
         detection_config_json: str | None = None,
+        text_enrichment_json: str | None = None,
         reference_assets_json: str | None = None,
         text_token: str | None = None,
         enabled: bool | None = None,
@@ -163,6 +172,8 @@ class CatalogService:
         row = get_symbol(entry_id)
         if row is None:
             return None
+        previous_key = row.key
+        previous_text_token = row.text_token
 
         updates: dict[str, object] = {}
         current_label = row.label
@@ -179,11 +190,23 @@ class CatalogService:
             symbol_type=symbol_type,
             detector_type=detector_type,
             detection_config_json=detection_config_json,
+            text_enrichment_json=text_enrichment_json,
             reference_assets_json=reference_assets_json,
             text_token=text_token,
             enabled=enabled,
         )
-        return update_symbol(entry_id=entry_id, updates=updates)
+        updated_symbol = update_symbol(entry_id=entry_id, updates=updates)
+        if updated_symbol is None:
+            return None
+
+        if updated_symbol.key != previous_key or updated_symbol.text_token != previous_text_token:
+            refresh_rule_text_for_symbol(
+                symbol_id=updated_symbol.id,
+                old_key=previous_key,
+                new_key=updated_symbol.key,
+            )
+
+        return updated_symbol
 
     def delete_keyword(self, *, entry_id: str) -> bool:
         return delete_keyword(entry_id=entry_id)
@@ -272,6 +295,7 @@ class CatalogService:
         symbol_type: str | None,
         detector_type: str | None,
         detection_config_json: str | None,
+        text_enrichment_json: str | None,
         reference_assets_json: str | None,
         text_token: str | None,
         enabled: bool | None,
@@ -284,6 +308,12 @@ class CatalogService:
             self._validate_symbol_config_json(detection_config_json, None)
             updates["detection_config_json"] = self._normalize_object_json(
                 detection_config_json,
+            )
+        if text_enrichment_json is not None:
+            self._validate_symbol_config_json(text_enrichment_json, None, field_name="text_enrichment_json")
+            updates["text_enrichment_json"] = self._normalize_object_json(
+                text_enrichment_json,
+                field_name="text_enrichment_json",
             )
         if reference_assets_json is not None:
             self._validate_symbol_config_json(None, reference_assets_json)
@@ -343,9 +373,18 @@ class CatalogService:
             out.append(compact)
         return out
 
-    def _validate_symbol_config_json(self, object_json: str | None, array_json: str | None) -> None:
-        if object_json is not None and not isinstance(self._normalize_object_json(object_json), dict):
-            raise ValueError("detection_config_json must be a JSON object")
+    def _validate_symbol_config_json(
+        self,
+        object_json: str | None,
+        array_json: str | None,
+        *,
+        field_name: str = "detection_config_json",
+    ) -> None:
+        if object_json is not None and not isinstance(
+            self._normalize_object_json(object_json, field_name=field_name),
+            dict,
+        ):
+            raise ValueError(f"{field_name} must be a JSON object")
         if array_json is None:
             return
         parsed = self._normalize_array_json(array_json)
@@ -354,11 +393,16 @@ class CatalogService:
         if not all(isinstance(item, str) for item in parsed):
             raise ValueError("reference_assets_json entries must be strings")
 
-    def _normalize_object_json(self, value: str | None) -> dict[str, object]:
+    def _normalize_object_json(
+        self,
+        value: str | None,
+        *,
+        field_name: str = "detection_config_json",
+    ) -> dict[str, object]:
         raw = (value or "").strip() or "{}"
         parsed = json.loads(raw)
         if not isinstance(parsed, dict):
-            raise ValueError("detection_config_json must be a JSON object")
+            raise ValueError(f"{field_name} must be a JSON object")
         return {str(key): parsed[key] for key in parsed}
 
     def _normalize_array_json(self, value: str | None) -> list[str]:

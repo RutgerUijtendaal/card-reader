@@ -1,14 +1,40 @@
 <template>
   <div class="rounded-lg border border-slate-200 p-3">
-    <h4 class="mb-3 text-sm font-semibold text-slate-800">
-      Existing {{ kindLabel(selectedKind).toLowerCase() }}
-    </h4>
+    <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h4 class="text-sm font-semibold text-slate-800">
+          Existing {{ kindLabel(selectedKind).toLowerCase() }}
+        </h4>
+        <p class="mt-1 text-xs text-slate-500">
+          {{ currentRows.length }} of {{ totalCount }} shown
+        </p>
+      </div>
+
+      <label class="block w-full max-w-sm">
+        <span class="mb-1 block text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+          Filter entries
+        </span>
+        <input
+          :value="searchTerm"
+          class="input-base"
+          :placeholder="`Search ${kindLabel(selectedKind).toLowerCase()} by label, key, or metadata`"
+          @input="emit('update:search-term', ($event.target as HTMLInputElement).value)"
+        >
+      </label>
+    </div>
 
     <div
-      v-if="currentRows.length === 0"
+      v-if="totalCount === 0"
       class="text-sm text-slate-500"
     >
       No entries.
+    </div>
+
+    <div
+      v-else-if="currentRows.length === 0"
+      class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500"
+    >
+      No matching entries.
     </div>
 
     <div
@@ -115,7 +141,8 @@
                 <td class="px-2 py-2">
                   <input
                     v-model="entry.key"
-                    class="input-base"
+                    class="input-base cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500"
+                    disabled
                   >
                 </td>
                 <td
@@ -251,7 +278,7 @@
                         }}
                       </button>
                     </div>
-                    <div>
+                    <div class="space-y-2">
                       <label
                         v-if="(entry as SymbolRecord).detector_type === 'template'"
                         class="field-label"
@@ -261,6 +288,14 @@
                           v-model="(entry as SymbolRecord).detection_config_json"
                           class="input-base min-h-24 font-mono"
                           :placeholder="detectionConfigExample"
+                        />
+                      </label>
+                      <label class="field-label">
+                        Text enrichment JSON
+                        <textarea
+                          v-model="(entry as SymbolRecord).text_enrichment_json"
+                          class="input-base min-h-24 font-mono"
+                          placeholder="{&quot;ocr_aliases&quot;:[],&quot;pattern_anchors&quot;:[]}"
                         />
                       </label>
                     </div>
@@ -289,6 +324,8 @@ import type {
 
 defineProps<{
   selectedKind: CatalogKind;
+  searchTerm: string;
+  totalCount: number;
   currentRows: CatalogRow[];
   kindLabel: (kind: CatalogKind) => string;
   savingEntryIds: Set<string>;
@@ -301,6 +338,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (e: 'update:search-term', value: string): void;
   (e: 'save', entry: CatalogRow): void;
   (e: 'request-delete', entry: CatalogRow): void;
   (e: 'upload-entry-asset', entry: SymbolRecord): void;
