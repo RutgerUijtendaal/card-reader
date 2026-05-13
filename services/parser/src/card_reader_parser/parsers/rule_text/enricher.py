@@ -64,14 +64,16 @@ class RuleTextEnricher:
                 if remaining_occurrences <= 0:
                     break
                 match_text = anchor.get("match", "")
+                match_regex = anchor.get("match_regex", "")
                 position = anchor.get("position", "before")
                 before_text = anchor.get("before_text", "")
                 after_text = anchor.get("after_text", "")
-                if not match_text:
+                if not match_text and not match_regex:
                     continue
                 enriched_text, insertions = _insert_anchor_occurrences(
                     enriched_text,
                     match_text=match_text,
+                    match_regex=match_regex,
                     placeholder=placeholder,
                     position=position,
                     before_text=before_text,
@@ -84,6 +86,7 @@ class RuleTextEnricher:
                         {
                             "symbol_key": symbol.key,
                             "match": match_text,
+                            "match_regex": match_regex,
                             "position": position,
                             "before_text": before_text,
                             "after_text": after_text,
@@ -136,8 +139,11 @@ def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
         if not isinstance(item, dict):
             continue
         match_text = item.get("match")
+        match_regex = item.get("match_regex")
         position = item.get("position")
-        if not isinstance(match_text, str) or not match_text:
+        normalized_match = match_text if isinstance(match_text, str) else ""
+        normalized_match_regex = match_regex if isinstance(match_regex, str) else ""
+        if bool(normalized_match) == bool(normalized_match_regex):
             continue
         if position not in {"before", "after"}:
             position = "before"
@@ -145,7 +151,8 @@ def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
         after_text = item.get("after_text")
         anchors.append(
             {
-                "match": match_text,
+                "match": normalized_match,
+                "match_regex": normalized_match_regex,
                 "position": position,
                 "before_text": before_text if isinstance(before_text, str) else "",
                 "after_text": after_text if isinstance(after_text, str) else "",
@@ -176,6 +183,7 @@ def _insert_anchor_occurrences(
     text: str,
     *,
     match_text: str,
+    match_regex: str,
     placeholder: str,
     position: str,
     before_text: str,
@@ -187,9 +195,15 @@ def _insert_anchor_occurrences(
     search_start = 0
 
     while inserted < max_insertions:
-        match_index = next_text.find(match_text, search_start)
-        if match_index < 0:
+        match_bounds = _find_anchor_match(
+            next_text,
+            match_text=match_text,
+            match_regex=match_regex,
+            search_start=search_start,
+        )
+        if match_bounds is None:
             break
+        match_index, match_end = match_bounds
 
         if position == "before":
             insertion_text = _normalize_insertion_boundaries(
@@ -205,19 +219,40 @@ def _insert_anchor_occurrences(
         else:
             insertion_text = _normalize_insertion_boundaries(
                 text=next_text,
-                insertion_index=match_index + len(match_text),
+                insertion_index=match_end,
                 insertion_text=f"{before_text}{placeholder}{after_text}",
             )
-            insertion_index = match_index + len(match_text)
+            insertion_index = match_end
             if next_text[insertion_index : insertion_index + len(insertion_text)] == insertion_text:
                 search_start = insertion_index + len(insertion_text)
                 continue
 
         next_text = f"{next_text[:insertion_index]}{insertion_text}{next_text[insertion_index:]}"
         inserted += 1
-        search_start = insertion_index + len(insertion_text) + len(match_text)
+        search_start = insertion_index + len(insertion_text)
 
     return next_text, inserted
+
+
+def _find_anchor_match(
+    text: str,
+    *,
+    match_text: str,
+    match_regex: str,
+    search_start: int,
+) -> tuple[int, int] | None:
+    if match_regex:
+        match = re.search(match_regex, text[search_start:], flags=re.IGNORECASE)
+        if match is None:
+            return None
+        start = search_start + match.start()
+        end = search_start + match.end()
+        return start, end
+
+    match_index = text.find(match_text, search_start)
+    if match_index < 0:
+        return None
+    return match_index, match_index + len(match_text)
 
 
 def _normalize_insertion_boundaries(
@@ -229,6 +264,9 @@ def _normalize_insertion_boundaries(
     normalized = insertion_text
     if normalized.startswith(" ") and insertion_index > 0 and text[insertion_index - 1].isspace():
         normalized = normalized.lstrip(" ")
-    if normalized.endswith(" ") and insertion_index < len(text) and text[insertion_index].isspace():
-        normalized = normalized.rstrip(" ")
+    if normalized.endswith(" "):
+        if insertion_index >= len(text):
+            normalized = normalized.rstrip(" ")
+        elif text[insertion_index].isspace():
+            normalized = normalized.rstrip(" ")
     return normalized

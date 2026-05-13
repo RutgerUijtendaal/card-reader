@@ -102,3 +102,68 @@ def test_rule_text_enricher_can_insert_spacing_around_anchor_matches() -> None:
     assert result.cleaned_text == "Gain 2 life."
     assert result.enriched_text == "Gain [[symbol:fire-mana]] 2 life."
     assert result.rendered_text == "Gain {FM} 2 life."
+
+
+def test_rule_text_enricher_supports_regex_anchors_against_mutated_text() -> None:
+    divine_symbol = Symbol(
+        id="symbol-1",
+        key="divine-mana",
+        label="Divine Mana",
+        symbol_type="mana",
+        text_token="{DM}",
+        text_enrichment_json={
+            "pattern_anchors": [
+                {
+                    "match_regex": r"Gain(?!\s+\[\[symbol:)",
+                    "position": "after",
+                    "before_text": " ",
+                    "after_text": " ",
+                }
+            ]
+        },
+    )
+    martial_symbol = Symbol(
+        id="symbol-2",
+        key="martial-mana",
+        label="Martial Mana",
+        symbol_type="mana",
+        text_token="{MM}",
+        text_enrichment_json={
+            "pattern_anchors": [
+                {
+                    "match_regex": r"\bor\b(?!\s+\[\[symbol:)",
+                    "position": "after",
+                    "before_text": " ",
+                    "after_text": " ",
+                }
+            ]
+        },
+    )
+
+    result = RuleTextEnricher().enrich(
+        raw_text="[E]: Gain or",
+        detected_symbols=[
+            DetectedSymbol(
+                symbol_id="symbol-1",
+                key="divine-mana",
+                symbol_type="mana",
+                confidence=0.95,
+                bbox=DetectionBBox(x=20, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            ),
+            DetectedSymbol(
+                symbol_id="symbol-2",
+                key="martial-mana",
+                symbol_type="mana",
+                confidence=0.94,
+                bbox=DetectionBBox(x=40, y=5, w=8, h=8),
+                detector_type="template",
+                match_metadata={},
+            ),
+        ],
+        symbols=[divine_symbol, martial_symbol],
+    )
+
+    assert result.enriched_text == "[E]: Gain [[symbol:divine-mana]] or [[symbol:martial-mana]]"
+    assert result.rendered_text == "[E]: Gain {DM} or {MM}"
