@@ -113,7 +113,6 @@ class OcrRunner:
         grouped_lines = self._group_by_lines(lines_data)
         final_lines: list[str] = []
         for line in grouped_lines:
-            logger.info("Line data: %s", line)
             line = sorted(line, key=lambda x: x["x"])
             final_lines.append(" ".join([w["text"] for w in line]))
 
