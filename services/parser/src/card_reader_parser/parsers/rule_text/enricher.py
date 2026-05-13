@@ -56,9 +56,12 @@ class RuleTextEnricher:
                 )
                 if replacements > 0:
                     remaining_occurrences -= replacements
-                    applied_aliases.append(
-                        {"symbol_key": symbol.key, "alias": alias, "count": replacements}
-                    )
+                    alias_debug = {
+                        "symbol_key": symbol.key,
+                        "count": replacements,
+                    }
+                    alias_debug.update(alias)
+                    applied_aliases.append(alias_debug)
 
             for anchor in config["pattern_anchors"]:
                 if remaining_occurrences <= 0:
@@ -133,7 +136,32 @@ def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
     if not isinstance(raw, dict):
         return {"ocr_aliases": [], "pattern_anchors": []}
 
-    aliases = [item.strip() for item in raw.get("ocr_aliases", []) if isinstance(item, str) and item.strip()]
+    aliases: list[dict[str, object]] = []
+    for item in raw.get("ocr_aliases", []):
+        if isinstance(item, str) and item.strip():
+            aliases.append({"match": item.strip()})
+            continue
+        if not isinstance(item, dict):
+            continue
+
+        match_text = item.get("match")
+        match_regex = item.get("match_regex")
+        normalized_match = match_text if isinstance(match_text, str) else ""
+        normalized_match_regex = match_regex if isinstance(match_regex, str) else ""
+        if bool(normalized_match) == bool(normalized_match_regex):
+            continue
+
+        replace_group = item.get("replace_group", 0)
+        if not isinstance(replace_group, int) or replace_group < 0:
+            replace_group = 0
+        aliases.append(
+            {
+                "match": normalized_match,
+                "match_regex": normalized_match_regex,
+                "replace_group": replace_group,
+            }
+        )
+
     anchors: list[dict[str, str]] = []
     for item in raw.get("pattern_anchors", []):
         if not isinstance(item, dict):
@@ -164,19 +192,62 @@ def _parse_text_enrichment_config(raw: object) -> dict[str, list[Any]]:
 def _replace_alias_occurrences(
     text: str,
     *,
-    alias: str,
+    alias: dict[str, object],
     placeholder: str,
     max_replacements: int,
 ) -> tuple[str, int]:
     replaced = 0
     next_text = text
+    match_text = alias.get("match", "")
+    match_regex = alias.get("match_regex", "")
+    replace_group = alias.get("replace_group", 0)
+    if not isinstance(match_text, str):
+        match_text = ""
+    if not isinstance(match_regex, str):
+        match_regex = ""
+    if not isinstance(replace_group, int):
+        replace_group = 0
+
     while replaced < max_replacements:
-        match = re.search(re.escape(alias), next_text, flags=re.IGNORECASE)
-        if match is None:
+        match_bounds = _find_alias_match(
+            next_text,
+            match_text=match_text,
+            match_regex=match_regex,
+            replace_group=replace_group,
+        )
+        if match_bounds is None:
             break
-        next_text = f"{next_text[:match.start()]}{placeholder}{next_text[match.end():]}"
+        start, end = match_bounds
+        next_text = f"{next_text[:start]}{placeholder}{next_text[end:]}"
         replaced += 1
     return next_text, replaced
+
+
+def _find_alias_match(
+    text: str,
+    *,
+    match_text: str,
+    match_regex: str,
+    replace_group: int,
+) -> tuple[int, int] | None:
+    if match_regex:
+        match = re.search(match_regex, text, flags=re.IGNORECASE)
+        if match is None:
+            return None
+        if replace_group > 0:
+            try:
+                start, end = match.span(replace_group)
+            except IndexError:
+                return None
+            if start < 0 or end < 0:
+                return None
+            return start, end
+        return match.start(), match.end()
+
+    match = re.search(re.escape(match_text), text, flags=re.IGNORECASE)
+    if match is None:
+        return None
+    return match.start(), match.end()
 
 
 def _insert_anchor_occurrences(
