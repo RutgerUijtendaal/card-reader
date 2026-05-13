@@ -26,6 +26,13 @@ export const kindLabel = (kind: CatalogKind): string => {
   return 'Types';
 };
 
+export const kindItemLabel = (kind: CatalogKind): string => {
+  if (kind === 'keywords') return 'Keyword';
+  if (kind === 'tags') return 'Tag';
+  if (kind === 'symbols') return 'Symbol';
+  return 'Type';
+};
+
 export const formatIdentifiersText = (identifiers: string[]): string =>
   identifiers.filter((item) => item.trim().length > 0).join('\n');
 
@@ -49,9 +56,29 @@ export const parseIdentifiersText = (rawText: string): string[] => {
   return out;
 };
 
-export const detectionConfigExample =
-  '{"threshold":0.9,"scales":[1.0,0.9,1.1],"max_candidates_per_asset":40,"max_detections_per_symbol":8,"nms_iou_threshold":0.25,"center_crop_ratio":0.7}';
-export const referenceAssetsExample = '["mana/fire.png","mana/fire_alt.png"]';
+export const detectionConfigExample = JSON.stringify(
+  {
+    threshold: 0.9,
+    scales: [1.0, 0.9, 1.1],
+    max_candidates_per_asset: 40,
+    max_detections_per_symbol: 8,
+    nms_iou_threshold: 0.25,
+    center_crop_ratio: 0.7,
+  },
+  null,
+  2,
+);
+
+export const textEnrichmentExample = JSON.stringify(
+  {
+    ocr_aliases: ['devotion', 'dev0tion'],
+    pattern_anchors: ['your devotion to blue', 'devotion to black and red'],
+  },
+  null,
+  2,
+);
+
+export const referenceAssetsExample = JSON.stringify(['mana/fire.png', 'mana/fire_alt.png'], null, 2);
 
 export const createEmptyCatalogEntry = (): CatalogFormEntry => ({
   label: '',
@@ -60,11 +87,77 @@ export const createEmptyCatalogEntry = (): CatalogFormEntry => ({
   symbol_type: 'generic',
   detector_type: 'template',
   detection_config_json: detectionConfigExample,
-  text_enrichment_json: '{"ocr_aliases":[],"pattern_anchors":[]}',
+  text_enrichment_json: JSON.stringify(
+    {
+      ocr_aliases: [],
+      pattern_anchors: [],
+    },
+    null,
+    2,
+  ),
   reference_assets_json: '[]',
   text_token: '',
   enabled: true,
 });
+
+export const catalogRowToFormEntry = (row: CatalogRow): CatalogFormEntry => {
+  if ('symbol_type' in row) {
+    return {
+      label: row.label,
+      key: row.key,
+      symbol_type: row.symbol_type,
+      detector_type: row.detector_type,
+      detection_config_json: row.detection_config_json,
+      text_enrichment_json: row.text_enrichment_json,
+      reference_assets_json: row.reference_assets_json,
+      text_token: row.text_token,
+      enabled: row.enabled,
+      identifiers_text: '',
+    };
+  }
+
+  return {
+    label: row.label,
+    key: row.key,
+    identifiers_text: row.identifiers_text,
+    symbol_type: 'generic',
+    detector_type: 'template',
+    detection_config_json: detectionConfigExample,
+    text_enrichment_json: '{"ocr_aliases":[],"pattern_anchors":[]}',
+    reference_assets_json: '[]',
+    text_token: '',
+    enabled: true,
+  };
+};
+
+export const catalogFormEntryToRow = (
+  kind: CatalogKind,
+  entryId: string,
+  entry: CatalogFormEntry,
+): CatalogRow => {
+  if (kind === 'symbols') {
+    return {
+      id: entryId,
+      label: entry.label,
+      key: entry.key,
+      symbol_type: entry.symbol_type,
+      detector_type: entry.detector_type,
+      detection_config_json: entry.detection_config_json,
+      text_enrichment_json: entry.text_enrichment_json,
+      reference_assets_json: entry.reference_assets_json,
+      text_token: entry.text_token,
+      enabled: entry.enabled,
+    };
+  }
+
+  return {
+    id: entryId,
+    label: entry.label,
+    key: entry.key,
+    identifiers: parseIdentifiersText(entry.identifiers_text ?? ''),
+    identifiers_text: entry.identifiers_text ?? '',
+  };
+};
 
 const parseJsonText = (rawText: string, fieldLabel: string): JsonValue => {
   const trimmed = rawText.trim();
