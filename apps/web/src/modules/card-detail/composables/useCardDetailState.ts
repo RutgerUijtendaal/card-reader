@@ -69,7 +69,7 @@ export const useCardDetailState = () => {
       router.back();
       return;
     }
-    void router.push('/cards');
+    void router.push(`/cards/${route.params.id}`);
   };
 
   const loadCard = async (): Promise<void> => {

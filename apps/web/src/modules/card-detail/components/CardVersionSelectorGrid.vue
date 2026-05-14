@@ -3,10 +3,10 @@
     <div class="mb-3 flex items-center justify-between gap-3">
       <div>
         <h3 class="text-sm font-semibold text-slate-900">
-          Card Versions
+          {{ title }}
         </h3>
         <p class="text-xs text-slate-500">
-          Select a version to inspect or edit.
+          {{ description }}
         </p>
       </div>
     </div>
@@ -65,12 +65,20 @@
 <script setup lang="ts">
 import type { CardVersionDetail } from '@/modules/card-detail/types';
 
-defineProps<{
-  versions: CardVersionDetail[];
-  selectedVersionId: string;
-  toAbsoluteApiUrl: (urlPath: string) => string;
-  formatDate: (value: string) => string;
-}>();
+withDefaults(
+  defineProps<{
+    versions: CardVersionDetail[];
+    selectedVersionId: string;
+    toAbsoluteApiUrl: (urlPath: string) => string;
+    formatDate: (value: string) => string;
+    title?: string;
+    description?: string;
+  }>(),
+  {
+    title: 'Card Versions',
+    description: 'Select a version to inspect or edit.',
+  },
+);
 
 defineEmits<{
   (e: 'select', versionId: string): void;

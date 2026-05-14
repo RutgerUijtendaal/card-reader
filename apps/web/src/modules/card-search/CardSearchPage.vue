@@ -111,12 +111,11 @@
       </div>
     </div>
 
-    <div class="flex flex-wrap items-start gap-5">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-6 2xl:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
       <CardGalleryItem
         v-for="card in cards"
         :key="card.id"
         :card="card"
-        :symbol-by-key="symbolByKey"
       />
     </div>
 
@@ -151,7 +150,6 @@ import type {
   CardFiltersResponse,
   MetadataOption,
   PaginatedCardsResponse,
-  SymbolFilterOption,
 } from '@/modules/card-detail/types';
 import {
   appendGalleryPage,
@@ -193,10 +191,6 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let latestSearchRequestId = 0;
 let loadMoreObserver: IntersectionObserver | null = null;
 const { exportCardsCsv } = useCsvExport();
-const symbolByKey = computed<Record<string, SymbolFilterOption>>(() =>
-  Object.fromEntries((filters.value.symbols ?? []).map((row) => [row.key, row])),
-);
-
 const manaTypeOptions = computed<MetadataOption[]>(() =>
   (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'mana'),
 );

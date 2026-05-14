@@ -15,7 +15,7 @@
       >
         <RouterLink
           class="font-medium text-sky-700 hover:text-sky-800"
-          :to="`/cards/${card.id}`"
+          :to="`/cards/${card.id}/edit`"
         >
           {{ card.name }}
         </RouterLink>

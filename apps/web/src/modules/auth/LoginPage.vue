@@ -68,7 +68,7 @@ const submit = async (): Promise<void> => {
   errorMessage.value = '';
   try {
     await auth.login({ username: username.value, password: password.value });
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/import-jobs';
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/cards';
     await router.replace(redirect);
   } catch {
     errorMessage.value = 'Invalid username or password.';
