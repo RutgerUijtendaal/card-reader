@@ -139,11 +139,13 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
-import { computed, onMounted, ref, watch } from 'vue';
+import { useDebounceFn, useIntersectionObserver, useScroll } from '@vueuse/core';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Download, Images, RotateCcw } from 'lucide-vue-next';
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { api } from '@/api/client';
 import { useCsvExport } from '@/composables/useCsvExport';
+import { useScrollContainer } from '@/composables/useScrollContainer';
 import FilterMultiSelectPopover from '@/components/filters/FilterMultiSelectPopover.vue';
 import FilterTextPopover from '@/components/filters/FilterTextPopover.vue';
 import CardGalleryItem, { type CardGalleryItemModel } from '@/components/cards/CardGalleryItem.vue';
@@ -153,28 +155,31 @@ import type {
   PaginatedCardsResponse,
 } from '@/modules/card-detail/types';
 import {
+  buildCardFilterApiSearchParams,
+  buildCardFilterRouteQuery,
+  createCardFilterCatalog,
+  createEmptyCardFilterState,
+  getCardFilterSignature,
+  parseCardFilterRouteQuery,
+  sameCardFilterState,
+} from '@/modules/card-filters/cardFilterState';
+import { useCardFilterState } from '@/modules/card-filters/useCardFilterState';
+import {
   appendGalleryPage,
   createEmptyGalleryPageState,
   isLatestGalleryRequest,
   replaceGalleryPage,
 } from '@/modules/card-search/galleryState';
-import { setGalleryNavigationCards } from '@/modules/card-search/galleryNavigation';
+import {
+  getGallerySnapshot,
+  saveGallerySnapshot,
+  setGalleryNavigationCards,
+} from '@/modules/card-search/galleryNavigation';
 
-const query = ref('');
-const manaCost = ref('');
-const templateId = ref('');
-const attackMin = ref('');
-const attackMax = ref('');
-const healthMin = ref('');
-const healthMax = ref('');
-
-const selectedKeywordIds = ref<string[]>([]);
-const selectedTagIds = ref<string[]>([]);
-const selectedManaTypeSymbolIds = ref<string[]>([]);
-const selectedAffinitySymbolIds = ref<string[]>([]);
-const selectedDevotionSymbolIds = ref<string[]>([]);
-const selectedOtherSymbolIds = ref<string[]>([]);
-const selectedTypeIds = ref<string[]>([]);
+const route = useRoute();
+const router = useRouter();
+const scrollContainer = useScrollContainer();
+const { y: scrollTopRef } = useScroll(scrollContainer);
 
 const filters = ref<CardFiltersResponse>({
   keywords: [],
@@ -182,65 +187,70 @@ const filters = ref<CardFiltersResponse>({
   symbols: [],
   types: [],
 });
+const filterCatalog = computed(() => createCardFilterCatalog(filters.value));
+const {
+  query,
+  manaCost,
+  templateId,
+  attackMin,
+  attackMax,
+  healthMin,
+  healthMax,
+  keywordIds: selectedKeywordIds,
+  tagIds: selectedTagIds,
+  manaTypeSymbolIds: selectedManaTypeSymbolIds,
+  affinitySymbolIds: selectedAffinitySymbolIds,
+  devotionSymbolIds: selectedDevotionSymbolIds,
+  otherSymbolIds: selectedOtherSymbolIds,
+  typeIds: selectedTypeIds,
+  selectionState,
+  applyFilterState,
+  readFilterState,
+  reset: resetCardFilterState,
+} = useCardFilterState(filterCatalog);
 const galleryState = ref(createEmptyGalleryPageState<CardGalleryItemModel>());
 const cards = computed(() => galleryState.value.cards);
 const totalCount = computed(() => galleryState.value.count);
 const nextPage = computed(() => galleryState.value.nextPage);
+const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.query));
+const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
+const filtersLoaded = ref(false);
 const isLoadingInitial = ref(false);
 const isLoadingPage = ref(false);
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 let latestSearchRequestId = 0;
 const { exportCardsCsv } = useCsvExport();
 const manaTypeOptions = computed<MetadataOption[]>(() =>
-  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'mana'),
+  filterCatalog.value.manaSymbols,
 );
 
 const affinityTypeOptions = computed<MetadataOption[]>(() =>
-  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'affinity'),
+  filterCatalog.value.affinitySymbols,
 );
 
 const devotionTypeOptions = computed<MetadataOption[]>(() =>
-  (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'devotion'),
+  filterCatalog.value.devotionSymbols,
 );
 
 const otherSymbolOptions = computed<MetadataOption[]>(() =>
-  (filters.value.symbols ?? []).filter(
-    (row) => !['mana', 'devotion', 'affinity'].includes(row.symbol_type),
-  ),
+  filterCatalog.value.otherSymbols,
 );
 
 const loadFilters = async (): Promise<void> => {
   const response = await api.get<CardFiltersResponse>('/cards/filters');
   filters.value = response.data;
+  filtersLoaded.value = true;
 };
 
-const buildSearchParams = (): URLSearchParams => {
-  const params = new URLSearchParams();
-  if (query.value.trim()) params.set('q', query.value.trim());
-  if (manaCost.value.trim()) params.set('mana_cost', manaCost.value.trim());
-  if (templateId.value.trim()) params.set('template_id', templateId.value.trim());
-  if (attackMin.value.trim()) params.set('attack_min', attackMin.value.trim());
-  if (attackMax.value.trim()) params.set('attack_max', attackMax.value.trim());
-  if (healthMin.value.trim()) params.set('health_min', healthMin.value.trim());
-  if (healthMax.value.trim()) params.set('health_max', healthMax.value.trim());
-
-  selectedKeywordIds.value.forEach((id) => params.append('keyword_ids', id));
-  selectedTagIds.value.forEach((id) => params.append('tag_ids', id));
-  const selectedSymbolIds = new Set<string>([
-    ...selectedManaTypeSymbolIds.value,
-    ...selectedAffinitySymbolIds.value,
-    ...selectedDevotionSymbolIds.value,
-    ...selectedOtherSymbolIds.value,
-  ]);
-  selectedSymbolIds.forEach((id) => params.append('symbol_ids', id));
-  selectedTypeIds.value.forEach((id) => params.append('type_ids', id));
-
-  return params;
+const restoreScroll = (value: number): void => {
+  window.requestAnimationFrame(() => {
+    scrollTopRef.value = value;
+  });
 };
 
 const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
   const requestId = ++latestSearchRequestId;
-  const params = buildSearchParams();
+  const params = buildCardFilterApiSearchParams(selectionState.value);
   params.set('page', String(page));
   params.set('page_size', '72');
   if (mode === 'replace') {
@@ -279,36 +289,32 @@ const loadNextPage = async (): Promise<void> => {
 };
 
 const exportCsv = async (): Promise<void> => {
-  await exportCardsCsv(buildSearchParams());
+  await exportCardsCsv(buildCardFilterApiSearchParams(selectionState.value));
 };
 
-const debouncedSearch = useDebounceFn(() => {
-  void searchCards();
+const debouncedUpdateRoute = useDebounceFn(() => {
+  if (!filtersLoaded.value) {
+    return;
+  }
+  const nextRouteState = readFilterState();
+  if (sameCardFilterState(nextRouteState, currentRouteFilterState.value)) {
+    return;
+  }
+  void router.replace({
+    path: '/cards',
+    query: buildCardFilterRouteQuery(nextRouteState),
+  });
 }, 250);
 
-const observedFilterState = computed(() => ({
-  query: query.value.trim(),
-  manaCost: manaCost.value.trim(),
-  templateId: templateId.value.trim(),
-  attackMin: attackMin.value.trim(),
-  attackMax: attackMax.value.trim(),
-  healthMin: healthMin.value.trim(),
-  healthMax: healthMax.value.trim(),
-  keywordIds: [...selectedKeywordIds.value].sort(),
-  tagIds: [...selectedTagIds.value].sort(),
-  manaTypeSymbolIds: [...selectedManaTypeSymbolIds.value].sort(),
-  affinitySymbolIds: [...selectedAffinitySymbolIds.value].sort(),
-  devotionSymbolIds: [...selectedDevotionSymbolIds.value].sort(),
-  otherSymbolIds: [...selectedOtherSymbolIds.value].sort(),
-  typeIds: [...selectedTypeIds.value].sort(),
-}));
-
-const galleryNavigationSearchParams = computed(() => buildSearchParams().toString());
+const observedFilterState = computed(() => selectionState.value);
+const galleryNavigationSearchParams = computed(() =>
+  buildCardFilterApiSearchParams(selectionState.value).toString(),
+);
 
 watch(
   observedFilterState,
   () => {
-    debouncedSearch();
+    debouncedUpdateRoute();
   },
   { deep: true },
 );
@@ -337,25 +343,46 @@ watch(
   { immediate: true },
 );
 
+watch(
+  [currentRouteSignature, filtersLoaded],
+  async ([searchParams, ready]) => {
+    if (!ready) {
+      return;
+    }
+
+    const routeState = currentRouteFilterState.value;
+    if (!sameCardFilterState(readFilterState(), routeState)) {
+      applyFilterState(routeState);
+    }
+
+    const snapshot = getGallerySnapshot<CardGalleryItemModel>(searchParams);
+    if (snapshot) {
+      galleryState.value = snapshot.pageState;
+      isLoadingInitial.value = false;
+      isLoadingPage.value = false;
+      saveGallerySnapshot(searchParams, snapshot.pageState, snapshot.scrollTop);
+      await nextTick();
+      restoreScroll(snapshot.scrollTop);
+      return;
+    }
+
+    scrollTopRef.value = 0;
+    await searchCards();
+    saveGallerySnapshot(searchParams, galleryState.value, scrollTopRef.value);
+  },
+  { immediate: true },
+);
+
 const resetFilters = (): void => {
-  query.value = '';
-  manaCost.value = '';
-  templateId.value = '';
-  attackMin.value = '';
-  attackMax.value = '';
-  healthMin.value = '';
-  healthMax.value = '';
-  selectedKeywordIds.value = [];
-  selectedTagIds.value = [];
-  selectedManaTypeSymbolIds.value = [];
-  selectedAffinitySymbolIds.value = [];
-  selectedDevotionSymbolIds.value = [];
-  selectedOtherSymbolIds.value = [];
-  selectedTypeIds.value = [];
+  resetCardFilterState();
+  void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(createEmptyCardFilterState()) });
 };
 
-onMounted(async () => {
-  await loadFilters();
-  await searchCards();
+onBeforeRouteLeave(() => {
+  saveGallerySnapshot(currentRouteSignature.value, galleryState.value, scrollTopRef.value);
+});
+
+onMounted(() => {
+  void loadFilters();
 });
 </script>

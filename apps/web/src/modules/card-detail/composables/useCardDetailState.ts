@@ -2,7 +2,10 @@ import { onKeyStroke } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
-import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
+import {
+  buildGalleryLocation,
+  useGalleryCardNavigation,
+} from '@/modules/card-search/galleryNavigation';
 import type {
   CardDetail,
   CardFiltersResponse,
@@ -69,7 +72,7 @@ export const useCardDetailState = () => {
   const isBusy = computed(() => isSaving.value || isQueuingReparse.value);
 
   const goBack = (): void => {
-    void router.push('/cards');
+    void router.push(buildGalleryLocation(route.query));
   };
 
   const loadCard = async (): Promise<void> => {

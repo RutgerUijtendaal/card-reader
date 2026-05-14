@@ -63,7 +63,10 @@
       </div>
     </aside>
 
-    <main class="h-full overflow-y-auto p-4 sm:p-6">
+    <main
+      ref="scrollContainerRef"
+      class="h-full overflow-y-auto p-4 sm:p-6"
+    >
       <RouterView />
     </main>
   </div>
@@ -74,13 +77,18 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { ClipboardCheck, Images, LogIn, LogOut, Settings, Upload } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 import { useRouter } from 'vue-router';
+import { provideScrollContainer } from '@/composables/useScrollContainer';
 import { useAuthStore } from '@/modules/auth/authStore';
 
 const auth = useAuthStore();
 const router = useRouter();
+const scrollContainerRef = ref<HTMLElement | null>(null);
+
+provideScrollContainer(scrollContainerRef);
 
 const signOut = async (): Promise<void> => {
   await auth.logout();

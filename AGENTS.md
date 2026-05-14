@@ -44,6 +44,9 @@ Core stack:
   - `api` depends on `core`; it must not import parser modules.
   - `parser` depends on `core`; it must not import API views, serializers, URLs, DRF settings, or API-only services.
   - `core` contains shared domain/runtime foundations only.
+- Keep shared card filtering logic centralized in `apps/web/src/modules/card-filters`.
+  - Route/query parsing, stable key-based filter state, key/id translation, and API filter param building belong there.
+  - Page modules such as gallery/review/pickers should only own page-specific behavior like pagination, navigation context, and scroll restoration.
 - Django owns the domain schema through migrations in `services/core`.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
@@ -66,7 +69,9 @@ Core stack:
 - Default seed JSON files live in `services/api/src/card_reader_api/seeds`:
   - `seed-keywords.json`
   - `seed-symbols.json`
+  - `seed-tags.json`
   - `seed-templates.json`
+  - `seed-types.json`
   - `seed-users.example.json`
 - Local development users live in:
   - `services/api/src/card_reader_api/seeds/seed-users.local.json`
@@ -110,6 +115,7 @@ Targeted commands:
   - format: `prettier`
   - typecheck: `vue-tsc`
   - tests: `vitest`
+  - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
 
 ## API Surface
 - `POST /imports/upload`
