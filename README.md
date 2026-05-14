@@ -4,6 +4,10 @@ Card Reader is a monorepo for importing, parsing, reviewing, and browsing card d
 It combines a Django API, a shared Python domain layer, an OCR/parser worker, a Vue web app, and a
 Tauri desktop shell.
 
+# Feature tracker
+
+https://trello.com/b/sCM4JM5V/cards
+
 ## What is in this repo
 
 - `apps/web`: Vue 3 + Vite frontend for gallery, imports, review, settings, and auth flows
