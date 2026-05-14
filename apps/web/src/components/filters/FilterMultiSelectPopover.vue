@@ -56,6 +56,32 @@
           >
             No matches.
           </p>
+
+          <div
+            v-if="matchMode"
+            class="border-t border-slate-200 pt-2"
+          >
+            <div class="flex justify-end">
+              <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
+                <button
+                  class="rounded-full px-3 py-1 text-xs font-medium transition"
+                  :class="matchMode === 'any' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+                  type="button"
+                  @click="setMatchMode('any')"
+                >
+                  OR
+                </button>
+                <button
+                  class="rounded-full px-3 py-1 text-xs font-medium transition"
+                  :class="matchMode === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+                  type="button"
+                  @click="setMatchMode('all')"
+                >
+                  AND
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -76,15 +102,18 @@ const props = withDefaults(
     label: string;
     options: Option[];
     modelValue: string[];
+    matchMode?: 'any' | 'all';
     emptyText?: string;
   }>(),
   {
     emptyText: 'No options available.',
+    matchMode: undefined,
   },
 );
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string[]): void;
+  (e: 'update:matchMode', value: 'any' | 'all'): void;
 }>();
 
 const { isOpen, triggerRef, panelRef, x, y, toggle } = useFloatingPopover();
@@ -112,6 +141,10 @@ const toggleOption = (id: string): void => {
     next.add(id);
   }
   emit('update:modelValue', Array.from(next));
+};
+
+const setMatchMode = (value: 'any' | 'all'): void => {
+  emit('update:matchMode', value);
 };
 </script>
 
