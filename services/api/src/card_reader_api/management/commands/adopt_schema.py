@@ -20,7 +20,7 @@ class Command(BaseCommand):
         call_command(
             "migrate",
             "card_reader_core",
-            "0005_card_version_search",
+            "0015_drop_card_version_search",
             fake=True,
             interactive=False,
         )
