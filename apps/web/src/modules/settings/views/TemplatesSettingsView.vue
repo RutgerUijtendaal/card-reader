@@ -66,14 +66,14 @@
           </label>
         </div>
 
-        <label class="field-label mt-3">
-          Definition JSON
-          <textarea
+        <div class="mt-3">
+          <JsonEditorField
             v-model="form.definition_json"
-            class="input-base min-h-[320px] font-mono text-xs"
-            spellcheck="false"
+            label="Definition JSON"
+            hint="Configure the template definition used to parse cards for this layout."
+            min-height="20rem"
           />
-        </label>
+        </div>
 
         <div class="mt-4 flex flex-wrap gap-2">
           <button
@@ -123,6 +123,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
+import JsonEditorField from '@/modules/settings/components/JsonEditorField.vue';
 import {
   createTemplate,
   deleteTemplate,
@@ -172,7 +173,7 @@ const selectTemplate = (id: string): void => {
   selectedId.value = row.id;
   form.label = row.label;
   form.key = row.key;
-  form.definition_json = row.definition_json;
+  form.definition_json = formatJsonForEditor(row.definition_json);
 };
 
 const startCreate = (): void => {
@@ -187,7 +188,7 @@ const resetForm = (): void => {
   }
   form.label = '';
   form.key = '';
-  form.definition_json = '{}';
+  form.definition_json = formatJsonForEditor('{}');
 };
 
 const saveTemplate = async (): Promise<void> => {
@@ -264,6 +265,19 @@ const normalizeDefinitionJson = (
     return { ok: true, value: parsed as JsonObject };
   } catch {
     return { ok: false, message: 'Definition JSON must be valid JSON.' };
+  }
+};
+
+const formatJsonForEditor = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return '{}';
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return raw;
   }
 };
 

@@ -28,6 +28,7 @@
             </p>
           </div>
           <span
+            v-if="showEditableState"
             class="rounded-full px-2.5 py-1 text-xs font-medium"
             :class="version.editable ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
           >
@@ -178,10 +179,16 @@
 import SymbolizedText from '@/components/SymbolizedText.vue';
 import type { SymbolLookupMap, CardVersionDetail } from '@/modules/card-detail/types';
 
-defineProps<{
-  version: CardVersionDetail;
-  symbolByKey: SymbolLookupMap;
-  toAbsoluteApiUrl: (urlPath: string) => string;
-  formatDate: (value: string) => string;
-}>();
+withDefaults(
+  defineProps<{
+    version: CardVersionDetail;
+    symbolByKey: SymbolLookupMap;
+    toAbsoluteApiUrl: (urlPath: string) => string;
+    formatDate: (value: string) => string;
+    showEditableState?: boolean;
+  }>(),
+  {
+    showEditableState: true,
+  },
+);
 </script>

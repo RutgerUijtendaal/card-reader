@@ -258,7 +258,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
+import { computed, onMounted, ref, watch } from 'vue';
 import { api } from '@/api/client';
 import { fetchTemplates } from '@/modules/settings/api/templates';
 import type { TemplateRecord } from '@/modules/settings/types';
@@ -286,6 +287,7 @@ const creatingJob = ref(false);
 const cancellingJobIds = ref<Set<string>>(new Set());
 const lastRefreshedAt = ref<string | null>(null);
 const templates = ref<TemplateRecord[]>([]);
+const documentVisibility = useDocumentVisibility();
 
 const queuedCount = computed(() => jobs.value.filter((job) => job.status === 'queued').length);
 const runningCount = computed(() => jobs.value.filter((job) => job.status === 'running').length);
@@ -293,8 +295,6 @@ const cancelingCount = computed(() => jobs.value.filter((job) => job.status === 
 const completedCount = computed(() => jobs.value.filter((job) => job.status === 'completed').length);
 const failedCount = computed(() => jobs.value.filter((job) => job.status === 'failed').length);
 const cancelledCount = computed(() => jobs.value.filter((job) => job.status === 'cancelled').length);
-
-let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const loadJobs = async (): Promise<void> => {
   isRefreshing.value = true;
@@ -385,8 +385,8 @@ const onDirectorySelected = (event: Event): void => {
 
 const canCancel = (job: ImportJob): boolean => job.status === 'queued' || job.status === 'running';
 
-const hasActiveJobs = (): boolean =>
-  jobs.value.some((job) => job.status === 'queued' || job.status === 'running' || job.status === 'canceling');
+const hasActiveJobs = computed<boolean>(() =>
+  jobs.value.some((job) => job.status === 'queued' || job.status === 'running' || job.status === 'canceling'));
 
 const progressPercent = (job: ImportJob): number => {
   if (job.total_items <= 0) return 0;
@@ -448,8 +448,8 @@ const extractError = (error: unknown): string => {
 };
 
 const pollJobs = async (): Promise<void> => {
-  if (document.hidden) return;
-  if (!hasActiveJobs()) return;
+  if (documentVisibility.value !== 'visible') return;
+  if (!hasActiveJobs.value) return;
   try {
     await loadJobs();
   } catch (error) {
@@ -457,33 +457,26 @@ const pollJobs = async (): Promise<void> => {
   }
 };
 
-const startPolling = (): void => {
-  if (pollTimer) return;
-  pollTimer = setInterval(() => {
-    void pollJobs();
-  }, 2000);
-};
-
-const stopPolling = (): void => {
-  if (!pollTimer) return;
-  clearInterval(pollTimer);
-  pollTimer = null;
-};
-
-const onVisibilityChange = (): void => {
-  if (document.hidden) return;
+const { pause: pausePolling, resume: resumePolling } = useIntervalFn(() => {
   void pollJobs();
-};
+}, 2000, { immediate: false });
+
+watch(
+  [documentVisibility, hasActiveJobs],
+  ([visibility, hasActive]) => {
+    if (visibility === 'visible' && hasActive) {
+      resumePolling();
+      void pollJobs();
+      return;
+    }
+
+    pausePolling();
+  },
+  { immediate: true },
+);
 
 onMounted(async () => {
   await loadTemplates();
   await loadJobs();
-  startPolling();
-  document.addEventListener('visibilitychange', onVisibilityChange);
-});
-
-onBeforeUnmount(() => {
-  stopPolling();
-  document.removeEventListener('visibilitychange', onVisibilityChange);
 });
 </script>

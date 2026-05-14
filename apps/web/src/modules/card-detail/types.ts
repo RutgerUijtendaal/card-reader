@@ -1,7 +1,7 @@
 import type {
   CardHoverTooltipModel,
   CardTooltipSymbolLookup,
-} from '@/components/cards/CardHoverTooltip.vue';
+} from '@/components/cards/cardModels';
 
 export type MetadataOption = {
   id: string;

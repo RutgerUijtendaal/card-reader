@@ -1,6 +1,6 @@
 <template>
-  <section class="space-y-5 xl:h-[calc(100vh-8rem)]">
-    <div class="flex items-center justify-between gap-3">
+  <section class="space-y-5 xl:h-[calc(100vh-13rem)]">
+    <div class="page-card space-y-4">
       <button
         class="btn-secondary inline-flex items-center gap-2"
         type="button"
@@ -9,16 +9,46 @@
         <ArrowLeft class="h-4 w-4" />
         <span>Back to Gallery</span>
       </button>
+
       <div
         v-if="card"
-        class="text-right"
+        class="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
       >
-        <h2 class="text-xl font-semibold text-slate-900">
-          {{ card.name }}
-        </h2>
-        <p class="text-xs text-slate-500">
-          {{ versions.length }} versions
-        </p>
+        <div class="min-w-0">
+          <h2 class="text-xl font-semibold text-slate-900">
+            {{ card.name }}
+          </h2>
+          <p class="text-xs text-slate-500">
+            {{ versions.length }} versions
+          </p>
+        </div>
+
+        <div
+          v-if="hasGalleryContext"
+          class="flex flex-wrap items-center gap-2 lg:justify-end"
+        >
+          <button
+            class="btn-secondary inline-flex items-center gap-2"
+            type="button"
+            :disabled="!previousCardId"
+            @click="goToPreviousCard"
+          >
+            <ChevronLeft class="h-4 w-4" />
+            <span>Previous Card</span>
+          </button>
+          <button
+            class="btn-secondary inline-flex items-center gap-2"
+            type="button"
+            :disabled="!nextCardId && !hasMoreResults"
+            @click="goToNextCard"
+          >
+            <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next Card' }}</span>
+            <ChevronRight class="h-4 w-4" />
+          </button>
+          <span class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+            {{ positionLabel }}
+          </span>
+        </div>
       </div>
     </div>
 
@@ -87,7 +117,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
 import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
@@ -99,6 +129,12 @@ const {
   versions,
   selectedVersionId,
   symbolByKey,
+  hasGalleryContext,
+  previousCardId,
+  nextCardId,
+  hasMoreResults,
+  isLoadingMoreCards,
+  positionLabel,
   isSaving,
   isQueuingReparse,
   saveMessage,
@@ -106,6 +142,8 @@ const {
   selectedVersion,
   isBusy,
   goBack,
+  goToPreviousCard,
+  goToNextCard,
   loadCard,
   selectVersion,
   saveEdits,

@@ -111,12 +111,11 @@
       </div>
     </div>
 
-    <div class="flex flex-wrap items-start gap-5">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-6 2xl:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
       <CardGalleryItem
         v-for="card in cards"
         :key="card.id"
         :card="card"
-        :symbol-by-key="symbolByKey"
       />
     </div>
 
@@ -140,7 +139,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Download, Images, RotateCcw } from 'lucide-vue-next';
 import { api } from '@/api/client';
 import { useCsvExport } from '@/composables/useCsvExport';
@@ -151,7 +151,6 @@ import type {
   CardFiltersResponse,
   MetadataOption,
   PaginatedCardsResponse,
-  SymbolFilterOption,
 } from '@/modules/card-detail/types';
 import {
   appendGalleryPage,
@@ -159,6 +158,7 @@ import {
   isLatestGalleryRequest,
   replaceGalleryPage,
 } from '@/modules/card-search/galleryState';
+import { setGalleryNavigationCards } from '@/modules/card-search/galleryNavigation';
 
 const query = ref('');
 const manaCost = ref('');
@@ -189,14 +189,8 @@ const nextPage = computed(() => galleryState.value.nextPage);
 const isLoadingInitial = ref(false);
 const isLoadingPage = ref(false);
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
-let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let latestSearchRequestId = 0;
-let loadMoreObserver: IntersectionObserver | null = null;
 const { exportCardsCsv } = useCsvExport();
-const symbolByKey = computed<Record<string, SymbolFilterOption>>(() =>
-  Object.fromEntries((filters.value.symbols ?? []).map((row) => [row.key, row])),
-);
-
 const manaTypeOptions = computed<MetadataOption[]>(() =>
   (filters.value.symbols ?? []).filter((row) => row.symbol_type === 'mana'),
 );
@@ -288,27 +282,9 @@ const exportCsv = async (): Promise<void> => {
   await exportCardsCsv(buildSearchParams());
 };
 
-const debouncedSearch = (): void => {
-  if (searchDebounceTimer) {
-    clearTimeout(searchDebounceTimer);
-  }
-  searchDebounceTimer = setTimeout(() => {
-    void searchCards();
-  }, 250);
-};
-
-const setupLoadMoreObserver = (): void => {
-  loadMoreObserver?.disconnect();
-  if (typeof window === 'undefined' || !('IntersectionObserver' in window) || !loadMoreSentinelRef.value) {
-    return;
-  }
-  loadMoreObserver = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) {
-      void loadNextPage();
-    }
-  }, { rootMargin: '400px 0px' });
-  loadMoreObserver.observe(loadMoreSentinelRef.value);
-};
+const debouncedSearch = useDebounceFn(() => {
+  void searchCards();
+}, 250);
 
 const observedFilterState = computed(() => ({
   query: query.value.trim(),
@@ -327,6 +303,8 @@ const observedFilterState = computed(() => ({
   typeIds: [...selectedTypeIds.value].sort(),
 }));
 
+const galleryNavigationSearchParams = computed(() => buildSearchParams().toString());
+
 watch(
   observedFilterState,
   () => {
@@ -335,9 +313,29 @@ watch(
   { deep: true },
 );
 
-watch(loadMoreSentinelRef, () => {
-  setupLoadMoreObserver();
-});
+useIntersectionObserver(
+  loadMoreSentinelRef,
+  (entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      void loadNextPage();
+    }
+  },
+  { rootMargin: '400px 0px' },
+);
+
+watch(
+  () => ({
+    cardIds: cards.value.map((card) => card.id),
+    totalCount: totalCount.value,
+    nextPage: nextPage.value,
+    pageSize: galleryState.value.pageSize,
+    searchParams: galleryNavigationSearchParams.value,
+  }),
+  ({ cardIds, totalCount, nextPage, pageSize, searchParams }) => {
+    setGalleryNavigationCards(cardIds, totalCount, nextPage, pageSize, searchParams);
+  },
+  { immediate: true },
+);
 
 const resetFilters = (): void => {
   query.value = '';
@@ -359,13 +357,5 @@ const resetFilters = (): void => {
 onMounted(async () => {
   await loadFilters();
   await searchCards();
-  setupLoadMoreObserver();
-});
-
-onBeforeUnmount(() => {
-  if (searchDebounceTimer) {
-    clearTimeout(searchDebounceTimer);
-  }
-  loadMoreObserver?.disconnect();
 });
 </script>

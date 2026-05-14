@@ -88,6 +88,8 @@ class CardFiltersView(APIView):
 
 
 class CardDetailView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, _request: Request, card_id: str) -> Response:
         card, version, image = get_card_with_image(card_id)
         if card is None or version is None:
@@ -106,6 +108,8 @@ class CardDetailView(APIView):
 
 
 class CardGenerationsView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, _request: Request, card_id: str) -> Response:
         card = get_card(card_id)
         if card is None:
@@ -197,6 +201,8 @@ class CardImageView(APIView):
 
 
 class CardVersionImageView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, _request: Request, card_id: str, version_id: str) -> FileResponse:
         if get_card(card_id) is None:
             raise Http404("Card not found")

@@ -4,6 +4,7 @@ import LoginPage from '@/modules/auth/LoginPage.vue';
 import ImportJobsPage from '@/modules/import-jobs/ImportJobsPage.vue';
 import CardSearchPage from '@/modules/card-search/CardSearchPage.vue';
 import CardDetailPage from '@/modules/card-detail/CardDetailPage.vue';
+import CardPublicDetailPage from '@/modules/card-detail/CardPublicDetailPage.vue';
 import ReviewQueuePage from '@/modules/review-queue/ReviewQueuePage.vue';
 import SettingsPage from '@/modules/settings/SettingsPage.vue';
 
@@ -12,9 +13,10 @@ export const router = createRouter({
   routes: [
     { path: '/', redirect: '/cards' },
     { path: '/cards', component: CardSearchPage },
+    { path: '/cards/:id', component: CardPublicDetailPage, props: true },
     { path: '/login', component: LoginPage, meta: { public: true } },
     { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true } },
-    { path: '/cards/:id', component: CardDetailPage, props: true, meta: { requiresStaff: true } },
+    { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true } },
     { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true } },
     { path: '/settings', component: SettingsPage, meta: { requiresStaff: true } },
   ],
