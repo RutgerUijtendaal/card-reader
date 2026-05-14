@@ -129,6 +129,7 @@
 
 <script setup lang="ts">
 import { isTauri } from '@tauri-apps/api/core';
+import { useClipboard } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { api } from '@/api/client';
@@ -144,6 +145,7 @@ const runningClear = ref(false);
 const runningOpenStorage = ref(false);
 const runningQueueReparse = ref(false);
 const lastRemovedPaths = ref<string[]>([]);
+const { copy, isSupported: clipboardSupported } = useClipboard({ legacy: true });
 
 const canRunActions = computed(() => confirmText.value.trim() === 'RESET');
 
@@ -211,8 +213,8 @@ const openStorageLocation = async (): Promise<void> => {
 
     if (!isTauri()) {
       const opened = tryOpenPathInBrowser(path);
-      if (!opened) {
-        await tryCopyPathToClipboard(path);
+      if (!opened && clipboardSupported.value) {
+        await copy(path);
         toast.success(response.data.message, {
           description: `Path copied: ${path}`,
         });
@@ -248,14 +250,5 @@ const tryOpenPathInBrowser = (path: string): boolean => {
   const fileUrl = normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`;
   const openedWindow = window.open(fileUrl, '_blank', 'noopener,noreferrer');
   return openedWindow !== null;
-};
-
-const tryCopyPathToClipboard = async (path: string): Promise<void> => {
-  if (!navigator.clipboard?.writeText) return;
-  try {
-    await navigator.clipboard.writeText(path);
-  } catch {
-    // no-op: clipboard may be blocked by browser permissions.
-  }
 };
 </script>

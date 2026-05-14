@@ -1,13 +1,16 @@
+import { onKeyStroke } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
 import { useAuthStore } from '@/modules/auth/authStore';
+import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
 import type {
   CardDetail,
   CardFiltersResponse,
   CardVersionDetail,
   SymbolLookupMap,
 } from '@/modules/card-detail/types';
+import { isEditableKeyboardTarget } from '@/utils/keyboard';
 
 export const useCardPublicDetailState = () => {
   const route = useRoute();
@@ -18,6 +21,7 @@ export const useCardPublicDetailState = () => {
   const versions = ref<CardVersionDetail[]>([]);
   const selectedVersionId = ref<string>('');
   const symbolByKey = ref<SymbolLookupMap>({});
+  const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
 
   const selectedVersion = computed<CardVersionDetail | null>(
     () => versions.value.find((version) => version.version_id === selectedVersionId.value) ?? null,
@@ -45,10 +49,6 @@ export const useCardPublicDetailState = () => {
   };
 
   const goBack = (): void => {
-    if (window.history.length > 1) {
-      router.back();
-      return;
-    }
     void router.push('/cards');
   };
 
@@ -76,6 +76,23 @@ export const useCardPublicDetailState = () => {
     return date.toLocaleDateString();
   };
 
+  onKeyStroke(['ArrowLeft', 'ArrowRight'], (event) => {
+    if (!galleryNavigation.hasGalleryContext.value || isEditableKeyboardTarget(event)) {
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' && galleryNavigation.previousCardId.value) {
+      event.preventDefault();
+      galleryNavigation.goToPreviousCard();
+      return;
+    }
+
+    if (event.key === 'ArrowRight' && (galleryNavigation.nextCardId.value || galleryNavigation.hasMoreResults.value)) {
+      event.preventDefault();
+      void galleryNavigation.goToNextCard();
+    }
+  });
+
   watch(() => route.params.id, loadCard);
 
   return {
@@ -85,10 +102,20 @@ export const useCardPublicDetailState = () => {
     selectedVersion,
     symbolByKey,
     canEdit,
+    hasGalleryContext: galleryNavigation.hasGalleryContext,
+    previousCardId: galleryNavigation.previousCardId,
+    nextCardId: galleryNavigation.nextCardId,
+    hasMoreResults: galleryNavigation.hasMoreResults,
+    isLoadingMoreCards: galleryNavigation.isLoadingMoreCards,
+    positionLabel: galleryNavigation.positionLabel,
     loadCard,
     goBack,
     openEditor,
     selectVersion,
+    goToPreviousCard: galleryNavigation.goToPreviousCard,
+    goToNextCard: () => {
+      void galleryNavigation.goToNextCard();
+    },
     toAbsoluteApiUrl,
     formatDate,
   };
