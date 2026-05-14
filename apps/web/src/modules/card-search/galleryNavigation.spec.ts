@@ -13,7 +13,7 @@ describe('galleryNavigation', () => {
         'card-123',
         {
           q: 'dragon',
-          keyword_ids: ['k-2', 'k-1'],
+          keyword_keys: ['flying', 'dragon'],
         },
         'detail',
       ),
@@ -21,7 +21,7 @@ describe('galleryNavigation', () => {
       path: '/cards/card-123',
       query: {
         q: 'dragon',
-        keyword_ids: ['k-1', 'k-2'],
+        keyword_keys: ['dragon', 'flying'],
       },
     });
   });
@@ -34,13 +34,13 @@ describe('galleryNavigation', () => {
     expect(
       buildGalleryLocation({
         q: 'angel',
-        affinity_symbol_ids: ['a-1'],
+        affinity_symbol_keys: ['air'],
       }),
     ).toEqual({
       path: '/cards',
       query: {
         q: 'angel',
-        affinity_symbol_ids: ['a-1'],
+        affinity_symbol_keys: ['air'],
       },
     });
   });

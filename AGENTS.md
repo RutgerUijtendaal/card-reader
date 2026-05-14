@@ -44,6 +44,9 @@ Core stack:
   - `api` depends on `core`; it must not import parser modules.
   - `parser` depends on `core`; it must not import API views, serializers, URLs, DRF settings, or API-only services.
   - `core` contains shared domain/runtime foundations only.
+- Keep shared card filtering logic centralized in `apps/web/src/modules/card-filters`.
+  - Route/query parsing, stable key-based filter state, key/id translation, and API filter param building belong there.
+  - Page modules such as gallery/review/pickers should only own page-specific behavior like pagination, navigation context, and scroll restoration.
 - Django owns the domain schema through migrations in `services/core`.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:

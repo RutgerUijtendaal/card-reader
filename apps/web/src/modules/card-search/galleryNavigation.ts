@@ -7,11 +7,11 @@ import type {
   Router,
 } from 'vue-router';
 import { api } from '@/api/client';
-import type { GalleryPageState } from '@/modules/card-search/galleryState';
 import {
-  buildGalleryRouteQuery,
-  parseGalleryFilterState,
-} from '@/modules/card-search/galleryRouteState';
+  buildCardFilterRouteQuery,
+  parseCardFilterRouteQuery,
+} from '@/modules/card-filters/cardFilterState';
+import type { GalleryPageState } from '@/modules/card-search/galleryState';
 import type { PaginatedCardsResponse } from '@/modules/card-detail/types';
 
 type GalleryNavigationCard = {
@@ -34,7 +34,7 @@ let pendingLoadMorePromise: Promise<void> | null = null;
 let gallerySnapshot: GallerySnapshot<GalleryNavigationCard> | null = null;
 
 const normalizeGalleryQuery = (query: LocationQuery): LocationQueryRaw =>
-  buildGalleryRouteQuery(parseGalleryFilterState(query));
+  buildCardFilterRouteQuery(parseCardFilterRouteQuery(query));
 
 export const getGalleryRouteQuery = (query: LocationQuery): LocationQueryRaw => normalizeGalleryQuery(query);
 
