@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Count, Prefetch, QuerySet
 
 from card_reader_core.models import (
     Card,
@@ -29,6 +29,14 @@ def list_cards(
     max_confidence: float | None,
     keyword_ids: list[str] | None = None,
     tag_ids: list[str] | None = None,
+    mana_symbol_ids: list[str] | None = None,
+    mana_symbol_match: str | None = None,
+    affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_match: str | None = None,
+    devotion_symbol_ids: list[str] | None = None,
+    devotion_symbol_match: str | None = None,
+    other_symbol_ids: list[str] | None = None,
+    other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
     mana_cost: str | None = None,
@@ -79,6 +87,34 @@ def list_cards(
     )
     versions = filter_by_links(versions, CardVersionKeyword, "keyword_id", keyword_ids)
     versions = filter_by_links(versions, CardVersionTag, "tag_id", tag_ids)
+    versions = filter_by_links(
+        versions,
+        CardVersionSymbol,
+        "symbol_id",
+        mana_symbol_ids,
+        match_mode=mana_symbol_match,
+    )
+    versions = filter_by_links(
+        versions,
+        CardVersionSymbol,
+        "symbol_id",
+        affinity_symbol_ids,
+        match_mode=affinity_symbol_match,
+    )
+    versions = filter_by_links(
+        versions,
+        CardVersionSymbol,
+        "symbol_id",
+        devotion_symbol_ids,
+        match_mode=devotion_symbol_match,
+    )
+    versions = filter_by_links(
+        versions,
+        CardVersionSymbol,
+        "symbol_id",
+        other_symbol_ids,
+        match_mode=other_symbol_match,
+    )
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
     versions = filter_by_links(versions, CardVersionType, "type_id", type_ids)
 
@@ -204,11 +240,20 @@ def filter_by_links(
     link_model: type[CardVersionKeyword] | type[CardVersionTag] | type[CardVersionSymbol] | type[CardVersionType],
     link_field: str,
     values: list[str] | None,
+    *,
+    match_mode: str | None = None,
 ) -> QuerySet[CardVersion]:
     if not values:
         return queryset
-    version_ids = link_model.objects.filter(**{f"{link_field}__in": values}).values_list(
-        "card_version_id",
-        flat=True,
-    )
+    normalized_values = list(dict.fromkeys(values))
+    link_rows = link_model.objects.filter(**{f"{link_field}__in": normalized_values})
+    if match_mode == "all":
+        version_ids = (
+            link_rows.values("card_version_id")
+            .annotate(match_count=Count(link_field, distinct=True))
+            .filter(match_count=len(normalized_values))
+            .values_list("card_version_id", flat=True)
+        )
+    else:
+        version_ids = link_rows.values_list("card_version_id", flat=True)
     return queryset.filter(id__in=version_ids)

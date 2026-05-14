@@ -8,6 +8,10 @@ import type {
 export type CardFilterState = {
   query: string;
   manaCost: string;
+  manaSymbolMatch: 'any' | 'all';
+  affinitySymbolMatch: 'any' | 'all';
+  devotionSymbolMatch: 'any' | 'all';
+  otherSymbolMatch: 'any' | 'all';
   templateId: string;
   attackMin: string;
   attackMax: string;
@@ -25,6 +29,10 @@ export type CardFilterState = {
 export type CardFilterSelectionState = {
   query: string;
   manaCost: string;
+  manaSymbolMatch: 'any' | 'all';
+  affinitySymbolMatch: 'any' | 'all';
+  devotionSymbolMatch: 'any' | 'all';
+  otherSymbolMatch: 'any' | 'all';
   templateId: string;
   attackMin: string;
   attackMax: string;
@@ -52,6 +60,10 @@ export type CardFilterCatalog = {
 export const createEmptyCardFilterState = (): CardFilterState => ({
   query: '',
   manaCost: '',
+  manaSymbolMatch: 'any',
+  affinitySymbolMatch: 'any',
+  devotionSymbolMatch: 'any',
+  otherSymbolMatch: 'any',
   templateId: '',
   attackMin: '',
   attackMax: '',
@@ -69,6 +81,10 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
 export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState => ({
   query: '',
   manaCost: '',
+  manaSymbolMatch: 'any',
+  affinitySymbolMatch: 'any',
+  devotionSymbolMatch: 'any',
+  otherSymbolMatch: 'any',
   templateId: '',
   attackMin: '',
   attackMax: '',
@@ -102,6 +118,10 @@ const readQueryValues = (
 export const normalizeCardFilterState = (state: CardFilterState): CardFilterState => ({
   query: normalizeStringValue(state.query),
   manaCost: normalizeStringValue(state.manaCost),
+  manaSymbolMatch: state.manaSymbolMatch === 'all' ? 'all' : 'any',
+  affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
+  devotionSymbolMatch: state.devotionSymbolMatch === 'all' ? 'all' : 'any',
+  otherSymbolMatch: state.otherSymbolMatch === 'all' ? 'all' : 'any',
   templateId: normalizeStringValue(state.templateId),
   attackMin: normalizeStringValue(state.attackMin),
   attackMax: normalizeStringValue(state.attackMax),
@@ -121,6 +141,10 @@ export const normalizeCardFilterSelectionState = (
 ): CardFilterSelectionState => ({
   query: normalizeStringValue(state.query),
   manaCost: normalizeStringValue(state.manaCost),
+  manaSymbolMatch: state.manaSymbolMatch === 'all' ? 'all' : 'any',
+  affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
+  devotionSymbolMatch: state.devotionSymbolMatch === 'all' ? 'all' : 'any',
+  otherSymbolMatch: state.otherSymbolMatch === 'all' ? 'all' : 'any',
   templateId: normalizeStringValue(state.templateId),
   attackMin: normalizeStringValue(state.attackMin),
   attackMax: normalizeStringValue(state.attackMax),
@@ -139,6 +163,10 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
   normalizeCardFilterState({
     query: typeof query.q === 'string' ? query.q : '',
     manaCost: typeof query.mana_cost === 'string' ? query.mana_cost : '',
+    manaSymbolMatch: query.mana_symbol_match === 'all' ? 'all' : 'any',
+    affinitySymbolMatch: query.affinity_symbol_match === 'all' ? 'all' : 'any',
+    devotionSymbolMatch: query.devotion_symbol_match === 'all' ? 'all' : 'any',
+    otherSymbolMatch: query.other_symbol_match === 'all' ? 'all' : 'any',
     templateId: typeof query.template_id === 'string' ? query.template_id : '',
     attackMin: typeof query.attack_min === 'string' ? query.attack_min : '',
     attackMax: typeof query.attack_max === 'string' ? query.attack_max : '',
@@ -159,6 +187,10 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
 
   if (normalized.query) query.q = normalized.query;
   if (normalized.manaCost) query.mana_cost = normalized.manaCost;
+  if (normalized.manaSymbolMatch === 'all') query.mana_symbol_match = 'all';
+  if (normalized.affinitySymbolMatch === 'all') query.affinity_symbol_match = 'all';
+  if (normalized.devotionSymbolMatch === 'all') query.devotion_symbol_match = 'all';
+  if (normalized.otherSymbolMatch === 'all') query.other_symbol_match = 'all';
   if (normalized.templateId) query.template_id = normalized.templateId;
   if (normalized.attackMin) query.attack_min = normalized.attackMin;
   if (normalized.attackMax) query.attack_max = normalized.attackMax;
@@ -227,6 +259,10 @@ export const buildCardFilterSelectionState = (
   normalizeCardFilterSelectionState({
     query: state.query,
     manaCost: state.manaCost,
+    manaSymbolMatch: state.manaSymbolMatch,
+    affinitySymbolMatch: state.affinitySymbolMatch,
+    devotionSymbolMatch: state.devotionSymbolMatch,
+    otherSymbolMatch: state.otherSymbolMatch,
     templateId: state.templateId,
     attackMin: state.attackMin,
     attackMax: state.attackMax,
@@ -248,6 +284,10 @@ export const buildCardFilterStateFromSelection = (
   normalizeCardFilterState({
     query: state.query,
     manaCost: state.manaCost,
+    manaSymbolMatch: state.manaSymbolMatch,
+    affinitySymbolMatch: state.affinitySymbolMatch,
+    devotionSymbolMatch: state.devotionSymbolMatch,
+    otherSymbolMatch: state.otherSymbolMatch,
     templateId: state.templateId,
     attackMin: state.attackMin,
     attackMax: state.attackMax,
@@ -270,6 +310,22 @@ export const buildCardFilterApiSearchParams = (
 
   if (normalized.query) params.set('q', normalized.query);
   if (normalized.manaCost) params.set('mana_cost', normalized.manaCost);
+  if (normalized.manaTypeSymbolIds.length > 0) {
+    normalized.manaTypeSymbolIds.forEach((id) => params.append('mana_symbol_ids', id));
+    params.set('mana_symbol_match', normalized.manaSymbolMatch);
+  }
+  if (normalized.affinitySymbolIds.length > 0) {
+    normalized.affinitySymbolIds.forEach((id) => params.append('affinity_symbol_ids', id));
+    params.set('affinity_symbol_match', normalized.affinitySymbolMatch);
+  }
+  if (normalized.devotionSymbolIds.length > 0) {
+    normalized.devotionSymbolIds.forEach((id) => params.append('devotion_symbol_ids', id));
+    params.set('devotion_symbol_match', normalized.devotionSymbolMatch);
+  }
+  if (normalized.otherSymbolIds.length > 0) {
+    normalized.otherSymbolIds.forEach((id) => params.append('other_symbol_ids', id));
+    params.set('other_symbol_match', normalized.otherSymbolMatch);
+  }
   if (normalized.templateId) params.set('template_id', normalized.templateId);
   if (normalized.attackMin) params.set('attack_min', normalized.attackMin);
   if (normalized.attackMax) params.set('attack_max', normalized.attackMax);
@@ -278,14 +334,6 @@ export const buildCardFilterApiSearchParams = (
 
   normalized.keywordIds.forEach((id) => params.append('keyword_ids', id));
   normalized.tagIds.forEach((id) => params.append('tag_ids', id));
-  [
-    ...normalized.manaTypeSymbolIds,
-    ...normalized.affinitySymbolIds,
-    ...normalized.devotionSymbolIds,
-    ...normalized.otherSymbolIds,
-  ]
-    .sort((left, right) => left.localeCompare(right))
-    .forEach((id) => params.append('symbol_ids', id));
   normalized.typeIds.forEach((id) => params.append('type_ids', id));
 
   return params;

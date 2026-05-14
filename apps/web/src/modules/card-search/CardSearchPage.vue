@@ -28,24 +28,28 @@
           />
           <FilterMultiSelectPopover
             v-model="selectedManaTypeSymbolIds"
+            v-model:match-mode="manaSymbolMatch"
             label="Mana Type"
             :options="manaTypeOptions"
             empty-text="No mana symbols available."
           />
           <FilterMultiSelectPopover
             v-model="selectedAffinitySymbolIds"
+            v-model:match-mode="affinitySymbolMatch"
             label="Affinity"
             :options="affinityTypeOptions"
             empty-text="No affinity symbols available."
           />
           <FilterMultiSelectPopover
             v-model="selectedDevotionSymbolIds"
+            v-model:match-mode="devotionSymbolMatch"
             label="Devotion"
             :options="devotionTypeOptions"
             empty-text="No devotion symbols available."
           />
           <FilterMultiSelectPopover
             v-model="selectedOtherSymbolIds"
+            v-model:match-mode="otherSymbolMatch"
             label="Other Symbols"
             :options="otherSymbolOptions"
             empty-text="No non-mana symbols available."
@@ -191,6 +195,10 @@ const filterCatalog = computed(() => createCardFilterCatalog(filters.value));
 const {
   query,
   manaCost,
+  manaSymbolMatch,
+  affinitySymbolMatch,
+  devotionSymbolMatch,
+  otherSymbolMatch,
   templateId,
   attackMin,
   attackMax,

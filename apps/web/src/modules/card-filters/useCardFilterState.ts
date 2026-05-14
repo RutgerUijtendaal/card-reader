@@ -12,6 +12,10 @@ import {
 export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const query = ref('');
   const manaCost = ref('');
+  const manaSymbolMatch = ref<'any' | 'all'>('any');
+  const affinitySymbolMatch = ref<'any' | 'all'>('any');
+  const devotionSymbolMatch = ref<'any' | 'all'>('any');
+  const otherSymbolMatch = ref<'any' | 'all'>('any');
   const templateId = ref('');
   const attackMin = ref('');
   const attackMax = ref('');
@@ -29,6 +33,10 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     normalizeCardFilterSelectionState({
       query: query.value,
       manaCost: manaCost.value,
+      manaSymbolMatch: manaSymbolMatch.value,
+      affinitySymbolMatch: affinitySymbolMatch.value,
+      devotionSymbolMatch: devotionSymbolMatch.value,
+      otherSymbolMatch: otherSymbolMatch.value,
       templateId: templateId.value,
       attackMin: attackMin.value,
       attackMax: attackMax.value,
@@ -48,6 +56,10 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     const normalized = normalizeCardFilterSelectionState(state);
     query.value = normalized.query;
     manaCost.value = normalized.manaCost;
+    manaSymbolMatch.value = normalized.manaSymbolMatch;
+    affinitySymbolMatch.value = normalized.affinitySymbolMatch;
+    devotionSymbolMatch.value = normalized.devotionSymbolMatch;
+    otherSymbolMatch.value = normalized.otherSymbolMatch;
     templateId.value = normalized.templateId;
     attackMin.value = normalized.attackMin;
     attackMax.value = normalized.attackMax;
@@ -76,6 +88,10 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   return {
     query,
     manaCost,
+    manaSymbolMatch,
+    affinitySymbolMatch,
+    devotionSymbolMatch,
+    otherSymbolMatch,
     templateId,
     attackMin,
     attackMax,

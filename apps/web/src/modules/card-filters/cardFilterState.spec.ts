@@ -25,6 +25,10 @@ describe('cardFilterState adapters', () => {
       {
         query: 'dragon',
         manaCost: '',
+        manaSymbolMatch: 'all',
+        affinitySymbolMatch: 'any',
+        devotionSymbolMatch: 'any',
+        otherSymbolMatch: 'any',
         templateId: '',
         attackMin: '',
         attackMax: '',
@@ -43,6 +47,7 @@ describe('cardFilterState adapters', () => {
 
     expect(selection).toMatchObject({
       query: 'dragon',
+      manaSymbolMatch: 'all',
       keywordIds: ['kw-1'],
       tagIds: ['tag-1'],
       manaTypeSymbolIds: ['sym-1'],
@@ -58,6 +63,10 @@ describe('cardFilterState adapters', () => {
       {
         query: '',
         manaCost: '',
+        manaSymbolMatch: 'all',
+        affinitySymbolMatch: 'all',
+        devotionSymbolMatch: 'any',
+        otherSymbolMatch: 'any',
         templateId: '',
         attackMin: '',
         attackMax: '',
@@ -75,6 +84,8 @@ describe('cardFilterState adapters', () => {
     );
 
     expect(state).toMatchObject({
+      manaSymbolMatch: 'all',
+      affinitySymbolMatch: 'all',
       keywordKeys: ['flying'],
       tagKeys: ['rare'],
       manaSymbolKeys: ['mana-fire'],
@@ -89,6 +100,10 @@ describe('cardFilterState adapters', () => {
     const params = buildCardFilterApiSearchParams({
       query: '',
       manaCost: '',
+      manaSymbolMatch: 'all',
+      affinitySymbolMatch: 'all',
+      devotionSymbolMatch: 'any',
+      otherSymbolMatch: 'any',
       templateId: '',
       attackMin: '',
       attackMax: '',
@@ -105,7 +120,15 @@ describe('cardFilterState adapters', () => {
 
     expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
     expect(params.getAll('tag_ids')).toEqual(['tag-1']);
-    expect(params.getAll('symbol_ids')).toEqual(['sym-1', 'sym-2', 'sym-3', 'sym-4']);
+    expect(params.getAll('mana_symbol_ids')).toEqual(['sym-1']);
+    expect(params.get('mana_symbol_match')).toBe('all');
+    expect(params.getAll('affinity_symbol_ids')).toEqual(['sym-2']);
+    expect(params.get('affinity_symbol_match')).toBe('all');
+    expect(params.getAll('devotion_symbol_ids')).toEqual(['sym-3']);
+    expect(params.get('devotion_symbol_match')).toBe('any');
+    expect(params.getAll('other_symbol_ids')).toEqual(['sym-4']);
+    expect(params.get('other_symbol_match')).toBe('any');
+    expect(params.getAll('symbol_ids')).toEqual([]);
     expect(params.getAll('type_ids')).toEqual(['type-1']);
     expect(params.getAll('keyword_keys')).toEqual([]);
   });

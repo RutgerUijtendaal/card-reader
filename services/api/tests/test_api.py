@@ -469,6 +469,65 @@ def test_cards_list_filters_preserve_count() -> None:
     assert payload["results"][0]["id"] in returned_ids
 
 
+def test_cards_list_symbol_group_match_modes() -> None:
+    mana_symbols = list(Symbol.objects.filter(symbol_type="mana").order_by("label")[:2])
+    affinity_symbols = list(Symbol.objects.filter(symbol_type="affinity").order_by("label")[:2])
+    assert len(mana_symbols) == 2
+    assert len(affinity_symbols) == 2
+
+    card_any, version_any = _create_editable_card_version(name="Mana Any")
+    card_all, version_all = _create_editable_card_version(name="Mana All")
+    _card_none, version_none = _create_editable_card_version(name="Mana None")
+    _create_card_image(version_any)
+    _create_card_image(version_all)
+    _create_card_image(version_none)
+    replace_card_version_symbols(card_version_id=version_any.id, symbol_ids=[mana_symbols[0].id, affinity_symbols[0].id])
+    replace_card_version_symbols(
+        card_version_id=version_all.id,
+        symbol_ids=[mana_symbols[0].id, mana_symbols[1].id, affinity_symbols[0].id, affinity_symbols[1].id],
+    )
+    replace_card_version_symbols(card_version_id=version_none.id, symbol_ids=[affinity_symbols[1].id])
+
+    client = Client(HTTP_HOST="localhost")
+
+    any_response = client.get(
+        "/cards",
+        {
+            "mana_symbol_ids": [mana_symbols[0].id, mana_symbols[1].id],
+            "mana_symbol_match": "any",
+        },
+    )
+    all_response = client.get(
+        "/cards",
+        {
+            "mana_symbol_ids": [mana_symbols[0].id, mana_symbols[1].id],
+            "mana_symbol_match": "all",
+        },
+    )
+    affinity_all_response = client.get(
+        "/cards",
+        {
+            "affinity_symbol_ids": [affinity_symbols[0].id, affinity_symbols[1].id],
+            "affinity_symbol_match": "all",
+        },
+    )
+
+    assert any_response.status_code == 200
+    assert all_response.status_code == 200
+    assert affinity_all_response.status_code == 200
+
+    any_ids = {row["id"] for row in any_response.json()["results"]}
+    all_ids = {row["id"] for row in all_response.json()["results"]}
+    affinity_all_ids = {row["id"] for row in affinity_all_response.json()["results"]}
+
+    assert card_any.id in any_ids
+    assert card_all.id in any_ids
+    assert card_any.id not in all_ids
+    assert card_all.id in all_ids
+    assert card_all.id in affinity_all_ids
+    assert card_any.id not in affinity_all_ids
+
+
 def test_cards_list_query_count_does_not_scale_linearly() -> None:
     keyword = Keyword.objects.first()
     tag = Tag.objects.first()

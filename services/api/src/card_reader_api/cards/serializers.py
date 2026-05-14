@@ -19,6 +19,14 @@ class CardFilterParams(TypedDict):
     max_confidence: float | None
     keyword_ids: list[str] | None
     tag_ids: list[str] | None
+    mana_symbol_ids: list[str] | None
+    mana_symbol_match: str | None
+    affinity_symbol_ids: list[str] | None
+    affinity_symbol_match: str | None
+    devotion_symbol_ids: list[str] | None
+    devotion_symbol_match: str | None
+    other_symbol_ids: list[str] | None
+    other_symbol_match: str | None
     symbol_ids: list[str] | None
     type_ids: list[str] | None
     mana_cost: str | None
@@ -160,6 +168,14 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     max_confidence = serializers.FloatField(required=False, allow_null=True)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    mana_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    mana_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    affinity_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    devotion_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    devotion_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    other_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    other_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     mana_cost = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -177,6 +193,14 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "max_confidence": self._float_or_none("max_confidence"),
             "keyword_ids": self._string_list_or_none("keyword_ids"),
             "tag_ids": self._string_list_or_none("tag_ids"),
+            "mana_symbol_ids": self._string_list_or_none("mana_symbol_ids"),
+            "mana_symbol_match": self._string_or_none("mana_symbol_match"),
+            "affinity_symbol_ids": self._string_list_or_none("affinity_symbol_ids"),
+            "affinity_symbol_match": self._string_or_none("affinity_symbol_match"),
+            "devotion_symbol_ids": self._string_list_or_none("devotion_symbol_ids"),
+            "devotion_symbol_match": self._string_or_none("devotion_symbol_match"),
+            "other_symbol_ids": self._string_list_or_none("other_symbol_ids"),
+            "other_symbol_match": self._string_or_none("other_symbol_match"),
             "symbol_ids": self._string_list_or_none("symbol_ids"),
             "type_ids": self._string_list_or_none("type_ids"),
             "mana_cost": self._string_or_none("mana_cost"),
