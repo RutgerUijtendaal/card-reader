@@ -1,10 +1,27 @@
 import { computed, ref } from 'vue';
-import type { Router, RouteLocationNormalizedLoaded } from 'vue-router';
+import type {
+  LocationQuery,
+  LocationQueryRaw,
+  RouteLocationNormalizedLoaded,
+  RouteLocationRaw,
+  Router,
+} from 'vue-router';
 import { api } from '@/api/client';
+import type { GalleryPageState } from '@/modules/card-search/galleryState';
+import {
+  buildGalleryRouteQuery,
+  parseGalleryFilterState,
+} from '@/modules/card-search/galleryRouteState';
 import type { PaginatedCardsResponse } from '@/modules/card-detail/types';
 
 type GalleryNavigationCard = {
   id: string;
+};
+
+type GallerySnapshot<TCard extends GalleryNavigationCard> = {
+  searchParams: string;
+  pageState: GalleryPageState<TCard>;
+  scrollTop: number;
 };
 
 const galleryCardIds = ref<string[]>([]);
@@ -14,6 +31,69 @@ const galleryPageSize = ref(72);
 const gallerySearchParams = ref('');
 const isLoadingMoreCards = ref(false);
 let pendingLoadMorePromise: Promise<void> | null = null;
+let gallerySnapshot: GallerySnapshot<GalleryNavigationCard> | null = null;
+
+const normalizeGalleryQuery = (query: LocationQuery): LocationQueryRaw =>
+  buildGalleryRouteQuery(parseGalleryFilterState(query));
+
+export const getGalleryRouteQuery = (query: LocationQuery): LocationQueryRaw => normalizeGalleryQuery(query);
+
+const hasQueryEntries = (query: LocationQueryRaw): boolean => Object.keys(query).length > 0;
+
+export const buildGalleryLocation = (query: LocationQuery): RouteLocationRaw => {
+  const galleryQuery = getGalleryRouteQuery(query);
+  if (!hasQueryEntries(galleryQuery)) {
+    return '/cards';
+  }
+  return { path: '/cards', query: galleryQuery };
+};
+
+export const buildCardDetailLocation = (
+  cardId: string,
+  query: LocationQuery,
+  mode: 'detail' | 'edit',
+): RouteLocationRaw => ({
+  path: mode === 'edit' ? `/cards/${cardId}/edit` : `/cards/${cardId}`,
+  query: getGalleryRouteQuery(query),
+});
+
+export const saveGallerySnapshot = <TCard extends GalleryNavigationCard>(
+  searchParams: string,
+  pageState: GalleryPageState<TCard>,
+  scrollTop: number,
+): void => {
+  gallerySnapshot = {
+    searchParams,
+    pageState: {
+      cards: [...pageState.cards],
+      count: pageState.count,
+      nextPage: pageState.nextPage,
+      page: pageState.page,
+      pageSize: pageState.pageSize,
+    },
+    scrollTop,
+  };
+};
+
+export const getGallerySnapshot = <TCard extends GalleryNavigationCard>(
+  searchParams: string,
+): GallerySnapshot<TCard> | null => {
+  if (!gallerySnapshot || gallerySnapshot.searchParams !== searchParams) {
+    return null;
+  }
+
+  return {
+    searchParams: gallerySnapshot.searchParams,
+    pageState: {
+      cards: [...gallerySnapshot.pageState.cards] as TCard[],
+      count: gallerySnapshot.pageState.count,
+      nextPage: gallerySnapshot.pageState.nextPage,
+      page: gallerySnapshot.pageState.page,
+      pageSize: gallerySnapshot.pageState.pageSize,
+    },
+    scrollTop: gallerySnapshot.scrollTop,
+  };
+};
 
 export const setGalleryNavigationCards = (
   cardIds: string[],
@@ -96,7 +176,7 @@ export const useGalleryCardNavigation = (
 
   const navigateToCard = (cardId: string | null): void => {
     if (!cardId) return;
-    void router.push(mode === 'edit' ? `/cards/${cardId}/edit` : `/cards/${cardId}`);
+    void router.push(buildCardDetailLocation(cardId, route.query, mode));
   };
 
   const goToPreviousCard = (): void => {

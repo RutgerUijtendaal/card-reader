@@ -3,7 +3,11 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
+import {
+  buildCardDetailLocation,
+  buildGalleryLocation,
+  useGalleryCardNavigation,
+} from '@/modules/card-search/galleryNavigation';
 import type {
   CardDetail,
   CardFiltersResponse,
@@ -49,11 +53,11 @@ export const useCardPublicDetailState = () => {
   };
 
   const goBack = (): void => {
-    void router.push('/cards');
+    void router.push(buildGalleryLocation(route.query));
   };
 
   const openEditor = (): void => {
-    void router.push(`/cards/${route.params.id}/edit`);
+    void router.push(buildCardDetailLocation(String(route.params.id), route.query, 'edit'));
   };
 
   const selectVersion = (versionId: string): void => {

@@ -139,11 +139,13 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
-import { computed, onMounted, ref, watch } from 'vue';
+import { useDebounceFn, useIntersectionObserver, useScroll } from '@vueuse/core';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Download, Images, RotateCcw } from 'lucide-vue-next';
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { api } from '@/api/client';
 import { useCsvExport } from '@/composables/useCsvExport';
+import { useScrollContainer } from '@/composables/useScrollContainer';
 import FilterMultiSelectPopover from '@/components/filters/FilterMultiSelectPopover.vue';
 import FilterTextPopover from '@/components/filters/FilterTextPopover.vue';
 import CardGalleryItem, { type CardGalleryItemModel } from '@/components/cards/CardGalleryItem.vue';
@@ -158,7 +160,26 @@ import {
   isLatestGalleryRequest,
   replaceGalleryPage,
 } from '@/modules/card-search/galleryState';
-import { setGalleryNavigationCards } from '@/modules/card-search/galleryNavigation';
+import {
+  getGallerySnapshot,
+  saveGallerySnapshot,
+  setGalleryNavigationCards,
+} from '@/modules/card-search/galleryNavigation';
+import {
+  buildGalleryApiSearchParams,
+  buildGalleryRouteQuery,
+  createEmptyGalleryFilterState,
+  getGalleryFilterSignature,
+  normalizeGalleryFilterState,
+  parseGalleryFilterState,
+  sameGalleryFilterState,
+  type GalleryFilterState,
+} from '@/modules/card-search/galleryRouteState';
+
+const route = useRoute();
+const router = useRouter();
+const scrollContainer = useScrollContainer();
+const { y: scrollTopRef } = useScroll(scrollContainer);
 
 const query = ref('');
 const manaCost = ref('');
@@ -186,6 +207,8 @@ const galleryState = ref(createEmptyGalleryPageState<CardGalleryItemModel>());
 const cards = computed(() => galleryState.value.cards);
 const totalCount = computed(() => galleryState.value.count);
 const nextPage = computed(() => galleryState.value.nextPage);
+const currentRouteFilterState = computed(() => parseGalleryFilterState(route.query));
+const currentRouteSignature = computed(() => getGalleryFilterSignature(currentRouteFilterState.value));
 const isLoadingInitial = ref(false);
 const isLoadingPage = ref(false);
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
@@ -214,33 +237,50 @@ const loadFilters = async (): Promise<void> => {
   filters.value = response.data;
 };
 
-const buildSearchParams = (): URLSearchParams => {
-  const params = new URLSearchParams();
-  if (query.value.trim()) params.set('q', query.value.trim());
-  if (manaCost.value.trim()) params.set('mana_cost', manaCost.value.trim());
-  if (templateId.value.trim()) params.set('template_id', templateId.value.trim());
-  if (attackMin.value.trim()) params.set('attack_min', attackMin.value.trim());
-  if (attackMax.value.trim()) params.set('attack_max', attackMax.value.trim());
-  if (healthMin.value.trim()) params.set('health_min', healthMin.value.trim());
-  if (healthMax.value.trim()) params.set('health_max', healthMax.value.trim());
+const readLocalFilterState = (): GalleryFilterState =>
+  normalizeGalleryFilterState({
+    query: query.value,
+    manaCost: manaCost.value,
+    templateId: templateId.value,
+    attackMin: attackMin.value,
+    attackMax: attackMax.value,
+    healthMin: healthMin.value,
+    healthMax: healthMax.value,
+    keywordIds: selectedKeywordIds.value,
+    tagIds: selectedTagIds.value,
+    manaTypeSymbolIds: selectedManaTypeSymbolIds.value,
+    affinitySymbolIds: selectedAffinitySymbolIds.value,
+    devotionSymbolIds: selectedDevotionSymbolIds.value,
+    otherSymbolIds: selectedOtherSymbolIds.value,
+    typeIds: selectedTypeIds.value,
+  });
 
-  selectedKeywordIds.value.forEach((id) => params.append('keyword_ids', id));
-  selectedTagIds.value.forEach((id) => params.append('tag_ids', id));
-  const selectedSymbolIds = new Set<string>([
-    ...selectedManaTypeSymbolIds.value,
-    ...selectedAffinitySymbolIds.value,
-    ...selectedDevotionSymbolIds.value,
-    ...selectedOtherSymbolIds.value,
-  ]);
-  selectedSymbolIds.forEach((id) => params.append('symbol_ids', id));
-  selectedTypeIds.value.forEach((id) => params.append('type_ids', id));
+const applyFilterState = (state: GalleryFilterState): void => {
+  query.value = state.query;
+  manaCost.value = state.manaCost;
+  templateId.value = state.templateId;
+  attackMin.value = state.attackMin;
+  attackMax.value = state.attackMax;
+  healthMin.value = state.healthMin;
+  healthMax.value = state.healthMax;
+  selectedKeywordIds.value = [...state.keywordIds];
+  selectedTagIds.value = [...state.tagIds];
+  selectedManaTypeSymbolIds.value = [...state.manaTypeSymbolIds];
+  selectedAffinitySymbolIds.value = [...state.affinitySymbolIds];
+  selectedDevotionSymbolIds.value = [...state.devotionSymbolIds];
+  selectedOtherSymbolIds.value = [...state.otherSymbolIds];
+  selectedTypeIds.value = [...state.typeIds];
+};
 
-  return params;
+const restoreScroll = (value: number): void => {
+  window.requestAnimationFrame(() => {
+    scrollTopRef.value = value;
+  });
 };
 
 const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
   const requestId = ++latestSearchRequestId;
-  const params = buildSearchParams();
+  const params = buildGalleryApiSearchParams(currentRouteFilterState.value);
   params.set('page', String(page));
   params.set('page_size', '72');
   if (mode === 'replace') {
@@ -279,36 +319,28 @@ const loadNextPage = async (): Promise<void> => {
 };
 
 const exportCsv = async (): Promise<void> => {
-  await exportCardsCsv(buildSearchParams());
+  await exportCardsCsv(buildGalleryApiSearchParams(currentRouteFilterState.value));
 };
 
-const debouncedSearch = useDebounceFn(() => {
-  void searchCards();
+const debouncedUpdateRoute = useDebounceFn((state: GalleryFilterState) => {
+  if (sameGalleryFilterState(state, currentRouteFilterState.value)) {
+    return;
+  }
+  void router.replace({
+    path: '/cards',
+    query: buildGalleryRouteQuery(state),
+  });
 }, 250);
 
-const observedFilterState = computed(() => ({
-  query: query.value.trim(),
-  manaCost: manaCost.value.trim(),
-  templateId: templateId.value.trim(),
-  attackMin: attackMin.value.trim(),
-  attackMax: attackMax.value.trim(),
-  healthMin: healthMin.value.trim(),
-  healthMax: healthMax.value.trim(),
-  keywordIds: [...selectedKeywordIds.value].sort(),
-  tagIds: [...selectedTagIds.value].sort(),
-  manaTypeSymbolIds: [...selectedManaTypeSymbolIds.value].sort(),
-  affinitySymbolIds: [...selectedAffinitySymbolIds.value].sort(),
-  devotionSymbolIds: [...selectedDevotionSymbolIds.value].sort(),
-  otherSymbolIds: [...selectedOtherSymbolIds.value].sort(),
-  typeIds: [...selectedTypeIds.value].sort(),
-}));
-
-const galleryNavigationSearchParams = computed(() => buildSearchParams().toString());
+const observedFilterState = computed(() => readLocalFilterState());
+const galleryNavigationSearchParams = computed(() =>
+  buildGalleryApiSearchParams(currentRouteFilterState.value).toString(),
+);
 
 watch(
   observedFilterState,
-  () => {
-    debouncedSearch();
+  (state) => {
+    debouncedUpdateRoute(state);
   },
   { deep: true },
 );
@@ -337,25 +369,43 @@ watch(
   { immediate: true },
 );
 
+watch(
+  currentRouteSignature,
+  async (searchParams) => {
+    const routeState = currentRouteFilterState.value;
+    if (!sameGalleryFilterState(readLocalFilterState(), routeState)) {
+      applyFilterState(routeState);
+    }
+
+    const snapshot = getGallerySnapshot<CardGalleryItemModel>(searchParams);
+    if (snapshot) {
+      galleryState.value = snapshot.pageState;
+      isLoadingInitial.value = false;
+      isLoadingPage.value = false;
+      saveGallerySnapshot(searchParams, snapshot.pageState, snapshot.scrollTop);
+      await nextTick();
+      restoreScroll(snapshot.scrollTop);
+      return;
+    }
+
+    scrollTopRef.value = 0;
+    await searchCards();
+    saveGallerySnapshot(searchParams, galleryState.value, scrollTopRef.value);
+  },
+  { immediate: true },
+);
+
 const resetFilters = (): void => {
-  query.value = '';
-  manaCost.value = '';
-  templateId.value = '';
-  attackMin.value = '';
-  attackMax.value = '';
-  healthMin.value = '';
-  healthMax.value = '';
-  selectedKeywordIds.value = [];
-  selectedTagIds.value = [];
-  selectedManaTypeSymbolIds.value = [];
-  selectedAffinitySymbolIds.value = [];
-  selectedDevotionSymbolIds.value = [];
-  selectedOtherSymbolIds.value = [];
-  selectedTypeIds.value = [];
+  const emptyState = createEmptyGalleryFilterState();
+  applyFilterState(emptyState);
+  void router.replace({ path: '/cards', query: buildGalleryRouteQuery(emptyState) });
 };
 
-onMounted(async () => {
-  await loadFilters();
-  await searchCards();
+onBeforeRouteLeave(() => {
+  saveGallerySnapshot(currentRouteSignature.value, galleryState.value, scrollTopRef.value);
+});
+
+onMounted(() => {
+  void loadFilters();
 });
 </script>

@@ -66,7 +66,9 @@ Core stack:
 - Default seed JSON files live in `services/api/src/card_reader_api/seeds`:
   - `seed-keywords.json`
   - `seed-symbols.json`
+  - `seed-tags.json`
   - `seed-templates.json`
+  - `seed-types.json`
   - `seed-users.example.json`
 - Local development users live in:
   - `services/api/src/card_reader_api/seeds/seed-users.local.json`
@@ -110,6 +112,7 @@ Targeted commands:
   - format: `prettier`
   - typecheck: `vue-tsc`
   - tests: `vitest`
+  - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
 
 ## API Surface
 - `POST /imports/upload`

@@ -2,7 +2,7 @@
   <div class="group w-full">
     <div class="relative transition duration-200 hover:-translate-y-1">
       <RouterLink
-        :to="`/cards/${card.id}`"
+        :to="buildDetailLocation(card.id, 'detail')"
         class="block"
       >
         <img
@@ -26,7 +26,7 @@
         class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3 opacity-0 transition duration-200 group-hover:opacity-100"
       >
         <RouterLink
-          :to="`/cards/${card.id}/edit`"
+          :to="buildDetailLocation(card.id, 'edit')"
           class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-xl transition hover:bg-slate-50"
         >
           <Pencil class="h-3.5 w-3.5" />
@@ -38,9 +38,11 @@
 </template>
 
 <script setup lang="ts">
+import { useRoute } from 'vue-router';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
 import { Pencil } from 'lucide-vue-next';
 import { useAuthStore } from '@/modules/auth/authStore';
+import { buildCardDetailLocation } from '@/modules/card-search/galleryNavigation';
 import type {
   CardHoverTooltipModel,
 } from '@/components/cards/cardModels';
@@ -54,6 +56,10 @@ defineProps<{
 }>();
 
 const auth = useAuthStore();
+const route = useRoute();
+
+const buildDetailLocation = (cardId: string, mode: 'detail' | 'edit') =>
+  buildCardDetailLocation(cardId, route.query, mode);
 
 const toAbsoluteApiUrl = (urlPath: string): string => {
   const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
