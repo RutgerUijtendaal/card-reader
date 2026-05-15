@@ -43,3 +43,30 @@
     @apply bg-white/20 text-white;
   }
 }
+
+@layer utilities {
+  .app-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .app-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    background-color: #cbd5e1;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+  }
+}

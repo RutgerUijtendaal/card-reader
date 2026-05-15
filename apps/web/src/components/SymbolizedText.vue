@@ -5,12 +5,13 @@
         v-for="(segment, index) in segments"
         :key="`seg-${index}-${segment.raw}`"
       >
-        <img
-          v-if="segment.kind === 'symbol' && segment.assetUrl"
-          :src="toAbsoluteApiUrl(segment.assetUrl)"
-          :alt="segment.label"
-          class="inline-block h-4 w-4 object-contain align-middle"
-        >
+        <SymbolToken
+          v-if="segment.kind === 'symbol'"
+          :asset-url="segment.assetUrl"
+          :label="segment.label"
+          :text-token="segment.label"
+          class="inline-block h-4 w-4 align-middle"
+        />
         <span
           v-else
           class="inline-block"
@@ -26,7 +27,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { api, DEFAULT_API_BASE_URL } from '@/api/client';
+import SymbolToken from '@/components/SymbolToken.vue';
 
 type SymbolLookup = {
   asset_url?: string | null;
@@ -58,14 +59,6 @@ const props = withDefaults(
 const segments = computed<Segment[]>(() =>
   tokenizeText(props.text ?? '', props.tokens ?? [], props.symbolByKey),
 );
-
-const toAbsoluteApiUrl = (urlPath: string): string => {
-  const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
-  if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
-    return urlPath;
-  }
-  return `${base.replace(/\/$/, '')}/${urlPath.replace(/^\//, '')}`;
-};
 
 const tokenizeText = (
   rawValue: string,

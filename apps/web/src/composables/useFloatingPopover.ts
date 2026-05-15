@@ -1,4 +1,4 @@
-import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
+import { autoUpdate, flip, offset, shift, useFloating, type Placement } from '@floating-ui/vue';
 import { onClickOutside, onKeyStroke } from '@vueuse/core';
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
 
@@ -14,14 +14,18 @@ export type UseFloatingPopoverResult = {
   close: () => void;
 };
 
-export const useFloatingPopover = (): UseFloatingPopoverResult => {
+export const useFloatingPopover = (
+  options: {
+    placement?: Placement;
+  } = {},
+): UseFloatingPopoverResult => {
   const isOpen = ref(false);
   const triggerRef = ref<MaybeElement>(null);
   const panelRef = ref<MaybeElement>(null);
 
   const floating = useFloating(triggerRef, panelRef, {
     open: isOpen,
-    placement: 'bottom-start',
+    placement: options.placement ?? 'bottom-start',
     strategy: 'fixed',
     middleware: [offset(8), flip(), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
