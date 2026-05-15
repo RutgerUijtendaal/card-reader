@@ -13,6 +13,7 @@ const filters: CardFiltersResponse = {
   types: [{ id: 'type-1', key: 'creature', label: 'Creature' }],
   symbols: [
     { id: 'sym-1', key: 'mana-fire', label: 'Fire', symbol_type: 'mana', text_token: '{F}', asset_url: null },
+    { id: 'sym-1b', key: 'colorless-mana-3', label: 'Colorless Mana 3', symbol_type: 'mana', text_token: '{3}', asset_url: null },
     { id: 'sym-2', key: 'air', label: 'Air', symbol_type: 'affinity', text_token: '{A}', asset_url: null },
     { id: 'sym-3', key: 'pray', label: 'Pray', symbol_type: 'devotion', text_token: '{P}', asset_url: null },
     { id: 'sym-4', key: 'tap', label: 'Tap', symbol_type: 'other', text_token: '{T}', asset_url: null },
@@ -24,12 +25,16 @@ describe('cardFilterState adapters', () => {
     const selection = buildCardFilterSelectionState(
       {
         query: 'dragon',
-        manaCost: '',
+        keywordMatch: 'all',
+        tagMatch: 'any',
+        typeMatch: 'all',
         manaSymbolMatch: 'all',
         affinitySymbolMatch: 'any',
         devotionSymbolMatch: 'any',
         otherSymbolMatch: 'any',
         templateId: '',
+        manaCostMin: '2',
+        manaCostMax: '5',
         attackMin: '',
         attackMax: '',
         healthMin: '',
@@ -47,7 +52,11 @@ describe('cardFilterState adapters', () => {
 
     expect(selection).toMatchObject({
       query: 'dragon',
+      keywordMatch: 'all',
+      typeMatch: 'all',
       manaSymbolMatch: 'all',
+      manaCostMin: '2',
+      manaCostMax: '5',
       keywordIds: ['kw-1'],
       tagIds: ['tag-1'],
       manaTypeSymbolIds: ['sym-1'],
@@ -62,12 +71,16 @@ describe('cardFilterState adapters', () => {
     const state = buildCardFilterStateFromSelection(
       {
         query: '',
-        manaCost: '',
+        keywordMatch: 'all',
+        tagMatch: 'all',
+        typeMatch: 'any',
         manaSymbolMatch: 'all',
         affinitySymbolMatch: 'all',
         devotionSymbolMatch: 'any',
         otherSymbolMatch: 'any',
         templateId: '',
+        manaCostMin: '1',
+        manaCostMax: '6',
         attackMin: '',
         attackMax: '',
         healthMin: '',
@@ -84,8 +97,12 @@ describe('cardFilterState adapters', () => {
     );
 
     expect(state).toMatchObject({
+      keywordMatch: 'all',
+      tagMatch: 'all',
       manaSymbolMatch: 'all',
       affinitySymbolMatch: 'all',
+      manaCostMin: '1',
+      manaCostMax: '6',
       keywordKeys: ['flying'],
       tagKeys: ['rare'],
       manaSymbolKeys: ['mana-fire'],
@@ -99,12 +116,16 @@ describe('cardFilterState adapters', () => {
   test('builds API params with UUID ids only', () => {
     const params = buildCardFilterApiSearchParams({
       query: '',
-      manaCost: '',
+      keywordMatch: 'all',
+      tagMatch: 'all',
+      typeMatch: 'any',
       manaSymbolMatch: 'all',
       affinitySymbolMatch: 'all',
       devotionSymbolMatch: 'any',
       otherSymbolMatch: 'any',
       templateId: '',
+      manaCostMin: '2',
+      manaCostMax: '7',
       attackMin: '',
       attackMax: '',
       healthMin: '',
@@ -119,7 +140,9 @@ describe('cardFilterState adapters', () => {
     });
 
     expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
+    expect(params.get('keyword_match')).toBe('all');
     expect(params.getAll('tag_ids')).toEqual(['tag-1']);
+    expect(params.get('tag_match')).toBe('all');
     expect(params.getAll('mana_symbol_ids')).toEqual(['sym-1']);
     expect(params.get('mana_symbol_match')).toBe('all');
     expect(params.getAll('affinity_symbol_ids')).toEqual(['sym-2']);
@@ -130,6 +153,15 @@ describe('cardFilterState adapters', () => {
     expect(params.get('other_symbol_match')).toBe('any');
     expect(params.getAll('symbol_ids')).toEqual([]);
     expect(params.getAll('type_ids')).toEqual(['type-1']);
+    expect(params.get('type_match')).toBe('any');
+    expect(params.get('mana_cost_min')).toBe('2');
+    expect(params.get('mana_cost_max')).toBe('7');
     expect(params.getAll('keyword_keys')).toEqual([]);
+  });
+
+  test('excludes colorless mana symbols from the mana toggle catalog', () => {
+    const catalog = createCardFilterCatalog(filters);
+
+    expect(catalog.manaSymbols.map((row) => row.key)).toEqual(['mana-fire']);
   });
 });

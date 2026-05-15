@@ -469,6 +469,72 @@ def test_cards_list_filters_preserve_count() -> None:
     assert payload["results"][0]["id"] in returned_ids
 
 
+def test_cards_list_metadata_match_modes() -> None:
+    keywords = list(Keyword.objects.order_by("label")[:2])
+    tags = list(Tag.objects.order_by("label")[:2])
+    types = list(Type.objects.order_by("label")[:2])
+    assert len(keywords) == 2
+    assert len(tags) == 2
+    assert len(types) == 2
+
+    card_any, version_any = _create_editable_card_version(name="Metadata Any")
+    card_all, version_all = _create_editable_card_version(name="Metadata All")
+    _card_none, version_none = _create_editable_card_version(name="Metadata None")
+    _create_card_image(version_any)
+    _create_card_image(version_all)
+    _create_card_image(version_none)
+
+    replace_card_version_keywords(card_version_id=version_any.id, keyword_ids=[keywords[0].id])
+    replace_card_version_keywords(card_version_id=version_all.id, keyword_ids=[keywords[0].id, keywords[1].id])
+    replace_card_version_keywords(card_version_id=version_none.id, keyword_ids=[keywords[1].id])
+
+    replace_card_version_tags(card_version_id=version_any.id, tag_ids=[tags[0].id])
+    replace_card_version_tags(card_version_id=version_all.id, tag_ids=[tags[0].id, tags[1].id])
+    replace_card_version_tags(card_version_id=version_none.id, tag_ids=[tags[1].id])
+
+    replace_card_version_types(card_version_id=version_any.id, type_ids=[types[0].id])
+    replace_card_version_types(card_version_id=version_all.id, type_ids=[types[0].id, types[1].id])
+    replace_card_version_types(card_version_id=version_none.id, type_ids=[types[1].id])
+
+    client = Client(HTTP_HOST="localhost")
+    keyword_all_response = client.get(
+        "/cards",
+        {
+            "keyword_ids": [keywords[0].id, keywords[1].id],
+            "keyword_match": "all",
+        },
+    )
+    tag_all_response = client.get(
+        "/cards",
+        {
+            "tag_ids": [tags[0].id, tags[1].id],
+            "tag_match": "all",
+        },
+    )
+    type_all_response = client.get(
+        "/cards",
+        {
+            "type_ids": [types[0].id, types[1].id],
+            "type_match": "all",
+        },
+    )
+
+    assert keyword_all_response.status_code == 200
+    assert tag_all_response.status_code == 200
+    assert type_all_response.status_code == 200
+
+    keyword_all_ids = {row["id"] for row in keyword_all_response.json()["results"]}
+    tag_all_ids = {row["id"] for row in tag_all_response.json()["results"]}
+    type_all_ids = {row["id"] for row in type_all_response.json()["results"]}
+
+    assert card_any.id not in keyword_all_ids
+    assert card_all.id in keyword_all_ids
+    assert card_any.id not in tag_all_ids
+    assert card_all.id in tag_all_ids
+    assert card_any.id not in type_all_ids
+    assert card_all.id in type_all_ids
+
+
 def test_cards_list_symbol_group_match_modes() -> None:
     mana_symbols = list(Symbol.objects.filter(symbol_type="mana").order_by("label")[:2])
     affinity_symbols = list(Symbol.objects.filter(symbol_type="affinity").order_by("label")[:2])
@@ -526,6 +592,53 @@ def test_cards_list_symbol_group_match_modes() -> None:
     assert card_all.id in all_ids
     assert card_all.id in affinity_all_ids
     assert card_any.id not in affinity_all_ids
+
+
+def test_cards_list_mana_cost_range_filters() -> None:
+    card_low, version_low = _create_editable_card_version(name="Mana Value Low")
+    card_mid, version_mid = _create_editable_card_version(name="Mana Value Mid")
+    card_high, version_high = _create_editable_card_version(name="Mana Value High")
+    _create_card_image(version_low)
+    _create_card_image(version_mid)
+    _create_card_image(version_high)
+
+    version_low.mana_cost = "1"
+    version_low.mana_symbols_json = []
+    version_low.mana_value = 1
+    version_low.save(update_fields=["mana_cost", "mana_symbols_json", "mana_value"])
+
+    version_mid.mana_cost = "X+2"
+    version_mid.mana_symbols_json = ["mana-fire", "mana-water", "x"]
+    version_mid.mana_value = 2
+    version_mid.save(update_fields=["mana_cost", "mana_symbols_json", "mana_value"])
+
+    version_high.mana_cost = "5"
+    version_high.mana_symbols_json = ["colorless-mana-3", "mana-fire", "mana-water"]
+    version_high.mana_value = 5
+    version_high.save(update_fields=["mana_cost", "mana_symbols_json", "mana_value"])
+
+    client = Client(HTTP_HOST="localhost")
+    min_response = client.get("/cards", {"mana_cost_min": 2})
+    max_response = client.get("/cards", {"mana_cost_max": 2})
+    range_response = client.get("/cards", {"mana_cost_min": 2, "mana_cost_max": 5})
+
+    assert min_response.status_code == 200
+    assert max_response.status_code == 200
+    assert range_response.status_code == 200
+
+    min_ids = {row["id"] for row in min_response.json()["results"]}
+    max_ids = {row["id"] for row in max_response.json()["results"]}
+    range_ids = {row["id"] for row in range_response.json()["results"]}
+
+    assert card_low.id not in min_ids
+    assert card_mid.id in min_ids
+    assert card_high.id in min_ids
+    assert card_low.id in max_ids
+    assert card_mid.id in max_ids
+    assert card_high.id not in max_ids
+    assert card_low.id not in range_ids
+    assert card_mid.id in range_ids
+    assert card_high.id in range_ids
 
 
 def test_cards_list_query_count_does_not_scale_linearly() -> None:
@@ -832,6 +945,7 @@ def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
         type_line="Base Type",
         mana_cost="2",
         mana_symbols_json="[]",
+        mana_value=2,
         rules_text_raw="Base rules",
         rules_text_enriched="Base rules",
         rules_text="Base rules",

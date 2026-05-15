@@ -115,6 +115,7 @@ Targeted commands:
   - format: `prettier`
   - typecheck: `vue-tsc`
   - tests: `vitest`
+  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility in `apps/web/src/styles.css`
   - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
 
 ## API Surface

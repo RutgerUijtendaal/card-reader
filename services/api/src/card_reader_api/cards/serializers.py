@@ -18,7 +18,9 @@ class CardFilterParams(TypedDict):
     query: str | None
     max_confidence: float | None
     keyword_ids: list[str] | None
+    keyword_match: str | None
     tag_ids: list[str] | None
+    tag_match: str | None
     mana_symbol_ids: list[str] | None
     mana_symbol_match: str | None
     affinity_symbol_ids: list[str] | None
@@ -29,7 +31,9 @@ class CardFilterParams(TypedDict):
     other_symbol_match: str | None
     symbol_ids: list[str] | None
     type_ids: list[str] | None
-    mana_cost: str | None
+    type_match: str | None
+    mana_cost_min: int | None
+    mana_cost_max: int | None
     template_id: str | None
     attack_min: int | None
     attack_max: int | None
@@ -167,7 +171,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     query = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     max_confidence = serializers.FloatField(required=False, allow_null=True)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    keyword_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     mana_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     mana_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
@@ -178,7 +184,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     other_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    mana_cost = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    type_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    mana_cost_min = serializers.IntegerField(required=False, allow_null=True)
+    mana_cost_max = serializers.IntegerField(required=False, allow_null=True)
     template_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     attack_min = serializers.IntegerField(required=False, allow_null=True)
     attack_max = serializers.IntegerField(required=False, allow_null=True)
@@ -192,7 +200,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "query": self._string_or_none("query"),
             "max_confidence": self._float_or_none("max_confidence"),
             "keyword_ids": self._string_list_or_none("keyword_ids"),
+            "keyword_match": self._string_or_none("keyword_match"),
             "tag_ids": self._string_list_or_none("tag_ids"),
+            "tag_match": self._string_or_none("tag_match"),
             "mana_symbol_ids": self._string_list_or_none("mana_symbol_ids"),
             "mana_symbol_match": self._string_or_none("mana_symbol_match"),
             "affinity_symbol_ids": self._string_list_or_none("affinity_symbol_ids"),
@@ -203,7 +213,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "other_symbol_match": self._string_or_none("other_symbol_match"),
             "symbol_ids": self._string_list_or_none("symbol_ids"),
             "type_ids": self._string_list_or_none("type_ids"),
-            "mana_cost": self._string_or_none("mana_cost"),
+            "type_match": self._string_or_none("type_match"),
+            "mana_cost_min": self._int_or_none("mana_cost_min"),
+            "mana_cost_max": self._int_or_none("mana_cost_max"),
             "template_id": self._string_or_none("template_id"),
             "attack_min": self._int_or_none("attack_min"),
             "attack_max": self._int_or_none("attack_max"),

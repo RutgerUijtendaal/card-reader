@@ -7,12 +7,16 @@ import type {
 
 export type CardFilterState = {
   query: string;
-  manaCost: string;
+  keywordMatch: 'any' | 'all';
+  tagMatch: 'any' | 'all';
+  typeMatch: 'any' | 'all';
   manaSymbolMatch: 'any' | 'all';
   affinitySymbolMatch: 'any' | 'all';
   devotionSymbolMatch: 'any' | 'all';
   otherSymbolMatch: 'any' | 'all';
   templateId: string;
+  manaCostMin: string;
+  manaCostMax: string;
   attackMin: string;
   attackMax: string;
   healthMin: string;
@@ -28,12 +32,16 @@ export type CardFilterState = {
 
 export type CardFilterSelectionState = {
   query: string;
-  manaCost: string;
+  keywordMatch: 'any' | 'all';
+  tagMatch: 'any' | 'all';
+  typeMatch: 'any' | 'all';
   manaSymbolMatch: 'any' | 'all';
   affinitySymbolMatch: 'any' | 'all';
   devotionSymbolMatch: 'any' | 'all';
   otherSymbolMatch: 'any' | 'all';
   templateId: string;
+  manaCostMin: string;
+  manaCostMax: string;
   attackMin: string;
   attackMax: string;
   healthMin: string;
@@ -59,12 +67,16 @@ export type CardFilterCatalog = {
 
 export const createEmptyCardFilterState = (): CardFilterState => ({
   query: '',
-  manaCost: '',
+  keywordMatch: 'any',
+  tagMatch: 'any',
+  typeMatch: 'any',
   manaSymbolMatch: 'any',
   affinitySymbolMatch: 'any',
   devotionSymbolMatch: 'any',
   otherSymbolMatch: 'any',
   templateId: '',
+  manaCostMin: '',
+  manaCostMax: '',
   attackMin: '',
   attackMax: '',
   healthMin: '',
@@ -80,12 +92,16 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
 
 export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState => ({
   query: '',
-  manaCost: '',
+  keywordMatch: 'any',
+  tagMatch: 'any',
+  typeMatch: 'any',
   manaSymbolMatch: 'any',
   affinitySymbolMatch: 'any',
   devotionSymbolMatch: 'any',
   otherSymbolMatch: 'any',
   templateId: '',
+  manaCostMin: '',
+  manaCostMax: '',
   attackMin: '',
   attackMax: '',
   healthMin: '',
@@ -99,7 +115,12 @@ export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState 
   typeIds: [],
 });
 
-const normalizeStringValue = (value: string | null | undefined): string => value?.trim() ?? '';
+const normalizeStringValue = (value: string | number | null | undefined): string => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : '';
+  }
+  return value?.trim() ?? '';
+};
 
 const normalizeStringArray = (values: readonly string[]): string[] =>
   [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) =>
@@ -117,12 +138,16 @@ const readQueryValues = (
 
 export const normalizeCardFilterState = (state: CardFilterState): CardFilterState => ({
   query: normalizeStringValue(state.query),
-  manaCost: normalizeStringValue(state.manaCost),
+  keywordMatch: state.keywordMatch === 'all' ? 'all' : 'any',
+  tagMatch: state.tagMatch === 'all' ? 'all' : 'any',
+  typeMatch: state.typeMatch === 'all' ? 'all' : 'any',
   manaSymbolMatch: state.manaSymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   devotionSymbolMatch: state.devotionSymbolMatch === 'all' ? 'all' : 'any',
   otherSymbolMatch: state.otherSymbolMatch === 'all' ? 'all' : 'any',
   templateId: normalizeStringValue(state.templateId),
+  manaCostMin: normalizeStringValue(state.manaCostMin),
+  manaCostMax: normalizeStringValue(state.manaCostMax),
   attackMin: normalizeStringValue(state.attackMin),
   attackMax: normalizeStringValue(state.attackMax),
   healthMin: normalizeStringValue(state.healthMin),
@@ -140,12 +165,16 @@ export const normalizeCardFilterSelectionState = (
   state: CardFilterSelectionState,
 ): CardFilterSelectionState => ({
   query: normalizeStringValue(state.query),
-  manaCost: normalizeStringValue(state.manaCost),
+  keywordMatch: state.keywordMatch === 'all' ? 'all' : 'any',
+  tagMatch: state.tagMatch === 'all' ? 'all' : 'any',
+  typeMatch: state.typeMatch === 'all' ? 'all' : 'any',
   manaSymbolMatch: state.manaSymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   devotionSymbolMatch: state.devotionSymbolMatch === 'all' ? 'all' : 'any',
   otherSymbolMatch: state.otherSymbolMatch === 'all' ? 'all' : 'any',
   templateId: normalizeStringValue(state.templateId),
+  manaCostMin: normalizeStringValue(state.manaCostMin),
+  manaCostMax: normalizeStringValue(state.manaCostMax),
   attackMin: normalizeStringValue(state.attackMin),
   attackMax: normalizeStringValue(state.attackMax),
   healthMin: normalizeStringValue(state.healthMin),
@@ -162,12 +191,16 @@ export const normalizeCardFilterSelectionState = (
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
   normalizeCardFilterState({
     query: typeof query.q === 'string' ? query.q : '',
-    manaCost: typeof query.mana_cost === 'string' ? query.mana_cost : '',
+    keywordMatch: query.keyword_match === 'all' ? 'all' : 'any',
+    tagMatch: query.tag_match === 'all' ? 'all' : 'any',
+    typeMatch: query.type_match === 'all' ? 'all' : 'any',
     manaSymbolMatch: query.mana_symbol_match === 'all' ? 'all' : 'any',
     affinitySymbolMatch: query.affinity_symbol_match === 'all' ? 'all' : 'any',
     devotionSymbolMatch: query.devotion_symbol_match === 'all' ? 'all' : 'any',
     otherSymbolMatch: query.other_symbol_match === 'all' ? 'all' : 'any',
     templateId: typeof query.template_id === 'string' ? query.template_id : '',
+    manaCostMin: typeof query.mana_cost_min === 'string' ? query.mana_cost_min : '',
+    manaCostMax: typeof query.mana_cost_max === 'string' ? query.mana_cost_max : '',
     attackMin: typeof query.attack_min === 'string' ? query.attack_min : '',
     attackMax: typeof query.attack_max === 'string' ? query.attack_max : '',
     healthMin: typeof query.health_min === 'string' ? query.health_min : '',
@@ -186,12 +219,16 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   const query: LocationQueryRaw = {};
 
   if (normalized.query) query.q = normalized.query;
-  if (normalized.manaCost) query.mana_cost = normalized.manaCost;
+  if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
+  if (normalized.tagMatch === 'all') query.tag_match = 'all';
+  if (normalized.typeMatch === 'all') query.type_match = 'all';
   if (normalized.manaSymbolMatch === 'all') query.mana_symbol_match = 'all';
   if (normalized.affinitySymbolMatch === 'all') query.affinity_symbol_match = 'all';
   if (normalized.devotionSymbolMatch === 'all') query.devotion_symbol_match = 'all';
   if (normalized.otherSymbolMatch === 'all') query.other_symbol_match = 'all';
   if (normalized.templateId) query.template_id = normalized.templateId;
+  if (normalized.manaCostMin) query.mana_cost_min = normalized.manaCostMin;
+  if (normalized.manaCostMax) query.mana_cost_max = normalized.manaCostMax;
   if (normalized.attackMin) query.attack_min = normalized.attackMin;
   if (normalized.attackMax) query.attack_max = normalized.attackMax;
   if (normalized.healthMin) query.health_min = normalized.healthMin;
@@ -234,7 +271,9 @@ export const createCardFilterCatalog = (filters: CardFiltersResponse): CardFilte
   keywords: filters.keywords ?? [],
   tags: filters.tags ?? [],
   types: filters.types ?? [],
-  manaSymbols: (filters.symbols ?? []).filter((row) => row.symbol_type === 'mana'),
+  manaSymbols: (filters.symbols ?? []).filter(
+    (row) => row.symbol_type === 'mana' && !row.key.startsWith('colorless-mana-'),
+  ),
   affinitySymbols: (filters.symbols ?? []).filter((row) => row.symbol_type === 'affinity'),
   devotionSymbols: (filters.symbols ?? []).filter((row) => row.symbol_type === 'devotion'),
   otherSymbols: (filters.symbols ?? []).filter(
@@ -258,12 +297,16 @@ export const buildCardFilterSelectionState = (
 ): CardFilterSelectionState =>
   normalizeCardFilterSelectionState({
     query: state.query,
-    manaCost: state.manaCost,
+    keywordMatch: state.keywordMatch,
+    tagMatch: state.tagMatch,
+    typeMatch: state.typeMatch,
     manaSymbolMatch: state.manaSymbolMatch,
     affinitySymbolMatch: state.affinitySymbolMatch,
     devotionSymbolMatch: state.devotionSymbolMatch,
     otherSymbolMatch: state.otherSymbolMatch,
     templateId: state.templateId,
+    manaCostMin: state.manaCostMin,
+    manaCostMax: state.manaCostMax,
     attackMin: state.attackMin,
     attackMax: state.attackMax,
     healthMin: state.healthMin,
@@ -283,12 +326,16 @@ export const buildCardFilterStateFromSelection = (
 ): CardFilterState =>
   normalizeCardFilterState({
     query: state.query,
-    manaCost: state.manaCost,
+    keywordMatch: state.keywordMatch,
+    tagMatch: state.tagMatch,
+    typeMatch: state.typeMatch,
     manaSymbolMatch: state.manaSymbolMatch,
     affinitySymbolMatch: state.affinitySymbolMatch,
     devotionSymbolMatch: state.devotionSymbolMatch,
     otherSymbolMatch: state.otherSymbolMatch,
     templateId: state.templateId,
+    manaCostMin: state.manaCostMin,
+    manaCostMax: state.manaCostMax,
     attackMin: state.attackMin,
     attackMax: state.attackMax,
     healthMin: state.healthMin,
@@ -309,7 +356,18 @@ export const buildCardFilterApiSearchParams = (
   const params = new URLSearchParams();
 
   if (normalized.query) params.set('q', normalized.query);
-  if (normalized.manaCost) params.set('mana_cost', normalized.manaCost);
+  if (normalized.keywordIds.length > 0) {
+    normalized.keywordIds.forEach((id) => params.append('keyword_ids', id));
+    params.set('keyword_match', normalized.keywordMatch);
+  }
+  if (normalized.tagIds.length > 0) {
+    normalized.tagIds.forEach((id) => params.append('tag_ids', id));
+    params.set('tag_match', normalized.tagMatch);
+  }
+  if (normalized.typeIds.length > 0) {
+    normalized.typeIds.forEach((id) => params.append('type_ids', id));
+    params.set('type_match', normalized.typeMatch);
+  }
   if (normalized.manaTypeSymbolIds.length > 0) {
     normalized.manaTypeSymbolIds.forEach((id) => params.append('mana_symbol_ids', id));
     params.set('mana_symbol_match', normalized.manaSymbolMatch);
@@ -327,14 +385,12 @@ export const buildCardFilterApiSearchParams = (
     params.set('other_symbol_match', normalized.otherSymbolMatch);
   }
   if (normalized.templateId) params.set('template_id', normalized.templateId);
+  if (normalized.manaCostMin) params.set('mana_cost_min', normalized.manaCostMin);
+  if (normalized.manaCostMax) params.set('mana_cost_max', normalized.manaCostMax);
   if (normalized.attackMin) params.set('attack_min', normalized.attackMin);
   if (normalized.attackMax) params.set('attack_max', normalized.attackMax);
   if (normalized.healthMin) params.set('health_min', normalized.healthMin);
   if (normalized.healthMax) params.set('health_max', normalized.healthMax);
-
-  normalized.keywordIds.forEach((id) => params.append('keyword_ids', id));
-  normalized.tagIds.forEach((id) => params.append('tag_ids', id));
-  normalized.typeIds.forEach((id) => params.append('type_ids', id));
 
   return params;
 };

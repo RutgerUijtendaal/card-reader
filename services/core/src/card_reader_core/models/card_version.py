@@ -29,6 +29,7 @@ class CardVersion(TimestampedModel):
     type_line: models.TextField[str, str] = models.TextField(default="")
     mana_cost: models.TextField[str, str] = models.TextField(default="")
     mana_symbols_json = models.JSONField(default=list)
+    mana_value: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True, db_index=True)
     attack: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True)
     health: models.IntegerField[int | None, int | None] = models.IntegerField(default=None, null=True)
     rules_text_raw: models.TextField[str, str] = models.TextField(default="")

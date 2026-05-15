@@ -7,7 +7,7 @@ from django.db import transaction
 from card_reader_core.models import Card, CardVersion, ImportJobItem, ImportJobStatus, ParseResult, now_utc
 from card_reader_core.rule_text import render_enriched_rule_text
 
-from ..helpers import extract_mana_symbols, normalize_slug_key, to_int_or_none
+from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
 from ..metadata_repository import (
     get_symbols_for_card_version,
     replace_card_version_keywords,
@@ -202,7 +202,10 @@ def update_latest_card_version(
             card.updated_at = now_utc()
             card.save(update_fields=["label", "key", "updated_at"])
 
-        version.mana_symbols_json = extract_mana_symbols({"mana_cost": version.mana_cost})
+        version.mana_value = infer_mana_value(
+            mana_cost=version.mana_cost,
+            mana_symbols=version.mana_symbols_json,
+        )
         version.field_sources_json = field_sources
         version.updated_at = now_utc()
         version.save()
@@ -219,6 +222,11 @@ def apply_parsed_fields_to_version(
     version.type_line = normalized_fields.get("type_line", "")
     version.mana_cost = normalized_fields.get("mana_cost", "")
     version.mana_symbols_json = extract_mana_symbols(normalized_fields)
+    version.mana_value = infer_mana_value(
+        mana_cost=version.mana_cost,
+        mana_symbols=version.mana_symbols_json,
+        mana_total=normalized_fields.get("mana_total"),
+    )
     version.attack = to_int_or_none(normalized_fields.get("attack"))
     version.health = to_int_or_none(normalized_fields.get("health"))
     version.rules_text_raw = normalized_fields.get("rules_text_raw", "")
@@ -298,6 +306,11 @@ def create_new_version(
         type_line=normalized_fields.get("type_line", ""),
         mana_cost=normalized_fields.get("mana_cost", ""),
         mana_symbols_json=extract_mana_symbols(normalized_fields),
+        mana_value=infer_mana_value(
+            mana_cost=normalized_fields.get("mana_cost", ""),
+            mana_symbols=extract_mana_symbols(normalized_fields),
+            mana_total=normalized_fields.get("mana_total"),
+        ),
         attack=to_int_or_none(normalized_fields.get("attack")),
         health=to_int_or_none(normalized_fields.get("health")),
         rules_text_raw=normalized_fields.get("rules_text_raw", ""),
@@ -371,6 +384,11 @@ def apply_parsed_output_to_version(
     if field_sources["fields"]["mana_cost"] == FIELD_SOURCE_AUTO:
         version.mana_cost = normalized_fields.get("mana_cost", "")
         version.mana_symbols_json = extract_mana_symbols(normalized_fields)
+        version.mana_value = infer_mana_value(
+            mana_cost=version.mana_cost,
+            mana_symbols=version.mana_symbols_json,
+            mana_total=normalized_fields.get("mana_total"),
+        )
     if field_sources["fields"]["attack"] == FIELD_SOURCE_AUTO:
         version.attack = to_int_or_none(normalized_fields.get("attack"))
     if field_sources["fields"]["health"] == FIELD_SOURCE_AUTO:

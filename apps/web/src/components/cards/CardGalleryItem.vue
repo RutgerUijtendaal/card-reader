@@ -1,5 +1,10 @@
 <template>
-  <div class="group w-full">
+  <div
+    ref="triggerRef"
+    class="group w-full"
+    @mouseenter="hovered = true"
+    @mouseleave="hovered = false"
+  >
     <div class="relative transition duration-200 hover:-translate-y-1">
       <RouterLink
         :to="buildDetailLocation(card.id, 'detail')"
@@ -9,17 +14,30 @@
           v-if="card.image_url"
           :src="toAbsoluteApiUrl(card.image_url)"
           alt="Card image"
-          class="block h-[27rem] w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+          class="block w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+          :style="{ height: `${cardHeightRem}rem` }"
           loading="lazy"
           decoding="async"
         >
         <div
           v-else
-          class="flex h-[27rem] items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500"
+          class="flex items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500"
+          :style="{ height: `${cardHeightRem}rem` }"
         >
           No image
         </div>
       </RouterLink>
+
+      <Teleport to="body">
+        <div
+          v-if="tooltipEnabled && hovered"
+          ref="tooltipRef"
+          class="z-30 hidden md:block"
+          :style="{ position: 'fixed', left: `${tooltipX}px`, top: `${tooltipY}px` }"
+        >
+          <CardHoverTooltip :card="card" />
+        </div>
+      </Teleport>
 
       <div
         v-if="auth.canAccessStaffRoutes"
@@ -38,9 +56,12 @@
 </template>
 
 <script setup lang="ts">
+import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { api, DEFAULT_API_BASE_URL } from '@/api/client';
 import { Pencil } from 'lucide-vue-next';
+import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardDetailLocation } from '@/modules/card-search/galleryNavigation';
 import type {
@@ -51,12 +72,32 @@ export type CardGalleryItemModel = CardHoverTooltipModel & {
   image_url: string | null;
 };
 
-defineProps<{
-  card: CardGalleryItemModel;
-}>();
+withDefaults(
+  defineProps<{
+    card: CardGalleryItemModel;
+    tooltipEnabled?: boolean;
+    cardHeightRem?: number;
+  }>(),
+  {
+    tooltipEnabled: true,
+    cardHeightRem: 27,
+  },
+);
 
 const auth = useAuthStore();
 const route = useRoute();
+const hovered = ref(false);
+const triggerRef = ref<HTMLElement | null>(null);
+const tooltipRef = ref<HTMLElement | null>(null);
+const floating = useFloating(triggerRef, tooltipRef, {
+  open: computed(() => hovered.value),
+  placement: 'right-start',
+  strategy: 'fixed',
+  middleware: [offset(16), flip(), shift({ padding: 12 })],
+  whileElementsMounted: autoUpdate,
+});
+const tooltipX = computed(() => floating.x.value ?? 0);
+const tooltipY = computed(() => floating.y.value ?? 0);
 
 const buildDetailLocation = (cardId: string, mode: 'detail' | 'edit') =>
   buildCardDetailLocation(cardId, route.query, mode);
