@@ -6,6 +6,7 @@ from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
 from card_reader_core.models import Keyword, Symbol, Tag, Type
+from card_reader_core.services.catalog import CatalogSuggestionDetail, SuggestionOccurrencePreview
 
 
 CatalogOption = Keyword | Tag | Type
@@ -49,6 +50,36 @@ def symbol_payload(row: Symbol) -> dict[str, object]:
         "reference_assets_json": row.reference_assets_json,
         "text_token": row.text_token,
         "enabled": row.enabled,
+    }
+
+
+def suggestion_occurrence_payload(row: SuggestionOccurrencePreview) -> dict[str, object]:
+    return {
+        "card_id": row["card_id"],
+        "card_label": row["card_label"],
+        "card_version_id": row["card_version_id"],
+        "card_version_name": row["card_version_name"],
+        "source_text": row["source_text"],
+        "normalized_source_text": row["normalized_source_text"],
+    }
+
+
+def suggestion_payload(row: CatalogSuggestionDetail) -> dict[str, object]:
+    accepted_target = None
+    if row["accepted_tag"] is not None:
+        accepted_target = tag_payload(row["accepted_tag"])
+    elif row["accepted_type"] is not None:
+        accepted_target = type_payload(row["accepted_type"])
+
+    return {
+        "id": row["id"],
+        "kind": row["kind"],
+        "display_value": row["display_value"],
+        "normalized_value": row["normalized_value"],
+        "status": row["status"],
+        "occurrence_count": row["occurrence_count"],
+        "accepted_target": accepted_target,
+        "occurrences": [suggestion_occurrence_payload(item) for item in row["occurrences"]],
     }
 
 
@@ -99,3 +130,13 @@ class SymbolAssetUploadSerializer(serializers.Serializer[dict[str, object]]):
         if not value.name:
             raise serializers.ValidationError("file is required")
         return value
+
+
+class SuggestionAcceptSerializer(serializers.Serializer[dict[str, object]]):
+    target_id = serializers.CharField(required=False, allow_blank=False)
+    label = serializers.CharField(required=False, allow_blank=False, allow_null=True)
+    key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class SuggestionStatusQuerySerializer(serializers.Serializer[dict[str, object]]):
+    status = serializers.ChoiceField(choices=["pending", "accepted", "rejected"], required=False, allow_null=True)

@@ -5,6 +5,7 @@ import type {
   CatalogRow,
   CatalogSearchState,
   KeywordRecord,
+  SuggestionRecord,
   SymbolRecord,
   TagRecord,
   TypeRecord,
@@ -17,17 +18,23 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     tags: '',
     symbols: '',
     types: '',
+    'suggested-tags': '',
+    'suggested-types': '',
   });
   const catalog = reactive<{
     keywords: KeywordRecord[];
     tags: TagRecord[];
     symbols: SymbolRecord[];
     types: TypeRecord[];
+    'suggested-tags': SuggestionRecord[];
+    'suggested-types': SuggestionRecord[];
   }>({
     keywords: [],
     tags: [],
     symbols: [],
     types: [],
+    'suggested-tags': [],
+    'suggested-types': [],
   });
 
   const currentSearchTerm = computed<string>(() => searchFilters[selectedKind.value]);
@@ -52,10 +59,12 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
 
   const loadCatalog = async (): Promise<void> => {
     const data = await fetchCatalog();
-    catalog.keywords = data.keywords ?? [];
-    catalog.tags = data.tags ?? [];
-    catalog.symbols = data.symbols ?? [];
-    catalog.types = data.types ?? [];
+    catalog.keywords = data.known.keywords ?? [];
+    catalog.tags = data.known.tags ?? [];
+    catalog.symbols = data.known.symbols ?? [];
+    catalog.types = data.known.types ?? [];
+    catalog['suggested-tags'] = data.suggested.tags ?? [];
+    catalog['suggested-types'] = data.suggested.types ?? [];
   };
 
   return {
@@ -79,6 +88,17 @@ const matchesCatalogSearch = (row: CatalogRow, query: string): boolean => {
 
   if ('symbol_type' in row) {
     haystacks.push(row.symbol_type, row.text_token, row.detector_type);
+  }
+
+  if ('status' in row) {
+    haystacks.push(
+      row.display_value,
+      row.normalized_value,
+      row.status,
+      row.accepted_target?.label ?? '',
+      row.accepted_target?.key ?? '',
+      ...row.occurrences.map((item) => `${item.card_label} ${item.source_text}`),
+    );
   }
 
   return haystacks.some((value) => value.toLowerCase().includes(query));

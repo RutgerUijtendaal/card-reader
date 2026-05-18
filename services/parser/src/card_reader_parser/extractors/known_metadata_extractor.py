@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from typing import Pattern, Protocol, Sequence
 
 
@@ -19,14 +20,50 @@ class KnownMetadataExtractor:
         if not text.strip():
             return []
 
-        matched_ids: list[str] = []
+        return [match.entry.id for match in self.extract_matches(text, entries)]
+
+    def extract_matches(
+        self,
+        text: str,
+        entries: Sequence[KnownMetadataEntry],
+    ) -> list["KnownMetadataMatch"]:
+        if not text.strip():
+            return []
+
+        matched_entries: list[KnownMetadataMatch] = []
         for entry in entries:
             terms = self._terms_for_entry(entry)
             if not terms:
                 continue
-            if any(self._pattern_for_label(term).search(text) for term in terms):
-                matched_ids.append(entry.id)
-        return matched_ids
+            matched_terms = [term for term in terms if self._pattern_for_label(term).search(text)]
+            if matched_terms:
+                matched_entries.append(KnownMetadataMatch(entry=entry, matched_terms=matched_terms))
+        return matched_entries
+
+    def remove_matches(self, text: str, entries: Sequence[KnownMetadataEntry]) -> str:
+        spans = self._match_spans(text, entries)
+        if not spans:
+            return self.normalize_candidate(text)
+
+        kept: list[tuple[int, int]] = []
+        last_end = -1
+        for start, end in sorted(spans, key=lambda item: (item[0], -(item[1] - item[0]))):
+            if start < last_end:
+                continue
+            kept.append((start, end))
+            last_end = end
+
+        out: list[str] = []
+        cursor = 0
+        for start, end in kept:
+            out.append(text[cursor:start])
+            out.append(" ")
+            cursor = end
+        out.append(text[cursor:])
+        return self.normalize_candidate("".join(out))
+
+    def normalize_candidate(self, text: str) -> str:
+        return " ".join(text.split()).strip()
 
     def _pattern_for_label(self, label: str) -> Pattern[str]:
         cached = self._pattern_cache.get(label)
@@ -66,3 +103,16 @@ class KnownMetadataExtractor:
         if not isinstance(payload, list):
             return []
         return [item for item in payload if isinstance(item, str)]
+
+    def _match_spans(self, text: str, entries: Sequence[KnownMetadataEntry]) -> list[tuple[int, int]]:
+        spans: list[tuple[int, int]] = []
+        for entry in entries:
+            for term in self._terms_for_entry(entry):
+                spans.extend((match.start(), match.end()) for match in self._pattern_for_label(term).finditer(text))
+        return spans
+
+
+@dataclass(frozen=True)
+class KnownMetadataMatch:
+    entry: KnownMetadataEntry
+    matched_terms: list[str]

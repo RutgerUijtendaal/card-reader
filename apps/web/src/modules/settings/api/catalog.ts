@@ -4,21 +4,28 @@ import type {
   CatalogKind,
   CatalogResponse,
   KeywordUpsertRequest,
+  KnownCatalogKind,
+  SuggestionAcceptExistingRequest,
+  SuggestionAcceptNewRequest,
+  SuggestionKind,
   SymbolAssetUploadResponse,
   SymbolUpsertRequest,
   TagUpsertRequest,
   TypeUpsertRequest,
 } from '@/modules/settings/types';
-import { normalizeCatalogResponse } from '@/modules/settings/composables/catalogSettingsUtils';
+import {
+  isKnownCatalogKind,
+  normalizeCatalogResponse,
+} from '@/modules/settings/composables/catalogSettingsUtils';
 
-const createPathByKind: Record<CatalogKind, string> = {
+const createPathByKind: Record<KnownCatalogKind, string> = {
   keywords: '/settings/keywords',
   tags: '/settings/tags',
   symbols: '/settings/symbols',
   types: '/settings/types',
 };
 
-const pathForKindAndId = (kind: CatalogKind, id: string): string =>
+const pathForKindAndId = (kind: KnownCatalogKind, id: string): string =>
   `${createPathByKind[kind]}/${id}`;
 
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
@@ -30,6 +37,9 @@ export const createCatalogEntry = async (
   kind: CatalogKind,
   payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest,
 ): Promise<void> => {
+  if (!isKnownCatalogKind(kind)) {
+    throw new Error('Suggestions cannot be created via the catalog CRUD API.');
+  }
   await api.post(createPathByKind[kind], payload);
 };
 
@@ -38,11 +48,37 @@ export const updateCatalogEntry = async (
   id: string,
   payload: KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest,
 ): Promise<void> => {
+  if (!isKnownCatalogKind(kind)) {
+    throw new Error('Suggestions cannot be updated via the catalog CRUD API.');
+  }
   await api.patch(pathForKindAndId(kind, id), payload);
 };
 
 export const deleteCatalogEntry = async (kind: CatalogKind, id: string): Promise<void> => {
+  if (!isKnownCatalogKind(kind)) {
+    throw new Error('Suggestions cannot be deleted via the catalog CRUD API.');
+  }
   await api.delete(pathForKindAndId(kind, id));
+};
+
+export const acceptSuggestionToExisting = async (
+  kind: SuggestionKind,
+  id: string,
+  payload: SuggestionAcceptExistingRequest,
+): Promise<void> => {
+  await api.post(`/settings/suggestions/${kind}/${id}/accept`, payload);
+};
+
+export const acceptSuggestionAsNew = async (
+  kind: SuggestionKind,
+  id: string,
+  payload: SuggestionAcceptNewRequest,
+): Promise<void> => {
+  await api.post(`/settings/suggestions/${kind}/${id}/accept`, payload);
+};
+
+export const rejectSuggestion = async (kind: SuggestionKind, id: string): Promise<void> => {
+  await api.post(`/settings/suggestions/${kind}/${id}/reject`);
 };
 
 export const uploadSymbolAsset = async (file: File): Promise<SymbolAssetUploadResponse> => {

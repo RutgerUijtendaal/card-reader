@@ -9,7 +9,9 @@ from card_reader_core.rule_text import render_enriched_rule_text
 
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
 from ..metadata_repository import (
+    SuggestionCandidate,
     get_symbols_for_card_version,
+    replace_card_version_metadata_suggestions,
     replace_card_version_keywords,
     replace_card_version_symbols,
     replace_card_version_tags,
@@ -43,6 +45,8 @@ def save_parsed_card(
     tag_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
     symbol_ids: list[str] | None = None,
+    tag_suggestions: list[SuggestionCandidate] | None = None,
+    type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
 ) -> CardVersion:
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
@@ -67,6 +71,8 @@ def save_parsed_card(
                 tag_ids=tag_ids or [],
                 type_ids=type_ids or [],
                 symbol_ids=symbol_ids or [],
+                tag_suggestions=tag_suggestions or [],
+                type_suggestions=type_suggestions or [],
             )
 
         card = Card.objects.filter(key=card_key).first()
@@ -85,6 +91,8 @@ def save_parsed_card(
                 tag_ids=tag_ids or [],
                 type_ids=type_ids or [],
                 symbol_ids=symbol_ids or [],
+                tag_suggestions=tag_suggestions or [],
+                type_suggestions=type_suggestions or [],
             )
 
         version = create_new_version(item, card, template_id, checksum, normalized_fields, confidence)
@@ -92,7 +100,19 @@ def save_parsed_card(
         replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids or [])
         replace_card_version_types(card_version_id=version.id, type_ids=type_ids or [])
         replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids or [])
-        save_parse_result(version, raw_ocr, normalized_fields, confidence)
+        parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
+        replace_card_version_metadata_suggestions(
+            card_version_id=version.id,
+            kind="tag",
+            candidates=tag_suggestions or [],
+            parse_result_id=parse_result.id,
+        )
+        replace_card_version_metadata_suggestions(
+            card_version_id=version.id,
+            kind="type",
+            candidates=type_suggestions or [],
+            parse_result_id=parse_result.id,
+        )
         save_parsed_snapshot(
             version,
             normalized_fields=normalized_fields,
@@ -246,6 +266,8 @@ def update_existing_version(
     tag_ids: list[str],
     type_ids: list[str],
     symbol_ids: list[str],
+    tag_suggestions: list[SuggestionCandidate],
+    type_suggestions: list[SuggestionCandidate],
 ) -> CardVersion:
     previous_name = version.name
     apply_parsed_output_to_version(
@@ -257,7 +279,19 @@ def update_existing_version(
         type_ids=type_ids,
         symbol_ids=symbol_ids,
     )
-    save_parse_result(version, raw_ocr, normalized_fields, confidence)
+    parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
+    replace_card_version_metadata_suggestions(
+        card_version_id=version.id,
+        kind="tag",
+        candidates=tag_suggestions,
+        parse_result_id=parse_result.id,
+    )
+    replace_card_version_metadata_suggestions(
+        card_version_id=version.id,
+        kind="type",
+        candidates=type_suggestions,
+        parse_result_id=parse_result.id,
+    )
     save_parsed_snapshot(
         version,
         normalized_fields=normalized_fields,
@@ -329,7 +363,7 @@ def save_parse_result(
     raw_ocr: dict[str, object],
     normalized_fields: dict[str, str],
     confidence: dict[str, float],
-) -> None:
+) -> ParseResult:
     parse_result = ParseResult.objects.create(
         card_version=version,
         raw_ocr_json=raw_ocr,
@@ -338,6 +372,7 @@ def save_parse_result(
     )
     version.parse_result = parse_result
     version.save(update_fields=["parse_result"])
+    return parse_result
 
 
 def save_parsed_snapshot(

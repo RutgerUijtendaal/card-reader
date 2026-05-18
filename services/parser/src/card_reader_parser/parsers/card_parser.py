@@ -20,7 +20,7 @@ from .regions import (
 )
 from .region_cropper import RegionCropper
 from .symbol_detector import SymbolDetector
-from .types import ParsedCard
+from .types import ParsedCard, ParsedMetadataSuggestion
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,8 @@ class CardParser:
         tag_ids = self._merge_tag_ids(region_results)
         type_ids = self._merge_type_ids(region_results)
         symbol_ids = self._merge_symbol_ids(region_results)
+        tag_suggestions = self._merge_tag_suggestions(region_results)
+        type_suggestions = self._merge_type_suggestions(region_results)
 
         raw_ocr = {
             "template": template,
@@ -245,6 +247,8 @@ class CardParser:
             tag_ids=tag_ids,
             type_ids=type_ids,
             symbol_ids=symbol_ids,
+            tag_suggestions=tag_suggestions,
+            type_suggestions=type_suggestions,
         )
 
     def _merge_normalized_fields(
@@ -330,4 +334,31 @@ class CardParser:
                     continue
                 seen.add(row.symbol_id)
                 out.append(row.symbol_id)
+        return out
+
+    def _merge_tag_suggestions(self, region_results: dict[str, RegionParseResult]) -> list[ParsedMetadataSuggestion]:
+        return self._merge_suggestions(region_results, kind="tag")
+
+    def _merge_type_suggestions(self, region_results: dict[str, RegionParseResult]) -> list[ParsedMetadataSuggestion]:
+        return self._merge_suggestions(region_results, kind="type")
+
+    def _merge_suggestions(
+        self,
+        region_results: dict[str, RegionParseResult],
+        *,
+        kind: str,
+    ) -> list[ParsedMetadataSuggestion]:
+        out: list[ParsedMetadataSuggestion] = []
+        seen: set[str] = set()
+        for result in region_results.values():
+            candidates = (
+                result.extracted_tag_suggestions
+                if kind == "tag"
+                else result.extracted_type_suggestions
+            )
+            for candidate in candidates:
+                if candidate.normalized_value in seen:
+                    continue
+                seen.add(candidate.normalized_value)
+                out.append(candidate)
         return out

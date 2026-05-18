@@ -15,9 +15,12 @@ from rest_framework.views import APIView
 
 from card_reader_api.catalog.serializers import (
     CatalogEntryWriteSerializer,
+    SuggestionAcceptSerializer,
+    SuggestionStatusQuerySerializer,
     SymbolAssetUploadSerializer,
     SymbolWriteSerializer,
     keyword_payload,
+    suggestion_payload,
     symbol_payload,
     tag_payload,
     type_payload,
@@ -33,10 +36,16 @@ class CatalogView(APIView):
         data = CatalogService().list_catalog()
         return Response(
             {
-                "keywords": [keyword_payload(item) for item in data["keywords"]],
-                "tags": [tag_payload(item) for item in data["tags"]],
-                "symbols": [symbol_payload(item) for item in data["symbols"]],
-                "types": [type_payload(item) for item in data["types"]],
+                "known": {
+                    "keywords": [keyword_payload(item) for item in data["known"]["keywords"]],
+                    "tags": [tag_payload(item) for item in data["known"]["tags"]],
+                    "symbols": [symbol_payload(item) for item in data["known"]["symbols"]],
+                    "types": [type_payload(item) for item in data["known"]["types"]],
+                },
+                "suggested": {
+                    "tags": [suggestion_payload(item) for item in data["suggested"]["tags"]],
+                    "types": [suggestion_payload(item) for item in data["suggested"]["types"]],
+                },
             }
         )
 
@@ -155,6 +164,78 @@ class SymbolAssetUploadView(APIView):
         )
 
 
+class SuggestionListView(APIView):
+    def get(self, request: Request, kind: str) -> Response:
+        serializer = SuggestionStatusQuerySerializer(data={"status": request.query_params.get("status")})
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
+        try:
+            normalized_kind = _normalize_suggestion_kind(kind)
+        except ValueError as exc:
+            return _bad_request(str(exc))
+        suggestions = CatalogService().list_suggestions(
+            kind=normalized_kind,
+            status=serializer.validated_data.get("status"),
+        )
+        return Response([suggestion_payload(item) for item in suggestions])
+
+
+class SuggestionDetailView(APIView):
+    def get(self, _request: Request, kind: str, entry_id: str) -> Response:
+        try:
+            normalized_kind = _normalize_suggestion_kind(kind)
+        except ValueError as exc:
+            return _bad_request(str(exc))
+        suggestion = CatalogService().get_suggestion_detail(suggestion_id=entry_id)
+        if suggestion is None or suggestion["kind"] != normalized_kind:
+            return _not_found("Suggestion not found")
+        return Response(suggestion_payload(suggestion))
+
+
+class SuggestionAcceptView(APIView):
+    def post(self, request: Request, kind: str, entry_id: str) -> Response:
+        serializer = SuggestionAcceptSerializer(data=request.data)
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
+        try:
+            normalized_kind = _normalize_suggestion_kind(kind)
+        except ValueError as exc:
+            return _bad_request(str(exc))
+        service = CatalogService()
+        try:
+            if serializer.validated_data.get("target_id"):
+                suggestion = service.accept_suggestion_to_existing(
+                    suggestion_id=entry_id,
+                    target_id=serializer.validated_data["target_id"],
+                )
+            else:
+                suggestion = service.accept_suggestion_as_new(
+                    suggestion_id=entry_id,
+                    label=serializer.validated_data.get("label"),
+                    key=serializer.validated_data.get("key"),
+                )
+        except ValueError as exc:
+            return _bad_request(str(exc))
+        detail = None if suggestion is None else service.get_suggestion_detail(suggestion_id=suggestion.id)
+        if detail is None or detail["kind"] != normalized_kind:
+            return _not_found("Suggestion not found")
+        return Response(suggestion_payload(detail))
+
+
+class SuggestionRejectView(APIView):
+    def post(self, _request: Request, kind: str, entry_id: str) -> Response:
+        try:
+            normalized_kind = _normalize_suggestion_kind(kind)
+        except ValueError as exc:
+            return _bad_request(str(exc))
+        service = CatalogService()
+        suggestion = service.reject_suggestion(suggestion_id=entry_id)
+        detail = None if suggestion is None else service.get_suggestion_detail(suggestion_id=suggestion.id)
+        if detail is None or detail["kind"] != normalized_kind:
+            return _not_found("Suggestion not found")
+        return Response(suggestion_payload(detail))
+
+
 def _create_simple(
     request: Request,
     kind: str,
@@ -220,6 +301,13 @@ def _store_symbol_asset(upload: UploadedFile, filename: str, suffix: str) -> Pat
         for chunk in upload.chunks():
             stream.write(chunk)
     return target_path
+
+
+def _normalize_suggestion_kind(kind: str) -> str:
+    normalized = kind.strip().lower()
+    if normalized not in {"tag", "type"}:
+        raise ValueError("Suggestion kind must be tag or type")
+    return normalized
 
 
 def _bad_request(detail: str) -> Response:

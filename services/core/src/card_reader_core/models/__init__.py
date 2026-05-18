@@ -20,11 +20,13 @@ if TYPE_CHECKING:
     from .card_version import CardVersion, CardVersionImage, ParseResult
     from .import_job import ImportJob, ImportJobItem, ImportJobStatus
     from .metadata import (
+        CardVersionMetadataSuggestion,
         CardVersionKeyword,
         CardVersionSymbol,
         CardVersionTag,
         CardVersionType,
         Keyword,
+        MetadataSuggestion,
         Symbol,
         Tag,
         Type,
@@ -44,10 +46,12 @@ _EXPORTS = {
     "Symbol": ".metadata",
     "Keyword": ".metadata",
     "Type": ".metadata",
+    "MetadataSuggestion": ".metadata",
     "CardVersionTag": ".metadata",
     "CardVersionSymbol": ".metadata",
     "CardVersionKeyword": ".metadata",
     "CardVersionType": ".metadata",
+    "CardVersionMetadataSuggestion": ".metadata",
     "Template": ".template",
 }
 
@@ -64,10 +68,12 @@ __all__ = [
     "Symbol",
     "Keyword",
     "Type",
+    "MetadataSuggestion",
     "CardVersionTag",
     "CardVersionSymbol",
     "CardVersionKeyword",
     "CardVersionType",
+    "CardVersionMetadataSuggestion",
     "Template",
 ]
 

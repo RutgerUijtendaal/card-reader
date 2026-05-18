@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from PIL import Image
 
 from card_reader_core.models import Keyword, Symbol

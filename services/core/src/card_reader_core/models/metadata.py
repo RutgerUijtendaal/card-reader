@@ -7,7 +7,7 @@ from django.db import models
 from .base import TimestampedModel, uuid_str
 
 if TYPE_CHECKING:
-    from .card_version import CardVersion
+    from .card_version import CardVersion, ParseResult
 
 
 class Tag(TimestampedModel):
@@ -54,6 +54,41 @@ class Type(TimestampedModel):
 
     class Meta:
         db_table = "type"
+
+
+class MetadataSuggestion(TimestampedModel):
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    kind: models.TextField[str, str] = models.TextField(default="", db_index=True)
+    normalized_value: models.TextField[str, str] = models.TextField(default="", db_index=True)
+    display_value: models.TextField[str, str] = models.TextField(default="")
+    status: models.TextField[str, str] = models.TextField(default="pending", db_index=True)
+    accepted_tag: models.ForeignKey[Tag | None, Tag | None] = models.ForeignKey(
+        "Tag",
+        on_delete=models.SET_NULL,
+        related_name="accepted_metadata_suggestions",
+        db_column="accepted_tag_id",
+        default=None,
+        null=True,
+        blank=True,
+    )
+    accepted_type: models.ForeignKey[Type | None, Type | None] = models.ForeignKey(
+        "Type",
+        on_delete=models.SET_NULL,
+        related_name="accepted_metadata_suggestions",
+        db_column="accepted_type_id",
+        default=None,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "metadata_suggestion"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("kind", "normalized_value"),
+                name="ux_metadata_suggestion_kind_value",
+            )
+        ]
 
 
 class CardVersionTag(TimestampedModel):
@@ -135,6 +170,42 @@ class CardVersionType(TimestampedModel):
         db_table = "card_version_type"
         constraints = [
             models.UniqueConstraint(fields=("card_version", "type"), name="ux_card_version_type_pair")
+        ]
+
+
+class CardVersionMetadataSuggestion(TimestampedModel):
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_version: models.ForeignKey[CardVersion, CardVersion] = models.ForeignKey(
+        "CardVersion",
+        on_delete=models.CASCADE,
+        related_name="card_version_metadata_suggestions",
+        db_column="card_version_id",
+    )
+    suggestion: models.ForeignKey[MetadataSuggestion, MetadataSuggestion] = models.ForeignKey(
+        "MetadataSuggestion",
+        on_delete=models.CASCADE,
+        related_name="card_version_metadata_suggestions",
+        db_column="suggestion_id",
+    )
+    parse_result: models.ForeignKey[ParseResult | None, ParseResult | None] = models.ForeignKey(
+        "ParseResult",
+        on_delete=models.SET_NULL,
+        related_name="+",
+        db_column="parse_result_id",
+        default=None,
+        null=True,
+        blank=True,
+    )
+    source_text: models.TextField[str, str] = models.TextField(default="")
+    normalized_source_text: models.TextField[str, str] = models.TextField(default="")
+
+    class Meta:
+        db_table = "card_version_metadata_suggestion"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("card_version", "suggestion"),
+                name="ux_card_version_metadata_suggestion_pair",
+            )
         ]
 
 

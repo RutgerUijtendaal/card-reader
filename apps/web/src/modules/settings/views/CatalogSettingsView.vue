@@ -6,7 +6,7 @@
 
     <div class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[220px_minmax(0,340px)_minmax(0,1fr)]">
       <CatalogKindSidebar
-        :catalog-kinds="catalogKinds"
+        :catalog-kind-groups="catalogKindGroups"
         :selected-kind="selectedKind"
         :kind-label="kindLabel"
         @select="selectKind"
@@ -20,12 +20,14 @@
         :selected-entry-id="selectedEntryId"
         :kind-label="kindLabel"
         :kind-item-label="kindItemLabel"
+        :can-create="canCreateSelectedKind"
         @update:search-term="setSearchTerm"
         @create-new="startCreateEntry"
         @select-entry="selectEntry"
       />
 
       <CatalogDetailSection
+        v-if="!isSuggestedKind"
         :selected-kind="selectedKind"
         :selected-row="selectedRow"
         :is-creating-new="isCreatingNew"
@@ -43,6 +45,24 @@
         @update:entry="setEditorEntry"
         @request-delete="(entry) => openDeleteModal(selectedKind, entry)"
         @upload-asset="pickAndUploadAsset"
+      />
+
+      <CatalogSuggestionDetailSection
+        v-else
+        :selected-kind="selectedKind"
+        :selected-row="selectedSuggestionRow"
+        :existing-options="existingSuggestionOptions"
+        :existing-target-id="suggestionExistingTargetId"
+        :new-label="suggestionNewLabel"
+        :new-key="suggestionNewKey"
+        :action-loading="suggestionActionLoading"
+        :kind-item-label="kindItemLabel"
+        @update:existing-target-id="setSuggestionExistingTargetId"
+        @update:new-label="setSuggestionNewLabel"
+        @update:new-key="setSuggestionNewKey"
+        @accept-existing="acceptSelectedSuggestionToExisting"
+        @accept-new="acceptSelectedSuggestionAsNew"
+        @reject="rejectSelectedSuggestion"
       />
     </div>
   </div>
@@ -66,6 +86,7 @@ import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import CatalogDetailSection from '@/modules/settings/components/CatalogDetailSection.vue';
 import CatalogEntriesSection from '@/modules/settings/components/CatalogEntriesSection.vue';
 import CatalogKindSidebar from '@/modules/settings/components/CatalogKindSidebar.vue';
+import CatalogSuggestionDetailSection from '@/modules/settings/components/CatalogSuggestionDetailSection.vue';
 import {
   detectionConfigExample,
   kindItemLabel,
@@ -76,14 +97,26 @@ import {
 
 const {
   catalogKinds,
+  catalogKindGroups,
   selectedKind,
   allCurrentRows,
   currentRows,
   currentSearchTerm,
   selectedEntryId,
   selectedRow,
+  selectedSuggestionRow,
   isCreatingNew,
+  isSuggestedKind,
+  canCreateSelectedKind,
   editorEntry,
+  existingSuggestionOptions,
+  suggestionExistingTargetId,
+  suggestionNewLabel,
+  suggestionNewKey,
+  suggestionActionLoading,
+  setSuggestionExistingTargetId,
+  setSuggestionNewLabel,
+  setSuggestionNewKey,
   savingEntryIds,
   deletingEntryIds,
   creatingEntry,
@@ -102,6 +135,9 @@ const {
   closeDeleteModal,
   confirmDeleteEntry,
   pickAndUploadAsset,
+  acceptSelectedSuggestionToExisting,
+  acceptSelectedSuggestionAsNew,
+  rejectSelectedSuggestion,
 } = useCatalogSettings();
 
 onMounted(() => {

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..symbol_detector import DetectedSymbol
+from ..types import ParsedMetadataSuggestion
 
 
 @dataclass(slots=True)
@@ -17,6 +18,8 @@ class RegionParseResult:
     extracted_keyword_ids: list[str] = field(default_factory=list)
     extracted_tag_ids: list[str] = field(default_factory=list)
     extracted_type_ids: list[str] = field(default_factory=list)
+    extracted_tag_suggestions: list[ParsedMetadataSuggestion] = field(default_factory=list)
+    extracted_type_suggestions: list[ParsedMetadataSuggestion] = field(default_factory=list)
     debug: dict[str, Any] = field(default_factory=dict)
 
 

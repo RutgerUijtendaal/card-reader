@@ -6,8 +6,12 @@ import type {
   CatalogKind,
   CatalogApiResponse,
   CatalogRow,
+  KnownCatalogKind,
   KeywordRecord,
   KeywordUpsertRequest,
+  SuggestionApiRecord,
+  SuggestionRecord,
+  SuggestedCatalogKind,
   SymbolRecord,
   SymbolApiRecord,
   SymbolUpsertRequest,
@@ -17,12 +21,28 @@ import type {
   TypeUpsertRequest,
 } from '@/modules/settings/types';
 
-export const CATALOG_KINDS: CatalogKind[] = ['keywords', 'tags', 'symbols', 'types'];
+export const KNOWN_CATALOG_KINDS: KnownCatalogKind[] = ['keywords', 'tags', 'symbols', 'types'];
+export const SUGGESTED_CATALOG_KINDS: SuggestedCatalogKind[] = ['suggested-tags', 'suggested-types'];
+export const CATALOG_KINDS: CatalogKind[] = [...KNOWN_CATALOG_KINDS, ...SUGGESTED_CATALOG_KINDS];
+export const CATALOG_KIND_GROUPS = [
+  { label: 'Known', kinds: KNOWN_CATALOG_KINDS },
+  { label: 'Suggested', kinds: SUGGESTED_CATALOG_KINDS },
+] as const;
+
+export const isKnownCatalogKind = (kind: CatalogKind): kind is KnownCatalogKind =>
+  KNOWN_CATALOG_KINDS.includes(kind as KnownCatalogKind);
+
+export const isSuggestedCatalogKind = (kind: CatalogKind): kind is SuggestedCatalogKind =>
+  SUGGESTED_CATALOG_KINDS.includes(kind as SuggestedCatalogKind);
+
+export const isSuggestionRecord = (row: CatalogRow): row is SuggestionRecord => 'status' in row;
 
 export const kindLabel = (kind: CatalogKind): string => {
   if (kind === 'keywords') return 'Keywords';
   if (kind === 'tags') return 'Tags';
   if (kind === 'symbols') return 'Symbols';
+  if (kind === 'types') return 'Types';
+  if (kind === 'suggested-tags') return 'Tags';
   return 'Types';
 };
 
@@ -30,7 +50,9 @@ export const kindItemLabel = (kind: CatalogKind): string => {
   if (kind === 'keywords') return 'Keyword';
   if (kind === 'tags') return 'Tag';
   if (kind === 'symbols') return 'Symbol';
-  return 'Type';
+  if (kind === 'types') return 'Type';
+  if (kind === 'suggested-tags') return 'Tag Suggestion';
+  return 'Type Suggestion';
 };
 
 export const formatIdentifiersText = (identifiers: string[]): string =>
@@ -101,6 +123,9 @@ export const createEmptyCatalogEntry = (): CatalogFormEntry => ({
 });
 
 export const catalogRowToFormEntry = (row: CatalogRow): CatalogFormEntry => {
+  if ('status' in row) {
+    return createEmptyCatalogEntry();
+  }
   if ('symbol_type' in row) {
     return {
       label: row.label,
@@ -135,6 +160,9 @@ export const catalogFormEntryToRow = (
   entryId: string,
   entry: CatalogFormEntry,
 ): CatalogRow => {
+  if (isSuggestedCatalogKind(kind)) {
+    throw new Error('Suggestions do not use the catalog editor row mapping.');
+  }
   if (kind === 'symbols') {
     return {
       id: entryId,
@@ -194,6 +222,9 @@ export const buildCreatePayload = (
   kind: CatalogKind,
   entry: CatalogFormEntry,
 ): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest => {
+  if (isSuggestedCatalogKind(kind)) {
+    throw new Error('Suggestions cannot be created from the catalog editor.');
+  }
   if (kind === 'keywords') {
     return {
       label: entry.label.trim(),
@@ -236,6 +267,9 @@ export const buildUpdatePayload = (
   kind: CatalogKind,
   entry: CatalogRow,
 ): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest => {
+  if (isSuggestedCatalogKind(kind)) {
+    throw new Error('Suggestions cannot be updated from the catalog editor.');
+  }
   if (kind === 'keywords' || kind === 'tags' || kind === 'types') {
     const keyword = entry as KeywordRecord;
     return {
@@ -313,20 +347,32 @@ const normalizeSymbolRecord = (row: SymbolApiRecord): SymbolRecord => ({
   reference_assets_json: formatJsonText(row.reference_assets_json, '[]'),
 });
 
+const normalizeSuggestionRecord = (row: SuggestionApiRecord): SuggestionRecord => ({
+  ...row,
+  label: row.display_value,
+  key: row.normalized_value,
+});
+
 export const normalizeCatalogResponse = (data: CatalogApiResponse): CatalogResponse => ({
-  keywords: (data.keywords ?? []).map((row) => ({
-    ...row,
-    identifiers_text: formatIdentifiersText(row.identifiers ?? []),
-  })),
-  tags: (data.tags ?? []).map((row) => ({
-    ...row,
-    identifiers_text: formatIdentifiersText(row.identifiers ?? []),
-  })),
-  symbols: (data.symbols ?? []).map(normalizeSymbolRecord),
-  types: (data.types ?? []).map((row) => ({
-    ...row,
-    identifiers_text: formatIdentifiersText(row.identifiers ?? []),
-  })),
+  known: {
+    keywords: (data.known?.keywords ?? []).map((row) => ({
+      ...row,
+      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
+    })),
+    tags: (data.known?.tags ?? []).map((row) => ({
+      ...row,
+      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
+    })),
+    symbols: (data.known?.symbols ?? []).map(normalizeSymbolRecord),
+    types: (data.known?.types ?? []).map((row) => ({
+      ...row,
+      identifiers_text: formatIdentifiersText(row.identifiers ?? []),
+    })),
+  },
+  suggested: {
+    tags: (data.suggested?.tags ?? []).map(normalizeSuggestionRecord),
+    types: (data.suggested?.types ?? []).map(normalizeSuggestionRecord),
+  },
 });
 
 export const normalizeTemplateRecord = (row: TemplateApiRecord): TemplateRecord => ({

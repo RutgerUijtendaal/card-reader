@@ -1,4 +1,6 @@
-export type CatalogKind = 'keywords' | 'tags' | 'symbols' | 'types';
+export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types';
+export type SuggestedCatalogKind = 'suggested-tags' | 'suggested-types';
+export type CatalogKind = KnownCatalogKind | SuggestedCatalogKind;
 
 export type CatalogSearchState = Record<CatalogKind, string>;
 
@@ -63,10 +65,16 @@ export type TemplateRecord = {
 };
 
 export type CatalogResponse = {
-  keywords: KeywordRecord[];
-  tags: TagRecord[];
-  symbols: SymbolRecord[];
-  types: TypeRecord[];
+  known: {
+    keywords: KeywordRecord[];
+    tags: TagRecord[];
+    symbols: SymbolRecord[];
+    types: TypeRecord[];
+  };
+  suggested: {
+    tags: SuggestionRecord[];
+    types: SuggestionRecord[];
+  };
 };
 
 export type SymbolAssetUploadResponse = {
@@ -95,10 +103,16 @@ export type TemplateApiRecord = {
 };
 
 export type CatalogApiResponse = {
-  keywords: KeywordRecord[];
-  tags: TagRecord[];
-  symbols: SymbolApiRecord[];
-  types: TypeRecord[];
+  known: {
+    keywords: KeywordRecord[];
+    tags: TagRecord[];
+    symbols: SymbolApiRecord[];
+    types: TypeRecord[];
+  };
+  suggested: {
+    tags: SuggestionApiRecord[];
+    types: SuggestionApiRecord[];
+  };
 };
 
 export type KeywordUpsertRequest = {
@@ -148,7 +162,42 @@ export type TemplateUpsertRequest = {
   definition_json?: JsonObject;
 };
 
-export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord;
+export type SuggestionStatus = 'pending' | 'accepted' | 'rejected';
+export type SuggestionKind = 'tag' | 'type';
+
+export type SuggestionOccurrencePreview = {
+  card_id: string;
+  card_label: string;
+  card_version_id: string;
+  card_version_name: string;
+  source_text: string;
+  normalized_source_text: string;
+};
+
+export type SuggestionAcceptedTarget = {
+  id: string;
+  key: string;
+  label: string;
+  identifiers?: string[];
+};
+
+export type SuggestionApiRecord = {
+  id: string;
+  kind: SuggestionKind;
+  display_value: string;
+  normalized_value: string;
+  status: SuggestionStatus;
+  occurrence_count: number;
+  accepted_target: SuggestionAcceptedTarget | null;
+  occurrences: SuggestionOccurrencePreview[];
+};
+
+export type SuggestionRecord = SuggestionApiRecord & {
+  label: string;
+  key: string;
+};
+
+export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord | SuggestionRecord;
 
 export type CatalogFormEntry = {
   label: string;
@@ -161,4 +210,13 @@ export type CatalogFormEntry = {
   reference_assets_json: string;
   text_token: string;
   enabled: boolean;
+};
+
+export type SuggestionAcceptExistingRequest = {
+  target_id: string;
+};
+
+export type SuggestionAcceptNewRequest = {
+  label?: string;
+  key?: string;
 };
