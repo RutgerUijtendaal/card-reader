@@ -30,6 +30,8 @@ from card_reader_core.repositories.metadata_repository import (
     list_symbols,
     list_tags,
     list_types,
+    get_tags_for_card_version,
+    get_types_for_card_version,
     replace_card_version_tags,
     replace_card_version_types,
     symbol_key_exists,
@@ -129,20 +131,20 @@ class CatalogService:
             return None
 
         if suggestion.kind == "tag":
-            target = get_tag(target_id)
-            if target is None:
+            target_tag = get_tag(target_id)
+            if target_tag is None:
                 raise ValueError("Tag not found")
             with transaction.atomic():
-                self._append_identifier(target, suggestion.normalized_value)
-                self._apply_suggestion_to_auto_versions(suggestion, target_tag=target)
+                self._append_identifier(target_tag, suggestion.normalized_value)
+                self._apply_suggestion_to_auto_versions(suggestion, target_tag=target_tag)
             return get_metadata_suggestion(suggestion_id)
 
-        target = get_type(target_id)
-        if target is None:
+        target_type = get_type(target_id)
+        if target_type is None:
             raise ValueError("Type not found")
         with transaction.atomic():
-            self._append_identifier(target, suggestion.normalized_value)
-            self._apply_suggestion_to_auto_versions(suggestion, target_type=target)
+            self._append_identifier(target_type, suggestion.normalized_value)
+            self._apply_suggestion_to_auto_versions(suggestion, target_type=target_type)
         return get_metadata_suggestion(suggestion_id)
 
     def accept_suggestion_as_new(
@@ -159,11 +161,19 @@ class CatalogService:
         chosen_label = self._normalize_label(label or suggestion.display_value or suggestion.normalized_value)
         with transaction.atomic():
             if suggestion.kind == "tag":
-                target = self.create_tag(label=chosen_label, key=key, identifiers=[suggestion.normalized_value])
-                self._apply_suggestion_to_auto_versions(suggestion, target_tag=target)
+                target_tag = self.create_tag(
+                    label=chosen_label,
+                    key=key,
+                    identifiers=[suggestion.normalized_value],
+                )
+                self._apply_suggestion_to_auto_versions(suggestion, target_tag=target_tag)
             else:
-                target = self.create_type(label=chosen_label, key=key, identifiers=[suggestion.normalized_value])
-                self._apply_suggestion_to_auto_versions(suggestion, target_type=target)
+                target_type = self.create_type(
+                    label=chosen_label,
+                    key=key,
+                    identifiers=[suggestion.normalized_value],
+                )
+                self._apply_suggestion_to_auto_versions(suggestion, target_type=target_type)
         return get_metadata_suggestion(suggestion_id)
 
     def create_keyword(
@@ -504,14 +514,14 @@ class CatalogService:
             if suggestion.kind == "tag":
                 if field_sources["metadata"].get("tags") != "auto":
                     continue
-                current_ids = [row.tag_id for row in version.card_version_tags.select_related("tag").all()]
+                current_ids = [row.id for row in get_tags_for_card_version(version.id)]
                 next_ids = [*current_ids, target_tag.id] if target_tag is not None else current_ids
                 replace_card_version_tags(card_version_id=version.id, tag_ids=next_ids)
                 continue
 
             if field_sources["metadata"].get("types") != "auto":
                 continue
-            current_ids = [row.type_id for row in version.card_version_types.select_related("type").all()]
+            current_ids = [row.id for row in get_types_for_card_version(version.id)]
             next_ids = [*current_ids, target_type.id] if target_type is not None else current_ids
             replace_card_version_types(card_version_id=version.id, type_ids=next_ids)
 

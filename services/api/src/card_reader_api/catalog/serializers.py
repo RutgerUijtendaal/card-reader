@@ -134,9 +134,13 @@ class SymbolAssetUploadSerializer(serializers.Serializer[dict[str, object]]):
 
 class SuggestionAcceptSerializer(serializers.Serializer[dict[str, object]]):
     target_id = serializers.CharField(required=False, allow_blank=False)
-    label = serializers.CharField(required=False, allow_blank=False, allow_null=True)
+    label = serializers.CharField(required=False, allow_blank=False, allow_null=True)  # type: ignore[assignment]
     key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class SuggestionStatusQuerySerializer(serializers.Serializer[dict[str, object]]):
-    status = serializers.ChoiceField(choices=["pending", "accepted", "rejected"], required=False, allow_null=True)
+    status = serializers.ChoiceField(
+        choices=["pending", "accepted", "rejected"],
+        required=False,
+        allow_null=True,
+    )

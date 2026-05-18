@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from card_reader_core.metadata_matching import KnownMetadataMatcher
 from card_reader_core.metadata_suggestions import extract_metadata_ids_and_suggestions, split_middle_text
 from django.core.management.base import BaseCommand
@@ -16,7 +18,7 @@ from card_reader_core.repositories.metadata_repository import (
 class Command(BaseCommand):
     help = "Backfill tag/type suggestions from latest card version type_line values."
 
-    def handle(self, *args, **options) -> None:
+    def handle(self, *args: Any, **options: Any) -> None:
         _ = args
         _ = options
         matcher = KnownMetadataMatcher()
@@ -43,13 +45,13 @@ class Command(BaseCommand):
                 card_version_id=version.id,
                 kind="type",
                 candidates=[suggestion_candidate_from_draft(row) for row in type_drafts],
-                parse_result_id=version.parse_result_id,
+                parse_result_id=getattr(version, "parse_result_id", None),
             )
             replace_card_version_metadata_suggestions(
                 card_version_id=version.id,
                 kind="tag",
                 candidates=[suggestion_candidate_from_draft(row) for row in tag_drafts],
-                parse_result_id=version.parse_result_id,
+                parse_result_id=getattr(version, "parse_result_id", None),
             )
             updated += 1
 

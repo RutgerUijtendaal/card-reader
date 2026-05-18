@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from django.db import migrations, models
 
@@ -10,7 +11,7 @@ BRACE_TOKEN_PATTERN = re.compile(r"\{([^}]+)\}")
 X_ONLY_PATTERN = re.compile(r"(^|[^a-z0-9])x([^a-z0-9]|$)", re.IGNORECASE)
 
 
-def backfill_mana_value(apps, _schema_editor) -> None:
+def backfill_mana_value(apps: Any, _schema_editor: Any) -> None:
     CardVersion = apps.get_model("card_reader_core", "CardVersion")
 
     for version in CardVersion.objects.all().iterator():
