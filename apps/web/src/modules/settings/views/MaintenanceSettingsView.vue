@@ -30,6 +30,14 @@
             <button
               class="btn-secondary justify-center"
               type="button"
+              :disabled="runningBackfillSuggestions"
+              @click="backfillMetadataSuggestions"
+            >
+              {{ runningBackfillSuggestions ? 'Backfilling...' : 'Backfill Metadata Suggestions' }}
+            </button>
+            <button
+              class="btn-secondary justify-center"
+              type="button"
               :disabled="runningQueueReparse"
               @click="queueLatestReparse"
             >
@@ -98,6 +106,9 @@
             Reparse queues one parser job per template using the latest known image for each card.
           </li>
           <li>
+            Backfill metadata suggestions rebuilds suggested tags and types from current latest card versions.
+          </li>
+          <li>
             Clear storage removes uploads and debug artifacts. Images are kept unless explicitly included.
           </li>
           <li>
@@ -143,6 +154,7 @@ const includeImages = ref(true);
 const runningRebuild = ref(false);
 const runningClear = ref(false);
 const runningOpenStorage = ref(false);
+const runningBackfillSuggestions = ref(false);
 const runningQueueReparse = ref(false);
 const lastRemovedPaths = ref<string[]>([]);
 const { copy, isSupported: clipboardSupported } = useClipboard({ legacy: true });
@@ -199,6 +211,22 @@ const queueLatestReparse = async (): Promise<void> => {
     toast.error(extractErrorMessage(error, 'Failed to queue latest reparses.'));
   } finally {
     runningQueueReparse.value = false;
+  }
+};
+
+const backfillMetadataSuggestions = async (): Promise<void> => {
+  if (runningBackfillSuggestions.value) return;
+  runningBackfillSuggestions.value = true;
+  try {
+    const response = await api.post<MaintenanceActionResponse>(
+      '/settings/maintenance/backfill-metadata-suggestions',
+    );
+    toast.success(response.data.message);
+  } catch (error) {
+    console.error('Backfill metadata suggestions failed', error);
+    toast.error(extractErrorMessage(error, 'Failed to backfill metadata suggestions.'));
+  } finally {
+    runningBackfillSuggestions.value = false;
   }
 };
 

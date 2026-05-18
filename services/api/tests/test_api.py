@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from card_reader_core.models import Card, CardVersion, CardVersionImage, ImportJob, ImportJobItem, Keyword, ParseResult, Symbol, Tag, Type  # noqa: E402
+from card_reader_core.models import Card, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Type  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
 from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata_repository import (  # noqa: E402
@@ -134,6 +134,8 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
                 tag_ids=[],
                 type_ids=[],
                 symbol_ids=[],
+                tag_suggestions=[],
+                type_suggestions=[],
             )
 
     processor = ImportProcessorService(InterruptingParser())
@@ -226,6 +228,40 @@ def test_staff_can_manage_catalog_entries() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_catalog_response_groups_known_and_suggested_entries() -> None:
+    username = "staff-catalog-suggestions-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    _login_and_get_csrf_token(client, username, password)
+
+    card, version = _create_editable_card_version(name="Suggested Catalog Card")
+    suggestion = MetadataSuggestion.objects.create(
+        kind="tag",
+        normalized_value="mystic relic accept auto manual",
+        display_value="Mystic Relic Accept Auto Manual",
+    )
+    CardVersionMetadataSuggestion.objects.create(
+        card_version=version,
+        suggestion=suggestion,
+        source_text="Mystic Relic",
+        normalized_source_text="Mystic Relic",
+        parse_result=version.parse_result,
+    )
+
+    response = client.get("/settings/catalog")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "known" in payload
+    assert "suggested" in payload
+    assert isinstance(payload["known"]["tags"], list)
+    suggested_ids = {row["id"] for row in payload["suggested"]["tags"]}
+    assert suggestion.id in suggested_ids
+    assert card.id
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_create_keyword_identifiers() -> None:
     username = "staff-keyword-alias-user"
     password = "password"
@@ -281,6 +317,113 @@ def test_staff_can_create_tag_and_type_identifiers() -> None:
     assert tag_response.json()["identifiers"] == ["weapon", "arms"]
     assert type_response.status_code == 200
     assert type_response.json()["identifiers"] == ["persistent", "ongoing"]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_accept_tag_suggestion_to_existing_and_preserve_manual_cards() -> None:
+    username = "staff-suggestion-accept-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    target_tag = Tag.objects.first()
+    assert target_tag is not None
+
+    auto_card, auto_version = _create_editable_card_version(name="Suggestion Auto Card")
+    manual_card, manual_version = _create_editable_card_version(name="Suggestion Manual Card")
+    manual_version.field_sources_json = json.dumps(
+        {
+            "fields": {
+                "name": "auto",
+                "type_line": "auto",
+                "mana_cost": "auto",
+                "attack": "auto",
+                "health": "auto",
+                "rules_text": "auto",
+            },
+            "metadata": {
+                "keywords": "auto",
+                "tags": "manual",
+                "types": "auto",
+                "symbols": "auto",
+            },
+        }
+    )
+    manual_version.save(update_fields=["field_sources_json"])
+
+    suggestion = MetadataSuggestion.objects.create(
+        kind="tag",
+        normalized_value="mystic relic accept manual propagation",
+        display_value="Mystic Relic Accept Manual Propagation",
+    )
+    CardVersionMetadataSuggestion.objects.create(
+        card_version=auto_version,
+        suggestion=suggestion,
+        source_text="Mystic Relic Accept Auto Manual",
+        normalized_source_text="Mystic Relic Accept Auto Manual",
+        parse_result=auto_version.parse_result,
+    )
+    CardVersionMetadataSuggestion.objects.create(
+        card_version=manual_version,
+        suggestion=suggestion,
+        source_text="Mystic Relic Accept Auto Manual",
+        normalized_source_text="Mystic Relic Accept Auto Manual",
+        parse_result=manual_version.parse_result,
+    )
+
+    response = client.post(
+        f"/settings/suggestions/tag/{suggestion.id}/accept",
+        data={"target_id": target_tag.id},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    suggestion.refresh_from_db()
+    target_tag.refresh_from_db()
+    assert suggestion.status == "accepted"
+    assert suggestion.accepted_tag_id == target_tag.id
+    assert "mystic relic accept manual propagation" in target_tag.identifiers_json
+    assert [row.id for row in get_tags_for_card_version(auto_version.id)] == [target_tag.id]
+    assert [row.id for row in get_tags_for_card_version(manual_version.id)] == []
+    assert auto_card.id
+    assert manual_card.id
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_reject_type_suggestion() -> None:
+    username = "staff-suggestion-reject-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    card, version = _create_editable_card_version(name="Suggestion Reject Card")
+    suggestion = MetadataSuggestion.objects.create(
+        kind="type",
+        normalized_value="ancient mystery",
+        display_value="Ancient Mystery",
+    )
+    CardVersionMetadataSuggestion.objects.create(
+        card_version=version,
+        suggestion=suggestion,
+        source_text="Ancient Mystery",
+        normalized_source_text="Ancient Mystery",
+        parse_result=version.parse_result,
+    )
+
+    response = client.post(
+        f"/settings/suggestions/type/{suggestion.id}/reject",
+        data={},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    suggestion.refresh_from_db()
+    assert suggestion.status == "rejected"
+    assert card.id
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

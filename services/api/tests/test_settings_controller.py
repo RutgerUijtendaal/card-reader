@@ -163,3 +163,18 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
         build_storage_relative_path("images", image_b.name),
         build_storage_relative_path("images", image_c.name),
     }
+
+
+def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> None:
+    recorded_calls: list[tuple[str, int]] = []
+
+    def fake_call_command(name: str, verbosity: int = 1) -> None:
+        recorded_calls.append((name, verbosity))
+
+    monkeypatch.setattr(maintenance_services, "call_command", fake_call_command)
+
+    result = MaintenanceService().backfill_metadata_suggestions()
+
+    assert recorded_calls == [("backfill_metadata_suggestions", 0)]
+    assert result.message == "Metadata suggestions backfill completed."
+    assert result.removed_paths == []

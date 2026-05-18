@@ -18,7 +18,11 @@ DEFAULT_CORS_ORIGINS = [
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="CARD_READER_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="CARD_READER_",
+        env_file=str(REPO_ROOT / ".env"),
+        extra="ignore",
+    )
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000

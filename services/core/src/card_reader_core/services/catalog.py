@@ -3,9 +3,13 @@ from __future__ import annotations
 import json
 from typing import Any, TypedDict, cast
 
-from card_reader_core.models import Keyword, Symbol, Tag, Type
+from django.db import transaction
+
+from card_reader_core.models import Keyword, MetadataSuggestion, Symbol, Tag, Type, now_utc
+from card_reader_core.repositories.cards_repository import decode_field_sources
 from card_reader_core.repositories.helpers import normalize_slug_key
 from card_reader_core.repositories.metadata_repository import (
+    MetadataSuggestionListRow,
     create_keyword,
     create_symbol,
     create_tag,
@@ -15,14 +19,21 @@ from card_reader_core.repositories.metadata_repository import (
     delete_tag,
     delete_type,
     get_keyword,
+    get_metadata_suggestion,
     get_symbol,
     get_tag,
     get_type,
     keyword_key_exists,
+    list_card_version_suggestion_occurrences,
     list_keywords,
+    list_metadata_suggestions,
     list_symbols,
     list_tags,
     list_types,
+    get_tags_for_card_version,
+    get_types_for_card_version,
+    replace_card_version_tags,
+    replace_card_version_types,
     symbol_key_exists,
     tag_key_exists,
     type_key_exists,
@@ -37,20 +48,133 @@ SUPPORTED_SYMBOL_DETECTOR_TYPES = {"template"}
 
 
 class CatalogData(TypedDict):
+    known: "KnownCatalogData"
+    suggested: "SuggestedCatalogData"
+
+
+class KnownCatalogData(TypedDict):
     keywords: list[Keyword]
     tags: list[Tag]
     symbols: list[Symbol]
     types: list[Type]
 
 
+class SuggestedCatalogData(TypedDict):
+    tags: list["CatalogSuggestionDetail"]
+    types: list["CatalogSuggestionDetail"]
+
+
+class SuggestionOccurrencePreview(TypedDict):
+    card_id: str
+    card_label: str
+    card_version_id: str
+    card_version_name: str
+    source_text: str
+    normalized_source_text: str
+
+
+class CatalogSuggestionDetail(TypedDict):
+    id: str
+    kind: str
+    display_value: str
+    normalized_value: str
+    status: str
+    occurrence_count: int
+    accepted_tag: Tag | None
+    accepted_type: Type | None
+    occurrences: list[SuggestionOccurrencePreview]
+
+
 class CatalogService:
     def list_catalog(self) -> CatalogData:
         return {
-            "keywords": list_keywords(),
-            "tags": list_tags(),
-            "symbols": list_symbols(),
-            "types": list_types(),
+            "known": {
+                "keywords": list_keywords(),
+                "tags": list_tags(),
+                "symbols": list_symbols(),
+                "types": list_types(),
+            },
+            "suggested": {
+                "tags": self.list_suggestions(kind="tag"),
+                "types": self.list_suggestions(kind="type"),
+            },
         }
+
+    def list_suggestions(self, *, kind: str, status: str | None = None) -> list[CatalogSuggestionDetail]:
+        rows = list_metadata_suggestions(kind=kind, status=status)
+        return [self._suggestion_detail_from_row(row) for row in rows]
+
+    def get_suggestion_detail(self, *, suggestion_id: str) -> CatalogSuggestionDetail | None:
+        suggestion = get_metadata_suggestion(suggestion_id)
+        if suggestion is None:
+            return None
+        occurrence_count = len(list_card_version_suggestion_occurrences(suggestion_id))
+        return self._suggestion_detail(suggestion, occurrence_count=occurrence_count)
+
+    def reject_suggestion(self, *, suggestion_id: str) -> MetadataSuggestion | None:
+        suggestion = get_metadata_suggestion(suggestion_id)
+        if suggestion is None:
+            return None
+        suggestion.status = "rejected"
+        suggestion.updated_at = now_utc()
+        suggestion.save(update_fields=["status", "updated_at"])
+        return suggestion
+
+    def accept_suggestion_to_existing(
+        self,
+        *,
+        suggestion_id: str,
+        target_id: str,
+    ) -> MetadataSuggestion | None:
+        suggestion = get_metadata_suggestion(suggestion_id)
+        if suggestion is None:
+            return None
+
+        if suggestion.kind == "tag":
+            target_tag = get_tag(target_id)
+            if target_tag is None:
+                raise ValueError("Tag not found")
+            with transaction.atomic():
+                self._append_identifier(target_tag, suggestion.normalized_value)
+                self._apply_suggestion_to_auto_versions(suggestion, target_tag=target_tag)
+            return get_metadata_suggestion(suggestion_id)
+
+        target_type = get_type(target_id)
+        if target_type is None:
+            raise ValueError("Type not found")
+        with transaction.atomic():
+            self._append_identifier(target_type, suggestion.normalized_value)
+            self._apply_suggestion_to_auto_versions(suggestion, target_type=target_type)
+        return get_metadata_suggestion(suggestion_id)
+
+    def accept_suggestion_as_new(
+        self,
+        *,
+        suggestion_id: str,
+        label: str | None = None,
+        key: str | None = None,
+    ) -> MetadataSuggestion | None:
+        suggestion = get_metadata_suggestion(suggestion_id)
+        if suggestion is None:
+            return None
+
+        chosen_label = self._normalize_label(label or suggestion.display_value or suggestion.normalized_value)
+        with transaction.atomic():
+            if suggestion.kind == "tag":
+                target_tag = self.create_tag(
+                    label=chosen_label,
+                    key=key,
+                    identifiers=[suggestion.normalized_value],
+                )
+                self._apply_suggestion_to_auto_versions(suggestion, target_tag=target_tag)
+            else:
+                target_type = self.create_type(
+                    label=chosen_label,
+                    key=key,
+                    identifiers=[suggestion.normalized_value],
+                )
+                self._apply_suggestion_to_auto_versions(suggestion, target_type=target_type)
+        return get_metadata_suggestion(suggestion_id)
 
     def create_keyword(
         self,
@@ -324,6 +448,88 @@ class CatalogService:
             updates["text_token"] = text_token.strip()
         if enabled is not None:
             updates["enabled"] = enabled
+
+    def _suggestion_detail_from_row(self, row: MetadataSuggestionListRow) -> CatalogSuggestionDetail:
+        return self._suggestion_detail(row.suggestion, occurrence_count=row.occurrence_count)
+
+    def _suggestion_detail(
+        self,
+        suggestion: MetadataSuggestion,
+        *,
+        occurrence_count: int,
+    ) -> CatalogSuggestionDetail:
+        occurrences = list_card_version_suggestion_occurrences(suggestion.id)
+        previews: list[SuggestionOccurrencePreview] = []
+        for occurrence in occurrences[:5]:
+            card_version = occurrence.card_version
+            card = card_version.card
+            previews.append(
+                {
+                    "card_id": card.id,
+                    "card_label": card.label,
+                    "card_version_id": card_version.id,
+                    "card_version_name": card_version.name,
+                    "source_text": occurrence.source_text,
+                    "normalized_source_text": occurrence.normalized_source_text,
+                }
+            )
+        return {
+            "id": suggestion.id,
+            "kind": suggestion.kind,
+            "display_value": suggestion.display_value,
+            "normalized_value": suggestion.normalized_value,
+            "status": suggestion.status,
+            "occurrence_count": occurrence_count,
+            "accepted_tag": suggestion.accepted_tag,
+            "accepted_type": suggestion.accepted_type,
+            "occurrences": previews,
+        }
+
+    def _append_identifier(self, row: Tag | Type, identifier: str) -> None:
+        normalized_identifiers = self._normalize_identifiers(row.label, [identifier])
+        for existing in row.identifiers_json:
+            normalized = " ".join(str(existing).split()).strip().lower()
+            if normalized and normalized not in normalized_identifiers:
+                normalized_identifiers.append(normalized)
+        row.identifiers_json = normalized_identifiers
+        row.updated_at = now_utc()
+        row.save(update_fields=["identifiers_json", "updated_at"])
+
+    def _apply_suggestion_to_auto_versions(
+        self,
+        suggestion: MetadataSuggestion,
+        *,
+        target_tag: Tag | None = None,
+        target_type: Type | None = None,
+    ) -> None:
+        if suggestion.kind == "tag" and target_tag is None:
+            raise ValueError("Tag target is required")
+        if suggestion.kind == "type" and target_type is None:
+            raise ValueError("Type target is required")
+
+        occurrences = list_card_version_suggestion_occurrences(suggestion.id)
+        for occurrence in occurrences:
+            version = occurrence.card_version
+            field_sources = decode_field_sources(version.field_sources_json)
+            if suggestion.kind == "tag":
+                if field_sources["metadata"].get("tags") != "auto":
+                    continue
+                current_ids = [row.id for row in get_tags_for_card_version(version.id)]
+                next_ids = [*current_ids, target_tag.id] if target_tag is not None else current_ids
+                replace_card_version_tags(card_version_id=version.id, tag_ids=next_ids)
+                continue
+
+            if field_sources["metadata"].get("types") != "auto":
+                continue
+            current_ids = [row.id for row in get_types_for_card_version(version.id)]
+            next_ids = [*current_ids, target_type.id] if target_type is not None else current_ids
+            replace_card_version_types(card_version_id=version.id, type_ids=next_ids)
+
+        suggestion.status = "accepted"
+        suggestion.accepted_tag = target_tag
+        suggestion.accepted_type = target_type
+        suggestion.updated_at = now_utc()
+        suggestion.save(update_fields=["status", "accepted_tag", "accepted_type", "updated_at"])
 
     def _ensure_unique(self, kind: str, key: str, exclude_id: str | None = None) -> None:
         exists_checks = {

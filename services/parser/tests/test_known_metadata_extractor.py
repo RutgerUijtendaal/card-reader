@@ -51,3 +51,12 @@ def test_extract_ids_supports_multi_word_type_identifiers() -> None:
     matched = extractor.extract_ids("Persistent Spell", [known_type])
 
     assert matched == ["type-1"]
+
+
+def test_remove_matches_returns_only_unmatched_leftover_text() -> None:
+    extractor = KnownMetadataExtractor()
+    known_tag = Tag(id="tag-1", key="weapon", label="Weapon", identifiers_json=json.dumps(["silver weapon"]))
+
+    leftover = extractor.remove_matches("Silver Weapon Relic", [known_tag])
+
+    assert leftover == "Relic"

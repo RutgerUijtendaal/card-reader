@@ -19,6 +19,7 @@ from card_reader_core.repositories.import_jobs_repository import (
     mark_job_running,
 )
 from card_reader_core.repositories.metadata_repository import (
+    SuggestionCandidate,
     list_detectable_symbols,
     list_keywords,
     list_tags,
@@ -169,6 +170,24 @@ class ImportProcessorService:
             tag_ids=parsed.tag_ids,
             type_ids=parsed.type_ids,
             symbol_ids=parsed.symbol_ids,
+            tag_suggestions=[
+                SuggestionCandidate(
+                    display_value=row.display_value,
+                    normalized_value=row.normalized_value,
+                    source_text=row.source_text,
+                    normalized_source_text=row.normalized_source_text,
+                )
+                for row in parsed.tag_suggestions
+            ],
+            type_suggestions=[
+                SuggestionCandidate(
+                    display_value=row.display_value,
+                    normalized_value=row.normalized_value,
+                    source_text=row.source_text,
+                    normalized_source_text=row.normalized_source_text,
+                )
+                for row in parsed.type_suggestions
+            ],
             reparse_existing=options.reparse_existing,
         )
         tag_count = len(parsed.tag_ids)

@@ -11,6 +11,7 @@
           </p>
         </div>
         <button
+          v-if="canCreate"
           class="btn-secondary px-3 py-2"
           type="button"
           @click="emit('create-new')"
@@ -26,7 +27,7 @@
         <input
           :value="searchTerm"
           class="input-base"
-          :placeholder="`Search ${kindLabel(selectedKind).toLowerCase()} by label, key, or metadata`"
+          :placeholder="searchPlaceholder"
           @input="emit('update:search-term', ($event.target as HTMLInputElement).value)"
         >
       </label>
@@ -36,7 +37,7 @@
       v-if="totalCount === 0"
       class="py-8 text-sm text-slate-500"
     >
-      No entries yet. Create the first {{ kindItemLabel(selectedKind).toLowerCase() }} from here.
+      {{ emptyState }}
     </div>
 
     <div
@@ -89,9 +90,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { CatalogKind, CatalogRow } from '@/modules/settings/types';
+import { isSuggestionRecord } from '@/modules/settings/composables/catalogSettingsUtils';
 
-defineProps<{
+const props = defineProps<{
   selectedKind: CatalogKind;
   searchTerm: string;
   totalCount: number;
@@ -99,6 +102,7 @@ defineProps<{
   selectedEntryId: string | null;
   kindLabel: (kind: CatalogKind) => string;
   kindItemLabel: (kind: CatalogKind) => string;
+  canCreate: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -107,7 +111,37 @@ const emit = defineEmits<{
   (e: 'select-entry', entryId: string): void;
 }>();
 
+const searchPlaceholder = computed(() =>
+  props.canCreate
+    ? `Search ${props.kindLabel(props.selectedKind).toLowerCase()} by label, key, or metadata`
+    : `Search ${props.kindLabel(props.selectedKind).toLowerCase()} suggestions`,
+);
+
+const emptyState = computed(() =>
+  props.canCreate
+    ? `No entries yet. Create the first ${props.kindItemLabel(props.selectedKind).toLowerCase()} from here.`
+    : `No suggestions yet.`,
+);
+
 const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
+  if (isSuggestionRecord(entry)) {
+    return [
+      {
+        label: `${entry.occurrence_count} matches`,
+        tone: 'bg-slate-100 text-slate-600',
+      },
+      {
+        label: entry.status,
+        tone:
+          entry.status === 'accepted'
+            ? 'bg-emerald-100 text-emerald-700'
+            : entry.status === 'rejected'
+              ? 'bg-amber-100 text-amber-700'
+              : 'bg-sky-100 text-sky-700',
+      },
+    ];
+  }
+
   if ('symbol_type' in entry) {
     return [
       {
@@ -132,6 +166,19 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
 };
 
 const entryPreview = (entry: CatalogRow): string => {
+  if (isSuggestionRecord(entry)) {
+    if (entry.accepted_target) {
+      return `Accepted as ${entry.accepted_target.label}`;
+    }
+    if (entry.occurrences.length === 0) {
+      return 'No linked cards yet.';
+    }
+    return entry.occurrences
+      .slice(0, 2)
+      .map((occurrence) => `${occurrence.card_label}: ${occurrence.source_text}`)
+      .join(' • ');
+  }
+
   if ('symbol_type' in entry) {
     return [entry.text_token ? `Token ${entry.text_token}` : 'No text token'].join(' • ');
   }
