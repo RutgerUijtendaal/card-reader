@@ -17,6 +17,14 @@ class RebuildDatabaseView(APIView):
         return Response({"message": result.message, "removed_paths": result.removed_paths})
 
 
+class BackfillMetadataSuggestionsView(APIView):
+    permission_classes = [AuthEnabledOrSuperuserAllowed]
+
+    def post(self, _request: Request) -> Response:
+        result = MaintenanceService().backfill_metadata_suggestions()
+        return Response({"message": result.message, "removed_paths": result.removed_paths})
+
+
 class QueueLatestReparseView(APIView):
     permission_classes = [AuthEnabledOrSuperuserAllowed]
 

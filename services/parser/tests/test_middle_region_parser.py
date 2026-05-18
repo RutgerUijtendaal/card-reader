@@ -35,6 +35,13 @@ def test_split_middle_text_normalizes_spacing_around_hyphen() -> None:
     )
 
 
+def test_split_middle_text_does_not_split_on_hyphen_without_surrounding_spaces() -> None:
+    parser = MiddleRegionParser(StubOcrRunner(""), KnownMetadataExtractor())
+
+    assert parser._split_middle_text("Sword-and-Shield Relic") == ("Sword-and-Shield Relic", "")
+    assert parser._split_middle_text("Persistent-Weapon") == ("Persistent-Weapon", "")
+
+
 def test_middle_region_parser_matches_known_type_and_tag_without_suggestions() -> None:
     parser = MiddleRegionParser(StubOcrRunner("Persistent Spell - Silver Weapon"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
@@ -68,6 +75,22 @@ def test_middle_region_parser_emits_type_suggestion_for_unknown_leftover() -> No
     assert result.extracted_type_ids == ["type-1"]
     assert [row.normalized_value for row in result.extracted_type_suggestions] == ["mystery"]
     assert result.extracted_tag_suggestions == []
+
+
+def test_middle_region_parser_removes_commas_from_type_suggestions() -> None:
+    parser = MiddleRegionParser(StubOcrRunner("Persistent Spell, Mystery - Weapon"), KnownMetadataExtractor())
+    image = Image.new("RGB", (120, 40), "white")
+
+    result = parser.parse(
+        region_name="type_bar",
+        image=image,
+        region_spec={},
+        known_tags=[Tag(id="tag-1", key="weapon", label="Weapon", identifiers_json=["weapon"])],
+        known_types=[Type(id="type-1", key="persistent", label="Persistent", identifiers_json=["persistent spell"])],
+    )
+
+    assert result.extracted_type_ids == ["type-1"]
+    assert [row.normalized_value for row in result.extracted_type_suggestions] == ["mystery"]
 
 
 def test_middle_region_parser_emits_tag_suggestion_for_unknown_right_side() -> None:
@@ -122,6 +145,28 @@ def test_middle_region_parser_splits_unknown_tag_leftovers_by_commas_when_presen
         "relic",
         "ancient artifact",
     ]
+
+
+def test_middle_region_parser_ignores_comma_only_tag_leftovers_after_known_matches() -> None:
+    parser = MiddleRegionParser(
+        StubOcrRunner("Persistent - Silver Weapon, Ancient Artifact, Weapon"),
+        KnownMetadataExtractor(),
+    )
+    image = Image.new("RGB", (120, 40), "white")
+
+    result = parser.parse(
+        region_name="type_bar",
+        image=image,
+        region_spec={},
+        known_tags=[
+            Tag(id="tag-1", key="weapon", label="Weapon", identifiers_json=["silver weapon", "weapon"]),
+            Tag(id="tag-2", key="ancient-artifact", label="Ancient Artifact", identifiers_json=["ancient artifact"]),
+        ],
+        known_types=[Type(id="type-1", key="persistent", label="Persistent", identifiers_json=["persistent"])],
+    )
+
+    assert result.extracted_tag_ids == ["tag-1", "tag-2"]
+    assert result.extracted_tag_suggestions == []
 
 
 def test_middle_region_parser_emits_suggestion_when_no_known_match_exists() -> None:

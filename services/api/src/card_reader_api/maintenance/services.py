@@ -30,6 +30,13 @@ class OpenStorageLocationResult:
 
 
 class MaintenanceService:
+    def backfill_metadata_suggestions(self) -> MaintenanceResult:
+        call_command("backfill_metadata_suggestions", verbosity=0)
+        return MaintenanceResult(
+            message="Metadata suggestions backfill completed.",
+            removed_paths=[],
+        )
+
     def queue_reparse_latest_versions(self) -> MaintenanceResult:
         grouped_files: dict[str, list[Path]] = {}
 

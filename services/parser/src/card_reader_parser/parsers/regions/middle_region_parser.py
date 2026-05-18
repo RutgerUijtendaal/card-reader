@@ -4,6 +4,10 @@ import logging
 from typing import Any
 
 from card_reader_core.models import Tag, Type
+from card_reader_core.metadata_suggestions import (
+    extract_metadata_ids_and_suggestions,
+    split_middle_text,
+)
 from PIL import Image
 
 from ...extractors import KnownMetadataExtractor
@@ -37,9 +41,21 @@ class MiddleRegionParser:
         logger.info("Middle region parse started. region=%s image_size=%sx%s", region_name, image.width, image.height)
         ocr_data = self._ocr_runner.run(image)
         text = str(ocr_data.get("text", ""))
-        type_text, tag_text = self._split_middle_text(text)
-        tag_ids, tag_suggestions = self._extract_ids_and_suggestions(tag_text, known_tags, split_mode="tag")
-        type_ids, type_suggestions = self._extract_ids_and_suggestions(type_text, known_types, split_mode="type")
+        type_text, tag_text = split_middle_text(text)
+        tag_ids, tag_drafts = extract_metadata_ids_and_suggestions(
+            tag_text,
+            known_tags,
+            kind="tag",
+            matcher=self._metadata_extractor,
+        )
+        type_ids, type_drafts = extract_metadata_ids_and_suggestions(
+            type_text,
+            known_types,
+            kind="type",
+            matcher=self._metadata_extractor,
+        )
+        tag_suggestions = [self._build_suggestion(row) for row in tag_drafts]
+        type_suggestions = [self._build_suggestion(row) for row in type_drafts]
         confidence = self._safe_confidence(ocr_data.get("confidence", 0.0))
         lines = self._safe_lines(ocr_data.get("lines", []))
         logger.info(
@@ -74,56 +90,12 @@ class MiddleRegionParser:
         return raw if isinstance(raw, list) else []
 
     def _split_middle_text(self, middle_text: str) -> tuple[str, str]:
-        text = " ".join(middle_text.split()).strip()
-        if not text:
-            return "", ""
-        if "-" not in text:
-            return text, ""
-        left, right = text.split("-", 1)
-        return left.strip(), right.strip()
+        return split_middle_text(middle_text)
 
-    def _extract_ids_and_suggestions(
-        self,
-        text: str,
-        entries: list[Tag] | list[Type],
-        *,
-        split_mode: str,
-    ) -> tuple[list[str], list[ParsedMetadataSuggestion]]:
-        normalized_source_text = self._metadata_extractor.normalize_candidate(text)
-        if not normalized_source_text:
-            return [], []
-
-        ids = self._metadata_extractor.extract_ids(normalized_source_text, entries)
-        leftover = self._metadata_extractor.remove_matches(normalized_source_text, entries)
-        if not leftover:
-            return ids, []
-
-        if split_mode == "tag":
-            segments = self._split_tag_leftovers(leftover)
-        else:
-            segments = [leftover]
-
-        return ids, [
-            ParsedMetadataSuggestion(
-                display_value=segment,
-                normalized_value=segment.lower(),
-                source_text=text,
-                normalized_source_text=normalized_source_text,
-            )
-            for segment in segments
-        ]
-
-    def _split_tag_leftovers(self, text: str) -> list[str]:
-        raw_segments = text.split(",") if "," in text else text.split()
-        out: list[str] = []
-        seen: set[str] = set()
-        for raw_segment in raw_segments:
-            segment = self._metadata_extractor.normalize_candidate(raw_segment)
-            if not segment:
-                continue
-            folded = segment.casefold()
-            if folded in seen:
-                continue
-            seen.add(folded)
-            out.append(segment)
-        return out
+    def _build_suggestion(self, row: Any) -> ParsedMetadataSuggestion:
+        return ParsedMetadataSuggestion(
+            display_value=row.display_value,
+            normalized_value=row.normalized_value,
+            source_text=row.source_text,
+            normalized_source_text=row.normalized_source_text,
+        )

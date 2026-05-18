@@ -342,6 +342,7 @@ def list_metadata_suggestions(
         .annotate(
             occurrence_count=Count("card_version_metadata_suggestions", distinct=True)
         )
+        .filter(occurrence_count__gt=0)
         .order_by("-occurrence_count", "display_value", "normalized_value")
     )
     if status is not None:
