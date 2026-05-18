@@ -96,7 +96,6 @@ import {
 } from '@/modules/settings/composables/useCatalogSettings';
 
 const {
-  catalogKinds,
   catalogKindGroups,
   selectedKind,
   allCurrentRows,
