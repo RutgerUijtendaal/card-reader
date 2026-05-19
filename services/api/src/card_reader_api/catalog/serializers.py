@@ -31,18 +31,21 @@ def _catalog_option_payload(row: CatalogOption) -> dict[str, object]:
 def keyword_payload(row: Keyword) -> dict[str, object]:
     payload = _catalog_option_payload(row)
     payload["identifiers"] = row.identifiers_json
+    payload["linked_card_count"] = int(getattr(row, "linked_card_count", 0))
     return payload
 
 
 def tag_payload(row: Tag) -> dict[str, object]:
     payload = _catalog_option_payload(row)
     payload["identifiers"] = row.identifiers_json
+    payload["linked_card_count"] = int(getattr(row, "linked_card_count", 0))
     return payload
 
 
 def type_payload(row: Type) -> dict[str, object]:
     payload = _catalog_option_payload(row)
     payload["identifiers"] = row.identifiers_json
+    payload["linked_card_count"] = int(getattr(row, "linked_card_count", 0))
     return payload
 
 
@@ -58,6 +61,7 @@ def symbol_payload(row: Symbol) -> dict[str, object]:
         "reference_assets_json": row.reference_assets_json,
         "text_token": row.text_token,
         "enabled": row.enabled,
+        "linked_card_count": int(getattr(row, "linked_card_count", 0)),
     }
 
 

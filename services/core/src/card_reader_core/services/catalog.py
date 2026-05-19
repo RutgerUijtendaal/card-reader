@@ -4,7 +4,7 @@ import json
 from typing import Any, TypedDict, cast
 
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Count, Q, QuerySet
 
 from card_reader_core.models import (
     CardVersion,
@@ -35,11 +35,7 @@ from card_reader_core.repositories.metadata_repository import (
     get_type,
     keyword_key_exists,
     list_card_version_suggestion_occurrences,
-    list_keywords,
     list_metadata_suggestions,
-    list_symbols,
-    list_tags,
-    list_types,
     get_tags_for_card_version,
     get_types_for_card_version,
     replace_card_version_tags,
@@ -132,10 +128,10 @@ class CatalogService:
     def list_catalog(self) -> CatalogData:
         return {
             "known": {
-                "keywords": list_keywords(),
-                "tags": list_tags(),
-                "symbols": list_symbols(),
-                "types": list_types(),
+                "keywords": self._list_keywords_with_counts(),
+                "tags": self._list_tags_with_counts(),
+                "symbols": self._list_symbols_with_counts(),
+                "types": self._list_types_with_counts(),
             },
             "suggested": {
                 "tags": self.list_suggestions(kind="tag"),
@@ -671,6 +667,50 @@ class CatalogService:
         if image is None:
             return None
         return f"/cards/{card_id}/versions/{card_version_id}/image"
+
+    def _list_keywords_with_counts(self) -> list[Keyword]:
+        return list(
+            Keyword.objects.order_by("label").annotate(
+                linked_card_count=Count(
+                    "card_version_keywords",
+                    filter=Q(card_version_keywords__card_version__is_latest=True),
+                    distinct=True,
+                ),
+            )
+        )
+
+    def _list_tags_with_counts(self) -> list[Tag]:
+        return list(
+            Tag.objects.order_by("label").annotate(
+                linked_card_count=Count(
+                    "card_version_tags",
+                    filter=Q(card_version_tags__card_version__is_latest=True),
+                    distinct=True,
+                ),
+            )
+        )
+
+    def _list_types_with_counts(self) -> list[Type]:
+        return list(
+            Type.objects.order_by("label").annotate(
+                linked_card_count=Count(
+                    "card_version_types",
+                    filter=Q(card_version_types__card_version__is_latest=True),
+                    distinct=True,
+                ),
+            )
+        )
+
+    def _list_symbols_with_counts(self) -> list[Symbol]:
+        return list(
+            Symbol.objects.order_by("label").annotate(
+                linked_card_count=Count(
+                    "card_version_symbols",
+                    filter=Q(card_version_symbols__card_version__is_latest=True),
+                    distinct=True,
+                ),
+            )
+        )
 
     def _ensure_unique(self, kind: str, key: str, exclude_id: str | None = None) -> None:
         exists_checks = {

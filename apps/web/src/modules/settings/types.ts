@@ -109,6 +109,7 @@ export type SymbolApiRecord = {
   reference_assets_json: string[];
   text_token: string;
   enabled: boolean;
+  linked_card_count?: number;
 };
 
 export type TemplateApiRecord = {

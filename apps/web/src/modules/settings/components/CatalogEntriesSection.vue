@@ -81,7 +81,20 @@
           </div>
         </div>
 
-        <p class="mt-3 text-xs text-slate-600">
+        <div
+          v-if="'symbol_type' in entry"
+          class="mt-3 flex items-center gap-2 text-xs text-slate-600"
+        >
+          <span
+            class="h-2.5 w-2.5 rounded-full"
+            :class="entry.enabled ? 'bg-emerald-500' : 'bg-rose-500'"
+          />
+          <span>{{ entry.text_token ? `Token ${entry.text_token}` : 'No text token' }}</span>
+        </div>
+        <p
+          v-else
+          class="mt-3 text-xs text-slate-600"
+        >
           {{ entryPreview(entry) }}
         </p>
       </button>
@@ -127,8 +140,8 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   if (isSuggestionRecord(entry)) {
     return [
       {
-        label: `${entry.occurrence_count} matches`,
-        tone: 'bg-slate-100 text-slate-600',
+        label: String(entry.occurrence_count),
+        tone: 'bg-sky-100 text-sky-700',
       },
       {
         label: entry.status,
@@ -145,10 +158,8 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   if ('symbol_type' in entry) {
     return [
       {
-        label: entry.enabled ? 'Enabled' : 'Disabled',
-        tone: entry.enabled
-          ? 'bg-emerald-100 text-emerald-700'
-          : 'bg-amber-100 text-amber-700',
+        label: String(entry.linked_card_count ?? 0),
+        tone: 'bg-sky-100 text-sky-700',
       },
       {
         label: entry.symbol_type || 'symbol',
@@ -158,6 +169,10 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   }
 
   return [
+    {
+      label: String(entry.linked_card_count ?? 0),
+      tone: 'bg-sky-100 text-sky-700',
+    },
     {
       label: `${entry.identifiers.length} identifiers`,
       tone: 'bg-slate-100 text-slate-600',
@@ -180,7 +195,7 @@ const entryPreview = (entry: CatalogRow): string => {
   }
 
   if ('symbol_type' in entry) {
-    return [entry.text_token ? `Token ${entry.text_token}` : 'No text token'].join(' • ');
+    return entry.text_token ? `Token ${entry.text_token}` : 'No text token';
   }
 
   if (entry.identifiers.length === 0) {
