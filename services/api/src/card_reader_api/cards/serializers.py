@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from rest_framework import serializers
 
@@ -143,17 +143,18 @@ def symbol_option(symbol: Symbol) -> dict[str, object]:
 
 
 def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) -> dict[str, object]:
-    members = list(group.members.all())
-    card_ids = [member.card_id for member in members]
-    position = next((member.position for member in members if member.card_id == card_id), None)
+    members = list(cast(Any, group).members.all())
+    anchor_card_id = group.anchor_card.id
+    card_ids = [member.card.id for member in members]
+    position = next((member.position for member in members if member.card.id == card_id), None)
     return {
         "id": group.id,
         "key": group.key,
         "name": group.name,
-        "anchor_card_id": group.anchor_card_id,
+        "anchor_card_id": anchor_card_id,
         "member_count": len(members),
         "card_ids": card_ids,
-        "is_anchor": group.anchor_card_id == card_id,
+        "is_anchor": anchor_card_id == card_id,
         "position": position,
     }
 

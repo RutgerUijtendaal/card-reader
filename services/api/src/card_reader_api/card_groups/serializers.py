@@ -6,14 +6,15 @@ from typing import Any, cast
 from rest_framework import serializers
 from rest_framework.response import Response
 
-from card_reader_api.cards.serializers import card_group_summary_payload, card_payload
+from card_reader_api.cards.serializers import card_payload
 from card_reader_core.models import CardGroup, CardGroupMember
 from card_reader_core.repositories.cards_repository import get_card_image
 from card_reader_core.services.cards import get_card_version_metadata, resolve_card_image_path
 
 
 def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
-    members = list(group.members.all())
+    members = list(cast(Any, group).members.all())
+    anchor_card_id = group.anchor_card.id
     preview_cards = []
     for member in members[:3]:
         version = member.card.latest_version
@@ -22,10 +23,10 @@ def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
         image = get_card_image(version.id)
         preview_cards.append(
             {
-                "card_id": member.card_id,
+                "card_id": member.card.id,
                 "position": member.position,
                 "name": version.name,
-                "image_url": f"/cards/{member.card_id}/image" if image and resolve_card_image_path(image) else None,
+                "image_url": f"/cards/{member.card.id}/image" if image and resolve_card_image_path(image) else None,
             }
         )
     anchor_version = group.anchor_card.latest_version
@@ -35,7 +36,7 @@ def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
         "group_id": group.id,
         "group_key": group.key,
         "group_name": group.name,
-        "anchor_card_id": group.anchor_card_id,
+        "anchor_card_id": anchor_card_id,
         "anchor_card_name": anchor_version.name if anchor_version is not None else group.anchor_card.label,
         "member_count": len(members),
         "preview_cards": preview_cards,
@@ -43,8 +44,9 @@ def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
 
 
 def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
+    anchor_card_id = group.anchor_card.id
     members_payload = []
-    for member in group.members.all():
+    for member in cast(Any, group).members.all():
         version = member.card.latest_version
         if version is None:
             continue
@@ -52,11 +54,11 @@ def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
         members_payload.append(
             {
                 "position": member.position,
-                "is_anchor": member.card_id == group.anchor_card_id,
+                "is_anchor": member.card.id == anchor_card_id,
                 "card": card_payload(
                     member.card,
                     version,
-                    image_url=f"/cards/{member.card_id}/image" if image and resolve_card_image_path(image) else None,
+                    image_url=f"/cards/{member.card.id}/image" if image and resolve_card_image_path(image) else None,
                     metadata=get_card_version_metadata(version.id),
                     card_groups=[],
                 ),
@@ -66,7 +68,7 @@ def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
         "id": group.id,
         "key": group.key,
         "name": group.name,
-        "anchor_card_id": group.anchor_card_id,
+        "anchor_card_id": anchor_card_id,
         "member_count": len(members_payload),
         "members": members_payload,
     }
@@ -74,28 +76,30 @@ def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
 
 def card_group_admin_payload(group: CardGroup) -> dict[str, object]:
     anchor_version = group.anchor_card.latest_version
-    members = list(group.members.all())
+    anchor_card_id = group.anchor_card.id
+    members = list(cast(Any, group).members.all())
     return {
         "id": group.id,
         "key": group.key,
         "name": group.name,
-        "anchor_card_id": group.anchor_card_id,
+        "anchor_card_id": anchor_card_id,
         "anchor_card_name": anchor_version.name if anchor_version is not None else group.anchor_card.label,
         "member_count": len(members),
-        "members": [card_group_member_admin_payload(member, group.anchor_card_id) for member in members],
+        "members": [card_group_member_admin_payload(member, anchor_card_id) for member in members],
     }
 
 
 def card_group_member_admin_payload(member: CardGroupMember, anchor_card_id: str) -> dict[str, object]:
     version = member.card.latest_version
     image = None if version is None else get_card_image(version.id)
+    card_id = member.card.id
     return {
-        "card_id": member.card_id,
+        "card_id": card_id,
         "card_label": member.card.label,
         "card_name": version.name if version is not None else member.card.label,
         "position": member.position,
-        "is_anchor": member.card_id == anchor_card_id,
-        "image_url": f"/cards/{member.card_id}/image" if version is not None and image and resolve_card_image_path(image) else None,
+        "is_anchor": card_id == anchor_card_id,
+        "image_url": f"/cards/{card_id}/image" if version is not None and image and resolve_card_image_path(image) else None,
     }
 
 
