@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from .card_groups import CardGroupMemberInput, CardGroupService
     from .cards import CardEditState, CardMetadata
     from .catalog import CatalogData, CatalogService
     from .imports import ImportService
@@ -11,6 +12,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "CardEditState",
+    "CardGroupMemberInput",
+    "CardGroupService",
     "CardMetadata",
     "CatalogData",
     "CatalogService",
@@ -30,6 +33,14 @@ def __getattr__(name: str) -> Any:
         values = {
             "CardEditState": CardEditState,
             "CardMetadata": CardMetadata,
+        }
+        return values[name]
+    if name in {"CardGroupMemberInput", "CardGroupService"}:
+        from .card_groups import CardGroupMemberInput, CardGroupService
+
+        values = {
+            "CardGroupMemberInput": CardGroupMemberInput,
+            "CardGroupService": CardGroupService,
         }
         return values[name]
     if name in {"CatalogData", "CatalogService"}:

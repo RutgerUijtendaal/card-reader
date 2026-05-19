@@ -35,6 +35,23 @@
             >
           </label>
 
+          <label class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-sm font-semibold text-slate-900">
+                Card Groups
+              </p>
+              <p class="text-xs text-slate-500">
+                Show anchored card groups as stacked gallery results.
+              </p>
+            </div>
+            <input
+              :checked="showCardGroups"
+              type="checkbox"
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+              @change="$emit('update:showCardGroups', ($event.target as HTMLInputElement).checked)"
+            >
+          </label>
+
           <label class="block space-y-2">
             <div class="flex items-center justify-between gap-3">
               <div>
@@ -73,11 +90,13 @@ import { useFloatingPopover } from '@/composables/useFloatingPopover';
 const props = defineProps<{
   tooltipEnabled: boolean;
   cardScale: number;
+  showCardGroups: boolean;
 }>();
 
 defineEmits<{
   (e: 'update:tooltipEnabled', value: boolean): void;
   (e: 'update:cardScale', value: number): void;
+  (e: 'update:showCardGroups', value: boolean): void;
 }>();
 
 const { isOpen, triggerRef, panelRef, x, y, toggle } = useFloatingPopover({

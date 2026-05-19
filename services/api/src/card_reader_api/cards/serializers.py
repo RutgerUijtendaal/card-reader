@@ -7,6 +7,7 @@ from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Typ
 from card_reader_core.rule_text import render_enriched_rule_text
 
 if TYPE_CHECKING:
+    from card_reader_core.models import CardGroup
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MetadataOption = Keyword | Tag | Type
@@ -44,6 +45,7 @@ class CardFilterParams(TypedDict):
 class CardListFilterParams(CardFilterParams):
     page: int
     page_size: int
+    show_groups: bool
 
 
 def card_payload(
@@ -53,10 +55,12 @@ def card_payload(
     image_url: str | None,
     metadata: CardMetadata | None = None,
     edit_state: CardEditState | None = None,
+    card_groups: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     rendered_rule_text = _render_card_rule_text(version, metadata)
     payload: dict[str, object] = {
         "id": card.id,
+        "result_type": "card",
         "key": card.key,
         "label": card.label,
         "name": version.name,
@@ -87,6 +91,7 @@ def card_payload(
         "tags": [],
         "symbols": [],
         "types": [],
+        "card_groups": card_groups or [],
     }
     if metadata is not None:
         payload.update(metadata_payload(metadata))
@@ -134,6 +139,22 @@ def symbol_option(symbol: Symbol) -> dict[str, object]:
         "symbol_type": symbol.symbol_type,
         "text_token": symbol.text_token,
         "asset_url": _first_symbol_asset_url(symbol.reference_assets_json),
+    }
+
+
+def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) -> dict[str, object]:
+    members = list(group.members.all())
+    card_ids = [member.card_id for member in members]
+    position = next((member.position for member in members if member.card_id == card_id), None)
+    return {
+        "id": group.id,
+        "key": group.key,
+        "name": group.name,
+        "anchor_card_id": group.anchor_card_id,
+        "member_count": len(members),
+        "card_ids": card_ids,
+        "is_anchor": group.anchor_card_id == card_id,
+        "position": position,
     }
 
 
@@ -194,6 +215,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     health_max = serializers.IntegerField(required=False, allow_null=True)
     page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(required=False, min_value=1, default=72)
+    show_groups = serializers.BooleanField(required=False, default=False)
 
     def validated_filters(self) -> CardFilterParams:
         return {
@@ -229,6 +251,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             **filters,
             "page": self._required_int("page"),
             "page_size": self._required_int("page_size"),
+            "show_groups": bool(self.validated_data.get("show_groups", False)),
         }
 
     def _string_or_none(self, key: str) -> str | None:

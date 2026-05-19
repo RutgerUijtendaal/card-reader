@@ -7,44 +7,89 @@
   >
     <div class="relative transition duration-200 hover:-translate-y-1">
       <RouterLink
-        :to="buildDetailLocation(card.id, 'detail')"
+        :to="detailLocation"
         class="block"
       >
-        <img
-          v-if="card.image_url"
-          :src="toAbsoluteApiUrl(card.image_url)"
-          alt="Card image"
-          class="block w-full object-contain transition duration-300 group-hover:scale-[1.02]"
-          :style="{ height: `${cardHeightRem}rem` }"
-          loading="lazy"
-          decoding="async"
-        >
-        <div
-          v-else
-          class="flex items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500"
-          :style="{ height: `${cardHeightRem}rem` }"
-        >
-          No image
-        </div>
+        <template v-if="isCardGroup">
+          <div
+            class="relative rounded-2xl"
+            :style="{ height: `${cardHeightRem}rem` }"
+          >
+            <div
+              v-if="stackCards[2]"
+              class="absolute inset-x-0 top-0 bottom-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm"
+              :style="{ transform: 'translate(1rem, 0.35rem) rotate(7deg)' }"
+            />
+            <div
+              v-if="stackCards[1]"
+              class="absolute inset-x-0 top-0 bottom-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm"
+              :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(3deg)' }"
+            />
+            <div class="relative h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+              <img
+                v-if="stackCards[0]?.image_url"
+                :src="toAbsoluteApiUrl(stackCards[0].image_url)"
+                :alt="stackCards[0].name"
+                class="block h-full w-full object-contain bg-white transition duration-300 group-hover:scale-[1.02]"
+                loading="lazy"
+                decoding="async"
+              >
+              <div
+                v-else
+                class="flex h-full items-center justify-center bg-slate-50 text-sm text-slate-500"
+              >
+                No image
+              </div>
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/78 via-slate-950/35 to-transparent p-4">
+                <div class="space-y-1">
+                  <p class="text-sm font-semibold text-white">
+                    {{ groupItem?.group_name }}
+                  </p>
+                  <p class="text-xs text-slate-100/90">
+                    {{ groupItem?.member_count }} cards in this stack
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <img
+            v-if="cardItem?.image_url"
+            :src="toAbsoluteApiUrl(cardItem.image_url)"
+            alt="Card image"
+            class="block w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+            :style="{ height: `${cardHeightRem}rem` }"
+            loading="lazy"
+            decoding="async"
+          >
+          <div
+            v-else
+            class="flex items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500"
+            :style="{ height: `${cardHeightRem}rem` }"
+          >
+            No image
+          </div>
+        </template>
       </RouterLink>
 
       <Teleport to="body">
         <div
-          v-if="tooltipEnabled && hovered"
+          v-if="tooltipEnabled && hovered && cardItem"
           ref="tooltipRef"
           class="z-30 hidden md:block"
           :style="{ position: 'fixed', left: `${tooltipX}px`, top: `${tooltipY}px` }"
         >
-          <CardHoverTooltip :card="card" />
+          <CardHoverTooltip :card="cardItem" />
         </div>
       </Teleport>
 
       <div
-        v-if="auth.canAccessStaffRoutes"
+        v-if="auth.canAccessStaffRoutes && isCard"
         class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3 opacity-0 transition duration-200 group-hover:opacity-100"
       >
         <RouterLink
-          :to="buildDetailLocation(card.id, 'edit')"
+          :to="editLocation"
           class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-xl transition hover:bg-slate-50"
         >
           <Pencil class="h-3.5 w-3.5" />
@@ -63,18 +108,12 @@ import { toAbsoluteApiUrl } from '@/api/client';
 import { Pencil } from 'lucide-vue-next';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { buildCardDetailLocation } from '@/modules/card-search/galleryNavigation';
-import type {
-  CardHoverTooltipModel,
-} from '@/components/cards/cardModels';
+import { buildCardDetailLocation, buildGalleryItemLocation } from '@/modules/card-search/galleryNavigation';
+import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';
 
-export type CardGalleryItemModel = CardHoverTooltipModel & {
-  image_url: string | null;
-};
-
-withDefaults(
+const props = withDefaults(
   defineProps<{
-    card: CardGalleryItemModel;
+    card: GalleryItem;
     tooltipEnabled?: boolean;
     cardHeightRem?: number;
   }>(),
@@ -98,8 +137,14 @@ const floating = useFloating(triggerRef, tooltipRef, {
 });
 const tooltipX = computed(() => floating.x.value ?? 0);
 const tooltipY = computed(() => floating.y.value ?? 0);
-
-const buildDetailLocation = (cardId: string, mode: 'detail' | 'edit') =>
-  buildCardDetailLocation(cardId, route.query, mode);
+const isCard = computed((): boolean => props.card.result_type === 'card');
+const isCardGroup = computed((): boolean => props.card.result_type === 'card_group');
+const cardItem = computed<CardListItem | null>(() => (isCard.value ? props.card as CardListItem : null));
+const groupItem = computed<CardGroupGalleryItem | null>(() => (isCardGroup.value ? props.card as CardGroupGalleryItem : null));
+const stackCards = computed(() => groupItem.value?.preview_cards.slice(0, 3) ?? []);
+const detailLocation = computed(() => buildGalleryItemLocation(props.card, route.query, 'detail'));
+const editLocation = computed(() =>
+  cardItem.value ? buildCardDetailLocation(cardItem.value.id, route.query, 'edit') : '/cards',
+);
 
 </script>

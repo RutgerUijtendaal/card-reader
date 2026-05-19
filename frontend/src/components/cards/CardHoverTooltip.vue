@@ -155,10 +155,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import SymbolizedText from '@/components/SymbolizedText.vue';
-import type { CardGalleryItemModel } from '@/components/cards/CardGalleryItem.vue';
+import type { CardListItem } from '@/modules/card-detail/types';
 
 const props = defineProps<{
-  card: CardGalleryItemModel;
+  card: CardListItem;
 }>();
 
 const symbolByKey = computed(() =>

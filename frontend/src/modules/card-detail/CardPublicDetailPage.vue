@@ -32,6 +32,20 @@
           <p class="text-sm text-slate-500">
             Browse parsed versions and full card metadata.
           </p>
+          <div
+            v-if="card.card_groups.length > 0"
+            class="mt-3 flex flex-wrap gap-2"
+          >
+            <RouterLink
+              v-for="group in card.card_groups"
+              :key="group.id"
+              :to="`/card-groups/${group.id}`"
+              class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+            >
+              <span>{{ group.name }}</span>
+              <span class="text-slate-400">{{ group.member_count }} cards</span>
+            </RouterLink>
+          </div>
         </div>
 
         <div

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from card_reader_core.models import Card, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Type  # noqa: E402
+from card_reader_core.models import Card, CardGroup, CardGroupMember, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Type  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
 from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata_repository import (  # noqa: E402
@@ -807,6 +807,106 @@ def test_cards_list_query_count_does_not_scale_linearly() -> None:
     assert len(queries) <= 12
 
 
+def test_cards_list_can_return_card_groups() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(name="Grouped Anchor")
+    member_card, member_version = _create_editable_card_version(name="Grouped Member")
+    standalone_card, standalone_version = _create_editable_card_version(name="Grouped Standalone")
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    _create_card_image(standalone_version)
+    _create_card_group("transform-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+
+    response = Client(HTTP_HOST="localhost").get("/cards", {"show_groups": "true"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    group_rows = [row for row in payload["results"] if row["result_type"] == "card_group"]
+    card_rows = [row for row in payload["results"] if row["result_type"] == "card"]
+    assert len(group_rows) == 1
+    assert group_rows[0]["anchor_card_id"] == anchor_card.id
+    assert group_rows[0]["member_count"] == 2
+    assert standalone_card.id in {row["id"] for row in card_rows}
+    assert anchor_card.id not in {row["id"] for row in card_rows}
+    assert member_card.id not in {row["id"] for row in card_rows}
+
+
+def test_card_detail_and_group_detail_include_card_group_membership() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(name="Detail Anchor")
+    member_card, member_version = _create_editable_card_version(name="Detail Member")
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    group = _create_card_group("detail-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+
+    client = Client(HTTP_HOST="localhost")
+    card_response = client.get(f"/cards/{member_card.id}")
+    group_response = client.get(f"/card-groups/{group.id}")
+
+    assert card_response.status_code == 200
+    assert group_response.status_code == 200
+    card_payload = card_response.json()
+    group_payload = group_response.json()
+    assert card_payload["card_groups"][0]["id"] == group.id
+    assert card_payload["card_groups"][0]["is_anchor"] is False
+    assert group_payload["id"] == group.id
+    assert [member["card"]["id"] for member in group_payload["members"]] == [anchor_card.id, member_card.id]
+    assert group_payload["members"][0]["is_anchor"] is True
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_manage_card_groups() -> None:
+    username = "staff-card-groups-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    anchor_card, _anchor_version = _create_editable_card_version(name="Staff Group Anchor")
+    member_card, _member_version = _create_editable_card_version(name="Staff Group Member")
+    replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
+
+    create_response = client.post(
+        "/settings/card-groups",
+        data={
+            "name": "Staff Managed Group",
+            "anchor_card_id": anchor_card.id,
+            "members": [
+                {"card_id": anchor_card.id, "position": 1},
+                {"card_id": member_card.id, "position": 2},
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert create_response.status_code == 200
+    group_id = create_response.json()["id"]
+
+    patch_response = client.patch(
+        f"/settings/card-groups/{group_id}",
+        data={
+            "anchor_card_id": replacement_card.id,
+            "members": [
+                {"card_id": replacement_card.id, "position": 2},
+                {"card_id": member_card.id, "position": 1},
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    list_response = client.get("/settings/card-groups")
+    delete_response = client.delete(
+        f"/settings/card-groups/{group_id}",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert patch_response.status_code == 200
+    assert list_response.status_code == 200
+    assert delete_response.status_code == 204
+    assert patch_response.json()["anchor_card_id"] == replacement_card.id
+    assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
+    assert all(row["id"] != group_id for row in client.get("/settings/card-groups").json())
+
+
 def test_seed_users_creates_missing_configured_users(
     tmp_path: Path,
 ) -> None:
@@ -1152,3 +1252,14 @@ def _create_card_image(version: CardVersion) -> CardVersionImage:
         stored_path=build_storage_relative_path("images", image_path.name),
         checksum=f"checksum-{version.id}",
     )
+
+
+def _create_card_group(name: str, *, anchor_card: Card, members: list[Card]) -> CardGroup:
+    group = CardGroup.objects.create(
+        key=name,
+        name=name.replace("-", " ").title(),
+        anchor_card=anchor_card,
+    )
+    for index, card in enumerate(members, start=1):
+        CardGroupMember.objects.create(group=group, card=card, position=index)
+    return group

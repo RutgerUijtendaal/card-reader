@@ -51,10 +51,22 @@ export type ParseResultSummary = {
   created_at: string;
 } | null;
 
+export type CardGroupSummary = {
+  id: string;
+  key: string;
+  name: string;
+  anchor_card_id: string;
+  member_count: number;
+  card_ids: string[];
+  is_anchor: boolean;
+  position: number | null;
+};
+
 export type CardDetail = {
   id: string;
   label: string;
   name: string;
+  card_groups: CardGroupSummary[];
 };
 
 export type CardVersionDetail = CardHoverTooltipModel & {
@@ -71,10 +83,47 @@ export type CardVersionDetail = CardHoverTooltipModel & {
 };
 
 export type CardListItem = CardHoverTooltipModel & {
+  result_type: 'card';
   image_url: string | null;
 };
 
-export type PaginatedCardsResponse<TCard = CardListItem> = {
+export type CardGroupPreviewCard = {
+  card_id: string;
+  position: number;
+  name: string;
+  image_url: string | null;
+};
+
+export type CardGroupGalleryItem = {
+  id: string;
+  result_type: 'card_group';
+  group_id: string;
+  group_key: string;
+  group_name: string;
+  anchor_card_id: string;
+  anchor_card_name: string;
+  member_count: number;
+  preview_cards: CardGroupPreviewCard[];
+};
+
+export type GalleryItem = CardListItem | CardGroupGalleryItem;
+
+export type CardGroupMemberDetail = {
+  position: number;
+  is_anchor: boolean;
+  card: CardVersionDetail;
+};
+
+export type CardGroupDetail = {
+  id: string;
+  key: string;
+  name: string;
+  anchor_card_id: string;
+  member_count: number;
+  members: CardGroupMemberDetail[];
+};
+
+export type PaginatedCardsResponse<TCard = GalleryItem> = {
   count: number;
   next_page: number | null;
   previous_page: number | null;

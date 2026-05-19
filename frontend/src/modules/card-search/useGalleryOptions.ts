@@ -4,11 +4,13 @@ import { useLocalStorage } from '@vueuse/core';
 type GalleryOptionsState = {
   tooltipEnabled: boolean;
   cardScale: number;
+  showCardGroups: boolean;
 };
 
 const DEFAULT_OPTIONS: GalleryOptionsState = {
   tooltipEnabled: true,
   cardScale: 1,
+  showCardGroups: true,
 };
 
 const clampScale = (value: number): number => Math.min(1.2, Math.max(0.8, value));
@@ -38,8 +40,19 @@ export const useGalleryOptions = () => {
     },
   });
 
+  const showCardGroups = computed({
+    get: () => storedOptions.value.showCardGroups,
+    set: (value: boolean) => {
+      storedOptions.value = {
+        ...storedOptions.value,
+        showCardGroups: value,
+      };
+    },
+  });
+
   return {
     tooltipEnabled,
     cardScale,
+    showCardGroups,
   };
 };

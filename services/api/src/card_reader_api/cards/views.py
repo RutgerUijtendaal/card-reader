@@ -12,9 +12,11 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
+from card_reader_api.card_groups.serializers import card_group_gallery_payload
 from card_reader_api.cards.serializers import (
     CardFiltersQuerySerializer,
     LatestVersionUpdateSerializer,
+    card_group_summary_payload,
     card_payload,
     metadata_option,
     symbol_option,
@@ -25,9 +27,11 @@ from card_reader_core.repositories.cards_repository import (
     get_card_image,
     list_card_generations,
     list_cards,
+    list_matching_cards,
     update_latest_card_version,
 )
 from card_reader_core.settings import settings
+from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
     get_card_version_metadata,
@@ -44,7 +48,11 @@ class CardListView(APIView):
         serializer = CardFiltersQuerySerializer(data=_query_data(request, include_paging=True))
         if not serializer.is_valid():
             return _serializer_error(serializer)
-        cards = list_cards(**serializer.validated_list_filters())
+        filters = serializer.validated_list_filters()
+        show_groups = filters.pop("show_groups")
+        if show_groups:
+            return Response(_grouped_gallery_payload(filters))
+        cards = list_cards(**filters)
         payloads = []
         for row in cards.results:
             payloads.append(
@@ -96,6 +104,10 @@ class CardDetailView(APIView):
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
+        card_groups = [
+            card_group_summary_payload(group, card_id=card.id)
+            for group in CardGroupService().get_groups_for_card(card.id)
+        ]
         return Response(
             card_payload(
                 card,
@@ -103,6 +115,7 @@ class CardDetailView(APIView):
                 image_url=f"/cards/{card.id}/image" if image else None,
                 metadata=metadata,
                 edit_state=edit_state,
+                card_groups=card_groups,
             )
         )
 
@@ -261,6 +274,9 @@ def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+    show_groups = request.query_params.get("show_groups")
+    if show_groups is not None:
+        data["show_groups"] = show_groups
     if include_paging:
         page = request.query_params.get("page")
         page_size = request.query_params.get("page_size")
@@ -277,3 +293,61 @@ def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
     if isinstance(detail, list):
         detail = detail[0]
     return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _grouped_gallery_payload(filters: dict[str, object]) -> dict[str, object]:
+    page = int(filters.pop("page", 1))
+    page_size = int(filters.pop("page_size", 72))
+    matching_rows = list_matching_cards(**filters)
+    matching_card_ids = [row.version.card.id for row in matching_rows]
+    groups = CardGroupService().get_groups_for_cards(matching_card_ids)
+
+    participant_card_ids = {
+        member.card_id
+        for group in groups
+        for member in group.members.all()
+    }
+
+    grouped_items: list[tuple[str, object, dict[str, object]]] = []
+    for row in matching_rows:
+        if row.version.card.id in participant_card_ids:
+            continue
+        grouped_items.append(
+            (
+                row.version.updated_at.isoformat(),
+                row.version.card.id,
+                card_payload(
+                    row.version.card,
+                    row.version,
+                    image_url=f"/cards/{row.version.card.id}/image" if row.image else None,
+                    metadata={
+                        "keywords": row.keywords,
+                        "tags": row.tags,
+                        "symbols": row.symbols,
+                        "types": row.types,
+                    },
+                ),
+            )
+        )
+
+    for group in groups:
+        anchor_version = group.anchor_card.latest_version
+        member_ids = {member.card_id for member in group.members.all()}
+        if anchor_version is None or not member_ids.intersection(matching_card_ids):
+            continue
+        grouped_items.append((anchor_version.updated_at.isoformat(), group.id, card_group_gallery_payload(group)))
+
+    grouped_items.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    total_count = len(grouped_items)
+    normalized_page = max(page, 1)
+    normalized_page_size = max(1, min(page_size, 100))
+    offset = (normalized_page - 1) * normalized_page_size
+    results = [payload for _sort_key, _id, payload in grouped_items[offset : offset + normalized_page_size]]
+    return {
+        "count": total_count,
+        "next_page": normalized_page + 1 if normalized_page * normalized_page_size < total_count else None,
+        "previous_page": normalized_page - 1 if normalized_page > 1 else None,
+        "page": normalized_page,
+        "page_size": normalized_page_size,
+        "results": results,
+    }
