@@ -6,6 +6,10 @@ import {
   buildGalleryLocation,
   useGalleryCardNavigation,
 } from '@/modules/card-search/galleryNavigation';
+import {
+  buildSettingsReturnLocation,
+  isSettingsReturnQuery,
+} from '@/modules/settings/settingsRouteState';
 import type {
   CardDetail,
   CardFiltersResponse,
@@ -72,6 +76,10 @@ export const useCardDetailState = () => {
   const isBusy = computed(() => isSaving.value || isQueuingReparse.value);
 
   const goBack = (): void => {
+    if (isSettingsReturnQuery(route.query)) {
+      void router.push(buildSettingsReturnLocation(route.query));
+      return;
+    }
     void router.push(buildGalleryLocation(route.query));
   };
 

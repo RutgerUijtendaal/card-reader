@@ -15,6 +15,14 @@ export type MaintenanceActionResponse = {
   removed_paths: string[];
 };
 
+export type LinkedCardPreview = {
+  card_id: string;
+  card_label: string;
+  card_version_id: string;
+  card_version_name: string;
+  image_url: string | null;
+};
+
 export type OpenStorageLocationResponse = {
   message: string;
   path: string;
@@ -26,6 +34,8 @@ export type KeywordRecord = {
   label: string;
   identifiers: string[];
   identifiers_text: string;
+  linked_cards?: LinkedCardPreview[];
+  linked_card_count?: number;
 };
 
 export type TagRecord = {
@@ -34,6 +44,8 @@ export type TagRecord = {
   label: string;
   identifiers: string[];
   identifiers_text: string;
+  linked_cards?: LinkedCardPreview[];
+  linked_card_count?: number;
 };
 
 export type TypeRecord = {
@@ -42,6 +54,8 @@ export type TypeRecord = {
   label: string;
   identifiers: string[];
   identifiers_text: string;
+  linked_cards?: LinkedCardPreview[];
+  linked_card_count?: number;
 };
 
 export type SymbolRecord = {
@@ -55,6 +69,8 @@ export type SymbolRecord = {
   reference_assets_json: string;
   text_token: string;
   enabled: boolean;
+  linked_cards?: LinkedCardPreview[];
+  linked_card_count?: number;
 };
 
 export type TemplateRecord = {
@@ -93,6 +109,7 @@ export type SymbolApiRecord = {
   reference_assets_json: string[];
   text_token: string;
   enabled: boolean;
+  linked_card_count?: number;
 };
 
 export type TemplateApiRecord = {
@@ -170,6 +187,7 @@ export type SuggestionOccurrencePreview = {
   card_label: string;
   card_version_id: string;
   card_version_name: string;
+  image_url: string | null;
   source_text: string;
   normalized_source_text: string;
 };

@@ -362,6 +362,7 @@ def list_card_version_suggestion_occurrences(
     return list(
         CardVersionMetadataSuggestion.objects.filter(suggestion_id=suggestion_id)
         .select_related("card_version__card", "parse_result")
+        .prefetch_related("card_version__images")
         .order_by("-created_at")
     )
 

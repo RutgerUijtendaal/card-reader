@@ -19,10 +19,14 @@ from card_reader_api.catalog.serializers import (
     SuggestionStatusQuerySerializer,
     SymbolAssetUploadSerializer,
     SymbolWriteSerializer,
+    keyword_detail_payload,
     keyword_payload,
     suggestion_payload,
+    symbol_detail_payload,
     symbol_payload,
+    tag_detail_payload,
     tag_payload,
+    type_detail_payload,
     type_payload,
 )
 from card_reader_core.services.catalog import CatalogService
@@ -56,6 +60,12 @@ class KeywordCreateView(APIView):
 
 
 class KeywordDetailView(APIView):
+    def get(self, _request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_keyword_detail(entry_id=entry_id)
+        if detail is None:
+            return _not_found("Keyword not found")
+        return Response(keyword_detail_payload(detail))
+
     def patch(self, request: Request, entry_id: str) -> Response:
         return _update_simple(request, entry_id, "keyword", keyword_payload, include_identifiers=True)
 
@@ -69,6 +79,12 @@ class TagCreateView(APIView):
 
 
 class TagDetailView(APIView):
+    def get(self, _request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_tag_detail(entry_id=entry_id)
+        if detail is None:
+            return _not_found("Tag not found")
+        return Response(tag_detail_payload(detail))
+
     def patch(self, request: Request, entry_id: str) -> Response:
         return _update_simple(request, entry_id, "tag", tag_payload, include_identifiers=True)
 
@@ -82,6 +98,12 @@ class TypeCreateView(APIView):
 
 
 class TypeDetailView(APIView):
+    def get(self, _request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_type_detail(entry_id=entry_id)
+        if detail is None:
+            return _not_found("Type not found")
+        return Response(type_detail_payload(detail))
+
     def patch(self, request: Request, entry_id: str) -> Response:
         return _update_simple(request, entry_id, "type", type_payload, include_identifiers=True)
 
@@ -112,6 +134,12 @@ class SymbolCreateView(APIView):
 
 
 class SymbolDetailView(APIView):
+    def get(self, _request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_symbol_detail(entry_id=entry_id)
+        if detail is None:
+            return _not_found("Symbol not found")
+        return Response(symbol_detail_payload(detail))
+
     def patch(self, request: Request, entry_id: str) -> Response:
         serializer = SymbolWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():

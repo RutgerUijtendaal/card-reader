@@ -103,7 +103,7 @@
               Linked cards
             </div>
             <div class="mt-1 text-sm text-slate-500">
-              Preview of cards where this suggestion was found.
+              {{ selectedRow.occurrence_count }} cards where this suggestion was found.
             </div>
           </div>
           <button
@@ -116,22 +116,11 @@
           </button>
         </div>
 
-        <div class="mt-4 space-y-3">
-          <div
-            v-for="occurrence in selectedRow.occurrences"
-            :key="`${occurrence.card_version_id}-${occurrence.source_text}`"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-3"
-          >
-            <div class="text-sm font-semibold text-slate-800">
-              {{ occurrence.card_label }}
-            </div>
-            <div class="mt-1 text-xs text-slate-500">
-              {{ occurrence.card_version_name }}
-            </div>
-            <div class="mt-2 text-sm text-slate-700">
-              {{ occurrence.source_text }}
-            </div>
-          </div>
+        <div class="mt-4">
+          <CatalogLinkedCardsGrid
+            :cards="selectedRow.occurrences"
+            empty-message="No linked cards found for this suggestion."
+          />
         </div>
       </div>
     </div>
@@ -140,6 +129,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import CatalogLinkedCardsGrid from '@/modules/settings/components/CatalogLinkedCardsGrid.vue';
 import type {
   CatalogKind,
   SuggestionAcceptNewRequest,

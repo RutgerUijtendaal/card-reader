@@ -36,6 +36,24 @@
         @update:entry="emit('update:entry', $event)"
         @upload-asset="emit('upload-asset')"
       />
+
+      <div
+        v-if="!isCreatingNew"
+        class="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+      >
+        <div class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+          Linked cards
+        </div>
+        <div class="mt-1 text-sm text-slate-500">
+          {{ linkedCardCount }} cards currently use this {{ kindItemLabel(selectedKind).toLowerCase() }}.
+        </div>
+        <div class="mt-4">
+          <CatalogLinkedCardsGrid
+            :cards="linkedCards"
+            :empty-message="`No linked cards found for this ${kindItemLabel(selectedKind).toLowerCase()}.`"
+          />
+        </div>
+      </div>
     </div>
 
     <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 bg-white pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -79,11 +97,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import CatalogLinkedCardsGrid from '@/modules/settings/components/CatalogLinkedCardsGrid.vue';
 import CatalogEntryForm from '@/modules/settings/components/CatalogEntryForm.vue';
 import type {
   CatalogFormEntry,
   CatalogKind,
   CatalogRow,
+  LinkedCardPreview,
 } from '@/modules/settings/types';
 
 const props = defineProps<{
@@ -98,6 +118,8 @@ const props = defineProps<{
   detectionConfigExample: string;
   referenceAssetsExample: string;
   kindItemLabel: (kind: CatalogKind) => string;
+  linkedCards: LinkedCardPreview[];
+  linkedCardCount: number;
 }>();
 
 const emit = defineEmits<{

@@ -15,9 +15,11 @@ import type {
   SymbolRecord,
   SymbolApiRecord,
   SymbolUpsertRequest,
+  TagRecord,
   TagUpsertRequest,
   TemplateApiRecord,
   TemplateRecord,
+  TypeRecord,
   TypeUpsertRequest,
 } from '@/modules/settings/types';
 
@@ -347,11 +349,25 @@ const normalizeSymbolRecord = (row: SymbolApiRecord): SymbolRecord => ({
   reference_assets_json: formatJsonText(row.reference_assets_json, '[]'),
 });
 
-const normalizeSuggestionRecord = (row: SuggestionApiRecord): SuggestionRecord => ({
+export const normalizeSuggestionRecord = (row: SuggestionApiRecord): SuggestionRecord => ({
   ...row,
   label: row.display_value,
   key: row.normalized_value,
 });
+
+export const normalizeKnownCatalogDetail = (
+  kind: KnownCatalogKind,
+  row: KeywordRecord | TagRecord | TypeRecord | SymbolApiRecord | SymbolRecord,
+): KeywordRecord | TagRecord | TypeRecord | SymbolRecord => {
+  if (kind === 'symbols') {
+    return normalizeSymbolRecord(row as SymbolApiRecord);
+  }
+
+  return {
+    ...(row as KeywordRecord | TagRecord | TypeRecord),
+    identifiers_text: formatIdentifiersText((row as KeywordRecord | TagRecord | TypeRecord).identifiers ?? []),
+  };
+};
 
 export const normalizeCatalogResponse = (data: CatalogApiResponse): CatalogResponse => ({
   known: {

@@ -18,7 +18,7 @@
                 ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
                 : 'text-slate-600 hover:bg-white hover:text-slate-900'
             "
-            @click="activeTab = 'catalog'"
+            @click="setActiveTab('catalog')"
           >
             <Tags class="h-4 w-4" />
             <span>Catalog</span>
@@ -31,7 +31,7 @@
                 ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
                 : 'text-slate-600 hover:bg-white hover:text-slate-900'
             "
-            @click="activeTab = 'templates'"
+            @click="setActiveTab('templates')"
           >
             <LayoutTemplate class="h-4 w-4" />
             <span>Templates</span>
@@ -45,7 +45,7 @@
                 ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
                 : 'text-slate-600 hover:bg-white hover:text-slate-900'
             "
-            @click="activeTab = 'maintenance'"
+            @click="setActiveTab('maintenance')"
           >
             <Database class="h-4 w-4" />
             <span>Maintenance</span>
@@ -61,13 +61,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { Database, LayoutTemplate, Settings, Tags } from 'lucide-vue-next';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/modules/auth/authStore';
+import {
+  buildSettingsQuery,
+  parseSettingsTab,
+  type SettingsTab,
+} from '@/modules/settings/settingsRouteState';
 import MaintenanceSettingsView from './views/MaintenanceSettingsView.vue';
 import CatalogSettingsView from './views/CatalogSettingsView.vue';
 import TemplatesSettingsView from './views/TemplatesSettingsView.vue';
 
 const auth = useAuthStore();
-const activeTab = ref<'maintenance' | 'catalog' | 'templates'>('catalog');
+const route = useRoute();
+const router = useRouter();
+const activeTab = ref<SettingsTab>('catalog');
+
+const setActiveTab = (tab: SettingsTab, options: { syncRoute?: boolean } = {}): void => {
+  activeTab.value = tab;
+  if (options.syncRoute === false) {
+    return;
+  }
+  void router.replace({
+    path: '/settings',
+    query: buildSettingsQuery(route.query, { tab }),
+  });
+};
+
+watch(
+  () => route.query,
+  (query) => {
+    const nextTab = parseSettingsTab(query, { allowMaintenance: auth.canAccessMaintenance });
+    if (activeTab.value !== nextTab) {
+      setActiveTab(nextTab, { syncRoute: false });
+    }
+  },
+  { immediate: true },
+);
 </script>

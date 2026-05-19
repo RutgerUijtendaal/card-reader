@@ -5,12 +5,17 @@ import type {
   CatalogResponse,
   KeywordUpsertRequest,
   KnownCatalogKind,
+  KeywordRecord,
   SuggestionAcceptExistingRequest,
   SuggestionAcceptNewRequest,
   SuggestionKind,
+  SuggestionRecord,
+  SymbolRecord,
   SymbolAssetUploadResponse,
   SymbolUpsertRequest,
+  TagRecord,
   TagUpsertRequest,
+  TypeRecord,
   TypeUpsertRequest,
 } from '@/modules/settings/types';
 import {
@@ -59,6 +64,22 @@ export const deleteCatalogEntry = async (kind: CatalogKind, id: string): Promise
     throw new Error('Suggestions cannot be deleted via the catalog CRUD API.');
   }
   await api.delete(pathForKindAndId(kind, id));
+};
+
+export const fetchKnownCatalogEntryDetail = async (
+  kind: KnownCatalogKind,
+  id: string,
+): Promise<KeywordRecord | TagRecord | TypeRecord | SymbolRecord> => {
+  const response = await api.get<KeywordRecord | TagRecord | TypeRecord | SymbolRecord>(pathForKindAndId(kind, id));
+  return response.data;
+};
+
+export const fetchSuggestionDetail = async (
+  kind: SuggestionKind,
+  id: string,
+): Promise<SuggestionRecord> => {
+  const response = await api.get<SuggestionRecord>(`/settings/suggestions/${kind}/${id}`);
+  return response.data;
 };
 
 export const acceptSuggestionToExisting = async (

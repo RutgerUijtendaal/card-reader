@@ -6,7 +6,15 @@ from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
 from card_reader_core.models import Keyword, Symbol, Tag, Type
-from card_reader_core.services.catalog import CatalogSuggestionDetail, SuggestionOccurrencePreview
+from card_reader_core.services.catalog import (
+    CatalogSuggestionDetail,
+    KeywordDetail,
+    LinkedCardPreview,
+    SuggestionOccurrencePreview,
+    SymbolDetail,
+    TagDetail,
+    TypeDetail,
+)
 
 
 CatalogOption = Keyword | Tag | Type
@@ -23,18 +31,21 @@ def _catalog_option_payload(row: CatalogOption) -> dict[str, object]:
 def keyword_payload(row: Keyword) -> dict[str, object]:
     payload = _catalog_option_payload(row)
     payload["identifiers"] = row.identifiers_json
+    payload["linked_card_count"] = int(getattr(row, "linked_card_count", 0))
     return payload
 
 
 def tag_payload(row: Tag) -> dict[str, object]:
     payload = _catalog_option_payload(row)
     payload["identifiers"] = row.identifiers_json
+    payload["linked_card_count"] = int(getattr(row, "linked_card_count", 0))
     return payload
 
 
 def type_payload(row: Type) -> dict[str, object]:
     payload = _catalog_option_payload(row)
     payload["identifiers"] = row.identifiers_json
+    payload["linked_card_count"] = int(getattr(row, "linked_card_count", 0))
     return payload
 
 
@@ -50,6 +61,7 @@ def symbol_payload(row: Symbol) -> dict[str, object]:
         "reference_assets_json": row.reference_assets_json,
         "text_token": row.text_token,
         "enabled": row.enabled,
+        "linked_card_count": int(getattr(row, "linked_card_count", 0)),
     }
 
 
@@ -59,8 +71,19 @@ def suggestion_occurrence_payload(row: SuggestionOccurrencePreview) -> dict[str,
         "card_label": row["card_label"],
         "card_version_id": row["card_version_id"],
         "card_version_name": row["card_version_name"],
+        "image_url": row["image_url"],
         "source_text": row["source_text"],
         "normalized_source_text": row["normalized_source_text"],
+    }
+
+
+def linked_card_payload(row: LinkedCardPreview) -> dict[str, object]:
+    return {
+        "card_id": row["card_id"],
+        "card_label": row["card_label"],
+        "card_version_id": row["card_version_id"],
+        "card_version_name": row["card_version_name"],
+        "image_url": row["image_url"],
     }
 
 
@@ -81,6 +104,34 @@ def suggestion_payload(row: CatalogSuggestionDetail) -> dict[str, object]:
         "accepted_target": accepted_target,
         "occurrences": [suggestion_occurrence_payload(item) for item in row["occurrences"]],
     }
+
+
+def keyword_detail_payload(row: KeywordDetail) -> dict[str, object]:
+    payload = keyword_payload(row["entry"])
+    payload["linked_cards"] = [linked_card_payload(item) for item in row["linked_cards"]]
+    payload["linked_card_count"] = row["linked_card_count"]
+    return payload
+
+
+def tag_detail_payload(row: TagDetail) -> dict[str, object]:
+    payload = tag_payload(row["entry"])
+    payload["linked_cards"] = [linked_card_payload(item) for item in row["linked_cards"]]
+    payload["linked_card_count"] = row["linked_card_count"]
+    return payload
+
+
+def type_detail_payload(row: TypeDetail) -> dict[str, object]:
+    payload = type_payload(row["entry"])
+    payload["linked_cards"] = [linked_card_payload(item) for item in row["linked_cards"]]
+    payload["linked_card_count"] = row["linked_card_count"]
+    return payload
+
+
+def symbol_detail_payload(row: SymbolDetail) -> dict[str, object]:
+    payload = symbol_payload(row["entry"])
+    payload["linked_cards"] = [linked_card_payload(item) for item in row["linked_cards"]]
+    payload["linked_card_count"] = row["linked_card_count"]
+    return payload
 
 
 class CatalogEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
