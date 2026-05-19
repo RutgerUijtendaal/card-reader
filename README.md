@@ -2,7 +2,7 @@
 
 Card Reader is a monorepo for importing, parsing, reviewing, and browsing card data.
 It combines a Django API, a shared Python domain layer, an OCR/parser worker, a Vue web app, and a
-Tauri desktop shell.
+supporting project automation.
 
 # Feature tracker
 
@@ -10,13 +10,12 @@ https://trello.com/b/sCM4JM5V/cards
 
 ## What is in this repo
 
-- `apps/web`: Vue 3 + Vite frontend for gallery, imports, review, settings, and auth flows
-- `apps/desktop`: Tauri wrapper for the web/backend experience
+- `frontend`: Vue 3 + Vite frontend for gallery, imports, review, settings, and auth flows
 - `services/core`: shared Django models, migrations, repositories, services, settings, and storage
 - `services/api`: Django + DRF API service
 - `services/parser`: background OCR/parser worker
 - `services/integration`: integration tests across API, parser, and core
-- `scripts`: project-specific automation for desktop Python packaging and repo versioning
+- `scripts`: project-specific automation for repo versioning
 
 ## Stack
 
@@ -25,7 +24,6 @@ https://trello.com/b/sCM4JM5V/cards
 - Backend: Django, Django REST Framework
 - Python tooling: `uv`, `pytest`, `ruff`, `mypy`
 - OCR/CV: PaddleOCR, PaddleX, OpenCV
-- Desktop: Tauri + Rust
 - Default persistence: SQLite
 
 ## Prerequisites
@@ -34,7 +32,6 @@ https://trello.com/b/sCM4JM5V/cards
 - `pnpm` 10+
 - Python 3.12+
 - `uv`
-- Rust + Cargo for desktop development only
 - Docker for containerized API/parser runs
 
 ## Quick Start
@@ -57,12 +54,6 @@ That starts:
 - the parser worker
 - the web app
 
-Desktop is excluded from the default loop. Use `pnpm dev:desktop` when needed.
-
-Desktop production bundles package a managed Python runtime plus installed backend packages. The
-desktop app launches the API and parser with `python -m ...` rather than frozen PyInstaller
-executables.
-
 ## Local Development
 
 Useful commands from the repo root:
@@ -73,7 +64,6 @@ pnpm deps:js
 pnpm deps:py
 pnpm dev
 pnpm dev:all
-pnpm dev:desktop
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -86,7 +76,6 @@ Targeted commands:
 pnpm --filter @card-reader/web dev
 pnpm --filter @card-reader/api dev
 pnpm --filter @card-reader/parser dev
-pnpm --filter @card-reader/desktop run build:python
 pnpm --filter @card-reader/integration test
 pnpm --filter @card-reader/core lint
 ```

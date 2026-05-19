@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "tests", "../parser/src", "../api/src", "../core/src"]
+pythonpath = ["tests", "../parser/src", "../api/src", "../core/src"]
 
 [tool.ruff]
 line-length = 100
