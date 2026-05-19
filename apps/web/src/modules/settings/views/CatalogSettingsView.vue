@@ -29,7 +29,7 @@
       <CatalogDetailSection
         v-if="!isSuggestedKind"
         :selected-kind="selectedKind"
-        :selected-row="selectedRow"
+        :selected-row="selectedKnownRow"
         :is-creating-new="isCreatingNew"
         :editor-entry="editorEntry"
         :creating-entry="creatingEntry"
@@ -39,6 +39,8 @@
         :detection-config-example="detectionConfigExample"
         :reference-assets-example="referenceAssetsExample"
         :kind-item-label="kindItemLabel"
+        :linked-cards="selectedKnownRow?.linked_cards ?? []"
+        :linked-card-count="selectedKnownRow?.linked_card_count ?? 0"
         @create="createEntry"
         @save="updateSelectedEntry"
         @create-new="startCreateEntry"
@@ -102,7 +104,7 @@ const {
   currentRows,
   currentSearchTerm,
   selectedEntryId,
-  selectedRow,
+  selectedKnownRow,
   selectedSuggestionRow,
   isCreatingNew,
   isSuggestedKind,

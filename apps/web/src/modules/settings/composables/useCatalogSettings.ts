@@ -1,11 +1,24 @@
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import { useRoute, useRouter } from 'vue-router';
 import {
   acceptSuggestionAsNew,
   acceptSuggestionToExisting,
+  fetchKnownCatalogEntryDetail,
   rejectSuggestion,
 } from '@/modules/settings/api/catalog';
-import type { SuggestionRecord, TagRecord, TypeRecord } from '@/modules/settings/types';
+import type {
+  KeywordRecord,
+  SuggestionRecord,
+  SymbolRecord,
+  TagRecord,
+  TypeRecord,
+} from '@/modules/settings/types';
+import {
+  buildSettingsQuery,
+  parseSettingsCatalogKind,
+  parseSettingsEntryId,
+} from '@/modules/settings/settingsRouteState';
 import {
   CATALOG_KIND_GROUPS,
   CATALOG_KINDS,
@@ -15,6 +28,7 @@ import {
   isSuggestedCatalogKind,
   kindItemLabel,
   kindLabel,
+  normalizeKnownCatalogDetail,
   referenceAssetsExample,
 } from './catalogSettingsUtils';
 import { extractErrorMessage } from './catalogSettingsUtils';
@@ -26,6 +40,8 @@ import { useSymbolAssetUpload } from './useSymbolAssetUpload';
 export { detectionConfigExample, kindItemLabel, kindLabel, referenceAssetsExample };
 
 export const useCatalogSettings = () => {
+  const route = useRoute();
+  const router = useRouter();
   const { newEntry: editorEntry, resetNewEntryForm: resetEditorEntry, setNewEntry: setEditorEntry } =
     useCatalogEntryForm();
   const catalogData = useCatalogData(resetEditorEntry);
@@ -37,6 +53,7 @@ export const useCatalogSettings = () => {
   const suggestionNewLabel = ref('');
   const suggestionNewKey = ref('');
   const suggestionActionLoading = ref(false);
+  const selectedKnownDetail = ref<KeywordRecord | TagRecord | TypeRecord | SymbolRecord | null>(null);
 
   const selectedRow = computed(() =>
     selectedEntryId.value
@@ -46,6 +63,12 @@ export const useCatalogSettings = () => {
   const selectedSuggestionRow = computed(() =>
     selectedRow.value && 'status' in selectedRow.value ? (selectedRow.value as SuggestionRecord) : null,
   );
+  const selectedKnownRow = computed(() => {
+    if (!selectedRow.value || 'status' in selectedRow.value) {
+      return null;
+    }
+    return selectedKnownDetail.value ?? selectedRow.value;
+  });
   const selectedSuggestionKind = computed<'tag' | 'type' | null>(() => {
     const row = selectedSuggestionRow.value;
     return row?.kind ?? null;
@@ -62,55 +85,149 @@ export const useCatalogSettings = () => {
 
   const startCreateEntry = (): void => {
     selectedEntryId.value = null;
+    selectedKnownDetail.value = null;
     resetEditorEntry();
+    void router.replace({
+      path: '/settings',
+      query: buildSettingsQuery(route.query, {
+        tab: 'catalog',
+        kind: catalogData.selectedKind.value,
+        entryId: null,
+      }),
+    });
   };
 
-  const selectEntry = (entryId: string): void => {
+  const selectEntry = async (entryId: string): Promise<void> => {
     const row = catalogData.allCurrentRows.value.find((item) => item.id === entryId);
     if (!row) return;
     selectedEntryId.value = row.id;
     if ('status' in row) {
+      selectedKnownDetail.value = null;
       suggestionExistingTargetId.value = '';
       suggestionNewLabel.value = row.display_value;
       suggestionNewKey.value = '';
+      void router.replace({
+        path: '/settings',
+        query: buildSettingsQuery(route.query, {
+          tab: 'catalog',
+          kind: catalogData.selectedKind.value,
+          entryId: row.id,
+        }),
+      });
       return;
     }
-    setEditorEntry(catalogRowToFormEntry(row));
+    void router.replace({
+      path: '/settings',
+      query: buildSettingsQuery(route.query, {
+        tab: 'catalog',
+        kind: catalogData.selectedKind.value,
+        entryId: row.id,
+      }),
+    });
+    await loadKnownDetail(row.id);
   };
 
   const selectKind = (kind: (typeof CATALOG_KINDS)[number]): void => {
     catalogData.selectKind(kind);
-    startCreateEntry();
+    selectedEntryId.value = null;
+    selectedKnownDetail.value = null;
+    resetEditorEntry();
+    void router.replace({
+      path: '/settings',
+      query: buildSettingsQuery(route.query, {
+        tab: 'catalog',
+        kind,
+        entryId: null,
+      }),
+    });
   };
 
-  watch(selectedRow, (row) => {
-    if (row) {
-      setEditorEntry(catalogRowToFormEntry(row));
+  watch(
+    () => route.query,
+    async (query) => {
+      const routeKind = parseSettingsCatalogKind(query);
+      const routeEntryId = parseSettingsEntryId(query);
+
+      if (catalogData.selectedKind.value !== routeKind) {
+        catalogData.selectKind(routeKind);
+      }
+
+      if (!routeEntryId) {
+        if (selectedEntryId.value !== null) {
+          selectedEntryId.value = null;
+          selectedKnownDetail.value = null;
+          resetEditorEntry();
+        }
+        return;
+      }
+
+      if (selectedEntryId.value !== routeEntryId) {
+        await selectEntry(routeEntryId);
+      }
+    },
+    { immediate: true },
+  );
+
+  const loadCatalog = async (): Promise<void> => {
+    await catalogData.loadCatalog();
+    const routeKind = parseSettingsCatalogKind(route.query);
+    const routeEntryId = parseSettingsEntryId(route.query);
+
+    if (catalogData.selectedKind.value !== routeKind) {
+      catalogData.selectKind(routeKind);
+    }
+
+    if (!routeEntryId) {
       return;
     }
 
-    if (selectedEntryId.value) {
-      startCreateEntry();
+    if (selectedEntryId.value !== routeEntryId) {
+      await selectEntry(routeEntryId);
+      return;
     }
-  });
+
+    if (selectedEntryId.value && isKnownCatalogKind(catalogData.selectedKind.value)) {
+      await loadKnownDetail(selectedEntryId.value);
+    }
+  };
 
   const entryActions = useCatalogEntryActions({
     selectedKind: catalogData.selectedKind,
     editorEntry,
     selectedEntryId,
-    loadCatalog: catalogData.loadCatalog,
+    loadCatalog,
     resetEditorEntry,
   });
   const symbolAssetUpload = useSymbolAssetUpload(editorEntry);
 
   const reloadSuggestions = async (): Promise<void> => {
-    await catalogData.loadCatalog();
+    await loadCatalog();
     if (!selectedEntryId.value) {
       return;
     }
     const row = catalogData.allCurrentRows.value.find((item) => item.id === selectedEntryId.value);
     if (row && 'status' in row) {
       suggestionNewLabel.value = row.display_value;
+    }
+  };
+
+  const loadKnownDetail = async (entryId: string): Promise<void> => {
+    const detailKind = catalogData.selectedKind.value;
+    if (!isKnownCatalogKind(detailKind)) {
+      selectedKnownDetail.value = null;
+      return;
+    }
+    try {
+      const detail = await fetchKnownCatalogEntryDetail(detailKind, entryId);
+      const normalized = normalizeKnownCatalogDetail(detailKind, detail);
+      if (selectedEntryId.value !== entryId || catalogData.selectedKind.value !== detailKind) {
+        return;
+      }
+      selectedKnownDetail.value = normalized;
+      setEditorEntry(catalogRowToFormEntry(normalized));
+    } catch (error) {
+      selectedKnownDetail.value = null;
+      toast.error(extractErrorMessage(error, 'Failed to load entry details.'));
     }
   };
 
@@ -181,6 +298,7 @@ export const useCatalogSettings = () => {
     currentRows: catalogData.currentRows,
     selectedEntryId,
     selectedRow,
+    selectedKnownRow,
     selectedSuggestionRow,
     isCreatingNew,
     isSuggestedKind,
@@ -204,7 +322,7 @@ export const useCatalogSettings = () => {
     kindLabel,
     selectKind,
     setSearchTerm: catalogData.setSearchTerm,
-    loadCatalog: catalogData.loadCatalog,
+    loadCatalog,
     startCreateEntry,
     selectEntry,
     createEntry: entryActions.createEntry,

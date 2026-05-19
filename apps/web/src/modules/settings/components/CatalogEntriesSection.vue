@@ -73,7 +73,7 @@
             <span
               v-for="badge in entryBadges(entry)"
               :key="badge.label"
-              class="rounded-full px-2 py-1 text-[11px] font-medium"
+              class="rounded-full px-2 py-1 text-[11px] font-medium text-nowrap"
               :class="badge.tone"
             >
               {{ badge.label }}

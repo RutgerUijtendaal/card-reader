@@ -4,8 +4,18 @@ import json
 from typing import Any, TypedDict, cast
 
 from django.db import transaction
+from django.db.models import QuerySet
 
-from card_reader_core.models import Keyword, MetadataSuggestion, Symbol, Tag, Type, now_utc
+from card_reader_core.models import (
+    CardVersion,
+    CardVersionImage,
+    Keyword,
+    MetadataSuggestion,
+    Symbol,
+    Tag,
+    Type,
+    now_utc,
+)
 from card_reader_core.repositories.cards_repository import decode_field_sources
 from card_reader_core.repositories.helpers import normalize_slug_key
 from card_reader_core.repositories.metadata_repository import (
@@ -69,8 +79,17 @@ class SuggestionOccurrencePreview(TypedDict):
     card_label: str
     card_version_id: str
     card_version_name: str
+    image_url: str | None
     source_text: str
     normalized_source_text: str
+
+
+class LinkedCardPreview(TypedDict):
+    card_id: str
+    card_label: str
+    card_version_id: str
+    card_version_name: str
+    image_url: str | None
 
 
 class CatalogSuggestionDetail(TypedDict):
@@ -83,6 +102,30 @@ class CatalogSuggestionDetail(TypedDict):
     accepted_tag: Tag | None
     accepted_type: Type | None
     occurrences: list[SuggestionOccurrencePreview]
+
+
+class KeywordDetail(TypedDict):
+    entry: Keyword
+    linked_cards: list[LinkedCardPreview]
+    linked_card_count: int
+
+
+class TagDetail(TypedDict):
+    entry: Tag
+    linked_cards: list[LinkedCardPreview]
+    linked_card_count: int
+
+
+class TypeDetail(TypedDict):
+    entry: Type
+    linked_cards: list[LinkedCardPreview]
+    linked_card_count: int
+
+
+class SymbolDetail(TypedDict):
+    entry: Symbol
+    linked_cards: list[LinkedCardPreview]
+    linked_card_count: int
 
 
 class CatalogService:
@@ -119,6 +162,70 @@ class CatalogService:
         suggestion.updated_at = now_utc()
         suggestion.save(update_fields=["status", "updated_at"])
         return suggestion
+
+    def get_keyword_detail(self, *, entry_id: str) -> KeywordDetail | None:
+        entry = get_keyword(entry_id)
+        if entry is None:
+            return None
+        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
+            CardVersion.objects.filter(
+                is_latest=True,
+                card_version_keywords__keyword_id=entry_id,
+            ),
+        )
+        return {
+            "entry": entry,
+            "linked_cards": linked_cards,
+            "linked_card_count": linked_card_count,
+        }
+
+    def get_tag_detail(self, *, entry_id: str) -> TagDetail | None:
+        entry = get_tag(entry_id)
+        if entry is None:
+            return None
+        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
+            CardVersion.objects.filter(
+                is_latest=True,
+                card_version_tags__tag_id=entry_id,
+            ),
+        )
+        return {
+            "entry": entry,
+            "linked_cards": linked_cards,
+            "linked_card_count": linked_card_count,
+        }
+
+    def get_type_detail(self, *, entry_id: str) -> TypeDetail | None:
+        entry = get_type(entry_id)
+        if entry is None:
+            return None
+        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
+            CardVersion.objects.filter(
+                is_latest=True,
+                card_version_types__type_id=entry_id,
+            ),
+        )
+        return {
+            "entry": entry,
+            "linked_cards": linked_cards,
+            "linked_card_count": linked_card_count,
+        }
+
+    def get_symbol_detail(self, *, entry_id: str) -> SymbolDetail | None:
+        entry = get_symbol(entry_id)
+        if entry is None:
+            return None
+        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
+            CardVersion.objects.filter(
+                is_latest=True,
+                card_version_symbols__symbol_id=entry_id,
+            ),
+        )
+        return {
+            "entry": entry,
+            "linked_cards": linked_cards,
+            "linked_card_count": linked_card_count,
+        }
 
     def accept_suggestion_to_existing(
         self,
@@ -463,12 +570,14 @@ class CatalogService:
         for occurrence in occurrences[:5]:
             card_version = occurrence.card_version
             card = card_version.card
+            image = next(iter(cast(Any, card_version).images.all()), None)
             previews.append(
                 {
                     "card_id": card.id,
                     "card_label": card.label,
                     "card_version_id": card_version.id,
                     "card_version_name": card_version.name,
+                    "image_url": self._image_url(card.id, card_version.id, image),
                     "source_text": occurrence.source_text,
                     "normalized_source_text": occurrence.normalized_source_text,
                 }
@@ -530,6 +639,38 @@ class CatalogService:
         suggestion.accepted_type = target_type
         suggestion.updated_at = now_utc()
         suggestion.save(update_fields=["status", "accepted_tag", "accepted_type", "updated_at"])
+
+    def _linked_cards_for_latest_versions(
+        self,
+        queryset: QuerySet[CardVersion],
+        *,
+        limit: int = 12,
+    ) -> tuple[list[LinkedCardPreview], int]:
+        versions = queryset.select_related("card").prefetch_related("images").order_by("-updated_at").distinct()
+        linked_card_count = versions.count()
+        previews: list[LinkedCardPreview] = []
+        for version in versions[:limit]:
+            image = next(iter(cast(Any, version).images.all()), None)
+            previews.append(
+                {
+                    "card_id": version.card.id,
+                    "card_label": version.card.label,
+                    "card_version_id": version.id,
+                    "card_version_name": version.name,
+                    "image_url": self._image_url(version.card.id, version.id, image),
+                }
+            )
+        return previews, linked_card_count
+
+    def _image_url(
+        self,
+        card_id: str,
+        card_version_id: str,
+        image: CardVersionImage | None,
+    ) -> str | None:
+        if image is None:
+            return None
+        return f"/cards/{card_id}/versions/{card_version_id}/image"
 
     def _ensure_unique(self, kind: str, key: str, exclude_id: str | None = None) -> None:
         exists_checks = {
