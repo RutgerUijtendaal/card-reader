@@ -1,7 +1,7 @@
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from 'vue-router';
 import type { CatalogKind } from '@/modules/settings/types';
 
-export type SettingsTab = 'catalog' | 'templates' | 'maintenance';
+export type SettingsTab = 'catalog' | 'templates' | 'card-groups' | 'maintenance';
 
 const SETTINGS_RETURN_TO = 'settings';
 const SETTINGS_TAB_QUERY_KEY = 'settings_tab';
@@ -18,7 +18,7 @@ const CATALOG_KINDS: CatalogKind[] = [
   'suggested-types',
 ];
 
-const SETTINGS_TABS: SettingsTab[] = ['catalog', 'templates', 'maintenance'];
+const SETTINGS_TABS: SettingsTab[] = ['catalog', 'templates', 'card-groups', 'maintenance'];
 
 const queryString = (value: unknown): string | null =>
   typeof value === 'string' && value.trim().length > 0 ? value : null;

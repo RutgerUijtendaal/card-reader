@@ -3,6 +3,7 @@ import { useAuthStore } from '@/modules/auth/authStore';
 import LoginPage from '@/modules/auth/LoginPage.vue';
 import ImportJobsPage from '@/modules/import-jobs/ImportJobsPage.vue';
 import CardSearchPage from '@/modules/card-search/CardSearchPage.vue';
+import CardGroupDetailPage from '@/modules/card-groups/CardGroupDetailPage.vue';
 import CardDetailPage from '@/modules/card-detail/CardDetailPage.vue';
 import CardPublicDetailPage from '@/modules/card-detail/CardPublicDetailPage.vue';
 import ReviewQueuePage from '@/modules/review-queue/ReviewQueuePage.vue';
@@ -14,6 +15,7 @@ export const router = createRouter({
     { path: '/', redirect: '/cards' },
     { path: '/cards', component: CardSearchPage },
     { path: '/cards/:id', component: CardPublicDetailPage, props: true },
+    { path: '/card-groups/:id', component: CardGroupDetailPage, props: true },
     { path: '/login', component: LoginPage, meta: { public: true } },
     { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true } },
     { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true } },

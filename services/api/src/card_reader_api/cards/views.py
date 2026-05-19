@@ -12,9 +12,12 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
+from card_reader_api.card_groups.serializers import card_group_gallery_payload
 from card_reader_api.cards.serializers import (
+    CardListFilterParams,
     CardFiltersQuerySerializer,
     LatestVersionUpdateSerializer,
+    card_group_summary_payload,
     card_payload,
     metadata_option,
     symbol_option,
@@ -25,9 +28,11 @@ from card_reader_core.repositories.cards_repository import (
     get_card_image,
     list_card_generations,
     list_cards,
+    list_matching_cards,
     update_latest_card_version,
 )
 from card_reader_core.settings import settings
+from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
     get_card_version_metadata,
@@ -44,7 +49,38 @@ class CardListView(APIView):
         serializer = CardFiltersQuerySerializer(data=_query_data(request, include_paging=True))
         if not serializer.is_valid():
             return _serializer_error(serializer)
-        cards = list_cards(**serializer.validated_list_filters())
+        filters = serializer.validated_list_filters()
+        show_groups = filters["show_groups"]
+        if show_groups:
+            return Response(_grouped_gallery_payload(filters))
+        cards = list_cards(
+            query=filters["query"],
+            max_confidence=filters["max_confidence"],
+            keyword_ids=filters["keyword_ids"],
+            keyword_match=filters["keyword_match"],
+            tag_ids=filters["tag_ids"],
+            tag_match=filters["tag_match"],
+            mana_symbol_ids=filters["mana_symbol_ids"],
+            mana_symbol_match=filters["mana_symbol_match"],
+            affinity_symbol_ids=filters["affinity_symbol_ids"],
+            affinity_symbol_match=filters["affinity_symbol_match"],
+            devotion_symbol_ids=filters["devotion_symbol_ids"],
+            devotion_symbol_match=filters["devotion_symbol_match"],
+            other_symbol_ids=filters["other_symbol_ids"],
+            other_symbol_match=filters["other_symbol_match"],
+            symbol_ids=filters["symbol_ids"],
+            type_ids=filters["type_ids"],
+            type_match=filters["type_match"],
+            mana_cost_min=filters["mana_cost_min"],
+            mana_cost_max=filters["mana_cost_max"],
+            template_id=filters["template_id"],
+            attack_min=filters["attack_min"],
+            attack_max=filters["attack_max"],
+            health_min=filters["health_min"],
+            health_max=filters["health_max"],
+            page=filters["page"],
+            page_size=filters["page_size"],
+        )
         payloads = []
         for row in cards.results:
             payloads.append(
@@ -96,6 +132,10 @@ class CardDetailView(APIView):
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
+        card_groups = [
+            card_group_summary_payload(group, card_id=card.id)
+            for group in CardGroupService().get_groups_for_card(card.id)
+        ]
         return Response(
             card_payload(
                 card,
@@ -103,6 +143,7 @@ class CardDetailView(APIView):
                 image_url=f"/cards/{card.id}/image" if image else None,
                 metadata=metadata,
                 edit_state=edit_state,
+                card_groups=card_groups,
             )
         )
 
@@ -261,6 +302,9 @@ def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+    show_groups = request.query_params.get("show_groups")
+    if show_groups is not None:
+        data["show_groups"] = show_groups
     if include_paging:
         page = request.query_params.get("page")
         page_size = request.query_params.get("page_size")
@@ -277,3 +321,86 @@ def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
     if isinstance(detail, list):
         detail = detail[0]
     return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
+    page = filters["page"]
+    page_size = filters["page_size"]
+    matching_rows = list_matching_cards(
+        query=filters["query"],
+        max_confidence=filters["max_confidence"],
+        keyword_ids=filters["keyword_ids"],
+        keyword_match=filters["keyword_match"],
+        tag_ids=filters["tag_ids"],
+        tag_match=filters["tag_match"],
+        mana_symbol_ids=filters["mana_symbol_ids"],
+        mana_symbol_match=filters["mana_symbol_match"],
+        affinity_symbol_ids=filters["affinity_symbol_ids"],
+        affinity_symbol_match=filters["affinity_symbol_match"],
+        devotion_symbol_ids=filters["devotion_symbol_ids"],
+        devotion_symbol_match=filters["devotion_symbol_match"],
+        other_symbol_ids=filters["other_symbol_ids"],
+        other_symbol_match=filters["other_symbol_match"],
+        symbol_ids=filters["symbol_ids"],
+        type_ids=filters["type_ids"],
+        type_match=filters["type_match"],
+        mana_cost_min=filters["mana_cost_min"],
+        mana_cost_max=filters["mana_cost_max"],
+        template_id=filters["template_id"],
+        attack_min=filters["attack_min"],
+        attack_max=filters["attack_max"],
+        health_min=filters["health_min"],
+        health_max=filters["health_max"],
+    )
+    matching_card_ids = [row.version.card.id for row in matching_rows]
+    groups = CardGroupService().get_groups_for_cards(matching_card_ids)
+
+    participant_card_ids = {
+        member.card.id
+        for group in groups
+        for member in cast(Any, group).members.all()
+    }
+
+    grouped_items: list[tuple[str, object, dict[str, object]]] = []
+    for row in matching_rows:
+        if row.version.card.id in participant_card_ids:
+            continue
+        grouped_items.append(
+            (
+                row.version.updated_at.isoformat(),
+                row.version.card.id,
+                card_payload(
+                    row.version.card,
+                    row.version,
+                    image_url=f"/cards/{row.version.card.id}/image" if row.image else None,
+                    metadata={
+                        "keywords": row.keywords,
+                        "tags": row.tags,
+                        "symbols": row.symbols,
+                        "types": row.types,
+                    },
+                ),
+            )
+        )
+
+    for group in groups:
+        anchor_version = group.anchor_card.latest_version
+        member_ids = {member.card.id for member in cast(Any, group).members.all()}
+        if anchor_version is None or not member_ids.intersection(matching_card_ids):
+            continue
+        grouped_items.append((anchor_version.updated_at.isoformat(), group.id, card_group_gallery_payload(group)))
+
+    grouped_items.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    total_count = len(grouped_items)
+    normalized_page = max(page, 1)
+    normalized_page_size = max(1, min(page_size, 100))
+    offset = (normalized_page - 1) * normalized_page_size
+    results = [payload for _sort_key, _id, payload in grouped_items[offset : offset + normalized_page_size]]
+    return {
+        "count": total_count,
+        "next_page": normalized_page + 1 if normalized_page * normalized_page_size < total_count else None,
+        "previous_page": normalized_page - 1 if normalized_page > 1 else None,
+        "page": normalized_page,
+        "page_size": normalized_page_size,
+        "results": results,
+    }

@@ -146,8 +146,10 @@
         <GalleryOptionsMenu
           :tooltip-enabled="tooltipEnabled"
           :card-scale="cardScale"
+          :show-card-groups="showCardGroups"
           @update:tooltip-enabled="tooltipEnabled = $event"
           @update:card-scale="cardScale = $event"
+          @update:show-card-groups="showCardGroups = $event"
         />
         <button
           class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
@@ -212,10 +214,11 @@ import { useCsvExport } from '@/composables/useCsvExport';
 import { useScrollContainer } from '@/composables/useScrollContainer';
 import MetadataChecklistGroup from '@/components/filters/MetadataChecklistGroup.vue';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
-import CardGalleryItem, { type CardGalleryItemModel } from '@/components/cards/CardGalleryItem.vue';
+import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import type {
   CardFiltersResponse,
+  GalleryItem,
   PaginatedCardsResponse,
 } from '@/modules/card-detail/types';
 import {
@@ -280,7 +283,7 @@ const {
   readFilterState,
   reset: resetCardFilterState,
 } = useCardFilterState(filterCatalog);
-const galleryState = ref(createEmptyGalleryPageState<CardGalleryItemModel>());
+const galleryState = ref(createEmptyGalleryPageState<GalleryItem>());
 const cards = computed(() => galleryState.value.cards);
 const totalCount = computed(() => galleryState.value.count);
 const nextPage = computed(() => galleryState.value.nextPage);
@@ -292,7 +295,7 @@ const isLoadingPage = ref(false);
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 let latestSearchRequestId = 0;
 const { exportCardsCsv } = useCsvExport();
-const { tooltipEnabled, cardScale } = useGalleryOptions();
+const { tooltipEnabled, cardScale, showCardGroups } = useGalleryOptions();
 const manaTypeOptions = computed(() => filterCatalog.value.manaSymbols);
 const affinityTypeOptions = computed(() => filterCatalog.value.affinitySymbols);
 const devotionTypeOptions = computed(() => filterCatalog.value.devotionSymbols);
@@ -358,6 +361,9 @@ const restoreScroll = (value: number): void => {
 const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
   const requestId = ++latestSearchRequestId;
   const params = buildCardFilterApiSearchParams(selectionState.value);
+  if (showCardGroups.value) {
+    params.set('show_groups', 'true');
+  }
   params.set('page', String(page));
   params.set('page_size', '72');
   if (mode === 'replace') {
@@ -367,7 +373,7 @@ const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<
   }
 
   try {
-    const response = await api.get<PaginatedCardsResponse<CardGalleryItemModel>>(`/cards?${params.toString()}`);
+    const response = await api.get<PaginatedCardsResponse<GalleryItem>>(`/cards?${params.toString()}`);
     if (!isLatestGalleryRequest(requestId, latestSearchRequestId)) {
       return;
     }
@@ -384,7 +390,7 @@ const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<
 };
 
 const searchCards = async (): Promise<void> => {
-  galleryState.value = createEmptyGalleryPageState<CardGalleryItemModel>();
+  galleryState.value = createEmptyGalleryPageState<GalleryItem>();
   await loadCardsPage(1, 'replace');
 };
 
@@ -414,8 +420,15 @@ const debouncedUpdateRoute = useDebounceFn(() => {
 }, 250);
 
 const observedFilterState = computed(() => selectionState.value);
-const galleryNavigationSearchParams = computed(() =>
-  buildCardFilterApiSearchParams(selectionState.value).toString(),
+const galleryNavigationSearchParams = computed(() => {
+  const params = buildCardFilterApiSearchParams(selectionState.value);
+  if (showCardGroups.value) {
+    params.set('show_groups', 'true');
+  }
+  return params.toString();
+});
+const galleryRequestSignature = computed(
+  () => `${currentRouteSignature.value}::${showCardGroups.value ? 'groups' : 'cards'}`,
 );
 
 watch(
@@ -438,20 +451,20 @@ useIntersectionObserver(
 
 watch(
   () => ({
-    cardIds: cards.value.map((card) => card.id),
+    cards: cards.value.map((card) => ({ id: card.id, result_type: card.result_type })),
     totalCount: totalCount.value,
     nextPage: nextPage.value,
     pageSize: galleryState.value.pageSize,
     searchParams: galleryNavigationSearchParams.value,
   }),
-  ({ cardIds, totalCount, nextPage, pageSize, searchParams }) => {
-    setGalleryNavigationCards(cardIds, totalCount, nextPage, pageSize, searchParams);
+  ({ cards, totalCount, nextPage, pageSize, searchParams }) => {
+    setGalleryNavigationCards(cards, totalCount, nextPage, pageSize, searchParams);
   },
   { immediate: true },
 );
 
 watch(
-  [currentRouteSignature, filtersLoaded],
+  [galleryRequestSignature, filtersLoaded],
   async ([searchParams, ready]) => {
     if (!ready) {
       return;
@@ -462,7 +475,7 @@ watch(
       applyFilterState(routeState);
     }
 
-    const snapshot = getGallerySnapshot<CardGalleryItemModel>(searchParams);
+    const snapshot = getGallerySnapshot<GalleryItem>(searchParams);
     if (snapshot) {
       galleryState.value = snapshot.pageState;
       isLoadingInitial.value = false;
@@ -486,7 +499,7 @@ const resetFilters = (): void => {
 };
 
 onBeforeRouteLeave(() => {
-  saveGallerySnapshot(currentRouteSignature.value, galleryState.value, scrollTopRef.value);
+  saveGallerySnapshot(galleryRequestSignature.value, galleryState.value, scrollTopRef.value);
 });
 
 onMounted(() => {

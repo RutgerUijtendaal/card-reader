@@ -11,6 +11,7 @@ urlpatterns = [
     path("auth/", include("card_reader_api.auth.urls")),
     path("", include("card_reader_api.imports.urls")),
     path("", include("card_reader_api.cards.urls")),
+    path("", include("card_reader_api.card_groups.urls")),
     path("", include("card_reader_api.catalog.urls")),
     path("", include("card_reader_api.templates.urls")),
     path("", include("card_reader_api.exports.urls")),

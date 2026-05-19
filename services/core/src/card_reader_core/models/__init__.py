@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 # not sufficient for ORM relation resolution across modules.
 _REGISTERED_MODEL_MODULES = (
     import_module(".card", __name__),
+    import_module(".card_group", __name__),
     import_module(".card_version", __name__),
     import_module(".import_job", __name__),
     import_module(".metadata", __name__),
@@ -17,6 +18,7 @@ _REGISTERED_MODEL_MODULES = (
 if TYPE_CHECKING:
     from .base import now_utc
     from .card import Card
+    from .card_group import CardGroup, CardGroupMember
     from .card_version import CardVersion, CardVersionImage, ParseResult
     from .import_job import ImportJob, ImportJobItem, ImportJobStatus
     from .metadata import (
@@ -39,6 +41,8 @@ _EXPORTS = {
     "ImportJob": ".import_job",
     "ImportJobItem": ".import_job",
     "Card": ".card",
+    "CardGroup": ".card_group",
+    "CardGroupMember": ".card_group",
     "CardVersion": ".card_version",
     "CardVersionImage": ".card_version",
     "ParseResult": ".card_version",
@@ -61,6 +65,8 @@ __all__ = [
     "ImportJob",
     "ImportJobItem",
     "Card",
+    "CardGroup",
+    "CardGroupMember",
     "CardVersion",
     "CardVersionImage",
     "ParseResult",

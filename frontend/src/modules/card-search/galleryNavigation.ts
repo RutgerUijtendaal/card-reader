@@ -12,10 +12,11 @@ import {
   parseCardFilterRouteQuery,
 } from '@/modules/card-filters/cardFilterState';
 import type { GalleryPageState } from '@/modules/card-search/galleryState';
-import type { PaginatedCardsResponse } from '@/modules/card-detail/types';
+import type { GalleryItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 
 type GalleryNavigationCard = {
   id: string;
+  result_type: 'card' | 'card_group';
 };
 
 type GallerySnapshot<TCard extends GalleryNavigationCard> = {
@@ -24,7 +25,7 @@ type GallerySnapshot<TCard extends GalleryNavigationCard> = {
   scrollTop: number;
 };
 
-const galleryCardIds = ref<string[]>([]);
+const galleryCards = ref<GalleryNavigationCard[]>([]);
 const galleryTotalCount = ref(0);
 const galleryNextPage = ref<number | null>(null);
 const galleryPageSize = ref(72);
@@ -56,6 +57,20 @@ export const buildCardDetailLocation = (
   path: mode === 'edit' ? `/cards/${cardId}/edit` : `/cards/${cardId}`,
   query: getGalleryRouteQuery(query),
 });
+
+export const buildGalleryItemLocation = (
+  item: Pick<GalleryItem, 'id' | 'result_type'>,
+  query: LocationQuery,
+  mode: 'detail' | 'edit',
+): RouteLocationRaw => {
+  if (item.result_type === 'card_group') {
+    return {
+      path: `/card-groups/${item.id}`,
+      query: getGalleryRouteQuery(query),
+    };
+  }
+  return buildCardDetailLocation(item.id, query, mode);
+};
 
 export const saveGallerySnapshot = <TCard extends GalleryNavigationCard>(
   searchParams: string,
@@ -96,13 +111,13 @@ export const getGallerySnapshot = <TCard extends GalleryNavigationCard>(
 };
 
 export const setGalleryNavigationCards = (
-  cardIds: string[],
+  cards: GalleryNavigationCard[],
   totalCount: number,
   nextPage: number | null,
   pageSize: number,
   searchParams: string,
 ): void => {
-  galleryCardIds.value = cardIds;
+  galleryCards.value = cards;
   galleryTotalCount.value = totalCount;
   galleryNextPage.value = nextPage;
   galleryPageSize.value = pageSize;
@@ -135,11 +150,9 @@ const loadMoreGalleryCards = async (): Promise<void> => {
     isLoadingMoreCards.value = true;
     try {
       const response = await api.get<PaginatedCardsResponse<GalleryNavigationCard>>(`/cards?${queryString}`);
-      const seen = new Set(galleryCardIds.value);
-      const appendedIds = response.data.results
-        .map((card) => card.id)
-        .filter((cardId) => !seen.has(cardId));
-      galleryCardIds.value = [...galleryCardIds.value, ...appendedIds];
+      const seen = new Set(galleryCards.value.map((card) => `${card.result_type}:${card.id}`));
+      const appendedCards = response.data.results.filter((card) => !seen.has(`${card.result_type}:${card.id}`));
+      galleryCards.value = [...galleryCards.value, ...appendedCards];
       galleryTotalCount.value = response.data.count;
       galleryNextPage.value = response.data.next_page;
       galleryPageSize.value = response.data.page_size;
@@ -158,51 +171,61 @@ export const useGalleryCardNavigation = (
   mode: 'detail' | 'edit',
 ) => {
   const currentCardId = computed(() => String(route.params.id ?? ''));
-  const currentIndex = computed(() => galleryCardIds.value.findIndex((cardId) => cardId === currentCardId.value));
-  const hasGalleryContext = computed(() => currentIndex.value >= 0);
-  const previousCardId = computed(() =>
-    currentIndex.value > 0 ? galleryCardIds.value[currentIndex.value - 1] : null,
+  const currentResultType = computed<'card' | 'card_group'>(() =>
+    route.path.startsWith('/card-groups/') ? 'card_group' : 'card',
   );
-  const nextCardId = computed(() =>
-    currentIndex.value >= 0 && currentIndex.value < galleryCardIds.value.length - 1
-      ? galleryCardIds.value[currentIndex.value + 1]
+  const navigationCards = computed(() =>
+    mode === 'edit' ? galleryCards.value.filter((card) => card.result_type === 'card') : galleryCards.value,
+  );
+  const currentIndex = computed(() =>
+    navigationCards.value.findIndex(
+      (card) => card.id === currentCardId.value && card.result_type === currentResultType.value,
+    ),
+  );
+  const hasGalleryContext = computed(() => currentIndex.value >= 0);
+  const previousCard = computed(() =>
+    currentIndex.value > 0 ? navigationCards.value[currentIndex.value - 1] : null,
+  );
+  const nextCard = computed(() =>
+    currentIndex.value >= 0 && currentIndex.value < navigationCards.value.length - 1
+      ? navigationCards.value[currentIndex.value + 1]
       : null,
   );
   const hasMoreResults = computed(() => galleryNextPage.value !== null);
   const positionLabel = computed(() => {
     if (!hasGalleryContext.value) return '';
-    return `${currentIndex.value + 1} of ${galleryTotalCount.value || galleryCardIds.value.length}`;
+    return `${currentIndex.value + 1} of ${galleryTotalCount.value || navigationCards.value.length}`;
   });
 
-  const navigateToCard = (cardId: string | null): void => {
-    if (!cardId) return;
-    void router.push(buildCardDetailLocation(cardId, route.query, mode));
+  const navigateToCard = (card: GalleryNavigationCard | null): void => {
+    if (!card) return;
+    void router.push(buildGalleryItemLocation(card, route.query, mode));
   };
 
   const goToPreviousCard = (): void => {
-    navigateToCard(previousCardId.value);
+    navigateToCard(previousCard.value);
   };
 
   const goToNextCard = async (): Promise<void> => {
-    if (nextCardId.value) {
-      navigateToCard(nextCardId.value);
+    if (nextCard.value) {
+      navigateToCard(nextCard.value);
       return;
     }
 
     const isAtLoadedEnd =
-      currentIndex.value >= 0 && currentIndex.value === galleryCardIds.value.length - 1;
+      currentIndex.value >= 0 && currentIndex.value === navigationCards.value.length - 1;
     if (!isAtLoadedEnd || !hasMoreResults.value) {
       return;
     }
 
     await loadMoreGalleryCards();
-    navigateToCard(nextCardId.value);
+    navigateToCard(nextCard.value);
   };
 
   return {
     hasGalleryContext,
-    previousCardId,
-    nextCardId,
+    previousCardId: computed(() => previousCard.value?.id ?? null),
+    nextCardId: computed(() => nextCard.value?.id ?? null),
     hasMoreResults,
     isLoadingMoreCards,
     positionLabel,

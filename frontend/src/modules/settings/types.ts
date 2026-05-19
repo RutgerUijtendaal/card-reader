@@ -15,6 +15,25 @@ export type MaintenanceActionResponse = {
   removed_paths: string[];
 };
 
+export type CardGroupMemberRecord = {
+  card_id: string;
+  card_label: string;
+  card_name: string;
+  position: number;
+  is_anchor: boolean;
+  image_url: string | null;
+};
+
+export type CardGroupRecord = {
+  id: string;
+  key: string;
+  name: string;
+  anchor_card_id: string;
+  anchor_card_name: string;
+  member_count: number;
+  members: CardGroupMemberRecord[];
+};
+
 export type LinkedCardPreview = {
   card_id: string;
   card_label: string;

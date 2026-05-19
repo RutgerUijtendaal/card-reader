@@ -37,6 +37,19 @@
             <span>Templates</span>
           </button>
           <button
+            class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
+            type="button"
+            :class="
+              activeTab === 'card-groups'
+                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
+                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+            "
+            @click="setActiveTab('card-groups')"
+          >
+            <Layers3 class="h-4 w-4" />
+            <span>Card groups</span>
+          </button>
+          <button
             v-if="auth.canAccessMaintenance"
             class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
             type="button"
@@ -55,6 +68,7 @@
     </div>
 
     <MaintenanceSettingsView v-if="activeTab === 'maintenance'" />
+    <CardGroupsSettingsView v-else-if="activeTab === 'card-groups'" />
     <TemplatesSettingsView v-else-if="activeTab === 'templates'" />
     <CatalogSettingsView v-else />
   </section>
@@ -62,7 +76,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { Database, LayoutTemplate, Settings, Tags } from 'lucide-vue-next';
+import { Database, Layers3, LayoutTemplate, Settings, Tags } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
@@ -72,6 +86,7 @@ import {
 } from '@/modules/settings/settingsRouteState';
 import MaintenanceSettingsView from './views/MaintenanceSettingsView.vue';
 import CatalogSettingsView from './views/CatalogSettingsView.vue';
+import CardGroupsSettingsView from './views/CardGroupsSettingsView.vue';
 import TemplatesSettingsView from './views/TemplatesSettingsView.vue';
 
 const auth = useAuthStore();

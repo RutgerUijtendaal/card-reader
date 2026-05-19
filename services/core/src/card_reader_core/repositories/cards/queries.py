@@ -54,34 +54,24 @@ def list_cards(
 ) -> PaginatedCardList:
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
-    versions = (
-        CardVersion.objects.filter(is_latest=True)
-        .select_related("card", "template", "previous_version")
-        .prefetch_related(
-            "images",
-            Prefetch(
-                "card_version_keywords",
-                queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
-            ),
-            Prefetch(
-                "card_version_tags",
-                queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
-            ),
-            Prefetch(
-                "card_version_symbols",
-                queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
-            ),
-            Prefetch(
-                "card_version_types",
-                queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
-            ),
-        )
-        .order_by("-updated_at")
-    )
-    versions = apply_card_search(versions, query)
-    versions = apply_card_filters(
-        versions,
+    versions = _build_filtered_versions_queryset(
+        query=query,
         max_confidence=max_confidence,
+        keyword_ids=keyword_ids,
+        keyword_match=keyword_match,
+        tag_ids=tag_ids,
+        tag_match=tag_match,
+        mana_symbol_ids=mana_symbol_ids,
+        mana_symbol_match=mana_symbol_match,
+        affinity_symbol_ids=affinity_symbol_ids,
+        affinity_symbol_match=affinity_symbol_match,
+        devotion_symbol_ids=devotion_symbol_ids,
+        devotion_symbol_match=devotion_symbol_match,
+        other_symbol_ids=other_symbol_ids,
+        other_symbol_match=other_symbol_match,
+        symbol_ids=symbol_ids,
+        type_ids=type_ids,
+        type_match=type_match,
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
@@ -90,66 +80,16 @@ def list_cards(
         health_min=health_min,
         health_max=health_max,
     )
-    versions = filter_by_links(versions, CardVersionKeyword, "keyword_id", keyword_ids, match_mode=keyword_match)
-    versions = filter_by_links(versions, CardVersionTag, "tag_id", tag_ids, match_mode=tag_match)
-    versions = filter_by_links(
-        versions,
-        CardVersionSymbol,
-        "symbol_id",
-        mana_symbol_ids,
-        match_mode=mana_symbol_match,
-    )
-    versions = filter_by_links(
-        versions,
-        CardVersionSymbol,
-        "symbol_id",
-        affinity_symbol_ids,
-        match_mode=affinity_symbol_match,
-    )
-    versions = filter_by_links(
-        versions,
-        CardVersionSymbol,
-        "symbol_id",
-        devotion_symbol_ids,
-        match_mode=devotion_symbol_match,
-    )
-    versions = filter_by_links(
-        versions,
-        CardVersionSymbol,
-        "symbol_id",
-        other_symbol_ids,
-        match_mode=other_symbol_match,
-    )
-    versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
-    versions = filter_by_links(versions, CardVersionType, "type_id", type_ids, match_mode=type_match)
 
     total_count = versions.count()
     offset = (normalized_page - 1) * normalized_page_size
-    version_rows = list(versions[offset : offset + normalized_page_size])
-    if not version_rows:
+    results = _build_card_list_rows(list(versions[offset : offset + normalized_page_size]))
+    if not results:
         return PaginatedCardList(
             count=total_count,
             page=normalized_page,
             page_size=normalized_page_size,
             results=[],
-        )
-
-    results: list[CardListRow] = []
-    for version in version_rows:
-        images = cast(Any, version).images.all()
-        keywords = cast(Any, version).card_version_keywords.all()
-        tags = cast(Any, version).card_version_tags.all()
-        symbols = cast(Any, version).card_version_symbols.all()
-        types = cast(Any, version).card_version_types.all()
-        results.append(
-            CardListRow(
-                version=version,
-                image=next(iter(images), None),
-                keywords=[cast(Keyword, row.keyword) for row in keywords],
-                tags=[cast(Tag, row.tag) for row in tags],
-                symbols=[cast(Symbol, row.symbol) for row in symbols],
-                types=[cast(Type, row.type) for row in types],
-            )
         )
 
     return PaginatedCardList(
@@ -158,6 +98,62 @@ def list_cards(
         page_size=normalized_page_size,
         results=results,
     )
+
+
+def list_matching_cards(
+    *,
+    query: str | None,
+    max_confidence: float | None,
+    keyword_ids: list[str] | None = None,
+    keyword_match: str | None = None,
+    tag_ids: list[str] | None = None,
+    tag_match: str | None = None,
+    mana_symbol_ids: list[str] | None = None,
+    mana_symbol_match: str | None = None,
+    affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_match: str | None = None,
+    devotion_symbol_ids: list[str] | None = None,
+    devotion_symbol_match: str | None = None,
+    other_symbol_ids: list[str] | None = None,
+    other_symbol_match: str | None = None,
+    symbol_ids: list[str] | None = None,
+    type_ids: list[str] | None = None,
+    type_match: str | None = None,
+    mana_cost_min: int | None = None,
+    mana_cost_max: int | None = None,
+    template_id: str | None = None,
+    attack_min: int | None = None,
+    attack_max: int | None = None,
+    health_min: int | None = None,
+    health_max: int | None = None,
+) -> list[CardListRow]:
+    versions = _build_filtered_versions_queryset(
+        query=query,
+        max_confidence=max_confidence,
+        keyword_ids=keyword_ids,
+        keyword_match=keyword_match,
+        tag_ids=tag_ids,
+        tag_match=tag_match,
+        mana_symbol_ids=mana_symbol_ids,
+        mana_symbol_match=mana_symbol_match,
+        affinity_symbol_ids=affinity_symbol_ids,
+        affinity_symbol_match=affinity_symbol_match,
+        devotion_symbol_ids=devotion_symbol_ids,
+        devotion_symbol_match=devotion_symbol_match,
+        other_symbol_ids=other_symbol_ids,
+        other_symbol_match=other_symbol_match,
+        symbol_ids=symbol_ids,
+        type_ids=type_ids,
+        type_match=type_match,
+        mana_cost_min=mana_cost_min,
+        mana_cost_max=mana_cost_max,
+        template_id=template_id,
+        attack_min=attack_min,
+        attack_max=attack_max,
+        health_min=health_min,
+        health_max=health_max,
+    )
+    return _build_card_list_rows(list(versions))
 
 
 def get_card(card_id: str) -> Card | None:
@@ -264,3 +260,102 @@ def filter_by_links(
     else:
         version_ids = link_rows.values_list("card_version_id", flat=True)
     return queryset.filter(id__in=version_ids)
+
+
+def _build_filtered_versions_queryset(
+    *,
+    query: str | None,
+    max_confidence: float | None,
+    keyword_ids: list[str] | None,
+    keyword_match: str | None,
+    tag_ids: list[str] | None,
+    tag_match: str | None,
+    mana_symbol_ids: list[str] | None,
+    mana_symbol_match: str | None,
+    affinity_symbol_ids: list[str] | None,
+    affinity_symbol_match: str | None,
+    devotion_symbol_ids: list[str] | None,
+    devotion_symbol_match: str | None,
+    other_symbol_ids: list[str] | None,
+    other_symbol_match: str | None,
+    symbol_ids: list[str] | None,
+    type_ids: list[str] | None,
+    type_match: str | None,
+    mana_cost_min: int | None,
+    mana_cost_max: int | None,
+    template_id: str | None,
+    attack_min: int | None,
+    attack_max: int | None,
+    health_min: int | None,
+    health_max: int | None,
+) -> QuerySet[CardVersion]:
+    versions = (
+        CardVersion.objects.filter(is_latest=True)
+        .select_related("card", "template", "previous_version")
+        .prefetch_related(
+            "images",
+            Prefetch(
+                "card_version_keywords",
+                queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
+            ),
+            Prefetch(
+                "card_version_tags",
+                queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
+            ),
+            Prefetch(
+                "card_version_symbols",
+                queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
+            ),
+            Prefetch(
+                "card_version_types",
+                queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
+            ),
+        )
+        .order_by("-updated_at")
+    )
+    versions = apply_card_search(versions, query)
+    versions = apply_card_filters(
+        versions,
+        max_confidence=max_confidence,
+        mana_cost_min=mana_cost_min,
+        mana_cost_max=mana_cost_max,
+        template_id=template_id,
+        attack_min=attack_min,
+        attack_max=attack_max,
+        health_min=health_min,
+        health_max=health_max,
+    )
+    versions = filter_by_links(versions, CardVersionKeyword, "keyword_id", keyword_ids, match_mode=keyword_match)
+    versions = filter_by_links(versions, CardVersionTag, "tag_id", tag_ids, match_mode=tag_match)
+    versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", mana_symbol_ids, match_mode=mana_symbol_match)
+    versions = filter_by_links(
+        versions, CardVersionSymbol, "symbol_id", affinity_symbol_ids, match_mode=affinity_symbol_match
+    )
+    versions = filter_by_links(
+        versions, CardVersionSymbol, "symbol_id", devotion_symbol_ids, match_mode=devotion_symbol_match
+    )
+    versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", other_symbol_ids, match_mode=other_symbol_match)
+    versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
+    versions = filter_by_links(versions, CardVersionType, "type_id", type_ids, match_mode=type_match)
+    return versions
+
+
+def _build_card_list_rows(version_rows: list[CardVersion]) -> list[CardListRow]:
+    results: list[CardListRow] = []
+    for version in version_rows:
+        images = cast(Any, version).images.all()
+        keywords = cast(Any, version).card_version_keywords.all()
+        tags = cast(Any, version).card_version_tags.all()
+        symbols = cast(Any, version).card_version_symbols.all()
+        types = cast(Any, version).card_version_types.all()
+        results.append(
+            CardListRow(
+                version=version,
+                image=next(iter(images), None),
+                keywords=[cast(Keyword, row.keyword) for row in keywords],
+                tags=[cast(Tag, row.tag) for row in tags],
+                symbols=[cast(Symbol, row.symbol) for row in symbols],
+                types=[cast(Type, row.type) for row in types],
+            )
+        )
+    return results

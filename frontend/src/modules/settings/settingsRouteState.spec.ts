@@ -12,12 +12,12 @@ import {
 describe('settingsRouteState', () => {
   test('parses settings tab, catalog kind, and entry id from query', () => {
     const query = {
-      settings_tab: 'catalog',
+      settings_tab: 'card-groups',
       settings_kind: 'tags',
       settings_entry: 'tag-123',
     };
 
-    expect(parseSettingsTab(query, { allowMaintenance: true })).toBe('catalog');
+    expect(parseSettingsTab(query, { allowMaintenance: true })).toBe('card-groups');
     expect(parseSettingsCatalogKind(query)).toBe('tags');
     expect(parseSettingsEntryId(query)).toBe('tag-123');
   });

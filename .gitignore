@@ -33,5 +33,6 @@ services/*/build/
 .idea/
 .tmp/
 *.spec
-TODO.local.md
 services/api/src/card_reader_api/seeds/seed-users.local.json
+TICKET*
+TODO*
