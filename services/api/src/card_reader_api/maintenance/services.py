@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import os
 import shutil
-import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,12 +18,6 @@ from card_reader_core.settings import settings
 class MaintenanceResult:
     message: str
     removed_paths: list[str]
-
-
-@dataclass(slots=True)
-class OpenStorageLocationResult:
-    message: str
-    path: str
 
 
 class MaintenanceService:
@@ -108,19 +99,6 @@ class MaintenanceService:
             removed_paths=removed_paths,
         )
 
-    def open_storage_location(self) -> OpenStorageLocationResult:
-        target = settings.storage_root_dir.resolve()
-        target.mkdir(parents=True, exist_ok=True)
-        opened = self._open_path(target)
-        return OpenStorageLocationResult(
-            message=(
-                "Opened storage location in file explorer."
-                if opened
-                else "Storage location resolved. Could not launch file explorer in this environment."
-            ),
-            path=str(target),
-        )
-
     def _reset_database(self) -> list[str]:
         self._drop_database_schema()
         return [f"{DATABASE_PATH} (schema reset)"]
@@ -151,17 +129,4 @@ class MaintenanceService:
             target.relative_to(storage_root)
             return True
         except ValueError:
-            return False
-
-    @staticmethod
-    def _open_path(target: Path) -> bool:
-        try:
-            if sys.platform.startswith("win"):
-                os.startfile(str(target))
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", str(target)])
-            else:
-                subprocess.Popen(["xdg-open", str(target)])
-            return True
-        except Exception:
             return False

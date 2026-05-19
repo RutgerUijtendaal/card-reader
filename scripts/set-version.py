@@ -12,8 +12,6 @@ VERSION_FILE = REPO_ROOT / "VERSION"
 
 JSON_VERSION_FILES = [
     REPO_ROOT / "apps" / "web" / "package.json",
-    REPO_ROOT / "apps" / "desktop" / "package.json",
-    REPO_ROOT / "apps" / "desktop" / "src-tauri" / "tauri.conf.json",
     REPO_ROOT / "services" / "api" / "package.json",
     REPO_ROOT / "services" / "core" / "package.json",
     REPO_ROOT / "services" / "integration" / "package.json",
@@ -25,7 +23,6 @@ TOML_VERSION_FILES = [
     REPO_ROOT / "services" / "core" / "pyproject.toml",
     REPO_ROOT / "services" / "integration" / "pyproject.toml",
     REPO_ROOT / "services" / "parser" / "pyproject.toml",
-    REPO_ROOT / "apps" / "desktop" / "src-tauri" / "Cargo.toml",
 ]
 
 VERSION_PATTERN = re.compile(r'(?m)^version\s*=\s*"[^"]+"$')

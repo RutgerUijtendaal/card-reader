@@ -41,11 +41,3 @@ class ClearStorageView(APIView):
             include_images=bool(request.data.get("include_images", True)),
         )
         return Response({"message": result.message, "removed_paths": result.removed_paths})
-
-
-class OpenStorageLocationView(APIView):
-    permission_classes = [AuthEnabledOrSuperuserAllowed]
-
-    def post(self, _request: Request) -> Response:
-        result = MaintenanceService().open_storage_location()
-        return Response({"message": result.message, "path": result.path})

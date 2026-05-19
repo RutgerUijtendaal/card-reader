@@ -5,14 +5,11 @@ const defaultApiBaseUrl = (): string => {
     return `http://${window.location.hostname}:8000`;
   }
 
-  const { protocol, hostname, origin } = window.location;
+  const { protocol, origin } = window.location;
   if (protocol === 'http:' || protocol === 'https:') {
     return origin;
   }
-  if (protocol === 'tauri:' || hostname === 'tauri.localhost') {
-    return 'http://127.0.0.1:18600';
-  }
-  return 'http://127.0.0.1:18600';
+  return origin;
 };
 
 export const DEFAULT_API_BASE_URL = defaultApiBaseUrl();

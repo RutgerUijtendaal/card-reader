@@ -8,13 +8,12 @@
 - Write scalable, readable code. Fix underlying issues cleanly instead of layering quick fixes.
 
 ## Purpose
-Card Reader is a Django-backed card parsing platform with a Vue web UI, a Tauri desktop shell, and a
+Card Reader is a Django-backed card parsing platform with a Vue web UI and a
 background OCR/parser process.
 
 Core stack:
 - Monorepo tooling: `pnpm` workspaces + `turbo`
 - Frontend: Vue 3 + Vite + TypeScript
-- Desktop shell: Tauri (Rust)
 - Shared core: Python package with Django models, migrations, settings, repositories, services, and storage
 - Backend API: Django + Django REST Framework + SQLite
 - Parser: Python background process using the core Django data layer
@@ -22,7 +21,6 @@ Core stack:
 
 ## Repo Structure
 - `apps/web`: Vue app for card gallery, imports, review, settings, and login.
-- `apps/desktop`: Tauri wrapper around the web/backend experience.
 - `services/core`: shared runtime and domain package.
   - Django models and migrations
   - database connection/adoption helpers
@@ -92,7 +90,6 @@ From repo root:
 - Install Python deps only: `pnpm deps:py`
 - Dev default: `pnpm dev`
 - Dev all: `pnpm dev:all`
-- Desktop dev: `pnpm dev:desktop`
 - Build all: `pnpm build`
 - Lint all: `pnpm lint`
 - Typecheck all: `pnpm typecheck`

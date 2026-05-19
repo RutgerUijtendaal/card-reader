@@ -22,14 +22,6 @@
             <button
               class="btn-secondary justify-center"
               type="button"
-              :disabled="runningOpenStorage"
-              @click="openStorageLocation"
-            >
-              {{ runningOpenStorage ? 'Opening...' : 'Open Storage Location' }}
-            </button>
-            <button
-              class="btn-secondary justify-center"
-              type="button"
               :disabled="runningBackfillSuggestions"
               @click="backfillMetadataSuggestions"
             >
@@ -139,25 +131,18 @@
 </template>
 
 <script setup lang="ts">
-import { isTauri } from '@tauri-apps/api/core';
-import { useClipboard } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { api } from '@/api/client';
-import type {
-  MaintenanceActionResponse,
-  OpenStorageLocationResponse,
-} from '@/modules/settings/types';
+import type { MaintenanceActionResponse } from '@/modules/settings/types';
 
 const confirmText = ref('');
 const includeImages = ref(true);
 const runningRebuild = ref(false);
 const runningClear = ref(false);
-const runningOpenStorage = ref(false);
 const runningBackfillSuggestions = ref(false);
 const runningQueueReparse = ref(false);
 const lastRemovedPaths = ref<string[]>([]);
-const { copy, isSupported: clipboardSupported } = useClipboard({ legacy: true });
 
 const canRunActions = computed(() => confirmText.value.trim() === 'RESET');
 
@@ -230,37 +215,6 @@ const backfillMetadataSuggestions = async (): Promise<void> => {
   }
 };
 
-const openStorageLocation = async (): Promise<void> => {
-  if (runningOpenStorage.value) return;
-  runningOpenStorage.value = true;
-  try {
-    const response = await api.post<OpenStorageLocationResponse>(
-      '/settings/maintenance/open-storage-location',
-    );
-    const path = response.data.path;
-
-    if (!isTauri()) {
-      const opened = tryOpenPathInBrowser(path);
-      if (!opened && clipboardSupported.value) {
-        await copy(path);
-        toast.success(response.data.message, {
-          description: `Path copied: ${path}`,
-        });
-        return;
-      }
-    }
-
-    toast.success(response.data.message, {
-      description: path,
-    });
-  } catch (error) {
-    console.error('Open storage location failed', error);
-    toast.error(extractErrorMessage(error, 'Failed to open storage location.'));
-  } finally {
-    runningOpenStorage.value = false;
-  }
-};
-
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (typeof error === 'object' && error && 'response' in error) {
     const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
@@ -271,12 +225,5 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
     return String((error as { message: unknown }).message);
   }
   return fallback;
-};
-
-const tryOpenPathInBrowser = (path: string): boolean => {
-  const normalized = path.replaceAll('\\', '/');
-  const fileUrl = normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`;
-  const openedWindow = window.open(fileUrl, '_blank', 'noopener,noreferrer');
-  return openedWindow !== null;
 };
 </script>

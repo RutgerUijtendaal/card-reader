@@ -23,11 +23,6 @@ export type LinkedCardPreview = {
   image_url: string | null;
 };
 
-export type OpenStorageLocationResponse = {
-  message: string;
-  path: string;
-};
-
 export type KeywordRecord = {
   id: string;
   key: string;
