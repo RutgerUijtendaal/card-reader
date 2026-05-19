@@ -1,7 +1,7 @@
 import { onKeyStroke } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, DEFAULT_API_BASE_URL } from '@/api/client';
+import { api, toAbsoluteApiUrl } from '@/api/client';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
   buildCardDetailLocation,
@@ -62,14 +62,6 @@ export const useCardPublicDetailState = () => {
 
   const selectVersion = (versionId: string): void => {
     selectedVersionId.value = versionId;
-  };
-
-  const toAbsoluteApiUrl = (urlPath: string): string => {
-    const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
-    if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
-      return urlPath;
-    }
-    return `${base.replace(/\/$/, '')}/${urlPath.replace(/^\//, '')}`;
   };
 
   const formatDate = (value: string): string => {

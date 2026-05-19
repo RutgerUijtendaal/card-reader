@@ -1,7 +1,7 @@
 import { onKeyStroke } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, DEFAULT_API_BASE_URL } from '@/api/client';
+import { api, toAbsoluteApiUrl } from '@/api/client';
 import {
   buildGalleryLocation,
   useGalleryCardNavigation,
@@ -268,14 +268,6 @@ export const useCardDetailState = () => {
     else if (groupName === 'tags') form.tag_ids = next;
     else if (groupName === 'types') form.type_ids = next;
     else form.symbol_ids = next;
-  };
-
-  const toAbsoluteApiUrl = (urlPath: string): string => {
-    const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
-    if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
-      return urlPath;
-    }
-    return `${base.replace(/\/$/, '')}/${urlPath.replace(/^\//, '')}`;
   };
 
   const formatDate = (value: string): string => {

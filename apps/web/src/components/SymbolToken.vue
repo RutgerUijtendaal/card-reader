@@ -13,7 +13,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { api, DEFAULT_API_BASE_URL } from '@/api/client';
+import { toAbsoluteApiUrl } from '@/api/client';
 
 const props = withDefaults(
   defineProps<{
@@ -29,11 +29,4 @@ const props = withDefaults(
 
 const fallbackLabel = computed(() => props.textToken?.trim() || props.label);
 
-const toAbsoluteApiUrl = (urlPath: string): string => {
-  const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
-  if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
-    return urlPath;
-  }
-  return `${base.replace(/\/$/, '')}/${urlPath.replace(/^\//, '')}`;
-};
 </script>

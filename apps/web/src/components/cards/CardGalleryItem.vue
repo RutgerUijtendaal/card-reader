@@ -59,7 +59,7 @@
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { api, DEFAULT_API_BASE_URL } from '@/api/client';
+import { toAbsoluteApiUrl } from '@/api/client';
 import { Pencil } from 'lucide-vue-next';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
@@ -102,11 +102,4 @@ const tooltipY = computed(() => floating.y.value ?? 0);
 const buildDetailLocation = (cardId: string, mode: 'detail' | 'edit') =>
   buildCardDetailLocation(cardId, route.query, mode);
 
-const toAbsoluteApiUrl = (urlPath: string): string => {
-  const base = api.defaults.baseURL ?? DEFAULT_API_BASE_URL;
-  if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
-    return urlPath;
-  }
-  return `${base.replace(/\/$/, '')}/${urlPath.replace(/^\//, '')}`;
-};
 </script>

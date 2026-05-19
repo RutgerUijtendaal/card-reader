@@ -61,7 +61,7 @@
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { DEFAULT_API_BASE_URL } from '@/api/client';
+import { toAbsoluteApiUrl } from '@/api/client';
 import { buildSettingsCardDetailLocation } from '@/modules/settings/settingsRouteState';
 import type { LinkedCardPreview } from '@/modules/settings/types';
 
@@ -84,7 +84,6 @@ const floating = useFloating(hoverTriggerRef, hoverPanelRef, {
 const hoverPreviewX = computed(() => floating.x.value ?? 0);
 const hoverPreviewY = computed(() => floating.y.value ?? 0);
 
-const toAbsoluteApiUrl = (urlPath: string): string => new URL(urlPath, DEFAULT_API_BASE_URL).toString();
 const detailLocation = (cardId: string) => buildSettingsCardDetailLocation(cardId, route.query);
 
 const showHoverPreview = (card: LinkedCardPreview, event: MouseEvent): void => {
