@@ -12,7 +12,7 @@ importers:
         specifier: ^2.1.1
         version: 2.9.6
 
-  apps/web:
+  frontend:
     dependencies:
       '@floating-ui/vue':
         specifier: ^1.1.11

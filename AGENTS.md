@@ -20,7 +20,7 @@ Core stack:
 - OCR/CV target: PaddleOCR + OpenCV
 
 ## Repo Structure
-- `apps/web`: Vue app for card gallery, imports, review, settings, and login.
+- `frontend`: Vue app for card gallery, imports, review, settings, and login.
 - `services/core`: shared runtime and domain package.
   - Django models and migrations
   - database connection/adoption helpers
@@ -43,7 +43,7 @@ Core stack:
   - `parser` depends on `core`; it must not import API views, serializers, URLs, DRF settings, or API-only services.
   - `core` contains shared domain/runtime foundations only.
 - Before adding a new dependency, custom utility, or bespoke implementation for a common UI/backend pattern, scan the existing package dependencies and local shared utilities first, and prefer using them when the use-case fits cleanly.
-- Keep shared card filtering logic centralized in `apps/web/src/modules/card-filters`.
+- Keep shared card filtering logic centralized in `frontend/src/modules/card-filters`.
   - Route/query parsing, stable key-based filter state, key/id translation, and API filter param building belong there.
   - Page modules such as gallery/review/pickers should only own page-specific behavior like pagination, navigation context, and scroll restoration.
 - Django owns the domain schema through migrations in `services/core`.
@@ -113,7 +113,7 @@ Targeted commands:
   - format: `prettier`
   - typecheck: `vue-tsc`
   - tests: `vitest`
-  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility in `apps/web/src/styles.css`
+  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility in `frontend/src/styles.css`
   - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
 
 ## API Surface

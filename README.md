@@ -10,7 +10,7 @@ https://trello.com/b/sCM4JM5V/cards
 
 ## What is in this repo
 
-- `apps/web`: Vue 3 + Vite frontend for gallery, imports, review, settings, and auth flows
+- `frontend`: Vue 3 + Vite frontend for gallery, imports, review, settings, and auth flows
 - `services/core`: shared Django models, migrations, repositories, services, settings, and storage
 - `services/api`: Django + DRF API service
 - `services/parser`: background OCR/parser worker

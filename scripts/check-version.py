@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 VERSION_FILE = REPO_ROOT / "VERSION"
 
 JSON_VERSION_FILES = [
-    REPO_ROOT / "apps" / "web" / "package.json",
+    REPO_ROOT / "frontend" / "package.json",
     REPO_ROOT / "services" / "api" / "package.json",
     REPO_ROOT / "services" / "core" / "package.json",
     REPO_ROOT / "services" / "integration" / "package.json",
