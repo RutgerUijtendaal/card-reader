@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <div class="mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+    <div class="app-scrollbar mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
       <CatalogEntryForm
         :kind="selectedKind"
         :entry="editorEntry"

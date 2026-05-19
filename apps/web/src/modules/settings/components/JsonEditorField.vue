@@ -1,5 +1,8 @@
 <template>
-  <div class="space-y-2">
+  <div
+    class="space-y-2"
+    :class="{ 'flex h-full min-h-0 flex-col': fillHeight }"
+  >
     <div class="flex items-center justify-between gap-3">
       <div class="text-sm font-medium text-slate-700">
         {{ label }}
@@ -13,11 +16,15 @@
       </button>
     </div>
 
-    <div class="relative">
+    <div
+      class="relative"
+      :class="{ 'flex min-h-0 flex-1 flex-col': fillHeight }"
+    >
       <textarea
         :value="modelValue"
-        class="json-textarea w-full rounded-lg border border-slate-300 bg-white px-3 py-3 pr-11 font-mono text-[13px] text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-        :style="{ minHeight }"
+        class="json-textarea app-scrollbar w-full rounded-lg border border-slate-300 bg-white px-3 py-3 pr-11 font-mono text-[13px] text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+        :class="{ 'min-h-0 flex-1': fillHeight }"
+        :style="textareaStyle"
         spellcheck="false"
         @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
       />
@@ -117,12 +124,14 @@ const props = withDefaults(
     label: string;
     hint?: string;
     minHeight?: string;
+    fillHeight?: boolean;
     exampleTitle?: string;
     exampleJson?: string;
   }>(),
   {
     hint: '',
     minHeight: '15rem',
+    fillHeight: false,
     exampleTitle: '',
     exampleJson: '',
   },
@@ -133,6 +142,14 @@ const emit = defineEmits<{
 }>();
 
 const showExample = ref(false);
+
+const textareaStyle = computed<Record<string, string>>(() => {
+  if (props.fillHeight) {
+    return { height: '100%', minHeight: props.minHeight };
+  }
+
+  return { height: 'auto', minHeight: props.minHeight };
+});
 
 const parseError = computed(() => {
   const trimmed = props.modelValue.trim();
@@ -173,5 +190,9 @@ const formatValue = (): void => {
   resize: vertical;
   line-height: 1.5;
   tab-size: 2;
+}
+
+.json-textarea.min-h-0.flex-1 {
+  resize: none;
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div class="grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-[260px_1fr]">
-    <aside class="h-full overflow-y-auto bg-slate-900 px-6 py-7 text-slate-50">
+    <aside class="app-scrollbar h-full overflow-y-auto bg-slate-900 px-6 py-7 text-slate-50">
       <h1 class="mb-4 text-2xl font-semibold">
         Card Reader
       </h1>
@@ -65,7 +65,7 @@
 
     <main
       ref="scrollContainerRef"
-      class="h-full overflow-y-auto p-4 sm:p-6"
+      class="app-scrollbar h-full overflow-y-auto p-4 sm:p-6"
     >
       <RouterView />
     </main>

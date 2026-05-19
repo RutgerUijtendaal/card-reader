@@ -24,7 +24,7 @@
 
     <div
       v-else
-      class="mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1"
+      class="app-scrollbar mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1"
     >
       <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
         <div class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">

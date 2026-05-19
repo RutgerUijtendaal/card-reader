@@ -1,13 +1,13 @@
 <template>
-  <div class="page-card space-y-4">
+  <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
     <div class="space-y-1">
       <h3 class="text-base font-semibold text-slate-800">
         Maintenance
       </h3>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div class="space-y-4">
+    <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div class="app-scrollbar min-h-0 space-y-4 overflow-y-auto pr-1">
         <section class="rounded-lg border border-slate-200 p-4">
           <div class="space-y-1">
             <h4 class="text-sm font-semibold text-slate-800">
@@ -97,7 +97,7 @@
         </section>
       </div>
 
-      <aside class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <aside class="app-scrollbar min-h-0 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
         <h4 class="text-sm font-semibold text-slate-800">
           Notes
         </h4>

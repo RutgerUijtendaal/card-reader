@@ -1,11 +1,11 @@
 <template>
-  <div class="page-card space-y-4">
+  <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
     <h3 class="text-base font-semibold text-slate-800">
       Templates
     </h3>
 
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside class="rounded-lg border border-slate-200 p-3">
+    <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <aside class="flex min-h-0 flex-col rounded-lg border border-slate-200 p-3">
         <div class="mb-3 flex items-center justify-between">
           <span class="text-sm font-semibold text-slate-800">Entries</span>
           <button
@@ -17,7 +17,7 @@
           </button>
         </div>
 
-        <div class="space-y-1">
+        <div class="app-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
           <button
             v-for="item in templates"
             :key="item.id"
@@ -46,33 +46,36 @@
         </div>
       </aside>
 
-      <div class="rounded-lg border border-slate-200 p-4">
-        <div class="grid gap-3 md:grid-cols-2">
-          <label class="field-label">
-            Label
-            <input
-              v-model="form.label"
-              class="input-base"
-              placeholder="MTG Like V1"
-            >
-          </label>
-          <label class="field-label">
-            Key (optional)
-            <input
-              v-model="form.key"
-              class="input-base"
-              placeholder="mtg-like-v1"
-            >
-          </label>
-        </div>
+      <div class="flex min-h-0 flex-col rounded-lg border border-slate-200 p-4">
+        <div class="app-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
+          <div class="shrink-0 grid gap-3 md:grid-cols-2">
+            <label class="field-label">
+              Label
+              <input
+                v-model="form.label"
+                class="input-base"
+                placeholder="MTG Like V1"
+              >
+            </label>
+            <label class="field-label">
+              Key (optional)
+              <input
+                v-model="form.key"
+                class="input-base"
+                placeholder="mtg-like-v1"
+              >
+            </label>
+          </div>
 
-        <div class="mt-3">
-          <JsonEditorField
-            v-model="form.definition_json"
-            label="Definition JSON"
-            hint="Configure the template definition used to parse cards for this layout."
-            min-height="20rem"
-          />
+          <div class="mt-3 min-h-0 flex-1">
+            <JsonEditorField
+              v-model="form.definition_json"
+              label="Definition JSON"
+              hint="Configure the template definition used to parse cards for this layout."
+              min-height="20rem"
+              fill-height
+            />
+          </div>
         </div>
 
         <div class="mt-4 flex flex-wrap gap-2">

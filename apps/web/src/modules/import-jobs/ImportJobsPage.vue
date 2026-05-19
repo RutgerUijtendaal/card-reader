@@ -162,7 +162,7 @@
       </div>
 
       <div
-        class="min-h-0 flex-1 overflow-y-auto pt-5"
+        class="app-scrollbar min-h-0 flex-1 overflow-y-auto pt-5"
       >
         <div
           v-if="jobs.length === 0"

@@ -49,7 +49,7 @@
 
     <div
       v-else
-      class="mt-4 min-h-0 space-y-2 overflow-y-auto pr-1"
+      class="app-scrollbar mt-4 min-h-0 space-y-2 overflow-y-auto pr-1"
     >
       <button
         v-for="entry in currentRows"
