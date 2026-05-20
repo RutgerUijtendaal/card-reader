@@ -21,7 +21,7 @@
             >
               <div
                 class="theme-card-frame-muted absolute inset-0 rounded-2xl"
-                :style="{ transform: 'translate(0.5rem, -0.2rem) rotate(7deg)' }"
+                :style="{ transform: 'translate(0.5rem, -0.0rem) rotate(7deg)' }"
               />
               <div
                 class="theme-card-frame-muted absolute inset-0 rounded-2xl"
