@@ -1,33 +1,33 @@
 <template>
   <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
-    <div class="flex items-center justify-between gap-3">
-      <div>
-        <h3 class="theme-section-title text-base font-semibold">
-          Card groups
-        </h3>
-        <p class="theme-section-muted text-sm">
-          Group anchored cards together for gallery presentation and detail browsing.
-        </p>
-      </div>
-      <button
-        class="btn-primary"
-        type="button"
-        @click="startCreate"
-      >
-        New group
-      </button>
+    <div>
+      <h3 class="theme-section-title text-base font-semibold">
+        Card groups
+      </h3>
+      <p class="theme-section-muted text-sm">
+        Group anchored cards together for gallery presentation and detail browsing.
+      </p>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[280px_320px_minmax(0,1fr)]">
       <aside class="theme-panel-shell flex min-h-0 flex-col p-4">
         <div class="theme-divider flex flex-col gap-3 border-b pb-4">
-          <div>
-            <h4 class="theme-section-title text-sm font-semibold">
-              Card groups
-            </h4>
-            <p class="theme-section-muted mt-1 text-xs">
-              {{ filteredGroups.length }} of {{ groups.length }} shown
-            </p>
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h4 class="theme-section-title text-sm font-semibold">
+                Card groups
+              </h4>
+              <p class="theme-section-muted mt-1 text-xs">
+                {{ filteredGroups.length }} of {{ groups.length }} shown
+              </p>
+            </div>
+            <button
+              class="btn-secondary px-3 py-2 text-xs"
+              type="button"
+              @click="startCreate"
+            >
+              New Group
+            </button>
           </div>
 
           <label class="block">
@@ -51,11 +51,16 @@
             :class="selectedGroupId === group.id ? 'theme-selected-surface-strong' : 'theme-card-frame hover:-translate-y-0.5'"
             @click="selectGroup(group.id)"
           >
-            <p class="theme-section-title text-sm font-semibold">
-              {{ group.name }}
-            </p>
+            <div class="flex items-start justify-between gap-3">
+              <p class="theme-section-title text-sm font-semibold">
+                {{ group.name }}
+              </p>
+              <span class="theme-pill theme-pill-accent text-nowrap">
+                {{ group.member_count }}
+              </span>
+            </div>
             <p class="theme-section-muted mt-1 text-xs">
-              {{ group.member_count }} cards · Anchor: {{ group.anchor_card_name }}
+              Anchor: {{ group.anchor_card_name }}
             </p>
           </button>
         </div>
@@ -115,21 +120,137 @@
         </div>
       </section>
 
-      <section class="page-card min-h-0 p-4">
-        <div
-          v-if="editor"
-          class="app-scrollbar space-y-5 overflow-y-auto xl:h-[calc(100vh-17rem)]"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h4 class="theme-section-title text-lg font-semibold">
-                {{ editor.id ? 'Edit card group' : 'Create card group' }}
-              </h4>
-              <p class="theme-section-muted text-sm">
-                Anchor cards are always kept at position 1.
+      <section class="theme-panel-shell flex min-h-0 flex-col p-4">
+        <template v-if="editor">
+          <div
+            class="app-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 xl:h-[calc(100vh-17rem)]"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h4 class="theme-section-title text-lg font-semibold">
+                  {{ editor.id ? 'Edit card group' : 'Create card group' }}
+                </h4>
+                <p class="theme-section-muted text-sm">
+                  Anchor cards are always kept at position 1.
+                </p>
+              </div>
+            </div>
+
+            <label class="block space-y-2">
+              <span class="theme-section-title text-sm font-semibold">Name</span>
+              <input
+                v-model="editor.name"
+                class="input-base"
+                placeholder="Defaults to anchor card name"
+              >
+            </label>
+
+            <div class="theme-muted-panel space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h5 class="theme-section-title text-sm font-semibold">
+                    Members
+                  </h5>
+                  <p class="theme-section-muted text-xs">
+                    Drag to reorder, or use the anchor selector to choose the stack front.
+                  </p>
+                </div>
+                <span class="theme-section-muted text-xs font-medium">
+                  {{ editor.members.length }} cards
+                </span>
+              </div>
+
+              <div
+                v-if="editor.members.length > 0"
+                class="space-y-2"
+              >
+                <div
+                  v-for="(member, index) in editor.members"
+                  :key="member.card_id"
+                  class="theme-card-frame flex items-center gap-3 rounded-xl p-3"
+                  draggable="true"
+                  @dragstart="onDragStart(index)"
+                  @dragover.prevent
+                  @drop="onDrop(index)"
+                >
+                  <div class="theme-card-frame-muted theme-card-image-well h-20 w-16 shrink-0 rounded-lg">
+                    <img
+                      v-if="member.image_url"
+                      :src="toAbsoluteApiUrl(member.image_url)"
+                      :alt="member.card_name"
+                      class="h-full w-full object-contain"
+                    >
+                    <div
+                      v-else
+                      class="theme-kicker flex h-full items-center justify-center text-[11px]"
+                    >
+                      No image
+                    </div>
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <p class="theme-section-title text-sm font-semibold">
+                      {{ member.card_name }}
+                    </p>
+                    <p class="theme-section-muted text-xs">
+                      Position {{ index + 1 }}
+                    </p>
+                  </div>
+
+                  <label class="theme-section-muted flex items-center gap-2 text-xs font-medium">
+                    <input
+                      :checked="editor.anchor_card_id === member.card_id"
+                      type="radio"
+                      name="anchor-card"
+                      class="theme-checkbox h-4 w-4 border-slate-300"
+                      @change="setAnchor(member.card_id)"
+                    >
+                    <span>Anchor</span>
+                  </label>
+
+                  <button
+                    class="btn-secondary px-2 py-1 text-xs font-semibold"
+                    type="button"
+                    @click="moveMember(index, -1)"
+                  >
+                    Up
+                  </button>
+                  <button
+                    class="btn-secondary px-2 py-1 text-xs font-semibold"
+                    type="button"
+                    @click="moveMember(index, 1)"
+                  >
+                    Down
+                  </button>
+                  <button
+                    class="btn-danger-secondary rounded-lg px-2 py-1 text-xs font-semibold"
+                    type="button"
+                    :disabled="editor.anchor_card_id === member.card_id"
+                    @click="removeMember(member.card_id)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <p
+                v-else
+                class="theme-section-muted text-sm"
+              >
+                Add at least two cards to create a card group.
               </p>
             </div>
-            <div class="flex gap-2">
+
+            <p
+              v-if="errorMessage"
+              class="theme-error-text text-sm"
+            >
+              {{ errorMessage }}
+            </p>
+          </div>
+
+          <div class="theme-divider mt-5 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 v-if="editor.id"
                 class="btn-secondary"
@@ -139,6 +260,16 @@
                 Open
               </button>
               <button
+                class="btn-secondary"
+                type="button"
+                @click="resetEditor"
+              >
+                Reset
+              </button>
+            </div>
+
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
                 v-if="editor.id"
                 class="btn-danger-secondary"
                 type="button"
@@ -146,138 +277,16 @@
               >
                 Delete
               </button>
-            </div>
-          </div>
-
-          <label class="block space-y-2">
-            <span class="theme-section-title text-sm font-semibold">Name</span>
-            <input
-              v-model="editor.name"
-              class="input-base"
-              placeholder="Defaults to anchor card name"
-            >
-          </label>
-
-          <div class="theme-muted-panel space-y-3">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <h5 class="theme-section-title text-sm font-semibold">
-                  Members
-                </h5>
-                <p class="theme-section-muted text-xs">
-                  Drag to reorder, or use the anchor selector to choose the stack front.
-                </p>
-              </div>
-              <span class="theme-section-muted text-xs font-medium">
-                {{ editor.members.length }} cards
-              </span>
-            </div>
-
-            <div
-              v-if="editor.members.length > 0"
-              class="space-y-2"
-            >
-              <div
-                v-for="(member, index) in editor.members"
-                :key="member.card_id"
-                class="theme-card-frame flex items-center gap-3 rounded-xl p-3"
-                draggable="true"
-                @dragstart="onDragStart(index)"
-                @dragover.prevent
-                @drop="onDrop(index)"
+              <button
+                class="btn-primary"
+                type="button"
+                @click="saveGroup"
               >
-                <div class="theme-card-frame-muted theme-card-image-well h-20 w-16 shrink-0 rounded-lg">
-                  <img
-                    v-if="member.image_url"
-                    :src="toAbsoluteApiUrl(member.image_url)"
-                    :alt="member.card_name"
-                    class="h-full w-full object-contain"
-                  >
-                  <div
-                    v-else
-                    class="theme-kicker flex h-full items-center justify-center text-[11px]"
-                  >
-                    No image
-                  </div>
-                </div>
-
-                <div class="min-w-0 flex-1">
-                  <p class="theme-section-title text-sm font-semibold">
-                    {{ member.card_name }}
-                  </p>
-                  <p class="theme-section-muted text-xs">
-                    Position {{ index + 1 }}
-                  </p>
-                </div>
-
-                <label class="theme-section-muted flex items-center gap-2 text-xs font-medium">
-                  <input
-                    :checked="editor.anchor_card_id === member.card_id"
-                    type="radio"
-                    name="anchor-card"
-                    class="theme-checkbox h-4 w-4 border-slate-300"
-                    @change="setAnchor(member.card_id)"
-                  >
-                  <span>Anchor</span>
-                </label>
-
-                <button
-                  class="btn-secondary px-2 py-1 text-xs font-semibold"
-                  type="button"
-                  @click="moveMember(index, -1)"
-                >
-                  Up
-                </button>
-                <button
-                  class="btn-secondary px-2 py-1 text-xs font-semibold"
-                  type="button"
-                  @click="moveMember(index, 1)"
-                >
-                  Down
-                </button>
-                <button
-                  class="btn-danger-secondary rounded-lg px-2 py-1 text-xs font-semibold"
-                  type="button"
-                  :disabled="editor.anchor_card_id === member.card_id"
-                  @click="removeMember(member.card_id)"
-                >
-                  Remove
-                </button>
-              </div>
+                {{ editor.id ? 'Save Changes' : 'Create Group' }}
+              </button>
             </div>
-
-            <p
-              v-else
-              class="theme-section-muted text-sm"
-            >
-              Add at least two cards to create a card group.
-            </p>
           </div>
-
-          <p
-            v-if="errorMessage"
-            class="theme-error-text text-sm"
-          >
-            {{ errorMessage }}
-          </p>
-
-          <div class="flex gap-2">
-            <button
-              class="btn-primary"
-              type="button"
-              @click="saveGroup"
-            >
-              {{ editor.id ? 'Save changes' : 'Create group' }}
-            </button>
-            <button
-              class="btn-secondary"
-              type="button"
-              @click="resetEditor"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+        </template>
 
         <div
           v-else

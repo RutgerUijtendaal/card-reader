@@ -1,5 +1,5 @@
 <template>
-  <div class="theme-popover pointer-events-none w-[24rem] shadow-2xl">
+  <div class="theme-popover pointer-events-none w-[27rem] shadow-2xl">
     <div class="space-y-4">
       <div>
         <h4 class="theme-section-title text-base font-semibold">

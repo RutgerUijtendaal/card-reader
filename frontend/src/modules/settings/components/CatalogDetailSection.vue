@@ -57,20 +57,9 @@
     </div>
 
     <div class="theme-divider mt-5 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-      <button
-        v-if="!isCreatingNew"
-        class="btn-secondary"
-        type="button"
-        @click="emit('create-new')"
-      >
-        New {{ kindItemLabel(selectedKind) }}
-      </button>
-      <div
-        v-else
-        class="theme-section-muted text-sm"
-      />
+      <div class="theme-section-muted text-sm" />
 
-      <div class="flex flex-col gap-3 sm:flex-row">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
           v-if="!isCreatingNew && selectedRow"
           class="btn-danger-secondary"

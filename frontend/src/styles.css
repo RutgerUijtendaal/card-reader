@@ -25,21 +25,24 @@
     --color-nav-text: #cbd5e1;
     --color-nav-hover-bg: rgba(255, 255, 255, 0.08);
     --color-nav-hover-text: #f8fafc;
-    --color-nav-active-bg: rgba(56, 189, 248, 0.18);
-    --color-nav-active-text: #f8fafc;
-    --color-selected-bg: rgba(255, 255, 255, 0.92);
-    --color-selected-bg-strong: rgba(241, 245, 249, 0.98);
-    --color-selected-border: rgba(148, 163, 184, 0.46);
-    --color-selected-text: #1e293b;
+    --color-nav-active-bg: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(59, 130, 246, 0.16) 100%);
+    --color-nav-active-text: #eff6ff;
+    --color-selected-bg: linear-gradient(135deg, rgba(224, 242, 254, 0.82) 0%, rgba(219, 234, 254, 0.92) 100%);
+    --color-selected-bg-strong: linear-gradient(135deg, rgba(219, 234, 254, 0.92) 0%, rgba(191, 219, 254, 0.98) 100%);
+    --color-selected-border: rgba(96, 165, 250, 0.38);
+    --color-selected-text: #1e3a8a;
     --color-link: #2563eb;
     --color-link-hover: #1d4ed8;
-    --color-control-accent: #475569;
+    --color-control-accent: #0f766e;
     --color-pill-neutral-bg: rgba(241, 245, 249, 0.95);
     --color-pill-neutral-border: rgba(203, 213, 225, 0.9);
     --color-pill-neutral-text: #475569;
     --color-pill-success-bg: rgba(220, 252, 231, 0.94);
     --color-pill-success-border: rgba(134, 239, 172, 0.72);
     --color-pill-success-text: #166534;
+    --color-pill-accent-bg: rgba(204, 251, 241, 0.96);
+    --color-pill-accent-border: rgba(94, 234, 212, 0.82);
+    --color-pill-accent-text: #115e59;
     --color-pill-keyword-bg: rgba(219, 234, 254, 0.94);
     --color-pill-keyword-border: rgba(147, 197, 253, 0.78);
     --color-pill-keyword-text: #1d4ed8;
@@ -58,12 +61,14 @@
     --color-input-border: rgba(148, 163, 184, 0.55);
     --color-input-focus: rgba(14, 165, 233, 0.85);
     --color-input-ring: rgba(125, 211, 252, 0.35);
-    --color-secondary-bg: rgba(255, 255, 255, 0.92);
-    --color-secondary-hover: rgba(241, 245, 249, 0.98);
-    --color-primary-from: rgb(14 165 233);
-    --color-primary-to: rgb(59 130 246);
-    --color-primary-hover-from: rgb(2 132 199);
-    --color-primary-hover-to: rgb(37 99 235);
+    --color-secondary-bg: linear-gradient(135deg, rgba(240, 249, 255, 0.96) 0%, rgba(224, 231, 255, 0.94) 100%);
+    --color-secondary-hover: linear-gradient(135deg, rgba(224, 242, 254, 0.98) 0%, rgba(199, 210, 254, 0.98) 100%);
+    --color-primary-from: rgb(59 130 246);
+    --color-primary-to: rgb(99 102 241);
+    --color-primary-hover-from: rgb(37 99 235);
+    --color-primary-hover-to: rgb(79 70 229);
+    --color-secondary-text: #334155;
+    --color-secondary-border: rgba(96, 165, 250, 0.24);
     --color-disabled-bg: rgba(241, 245, 249, 0.95);
     --color-disabled-border: rgba(203, 213, 225, 0.9);
     --color-disabled-text: #94a3b8;
@@ -101,21 +106,24 @@
     --color-nav-text: #d4dbe3;
     --color-nav-hover-bg: rgba(255, 255, 255, 0.06);
     --color-nav-hover-text: #ffffff;
-    --color-nav-active-bg: rgba(148, 163, 184, 0.18);
-    --color-nav-active-text: #f8fafc;
-    --color-selected-bg: rgba(70, 79, 88, 0.92);
-    --color-selected-bg-strong: rgba(81, 91, 101, 0.96);
-    --color-selected-border: rgba(137, 149, 162, 0.72);
-    --color-selected-text: #f8fafc;
+    --color-nav-active-bg: linear-gradient(135deg, rgba(56, 189, 248, 0.14) 0%, rgba(96, 165, 250, 0.12) 100%);
+    --color-nav-active-text: #eff6ff;
+    --color-selected-bg: linear-gradient(135deg, rgba(30, 58, 95, 0.62) 0%, rgba(37, 56, 88, 0.74) 100%);
+    --color-selected-bg-strong: linear-gradient(135deg, rgba(36, 67, 106, 0.78) 0%, rgba(46, 67, 101, 0.86) 100%);
+    --color-selected-border: rgba(96, 165, 250, 0.34);
+    --color-selected-text: #eff6ff;
     --color-link: #d7dde4;
     --color-link-hover: #ffffff;
-    --color-control-accent: #a7b4c0;
+    --color-control-accent: #5eead4;
     --color-pill-neutral-bg: rgba(80, 91, 101, 0.82);
     --color-pill-neutral-border: rgba(115, 126, 138, 0.72);
     --color-pill-neutral-text: #f1f5f9;
     --color-pill-success-bg: rgba(39, 76, 58, 0.76);
     --color-pill-success-border: rgba(74, 222, 128, 0.28);
     --color-pill-success-text: #dcfce7;
+    --color-pill-accent-bg: rgba(19, 78, 74, 0.8);
+    --color-pill-accent-border: rgba(45, 212, 191, 0.32);
+    --color-pill-accent-text: #ccfbf1;
     --color-pill-keyword-bg: rgba(34, 65, 107, 0.78);
     --color-pill-keyword-border: rgba(96, 165, 250, 0.34);
     --color-pill-keyword-text: #dbeafe;
@@ -134,12 +142,14 @@
     --color-input-border: rgba(98, 110, 122, 0.74);
     --color-input-focus: rgba(137, 149, 162, 0.82);
     --color-input-ring: rgba(148, 163, 184, 0.22);
-    --color-secondary-bg: rgba(30, 36, 41, 0.9);
-    --color-secondary-hover: rgba(43, 50, 57, 0.98);
-    --color-primary-from: rgb(115 136 156);
-    --color-primary-to: rgb(92 111 129);
-    --color-primary-hover-from: rgb(129 147 164);
-    --color-primary-hover-to: rgb(104 121 137);
+    --color-secondary-bg: linear-gradient(135deg, rgba(40, 52, 70, 0.92) 0%, rgba(52, 50, 83, 0.9) 100%);
+    --color-secondary-hover: linear-gradient(135deg, rgba(49, 66, 89, 0.98) 0%, rgba(64, 63, 101, 0.96) 100%);
+    --color-primary-from: rgb(96 165 250);
+    --color-primary-to: rgb(129 140 248);
+    --color-primary-hover-from: rgb(59 130 246);
+    --color-primary-hover-to: rgb(99 102 241);
+    --color-secondary-text: #dbeafe;
+    --color-secondary-border: rgba(96, 165, 250, 0.24);
     --color-disabled-bg: rgba(39, 46, 52, 0.9);
     --color-disabled-border: rgba(83, 95, 107, 0.92);
     --color-disabled-text: #788491;
@@ -218,9 +228,9 @@
 
   .btn-secondary {
     @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition;
-    border: 1px solid var(--color-input-border);
+    border: 1px solid var(--color-secondary-border);
     background: var(--color-secondary-bg);
-    color: var(--color-text-muted);
+    color: var(--color-secondary-text);
   }
 
   .btn-secondary:hover {
@@ -454,6 +464,12 @@
     color: var(--color-pill-success-text);
   }
 
+  .theme-pill-accent {
+    border-color: var(--color-pill-accent-border);
+    background: var(--color-pill-accent-bg);
+    color: var(--color-pill-accent-text);
+  }
+
   .theme-pill-keyword {
     border-color: var(--color-pill-keyword-border);
     background: var(--color-pill-keyword-bg);
@@ -528,7 +544,7 @@
   }
 
   .theme-toggle-option {
-    @apply rounded-full px-3 py-1 text-xs font-medium transition;
+    @apply rounded-full border border-transparent px-3 py-1 text-xs font-medium transition;
     color: var(--color-text-muted);
   }
 
@@ -538,6 +554,7 @@
   }
 
   .theme-toggle-option-active {
+    border-color: var(--color-selected-border);
     background: var(--color-selected-bg);
     color: var(--color-selected-text);
   }

@@ -136,12 +136,29 @@ const emptyState = computed(() =>
     : `No suggestions yet.`,
 );
 
+const metadataToneForKind = (kind: CatalogKind): string => {
+  switch (kind) {
+    case 'keywords':
+      return 'theme-pill-keyword';
+    case 'tags':
+    case 'suggested-tags':
+      return 'theme-pill-success';
+    case 'types':
+    case 'suggested-types':
+      return 'theme-pill-warning';
+    case 'symbols':
+      return 'theme-pill-symbol';
+    default:
+      return 'theme-pill-neutral';
+  }
+};
+
 const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   if (isSuggestionRecord(entry)) {
     return [
       {
         label: String(entry.occurrence_count),
-        tone: 'theme-pill-neutral',
+        tone: 'theme-pill-accent',
       },
       {
         label: entry.status,
@@ -149,7 +166,7 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
           entry.status === 'accepted'
             ? 'theme-pill-success'
             : entry.status === 'rejected'
-              ? 'theme-pill-warning'
+              ? 'theme-pill-danger'
               : 'theme-pill-neutral',
       },
     ];
@@ -159,11 +176,11 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
     return [
       {
         label: String(entry.linked_card_count ?? 0),
-        tone: 'theme-pill-neutral',
+        tone: 'theme-pill-accent',
       },
       {
         label: entry.symbol_type || 'symbol',
-        tone: 'theme-pill-neutral',
+        tone: 'theme-pill-symbol',
       },
     ];
   }
@@ -171,11 +188,11 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   return [
     {
       label: String(entry.linked_card_count ?? 0),
-      tone: 'theme-pill-neutral',
+      tone: 'theme-pill-accent',
     },
     {
       label: `${entry.identifiers.length} identifiers`,
-      tone: 'theme-pill-neutral',
+      tone: metadataToneForKind(props.selectedKind),
     },
   ];
 };

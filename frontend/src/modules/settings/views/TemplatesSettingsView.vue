@@ -6,14 +6,14 @@
 
     <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside class="theme-panel-shell flex min-h-0 flex-col p-3">
-        <div class="mb-3 flex items-center justify-between">
+        <div class="theme-divider mb-3 flex items-center justify-between border-b pb-3">
           <span class="theme-section-title text-sm font-semibold">Entries</span>
           <button
-            class="btn-secondary px-2 py-1 text-xs"
+            class="btn-secondary px-3 py-2 text-xs"
             type="button"
             @click="startCreate"
           >
-            New
+            New Template
           </button>
         </div>
 
@@ -78,32 +78,37 @@
           </div>
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button
-            class="btn-primary"
-            type="button"
-            :disabled="saving"
-            @click="saveTemplate"
-          >
-            {{ saving ? 'Saving...' : createMode ? 'Create Template' : 'Save Changes' }}
-          </button>
-          <button
-            class="btn-secondary"
-            type="button"
-            :disabled="saving"
-            @click="resetForm"
-          >
-            Reset
-          </button>
-          <button
-            v-if="!createMode"
-            class="btn-danger-secondary"
-            type="button"
-            :disabled="saving || deleting"
-            @click="openDeleteModal"
-          >
-            {{ deleting ? 'Deleting...' : 'Delete' }}
-          </button>
+        <div class="theme-divider mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              class="btn-secondary"
+              type="button"
+              :disabled="saving"
+              @click="resetForm"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              v-if="!createMode"
+              class="btn-danger-secondary"
+              type="button"
+              :disabled="saving || deleting"
+              @click="openDeleteModal"
+            >
+              {{ deleting ? 'Deleting...' : 'Delete' }}
+            </button>
+            <button
+              class="btn-primary"
+              type="button"
+              :disabled="saving"
+              @click="saveTemplate"
+            >
+              {{ saving ? 'Saving...' : createMode ? 'Create Template' : 'Save Changes' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

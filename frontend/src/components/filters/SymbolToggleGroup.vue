@@ -29,7 +29,7 @@
         </button>
         <span
           v-if="modelValue.length > 0"
-          class="theme-pill theme-pill-neutral px-2 py-0.5 text-xs font-medium"
+          class="theme-pill theme-pill-accent px-2 py-0.5 text-xs font-medium"
         >
           {{ modelValue.length }}
         </span>

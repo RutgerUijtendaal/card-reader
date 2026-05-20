@@ -15,39 +15,39 @@
             class="relative rounded-2xl"
             :style="{ height: `${cardHeightRem}rem` }"
           >
-            <div
-              v-if="stackCards[2]"
-              class="theme-card-frame-muted absolute inset-x-0 top-0 bottom-0 rounded-2xl"
-              :style="{ transform: 'translate(1rem, 0.35rem) rotate(7deg)' }"
-            />
-            <div
-              v-if="stackCards[1]"
-              class="theme-card-frame-muted absolute inset-x-0 top-0 bottom-0 rounded-2xl"
-              :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(3deg)' }"
-            />
-            <div class="theme-card-frame relative h-full rounded-2xl">
-              <img
-                v-if="stackCards[0]?.image_url"
-                :src="toAbsoluteApiUrl(stackCards[0].image_url)"
-                :alt="stackCards[0].name"
-                class="theme-card-image-well block h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
-                loading="lazy"
-                decoding="async"
-              >
+            <div class="absolute left-1/2 top-0 h-full aspect-[63/88] -translate-x-1/2">
               <div
-                v-else
-                class="theme-card-image-well theme-section-muted flex h-full items-center justify-center text-sm"
-              >
-                No image
-              </div>
-              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/78 via-slate-950/35 to-transparent p-4">
-                <div class="space-y-1">
-                  <p class="text-sm font-semibold text-white">
-                    {{ groupItem?.group_name }}
-                  </p>
-                  <p class="text-xs text-slate-100/90">
-                    {{ groupItem?.member_count }} cards in this stack
-                  </p>
+                class="theme-card-frame-muted absolute inset-0 rounded-2xl"
+                :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(5deg)' }"
+              />
+              <div
+                class="theme-card-frame-muted absolute inset-0 rounded-2xl"
+                :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(2deg)' }"
+              />
+              <div class="relative h-full overflow-hidden rounded-2xl">
+                <img
+                  v-if="stackCards[0]?.image_url"
+                  :src="toAbsoluteApiUrl(stackCards[0].image_url)"
+                  :alt="stackCards[0].name"
+                  class="theme-card-image-well block h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+                  loading="lazy"
+                  decoding="async"
+                >
+                <div
+                  v-else
+                  class="theme-card-image-well theme-section-muted flex h-full items-center justify-center text-sm"
+                >
+                  No image
+                </div>
+                <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/88 via-slate-950/42 to-transparent p-4">
+                  <div class="inline-flex max-w-[85%] flex-col gap-1 rounded-2xl border border-white/14 bg-slate-950/42 px-3 py-2 shadow-lg backdrop-blur-md">
+                    <p class="text-sm font-semibold tracking-tight text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.85)]">
+                      {{ groupItem?.group_name }}
+                    </p>
+                    <p class="text-xs font-medium text-slate-50/95 drop-shadow-[0_1px_2px_rgba(15,23,42,0.8)]">
+                      {{ groupItem?.member_count }} cards in this stack
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
