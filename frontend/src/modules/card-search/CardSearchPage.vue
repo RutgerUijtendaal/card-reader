@@ -1,148 +1,163 @@
 <template>
   <section class="grid gap-6 xl:grid-cols-[25rem_minmax(0,1fr)] xl:items-start">
-    <aside class="page-card app-scrollbar space-y-4 xl:sticky xl:top-0 xl:h-[calc(100vh-2rem)] xl:overflow-y-auto">
-      <div class="space-y-2">
-        <h2 class="flex items-center gap-2 text-xl font-semibold text-slate-900">
-          <Images class="h-5 w-5 text-slate-500" />
-          <span>Card Gallery</span>
-        </h2>
-        <p class="text-sm text-slate-500">
-          Filter the visible card pool by symbols, stats, and metadata.
-        </p>
-      </div>
+    <aside class="page-card flex min-h-0 flex-col xl:sticky xl:top-0 xl:h-[calc(100vh-2rem)]">
+      <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
+        <div class="space-y-2">
+          <h2 class="flex items-center gap-2 text-xl font-semibold text-slate-900">
+            <Images class="h-5 w-5 text-slate-500" />
+            <span>Card Gallery</span>
+          </h2>
+          <p class="text-sm text-slate-500">
+            Filter the visible card pool by symbols, stats, and metadata.
+          </p>
+        </div>
 
-      <div class="space-y-2">
-        <input
-          v-model="query"
-          class="input-base"
-          placeholder="Search cards..."
-        >
-        <p class="text-xs text-slate-500">
-          {{ totalCount }} results
-        </p>
-      </div>
-
-      <div class="space-y-3">
-        <SymbolToggleGroup
-          v-model="selectedManaTypeSymbolIds"
-          v-model:match-mode="manaSymbolMatch"
-          :default-open="true"
-          label="Mana"
-          :options="manaTypeOptions"
-          @reset="resetManaGroup"
-        >
-          <div class="rounded-xl border border-slate-200 bg-white/80 p-3">
-            <div class="flex items-center gap-3">
-              <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
-                Cost
-              </h4>
-              <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                <input
-                  v-model="manaCostMin"
-                  class="input-base min-w-0"
-                  type="number"
-                  placeholder="Min"
-                >
-                <input
-                  v-model="manaCostMax"
-                  class="input-base min-w-0"
-                  type="number"
-                  placeholder="Max"
-                >
-              </div>
-            </div>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <input
+              v-model="query"
+              class="input-base flex-1"
+              placeholder="Search cards..."
+            >
+            <button
+              class="btn-secondary inline-flex h-11 w-11 shrink-0 items-center justify-center px-0"
+              type="button"
+              title="Reset filters"
+              aria-label="Reset filters"
+              @click="resetFilters"
+            >
+              <RotateCcw class="h-4 w-4" />
+            </button>
           </div>
-        </SymbolToggleGroup>
-        <SymbolToggleGroup
-          v-model="selectedAffinitySymbolIds"
-          v-model:match-mode="affinitySymbolMatch"
-          label="Affinity"
-          :options="affinityTypeOptions"
-          @reset="resetAffinityGroup"
-        />
-        <SymbolToggleGroup
-          v-model="selectedDevotionSymbolIds"
-          v-model:match-mode="devotionSymbolMatch"
-          label="Devotion"
-          :options="devotionTypeOptions"
-          @reset="resetDevotionGroup"
-        />
-        <SymbolToggleGroup
-          v-model="selectedOtherSymbolIds"
-          v-model:match-mode="otherSymbolMatch"
-          label="Generic"
-          :options="otherSymbolOptions"
-          @reset="resetGenericGroup"
-        >
-          <div class="space-y-2 rounded-xl border border-slate-200 bg-white/80 p-3">
-            <div class="flex items-center gap-3">
-              <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
-                Attack
-              </h4>
-              <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                <input
-                  v-model="attackMin"
-                  class="input-base min-w-0"
-                  type="number"
-                  placeholder="Min"
-                >
-                <input
-                  v-model="attackMax"
-                  class="input-base min-w-0"
-                  type="number"
-                  placeholder="Max"
-                >
+          <p class="text-xs text-slate-500">
+            {{ totalCount }} results
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <SymbolToggleGroup
+            v-model="selectedManaTypeSymbolIds"
+            v-model:match-mode="manaSymbolMatch"
+            :default-open="true"
+            label="Mana"
+            :options="manaTypeOptions"
+            @reset="resetManaGroup"
+          >
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-3">
+              <div class="flex items-center gap-3">
+                <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
+                  Cost
+                </h4>
+                <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                  <input
+                    v-model="manaCostMin"
+                    class="input-base min-w-0"
+                    type="number"
+                    placeholder="Min"
+                  >
+                  <input
+                    v-model="manaCostMax"
+                    class="input-base min-w-0"
+                    type="number"
+                    placeholder="Max"
+                  >
+                </div>
               </div>
             </div>
+          </SymbolToggleGroup>
+          <MetadataPillGroup
+            v-model="selectedTypeIds"
+            v-model:match-mode="typeMatch"
+            :default-open="true"
+            :initial-visible-count="7"
+            label="Types"
+            :options="filters.types"
+            @reset="resetTypeGroup"
+          />
+          <SymbolToggleGroup
+            v-model="selectedAffinitySymbolIds"
+            v-model:match-mode="affinitySymbolMatch"
+            label="Affinity"
+            :options="affinityTypeOptions"
+            @reset="resetAffinityGroup"
+          />
+          <SymbolToggleGroup
+            v-model="selectedDevotionSymbolIds"
+            v-model:match-mode="devotionSymbolMatch"
+            label="Devotion"
+            :options="devotionTypeOptions"
+            @reset="resetDevotionGroup"
+          />
+          <SymbolToggleGroup
+            v-model="selectedOtherSymbolIds"
+            v-model:match-mode="otherSymbolMatch"
+            label="Generic"
+            :options="otherSymbolOptions"
+            @reset="resetGenericGroup"
+          >
+            <div class="space-y-2 rounded-xl border border-slate-200 bg-white/80 p-3">
+              <div class="flex items-center gap-3">
+                <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
+                  Attack
+                </h4>
+                <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                  <input
+                    v-model="attackMin"
+                    class="input-base min-w-0"
+                    type="number"
+                    placeholder="Min"
+                  >
+                  <input
+                    v-model="attackMax"
+                    class="input-base min-w-0"
+                    type="number"
+                    placeholder="Max"
+                  >
+                </div>
+              </div>
 
-            <div class="flex items-center gap-3">
-              <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
-                Health
-              </h4>
-              <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                <input
-                  v-model="healthMin"
-                  class="input-base min-w-0"
-                  type="number"
-                  placeholder="Min"
-                >
-                <input
-                  v-model="healthMax"
-                  class="input-base min-w-0"
-                  type="number"
-                  placeholder="Max"
-                >
+              <div class="flex items-center gap-3">
+                <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
+                  Health
+                </h4>
+                <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                  <input
+                    v-model="healthMin"
+                    class="input-base min-w-0"
+                    type="number"
+                    placeholder="Min"
+                  >
+                  <input
+                    v-model="healthMax"
+                    class="input-base min-w-0"
+                    type="number"
+                    placeholder="Max"
+                  >
+                </div>
               </div>
             </div>
-          </div>
-        </SymbolToggleGroup>
+          </SymbolToggleGroup>
+        </div>
+
+        <div class="space-y-3">
+          <MetadataChecklistGroup
+            v-model="selectedKeywordIds"
+            v-model:match-mode="keywordMatch"
+            label="Keywords"
+            :options="filters.keywords"
+            @reset="resetKeywordGroup"
+          />
+          <MetadataChecklistGroup
+            v-model="selectedTagIds"
+            v-model:match-mode="tagMatch"
+            label="Tags"
+            :options="filters.tags"
+            @reset="resetTagGroup"
+          />
+        </div>
       </div>
 
-      <div class="space-y-3">
-        <MetadataChecklistGroup
-          v-model="selectedKeywordIds"
-          v-model:match-mode="keywordMatch"
-          label="Keywords"
-          :options="filters.keywords"
-          @reset="resetKeywordGroup"
-        />
-        <MetadataChecklistGroup
-          v-model="selectedTagIds"
-          v-model:match-mode="tagMatch"
-          label="Tags"
-          :options="filters.tags"
-          @reset="resetTagGroup"
-        />
-        <MetadataChecklistGroup
-          v-model="selectedTypeIds"
-          v-model:match-mode="typeMatch"
-          label="Types"
-          :options="filters.types"
-          @reset="resetTypeGroup"
-        />
-      </div>
-
-      <div class="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+      <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
         <GalleryOptionsMenu
           :tooltip-enabled="tooltipEnabled"
           :card-scale="cardScale"
@@ -158,14 +173,6 @@
         >
           <Download class="h-4 w-4" />
           <span>Export CSV</span>
-        </button>
-        <button
-          class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
-          type="button"
-          @click="resetFilters"
-        >
-          <RotateCcw class="h-4 w-4" />
-          <span>Reset</span>
         </button>
       </div>
     </aside>
@@ -213,6 +220,7 @@ import { api } from '@/api/client';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { useScrollContainer } from '@/composables/useScrollContainer';
 import MetadataChecklistGroup from '@/components/filters/MetadataChecklistGroup.vue';
+import MetadataPillGroup from '@/components/filters/MetadataPillGroup.vue';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';

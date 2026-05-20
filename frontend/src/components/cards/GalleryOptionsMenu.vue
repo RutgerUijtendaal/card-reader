@@ -41,7 +41,7 @@
                 Card Groups
               </p>
               <p class="text-xs text-slate-500">
-                Show anchored card groups as stacked gallery results.
+                Show card groups as stacked gallery results.
               </p>
             </div>
             <input
@@ -59,7 +59,7 @@
                   Card Size
                 </p>
                 <p class="text-xs text-slate-500">
-                  Scale gallery cards within a practical range.
+                  Scale gallery cards.
                 </p>
               </div>
               <span class="text-xs font-medium text-slate-500">
