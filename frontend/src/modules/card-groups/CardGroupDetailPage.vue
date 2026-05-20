@@ -33,17 +33,17 @@
             <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next' }}</span>
             <ChevronRight class="h-4 w-4" />
           </button>
-          <span class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+          <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
             {{ positionLabel }}
           </span>
         </div>
       </div>
 
       <div v-if="group">
-        <h2 class="text-2xl font-semibold text-slate-900">
+        <h2 class="theme-section-title text-2xl font-semibold">
           {{ group.name }}
         </h2>
-        <p class="text-sm text-slate-500">
+        <p class="theme-section-muted text-sm">
           {{ group.member_count }} cards in this group
         </p>
       </div>
@@ -60,19 +60,19 @@
       >
         <div class="flex items-center justify-between gap-3 px-1">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-semibold text-slate-900">
+            <span class="theme-section-title text-sm font-semibold">
               {{ member.card.name }}
             </span>
             <span
               v-if="member.is_anchor"
-              class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700"
+              class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700 dark:bg-sky-950/70 dark:text-sky-100"
             >
               Anchor
             </span>
           </div>
           <RouterLink
             :to="`/cards/${member.card.id}`"
-            class="text-sm font-medium text-sky-700 hover:text-sky-800"
+            class="text-sm font-medium text-sky-700 transition hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
           >
             Open card
           </RouterLink>

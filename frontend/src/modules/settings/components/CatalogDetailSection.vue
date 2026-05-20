@@ -68,8 +68,7 @@
       <div
         v-else
         class="theme-section-muted text-sm"
-      >
-      </div>
+      />
 
       <div class="flex flex-col gap-3 sm:flex-row">
         <button

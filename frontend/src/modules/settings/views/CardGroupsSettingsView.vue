@@ -19,13 +19,30 @@
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[280px_320px_minmax(0,1fr)]">
-      <aside class="theme-muted-panel min-h-0 space-y-3">
-        <input
-          v-model="listSearch"
-          class="input-base"
-          placeholder="Search card groups..."
-        >
-        <div class="app-scrollbar space-y-2 overflow-y-auto xl:h-[calc(100vh-17rem)]">
+      <aside class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
+        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
+          <div>
+            <h4 class="theme-section-title text-sm font-semibold">
+              Card groups
+            </h4>
+            <p class="theme-section-muted mt-1 text-xs">
+              {{ filteredGroups.length }} of {{ groups.length }} shown
+            </p>
+          </div>
+
+          <label class="block">
+            <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
+              Filter groups
+            </span>
+            <input
+              v-model="listSearch"
+              class="input-base"
+              placeholder="Search card groups..."
+            >
+          </label>
+        </div>
+
+        <div class="app-scrollbar mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 xl:h-[calc(100vh-17rem)]">
           <button
             v-for="group in filteredGroups"
             :key="group.id"
@@ -44,54 +61,57 @@
         </div>
       </aside>
 
-      <section class="theme-muted-panel min-h-0">
-        <div class="space-y-3">
+      <section class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
+        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
           <div>
             <h4 class="theme-section-title text-sm font-semibold">
               Card search
             </h4>
-            <p class="theme-section-muted text-xs">
+            <p class="theme-section-muted mt-1 text-xs">
               Find cards to add to the selected group.
             </p>
           </div>
 
-          <div class="flex gap-2">
+          <label class="block">
+            <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
+              Search cards
+            </span>
             <input
               v-model="pickerQuery"
               class="input-base"
               placeholder="Search cards to add..."
               @keydown.enter.prevent
             >
-          </div>
+          </label>
+        </div>
 
-          <div class="app-scrollbar space-y-2 overflow-y-auto xl:h-[calc(100vh-20rem)]">
-            <div
-              v-if="pickerResults.length === 0"
-              class="theme-empty-state"
-            >
-              Search for cards to add them here.
-            </div>
-            <button
-              v-for="result in pickerResults"
-              :key="result.id"
-              type="button"
-              class="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500"
-              :disabled="memberIds.has(result.id)"
-              @click="addMember(result)"
-            >
-              <div>
-                <p class="theme-section-title text-sm font-medium">
-                  {{ result.name }}
-                </p>
-                <p class="theme-section-muted text-xs">
-                  {{ result.label }}
-                </p>
-              </div>
-              <span class="text-xs font-semibold text-sky-700 dark:text-sky-300">
-                {{ memberIds.has(result.id) ? 'Added' : 'Add' }}
-              </span>
-            </button>
+        <div class="app-scrollbar mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 xl:h-[calc(100vh-20rem)]">
+          <div
+            v-if="pickerResults.length === 0"
+            class="theme-empty-state"
+          >
+            Search for cards to add them here.
           </div>
+          <button
+            v-for="result in pickerResults"
+            :key="result.id"
+            type="button"
+            class="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500"
+            :disabled="memberIds.has(result.id)"
+            @click="addMember(result)"
+          >
+            <div>
+              <p class="theme-section-title text-sm font-medium">
+                {{ result.name }}
+              </p>
+              <p class="theme-section-muted text-xs">
+                {{ result.label }}
+              </p>
+            </div>
+            <span class="text-xs font-semibold text-sky-700 dark:text-sky-300">
+              {{ memberIds.has(result.id) ? 'Added' : 'Add' }}
+            </span>
+          </button>
         </div>
       </section>
 
@@ -274,6 +294,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/modules/settings/types';
@@ -308,13 +329,18 @@ const filteredGroups = computed(() => {
 const memberIds = computed(() => new Set(editor.value?.members.map((member) => member.card_id) ?? []));
 
 const loadGroups = async (): Promise<void> => {
-  const response = await api.get<CardGroupRecord[]>('/settings/card-groups');
-  groups.value = response.data;
-  if (selectedGroupId.value) {
-    const next = groups.value.find((group) => group.id === selectedGroupId.value);
-    if (next) {
-      applyEditor(next);
+  try {
+    const response = await api.get<CardGroupRecord[]>('/settings/card-groups');
+    groups.value = response.data;
+    if (selectedGroupId.value) {
+      const next = groups.value.find((group) => group.id === selectedGroupId.value);
+      if (next) {
+        applyEditor(next);
+      }
     }
+  } catch (error) {
+    console.error('Load card groups failed', error);
+    toast.error(extractErrorMessage(error, 'Failed to load card groups.'));
   }
 };
 
@@ -450,10 +476,12 @@ const buildPayload = (): Record<string, unknown> | null => {
   }
   if (editor.value.members.length < 2) {
     errorMessage.value = 'Card groups require at least 2 cards.';
+    toast.error(errorMessage.value);
     return null;
   }
   if (!editor.value.anchor_card_id) {
     errorMessage.value = 'Choose an anchor card before saving.';
+    toast.error(errorMessage.value);
     return null;
   }
   errorMessage.value = '';
@@ -477,9 +505,11 @@ const saveGroup = async (): Promise<void> => {
     if (editor.value.id) {
       const response = await api.patch<CardGroupRecord>(`/settings/card-groups/${editor.value.id}`, payload);
       savedGroup = response.data;
+      toast.success('Card group updated.');
     } else {
       const response = await api.post<CardGroupRecord>('/settings/card-groups', payload);
       savedGroup = response.data;
+      toast.success('Card group created.');
     }
     await loadGroups();
     const next = groups.value.find((group) => group.id === savedGroup.id);
@@ -487,8 +517,9 @@ const saveGroup = async (): Promise<void> => {
       applyEditor(next);
     }
   } catch (error) {
-    console.error(error);
-    errorMessage.value = 'Unable to save card group.';
+    console.error('Save card group failed', error);
+    errorMessage.value = extractErrorMessage(error, 'Unable to save card group.');
+    toast.error(errorMessage.value);
   }
 };
 
@@ -496,9 +527,15 @@ const deleteGroup = async (): Promise<void> => {
   if (!editor.value?.id) {
     return;
   }
-  await api.delete(`/settings/card-groups/${editor.value.id}`);
-  startCreate();
-  await loadGroups();
+  try {
+    await api.delete(`/settings/card-groups/${editor.value.id}`);
+    toast.success('Card group deleted.');
+    startCreate();
+    await loadGroups();
+  } catch (error) {
+    console.error('Delete card group failed', error);
+    toast.error(extractErrorMessage(error, 'Failed to delete card group.'));
+  }
 };
 
 const openPublicView = (): void => {
@@ -535,4 +572,18 @@ watch(
     debouncedSearchCards();
   },
 );
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
+    const detail = maybeResponse?.data?.detail;
+    if (typeof detail === 'string' && detail.length > 0) {
+      return detail;
+    }
+  }
+  if (typeof error === 'object' && error && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return fallback;
+};
 </script>
