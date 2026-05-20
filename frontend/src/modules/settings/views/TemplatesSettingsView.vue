@@ -5,7 +5,7 @@
     </h3>
 
     <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside class="theme-muted-panel flex min-h-0 flex-col p-3">
+      <aside class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-950/55">
         <div class="mb-3 flex items-center justify-between">
           <span class="theme-section-title text-sm font-semibold">Entries</span>
           <button
@@ -46,7 +46,7 @@
         </div>
       </aside>
 
-      <div class="theme-muted-panel flex min-h-0 flex-col p-4">
+      <div class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
         <div class="app-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
           <div class="shrink-0 grid gap-3 md:grid-cols-2">
             <label class="field-label">

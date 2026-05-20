@@ -19,7 +19,7 @@
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[280px_320px_minmax(0,1fr)]">
-      <aside class="theme-muted-panel flex min-h-0 flex-col p-4">
+      <aside class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
         <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
           <div>
             <h4 class="theme-section-title text-sm font-semibold">
@@ -61,7 +61,7 @@
         </div>
       </aside>
 
-      <section class="theme-muted-panel flex min-h-0 flex-col p-4">
+      <section class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
         <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
           <div>
             <h4 class="theme-section-title text-sm font-semibold">
