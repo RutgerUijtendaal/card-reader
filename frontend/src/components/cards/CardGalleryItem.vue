@@ -12,30 +12,33 @@
       >
         <template v-if="isCardGroup">
           <div
-            class="relative rounded-2xl"
+            class="relative flex justify-center rounded-2xl"
             :style="{ height: `${cardHeightRem}rem` }"
           >
-            <div class="absolute left-1/2 top-0 h-full aspect-[63/88] -translate-x-1/2">
+            <div
+              class="relative h-full w-full"
+              :style="{ maxWidth: `${cardStackMaxWidthRem}rem` }"
+            >
               <div
                 class="theme-card-frame-muted absolute inset-0 rounded-2xl"
-                :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(5deg)' }"
+                :style="{ transform: 'translate(0.5rem, -0.2rem) rotate(7deg)' }"
               />
               <div
                 class="theme-card-frame-muted absolute inset-0 rounded-2xl"
-                :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(2deg)' }"
+                :style="{ transform: 'translate(0.3rem, 0.0rem) rotate(4deg)' }"
               />
               <div class="relative h-full overflow-hidden rounded-2xl">
                 <img
                   v-if="stackCards[0]?.image_url"
                   :src="toAbsoluteApiUrl(stackCards[0].image_url)"
                   :alt="stackCards[0].name"
-                  class="theme-card-image-well block h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+                  class="block h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
                   loading="lazy"
                   decoding="async"
                 >
                 <div
                   v-else
-                  class="theme-card-image-well theme-section-muted flex h-full items-center justify-center text-sm"
+                  class="theme-section-muted flex h-full items-center justify-center text-sm"
                 >
                   No image
                 </div>
@@ -142,6 +145,7 @@ const isCardGroup = computed((): boolean => props.card.result_type === 'card_gro
 const cardItem = computed<CardListItem | null>(() => (isCard.value ? props.card as CardListItem : null));
 const groupItem = computed<CardGroupGalleryItem | null>(() => (isCardGroup.value ? props.card as CardGroupGalleryItem : null));
 const stackCards = computed(() => groupItem.value?.preview_cards.slice(0, 3) ?? []);
+const cardStackMaxWidthRem = computed(() => Number(((props.cardHeightRem * 63) / 88).toFixed(3)));
 const detailLocation = computed(() => buildGalleryItemLocation(props.card, route.query, 'detail'));
 const editLocation = computed(() =>
   cardItem.value ? buildCardDetailLocation(cardItem.value.id, route.query, 'edit') : '/cards',
