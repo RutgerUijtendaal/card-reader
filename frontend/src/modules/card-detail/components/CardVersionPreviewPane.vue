@@ -88,7 +88,7 @@
               <span
                 v-for="keyword in version.keywords"
                 :key="`keyword-${version.version_id}-${keyword}`"
-                class="theme-pill theme-pill-neutral px-2 py-0.5 text-xs"
+                class="theme-pill theme-pill-keyword px-2 py-0.5 text-xs"
               >
                 {{ keyword }}
               </span>
@@ -148,7 +148,7 @@
               <span
                 v-for="symbol in version.symbols"
                 :key="symbol.id"
-                class="theme-pill theme-pill-neutral px-2 py-0.5 text-xs"
+                class="theme-pill theme-pill-symbol px-2 py-0.5 text-xs"
               >
                 {{ symbol.label }}
               </span>

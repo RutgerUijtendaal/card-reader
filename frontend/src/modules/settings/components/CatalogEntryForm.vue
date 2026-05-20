@@ -41,6 +41,7 @@
           <input
             v-model="enabledModel"
             type="checkbox"
+            class="theme-checkbox h-4 w-4"
           >
           <span>Enabled</span>
         </label>

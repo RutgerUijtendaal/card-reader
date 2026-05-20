@@ -63,6 +63,7 @@
               <input
                 v-model="includeImages"
                 type="checkbox"
+                class="theme-checkbox h-4 w-4"
               >
               <span>Also remove imported images</span>
             </label>

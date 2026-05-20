@@ -63,7 +63,7 @@
             <span
               v-for="keyword in card.keywords"
               :key="keyword"
-              class="theme-pill theme-pill-neutral px-2 py-0.5 text-[11px]"
+              class="theme-pill theme-pill-keyword px-2 py-0.5 text-[11px]"
             >
               {{ keyword }}
             </span>
@@ -126,7 +126,7 @@
             <span
               v-for="symbol in card.symbols"
               :key="symbol.id"
-              class="theme-pill theme-pill-neutral px-2 py-0.5 text-[11px]"
+              class="theme-pill theme-pill-symbol px-2 py-0.5 text-[11px]"
             >
               {{ symbol.label }}
             </span>

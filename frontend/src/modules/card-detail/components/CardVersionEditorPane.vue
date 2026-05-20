@@ -135,6 +135,7 @@
               <input
                 :checked="selectedIds(group.name).includes(option.id)"
                 type="checkbox"
+                class="theme-checkbox h-4 w-4"
                 :disabled="!version.editable || isBusy"
                 @change="$emit('toggle-group', group.name, option.id, ($event.target as HTMLInputElement).checked)"
               >

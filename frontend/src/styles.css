@@ -40,6 +40,12 @@
     --color-pill-success-bg: rgba(220, 252, 231, 0.94);
     --color-pill-success-border: rgba(134, 239, 172, 0.72);
     --color-pill-success-text: #166534;
+    --color-pill-keyword-bg: rgba(219, 234, 254, 0.94);
+    --color-pill-keyword-border: rgba(147, 197, 253, 0.78);
+    --color-pill-keyword-text: #1d4ed8;
+    --color-pill-symbol-bg: rgba(237, 233, 254, 0.96);
+    --color-pill-symbol-border: rgba(196, 181, 253, 0.8);
+    --color-pill-symbol-text: #6d28d9;
     --color-pill-warning-bg: rgba(254, 249, 195, 0.94);
     --color-pill-warning-border: rgba(253, 224, 71, 0.72);
     --color-pill-warning-text: #a16207;
@@ -110,6 +116,12 @@
     --color-pill-success-bg: rgba(39, 76, 58, 0.76);
     --color-pill-success-border: rgba(74, 222, 128, 0.28);
     --color-pill-success-text: #dcfce7;
+    --color-pill-keyword-bg: rgba(34, 65, 107, 0.78);
+    --color-pill-keyword-border: rgba(96, 165, 250, 0.34);
+    --color-pill-keyword-text: #dbeafe;
+    --color-pill-symbol-bg: rgba(74, 47, 115, 0.8);
+    --color-pill-symbol-border: rgba(167, 139, 250, 0.34);
+    --color-pill-symbol-text: #f3e8ff;
     --color-pill-warning-bg: rgba(98, 76, 29, 0.72);
     --color-pill-warning-border: rgba(250, 204, 21, 0.3);
     --color-pill-warning-text: #fef3c7;
@@ -244,20 +256,21 @@
   .theme-danger-panel {
     @apply rounded-lg border p-4;
     border-color: var(--color-danger-border);
-    background: color-mix(in srgb, var(--color-danger-bg) 72%, var(--color-surface-strong) 28%);
+    background: color-mix(in srgb, var(--color-surface-strong) 88%, var(--color-danger-bg) 12%);
   }
 
   .theme-danger-title {
-    color: var(--color-danger-text);
+    color: color-mix(in srgb, var(--color-text) 80%, var(--color-danger-text) 20%);
   }
 
   .theme-danger-copy {
-    color: color-mix(in srgb, var(--color-danger-text) 82%, var(--color-text-muted) 18%);
+    color: color-mix(in srgb, var(--color-text-muted) 88%, var(--color-danger-text) 12%);
   }
 
   .theme-danger-input {
     border-color: var(--color-danger-border);
-    color: var(--color-danger-text);
+    background: color-mix(in srgb, var(--color-input-bg) 92%, var(--color-danger-bg) 8%);
+    color: var(--color-text);
   }
 
   .theme-danger-input:focus {
@@ -439,6 +452,18 @@
     border-color: var(--color-pill-success-border);
     background: var(--color-pill-success-bg);
     color: var(--color-pill-success-text);
+  }
+
+  .theme-pill-keyword {
+    border-color: var(--color-pill-keyword-border);
+    background: var(--color-pill-keyword-bg);
+    color: var(--color-pill-keyword-text);
+  }
+
+  .theme-pill-symbol {
+    border-color: var(--color-pill-symbol-border);
+    background: var(--color-pill-symbol-bg);
+    color: var(--color-pill-symbol-text);
   }
 
   .theme-pill-warning {
