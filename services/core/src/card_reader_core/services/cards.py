@@ -26,7 +26,6 @@ from card_reader_core.repositories.metadata_repository import (
     list_keywords,
     list_symbols,
     list_tags,
-    list_types,
 )
 from django.db.models import Count, Q
 
