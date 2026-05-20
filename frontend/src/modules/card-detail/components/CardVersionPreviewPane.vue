@@ -29,8 +29,8 @@
           </div>
           <span
             v-if="showEditableState"
-            class="rounded-full px-2.5 py-1 text-xs font-medium"
-            :class="version.editable ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-100' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+            class="theme-pill px-2.5 py-1 text-xs"
+            :class="version.editable ? 'theme-pill-success' : 'theme-pill-neutral'"
           >
             {{ version.editable ? 'Editable' : 'Read-only' }}
           </span>
@@ -88,7 +88,7 @@
               <span
                 v-for="keyword in version.keywords"
                 :key="`keyword-${version.version_id}-${keyword}`"
-                class="rounded bg-sky-100 px-2 py-0.5 text-xs text-sky-800 dark:bg-sky-950/70 dark:text-sky-100"
+                class="theme-pill theme-pill-neutral px-2 py-0.5 text-xs"
               >
                 {{ keyword }}
               </span>
@@ -108,7 +108,7 @@
               <span
                 v-for="tag in version.tags"
                 :key="tag.id"
-                class="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-100"
+                class="theme-pill theme-pill-success px-2 py-0.5 text-xs"
               >
                 {{ tag.label }}
               </span>
@@ -128,7 +128,7 @@
               <span
                 v-for="type in version.types"
                 :key="type.id"
-                class="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-950/70 dark:text-amber-100"
+                class="theme-pill theme-pill-warning px-2 py-0.5 text-xs"
               >
                 {{ type.label }}
               </span>
@@ -148,7 +148,7 @@
               <span
                 v-for="symbol in version.symbols"
                 :key="symbol.id"
-                class="rounded bg-violet-100 px-2 py-0.5 text-xs text-violet-800 dark:bg-violet-950/70 dark:text-violet-100"
+                class="theme-pill theme-pill-neutral px-2 py-0.5 text-xs"
               >
                 {{ symbol.label }}
               </span>
@@ -166,7 +166,7 @@
           <p class="theme-kicker mb-2 text-xs font-semibold uppercase tracking-wide">
             Rules Text
           </p>
-          <p class="whitespace-pre-line rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
+          <p class="theme-card-frame-muted theme-section-muted whitespace-pre-line rounded-lg p-3 text-sm">
             {{ version.rules_text || '-' }}
           </p>
         </div>

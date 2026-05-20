@@ -18,8 +18,8 @@
         type="button"
         class="rounded-xl border p-3 text-left transition"
         :class="version.version_id === selectedVersionId
-          ? 'border-sky-500 bg-sky-500/12 text-slate-950 shadow-lg dark:text-sky-50'
-          : 'theme-card-frame text-slate-900 hover:-translate-y-0.5 dark:text-slate-100'"
+          ? 'theme-selected-surface-strong shadow-lg'
+          : 'theme-card-frame theme-section-title hover:-translate-y-0.5'"
         @click="$emit('select', version.version_id)"
       >
         <div class="theme-card-frame-muted theme-card-image-well mb-3 rounded-lg">
@@ -43,17 +43,17 @@
           <span
             class="rounded-full px-2 py-0.5 text-[10px] font-medium"
             :class="version.version_id === selectedVersionId
-              ? 'bg-sky-100/80 text-sky-800 dark:bg-sky-400/15 dark:text-sky-100'
+              ? 'theme-pill-neutral'
               : version.is_latest
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-100'
-                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+                ? 'theme-pill-success'
+                : 'theme-pill-neutral'"
           >
             {{ version.is_latest ? 'Latest' : 'History' }}
           </span>
         </div>
         <p
           class="mt-1 text-xs"
-          :class="version.version_id === selectedVersionId ? 'text-sky-900 dark:text-sky-100/90' : 'theme-section-muted'"
+          :class="version.version_id === selectedVersionId ? 'theme-section-title' : 'theme-section-muted'"
         >
           {{ formatDate(version.created_at) }}
         </p>

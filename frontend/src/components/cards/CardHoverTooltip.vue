@@ -63,7 +63,7 @@
             <span
               v-for="keyword in card.keywords"
               :key="keyword"
-              class="rounded bg-sky-100 px-2 py-0.5 text-[11px] text-sky-800 dark:bg-sky-950/70 dark:text-sky-100"
+              class="theme-pill theme-pill-neutral px-2 py-0.5 text-[11px]"
             >
               {{ keyword }}
             </span>
@@ -84,7 +84,7 @@
             <span
               v-for="tag in card.tags"
               :key="tag.id"
-              class="rounded bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-100"
+              class="theme-pill theme-pill-success px-2 py-0.5 text-[11px]"
             >
               {{ tag.label }}
             </span>
@@ -105,7 +105,7 @@
             <span
               v-for="type in card.types"
               :key="type.id"
-              class="rounded bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800 dark:bg-amber-950/70 dark:text-amber-100"
+              class="theme-pill theme-pill-warning px-2 py-0.5 text-[11px]"
             >
               {{ type.label }}
             </span>
@@ -126,7 +126,7 @@
             <span
               v-for="symbol in card.symbols"
               :key="symbol.id"
-              class="rounded bg-violet-100 px-2 py-0.5 text-[11px] text-violet-800 dark:bg-violet-950/70 dark:text-violet-100"
+              class="theme-pill theme-pill-neutral px-2 py-0.5 text-[11px]"
             >
               {{ symbol.label }}
             </span>
@@ -144,7 +144,7 @@
         <p class="theme-kicker mb-2 text-[11px] font-semibold uppercase tracking-wide">
           Rules Text
         </p>
-        <p class="whitespace-pre-line rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
+        <p class="theme-card-frame-muted theme-section-muted whitespace-pre-line rounded-lg p-3 text-xs leading-5">
           {{ card.rules_text || '-' }}
         </p>
       </div>

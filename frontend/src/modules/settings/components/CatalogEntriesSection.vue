@@ -1,6 +1,6 @@
 <template>
-  <section class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
-    <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
+  <section class="theme-panel-shell flex min-h-0 flex-col p-4">
+    <div class="theme-divider flex flex-col gap-3 border-b pb-4">
       <div class="flex items-start justify-between gap-3">
         <div>
           <h4 class="theme-section-title text-sm font-semibold">
@@ -57,8 +57,8 @@
         class="w-full rounded-xl border px-3 py-3 text-left transition"
         :class="
           selectedEntryId === entry.id
-            ? 'border-sky-300 bg-sky-50 shadow-sm dark:border-sky-700/80 dark:bg-sky-950/55'
-            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500 dark:hover:bg-slate-800'
+            ? 'theme-selected-surface-strong'
+            : 'theme-card-frame hover:-translate-y-0.5'
         "
         type="button"
         @click="emit('select-entry', entry.id)"
@@ -73,7 +73,7 @@
             <span
               v-for="badge in entryBadges(entry)"
               :key="badge.label"
-              class="rounded-full px-2 py-1 text-[11px] font-medium text-nowrap"
+              class="theme-pill text-nowrap"
               :class="badge.tone"
             >
               {{ badge.label }}
@@ -83,7 +83,7 @@
 
         <div
           v-if="'symbol_type' in entry"
-          class="mt-3 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
+          class="theme-inline-muted mt-3 flex items-center gap-2 text-xs"
         >
           <span
             class="h-2.5 w-2.5 rounded-full"
@@ -93,7 +93,7 @@
         </div>
         <p
           v-else
-          class="mt-3 text-xs text-slate-600 dark:text-slate-300"
+          class="theme-inline-muted mt-3 text-xs"
         >
           {{ entryPreview(entry) }}
         </p>
@@ -141,16 +141,16 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
     return [
       {
         label: String(entry.occurrence_count),
-        tone: 'bg-sky-100 text-sky-700 dark:bg-sky-900/80 dark:text-sky-100 dark:ring-1 dark:ring-sky-700/70',
+        tone: 'theme-pill-neutral',
       },
       {
         label: entry.status,
         tone:
           entry.status === 'accepted'
-            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/80 dark:text-emerald-100 dark:ring-1 dark:ring-emerald-700/70'
+            ? 'theme-pill-success'
             : entry.status === 'rejected'
-              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/80 dark:text-amber-100 dark:ring-1 dark:ring-amber-700/70'
-              : 'bg-sky-100 text-sky-700 dark:bg-sky-900/80 dark:text-sky-100 dark:ring-1 dark:ring-sky-700/70',
+              ? 'theme-pill-warning'
+              : 'theme-pill-neutral',
       },
     ];
   }
@@ -159,11 +159,11 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
     return [
       {
         label: String(entry.linked_card_count ?? 0),
-        tone: 'bg-sky-100 text-sky-700 dark:bg-sky-900/80 dark:text-sky-100 dark:ring-1 dark:ring-sky-700/70',
+        tone: 'theme-pill-neutral',
       },
       {
         label: entry.symbol_type || 'symbol',
-        tone: 'bg-slate-100 text-slate-600 dark:bg-slate-800/95 dark:text-slate-100 dark:ring-1 dark:ring-slate-600/80',
+        tone: 'theme-pill-neutral',
       },
     ];
   }
@@ -171,11 +171,11 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   return [
     {
       label: String(entry.linked_card_count ?? 0),
-      tone: 'bg-sky-100 text-sky-700 dark:bg-sky-900/80 dark:text-sky-100 dark:ring-1 dark:ring-sky-700/70',
+      tone: 'theme-pill-neutral',
     },
     {
       label: `${entry.identifiers.length} identifiers`,
-      tone: 'bg-slate-100 text-slate-600 dark:bg-slate-800/95 dark:text-slate-100 dark:ring-1 dark:ring-slate-600/80',
+      tone: 'theme-pill-neutral',
     },
   ];
 };

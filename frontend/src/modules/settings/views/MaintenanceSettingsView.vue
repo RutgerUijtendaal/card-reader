@@ -38,22 +38,22 @@
           </div>
         </section>
 
-        <section class="rounded-lg border border-red-200 p-4 dark:border-red-900/50 dark:bg-slate-950/45">
+        <section class="theme-danger-panel">
           <div class="space-y-1">
-            <h4 class="text-sm font-semibold text-red-900 dark:text-red-200">
+            <h4 class="theme-danger-title text-sm font-semibold">
               Destructive Actions
             </h4>
-            <p class="text-sm text-red-800/80 dark:text-red-200/80">
+            <p class="theme-danger-copy text-sm">
               These actions remove data or rebuild state and cannot be undone.
             </p>
           </div>
 
           <div class="mt-4 space-y-4">
-            <label class="field-label dark:text-red-100/85">
+            <label class="field-label theme-danger-title">
               Type <span class="font-semibold">RESET</span> to enable destructive actions
               <input
                 v-model="confirmText"
-                class="input-base border-red-200 focus:border-red-300 focus:ring-red-100 dark:border-red-900/50 dark:bg-slate-900 dark:text-red-100 dark:focus:border-red-800 dark:focus:ring-red-950/60"
+                class="input-base theme-danger-input"
                 placeholder="RESET"
                 autocomplete="off"
               >
@@ -69,7 +69,7 @@
 
             <div class="grid gap-3 md:grid-cols-2">
               <button
-                class="btn-danger-secondary justify-center dark:bg-red-950/30 dark:hover:bg-red-950/45"
+                class="btn-danger-secondary justify-center"
                 type="button"
                 :disabled="!canRunActions || runningRebuild"
                 @click="rebuildDatabase"
@@ -77,7 +77,7 @@
                 {{ runningRebuild ? 'Rebuilding...' : 'Rebuild Database' }}
               </button>
               <button
-                class="btn-danger-secondary justify-center dark:bg-red-950/30 dark:hover:bg-red-950/45"
+                class="btn-danger-secondary justify-center"
                 type="button"
                 :disabled="!canRunActions || runningClear"
                 @click="clearStorage"

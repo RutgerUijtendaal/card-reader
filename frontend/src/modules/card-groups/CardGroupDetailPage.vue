@@ -65,14 +65,14 @@
             </span>
             <span
               v-if="member.is_anchor"
-              class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700 dark:bg-sky-950/70 dark:text-sky-100"
+              class="theme-pill theme-pill-neutral px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
             >
               Anchor
             </span>
           </div>
           <RouterLink
             :to="`/cards/${member.card.id}`"
-            class="text-sm font-medium text-sky-700 transition hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+            class="theme-link text-sm font-medium transition"
           >
             Open card
           </RouterLink>

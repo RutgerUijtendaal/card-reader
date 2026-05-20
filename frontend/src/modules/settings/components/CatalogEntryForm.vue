@@ -17,7 +17,7 @@
           <input
             v-model="keyModel"
             class="input-base"
-            :class="keyDisabled ? 'cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400' : ''"
+            :class="keyDisabled ? 'theme-input-disabled-key' : ''"
             :disabled="keyDisabled"
           >
         </label>
@@ -37,7 +37,7 @@
             placeholder="mana"
           >
         </label>
-        <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+        <label class="theme-section-title inline-flex items-center gap-2 text-sm">
           <input
             v-model="enabledModel"
             type="checkbox"
@@ -110,7 +110,7 @@
         <input
           v-model="keyModel"
           class="input-base"
-          :class="keyDisabled ? 'cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400' : ''"
+          :class="keyDisabled ? 'theme-input-disabled-key' : ''"
           :disabled="keyDisabled"
         >
       </label>

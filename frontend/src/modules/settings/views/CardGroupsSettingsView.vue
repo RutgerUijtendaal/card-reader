@@ -19,8 +19,8 @@
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[280px_320px_minmax(0,1fr)]">
-      <aside class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
-        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
+      <aside class="theme-panel-shell flex min-h-0 flex-col p-4">
+        <div class="theme-divider flex flex-col gap-3 border-b pb-4">
           <div>
             <h4 class="theme-section-title text-sm font-semibold">
               Card groups
@@ -48,7 +48,7 @@
             :key="group.id"
             type="button"
             class="w-full rounded-xl border p-3 text-left transition"
-            :class="selectedGroupId === group.id ? 'border-sky-300 bg-sky-50 shadow-sm dark:border-sky-700 dark:bg-sky-950/40' : 'theme-card-frame hover:-translate-y-0.5'"
+            :class="selectedGroupId === group.id ? 'theme-selected-surface-strong' : 'theme-card-frame hover:-translate-y-0.5'"
             @click="selectGroup(group.id)"
           >
             <p class="theme-section-title text-sm font-semibold">
@@ -61,8 +61,8 @@
         </div>
       </aside>
 
-      <section class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-950/55">
-        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
+      <section class="theme-panel-shell flex min-h-0 flex-col p-4">
+        <div class="theme-divider flex flex-col gap-3 border-b pb-4">
           <div>
             <h4 class="theme-section-title text-sm font-semibold">
               Card search
@@ -96,7 +96,7 @@
             v-for="result in pickerResults"
             :key="result.id"
             type="button"
-            class="theme-card-frame flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition hover:-translate-y-0.5"
+            class="theme-selected-surface flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition hover:-translate-y-0.5"
             :disabled="memberIds.has(result.id)"
             @click="addMember(result)"
           >
@@ -108,7 +108,7 @@
                 {{ result.label }}
               </p>
             </div>
-            <span class="text-xs font-semibold text-sky-700 dark:text-sky-300">
+            <span class="theme-link text-xs font-semibold">
               {{ memberIds.has(result.id) ? 'Added' : 'Add' }}
             </span>
           </button>
@@ -215,7 +215,7 @@
                     :checked="editor.anchor_card_id === member.card_id"
                     type="radio"
                     name="anchor-card"
-                    class="h-4 w-4 border-slate-300 text-sky-600"
+                    class="theme-checkbox h-4 w-4 border-slate-300"
                     @change="setAnchor(member.card_id)"
                   >
                   <span>Anchor</span>
@@ -256,7 +256,7 @@
 
           <p
             v-if="errorMessage"
-            class="text-sm text-rose-700 dark:text-rose-300"
+            class="theme-error-text text-sm"
           >
             {{ errorMessage }}
           </p>

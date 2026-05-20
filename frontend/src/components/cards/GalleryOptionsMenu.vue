@@ -30,7 +30,7 @@
             <input
               :checked="tooltipEnabled"
               type="checkbox"
-              class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+              class="theme-checkbox mt-1 h-4 w-4 rounded border-slate-300"
               @change="$emit('update:tooltipEnabled', ($event.target as HTMLInputElement).checked)"
             >
           </label>
@@ -47,7 +47,7 @@
             <input
               :checked="showCardGroups"
               type="checkbox"
-              class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+              class="theme-checkbox mt-1 h-4 w-4 rounded border-slate-300"
               @change="$emit('update:showCardGroups', ($event.target as HTMLInputElement).checked)"
             >
           </label>
@@ -72,7 +72,7 @@
               min="0.8"
               max="1.2"
               step="0.05"
-              class="w-full accent-sky-600"
+              class="theme-range w-full"
               @input="$emit('update:cardScale', Number(($event.target as HTMLInputElement).value))"
             >
           </label>

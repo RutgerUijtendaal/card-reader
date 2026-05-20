@@ -6,8 +6,8 @@
       class="filter-chip"
       :class="
         hasValue
-          ? 'border-sky-300 bg-sky-50 text-sky-700'
-          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+          ? 'theme-choice-chip-active'
+          : 'theme-choice-chip'
       "
       @click="toggle"
     >

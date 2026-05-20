@@ -14,7 +14,7 @@
         <button
           v-if="showReset"
           type="button"
-          class="rounded-full p-1 transition hover:bg-white hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          class="theme-icon-button"
           title="Reset group"
           aria-label="Reset group"
           @click.stop="emit('reset')"
@@ -23,7 +23,7 @@
         </button>
         <span
           v-if="modelValue.length > 0"
-          class="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-sky-500 dark:text-slate-950"
+          class="theme-pill theme-pill-neutral px-2 py-0.5 text-xs font-medium"
         >
           {{ modelValue.length }}
         </span>
@@ -51,12 +51,12 @@
         <label
           v-for="option in filteredOptions"
           :key="option.id"
-          class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          class="theme-checkbox-row"
         >
           <input
             :checked="selectedIds.has(option.id)"
             type="checkbox"
-            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600"
+            class="theme-checkbox mt-0.5 h-4 w-4 rounded border-slate-300"
             @change="toggle(option.id)"
           >
           <span>{{ option.label }}</span>
@@ -70,20 +70,20 @@
         {{ emptyState }}
       </p>
 
-      <div class="flex justify-end border-t border-slate-200 pt-2 dark:border-slate-700">
-        <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/80">
+      <div class="theme-divider flex justify-end border-t pt-2">
+        <div class="theme-toggle-shell">
           <button
             type="button"
-            class="rounded-full px-3 py-1 text-xs font-medium transition"
-            :class="matchMode === 'all' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
+            class="theme-toggle-option"
+            :class="matchMode === 'all' ? 'theme-toggle-option-active' : ''"
             @click.stop="emit('update:matchMode', 'all')"
           >
             AND
           </button>
           <button
             type="button"
-            class="rounded-full px-3 py-1 text-xs font-medium transition"
-            :class="matchMode === 'any' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
+            class="theme-toggle-option"
+            :class="matchMode === 'any' ? 'theme-toggle-option-active' : ''"
             @click.stop="emit('update:matchMode', 'any')"
           >
             OR

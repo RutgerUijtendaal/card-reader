@@ -14,8 +14,8 @@
         </p>
       </div>
       <span
-        class="rounded-full px-2.5 py-1 text-xs font-medium"
-        :class="version.editable ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-100' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+        class="theme-pill px-2.5 py-1 text-xs"
+        :class="version.editable ? 'theme-pill-success' : 'theme-pill-neutral'"
       >
         {{ version.editable ? 'Latest Version' : 'Historical Version' }}
       </span>
@@ -160,10 +160,10 @@
       </div>
     </div>
 
-    <div class="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+    <div class="theme-divider flex shrink-0 items-center justify-end gap-3 border-t pt-4">
       <p
         v-if="saveMessage"
-        class="mr-auto text-sm text-emerald-700 dark:text-emerald-300"
+        class="theme-success-text mr-auto text-sm"
       >
         {{ saveMessage }}
       </p>

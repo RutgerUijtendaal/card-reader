@@ -6,8 +6,8 @@
       class="filter-chip"
       :class="
         isActive
-          ? 'border-sky-300 bg-sky-50 text-sky-700'
-          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+          ? 'theme-choice-chip-active'
+          : 'theme-choice-chip'
       "
       @click="toggle"
     >
@@ -32,12 +32,12 @@
             <label
               v-for="option in filteredOptions"
               :key="option.id"
-              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+              class="theme-checkbox-row cursor-pointer items-center gap-2 rounded px-2 py-1"
             >
               <input
                 :checked="selectedSet.has(option.id)"
                 type="checkbox"
-                class="h-4 w-4 rounded border-slate-300 text-sky-600"
+                class="theme-checkbox h-4 w-4 rounded border-slate-300"
                 @change="toggleOption(option.id)"
               >
               <span>{{ option.label }}</span>
@@ -59,21 +59,21 @@
 
           <div
             v-if="matchMode"
-            class="border-t border-slate-200 pt-2 dark:border-slate-700"
+            class="theme-divider border-t pt-2"
           >
             <div class="flex justify-end">
-              <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/80">
+              <div class="theme-toggle-shell">
                 <button
-                  class="rounded-full px-3 py-1 text-xs font-medium transition"
-                  :class="matchMode === 'any' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
+                  class="theme-toggle-option"
+                  :class="matchMode === 'any' ? 'theme-toggle-option-active' : ''"
                   type="button"
                   @click="setMatchMode('any')"
                 >
                   OR
                 </button>
                 <button
-                  class="rounded-full px-3 py-1 text-xs font-medium transition"
-                  :class="matchMode === 'all' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
+                  class="theme-toggle-option"
+                  :class="matchMode === 'all' ? 'theme-toggle-option-active' : ''"
                   type="button"
                   @click="setMatchMode('all')"
                 >

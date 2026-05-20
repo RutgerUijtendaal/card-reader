@@ -3,7 +3,7 @@
     <div class="space-y-6 xl:sticky xl:top-0">
       <header class="page-card overflow-hidden">
         <div class="space-y-3">
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-teal-700 dark:text-teal-300">
+          <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.22em]">
             Intake Queue
           </p>
           <div class="space-y-2">
@@ -16,16 +16,16 @@
             </p>
           </div>
           <div class="theme-section-muted flex flex-wrap gap-3 pt-1 text-sm">
-            <div class="rounded-full bg-slate-100 px-3 py-1.5 dark:bg-slate-800 dark:text-slate-200">
+            <div class="theme-pill theme-pill-neutral px-3 py-1.5 text-sm">
               {{ queuedCount }} queued
             </div>
-            <div class="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800 dark:bg-amber-950/70 dark:text-amber-100">
+            <div class="theme-pill theme-pill-warning px-3 py-1.5 text-sm">
               {{ runningCount + cancelingCount }} active
             </div>
-            <div class="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-100">
+            <div class="theme-pill theme-pill-success px-3 py-1.5 text-sm">
               {{ completedCount }} completed
             </div>
-            <div class="rounded-full bg-rose-100 px-3 py-1.5 text-rose-800 dark:bg-rose-950/70 dark:text-rose-100">
+            <div class="theme-pill theme-pill-danger px-3 py-1.5 text-sm">
               {{ failedCount + cancelledCount }} stopped
             </div>
           </div>
@@ -141,7 +141,7 @@
     </div>
 
     <section class="page-card flex min-h-0 flex-col overflow-hidden xl:h-full">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-1 pb-4 dark:border-slate-700">
+      <div class="theme-divider flex flex-wrap items-center justify-between gap-3 border-b px-1 pb-4">
         <div class="space-y-1">
           <h3 class="theme-section-title text-base font-semibold">
             Queue Monitor
@@ -178,7 +178,7 @@
           <article
             v-for="job in jobs"
             :key="job.id"
-            class="rounded-[1.75rem] border border-slate-200 bg-white px-6 py-6 shadow-sm dark:border-slate-700 dark:bg-slate-950/70"
+            class="theme-card-frame rounded-[1.75rem] px-6 py-6"
           >
             <div class="flex flex-wrap items-start justify-between gap-5">
               <div class="min-w-0 space-y-3 pr-2">
@@ -222,7 +222,7 @@
                   <span>Progress</span>
                   <span>{{ job.processed_items }}/{{ job.total_items }}</span>
                 </div>
-                <div class="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div class="theme-card-frame-muted h-2.5 rounded-full">
                   <div
                     class="h-full rounded-full transition-all"
                     :class="progressClass(job.status)"
@@ -394,19 +394,19 @@ const progressPercent = (job: ImportJob): number => {
 };
 
 const statusClass = (status: ImportJobStatus): string => {
-  if (status === 'queued') return 'bg-slate-100 text-slate-700';
-  if (status === 'running') return 'bg-amber-100 text-amber-800';
-  if (status === 'canceling') return 'bg-orange-100 text-orange-800';
-  if (status === 'cancelled') return 'bg-slate-200 text-slate-700';
-  if (status === 'completed') return 'bg-emerald-100 text-emerald-800';
-  return 'bg-rose-100 text-rose-800';
+  if (status === 'queued') return 'theme-pill-neutral';
+  if (status === 'running') return 'theme-pill-warning';
+  if (status === 'canceling') return 'theme-pill-warning';
+  if (status === 'cancelled') return 'theme-pill-neutral';
+  if (status === 'completed') return 'theme-pill-success';
+  return 'theme-pill-danger';
 };
 
 const progressClass = (status: ImportJobStatus): string => {
   if (status === 'failed') return 'bg-rose-500';
-  if (status === 'cancelled' || status === 'canceling') return 'bg-orange-400';
+  if (status === 'cancelled' || status === 'canceling') return 'bg-amber-500';
   if (status === 'completed') return 'bg-emerald-500';
-  return 'bg-teal-500';
+  return 'bg-slate-500';
 };
 
 const formatTimestamp = (value: string): string => {

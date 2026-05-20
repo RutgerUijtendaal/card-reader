@@ -33,7 +33,7 @@
 
       <p
         v-if="errorMessage"
-        class="text-sm font-medium text-rose-700 dark:text-rose-300"
+        class="theme-error-text text-sm font-medium"
       >
         {{ errorMessage }}
       </p>

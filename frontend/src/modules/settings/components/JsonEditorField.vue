@@ -31,7 +31,7 @@
 
       <div class="absolute right-4 top-3 group">
         <div
-          class="inline-flex h-6 w-6 items-center justify-center rounded-full border bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+          class="theme-card-frame-muted inline-flex h-6 w-6 items-center justify-center rounded-full shadow-sm"
           :class="
             parseError
               ? 'border-rose-200 text-rose-600'
@@ -106,7 +106,7 @@
             </button>
           </div>
 
-          <pre class="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><code>{{ exampleJson }}</code></pre>
+          <pre class="theme-card-frame-muted theme-section-title mt-4 overflow-x-auto rounded-lg p-4 text-xs"><code>{{ exampleJson }}</code></pre>
         </div>
       </div>
     </Teleport>

@@ -157,7 +157,7 @@
         </div>
       </div>
 
-      <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+      <div class="theme-divider mt-4 flex flex-wrap gap-2 border-t pt-4">
         <GalleryOptionsMenu
           :tooltip-enabled="tooltipEnabled"
           :card-scale="cardScale"

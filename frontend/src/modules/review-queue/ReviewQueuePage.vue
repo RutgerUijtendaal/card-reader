@@ -11,10 +11,10 @@
       <li
         v-for="card in cards"
         :key="card.id"
-        class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200"
+        class="theme-card-frame theme-section-title rounded-lg px-3 py-2 text-sm"
       >
         <RouterLink
-          class="font-medium text-sky-700 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+          class="theme-link font-medium"
           :to="`/cards/${card.id}/edit`"
         >
           {{ card.name }}

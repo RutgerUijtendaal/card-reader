@@ -1,6 +1,6 @@
 <template>
-  <section class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/55">
-    <div class="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-slate-700 md:flex-row md:items-start md:justify-between">
+  <section class="theme-panel-shell flex min-h-0 flex-col rounded-2xl p-5 shadow-sm">
+    <div class="theme-divider flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:justify-between">
       <div>
         <p class="theme-kicker text-xs font-medium uppercase tracking-[0.18em]">
           Review {{ kindItemLabel(selectedKind) }}
@@ -18,9 +18,9 @@
 
       <div
         v-if="selectedRow"
-        class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+        class="theme-info-box text-xs"
       >
-        <div class="font-semibold text-slate-700 dark:text-slate-100">
+        <div class="theme-section-title font-semibold">
           Suggested value
         </div>
         <div class="mt-1">
