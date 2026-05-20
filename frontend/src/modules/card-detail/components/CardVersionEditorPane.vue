@@ -26,7 +26,7 @@
         <div
           v-for="field in scalarFields"
           :key="field.name"
-          class="rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+          class="theme-muted-panel p-3"
         >
           <div class="mb-2 flex items-center justify-between gap-3">
             <div>
@@ -74,9 +74,9 @@
 
           <p
             v-if="fieldHasParsedSuggestion(field.name)"
-            class="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/80 dark:text-slate-300"
+            class="theme-card-frame-muted theme-section-muted mt-2 rounded-lg px-3 py-2 text-xs"
           >
-            <span class="font-semibold text-slate-700 dark:text-slate-100">Parser suggestion:</span>
+            <span class="theme-section-title font-semibold">Parser suggestion:</span>
             {{ formatParsedFieldValue(field.name) }}
           </p>
         </div>
@@ -84,7 +84,7 @@
         <div
           v-for="group in metadataGroups"
           :key="group.name"
-          class="rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+          class="theme-muted-panel p-3"
         >
           <div class="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -130,7 +130,7 @@
             <label
               v-for="option in optionsForGroup(group.name)"
               :key="option.id"
-              class="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
+              class="theme-card-frame-muted theme-section-title flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
             >
               <input
                 :checked="selectedIds(group.name).includes(option.id)"
@@ -151,16 +151,16 @@
 
           <p
             v-if="metadataHasParsedSuggestion(group.name)"
-            class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/80 dark:text-slate-300"
+            class="theme-card-frame-muted theme-section-muted mt-3 rounded-lg px-3 py-2 text-xs"
           >
-            <span class="font-semibold text-slate-700 dark:text-slate-100">Parser suggestion:</span>
+            <span class="theme-section-title font-semibold">Parser suggestion:</span>
             {{ parsedMetadataLabels(group.name).join(', ') || 'None' }}
           </p>
         </div>
       </div>
     </div>
 
-    <div class="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white pt-4 dark:border-slate-700 dark:bg-transparent">
+    <div class="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
       <p
         v-if="saveMessage"
         class="mr-auto text-sm text-emerald-700 dark:text-emerald-300"

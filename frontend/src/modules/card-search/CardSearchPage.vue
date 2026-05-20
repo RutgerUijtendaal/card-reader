@@ -43,7 +43,7 @@
             :options="manaTypeOptions"
             @reset="resetManaGroup"
           >
-            <div class="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/80">
+            <div class="theme-muted-panel p-3">
               <div class="flex items-center gap-3">
                 <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
                   Cost
@@ -95,7 +95,7 @@
             :options="otherSymbolOptions"
             @reset="resetGenericGroup"
           >
-            <div class="space-y-2 rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/80">
+            <div class="theme-muted-panel space-y-2 p-3">
               <div class="flex items-center gap-3">
                 <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
                   Attack

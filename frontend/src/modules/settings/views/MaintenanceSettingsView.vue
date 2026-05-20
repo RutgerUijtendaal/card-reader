@@ -8,7 +8,7 @@
 
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div class="app-scrollbar min-h-0 space-y-4 overflow-y-auto pr-1">
-        <section class="rounded-lg border border-slate-200 p-4 dark:border-slate-700 dark:bg-slate-950/45">
+        <section class="theme-muted-panel p-4">
           <div class="space-y-1">
             <h4 class="theme-section-title text-sm font-semibold">
               Utility
@@ -59,7 +59,7 @@
               >
             </label>
 
-            <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <label class="theme-section-title inline-flex items-center gap-2 text-sm">
               <input
                 v-model="includeImages"
                 type="checkbox"
@@ -89,7 +89,7 @@
         </section>
       </div>
 
-      <aside class="app-scrollbar min-h-0 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/45">
+      <aside class="theme-muted-panel app-scrollbar min-h-0 overflow-y-auto p-4">
         <h4 class="theme-section-title text-sm font-semibold">
           Notes
         </h4>
@@ -110,7 +110,7 @@
 
         <div
           v-if="lastRemovedPaths.length > 0"
-          class="mt-4 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+          class="theme-card-frame mt-4 rounded-lg p-3"
         >
           <div class="theme-kicker text-xs font-semibold uppercase tracking-wide">
             Last Removed Paths

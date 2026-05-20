@@ -5,7 +5,7 @@
     </h3>
 
     <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside class="flex min-h-0 flex-col rounded-lg border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-950/45">
+      <aside class="theme-muted-panel flex min-h-0 flex-col p-3">
         <div class="mb-3 flex items-center justify-between">
           <span class="theme-section-title text-sm font-semibold">Entries</span>
           <button
@@ -24,8 +24,8 @@
             class="w-full rounded-md border px-2 py-1.5 text-left text-sm"
             :class="
               selectedId === item.id
-                ? 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-100'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:bg-slate-800'
+                ? 'border-sky-300 bg-sky-50 text-sky-700 shadow-sm dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-100'
+                : 'theme-card-frame theme-section-title hover:-translate-y-0.5'
             "
             type="button"
             @click="selectTemplate(item.id)"
@@ -46,7 +46,7 @@
         </div>
       </aside>
 
-      <div class="flex min-h-0 flex-col rounded-lg border border-slate-200 p-4 dark:border-slate-700 dark:bg-slate-950/45">
+      <div class="theme-muted-panel flex min-h-0 flex-col p-4">
         <div class="app-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
           <div class="shrink-0 grid gap-3 md:grid-cols-2">
             <label class="field-label">
