@@ -1,9 +1,9 @@
 <template>
   <section class="page-card space-y-4">
-    <h2 class="text-xl font-semibold text-slate-900">
+    <h2 class="theme-section-title text-xl font-semibold">
       Review Queue
     </h2>
-    <p class="text-sm text-slate-600">
+    <p class="theme-section-muted text-sm">
       Cards below confidence threshold appear here for manual correction.
     </p>
 
@@ -11,10 +11,10 @@
       <li
         v-for="card in cards"
         :key="card.id"
-        class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+        class="theme-card-frame theme-section-title rounded-lg px-3 py-2 text-sm"
       >
         <RouterLink
-          class="font-medium text-sky-700 hover:text-sky-800"
+          class="theme-link font-medium"
           :to="`/cards/${card.id}/edit`"
         >
           {{ card.name }}

@@ -5,7 +5,7 @@
       @submit.prevent="submit"
     >
       <div>
-        <h2 class="text-xl font-semibold text-slate-900">
+        <h2 class="theme-section-title text-xl font-semibold">
           Sign in
         </h2>
       </div>
@@ -33,7 +33,7 @@
 
       <p
         v-if="errorMessage"
-        class="text-sm font-medium text-rose-700"
+        class="theme-error-text text-sm font-medium"
       >
         {{ errorMessage }}
       </p>

@@ -1,19 +1,19 @@
 <template>
   <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
     <div class="space-y-1">
-      <h3 class="text-base font-semibold text-slate-800">
+      <h3 class="theme-section-title text-base font-semibold">
         Maintenance
       </h3>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div class="app-scrollbar min-h-0 space-y-4 overflow-y-auto pr-1">
-        <section class="rounded-lg border border-slate-200 p-4">
+        <section class="theme-muted-panel p-4">
           <div class="space-y-1">
-            <h4 class="text-sm font-semibold text-slate-800">
+            <h4 class="theme-section-title text-sm font-semibold">
               Utility
             </h4>
-            <p class="text-sm text-slate-600">
+            <p class="theme-section-muted text-sm">
               Safe actions that help inspect or queue work without removing data.
             </p>
           </div>
@@ -38,38 +38,39 @@
           </div>
         </section>
 
-        <section class="rounded-lg border border-red-200 bg-red-50/40 p-4">
+        <section class="theme-danger-panel">
           <div class="space-y-1">
-            <h4 class="text-sm font-semibold text-red-900">
+            <h4 class="theme-danger-title text-sm font-semibold">
               Destructive Actions
             </h4>
-            <p class="text-sm text-red-800/80">
+            <p class="theme-danger-copy text-sm">
               These actions remove data or rebuild state and cannot be undone.
             </p>
           </div>
 
           <div class="mt-4 space-y-4">
-            <label class="field-label">
+            <label class="field-label theme-danger-title">
               Type <span class="font-semibold">RESET</span> to enable destructive actions
               <input
                 v-model="confirmText"
-                class="input-base border-red-200 focus:border-red-300 focus:ring-red-100"
+                class="input-base theme-danger-input"
                 placeholder="RESET"
                 autocomplete="off"
               >
             </label>
 
-            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <label class="theme-section-title inline-flex items-center gap-2 text-sm">
               <input
                 v-model="includeImages"
                 type="checkbox"
+                class="theme-checkbox h-4 w-4"
               >
               <span>Also remove imported images</span>
             </label>
 
             <div class="grid gap-3 md:grid-cols-2">
               <button
-                class="btn-secondary justify-center border-red-300 text-red-700 hover:bg-red-50"
+                class="btn-danger-secondary justify-center"
                 type="button"
                 :disabled="!canRunActions || runningRebuild"
                 @click="rebuildDatabase"
@@ -77,7 +78,7 @@
                 {{ runningRebuild ? 'Rebuilding...' : 'Rebuild Database' }}
               </button>
               <button
-                class="btn-secondary justify-center border-red-300 text-red-700 hover:bg-red-50"
+                class="btn-danger-secondary justify-center"
                 type="button"
                 :disabled="!canRunActions || runningClear"
                 @click="clearStorage"
@@ -89,11 +90,11 @@
         </section>
       </div>
 
-      <aside class="app-scrollbar min-h-0 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <h4 class="text-sm font-semibold text-slate-800">
+      <aside class="theme-muted-panel app-scrollbar min-h-0 overflow-y-auto p-4">
+        <h4 class="theme-section-title text-sm font-semibold">
           Notes
         </h4>
-        <ul class="mt-3 space-y-2 text-sm text-slate-600">
+        <ul class="theme-section-muted mt-3 space-y-2 text-sm">
           <li>
             Reparse queues one parser job per template using the latest known image for each card.
           </li>
@@ -110,12 +111,12 @@
 
         <div
           v-if="lastRemovedPaths.length > 0"
-          class="mt-4 rounded-lg border border-slate-200 bg-white p-3"
+          class="theme-card-frame mt-4 rounded-lg p-3"
         >
-          <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div class="theme-kicker text-xs font-semibold uppercase tracking-wide">
             Last Removed Paths
           </div>
-          <ul class="mt-2 grid gap-1 text-xs text-slate-700">
+          <ul class="theme-section-title mt-2 grid gap-1 text-xs">
             <li
               v-for="path in lastRemovedPaths"
               :key="path"

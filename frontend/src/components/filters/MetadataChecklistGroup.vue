@@ -1,20 +1,20 @@
 <template>
-  <section class="flex min-w-[12rem] flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+  <section class="theme-muted-panel flex min-w-[12rem] flex-col gap-3">
     <button
       type="button"
       class="flex items-start justify-between gap-3 text-left"
       @click="isOpen = !isOpen"
     >
       <div class="min-w-0">
-        <h3 class="text-sm font-semibold text-slate-900">
+        <h3 class="theme-section-title text-sm font-semibold">
           {{ label }}
         </h3>
       </div>
-      <div class="flex items-center gap-2 text-slate-500">
+      <div class="theme-section-muted flex items-center gap-2">
         <button
           v-if="showReset"
           type="button"
-          class="rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-slate-900"
+          class="theme-icon-button"
           title="Reset group"
           aria-label="Reset group"
           @click.stop="emit('reset')"
@@ -23,7 +23,7 @@
         </button>
         <span
           v-if="modelValue.length > 0"
-          class="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white"
+          class="theme-pill theme-pill-accent px-2 py-0.5 text-xs font-medium"
         >
           {{ modelValue.length }}
         </span>
@@ -51,12 +51,12 @@
         <label
           v-for="option in filteredOptions"
           :key="option.id"
-          class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+          class="theme-checkbox-row"
         >
           <input
             :checked="selectedIds.has(option.id)"
             type="checkbox"
-            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600"
+            class="theme-checkbox mt-0.5 h-4 w-4 rounded border-slate-300"
             @change="toggle(option.id)"
           >
           <span>{{ option.label }}</span>
@@ -65,25 +65,25 @@
 
       <p
         v-else
-        class="flex h-64 items-center rounded-lg border border-dashed border-slate-200 bg-white px-3 py-4 text-sm text-slate-500"
+        class="theme-empty-state flex h-64 items-center"
       >
         {{ emptyState }}
       </p>
 
-      <div class="flex justify-end border-t border-slate-200 pt-2">
-        <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
+      <div class="theme-divider flex justify-end border-t pt-2">
+        <div class="theme-toggle-shell">
           <button
             type="button"
-            class="rounded-full px-3 py-1 text-xs font-medium transition"
-            :class="matchMode === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+            class="theme-toggle-option"
+            :class="matchMode === 'all' ? 'theme-toggle-option-active' : ''"
             @click.stop="emit('update:matchMode', 'all')"
           >
             AND
           </button>
           <button
             type="button"
-            class="rounded-full px-3 py-1 text-xs font-medium transition"
-            :class="matchMode === 'any' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+            class="theme-toggle-option"
+            :class="matchMode === 'any' ? 'theme-toggle-option-active' : ''"
             @click.stop="emit('update:matchMode', 'any')"
           >
             OR

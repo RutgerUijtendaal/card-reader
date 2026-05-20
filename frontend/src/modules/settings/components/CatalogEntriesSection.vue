@@ -1,12 +1,12 @@
 <template>
-  <section class="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white/80 p-4">
-    <div class="flex flex-col gap-3 border-b border-slate-200 pb-4">
+  <section class="theme-panel-shell flex min-h-0 flex-col p-4">
+    <div class="theme-divider flex flex-col gap-3 border-b pb-4">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <h4 class="text-sm font-semibold text-slate-900">
+          <h4 class="theme-section-title text-sm font-semibold">
             {{ kindLabel(selectedKind) }}
           </h4>
-          <p class="mt-1 text-xs text-slate-500">
+          <p class="theme-section-muted mt-1 text-xs">
             {{ currentRows.length }} of {{ totalCount }} shown
           </p>
         </div>
@@ -21,7 +21,7 @@
       </div>
 
       <label class="block">
-        <span class="mb-1 block text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+        <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
           Filter entries
         </span>
         <input
@@ -35,14 +35,14 @@
 
     <div
       v-if="totalCount === 0"
-      class="py-8 text-sm text-slate-500"
+      class="theme-section-muted py-8 text-sm"
     >
       {{ emptyState }}
     </div>
 
     <div
       v-else-if="currentRows.length === 0"
-      class="py-8 text-sm text-slate-500"
+      class="theme-section-muted py-8 text-sm"
     >
       No matching entries.
     </div>
@@ -57,15 +57,15 @@
         class="w-full rounded-xl border px-3 py-3 text-left transition"
         :class="
           selectedEntryId === entry.id
-            ? 'border-sky-300 bg-sky-50 shadow-sm'
-            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+            ? 'theme-selected-surface-strong'
+            : 'theme-card-frame hover:-translate-y-0.5'
         "
         type="button"
         @click="emit('select-entry', entry.id)"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <div class="truncate text-sm font-semibold text-slate-900">
+            <div class="theme-section-title truncate text-sm font-semibold">
               {{ entry.label || entry.key || 'Untitled entry' }}
             </div>
           </div>
@@ -73,7 +73,7 @@
             <span
               v-for="badge in entryBadges(entry)"
               :key="badge.label"
-              class="rounded-full px-2 py-1 text-[11px] font-medium text-nowrap"
+              class="theme-pill text-nowrap"
               :class="badge.tone"
             >
               {{ badge.label }}
@@ -83,7 +83,7 @@
 
         <div
           v-if="'symbol_type' in entry"
-          class="mt-3 flex items-center gap-2 text-xs text-slate-600"
+          class="theme-inline-muted mt-3 flex items-center gap-2 text-xs"
         >
           <span
             class="h-2.5 w-2.5 rounded-full"
@@ -93,7 +93,7 @@
         </div>
         <p
           v-else
-          class="mt-3 text-xs text-slate-600"
+          class="theme-inline-muted mt-3 text-xs"
         >
           {{ entryPreview(entry) }}
         </p>
@@ -136,21 +136,38 @@ const emptyState = computed(() =>
     : `No suggestions yet.`,
 );
 
+const metadataToneForKind = (kind: CatalogKind): string => {
+  switch (kind) {
+    case 'keywords':
+      return 'theme-pill-keyword';
+    case 'tags':
+    case 'suggested-tags':
+      return 'theme-pill-success';
+    case 'types':
+    case 'suggested-types':
+      return 'theme-pill-warning';
+    case 'symbols':
+      return 'theme-pill-symbol';
+    default:
+      return 'theme-pill-neutral';
+  }
+};
+
 const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   if (isSuggestionRecord(entry)) {
     return [
       {
         label: String(entry.occurrence_count),
-        tone: 'bg-sky-100 text-sky-700',
+        tone: 'theme-pill-accent',
       },
       {
         label: entry.status,
         tone:
           entry.status === 'accepted'
-            ? 'bg-emerald-100 text-emerald-700'
+            ? 'theme-pill-success'
             : entry.status === 'rejected'
-              ? 'bg-amber-100 text-amber-700'
-              : 'bg-sky-100 text-sky-700',
+              ? 'theme-pill-danger'
+              : 'theme-pill-neutral',
       },
     ];
   }
@@ -159,11 +176,11 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
     return [
       {
         label: String(entry.linked_card_count ?? 0),
-        tone: 'bg-sky-100 text-sky-700',
+        tone: 'theme-pill-accent',
       },
       {
         label: entry.symbol_type || 'symbol',
-        tone: 'bg-slate-100 text-slate-600',
+        tone: 'theme-pill-symbol',
       },
     ];
   }
@@ -171,11 +188,11 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   return [
     {
       label: String(entry.linked_card_count ?? 0),
-      tone: 'bg-sky-100 text-sky-700',
+      tone: 'theme-pill-accent',
     },
     {
       label: `${entry.identifiers.length} identifiers`,
-      tone: 'bg-slate-100 text-slate-600',
+      tone: metadataToneForKind(props.selectedKind),
     },
   ];
 };

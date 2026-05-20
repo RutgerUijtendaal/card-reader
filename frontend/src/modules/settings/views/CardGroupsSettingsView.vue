@@ -1,115 +1,256 @@
 <template>
   <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
-    <div class="flex items-center justify-between gap-3">
-      <div>
-        <h3 class="text-base font-semibold text-slate-800">
-          Card groups
-        </h3>
-        <p class="text-sm text-slate-500">
-          Group anchored cards together for gallery presentation and detail browsing.
-        </p>
-      </div>
-      <button
-        class="btn-primary"
-        type="button"
-        @click="startCreate"
-      >
-        New group
-      </button>
+    <div>
+      <h3 class="theme-section-title text-base font-semibold">
+        Card groups
+      </h3>
+      <p class="theme-section-muted text-sm">
+        Group anchored cards together for gallery presentation and detail browsing.
+      </p>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[280px_320px_minmax(0,1fr)]">
-      <aside class="min-h-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <input
-          v-model="listSearch"
-          class="input-base"
-          placeholder="Search card groups..."
-        >
-        <div class="app-scrollbar space-y-2 overflow-y-auto xl:h-[calc(100vh-17rem)]">
+      <aside class="theme-panel-shell flex min-h-0 flex-col p-4">
+        <div class="theme-divider flex flex-col gap-3 border-b pb-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h4 class="theme-section-title text-sm font-semibold">
+                Card groups
+              </h4>
+              <p class="theme-section-muted mt-1 text-xs">
+                {{ filteredGroups.length }} of {{ groups.length }} shown
+              </p>
+            </div>
+            <button
+              class="btn-secondary px-3 py-2 text-xs"
+              type="button"
+              @click="startCreate"
+            >
+              New Group
+            </button>
+          </div>
+
+          <label class="block">
+            <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
+              Filter groups
+            </span>
+            <input
+              v-model="listSearch"
+              class="input-base"
+              placeholder="Search card groups..."
+            >
+          </label>
+        </div>
+
+        <div class="app-scrollbar mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 xl:h-[calc(100vh-17rem)]">
           <button
             v-for="group in filteredGroups"
             :key="group.id"
             type="button"
             class="w-full rounded-xl border p-3 text-left transition"
-            :class="selectedGroupId === group.id ? 'border-sky-300 bg-white shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'"
+            :class="selectedGroupId === group.id ? 'theme-selected-surface-strong' : 'theme-card-frame hover:-translate-y-0.5'"
             @click="selectGroup(group.id)"
           >
-            <p class="text-sm font-semibold text-slate-900">
-              {{ group.name }}
-            </p>
-            <p class="mt-1 text-xs text-slate-500">
-              {{ group.member_count }} cards · Anchor: {{ group.anchor_card_name }}
+            <div class="flex items-start justify-between gap-3">
+              <p class="theme-section-title text-sm font-semibold">
+                {{ group.name }}
+              </p>
+              <span class="theme-pill theme-pill-accent text-nowrap">
+                {{ group.member_count }}
+              </span>
+            </div>
+            <p class="theme-section-muted mt-1 text-xs">
+              Anchor: {{ group.anchor_card_name }}
             </p>
           </button>
         </div>
       </aside>
 
-      <section class="min-h-0 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div class="space-y-3">
+      <section class="theme-panel-shell flex min-h-0 flex-col p-4">
+        <div class="theme-divider flex flex-col gap-3 border-b pb-4">
           <div>
-            <h4 class="text-sm font-semibold text-slate-900">
+            <h4 class="theme-section-title text-sm font-semibold">
               Card search
             </h4>
-            <p class="text-xs text-slate-500">
+            <p class="theme-section-muted mt-1 text-xs">
               Find cards to add to the selected group.
             </p>
           </div>
 
-          <div class="flex gap-2">
+          <label class="block">
+            <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
+              Search cards
+            </span>
             <input
               v-model="pickerQuery"
               class="input-base"
               placeholder="Search cards to add..."
               @keydown.enter.prevent
             >
-          </div>
+          </label>
+        </div>
 
-          <div class="app-scrollbar space-y-2 overflow-y-auto xl:h-[calc(100vh-20rem)]">
-            <div
-              v-if="pickerResults.length === 0"
-              class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500"
-            >
-              Search for cards to add them here.
-            </div>
-            <button
-              v-for="result in pickerResults"
-              :key="result.id"
-              type="button"
-              class="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-slate-300"
-              :disabled="memberIds.has(result.id)"
-              @click="addMember(result)"
-            >
-              <div>
-                <p class="text-sm font-medium text-slate-900">
-                  {{ result.name }}
-                </p>
-                <p class="text-xs text-slate-500">
-                  {{ result.label }}
-                </p>
-              </div>
-              <span class="text-xs font-semibold text-sky-700">
-                {{ memberIds.has(result.id) ? 'Added' : 'Add' }}
-              </span>
-            </button>
+        <div class="app-scrollbar mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 xl:h-[calc(100vh-20rem)]">
+          <div
+            v-if="pickerResults.length === 0"
+            class="theme-empty-state"
+          >
+            Search for cards to add them here.
           </div>
+          <button
+            v-for="result in pickerResults"
+            :key="result.id"
+            type="button"
+            class="theme-selected-surface flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition hover:-translate-y-0.5"
+            :disabled="memberIds.has(result.id)"
+            @click="addMember(result)"
+          >
+            <div>
+              <p class="theme-section-title text-sm font-medium">
+                {{ result.name }}
+              </p>
+              <p class="theme-section-muted text-xs">
+                {{ result.label }}
+              </p>
+            </div>
+            <span class="theme-link text-xs font-semibold">
+              {{ memberIds.has(result.id) ? 'Added' : 'Add' }}
+            </span>
+          </button>
         </div>
       </section>
 
-      <section class="min-h-0 rounded-2xl border border-slate-200 bg-white p-4">
-        <div
-          v-if="editor"
-          class="app-scrollbar space-y-5 overflow-y-auto xl:h-[calc(100vh-17rem)]"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h4 class="text-lg font-semibold text-slate-900">
-                {{ editor.id ? 'Edit card group' : 'Create card group' }}
-              </h4>
-              <p class="text-sm text-slate-500">
-                Anchor cards are always kept at position 1.
+      <section class="theme-panel-shell flex min-h-0 flex-col p-4">
+        <template v-if="editor">
+          <div
+            class="app-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 xl:h-[calc(100vh-17rem)]"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h4 class="theme-section-title text-lg font-semibold">
+                  {{ editor.id ? 'Edit card group' : 'Create card group' }}
+                </h4>
+                <p class="theme-section-muted text-sm">
+                  Anchor cards are always kept at position 1.
+                </p>
+              </div>
+            </div>
+
+            <label class="block space-y-2">
+              <span class="theme-section-title text-sm font-semibold">Name</span>
+              <input
+                v-model="editor.name"
+                class="input-base"
+                placeholder="Defaults to anchor card name"
+              >
+            </label>
+
+            <div class="theme-muted-panel space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h5 class="theme-section-title text-sm font-semibold">
+                    Members
+                  </h5>
+                  <p class="theme-section-muted text-xs">
+                    Drag to reorder, or use the anchor selector to choose the stack front.
+                  </p>
+                </div>
+                <span class="theme-section-muted text-xs font-medium">
+                  {{ editor.members.length }} cards
+                </span>
+              </div>
+
+              <div
+                v-if="editor.members.length > 0"
+                class="space-y-2"
+              >
+                <div
+                  v-for="(member, index) in editor.members"
+                  :key="member.card_id"
+                  class="theme-card-frame flex items-center gap-3 rounded-xl p-3"
+                  draggable="true"
+                  @dragstart="onDragStart(index)"
+                  @dragover.prevent
+                  @drop="onDrop(index)"
+                >
+                  <div class="theme-card-frame-muted theme-card-image-well h-20 w-16 shrink-0 rounded-lg">
+                    <img
+                      v-if="member.image_url"
+                      :src="toAbsoluteApiUrl(member.image_url)"
+                      :alt="member.card_name"
+                      class="h-full w-full object-contain"
+                    >
+                    <div
+                      v-else
+                      class="theme-kicker flex h-full items-center justify-center text-[11px]"
+                    >
+                      No image
+                    </div>
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <p class="theme-section-title text-sm font-semibold">
+                      {{ member.card_name }}
+                    </p>
+                    <p class="theme-section-muted text-xs">
+                      Position {{ index + 1 }}
+                    </p>
+                  </div>
+
+                  <label class="theme-section-muted flex items-center gap-2 text-xs font-medium">
+                    <input
+                      :checked="editor.anchor_card_id === member.card_id"
+                      type="radio"
+                      name="anchor-card"
+                      class="theme-checkbox h-4 w-4 border-slate-300"
+                      @change="setAnchor(member.card_id)"
+                    >
+                    <span>Anchor</span>
+                  </label>
+
+                  <button
+                    class="btn-secondary px-2 py-1 text-xs font-semibold"
+                    type="button"
+                    @click="moveMember(index, -1)"
+                  >
+                    Up
+                  </button>
+                  <button
+                    class="btn-secondary px-2 py-1 text-xs font-semibold"
+                    type="button"
+                    @click="moveMember(index, 1)"
+                  >
+                    Down
+                  </button>
+                  <button
+                    class="btn-danger-secondary rounded-lg px-2 py-1 text-xs font-semibold"
+                    type="button"
+                    :disabled="editor.anchor_card_id === member.card_id"
+                    @click="removeMember(member.card_id)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <p
+                v-else
+                class="theme-section-muted text-sm"
+              >
+                Add at least two cards to create a card group.
               </p>
             </div>
-            <div class="flex gap-2">
+
+            <p
+              v-if="errorMessage"
+              class="theme-error-text text-sm"
+            >
+              {{ errorMessage }}
+            </p>
+          </div>
+
+          <div class="theme-divider mt-5 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 v-if="editor.id"
                 class="btn-secondary"
@@ -119,149 +260,37 @@
                 Open
               </button>
               <button
+                class="btn-secondary"
+                type="button"
+                @click="resetEditor"
+              >
+                Reset
+              </button>
+            </div>
+
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
                 v-if="editor.id"
-                class="btn-secondary text-rose-700 hover:text-rose-800"
+                class="btn-danger-secondary"
                 type="button"
                 @click="deleteGroup"
               >
                 Delete
               </button>
-            </div>
-          </div>
-
-          <label class="block space-y-2">
-            <span class="text-sm font-semibold text-slate-900">Name</span>
-            <input
-              v-model="editor.name"
-              class="input-base"
-              placeholder="Defaults to anchor card name"
-            >
-          </label>
-
-          <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <h5 class="text-sm font-semibold text-slate-900">
-                  Members
-                </h5>
-                <p class="text-xs text-slate-500">
-                  Drag to reorder, or use the anchor selector to choose the stack front.
-                </p>
-              </div>
-              <span class="text-xs font-medium text-slate-500">
-                {{ editor.members.length }} cards
-              </span>
-            </div>
-
-            <div
-              v-if="editor.members.length > 0"
-              class="space-y-2"
-            >
-              <div
-                v-for="(member, index) in editor.members"
-                :key="member.card_id"
-                class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
-                draggable="true"
-                @dragstart="onDragStart(index)"
-                @dragover.prevent
-                @drop="onDrop(index)"
+              <button
+                class="btn-primary"
+                type="button"
+                @click="saveGroup"
               >
-                <div class="h-20 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                  <img
-                    v-if="member.image_url"
-                    :src="toAbsoluteApiUrl(member.image_url)"
-                    :alt="member.card_name"
-                    class="h-full w-full object-contain"
-                  >
-                  <div
-                    v-else
-                    class="flex h-full items-center justify-center text-[11px] text-slate-400"
-                  >
-                    No image
-                  </div>
-                </div>
-
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-semibold text-slate-900">
-                    {{ member.card_name }}
-                  </p>
-                  <p class="text-xs text-slate-500">
-                    Position {{ index + 1 }}
-                  </p>
-                </div>
-
-                <label class="flex items-center gap-2 text-xs font-medium text-slate-600">
-                  <input
-                    :checked="editor.anchor_card_id === member.card_id"
-                    type="radio"
-                    name="anchor-card"
-                    class="h-4 w-4 border-slate-300 text-sky-600"
-                    @change="setAnchor(member.card_id)"
-                  >
-                  <span>Anchor</span>
-                </label>
-
-                <button
-                  class="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                  type="button"
-                  @click="moveMember(index, -1)"
-                >
-                  Up
-                </button>
-                <button
-                  class="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                  type="button"
-                  @click="moveMember(index, 1)"
-                >
-                  Down
-                </button>
-                <button
-                  class="rounded-lg px-2 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
-                  type="button"
-                  :disabled="editor.anchor_card_id === member.card_id"
-                  @click="removeMember(member.card_id)"
-                >
-                  Remove
-                </button>
-              </div>
+                {{ editor.id ? 'Save Changes' : 'Create Group' }}
+              </button>
             </div>
-
-            <p
-              v-else
-              class="text-sm text-slate-500"
-            >
-              Add at least two cards to create a card group.
-            </p>
           </div>
-
-          <p
-            v-if="errorMessage"
-            class="text-sm text-rose-700"
-          >
-            {{ errorMessage }}
-          </p>
-
-          <div class="flex gap-2">
-            <button
-              class="btn-primary"
-              type="button"
-              @click="saveGroup"
-            >
-              {{ editor.id ? 'Save changes' : 'Create group' }}
-            </button>
-            <button
-              class="btn-secondary"
-              type="button"
-              @click="resetEditor"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+        </template>
 
         <div
           v-else
-          class="flex h-full items-center justify-center text-sm text-slate-500"
+          class="theme-section-muted flex h-full items-center justify-center text-sm"
         >
           Select a card group or create a new one.
         </div>
@@ -274,6 +303,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/modules/settings/types';
@@ -308,13 +338,18 @@ const filteredGroups = computed(() => {
 const memberIds = computed(() => new Set(editor.value?.members.map((member) => member.card_id) ?? []));
 
 const loadGroups = async (): Promise<void> => {
-  const response = await api.get<CardGroupRecord[]>('/settings/card-groups');
-  groups.value = response.data;
-  if (selectedGroupId.value) {
-    const next = groups.value.find((group) => group.id === selectedGroupId.value);
-    if (next) {
-      applyEditor(next);
+  try {
+    const response = await api.get<CardGroupRecord[]>('/settings/card-groups');
+    groups.value = response.data;
+    if (selectedGroupId.value) {
+      const next = groups.value.find((group) => group.id === selectedGroupId.value);
+      if (next) {
+        applyEditor(next);
+      }
     }
+  } catch (error) {
+    console.error('Load card groups failed', error);
+    toast.error(extractErrorMessage(error, 'Failed to load card groups.'));
   }
 };
 
@@ -450,10 +485,12 @@ const buildPayload = (): Record<string, unknown> | null => {
   }
   if (editor.value.members.length < 2) {
     errorMessage.value = 'Card groups require at least 2 cards.';
+    toast.error(errorMessage.value);
     return null;
   }
   if (!editor.value.anchor_card_id) {
     errorMessage.value = 'Choose an anchor card before saving.';
+    toast.error(errorMessage.value);
     return null;
   }
   errorMessage.value = '';
@@ -477,9 +514,11 @@ const saveGroup = async (): Promise<void> => {
     if (editor.value.id) {
       const response = await api.patch<CardGroupRecord>(`/settings/card-groups/${editor.value.id}`, payload);
       savedGroup = response.data;
+      toast.success('Card group updated.');
     } else {
       const response = await api.post<CardGroupRecord>('/settings/card-groups', payload);
       savedGroup = response.data;
+      toast.success('Card group created.');
     }
     await loadGroups();
     const next = groups.value.find((group) => group.id === savedGroup.id);
@@ -487,8 +526,9 @@ const saveGroup = async (): Promise<void> => {
       applyEditor(next);
     }
   } catch (error) {
-    console.error(error);
-    errorMessage.value = 'Unable to save card group.';
+    console.error('Save card group failed', error);
+    errorMessage.value = extractErrorMessage(error, 'Unable to save card group.');
+    toast.error(errorMessage.value);
   }
 };
 
@@ -496,9 +536,15 @@ const deleteGroup = async (): Promise<void> => {
   if (!editor.value?.id) {
     return;
   }
-  await api.delete(`/settings/card-groups/${editor.value.id}`);
-  startCreate();
-  await loadGroups();
+  try {
+    await api.delete(`/settings/card-groups/${editor.value.id}`);
+    toast.success('Card group deleted.');
+    startCreate();
+    await loadGroups();
+  } catch (error) {
+    console.error('Delete card group failed', error);
+    toast.error(extractErrorMessage(error, 'Failed to delete card group.'));
+  }
 };
 
 const openPublicView = (): void => {
@@ -535,4 +581,18 @@ watch(
     debouncedSearchCards();
   },
 );
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
+    const detail = maybeResponse?.data?.detail;
+    if (typeof detail === 'string' && detail.length > 0) {
+      return detail;
+    }
+  }
+  if (typeof error === 'object' && error && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return fallback;
+};
 </script>

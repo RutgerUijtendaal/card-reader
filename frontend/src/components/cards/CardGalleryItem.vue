@@ -12,42 +12,45 @@
       >
         <template v-if="isCardGroup">
           <div
-            class="relative rounded-2xl"
+            class="relative flex justify-center rounded-2xl"
             :style="{ height: `${cardHeightRem}rem` }"
           >
             <div
-              v-if="stackCards[2]"
-              class="absolute inset-x-0 top-0 bottom-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm"
-              :style="{ transform: 'translate(1rem, 0.35rem) rotate(7deg)' }"
-            />
-            <div
-              v-if="stackCards[1]"
-              class="absolute inset-x-0 top-0 bottom-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm"
-              :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(3deg)' }"
-            />
-            <div class="relative h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
-              <img
-                v-if="stackCards[0]?.image_url"
-                :src="toAbsoluteApiUrl(stackCards[0].image_url)"
-                :alt="stackCards[0].name"
-                class="block h-full w-full object-contain bg-white transition duration-300 group-hover:scale-[1.02]"
-                loading="lazy"
-                decoding="async"
-              >
+              class="relative h-full w-full"
+              :style="{ maxWidth: `${cardStackMaxWidthRem}rem` }"
+            >
               <div
-                v-else
-                class="flex h-full items-center justify-center bg-slate-50 text-sm text-slate-500"
-              >
-                No image
-              </div>
-              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/78 via-slate-950/35 to-transparent p-4">
-                <div class="space-y-1">
-                  <p class="text-sm font-semibold text-white">
-                    {{ groupItem?.group_name }}
-                  </p>
-                  <p class="text-xs text-slate-100/90">
-                    {{ groupItem?.member_count }} cards in this stack
-                  </p>
+                class="theme-card-frame-muted absolute inset-0 rounded-2xl"
+                :style="{ transform: 'translate(0.5rem, -0.0rem) rotate(7deg)' }"
+              />
+              <div
+                class="theme-card-frame-muted absolute inset-0 rounded-2xl"
+                :style="{ transform: 'translate(0.3rem, 0.0rem) rotate(4deg)' }"
+              />
+              <div class="relative h-full overflow-hidden rounded-2xl">
+                <img
+                  v-if="stackCards[0]?.image_url"
+                  :src="toAbsoluteApiUrl(stackCards[0].image_url)"
+                  :alt="stackCards[0].name"
+                  class="block h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+                  loading="lazy"
+                  decoding="async"
+                >
+                <div
+                  v-else
+                  class="theme-section-muted flex h-full items-center justify-center text-sm"
+                >
+                  No image
+                </div>
+                <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/88 via-slate-950/42 to-transparent p-4">
+                  <div class="inline-flex max-w-[85%] flex-col gap-1 rounded-2xl border border-white/14 bg-slate-950/42 px-3 py-2 shadow-lg backdrop-blur-md">
+                    <p class="text-sm font-semibold tracking-tight text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.85)]">
+                      {{ groupItem?.group_name }}
+                    </p>
+                    <p class="text-xs font-medium text-slate-50/95 drop-shadow-[0_1px_2px_rgba(15,23,42,0.8)]">
+                      {{ groupItem?.member_count }} cards in this stack
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -65,7 +68,7 @@
           >
           <div
             v-else
-            class="flex items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500"
+            class="theme-empty-state flex items-center justify-center rounded-xl text-sm"
             :style="{ height: `${cardHeightRem}rem` }"
           >
             No image
@@ -90,7 +93,7 @@
       >
         <RouterLink
           :to="editLocation"
-          class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-xl transition hover:bg-slate-50"
+          class="btn-secondary pointer-events-auto gap-1.5 rounded-full px-3 py-1.5 text-xs shadow-xl"
         >
           <Pencil class="h-3.5 w-3.5" />
           <span>Edit</span>
@@ -142,6 +145,7 @@ const isCardGroup = computed((): boolean => props.card.result_type === 'card_gro
 const cardItem = computed<CardListItem | null>(() => (isCard.value ? props.card as CardListItem : null));
 const groupItem = computed<CardGroupGalleryItem | null>(() => (isCardGroup.value ? props.card as CardGroupGalleryItem : null));
 const stackCards = computed(() => groupItem.value?.preview_cards.slice(0, 3) ?? []);
+const cardStackMaxWidthRem = computed(() => Number(((props.cardHeightRem * 63) / 88).toFixed(3)));
 const detailLocation = computed(() => buildGalleryItemLocation(props.card, route.query, 'detail'));
 const editLocation = computed(() =>
   cardItem.value ? buildCardDetailLocation(cardItem.value.id, route.query, 'edit') : '/cards',

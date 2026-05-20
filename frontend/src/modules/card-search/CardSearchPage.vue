@@ -3,11 +3,11 @@
     <aside class="page-card flex min-h-0 flex-col xl:sticky xl:top-0 xl:h-[calc(100vh-2rem)]">
       <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
         <div class="space-y-2">
-          <h2 class="flex items-center gap-2 text-xl font-semibold text-slate-900">
-            <Images class="h-5 w-5 text-slate-500" />
+          <h2 class="theme-section-title flex items-center gap-2 text-xl font-semibold">
+            <Images class="theme-section-muted h-5 w-5" />
             <span>Card Gallery</span>
           </h2>
-          <p class="text-sm text-slate-500">
+          <p class="theme-section-muted text-sm">
             Filter the visible card pool by symbols, stats, and metadata.
           </p>
         </div>
@@ -29,7 +29,7 @@
               <RotateCcw class="h-4 w-4" />
             </button>
           </div>
-          <p class="text-xs text-slate-500">
+          <p class="theme-section-muted text-xs">
             {{ totalCount }} results
           </p>
         </div>
@@ -43,9 +43,9 @@
             :options="manaTypeOptions"
             @reset="resetManaGroup"
           >
-            <div class="rounded-xl border border-slate-200 bg-white/80 p-3">
+            <div class="theme-muted-panel p-3">
               <div class="flex items-center gap-3">
-                <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
+                <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
                   Cost
                 </h4>
                 <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
@@ -95,9 +95,9 @@
             :options="otherSymbolOptions"
             @reset="resetGenericGroup"
           >
-            <div class="space-y-2 rounded-xl border border-slate-200 bg-white/80 p-3">
+            <div class="theme-muted-panel space-y-2 p-3">
               <div class="flex items-center gap-3">
-                <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
+                <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
                   Attack
                 </h4>
                 <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
@@ -117,7 +117,7 @@
               </div>
 
               <div class="flex items-center gap-3">
-                <h4 class="w-16 shrink-0 text-sm font-semibold text-slate-900">
+                <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
                   Health
                 </h4>
                 <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
@@ -157,7 +157,7 @@
         </div>
       </div>
 
-      <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+      <div class="theme-divider mt-4 flex flex-wrap gap-2 border-t pt-4">
         <GalleryOptionsMenu
           :tooltip-enabled="tooltipEnabled"
           :card-scale="cardScale"
@@ -194,7 +194,7 @@
       <div
         v-if="cards.length > 0"
         ref="loadMoreSentinelRef"
-        class="flex justify-center py-4 text-sm text-slate-500"
+        class="theme-section-muted flex justify-center py-4 text-sm"
       >
         <span v-if="isLoadingPage">Loading more cards...</span>
         <span v-else-if="nextPage === null">All cards loaded.</span>
@@ -203,7 +203,7 @@
 
       <div
         v-if="!isLoadingInitial && cards.length === 0"
-        class="page-card text-sm text-slate-500"
+        class="page-card theme-section-muted text-sm"
       >
         No cards found for the current filters.
       </div>

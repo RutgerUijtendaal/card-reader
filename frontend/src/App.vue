@@ -1,6 +1,6 @@
 <template>
   <div class="grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-[260px_1fr]">
-    <aside class="app-scrollbar h-full overflow-y-auto bg-slate-900 px-6 py-7 text-slate-50">
+    <aside class="app-sidebar app-scrollbar flex h-full flex-col overflow-y-auto px-6 py-7">
       <h1 class="mb-4 text-2xl font-semibold">
         Card Reader
       </h1>
@@ -41,25 +41,31 @@
         </RouterLink>
       </nav>
 
-      <div class="mt-6 border-t border-white/10 pt-4">
-        <RouterLink
-          v-if="auth.authEnabled && !auth.authenticated"
-          class="nav-link"
-          to="/login"
-        >
-          <LogIn class="h-4 w-4" />
-          <span>Sign in</span>
-        </RouterLink>
+      <div class="mt-auto space-y-4 pt-6">
+        <div class="app-sidebar-divider pt-4">
+          <ThemeModeMenu />
+        </div>
 
-        <button
-          v-if="auth.authEnabled && auth.authenticated"
-          class="nav-link w-full"
-          type="button"
-          @click="signOut"
-        >
-          <LogOut class="h-4 w-4" />
-          <span>Sign out</span>
-        </button>
+        <div class="app-sidebar-divider pt-4">
+          <RouterLink
+            v-if="auth.authEnabled && !auth.authenticated"
+            class="nav-link"
+            to="/login"
+          >
+            <LogIn class="h-4 w-4" />
+            <span>Sign in</span>
+          </RouterLink>
+
+          <button
+            v-if="auth.authEnabled && auth.authenticated"
+            class="nav-link w-full"
+            type="button"
+            @click="signOut"
+          >
+            <LogOut class="h-4 w-4" />
+            <span>Sign out</span>
+          </button>
+        </div>
       </div>
     </aside>
 
@@ -81,6 +87,7 @@ import { ref } from 'vue';
 import { ClipboardCheck, Images, LogIn, LogOut, Settings, Upload } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 import { useRouter } from 'vue-router';
+import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
 import { provideScrollContainer } from '@/composables/useScrollContainer';
 import { useAuthStore } from '@/modules/auth/authStore';
 

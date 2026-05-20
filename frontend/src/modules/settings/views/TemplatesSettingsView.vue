@@ -1,19 +1,19 @@
 <template>
   <div class="page-card flex min-h-0 flex-col space-y-4 xl:h-[calc(100vh-10rem)]">
-    <h3 class="text-base font-semibold text-slate-800">
+    <h3 class="theme-section-title text-base font-semibold">
       Templates
     </h3>
 
     <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside class="flex min-h-0 flex-col rounded-lg border border-slate-200 p-3">
-        <div class="mb-3 flex items-center justify-between">
-          <span class="text-sm font-semibold text-slate-800">Entries</span>
+      <aside class="theme-panel-shell flex min-h-0 flex-col p-3">
+        <div class="theme-divider mb-3 flex items-center justify-between border-b pb-3">
+          <span class="theme-section-title text-sm font-semibold">Entries</span>
           <button
-            class="btn-secondary px-2 py-1 text-xs"
+            class="btn-secondary px-3 py-2 text-xs"
             type="button"
             @click="startCreate"
           >
-            New
+            New Template
           </button>
         </div>
 
@@ -24,8 +24,8 @@
             class="w-full rounded-md border px-2 py-1.5 text-left text-sm"
             :class="
               selectedId === item.id
-                ? 'border-sky-300 bg-sky-50 text-sky-700'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                ? 'theme-selected-surface'
+                : 'theme-card-frame theme-section-title hover:-translate-y-0.5'
             "
             type="button"
             @click="selectTemplate(item.id)"
@@ -33,20 +33,20 @@
             <div class="truncate font-medium">
               {{ item.label }}
             </div>
-            <div class="truncate text-xs text-slate-500">
+            <div class="theme-section-muted truncate text-xs">
               {{ item.key }}
             </div>
           </button>
           <p
             v-if="templates.length === 0"
-            class="text-xs text-slate-500"
+            class="theme-section-muted text-xs"
           >
             No templates yet.
           </p>
         </div>
       </aside>
 
-      <div class="flex min-h-0 flex-col rounded-lg border border-slate-200 p-4">
+      <div class="theme-panel-shell flex min-h-0 flex-col p-4">
         <div class="app-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
           <div class="shrink-0 grid gap-3 md:grid-cols-2">
             <label class="field-label">
@@ -78,32 +78,37 @@
           </div>
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button
-            class="btn-primary"
-            type="button"
-            :disabled="saving"
-            @click="saveTemplate"
-          >
-            {{ saving ? 'Saving...' : createMode ? 'Create Template' : 'Save Changes' }}
-          </button>
-          <button
-            class="btn-secondary"
-            type="button"
-            :disabled="saving"
-            @click="resetForm"
-          >
-            Reset
-          </button>
-          <button
-            v-if="!createMode"
-            class="btn-secondary border-red-300 text-red-700 hover:bg-red-50"
-            type="button"
-            :disabled="saving || deleting"
-            @click="openDeleteModal"
-          >
-            {{ deleting ? 'Deleting...' : 'Delete' }}
-          </button>
+        <div class="theme-divider mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              class="btn-secondary"
+              type="button"
+              :disabled="saving"
+              @click="resetForm"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              v-if="!createMode"
+              class="btn-danger-secondary"
+              type="button"
+              :disabled="saving || deleting"
+              @click="openDeleteModal"
+            >
+              {{ deleting ? 'Deleting...' : 'Delete' }}
+            </button>
+            <button
+              class="btn-primary"
+              type="button"
+              :disabled="saving"
+              @click="saveTemplate"
+            >
+              {{ saving ? 'Saving...' : createMode ? 'Create Template' : 'Save Changes' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

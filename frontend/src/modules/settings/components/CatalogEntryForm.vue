@@ -3,7 +3,7 @@
     v-if="kind === 'symbols'"
     class="grid gap-4 xl:grid-cols-2"
   >
-    <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+    <div class="theme-muted-panel">
       <div class="grid gap-3">
         <label class="field-label">
           Label
@@ -17,7 +17,7 @@
           <input
             v-model="keyModel"
             class="input-base"
-            :class="keyDisabled ? 'cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500' : ''"
+            :class="keyDisabled ? 'theme-input-disabled-key' : ''"
             :disabled="keyDisabled"
           >
         </label>
@@ -37,10 +37,11 @@
             placeholder="mana"
           >
         </label>
-        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+        <label class="theme-section-title inline-flex items-center gap-2 text-sm">
           <input
             v-model="enabledModel"
             type="checkbox"
+            class="theme-checkbox h-4 w-4"
           >
           <span>Enabled</span>
         </label>
@@ -48,7 +49,7 @@
     </div>
 
     <template v-if="entry.detector_type === 'template' && advancedOpen">
-      <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <div class="theme-muted-panel">
         <JsonEditorField
           v-model="detectionConfigModel"
           label="Detection config JSON"
@@ -59,7 +60,7 @@
         />
       </div>
 
-      <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <div class="theme-muted-panel">
         <JsonEditorField
           v-model="textEnrichmentModel"
           label="Text enrichment JSON"
@@ -70,7 +71,7 @@
         />
       </div>
 
-      <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <div class="theme-muted-panel">
         <div class="space-y-2">
           <JsonEditorField
             v-model="referenceAssetsModel"
@@ -110,7 +111,7 @@
         <input
           v-model="keyModel"
           class="input-base"
-          :class="keyDisabled ? 'cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-500' : ''"
+          :class="keyDisabled ? 'theme-input-disabled-key' : ''"
           :disabled="keyDisabled"
         >
       </label>
@@ -122,7 +123,7 @@
         class="input-base min-h-24 font-mono"
         placeholder="turn start&#10;at the beginning of your turn"
       />
-      <span class="text-xs font-normal text-slate-500">
+      <span class="theme-section-muted text-xs font-normal">
         One identifier per line. Matching is case-insensitive.
       </span>
     </label>

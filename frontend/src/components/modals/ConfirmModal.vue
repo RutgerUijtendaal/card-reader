@@ -2,14 +2,14 @@
   <Teleport to="body">
     <div
       v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      class="theme-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
       @click.self="emit('cancel')"
     >
-      <div class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
-        <h3 class="text-base font-semibold text-slate-900">
+      <div class="theme-popover w-full max-w-md shadow-xl">
+        <h3 class="theme-section-title text-base font-semibold">
           {{ title }}
         </h3>
-        <p class="mt-2 whitespace-pre-line text-sm text-slate-600">
+        <p class="theme-section-muted mt-2 whitespace-pre-line text-sm">
           {{ message }}
         </p>
         <div class="mt-4 flex justify-end gap-2">
@@ -22,7 +22,7 @@
             {{ cancelLabel }}
           </button>
           <button
-            class="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+            class="btn-danger-secondary"
             type="button"
             :disabled="loading"
             @click="emit('confirm')"
