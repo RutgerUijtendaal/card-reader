@@ -1,20 +1,20 @@
 <template>
-  <section class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <div class="flex flex-col gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+  <section class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/55">
+    <div class="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-slate-700 md:flex-row md:items-start md:justify-between">
       <div>
-        <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+        <p class="theme-kicker text-xs font-medium uppercase tracking-[0.18em]">
           {{ isCreatingNew ? 'Create' : 'Edit' }} {{ kindItemLabel(selectedKind) }}
         </p>
-        <h4 class="mt-2 text-lg font-semibold text-slate-900">
+        <h4 class="theme-section-title mt-2 text-lg font-semibold">
           {{ title }}
         </h4>
       </div>
 
       <div
         v-if="!isCreatingNew"
-        class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+        class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
       >
-        <div class="font-semibold text-slate-700">
+        <div class="font-semibold text-slate-700 dark:text-slate-100">
           Existing entry
         </div>
         <div class="mt-1">
@@ -39,12 +39,12 @@
 
       <div
         v-if="!isCreatingNew"
-        class="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+        class="theme-muted-panel"
       >
-        <div class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+        <div class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
           Linked cards
         </div>
-        <div class="mt-1 text-sm text-slate-500">
+        <div class="theme-section-muted mt-1 text-sm">
           {{ linkedCardCount }} cards currently use this {{ kindItemLabel(selectedKind).toLowerCase() }}.
         </div>
         <div class="mt-4">
@@ -56,7 +56,7 @@
       </div>
     </div>
 
-    <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 bg-white pt-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 bg-white pt-4 dark:border-slate-700 dark:bg-transparent sm:flex-row sm:items-center sm:justify-between">
       <button
         v-if="!isCreatingNew"
         class="btn-secondary"
@@ -67,15 +67,14 @@
       </button>
       <div
         v-else
-        class="text-sm text-slate-500"
+        class="theme-section-muted text-sm"
       >
-        New entries use the same editor as existing ones.
       </div>
 
       <div class="flex flex-col gap-3 sm:flex-row">
         <button
           v-if="!isCreatingNew && selectedRow"
-          class="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+          class="btn-danger-secondary"
           type="button"
           :disabled="deletingEntryIds.has(selectedRow.id)"
           @click="emit('request-delete', selectedRow)"

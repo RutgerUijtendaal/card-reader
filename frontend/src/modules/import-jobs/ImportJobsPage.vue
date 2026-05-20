@@ -3,29 +3,29 @@
     <div class="space-y-6 xl:sticky xl:top-0">
       <header class="page-card overflow-hidden">
         <div class="space-y-3">
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-teal-700">
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-teal-700 dark:text-teal-300">
             Intake Queue
           </p>
           <div class="space-y-2">
-            <h2 class="text-2xl font-semibold text-slate-900">
+            <h2 class="theme-section-title text-2xl font-semibold">
               Import Jobs
             </h2>
-            <p class="max-w-2xl text-sm leading-6 text-slate-600">
+            <p class="theme-section-muted max-w-2xl text-sm leading-6">
               Queue new card image batches, monitor parser throughput, and interrupt active jobs
               without killing the parser process.
             </p>
           </div>
-          <div class="flex flex-wrap gap-3 pt-1 text-sm text-slate-600">
-            <div class="rounded-full bg-slate-100 px-3 py-1.5">
+          <div class="theme-section-muted flex flex-wrap gap-3 pt-1 text-sm">
+            <div class="rounded-full bg-slate-100 px-3 py-1.5 dark:bg-slate-800 dark:text-slate-200">
               {{ queuedCount }} queued
             </div>
-            <div class="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800">
+            <div class="rounded-full bg-amber-100 px-3 py-1.5 text-amber-800 dark:bg-amber-950/70 dark:text-amber-100">
               {{ runningCount + cancelingCount }} active
             </div>
-            <div class="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-800">
+            <div class="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-100">
               {{ completedCount }} completed
             </div>
-            <div class="rounded-full bg-rose-100 px-3 py-1.5 text-rose-800">
+            <div class="rounded-full bg-rose-100 px-3 py-1.5 text-rose-800 dark:bg-rose-950/70 dark:text-rose-100">
               {{ failedCount + cancelledCount }} stopped
             </div>
           </div>
@@ -33,16 +33,16 @@
       </header>
 
       <form
-        class="page-card rounded-[1.75rem] border border-slate-200 bg-white/90 p-6 shadow-sm"
+        class="page-card rounded-[1.75rem] p-6 shadow-sm"
         @submit.prevent="createJobFromPicker"
       >
         <div class="mb-5 flex items-center justify-between gap-3">
           <div class="grid gap-3">
             <div>
-              <h3 class="text-base font-semibold text-slate-900">
+              <h3 class="theme-section-title text-base font-semibold">
                 New Import
               </h3>
-              <p class="text-sm text-slate-500">
+              <p class="theme-section-muted text-sm">
                 Upload one file or a whole folder into the parser queue.
               </p>
             </div>
@@ -106,18 +106,18 @@
             >
           </label>
 
-          <div class="rounded-[1.25rem] bg-slate-50 px-4 py-4">
-            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <div class="theme-muted-panel rounded-[1.25rem] px-4 py-4">
+            <div class="theme-kicker text-xs font-semibold uppercase tracking-[0.18em]">
               Selection
             </div>
-            <div class="mt-2 text-sm text-slate-700">
+            <div class="theme-section-title mt-2 text-sm">
               {{ pickedFiles.length }} file{{ pickedFiles.length === 1 ? '' : 's' }} ready
             </div>
           </div>
 
           <p
             v-if="templates.length === 0"
-            class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            class="theme-alert-warning"
           >
             No templates available. Add one in Settings > Templates first.
           </p>
@@ -134,19 +134,19 @@
 
       <p
         v-if="errorMessage"
-        class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700"
+        class="theme-alert-danger"
       >
         {{ errorMessage }}
       </p>
     </div>
 
     <section class="page-card flex min-h-0 flex-col overflow-hidden xl:h-full">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-1 pb-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-1 pb-4 dark:border-slate-700">
         <div class="space-y-1">
-          <h3 class="text-base font-semibold text-slate-900">
+          <h3 class="theme-section-title text-base font-semibold">
             Queue Monitor
           </h3>
-          <p class="text-sm text-slate-500">
+          <p class="theme-section-muted text-sm">
             {{ isRefreshing ? 'Refreshing live status...' : 'Live status idle.' }}
             <span v-if="lastRefreshedAt">Last update {{ lastRefreshedAt }}.</span>
           </p>
@@ -166,7 +166,7 @@
       >
         <div
           v-if="jobs.length === 0"
-          class="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500"
+          class="theme-empty-state rounded-[1.5rem] px-6 py-10 text-center"
         >
           No import jobs yet.
         </div>
@@ -178,7 +178,7 @@
           <article
             v-for="job in jobs"
             :key="job.id"
-            class="rounded-[1.75rem] border border-slate-200 bg-white px-6 py-6 shadow-sm"
+            class="rounded-[1.75rem] border border-slate-200 bg-white px-6 py-6 shadow-sm dark:border-slate-700 dark:bg-slate-950/70"
           >
             <div class="flex flex-wrap items-start justify-between gap-5">
               <div class="min-w-0 space-y-3 pr-2">
@@ -189,15 +189,15 @@
                   >
                     {{ job.status }}
                   </span>
-                  <span class="text-xs text-slate-400">
+                  <span class="theme-kicker text-xs">
                     {{ job.id }}
                   </span>
                 </div>
                 <div class="space-y-1.5">
-                  <p class="text-sm font-semibold text-slate-900">
+                  <p class="theme-section-title text-sm font-semibold">
                     {{ job.template_id }}
                   </p>
-                  <p class="break-all text-sm leading-6 text-slate-500">
+                  <p class="theme-section-muted break-all text-sm leading-6">
                     {{ job.source_path }}
                   </p>
                 </div>
@@ -206,7 +206,7 @@
               <div class="flex flex-wrap items-center gap-2 pl-1">
                 <button
                   v-if="canCancel(job)"
-                  class="rounded-full border border-rose-300 px-3 py-1.5 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="btn-danger-secondary rounded-full px-3 py-1.5"
                   type="button"
                   :disabled="cancellingJobIds.has(job.id)"
                   @click="cancelJob(job.id)"
@@ -218,11 +218,11 @@
 
             <div class="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
               <div class="space-y-2.5">
-                <div class="flex items-center justify-between text-sm text-slate-600">
+                <div class="theme-section-muted flex items-center justify-between text-sm">
                   <span>Progress</span>
                   <span>{{ job.processed_items }}/{{ job.total_items }}</span>
                 </div>
-                <div class="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div class="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
                     class="h-full rounded-full transition-all"
                     :class="progressClass(job.status)"
@@ -231,20 +231,20 @@
                 </div>
               </div>
 
-              <dl class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm text-slate-600">
+              <dl class="theme-section-muted grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
                 <div>
-                  <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                  <dt class="theme-kicker text-xs uppercase tracking-[0.16em]">
                     Created
                   </dt>
-                  <dd class="mt-1.5 text-slate-700">
+                  <dd class="theme-section-title mt-1.5">
                     {{ formatTimestamp(job.created_at) }}
                   </dd>
                 </div>
                 <div>
-                  <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                  <dt class="theme-kicker text-xs uppercase tracking-[0.16em]">
                     Updated
                   </dt>
-                  <dd class="mt-1.5 text-slate-700">
+                  <dd class="theme-section-title mt-1.5">
                     {{ formatTimestamp(job.updated_at) }}
                   </dd>
                 </div>

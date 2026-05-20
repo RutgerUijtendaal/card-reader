@@ -17,26 +17,26 @@
           >
             <div
               v-if="stackCards[2]"
-              class="absolute inset-x-0 top-0 bottom-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm"
+              class="theme-card-frame-muted absolute inset-x-0 top-0 bottom-0 rounded-2xl"
               :style="{ transform: 'translate(1rem, 0.35rem) rotate(7deg)' }"
             />
             <div
               v-if="stackCards[1]"
-              class="absolute inset-x-0 top-0 bottom-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm"
+              class="theme-card-frame-muted absolute inset-x-0 top-0 bottom-0 rounded-2xl"
               :style="{ transform: 'translate(0.45rem, 0.2rem) rotate(3deg)' }"
             />
-            <div class="relative h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+            <div class="theme-card-frame relative h-full rounded-2xl">
               <img
                 v-if="stackCards[0]?.image_url"
                 :src="toAbsoluteApiUrl(stackCards[0].image_url)"
                 :alt="stackCards[0].name"
-                class="block h-full w-full object-contain bg-white transition duration-300 group-hover:scale-[1.02]"
+                class="theme-card-image-well block h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
                 loading="lazy"
                 decoding="async"
               >
               <div
                 v-else
-                class="flex h-full items-center justify-center bg-slate-50 text-sm text-slate-500"
+                class="theme-card-image-well theme-section-muted flex h-full items-center justify-center text-sm"
               >
                 No image
               </div>
@@ -65,7 +65,7 @@
           >
           <div
             v-else
-            class="flex items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500"
+            class="theme-empty-state flex items-center justify-center rounded-xl text-sm"
             :style="{ height: `${cardHeightRem}rem` }"
           >
             No image
@@ -90,7 +90,7 @@
       >
         <RouterLink
           :to="editLocation"
-          class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-xl transition hover:bg-slate-50"
+          class="btn-secondary pointer-events-auto gap-1.5 rounded-full px-3 py-1.5 text-xs shadow-xl"
         >
           <Pencil class="h-3.5 w-3.5" />
           <span>Edit</span>

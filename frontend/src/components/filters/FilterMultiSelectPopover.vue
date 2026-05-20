@@ -7,7 +7,7 @@
       :class="
         isActive
           ? 'border-sky-300 bg-sky-50 text-sky-700'
-          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
       "
       @click="toggle"
     >
@@ -18,7 +18,7 @@
       <div
         v-if="isOpen"
         ref="panelRef"
-        class="z-50 w-72 rounded-lg border border-slate-200 bg-white p-3 shadow-xl"
+        class="theme-popover z-50 w-72"
         :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
       >
         <div class="space-y-2">
@@ -32,7 +32,7 @@
             <label
               v-for="option in filteredOptions"
               :key="option.id"
-              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-slate-700 hover:bg-slate-100"
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <input
                 :checked="selectedSet.has(option.id)"
@@ -46,26 +46,26 @@
 
           <p
             v-if="options.length === 0"
-            class="text-xs text-slate-400"
+            class="theme-kicker text-xs"
           >
             {{ emptyText }}
           </p>
           <p
             v-else-if="filteredOptions.length === 0"
-            class="text-xs text-slate-400"
+            class="theme-kicker text-xs"
           >
             No matches.
           </p>
 
           <div
             v-if="matchMode"
-            class="border-t border-slate-200 pt-2"
+            class="border-t border-slate-200 pt-2 dark:border-slate-700"
           >
             <div class="flex justify-end">
-              <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
+              <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/80">
                 <button
                   class="rounded-full px-3 py-1 text-xs font-medium transition"
-                  :class="matchMode === 'any' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+                  :class="matchMode === 'any' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
                   type="button"
                   @click="setMatchMode('any')"
                 >
@@ -73,7 +73,7 @@
                 </button>
                 <button
                   class="rounded-full px-3 py-1 text-xs font-medium transition"
-                  :class="matchMode === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+                  :class="matchMode === 'all' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
                   type="button"
                   @click="setMatchMode('all')"
                 >

@@ -14,16 +14,16 @@
       <div
         v-if="isOpen"
         ref="panelRef"
-        class="z-30 w-80 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl"
+        class="theme-popover z-30 w-80"
         :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
       >
         <div class="space-y-4">
           <label class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm font-semibold text-slate-900">
+              <p class="theme-section-title text-sm font-semibold">
                 Tooltip
               </p>
-              <p class="text-xs text-slate-500">
+              <p class="theme-section-muted text-xs">
                 Show card details on hover in the gallery.
               </p>
             </div>
@@ -37,10 +37,10 @@
 
           <label class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm font-semibold text-slate-900">
+              <p class="theme-section-title text-sm font-semibold">
                 Card Groups
               </p>
-              <p class="text-xs text-slate-500">
+              <p class="theme-section-muted text-xs">
                 Show card groups as stacked gallery results.
               </p>
             </div>
@@ -55,14 +55,14 @@
           <label class="block space-y-2">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <p class="text-sm font-semibold text-slate-900">
+                <p class="theme-section-title text-sm font-semibold">
                   Card Size
                 </p>
-                <p class="text-xs text-slate-500">
+                <p class="theme-section-muted text-xs">
                   Scale gallery cards.
                 </p>
               </div>
-              <span class="text-xs font-medium text-slate-500">
+              <span class="theme-section-muted text-xs font-medium">
                 {{ percentLabel }}
               </span>
             </div>

@@ -115,6 +115,9 @@ Targeted commands:
   - tests: `vitest`
   - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility in `frontend/src/styles.css`
   - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
+  - preserve and extend the shared light/dark theme system in `frontend/src/styles.css` and `frontend/src/composables/useTheme.ts`
+  - prefer semantic theme primitives and token-backed shared classes over scattering raw light-only or dark-only color utilities across components
+  - when adding or changing visible UI, verify both light and dark appearances instead of treating dark mode as optional follow-up polish
 
 ## API Surface
 - `POST /imports/upload`

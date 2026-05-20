@@ -1,26 +1,26 @@
 <template>
-  <section class="flex min-w-[12rem] flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+  <section class="theme-muted-panel flex min-w-[12rem] flex-col gap-3">
     <button
       type="button"
       class="flex items-start justify-between gap-3 text-left"
       @click="isOpen = !isOpen"
     >
       <div class="min-w-0">
-        <h3 class="text-sm font-semibold text-slate-900">
+        <h3 class="theme-section-title text-sm font-semibold">
           {{ label }}
         </h3>
         <p
           v-if="description"
-          class="text-xs text-slate-500"
+          class="theme-section-muted text-xs"
         >
           {{ description }}
         </p>
       </div>
-      <div class="flex items-center gap-2 text-slate-500">
+      <div class="theme-section-muted flex items-center gap-2">
         <button
           v-if="showReset"
           type="button"
-          class="rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-slate-900"
+          class="rounded-full p-1 transition hover:bg-white hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
           title="Reset group"
           aria-label="Reset group"
           @click.stop="emit('reset')"
@@ -29,7 +29,7 @@
         </button>
         <span
           v-if="modelValue.length > 0"
-          class="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white"
+          class="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-sky-500 dark:text-slate-950"
         >
           {{ modelValue.length }}
         </span>
@@ -45,11 +45,11 @@
       class="space-y-3"
     >
       <div class="flex justify-end">
-        <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
+        <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/80">
           <button
             type="button"
             class="rounded-full px-3 py-1 text-xs font-medium transition"
-            :class="matchMode === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+            :class="matchMode === 'all' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
             @click.stop="emit('update:matchMode', 'all')"
           >
             AND
@@ -57,7 +57,7 @@
           <button
             type="button"
             class="rounded-full px-3 py-1 text-xs font-medium transition"
-            :class="matchMode === 'any' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'"
+            :class="matchMode === 'any' ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'"
             @click.stop="emit('update:matchMode', 'any')"
           >
             OR
@@ -73,8 +73,8 @@
           class="inline-flex h-10 w-10 items-center justify-center rounded-full border transition"
           :class="
             selectedIds.has(option.id)
-              ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-              : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+              ? 'border-slate-900 bg-slate-900 text-white shadow-sm dark:border-sky-500 dark:bg-sky-500 dark:text-slate-950'
+              : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800'
           "
           :title="option.label"
           :aria-pressed="selectedIds.has(option.id)"

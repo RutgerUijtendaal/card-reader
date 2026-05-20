@@ -3,20 +3,20 @@
     <div class="page-card">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="space-y-2">
-          <h2 class="flex items-center gap-2 text-xl font-semibold text-slate-900">
-            <Settings class="h-5 w-5 text-slate-500" />
+          <h2 class="theme-section-title flex items-center gap-2 text-xl font-semibold">
+            <Settings class="theme-section-muted h-5 w-5" />
             <span>Settings</span>
           </h2>
         </div>
 
-        <div class="inline-flex w-full flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1 lg:w-auto lg:flex-nowrap">
+        <div class="inline-flex w-full flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/80 lg:w-auto lg:flex-nowrap">
           <button
             class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
             type="button"
             :class="
               activeTab === 'catalog'
-                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
-                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100 dark:bg-slate-800 dark:text-sky-200 dark:ring-sky-500/20'
+                : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
             "
             @click="setActiveTab('catalog')"
           >
@@ -28,8 +28,8 @@
             type="button"
             :class="
               activeTab === 'templates'
-                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
-                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100 dark:bg-slate-800 dark:text-sky-200 dark:ring-sky-500/20'
+                : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
             "
             @click="setActiveTab('templates')"
           >
@@ -41,8 +41,8 @@
             type="button"
             :class="
               activeTab === 'card-groups'
-                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
-                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100 dark:bg-slate-800 dark:text-sky-200 dark:ring-sky-500/20'
+                : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
             "
             @click="setActiveTab('card-groups')"
           >
@@ -55,8 +55,8 @@
             type="button"
             :class="
               activeTab === 'maintenance'
-                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100'
-                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100 dark:bg-slate-800 dark:text-sky-200 dark:ring-sky-500/20'
+                : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
             "
             @click="setActiveTab('maintenance')"
           >

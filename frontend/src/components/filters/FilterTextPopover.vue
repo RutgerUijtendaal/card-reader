@@ -7,7 +7,7 @@
       :class="
         hasValue
           ? 'border-sky-300 bg-sky-50 text-sky-700'
-          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
       "
       @click="toggle"
     >
@@ -18,10 +18,10 @@
       <div
         v-if="isOpen"
         ref="panelRef"
-        class="z-50 w-64 rounded-lg border border-slate-200 bg-white p-3 shadow-xl"
+        class="theme-popover z-50 w-64"
         :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
       >
-        <label class="grid gap-2 text-xs font-medium text-slate-600">
+        <label class="theme-section-muted grid gap-2 text-xs font-medium">
           {{ label }}
           <input
             :value="modelValue"

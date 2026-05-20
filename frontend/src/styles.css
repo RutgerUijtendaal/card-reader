@@ -3,6 +3,94 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+    --app-bg-from: #f8ecd8;
+    --app-bg-to: #cbd5e1;
+    --color-text: #0f172a;
+    --color-text-muted: #475569;
+    --color-text-soft: #64748b;
+    --color-border: rgba(148, 163, 184, 0.32);
+    --color-border-strong: rgba(100, 116, 139, 0.45);
+    --color-surface: rgba(255, 255, 255, 0.84);
+    --color-surface-strong: rgba(255, 255, 255, 0.93);
+    --color-surface-muted: rgba(248, 250, 252, 0.78);
+    --color-surface-soft: rgba(241, 245, 249, 0.92);
+    --color-popover: rgba(255, 255, 255, 0.96);
+    --color-sidebar: linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(30, 41, 59, 0.92) 100%);
+    --color-sidebar-border: rgba(148, 163, 184, 0.16);
+    --color-sidebar-text: #e2e8f0;
+    --color-sidebar-surface: rgba(30, 41, 59, 0.62);
+    --color-sidebar-surface-hover: rgba(51, 65, 85, 0.82);
+    --color-nav-text: #cbd5e1;
+    --color-nav-hover-bg: rgba(255, 255, 255, 0.08);
+    --color-nav-hover-text: #f8fafc;
+    --color-nav-active-bg: rgba(56, 189, 248, 0.18);
+    --color-nav-active-text: #f8fafc;
+    --color-input-bg: rgba(255, 255, 255, 0.96);
+    --color-input-border: rgba(148, 163, 184, 0.55);
+    --color-input-ring: rgba(125, 211, 252, 0.35);
+    --color-secondary-bg: rgba(255, 255, 255, 0.92);
+    --color-secondary-hover: rgba(241, 245, 249, 0.98);
+    --color-disabled-bg: rgba(241, 245, 249, 0.95);
+    --color-disabled-border: rgba(203, 213, 225, 0.9);
+    --color-disabled-text: #94a3b8;
+    --color-danger-bg: rgba(254, 242, 242, 0.94);
+    --color-danger-hover: rgba(254, 226, 226, 0.98);
+    --color-danger-border: rgba(251, 146, 146, 0.7);
+    --color-danger-text: #b91c1c;
+    --color-warning-bg: rgba(255, 251, 235, 0.94);
+    --color-warning-border: rgba(252, 211, 77, 0.72);
+    --color-warning-text: #b45309;
+    --color-overlay: rgba(15, 23, 42, 0.52);
+    --scrollbar-thumb: rgba(148, 163, 184, 0.9);
+    --scrollbar-thumb-hover: rgba(100, 116, 139, 0.96);
+  }
+
+  html.dark {
+    color-scheme: dark;
+    --app-bg-from: #020617;
+    --app-bg-to: #111827;
+    --color-text: #e5eefb;
+    --color-text-muted: #94a3b8;
+    --color-text-soft: #64748b;
+    --color-border: rgba(71, 85, 105, 0.62);
+    --color-border-strong: rgba(100, 116, 139, 0.78);
+    --color-surface: rgba(15, 23, 42, 0.82);
+    --color-surface-strong: rgba(15, 23, 42, 0.94);
+    --color-surface-muted: rgba(30, 41, 59, 0.72);
+    --color-surface-soft: rgba(30, 41, 59, 0.9);
+    --color-popover: rgba(15, 23, 42, 0.97);
+    --color-sidebar: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 0.92) 100%);
+    --color-sidebar-border: rgba(148, 163, 184, 0.12);
+    --color-sidebar-text: #e5eefb;
+    --color-sidebar-surface: rgba(30, 41, 59, 0.72);
+    --color-sidebar-surface-hover: rgba(51, 65, 85, 0.92);
+    --color-nav-text: #cbd5e1;
+    --color-nav-hover-bg: rgba(51, 65, 85, 0.58);
+    --color-nav-hover-text: #f8fafc;
+    --color-nav-active-bg: rgba(56, 189, 248, 0.22);
+    --color-nav-active-text: #e0f2fe;
+    --color-input-bg: rgba(15, 23, 42, 0.92);
+    --color-input-border: rgba(71, 85, 105, 0.78);
+    --color-input-ring: rgba(56, 189, 248, 0.25);
+    --color-secondary-bg: rgba(15, 23, 42, 0.88);
+    --color-secondary-hover: rgba(30, 41, 59, 0.98);
+    --color-disabled-bg: rgba(30, 41, 59, 0.9);
+    --color-disabled-border: rgba(71, 85, 105, 0.95);
+    --color-disabled-text: #64748b;
+    --color-danger-bg: rgba(69, 10, 10, 0.48);
+    --color-danger-hover: rgba(127, 29, 29, 0.56);
+    --color-danger-border: rgba(248, 113, 113, 0.34);
+    --color-danger-text: #fecaca;
+    --color-warning-bg: rgba(120, 53, 15, 0.38);
+    --color-warning-border: rgba(251, 191, 36, 0.3);
+    --color-warning-text: #fde68a;
+    --color-overlay: rgba(2, 6, 23, 0.78);
+    --scrollbar-thumb: rgba(71, 85, 105, 0.95);
+    --scrollbar-thumb-hover: rgba(100, 116, 139, 1);
+  }
+
   html,
   body,
   #app {
@@ -10,44 +98,251 @@
   }
 
   body {
-    @apply m-0 overflow-hidden bg-gradient-to-br from-amber-50 to-slate-200 text-slate-900 antialiased;
+    @apply m-0 overflow-hidden antialiased;
+    background-image: linear-gradient(to bottom right, var(--app-bg-from), var(--app-bg-to));
+    color: var(--color-text);
   }
 }
 
 @layer components {
   .page-card {
-    @apply rounded-xl border border-slate-200/80 bg-white/85 p-5 shadow-sm;
+    @apply rounded-xl p-5 shadow-sm backdrop-blur-sm;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
   }
 
   .field-label {
-    @apply grid gap-2 text-sm font-medium text-slate-700;
+    @apply grid gap-2 text-sm font-medium;
+    color: var(--color-text-muted);
   }
 
   .input-base {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200;
+    @apply w-full rounded-lg px-3 py-2 text-sm outline-none transition;
+    border: 1px solid var(--color-input-border);
+    background: var(--color-input-bg);
+    color: var(--color-text);
+    box-shadow: none;
+  }
+
+  .input-base::placeholder {
+    color: var(--color-text-soft);
+  }
+
+  .input-base:disabled,
+  .input-base[readonly] {
+    background: var(--color-disabled-bg);
+    border-color: var(--color-disabled-border);
+    color: var(--color-disabled-text);
+    cursor: not-allowed;
+    opacity: 1;
+  }
+
+  .input-base:focus {
+    border-color: rgb(14 165 233 / 0.85);
+    box-shadow: 0 0 0 3px var(--color-input-ring);
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
+    background: linear-gradient(135deg, rgb(14 165 233) 0%, rgb(59 130 246) 100%);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, rgb(2 132 199) 0%, rgb(37 99 235) 100%);
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100;
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition;
+    border: 1px solid var(--color-input-border);
+    background: var(--color-secondary-bg);
+    color: var(--color-text-muted);
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-secondary-hover);
+    color: var(--color-text);
+  }
+
+  .btn-danger-secondary {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+    border: 1px solid var(--color-danger-border);
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
+  }
+
+  .btn-danger-secondary:hover {
+    background: var(--color-danger-hover);
+  }
+
+  .theme-alert-warning {
+    @apply rounded-xl border px-3 py-2 text-sm;
+    border-color: var(--color-warning-border);
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+  }
+
+  .theme-alert-danger {
+    @apply rounded-xl border px-4 py-3 text-sm font-medium;
+    border-color: var(--color-danger-border);
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
   }
 
   .nav-link {
-    @apply flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-100/90 transition hover:bg-white/10 hover:text-white;
+    @apply flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition;
+    color: var(--color-nav-text);
+  }
+
+  .nav-link:hover {
+    background: var(--color-nav-hover-bg);
+    color: var(--color-nav-hover-text);
   }
 
   .nav-link.router-link-active {
-    @apply bg-white/20 text-white;
+    background: var(--color-nav-active-bg);
+    color: var(--color-nav-active-text);
+  }
+
+  .app-sidebar {
+    @apply backdrop-blur-xl;
+    background: var(--color-sidebar);
+    color: var(--color-sidebar-text);
+    border-right: 1px solid var(--color-sidebar-border);
+  }
+
+  .app-sidebar-divider {
+    border-top: 1px solid var(--color-sidebar-border);
+  }
+
+  .theme-popover {
+    @apply rounded-2xl border p-4 shadow-xl backdrop-blur-md;
+    border-color: var(--color-border-strong);
+    background: var(--color-popover);
+    color: var(--color-text);
+  }
+
+  .theme-muted-panel {
+    @apply rounded-xl border p-4;
+    border-color: var(--color-border);
+    background: var(--color-surface-muted);
+  }
+
+  .theme-card-frame {
+    @apply overflow-hidden border;
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-strong);
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      0 10px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .theme-card-frame-muted {
+    @apply overflow-hidden border;
+    border-color: var(--color-border);
+    background: var(--color-surface-soft);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  }
+
+  html.dark .theme-card-frame {
+    box-shadow:
+      0 1px 2px rgba(2, 6, 23, 0.42),
+      0 14px 32px rgba(2, 6, 23, 0.28);
+  }
+
+  html.dark .theme-card-frame-muted {
+    box-shadow: 0 1px 2px rgba(2, 6, 23, 0.28);
+  }
+
+  .theme-card-image-well {
+    background: var(--color-surface-soft);
+  }
+
+  .theme-empty-state {
+    @apply rounded-lg border border-dashed px-3 py-4 text-sm;
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-strong);
+    color: var(--color-text-muted);
+  }
+
+  .theme-section-title {
+    color: var(--color-text);
+  }
+
+  .theme-section-muted {
+    color: var(--color-text-muted);
+  }
+
+  .theme-kicker {
+    color: var(--color-text-soft);
+  }
+
+  .theme-overlay {
+    background: var(--color-overlay);
+  }
+
+  .theme-mode-button {
+    @apply flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition;
+    border-color: var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+  }
+
+  .theme-mode-button:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-strong);
+  }
+
+  .theme-mode-icon-wrap {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full;
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.24) 0%, rgba(56, 189, 248, 0.22) 100%);
+    color: var(--color-text);
+  }
+
+  .theme-mode-option {
+    @apply flex w-full items-start gap-3 rounded-xl border px-3 py-3 transition;
+    border-color: transparent;
+    color: var(--color-text);
+  }
+
+  .theme-mode-option:hover {
+    border-color: var(--color-border);
+    background: var(--color-surface-soft);
+  }
+
+  .theme-mode-option-active {
+    border-color: rgb(56 189 248 / 0.35);
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.16) 0%, rgba(250, 204, 21, 0.08) 100%);
+    color: var(--color-text);
+  }
+
+  .theme-mode-option-icon {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full;
+    background: var(--color-surface-soft);
+    color: var(--color-text-muted);
+  }
+
+  .app-sidebar .theme-mode-button {
+    border-color: var(--color-sidebar-border);
+    background: var(--color-sidebar-surface);
+    color: var(--color-sidebar-text);
+  }
+
+  .app-sidebar .theme-mode-button:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-sidebar-surface-hover);
+  }
+
+  .app-sidebar .theme-mode-icon-wrap {
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(56, 189, 248, 0.2) 100%);
+    color: var(--color-sidebar-text);
   }
 }
 
 @layer utilities {
   .app-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
 
   .app-scrollbar::-webkit-scrollbar {
@@ -63,10 +358,10 @@
     border-radius: 9999px;
     border: 2px solid transparent;
     background-clip: padding-box;
-    background-color: #cbd5e1;
+    background-color: var(--scrollbar-thumb);
   }
 
   .app-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: #94a3b8;
+    background-color: var(--scrollbar-thumb-hover);
   }
 }

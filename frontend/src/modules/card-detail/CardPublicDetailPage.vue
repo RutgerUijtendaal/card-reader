@@ -26,10 +26,10 @@
         class="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
       >
         <div class="min-w-0">
-          <h2 class="text-2xl font-semibold text-slate-900">
+          <h2 class="theme-section-title text-2xl font-semibold">
             {{ card.name }}
           </h2>
-          <p class="text-sm text-slate-500">
+          <p class="theme-section-muted text-sm">
             Browse parsed versions and full card metadata.
           </p>
           <div
@@ -40,10 +40,10 @@
               v-for="group in card.card_groups"
               :key="group.id"
               :to="`/card-groups/${group.id}`"
-              class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+              class="btn-secondary rounded-full px-3 py-1 text-xs font-medium"
             >
               <span>{{ group.name }}</span>
-              <span class="text-slate-400">{{ group.member_count }} cards</span>
+              <span class="theme-kicker">{{ group.member_count }} cards</span>
             </RouterLink>
           </div>
         </div>
@@ -70,7 +70,7 @@
             <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next Card' }}</span>
             <ChevronRight class="h-4 w-4" />
           </button>
-          <span class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+          <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
             {{ positionLabel }}
           </span>
         </div>
@@ -106,7 +106,7 @@
 
     <div
       v-else
-      class="page-card text-sm text-slate-500"
+      class="page-card theme-section-muted text-sm"
     >
       No versions found.
     </div>

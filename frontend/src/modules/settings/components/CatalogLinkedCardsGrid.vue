@@ -7,12 +7,12 @@
       v-for="card in cards"
       :key="card.card_version_id"
       :to="detailLocation(card.card_id)"
-      class="group w-[210px] overflow-hidden rounded-lg border border-slate-200 bg-white transition duration-200 hover:border-slate-300 hover:shadow-sm"
+      class="theme-card-frame group w-[210px] rounded-lg transition duration-200 hover:-translate-y-0.5"
       :title="`${card.card_label} (${card.card_version_name})`"
       @mouseenter="showHoverPreview(card, $event)"
       @mouseleave="hideHoverPreview"
     >
-      <div class="aspect-[0.72] bg-slate-100">
+      <div class="theme-card-image-well aspect-[0.72]">
         <img
           v-if="card.image_url"
           :src="toAbsoluteApiUrl(card.image_url)"
@@ -22,7 +22,7 @@
         >
         <div
           v-else
-          class="flex h-full items-center justify-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-400"
+          class="theme-kicker flex h-full items-center justify-center text-xs font-semibold uppercase tracking-[0.16em]"
         >
           No image
         </div>
@@ -32,7 +32,7 @@
 
   <div
     v-else
-    class="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500"
+    class="theme-empty-state px-3 py-6 text-center"
   >
     {{ emptyMessage }}
   </div>
@@ -44,8 +44,8 @@
       class="pointer-events-none fixed left-0 top-0 z-[1200]"
       :style="{ left: `${hoverPreviewX}px`, top: `${hoverPreviewY}px` }"
     >
-      <div class="w-[320px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl">
-        <div class="aspect-[0.72] bg-slate-100">
+      <div class="theme-card-frame w-[320px] rounded-xl shadow-2xl">
+        <div class="theme-card-image-well aspect-[0.72]">
           <img
             :src="toAbsoluteApiUrl(hoverPreview.image_url!)"
             :alt="hoverPreview.card_label"
