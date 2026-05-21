@@ -3,7 +3,7 @@
     <div
       v-for="region in regions"
       :key="region.region_id"
-      class="absolute flex items-center justify-center overflow-hidden rounded-md border-2 shadow-[0_0_0_1px_rgba(15,23,42,0.45)] backdrop-blur-[1.5px]"
+      class="absolute flex items-center justify-center overflow-hidden rounded-md border-2 shadow-[0_0_0_1px_rgba(15,23,42,0.45)] backdrop-blur-[4px]"
       :class="regionClass(region.parser_type)"
       :style="{
         left: `${region.left_pct}%`,
@@ -12,7 +12,7 @@
         height: `${region.height_pct}%`,
       }"
     >
-      <span class="max-w-full px-2 text-center text-[11px] font-semibold leading-none text-slate-950 [text-shadow:0_1px_1px_rgba(255,255,255,0.35)]">
+      <span class="max-w-full px-2 text-center font-semibold leading-none text-slate-950 [font-size:clamp(0.65rem,1.2vw,0.95rem)] [text-shadow:0_1px_1px_rgba(255,255,255,0.35)]">
         {{ region.region_id }}
       </span>
     </div>
