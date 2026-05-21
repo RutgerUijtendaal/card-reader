@@ -33,6 +33,29 @@ export type TemplateRegionDefinition = {
   ocr_config: JsonObject;
 };
 
+export type TemplatePreviewCardOption = {
+  id: string;
+  label: string;
+  name: string;
+  template_id: string;
+  image_url: string | null;
+};
+
+export type TemplatePreviewScope = 'current-template' | 'all-cards';
+
+export type TemplatePreviewSelectionState = TemplatePreviewCardOption & {
+  scope: TemplatePreviewScope;
+};
+
+export type TemplatePreviewRenderRegion = {
+  region_id: string;
+  parser_type: TemplateParserType;
+  left_pct: number;
+  top_pct: number;
+  width_pct: number;
+  height_pct: number;
+};
+
 export type TemplateDefinition = JsonObject & {
   id?: string;
   version?: number;

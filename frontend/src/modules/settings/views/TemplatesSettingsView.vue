@@ -67,15 +67,31 @@
             </label>
           </div>
 
-          <div class="mt-3 min-h-0 flex-1">
-            <JsonEditorField
-              v-model="form.definition_json"
-              label="Definition JSON"
-              hint="Define parser-driven regions with region_id, cut_region, parser_type, and ocr_config. Supported parser types: name_mana_cost, type_tag, rules_text, attack, health, affinity."
-              min-height="20rem"
-              fill-height
-              example-title="Template Region Handler Example"
-              :example-json="TEMPLATE_DEFINITION_EXAMPLE_JSON"
+          <div class="mt-3 grid min-h-0 flex-1 gap-4 xl:grid-cols-2">
+            <div class="min-h-0">
+              <JsonEditorField
+                v-model="form.definition_json"
+                label="Definition JSON"
+                hint="Define parser-driven regions with region_id, cut_region, parser_type, and ocr_config. Supported parser types: name_mana_cost, type_tag, rules_text, attack, health, affinity."
+                min-height="20rem"
+                fill-height
+                example-title="Template Region Handler Example"
+                :example-json="TEMPLATE_DEFINITION_EXAMPLE_JSON"
+              />
+            </div>
+
+            <TemplatePreviewPane
+              :preview-cards="previewCards"
+              :preview-loading="previewLoading"
+              :preview-regions="previewRegions"
+              :preview-scope="previewScope"
+              :preview-search-query="previewSearchQuery"
+              :preview-warning="previewWarning"
+              :selected-preview-card="selectedPreviewCard"
+              :template-scope-available="templateScopeAvailable"
+              @update:scope="previewScope = $event"
+              @update:search-query="previewSearchQuery = $event"
+              @select-card="selectPreviewCard"
             />
           </div>
         </div>
@@ -134,12 +150,14 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import JsonEditorField from '@/modules/settings/components/JsonEditorField.vue';
+import TemplatePreviewPane from '@/modules/settings/components/TemplatePreviewPane.vue';
 import {
   createTemplate,
   deleteTemplate,
   fetchTemplates,
   updateTemplate,
 } from '@/modules/settings/api/templates';
+import { useTemplatePreview } from '@/modules/settings/composables/useTemplatePreview';
 import type { TemplateDefinition, TemplateRecord } from '@/modules/settings/types';
 
 type TemplateForm = {
@@ -256,6 +274,23 @@ const form = reactive<TemplateForm>({
 });
 
 const createMode = computed(() => selectedId.value === null);
+const templateKeyForPreview = computed(() => form.key.trim());
+
+const {
+  previewCards,
+  previewLoading,
+  previewRegions,
+  previewScope,
+  previewSearchQuery,
+  previewWarning,
+  restorePreviewCard,
+  selectedPreviewCard,
+  selectPreviewCard,
+  templateScopeAvailable,
+} = useTemplatePreview({
+  definitionJson: computed(() => form.definition_json),
+  templateKey: templateKeyForPreview,
+});
 
 const loadTemplates = async (): Promise<void> => {
   const rows = await fetchTemplates();
@@ -400,5 +435,6 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
 
 onMounted(() => {
   void loadTemplates();
+  void restorePreviewCard();
 });
 </script>
