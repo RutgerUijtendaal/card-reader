@@ -12,6 +12,7 @@ from PIL import Image
 
 from ...extractors import KnownMetadataExtractor
 from ..ocr_runner import OcrRunner
+from ..region_config import resolve_region_ocr_config
 from ..types import ParsedMetadataSuggestion
 
 from .types import RegionParseResult
@@ -19,7 +20,7 @@ from .types import RegionParseResult
 logger = logging.getLogger(__name__)
 
 
-class MiddleRegionParser:
+class TypeTagParser:
     def __init__(
         self,
         ocr_runner: OcrRunner,
@@ -37,9 +38,8 @@ class MiddleRegionParser:
         known_tags: list[Tag],
         known_types: list[Type],
     ) -> RegionParseResult:
-        _ = region_spec
-        logger.info("Middle region parse started. region=%s image_size=%sx%s", region_name, image.width, image.height)
-        ocr_data = self._ocr_runner.run(image)
+        logger.info("Type/tag parser started. region=%s image_size=%sx%s", region_name, image.width, image.height)
+        ocr_data = self._ocr_runner.run(image, config=resolve_region_ocr_config(region_spec))
         text = str(ocr_data.get("text", ""))
         type_text, tag_text = split_middle_text(text)
         tag_ids, tag_drafts = extract_metadata_ids_and_suggestions(
@@ -59,7 +59,7 @@ class MiddleRegionParser:
         confidence = self._safe_confidence(ocr_data.get("confidence", 0.0))
         lines = self._safe_lines(ocr_data.get("lines", []))
         logger.info(
-            "Middle region parse finished. region=%s conf=%.3f text_len=%s lines=%s tags=%s types=%s",
+            "Type/tag parser finished. region=%s conf=%.3f text_len=%s lines=%s tags=%s types=%s",
             region_name,
             confidence,
             len(text),

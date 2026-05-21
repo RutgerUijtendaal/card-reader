@@ -15,6 +15,15 @@ from card_reader_core.repositories.templates_repository import (
     update_template,
 )
 
+SUPPORTED_TEMPLATE_PARSER_TYPES = {
+    "name_mana_cost",
+    "type_tag",
+    "rules_text",
+    "attack",
+    "health",
+    "affinity",
+}
+
 
 class TemplateService:
     def list_templates(self) -> list[Template]:
@@ -32,7 +41,7 @@ class TemplateService:
             return self._normalize_definition_json(row.definition_json)
         if not isinstance(row.definition_json, dict):
             raise ValueError(f"Template '{key}' definition_json must be a JSON object")
-        return row.definition_json
+        return self._validate_template_definition(row.definition_json)
 
     def create_template(
         self,
@@ -106,4 +115,48 @@ class TemplateService:
             raise ValueError("definition_json must be valid JSON") from exc
         if not isinstance(parsed, dict):
             raise ValueError("definition_json must be a JSON object")
-        return parsed
+        return self._validate_template_definition(parsed)
+
+    def _validate_template_definition(self, definition: dict[str, Any]) -> dict[str, Any]:
+        regions = definition.get("regions")
+        if not isinstance(regions, list) or not regions:
+            raise ValueError("definition_json.regions must be a non-empty array")
+
+        seen_region_ids: set[str] = set()
+        normalized_regions: list[dict[str, Any]] = []
+        for index, region in enumerate(regions):
+            if not isinstance(region, dict):
+                raise ValueError(f"definition_json.regions[{index}] must be an object")
+
+            region_id = str(region.get("region_id", "")).strip()
+            if not region_id:
+                raise ValueError(f"definition_json.regions[{index}].region_id is required")
+            if region_id in seen_region_ids:
+                raise ValueError(f"definition_json.regions[{index}].region_id must be unique")
+            seen_region_ids.add(region_id)
+
+            parser_type = str(region.get("parser_type", "")).strip()
+            if parser_type not in SUPPORTED_TEMPLATE_PARSER_TYPES:
+                supported = ", ".join(sorted(SUPPORTED_TEMPLATE_PARSER_TYPES))
+                raise ValueError(
+                    f"definition_json.regions[{index}].parser_type must be one of: {supported}"
+                )
+
+            cut_region = region.get("cut_region")
+            if not isinstance(cut_region, dict):
+                raise ValueError(f"definition_json.regions[{index}].cut_region must be an object")
+
+            ocr_config = region.get("ocr_config", {})
+            if not isinstance(ocr_config, dict):
+                raise ValueError(f"definition_json.regions[{index}].ocr_config must be an object")
+
+            normalized_region = dict(region)
+            normalized_region["region_id"] = region_id
+            normalized_region["parser_type"] = parser_type
+            normalized_region["cut_region"] = cut_region
+            normalized_region["ocr_config"] = ocr_config
+            normalized_regions.append(normalized_region)
+
+        normalized_definition = dict(definition)
+        normalized_definition["regions"] = normalized_regions
+        return normalized_definition

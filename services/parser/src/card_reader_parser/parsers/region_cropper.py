@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from PIL import Image
 
 from card_reader_core.settings import settings
+
+
+class RegionCrop(TypedDict):
+    x: int
+    y: int
+    w: int
+    h: int
+    image: Image.Image
 
 
 class RegionCropper:
@@ -15,20 +23,25 @@ class RegionCropper:
         *,
         image_path: Path,
         template: dict[str, Any],
-    ) -> dict[str, dict[str, Any]]:
+    ) -> dict[str, RegionCrop]:
         regions = template.get("regions")
-        if not isinstance(regions, dict) or not regions:
+        if not isinstance(regions, list) or not regions:
             raise ValueError("Template has no valid regions")
 
         template_width = self._as_int(template.get("card_width"))
         template_height = self._as_int(template.get("card_height"))
-        region_crops: dict[str, dict[str, Any]] = {}
+        region_crops: dict[str, RegionCrop] = {}
 
         with Image.open(image_path) as image:
             width, height = image.size
-            for region_name, region_spec in regions.items():
+            for region_spec in regions:
+                if not isinstance(region_spec, dict):
+                    raise ValueError("Invalid region entry. Expected object.")
+                region_name = str(region_spec.get("region_id", "")).strip()
+                if not region_name:
+                    raise ValueError("Invalid region entry. region_id is required.")
                 x, y, w, h = self._resolve_bbox(
-                    region_spec=region_spec,
+                    region_spec=region_spec.get("cut_region"),
                     image_width=width,
                     image_height=height,
                     template_width=template_width,
@@ -45,7 +58,7 @@ class RegionCropper:
         template_id: str,
         checksum: str,
         image_path: Path,
-        region_crops: dict[str, dict[str, Any]],
+        region_crops: dict[str, RegionCrop],
     ) -> None:
         output_dir = settings.debug_crops_dir / template_id / checksum
         output_dir.mkdir(parents=True, exist_ok=True)

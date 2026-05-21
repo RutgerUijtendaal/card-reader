@@ -6,9 +6,9 @@ from typing import Any
 
 from card_reader_core.models import Symbol
 from PIL import Image
-from card_reader_core.settings import settings
 
 from ..ocr_runner import OcrRunner
+from ..region_config import resolve_region_ocr_config
 from ..symbol_detector import SymbolDetector
 
 from .types import RegionParseResult
@@ -16,7 +16,7 @@ from .types import RegionParseResult
 logger = logging.getLogger(__name__)
 
 
-class TopRegionParser:
+class NameManaCostParser:
     _EXPECTED_SYMBOL_TYPES = {"mana"}
     _star_tail_pattern = re.compile(r"\s*[★☆✪✫✬✭✮✯✰✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿]+.*$")
     _trailing_integer_pattern = re.compile(r"(\d+)\s*$")
@@ -38,18 +38,15 @@ class TopRegionParser:
         symbols: list[Symbol],
     ) -> RegionParseResult:
         logger.info(
-            "Top region parse started. region=%s image_size=%sx%s expected_symbol_types=%s",
+            "Name/mana parser started. region=%s image_size=%sx%s expected_symbol_types=%s",
             region_name,
             image.width,
             image.height,
             sorted(self._EXPECTED_SYMBOL_TYPES),
         )
-        ocr_data = self._ocr_runner.run(image)
-        min_ocr_confidence = self._resolve_min_ocr_confidence(region_spec)
-        filtered_lines = self._filter_ocr_lines(
-            raw_lines=self._safe_lines(ocr_data.get("lines", [])),
-            min_confidence=min_ocr_confidence,
-        )
+        ocr_config = resolve_region_ocr_config(region_spec)
+        ocr_data = self._ocr_runner.run(image, config=ocr_config)
+        filtered_lines = self._safe_lines(ocr_data.get("lines", []))
         full_text = self._join_line_texts(filtered_lines)
 
         candidate_symbols = self._select_mana_candidate_symbols(symbols)
@@ -84,7 +81,7 @@ class TopRegionParser:
         ) or image_stem
 
         logger.info(
-            "Top parse summary. text=%r any_color=%s symbols_all=%s symbols_right=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
+            "Name/mana parse summary. text=%r any_color=%s symbols_all=%s symbols_right=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
             full_text,
             any_color,
             len(detected_symbols_all),
@@ -96,7 +93,7 @@ class TopRegionParser:
         )
         if detected_symbols_all:
             logger.info(
-                "Top parse symbols_all_details=%s",
+                "Name/mana parse symbols_all_details=%s",
                 [
                     {
                         "key": row.key,
@@ -110,9 +107,9 @@ class TopRegionParser:
                 ],
             )
         else:
-            logger.info("Top parse symbols_all_details=[]")
+            logger.info("Name/mana parse symbols_all_details=[]")
         logger.info(
-            "Top region parse finished. region=%s conf=%.3f name=%r mana_cost=%r mana_symbols=%s",
+            "Name/mana parser finished. region=%s conf=%.3f name=%r mana_cost=%r mana_symbols=%s",
             region_name,
             self._average_line_confidence(filtered_lines),
             name,
@@ -138,7 +135,7 @@ class TopRegionParser:
                 "expected_symbol_types": sorted(self._EXPECTED_SYMBOL_TYPES),
                 "full_ocr_text": full_text,
                 "candidate_symbol_count": len(candidate_symbols),
-                "ocr_min_confidence": min_ocr_confidence,
+                "ocr_config": ocr_config,
                 "ocr_line_count_raw": len(self._safe_lines(ocr_data.get("lines", []))),
                 "ocr_line_count_filtered": len(filtered_lines),
             },
@@ -149,14 +146,14 @@ class TopRegionParser:
         mana_typed = [row for row in enabled_template if row.symbol_type.strip().lower() == "mana"]
         if mana_typed:
             logger.info(
-                "Top parse symbol candidates: using mana-typed symbols. total=%s mana=%s",
+                "Name/mana parser symbol candidates: using mana-typed symbols. total=%s mana=%s",
                 len(enabled_template),
                 len(mana_typed),
             )
             return mana_typed
 
         logger.warning(
-            "Top parse symbol candidates: no mana-typed symbols found; falling back to all template symbols. total=%s",
+            "Name/mana parser symbol candidates: no mana-typed symbols found; falling back to all template symbols. total=%s",
             len(enabled_template),
         )
         return enabled_template
@@ -253,29 +250,6 @@ class TopRegionParser:
 
     def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
         return raw if isinstance(raw, list) else []
-
-    def _resolve_min_ocr_confidence(self, region_spec: dict[str, Any]) -> float:
-        raw = region_spec.get("ocr_min_confidence", settings.low_confidence_threshold)
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
-            return settings.low_confidence_threshold
-        return max(0.0, min(1.0, value))
-
-    def _filter_ocr_lines(
-        self,
-        *,
-        raw_lines: list[dict[str, Any]],
-        min_confidence: float,
-    ) -> list[dict[str, Any]]:
-        out: list[dict[str, Any]] = []
-        for row in raw_lines:
-            text = str(row.get("text", "")).strip()
-            conf = self._safe_confidence(row.get("confidence", 0.0))
-            if not text or conf < min_confidence:
-                continue
-            out.append({"text": text, "confidence": conf})
-        return out
 
     def _join_line_texts(self, lines: list[dict[str, Any]]) -> str:
         return "\n".join(str(row.get("text", "")).strip() for row in lines if row.get("text")).strip()

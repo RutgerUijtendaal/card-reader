@@ -71,9 +71,11 @@
             <JsonEditorField
               v-model="form.definition_json"
               label="Definition JSON"
-              hint="Configure the template definition used to parse cards for this layout."
+              hint="Define parser-driven regions with region_id, cut_region, parser_type, and ocr_config. Supported parser types: name_mana_cost, type_tag, rules_text, attack, health, affinity."
               min-height="20rem"
               fill-height
+              example-title="Template Region Handler Example"
+              :example-json="TEMPLATE_DEFINITION_EXAMPLE_JSON"
             />
           </div>
         </div>
@@ -138,13 +140,108 @@ import {
   fetchTemplates,
   updateTemplate,
 } from '@/modules/settings/api/templates';
-import type { JsonObject, TemplateRecord } from '@/modules/settings/types';
+import type { TemplateDefinition, TemplateRecord } from '@/modules/settings/types';
 
 type TemplateForm = {
   label: string;
   key: string;
   definition_json: string;
 };
+
+const TEMPLATE_DEFINITION_EXAMPLE: TemplateDefinition = {
+  id: 'mtg-like-v1',
+  version: 7,
+  regions: [
+    {
+      region_id: 'top_bar',
+      parser_type: 'name_mana_cost',
+      cut_region: {
+        unit: 'relative',
+        x: 0.04,
+        y: 0.02,
+        w: 0.92,
+        h: 0.07,
+      },
+      ocr_config: {
+        ocr_min_confidence: 0.55,
+      },
+    },
+    {
+      region_id: 'type_bar',
+      parser_type: 'type_tag',
+      cut_region: {
+        unit: 'relative',
+        x: 0.04,
+        y: 0.54,
+        w: 0.92,
+        h: 0.05,
+      },
+      ocr_config: {},
+    },
+    {
+      region_id: 'rules_text',
+      parser_type: 'rules_text',
+      cut_region: {
+        unit: 'relative',
+        x: 0.07,
+        y: 0.6,
+        w: 0.86,
+        h: 0.32,
+      },
+      ocr_config: {},
+    },
+    {
+      region_id: 'rules_text_fallback',
+      parser_type: 'rules_text',
+      cut_region: {
+        unit: 'relative',
+        x: 0.07,
+        y: 0.7,
+        w: 0.86,
+        h: 0.12,
+      },
+      ocr_config: {},
+    },
+    {
+      region_id: 'bottom_left',
+      parser_type: 'attack',
+      cut_region: {
+        unit: 'relative',
+        x: 0.01,
+        y: 0.9,
+        w: 0.14,
+        h: 0.09,
+      },
+      ocr_config: {},
+    },
+    {
+      region_id: 'bottom_middle',
+      parser_type: 'affinity',
+      cut_region: {
+        unit: 'relative',
+        x: 0.37,
+        y: 0.93,
+        w: 0.26,
+        h: 0.06,
+      },
+      ocr_config: {},
+    },
+    {
+      region_id: 'bottom_right',
+      parser_type: 'health',
+      cut_region: {
+        unit: 'relative',
+        x: 0.85,
+        y: 0.9,
+        w: 0.14,
+        h: 0.08,
+      },
+      ocr_config: {},
+    },
+  ],
+};
+
+const TEMPLATE_DEFINITION_EXAMPLE_JSON = JSON.stringify(TEMPLATE_DEFINITION_EXAMPLE, null, 2);
 
 const templates = ref<TemplateRecord[]>([]);
 const selectedId = ref<string | null>(null);
@@ -155,7 +252,7 @@ const deleteModalOpen = ref(false);
 const form = reactive<TemplateForm>({
   label: '',
   key: '',
-  definition_json: '{}',
+  definition_json: TEMPLATE_DEFINITION_EXAMPLE_JSON,
 });
 
 const createMode = computed(() => selectedId.value === null);
@@ -196,7 +293,7 @@ const resetForm = (): void => {
   }
   form.label = '';
   form.key = '';
-  form.definition_json = formatJsonForEditor('{}');
+  form.definition_json = TEMPLATE_DEFINITION_EXAMPLE_JSON;
 };
 
 const saveTemplate = async (): Promise<void> => {
@@ -260,7 +357,7 @@ const confirmDelete = async (): Promise<void> => {
 
 const normalizeDefinitionJson = (
   raw: string,
-): { ok: true; value: JsonObject } | { ok: false; message: string } => {
+): { ok: true; value: TemplateDefinition } | { ok: false; message: string } => {
   const trimmed = raw.trim();
   if (!trimmed) {
     return { ok: false, message: 'Definition JSON is required.' };
@@ -270,7 +367,7 @@ const normalizeDefinitionJson = (
     if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
       return { ok: false, message: 'Definition JSON must be an object.' };
     }
-    return { ok: true, value: parsed as JsonObject };
+    return { ok: true, value: parsed as TemplateDefinition };
   } catch {
     return { ok: false, message: 'Definition JSON must be valid JSON.' };
   }

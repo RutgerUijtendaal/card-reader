@@ -25,6 +25,27 @@ from django.test import Client, override_settings  # noqa: E402
 from card_reader_api.seeds.users import seed_users  # noqa: E402
 
 
+def _valid_template_definition(*, region_id: str = "top_bar") -> dict[str, object]:
+    return {
+        "id": "mtg-like-v1",
+        "version": 7,
+        "regions": [
+            {
+                "region_id": region_id,
+                "parser_type": "name_mana_cost",
+                "cut_region": {
+                    "unit": "relative",
+                    "x": 0.04,
+                    "y": 0.02,
+                    "w": 0.92,
+                    "h": 0.07,
+                },
+                "ocr_config": {},
+            }
+        ],
+    }
+
+
 def test_health() -> None:
     response = Client(HTTP_HOST="localhost").get("/health")
     assert response.status_code == 200
@@ -440,7 +461,7 @@ def test_staff_can_manage_templates() -> None:
         data={
             "label": "Staff Template",
             "key": "staff-template",
-            "definition_json": "{}",
+            "definition_json": _valid_template_definition(),
         },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -448,6 +469,41 @@ def test_staff_can_manage_templates() -> None:
 
     assert list_response.status_code == 200
     assert create_response.status_code == 200
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_template_create_rejects_old_keyed_regions_schema() -> None:
+    username = "staff-template-invalid-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/settings/templates",
+        data={
+            "label": "Invalid Template",
+            "key": "invalid-template",
+            "definition_json": {
+                "id": "invalid-template",
+                "version": 6,
+                "regions": {
+                    "top_bar": {
+                        "unit": "relative",
+                        "x": 0.04,
+                        "y": 0.02,
+                        "w": 0.92,
+                        "h": 0.07,
+                    }
+                },
+            },
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "definition_json.regions must be a non-empty array"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

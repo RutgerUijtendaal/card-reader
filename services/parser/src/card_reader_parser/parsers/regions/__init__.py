@@ -1,16 +1,16 @@
-from .bottom_region_parser import BottomRegionParser
-from .devotion_region_parser import AffinityRegionParser
-from .middle_region_parser import MiddleRegionParser
+from .affinity_parser import AffinityParser
+from .name_mana_cost_parser import NameManaCostParser
+from .rules_text_parser import RulesTextParser
 from .stats_region_parser import StatsRegionParser
-from .top_region_parser import TopRegionParser
+from .type_tag_parser import TypeTagParser
 from .types import RegionParseResult
 
 __all__ = [
-    "BottomRegionParser",
-    "AffinityRegionParser",
-    "MiddleRegionParser",
+    "AffinityParser",
+    "NameManaCostParser",
+    "RulesTextParser",
     "StatsRegionParser",
-    "TopRegionParser",
+    "TypeTagParser",
     "RegionParseResult",
 ]
 

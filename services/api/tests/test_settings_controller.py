@@ -8,9 +8,32 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from card_reader_api.catalog.views import _store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
+from card_reader_api.seeds.templates import DEFAULT_TEMPLATES_FILE, read_template_entries
 from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, ImportJob, ImportJobItem, Template
+from card_reader_core.services.templates import TemplateService
 from card_reader_core.settings import settings
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
+
+
+def _template_definition(region_id: str) -> dict[str, object]:
+    return {
+        "id": region_id,
+        "version": 7,
+        "regions": [
+            {
+                "region_id": region_id,
+                "parser_type": "name_mana_cost",
+                "cut_region": {
+                    "unit": "relative",
+                    "x": 0.04,
+                    "y": 0.02,
+                    "w": 0.92,
+                    "h": 0.07,
+                },
+                "ocr_config": {},
+            }
+        ],
+    }
 
 
 def test_upload_symbol_asset_stores_under_uploads(tmp_path: Path, monkeypatch) -> None:
@@ -91,8 +114,16 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     Card.objects.all().delete()
     Template.objects.filter(key__in=["mtg-like-v1", "sorcery-v1"]).delete()
 
-    Template.objects.create(key="mtg-like-v1", label="MTG", definition_json="{}")
-    Template.objects.create(key="sorcery-v1", label="Sorcery", definition_json="{}")
+    Template.objects.create(
+        key="mtg-like-v1",
+        label="MTG",
+        definition_json=_template_definition("top_bar"),
+    )
+    Template.objects.create(
+        key="sorcery-v1",
+        label="Sorcery",
+        definition_json=_template_definition("top_bar_alt"),
+    )
 
     card_a = Card.objects.create(key="card-a", label="Card A")
     card_b = Card.objects.create(key="card-b", label="Card B")
@@ -179,3 +210,20 @@ def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> N
     assert recorded_calls == [("backfill_metadata_suggestions", 0)]
     assert result.message == "Metadata suggestions backfill completed."
     assert result.removed_paths == []
+
+
+def test_default_template_seed_uses_region_handler_schema() -> None:
+    entries = read_template_entries(DEFAULT_TEMPLATES_FILE)
+
+    assert len(entries) == 1
+    validated = TemplateService()._validate_template_definition(entries[0].definition_json)
+    assert validated["version"] == 7
+    assert [region["parser_type"] for region in validated["regions"]] == [
+        "name_mana_cost",
+        "type_tag",
+        "rules_text",
+        "rules_text",
+        "attack",
+        "affinity",
+        "health",
+    ]

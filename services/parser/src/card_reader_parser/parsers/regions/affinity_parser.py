@@ -13,7 +13,7 @@ from .types import RegionParseResult
 logger = logging.getLogger(__name__)
 
 
-class AffinityRegionParser:
+class AffinityParser:
     _EXPECTED_SYMBOL_TYPES = {"affinity"}
 
     def __init__(self, symbol_detector: SymbolDetector) -> None:
@@ -29,7 +29,7 @@ class AffinityRegionParser:
     ) -> RegionParseResult:
         _ = region_spec
         logger.info(
-            "Affinity region parse started. region=%s image_size=%sx%s expected_symbol_types=%s",
+            "Affinity parser started. region=%s image_size=%sx%s expected_symbol_types=%s",
             region_name,
             image.width,
             image.height,
@@ -42,7 +42,7 @@ class AffinityRegionParser:
         )
         affinity_keys = [row.key for row in sorted(detected_symbols, key=lambda row: row.bbox.x)]
         logger.info(
-            "Affinity region parse finished. region=%s symbols=%s affinity_keys=%s",
+            "Affinity parser finished. region=%s symbols=%s affinity_keys=%s",
             region_name,
             len(detected_symbols),
             affinity_keys,
