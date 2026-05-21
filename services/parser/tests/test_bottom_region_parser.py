@@ -3,12 +3,13 @@ from __future__ import annotations
 from PIL import Image
 
 from card_reader_core.models import Keyword, Symbol
-from card_reader_parser.parsers.regions.bottom_region_parser import BottomRegionParser
+from card_reader_parser.parsers.regions.rules_text_parser import RulesTextParser
 from card_reader_parser.parsers.symbol_detector import DetectedSymbol, DetectionBBox
 
 
 class StubOcrRunner:
-    def run(self, _image: Image.Image) -> dict[str, object]:
+    def run(self, _image: Image.Image, config: dict[str, object] | None = None) -> dict[str, object]:
+        _ = config
         return {
             "text": ": target creature and gain devotion.",
             "confidence": 0.91,
@@ -41,7 +42,7 @@ class StubMetadataExtractor:
         return ["keyword-1"]
 
 
-def test_bottom_region_parser_detects_mana_devotion_and_generic_symbols_in_rules_text() -> None:
+def test_rules_text_parser_detects_mana_devotion_and_generic_symbols_in_rules_text() -> None:
     detections = [
         DetectedSymbol(
             symbol_id="mana-1",
@@ -72,7 +73,7 @@ def test_bottom_region_parser_detects_mana_devotion_and_generic_symbols_in_rules
         ),
     ]
     symbol_detector = StubSymbolDetector(detections)
-    parser = BottomRegionParser(StubOcrRunner(), symbol_detector, StubMetadataExtractor())
+    parser = RulesTextParser(StubOcrRunner(), symbol_detector, StubMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(

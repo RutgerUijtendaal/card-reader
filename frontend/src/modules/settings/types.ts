@@ -10,6 +10,60 @@ export type JsonObject = {
   [key: string]: JsonValue;
 };
 
+export type RegionBounds = {
+  unit: 'relative' | 'absolute';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+export type TemplateParserType =
+  | 'name_mana_cost'
+  | 'type_tag'
+  | 'rules_text'
+  | 'attack'
+  | 'health'
+  | 'affinity';
+
+export type TemplateRegionDefinition = {
+  region_id: string;
+  cut_region: RegionBounds;
+  parser_type: TemplateParserType;
+  ocr_config: JsonObject;
+};
+
+export type TemplatePreviewCardOption = {
+  id: string;
+  label: string;
+  name: string;
+  template_id: string;
+  image_url: string | null;
+};
+
+export type TemplatePreviewScope = 'current-template' | 'all-cards';
+
+export type TemplatePreviewSelectionState = TemplatePreviewCardOption & {
+  scope: TemplatePreviewScope;
+};
+
+export type TemplatePreviewRenderRegion = {
+  region_id: string;
+  parser_type: TemplateParserType;
+  left_pct: number;
+  top_pct: number;
+  width_pct: number;
+  height_pct: number;
+};
+
+export type TemplateDefinition = JsonObject & {
+  id?: string;
+  version?: number;
+  card_width?: number;
+  card_height?: number;
+  regions: TemplateRegionDefinition[];
+};
+
 export type MaintenanceActionResponse = {
   message: string;
   removed_paths: string[];
@@ -130,7 +184,7 @@ export type TemplateApiRecord = {
   id: string;
   key: string;
   label: string;
-  definition_json: JsonObject;
+  definition_json: TemplateDefinition;
 };
 
 export type CatalogApiResponse = {
@@ -190,7 +244,7 @@ export type SymbolUpsertRequest = {
 export type TemplateUpsertRequest = {
   label?: string;
   key?: string;
-  definition_json?: JsonObject;
+  definition_json?: TemplateDefinition;
 };
 
 export type SuggestionStatus = 'pending' | 'accepted' | 'rejected';

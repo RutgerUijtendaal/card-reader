@@ -10,19 +10,26 @@ from card_reader_core.settings import settings
 from card_reader_core.storage import calculate_checksum
 
 from .ocr_runner import OcrRunner
+from .region_cropper import RegionCrop, RegionCropper
 from .regions import (
-    BottomRegionParser,
-    AffinityRegionParser,
-    MiddleRegionParser,
+    AffinityParser,
+    NameManaCostParser,
     RegionParseResult,
+    RulesTextParser,
     StatsRegionParser,
-    TopRegionParser,
+    TypeTagParser,
 )
-from .region_cropper import RegionCropper
 from .symbol_detector import SymbolDetector
 from .types import ParsedCard, ParsedMetadataSuggestion
 
 logger = logging.getLogger(__name__)
+
+NAME_MANA_COST = "name_mana_cost"
+TYPE_TAG = "type_tag"
+RULES_TEXT = "rules_text"
+ATTACK = "attack"
+HEALTH = "health"
+AFFINITY = "affinity"
 
 
 class CardParser:
@@ -32,12 +39,12 @@ class CardParser:
         self._ocr_runner = OcrRunner()
         self._symbol_detector = SymbolDetector()
         self._metadata_extractor = KnownMetadataExtractor()
-        self._top_region_parser = TopRegionParser(self._ocr_runner, self._symbol_detector)
-        self._middle_region_parser = MiddleRegionParser(self._ocr_runner, self._metadata_extractor)
-        self._bottom_region_parser = BottomRegionParser(
+        self._name_mana_cost_parser = NameManaCostParser(self._ocr_runner, self._symbol_detector)
+        self._type_tag_parser = TypeTagParser(self._ocr_runner, self._metadata_extractor)
+        self._rules_text_parser = RulesTextParser(
             self._ocr_runner, self._symbol_detector, self._metadata_extractor
         )
-        self._affinity_region_parser = AffinityRegionParser(self._symbol_detector)
+        self._affinity_parser = AffinityParser(self._symbol_detector)
         self._stats_region_parser = StatsRegionParser(self._ocr_runner)
 
     def parse(
@@ -78,121 +85,43 @@ class CardParser:
         known_keywords = known_keywords or []
         known_tags = known_tags or []
         known_types = known_types or []
-        regions_spec = template.get("regions", {})
-
         region_results: dict[str, RegionParseResult] = {}
-        if "top_bar" in region_crops:
-            region_results["top_bar"] = self._top_region_parser.parse(
-                region_name="top_bar",
-                image=region_crops["top_bar"]["image"],
-                image_stem=image_path.stem,
-                region_spec=regions_spec.get("top_bar", {}),
+        semantic_results: dict[str, RegionParseResult] = {}
+        rules_text_primary: RegionParseResult | None = None
+        regions_spec = template.get("regions", [])
+        for region_spec in regions_spec:
+            if not isinstance(region_spec, dict):
+                continue
+            region_id = str(region_spec.get("region_id", "")).strip()
+            parser_type = str(region_spec.get("parser_type", "")).strip()
+            if not region_id or region_id not in region_crops:
+                continue
+
+            if parser_type == RULES_TEXT and rules_text_primary is not None and rules_text_primary.text:
+                continue
+
+            result = self._parse_region(
+                parser_type=parser_type,
+                region_id=region_id,
+                image_path=image_path,
+                region_spec=region_spec,
+                region_crops=region_crops,
                 symbols=symbols,
-            )
-            top_result = region_results["top_bar"]
-            logger.info(
-                "Region parsed successfully. region=top_bar conf=%.3f text_len=%s fields=%s symbols=%s",
-                top_result.confidence,
-                len(top_result.text),
-                sorted(top_result.normalized_fields.keys()),
-                len(top_result.detected_symbols),
-            )
-        if "type_bar" in region_crops:
-            region_results["type_bar"] = self._middle_region_parser.parse(
-                region_name="type_bar",
-                image=region_crops["type_bar"]["image"],
-                region_spec=regions_spec.get("type_bar", {}),
+                known_keywords=known_keywords,
                 known_tags=known_tags,
                 known_types=known_types,
             )
-            middle_result = region_results["type_bar"]
-            logger.info(
-                "Region parsed successfully. region=type_bar conf=%.3f text_len=%s tags=%s types=%s fields=%s",
-                middle_result.confidence,
-                len(middle_result.text),
-                len(middle_result.extracted_tag_ids),
-                len(middle_result.extracted_type_ids),
-                sorted(middle_result.normalized_fields.keys()),
-            )
-        if "rules_text" in region_crops:
-            region_results["rules_text"] = self._bottom_region_parser.parse(
-                region_name="rules_text",
-                image=region_crops["rules_text"]["image"],
-                region_spec=regions_spec.get("rules_text", {}),
-                symbols=symbols,
-                known_keywords=known_keywords,
-            )
-            bottom_result = region_results["rules_text"]
-            logger.info(
-                "Region parsed successfully. region=rules_text conf=%.3f text_len=%s keywords=%s symbols=%s fields=%s",
-                bottom_result.confidence,
-                len(bottom_result.text),
-                len(bottom_result.extracted_keyword_ids),
-                len(bottom_result.detected_symbols),
-                sorted(bottom_result.normalized_fields.keys()),
-            )
-        if "rules_text_fallback" in region_crops and "rules_text" in region_results and len(region_results["rules_text"].text) == 0:
-            region_results["rules_text_fallback"] = self._bottom_region_parser.parse(
-                region_name="rules_text_fallback",
-                image=region_crops["rules_text_fallback"]["image"],
-                region_spec=regions_spec.get("rules_text_fallback", {}),
-                symbols=symbols,
-                known_keywords=known_keywords,
-            )
-            bottom_result = region_results["rules_text_fallback"]
-            logger.info(
-                "Region parsed successfully. region=rules_text_fallback conf=%.3f text_len=%s keywords=%s symbols=%s fields=%s",
-                bottom_result.confidence,
-                len(bottom_result.text),
-                len(bottom_result.extracted_keyword_ids),
-                len(bottom_result.detected_symbols),
-                sorted(bottom_result.normalized_fields.keys()),
-            )
-        if "bottom_middle" in region_crops:
-            region_results["bottom_middle"] = self._affinity_region_parser.parse(
-                region_name="bottom_middle",
-                image=region_crops["bottom_middle"]["image"],
-                region_spec=regions_spec.get("bottom_middle", {}),
-                symbols=symbols,
-            )
-            affinity_result = region_results["bottom_middle"]
-            logger.info(
-                "Region parsed successfully. region=bottom_middle conf=%.3f symbols=%s fields=%s",
-                affinity_result.confidence,
-                len(affinity_result.detected_symbols),
-                sorted(affinity_result.normalized_fields.keys()),
-            )
-        if "bottom_left" in region_crops:
-            region_results["bottom_left"] = self._stats_region_parser.parse(
-                region_name="bottom_left",
-                field_name="attack",
-                image=region_crops["bottom_left"]["image"],
-                region_spec=regions_spec.get("bottom_left", {}),
-            )
-            attack_result = region_results["bottom_left"]
-            logger.info(
-                "Region parsed successfully. region=bottom_left conf=%.3f text_len=%s fields=%s",
-                attack_result.confidence,
-                len(attack_result.text),
-                sorted(attack_result.normalized_fields.keys()),
-            )
-        if "bottom_right" in region_crops:
-            region_results["bottom_right"] = self._stats_region_parser.parse(
-                region_name="bottom_right",
-                field_name="health",
-                image=region_crops["bottom_right"]["image"],
-                region_spec=regions_spec.get("bottom_right", {}),
-            )
-            health_result = region_results["bottom_right"]
-            logger.info(
-                "Region parsed successfully. region=bottom_right conf=%.3f text_len=%s fields=%s",
-                health_result.confidence,
-                len(health_result.text),
-                sorted(health_result.normalized_fields.keys()),
-            )
+            if result is None:
+                continue
+
+            region_results[region_id] = result
+            if parser_type != RULES_TEXT or not rules_text_primary or not rules_text_primary.text:
+                semantic_results[parser_type] = result
+            if parser_type == RULES_TEXT and rules_text_primary is None:
+                rules_text_primary = result
 
         normalized_fields = self._merge_normalized_fields(region_results, image_path)
-        confidence = self._confidence_breakdown(region_results)
+        confidence = self._confidence_breakdown(semantic_results)
         keyword_ids = self._merge_keyword_ids(region_results)
         tag_ids = self._merge_tag_ids(region_results)
         type_ids = self._merge_type_ids(region_results)
@@ -251,6 +180,132 @@ class CardParser:
             type_suggestions=type_suggestions,
         )
 
+    def _parse_region(
+        self,
+        *,
+        parser_type: str,
+        region_id: str,
+        image_path: Path,
+        region_spec: dict[str, object],
+        region_crops: dict[str, RegionCrop],
+        symbols: list[Symbol],
+        known_keywords: list[Keyword],
+        known_tags: list[Tag],
+        known_types: list[Type],
+    ) -> RegionParseResult | None:
+        image = region_crops[region_id]["image"]
+        if parser_type == NAME_MANA_COST:
+            result = self._name_mana_cost_parser.parse(
+                region_name=region_id,
+                image=image,
+                image_stem=image_path.stem,
+                region_spec=region_spec,
+                symbols=symbols,
+            )
+            logger.info(
+                "Region parsed successfully. region=%s parser_type=%s conf=%.3f text_len=%s fields=%s symbols=%s",
+                region_id,
+                parser_type,
+                result.confidence,
+                len(result.text),
+                sorted(result.normalized_fields.keys()),
+                len(result.detected_symbols),
+            )
+            return result
+
+        if parser_type == TYPE_TAG:
+            result = self._type_tag_parser.parse(
+                region_name=region_id,
+                image=image,
+                region_spec=region_spec,
+                known_tags=known_tags,
+                known_types=known_types,
+            )
+            logger.info(
+                "Region parsed successfully. region=%s parser_type=%s conf=%.3f text_len=%s tags=%s types=%s fields=%s",
+                region_id,
+                parser_type,
+                result.confidence,
+                len(result.text),
+                len(result.extracted_tag_ids),
+                len(result.extracted_type_ids),
+                sorted(result.normalized_fields.keys()),
+            )
+            return result
+
+        if parser_type == RULES_TEXT:
+            result = self._rules_text_parser.parse(
+                region_name=region_id,
+                image=image,
+                region_spec=region_spec,
+                symbols=symbols,
+                known_keywords=known_keywords,
+            )
+            logger.info(
+                "Region parsed successfully. region=%s parser_type=%s conf=%.3f text_len=%s keywords=%s symbols=%s fields=%s",
+                region_id,
+                parser_type,
+                result.confidence,
+                len(result.text),
+                len(result.extracted_keyword_ids),
+                len(result.detected_symbols),
+                sorted(result.normalized_fields.keys()),
+            )
+            return result
+
+        if parser_type == AFFINITY:
+            result = self._affinity_parser.parse(
+                region_name=region_id,
+                image=image,
+                region_spec=region_spec,
+                symbols=symbols,
+            )
+            logger.info(
+                "Region parsed successfully. region=%s parser_type=%s conf=%.3f symbols=%s fields=%s",
+                region_id,
+                parser_type,
+                result.confidence,
+                len(result.detected_symbols),
+                sorted(result.normalized_fields.keys()),
+            )
+            return result
+
+        if parser_type == ATTACK:
+            result = self._stats_region_parser.parse(
+                region_name=region_id,
+                field_name="attack",
+                image=image,
+                region_spec=region_spec,
+            )
+            logger.info(
+                "Region parsed successfully. region=%s parser_type=%s conf=%.3f text_len=%s fields=%s",
+                region_id,
+                parser_type,
+                result.confidence,
+                len(result.text),
+                sorted(result.normalized_fields.keys()),
+            )
+            return result
+
+        if parser_type == HEALTH:
+            result = self._stats_region_parser.parse(
+                region_name=region_id,
+                field_name="health",
+                image=image,
+                region_spec=region_spec,
+            )
+            logger.info(
+                "Region parsed successfully. region=%s parser_type=%s conf=%.3f text_len=%s fields=%s",
+                region_id,
+                parser_type,
+                result.confidence,
+                len(result.text),
+                sorted(result.normalized_fields.keys()),
+            )
+            return result
+
+        return None
+
     def _merge_normalized_fields(
         self,
         region_results: dict[str, RegionParseResult],
@@ -272,12 +327,12 @@ class CardParser:
         merged.setdefault("rules_text", "")
         return merged
 
-    def _confidence_breakdown(self, region_results: dict[str, RegionParseResult]) -> dict[str, float]:
-        name_conf = region_results.get("top_bar", RegionParseResult("top_bar")).confidence
-        type_conf = region_results.get("type_bar", RegionParseResult("type_bar")).confidence
-        rules_conf = region_results.get("rules_text", RegionParseResult("rules_text")).confidence
-        attack_conf = region_results.get("bottom_left", RegionParseResult("bottom_left")).confidence
-        health_conf = region_results.get("bottom_right", RegionParseResult("bottom_right")).confidence
+    def _confidence_breakdown(self, semantic_results: dict[str, RegionParseResult]) -> dict[str, float]:
+        name_conf = semantic_results.get(NAME_MANA_COST, RegionParseResult(NAME_MANA_COST)).confidence
+        type_conf = semantic_results.get(TYPE_TAG, RegionParseResult(TYPE_TAG)).confidence
+        rules_conf = semantic_results.get(RULES_TEXT, RegionParseResult(RULES_TEXT)).confidence
+        attack_conf = semantic_results.get(ATTACK, RegionParseResult(ATTACK)).confidence
+        health_conf = semantic_results.get(HEALTH, RegionParseResult(HEALTH)).confidence
 
         present_conf = [v for v in [name_conf, type_conf, rules_conf, attack_conf, health_conf] if v > 0.0]
         overall = float(sum(present_conf) / len(present_conf)) if present_conf else 0.0

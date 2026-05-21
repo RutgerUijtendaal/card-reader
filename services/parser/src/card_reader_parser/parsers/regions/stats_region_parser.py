@@ -8,6 +8,7 @@ from PIL import Image
 from PIL import ImageOps
 
 from ..ocr_runner import OcrRunner
+from ..region_config import resolve_region_ocr_config
 
 from .types import RegionParseResult
 
@@ -28,7 +29,6 @@ class StatsRegionParser:
         image: Image.Image,
         region_spec: dict[str, Any],
     ) -> RegionParseResult:
-        _ = region_spec
         logger.info(
             "Stats region parse started. region=%s field=%s image_size=%sx%s",
             region_name,
@@ -37,6 +37,7 @@ class StatsRegionParser:
             image.height,
         )
         attempts = self._build_ocr_attempts()
+        ocr_config = resolve_region_ocr_config(region_spec)
 
         chosen_ocr_data: dict[str, Any] | None = None
         chosen_text = ""
@@ -55,7 +56,7 @@ class StatsRegionParser:
                 scale=attempt_scale,
                 grayscale=attempt_grayscale,
             )
-            ocr_data = self._ocr_runner.run(preprocessed_image)
+            ocr_data = self._ocr_runner.run(preprocessed_image, config=ocr_config)
             text = str(ocr_data.get("text", ""))
             parsed_value = self._extract_number(text)
             logger.info(
@@ -144,4 +145,3 @@ class StatsRegionParser:
             seen.add(candidate)
             out.append(candidate)
         return out
-

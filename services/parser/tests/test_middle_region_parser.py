@@ -4,14 +4,15 @@ from PIL import Image
 
 from card_reader_core.models import Tag, Type
 from card_reader_parser.extractors.known_metadata_extractor import KnownMetadataExtractor
-from card_reader_parser.parsers.regions.middle_region_parser import MiddleRegionParser
+from card_reader_parser.parsers.regions.type_tag_parser import TypeTagParser
 
 
 class StubOcrRunner:
     def __init__(self, text: str) -> None:
         self._text = text
 
-    def run(self, _image: Image.Image) -> dict[str, object]:
+    def run(self, _image: Image.Image, config: dict[str, object] | None = None) -> dict[str, object]:
+        _ = config
         return {
             "text": self._text,
             "confidence": 0.88,
@@ -20,14 +21,14 @@ class StubOcrRunner:
 
 
 def test_split_middle_text_handles_empty_and_missing_hyphen() -> None:
-    parser = MiddleRegionParser(StubOcrRunner(""), KnownMetadataExtractor())
+    parser = TypeTagParser(StubOcrRunner(""), KnownMetadataExtractor())
 
     assert parser._split_middle_text("") == ("", "")
     assert parser._split_middle_text(" Persistent Spell ") == ("Persistent Spell", "")
 
 
 def test_split_middle_text_normalizes_spacing_around_hyphen() -> None:
-    parser = MiddleRegionParser(StubOcrRunner(""), KnownMetadataExtractor())
+    parser = TypeTagParser(StubOcrRunner(""), KnownMetadataExtractor())
 
     assert parser._split_middle_text("  Persistent   Spell   -   Silver   Weapon ") == (
         "Persistent Spell",
@@ -36,14 +37,14 @@ def test_split_middle_text_normalizes_spacing_around_hyphen() -> None:
 
 
 def test_split_middle_text_does_not_split_on_hyphen_without_surrounding_spaces() -> None:
-    parser = MiddleRegionParser(StubOcrRunner(""), KnownMetadataExtractor())
+    parser = TypeTagParser(StubOcrRunner(""), KnownMetadataExtractor())
 
     assert parser._split_middle_text("Sword-and-Shield Relic") == ("Sword-and-Shield Relic", "")
     assert parser._split_middle_text("Persistent-Weapon") == ("Persistent-Weapon", "")
 
 
-def test_middle_region_parser_matches_known_type_and_tag_without_suggestions() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Persistent Spell - Silver Weapon"), KnownMetadataExtractor())
+def test_type_tag_parser_matches_known_type_and_tag_without_suggestions() -> None:
+    parser = TypeTagParser(StubOcrRunner("Persistent Spell - Silver Weapon"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(
@@ -60,8 +61,8 @@ def test_middle_region_parser_matches_known_type_and_tag_without_suggestions() -
     assert result.extracted_tag_suggestions == []
 
 
-def test_middle_region_parser_emits_type_suggestion_for_unknown_leftover() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Persistent Spell Mystery - Weapon"), KnownMetadataExtractor())
+def test_type_tag_parser_emits_type_suggestion_for_unknown_leftover() -> None:
+    parser = TypeTagParser(StubOcrRunner("Persistent Spell Mystery - Weapon"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(
@@ -77,8 +78,8 @@ def test_middle_region_parser_emits_type_suggestion_for_unknown_leftover() -> No
     assert result.extracted_tag_suggestions == []
 
 
-def test_middle_region_parser_removes_commas_from_type_suggestions() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Persistent Spell, Mystery - Weapon"), KnownMetadataExtractor())
+def test_type_tag_parser_removes_commas_from_type_suggestions() -> None:
+    parser = TypeTagParser(StubOcrRunner("Persistent Spell, Mystery - Weapon"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(
@@ -93,8 +94,8 @@ def test_middle_region_parser_removes_commas_from_type_suggestions() -> None:
     assert [row.normalized_value for row in result.extracted_type_suggestions] == ["mystery"]
 
 
-def test_middle_region_parser_emits_tag_suggestion_for_unknown_right_side() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Persistent - Silver Weapon Relic"), KnownMetadataExtractor())
+def test_type_tag_parser_emits_tag_suggestion_for_unknown_right_side() -> None:
+    parser = TypeTagParser(StubOcrRunner("Persistent - Silver Weapon Relic"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(
@@ -109,8 +110,8 @@ def test_middle_region_parser_emits_tag_suggestion_for_unknown_right_side() -> N
     assert [row.normalized_value for row in result.extracted_tag_suggestions] == ["relic"]
 
 
-def test_middle_region_parser_splits_unknown_tag_leftovers_by_whitespace_when_no_commas_exist() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Persistent - Silver Weapon Relic Ancient"), KnownMetadataExtractor())
+def test_type_tag_parser_splits_unknown_tag_leftovers_by_whitespace_when_no_commas_exist() -> None:
+    parser = TypeTagParser(StubOcrRunner("Persistent - Silver Weapon Relic Ancient"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(
@@ -125,8 +126,8 @@ def test_middle_region_parser_splits_unknown_tag_leftovers_by_whitespace_when_no
     assert [row.normalized_value for row in result.extracted_tag_suggestions] == ["relic", "ancient"]
 
 
-def test_middle_region_parser_splits_unknown_tag_leftovers_by_commas_when_present() -> None:
-    parser = MiddleRegionParser(
+def test_type_tag_parser_splits_unknown_tag_leftovers_by_commas_when_present() -> None:
+    parser = TypeTagParser(
         StubOcrRunner("Persistent - Silver Weapon, Relic, Ancient Artifact"),
         KnownMetadataExtractor(),
     )
@@ -147,8 +148,8 @@ def test_middle_region_parser_splits_unknown_tag_leftovers_by_commas_when_presen
     ]
 
 
-def test_middle_region_parser_ignores_comma_only_tag_leftovers_after_known_matches() -> None:
-    parser = MiddleRegionParser(
+def test_type_tag_parser_ignores_comma_only_tag_leftovers_after_known_matches() -> None:
+    parser = TypeTagParser(
         StubOcrRunner("Persistent - Silver Weapon, Ancient Artifact, Weapon"),
         KnownMetadataExtractor(),
     )
@@ -169,8 +170,8 @@ def test_middle_region_parser_ignores_comma_only_tag_leftovers_after_known_match
     assert result.extracted_tag_suggestions == []
 
 
-def test_middle_region_parser_emits_suggestion_when_no_known_match_exists() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Mystic Relic"), KnownMetadataExtractor())
+def test_type_tag_parser_emits_suggestion_when_no_known_match_exists() -> None:
+    parser = TypeTagParser(StubOcrRunner("Mystic Relic"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(
@@ -186,8 +187,8 @@ def test_middle_region_parser_emits_suggestion_when_no_known_match_exists() -> N
     assert result.extracted_tag_suggestions == []
 
 
-def test_middle_region_parser_deduplicates_repeated_known_identifier_matches() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Persistent Persistent - Weapon Weapon"), KnownMetadataExtractor())
+def test_type_tag_parser_deduplicates_repeated_known_identifier_matches() -> None:
+    parser = TypeTagParser(StubOcrRunner("Persistent Persistent - Weapon Weapon"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     result = parser.parse(
@@ -204,8 +205,8 @@ def test_middle_region_parser_deduplicates_repeated_known_identifier_matches() -
     assert result.extracted_tag_suggestions == []
 
 
-def test_middle_region_parser_treats_added_identifier_as_reparse_equivalent() -> None:
-    parser = MiddleRegionParser(StubOcrRunner("Persistent Spell Mystery - Weapon"), KnownMetadataExtractor())
+def test_type_tag_parser_treats_added_identifier_as_reparse_equivalent() -> None:
+    parser = TypeTagParser(StubOcrRunner("Persistent Spell Mystery - Weapon"), KnownMetadataExtractor())
     image = Image.new("RGB", (120, 40), "white")
 
     initial = parser.parse(

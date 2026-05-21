@@ -4,6 +4,11 @@ import logging
 from typing import Any, TypedDict
 
 from PIL import Image
+from .region_config import (
+    build_ocr_engine_config,
+    build_ocr_engine_config_key,
+    resolve_ocr_min_confidence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,33 +21,6 @@ try:
     from paddleocr import PaddleOCR  # type: ignore[import-untyped]
 except Exception:  # pragma: no cover
     PaddleOCR = None
-
-_PADDLEX_OCR_CONFIG: dict[str, Any] = {
-    "pipeline_name": "OCR",
-    "text_type": "general",
-    "use_doc_preprocessor": False,
-    "use_textline_orientation": False,
-    "SubModules": {
-        "TextDetection": {
-            "module_name": "text_detection",
-            "model_name": "PP-OCRv5_server_det",
-            "model_dir": None,
-            "limit_side_len": 512,
-            "limit_type": "max",
-            "max_side_limit": 1024,
-            "thresh": 0.3,
-            "box_thresh": 0.6,
-            "unclip_ratio": 1.5,
-        },
-        "TextRecognition": {
-            "module_name": "text_recognition",
-            "model_name": "PP-OCRv5_server_rec",
-            "model_dir": None,
-            "batch_size": 1,
-            "score_thresh": 0.8,
-        },
-    },
-}
 
 
 Point = tuple[float, float]
@@ -59,12 +37,15 @@ class OcrLineItem(TypedDict):
 
 class OcrRunner:
     def __init__(self) -> None:
-        self._ocr_engine: Any = None
+        self._ocr_engines: dict[str, Any] = {}
+        self._failed_engine_keys: set[str] = set()
         self._ocr_init_failed = False
 
-    def run(self, image: Image.Image) -> dict[str, Any]:
+    def run(self, image: Image.Image, config: dict[str, Any] | None = None) -> dict[str, Any]:
         logger.info("OCR run started. image_size=%sx%s", image.width, image.height)
-        engine = self._get_ocr_engine()
+        min_confidence = resolve_ocr_min_confidence(config)
+        engine_config = build_ocr_engine_config(config)
+        engine = self._get_ocr_engine(engine_config)
         if engine is None or np is None:
             logger.warning("OCR run skipped. engine_available=%s numpy_available=%s", engine is not None, np is not None)
             return {"text": "", "confidence": 0.0, "lines": []}
@@ -87,14 +68,21 @@ class OcrRunner:
         if not isinstance(json_payload, dict):
             logger.warning("OCR run finished with non-dict payload.")
             return {"text": "", "confidence": 0.0, "lines": []}
-        return self._finalize_from_json_payload(json_payload)
+        return self._finalize_from_json_payload(json_payload, min_confidence=min_confidence)
 
-    def _finalize_from_json_payload(self, json_payload: dict[str, Any]) -> dict[str, Any]:
+    def _finalize_from_json_payload(
+        self,
+        json_payload: dict[str, Any],
+        *,
+        min_confidence: float,
+    ) -> dict[str, Any]:
         lines_data: list[OcrLineItem] = []
         confidences: list[float] = []
 
         for poly, text_value, conf_value in self._extract_text_conf_pairs(json_payload):
             if not text_value:
+                continue
+            if conf_value < min_confidence:
                 continue
 
             # compute a simple center point
@@ -119,10 +107,11 @@ class OcrRunner:
         combined = "\n".join(final_lines).strip()
         avg_conf = float(sum(confidences) / len(confidences)) if confidences else 0.0
         logger.info(
-            "OCR run finished. text_len=%s lines=%s avg_conf=%.3f",
+            "OCR run finished. text_len=%s lines=%s avg_conf=%.3f min_conf=%.3f",
             len(combined),
             len(lines_data),
             avg_conf,
+            min_confidence,
         )
         return {"text": combined, "confidence": avg_conf, "lines": lines_data}
 
@@ -206,9 +195,7 @@ class OcrRunner:
 
         return pairs
 
-    def _get_ocr_engine(self) -> Any:
-        if self._ocr_engine is not None:
-            return self._ocr_engine
+    def _get_ocr_engine(self, config: dict[str, Any]) -> Any:
         if self._ocr_init_failed:
             return None
         if PaddleOCR is None or np is None:
@@ -216,15 +203,22 @@ class OcrRunner:
             self._ocr_init_failed = True
             return None
 
+        config_key = build_ocr_engine_config_key(config)
+        if config_key in self._ocr_engines:
+            return self._ocr_engines[config_key]
+        if config_key in self._failed_engine_keys:
+            return None
+
         try:
-            self._ocr_engine = PaddleOCR(
+            engine = PaddleOCR(
                 lang="en",
                 device="cpu",
                 enable_mkldnn=False,
-                paddlex_config=_PADDLEX_OCR_CONFIG,
+                paddlex_config=config,
             )
         except Exception:
             logger.exception("Failed to initialize PaddleOCR")
-            self._ocr_init_failed = True
-            self._ocr_engine = None
-        return self._ocr_engine
+            self._failed_engine_keys.add(config_key)
+            return None
+        self._ocr_engines[config_key] = engine
+        return engine

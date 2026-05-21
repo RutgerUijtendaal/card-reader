@@ -9,6 +9,7 @@ from PIL import Image
 from ...extractors import KnownMetadataExtractor
 from ..rule_text import RuleTextEnricher
 from ..ocr_runner import OcrRunner
+from ..region_config import resolve_region_ocr_config
 from ..symbol_detector import SymbolDetector
 
 from .types import RegionParseResult
@@ -16,7 +17,7 @@ from .types import RegionParseResult
 logger = logging.getLogger(__name__)
 
 
-class BottomRegionParser:
+class RulesTextParser:
     _EXPECTED_SYMBOL_TYPES = {"mana", "devotion", "generic"}
 
     def __init__(
@@ -39,18 +40,17 @@ class BottomRegionParser:
         symbols: list[Symbol],
         known_keywords: list[Keyword],
     ) -> RegionParseResult:
-        _ = region_spec
-        logger.info("Bottom region parse started. region=%s image_size=%sx%s", region_name, image.width, image.height)
-        logger.info("Bottom region OCR step started. region=%s", region_name)
-        ocr_data = self._ocr_runner.run(image)
+        logger.info("Rules text parser started. region=%s image_size=%sx%s", region_name, image.width, image.height)
+        logger.info("Rules text parser OCR step started. region=%s", region_name)
+        ocr_data = self._ocr_runner.run(image, config=resolve_region_ocr_config(region_spec))
         logger.info(
-            "Bottom region OCR step finished. region=%s conf=%.3f",
+            "Rules text parser OCR step finished. region=%s conf=%.3f",
             region_name,
             self._safe_confidence(ocr_data.get("confidence", 0.0)),
         )
         raw_text = str(ocr_data.get("text", ""))
         logger.info(
-            "Bottom region symbol detection step started. region=%s symbol_candidates=%s expected_types=%s",
+            "Rules text parser symbol detection step started. region=%s symbol_candidates=%s expected_types=%s",
             region_name,
             len(symbols),
             sorted(self._EXPECTED_SYMBOL_TYPES),
@@ -61,12 +61,12 @@ class BottomRegionParser:
             expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
         )
         logger.info(
-            "Bottom region symbol detection step finished. region=%s symbols=%s",
+            "Rules text parser symbol detection step finished. region=%s symbols=%s",
             region_name,
             len(detected_symbols),
         )
         logger.info(
-            "Bottom region rule text enrichment step started. text=%s symbols=%s",
+            "Rules text parser enrichment step started. text=%s symbols=%s",
             raw_text,
             len(detected_symbols),
         )
@@ -76,25 +76,25 @@ class BottomRegionParser:
             symbols=symbols,
         )
         logger.info(
-            "Bottom region rule text enrichment step finished. text=%s symbols=%s",
+            "Rules text parser enrichment step finished. text=%s symbols=%s",
             raw_text,
             len(detected_symbols),
         )
         logger.info(
-            "Bottom region keyword extraction step started. region=%s known_keywords=%s",
+            "Rules text parser keyword extraction step started. region=%s known_keywords=%s",
             region_name,
             len(known_keywords),
         )
         keyword_ids = self._metadata_extractor.extract_ids(enrichment.cleaned_text, known_keywords)
         logger.info(
-            "Bottom region keyword extraction step finished. region=%s keywords=%s",
+            "Rules text parser keyword extraction step finished. region=%s keywords=%s",
             region_name,
             len(keyword_ids),
         )
         confidence = self._safe_confidence(ocr_data.get("confidence", 0.0))
         lines = self._safe_lines(ocr_data.get("lines", []))
         logger.info(
-            "Bottom region parse finished. region=%s conf=%.3f text_len=%s lines=%s symbols=%s keywords=%s",
+            "Rules text parser finished. region=%s conf=%.3f text_len=%s lines=%s symbols=%s keywords=%s",
             region_name,
             confidence,
             len(enrichment.rendered_text),
