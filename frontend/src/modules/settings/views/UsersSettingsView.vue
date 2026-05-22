@@ -211,7 +211,10 @@
               </span>
             </div>
             <p class="theme-section-muted mt-1 text-xs">
-              Joined {{ formatDate(user.date_joined) }}. Last sign-in {{ formatDate(user.last_login, 'Never') }}.
+              Joined {{ formatDate(user.date_joined) }}.
+              <template v-if="user.last_login">
+                Last sign-in {{ formatDate(user.last_login) }}.
+              </template>
             </p>
           </div>
 
