@@ -58,11 +58,13 @@
               >
             </label>
             <label class="field-label">
-              Key (optional)
+              Key
               <input
                 v-model="form.key"
                 class="input-base"
-                placeholder="mtg-like-v1"
+                :readonly="!createMode"
+                :disabled="!createMode"
+                :placeholder="createMode ? 'mtg-like-v1' : ''"
               >
             </label>
           </div>
@@ -349,11 +351,13 @@ const saveTemplate = async (): Promise<void> => {
   try {
     const payload = {
       label: normalizedLabel,
-      key: form.key.trim() || undefined,
       definition_json: normalizedDefinition.value,
     };
     if (createMode.value) {
-      await createTemplate(payload);
+      await createTemplate({
+        ...payload,
+        key: form.key.trim() || undefined,
+      });
       toast.success('Template created.');
     } else if (selectedId.value) {
       await updateTemplate(selectedId.value, payload);

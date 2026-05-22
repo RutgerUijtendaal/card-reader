@@ -22,7 +22,6 @@ class CardVersion(TimestampedModel):
         on_delete=models.PROTECT,
         related_name="card_versions",
         db_column="template_id",
-        to_field="key",
     )
     image_hash: models.TextField[str, str] = models.TextField(db_index=True)
     name: models.TextField[str, str] = models.TextField(default="")

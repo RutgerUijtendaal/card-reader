@@ -114,12 +114,12 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     Card.objects.all().delete()
     Template.objects.filter(key__in=["mtg-like-v1", "sorcery-v1"]).delete()
 
-    Template.objects.create(
+    mtg_template = Template.objects.create(
         key="mtg-like-v1",
         label="MTG",
         definition_json=_template_definition("top_bar"),
     )
-    Template.objects.create(
+    sorcery_template = Template.objects.create(
         key="sorcery-v1",
         label="Sorcery",
         definition_json=_template_definition("top_bar_alt"),
@@ -132,7 +132,7 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     version_a = CardVersion.objects.create(
         card_id=card_a.id,
         version_number=1,
-        template_id="mtg-like-v1",
+        template=mtg_template,
         image_hash="hash-a",
         name="Card A",
         is_latest=True,
@@ -140,7 +140,7 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     version_b = CardVersion.objects.create(
         card_id=card_b.id,
         version_number=1,
-        template_id="mtg-like-v1",
+        template=mtg_template,
         image_hash="hash-b",
         name="Card B",
         is_latest=True,
@@ -148,7 +148,7 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     version_c = CardVersion.objects.create(
         card_id=card_c.id,
         version_number=1,
-        template_id="sorcery-v1",
+        template=sorcery_template,
         image_hash="hash-c",
         name="Card C",
         is_latest=True,
