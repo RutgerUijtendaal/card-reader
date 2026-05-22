@@ -11,10 +11,13 @@ export const useAuthStore = defineStore('auth', () => {
   const authEnabled = computed(() => user.value?.auth_enabled ?? true);
   const authenticated = computed(() => user.value?.authenticated ?? false);
   const canAccessStaffRoutes = computed(
-    () => !authEnabled.value || (authenticated.value && user.value?.is_staff === true),
+    () => !authEnabled.value || user.value?.can_manage_settings === true,
+  );
+  const canManageUsers = computed(
+    () => !authEnabled.value || user.value?.can_manage_users === true,
   );
   const canAccessMaintenance = computed(
-    () => !authEnabled.value || (authenticated.value && user.value?.is_superuser === true),
+    () => !authEnabled.value || user.value?.can_access_maintenance === true,
   );
 
   const applyCsrfToken = (currentUser: CurrentUser): void => {
@@ -67,6 +70,7 @@ export const useAuthStore = defineStore('auth', () => {
     authEnabled,
     authenticated,
     canAccessStaffRoutes,
+    canManageUsers,
     canAccessMaintenance,
     fetchCurrentUser,
     login,

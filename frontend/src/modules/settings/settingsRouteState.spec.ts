@@ -17,9 +17,18 @@ describe('settingsRouteState', () => {
       settings_entry: 'tag-123',
     };
 
-    expect(parseSettingsTab(query, { allowMaintenance: true })).toBe('card-groups');
+    expect(parseSettingsTab(query, { allowUsers: true, allowMaintenance: true })).toBe('card-groups');
     expect(parseSettingsCatalogKind(query)).toBe('tags');
     expect(parseSettingsEntryId(query)).toBe('tag-123');
+  });
+
+  test('falls back when users tab is not allowed', () => {
+    expect(
+      parseSettingsTab(
+        { settings_tab: 'users' },
+        { allowUsers: false, allowMaintenance: true },
+      ),
+    ).toBe('catalog');
   });
 
   test('builds card detail location that preserves settings context', () => {

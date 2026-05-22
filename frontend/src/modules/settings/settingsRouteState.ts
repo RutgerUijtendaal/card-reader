@@ -1,7 +1,7 @@
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from 'vue-router';
 import type { CatalogKind } from '@/modules/settings/types';
 
-export type SettingsTab = 'catalog' | 'templates' | 'card-groups' | 'maintenance';
+export type SettingsTab = 'catalog' | 'templates' | 'card-groups' | 'users' | 'maintenance';
 
 const SETTINGS_RETURN_TO = 'settings';
 const SETTINGS_TAB_QUERY_KEY = 'settings_tab';
@@ -18,17 +18,20 @@ const CATALOG_KINDS: CatalogKind[] = [
   'suggested-types',
 ];
 
-const SETTINGS_TABS: SettingsTab[] = ['catalog', 'templates', 'card-groups', 'maintenance'];
+const SETTINGS_TABS: SettingsTab[] = ['catalog', 'templates', 'card-groups', 'users', 'maintenance'];
 
 const queryString = (value: unknown): string | null =>
   typeof value === 'string' && value.trim().length > 0 ? value : null;
 
 export const parseSettingsTab = (
   query: LocationQuery,
-  options: { allowMaintenance: boolean },
+  options: { allowUsers: boolean; allowMaintenance: boolean },
 ): SettingsTab => {
   const value = queryString(query[SETTINGS_TAB_QUERY_KEY]);
   if (!value || !SETTINGS_TABS.includes(value as SettingsTab)) {
+    return 'catalog';
+  }
+  if (value === 'users' && !options.allowUsers) {
     return 'catalog';
   }
   if (value === 'maintenance' && !options.allowMaintenance) {
