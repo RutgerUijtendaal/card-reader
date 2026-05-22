@@ -137,9 +137,6 @@
               </div>
             </div>
           </SymbolToggleGroup>
-        </div>
-
-        <div class="space-y-3">
           <MetadataChecklistGroup
             v-model="selectedKeywordIds"
             v-model:match-mode="keywordMatch"
