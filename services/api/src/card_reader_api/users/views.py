@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any, cast
+
+from rest_framework import status
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.serializers import BaseSerializer
+from rest_framework.views import APIView
+
+from card_reader_api.auth.password_flow import PasswordSetupService
+from card_reader_api.common.permissions import AuthEnabledOrUserManagementAllowed
+from card_reader_api.users.serializers import (
+    ManagedUserCreateSerializer,
+    ManagedUserListQuerySerializer,
+    managed_user_payload,
+    password_setup_payload,
+)
+from card_reader_api.users.services import ManagedUserService
+
+
+class ManagedUserListCreateView(APIView):
+    permission_classes = [AuthEnabledOrUserManagementAllowed]
+
+    def get(self, request: Request) -> Response:
+        serializer = ManagedUserListQuerySerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
+        managed_users, unmanaged_users = ManagedUserService().list_users(
+            include_inactive=serializer.validated_data["include_inactive"],
+        )
+        return Response(
+            {
+                "managed_results": [managed_user_payload(user) for user in managed_users],
+                "unmanaged_results": [
+                    managed_user_payload(
+                        user,
+                        include_last_login=bool(getattr(request.user, "is_superuser", False)),
+                    )
+                    for user in unmanaged_users
+                ],
+            }
+        )
+
+    def post(self, request: Request) -> Response:
+        serializer = ManagedUserCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
+        try:
+            user = ManagedUserService().create_user(username=serializer.validated_data["username"])
+        except ValueError as exc:
+            return _bad_request(str(exc))
+        link = PasswordSetupService().build_setup_link(user, request._request)
+        return Response(password_setup_payload(user, link), status=status.HTTP_201_CREATED)
+
+
+class ManagedUserDetailView(APIView):
+    permission_classes = [AuthEnabledOrUserManagementAllowed]
+
+    def delete(self, _request: Request, user_id: str) -> Response:
+        user = ManagedUserService().deactivate_user(user_id=user_id)
+        if user is None:
+            return _not_found("Managed user not found.")
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ManagedUserRestoreView(APIView):
+    permission_classes = [AuthEnabledOrUserManagementAllowed]
+
+    def post(self, _request: Request, user_id: str) -> Response:
+        user = ManagedUserService().restore_user(user_id=user_id)
+        if user is None:
+            return _not_found("Managed user not found.")
+        return Response(managed_user_payload(user))
+
+
+class ManagedUserResetPasswordView(APIView):
+    permission_classes = [AuthEnabledOrUserManagementAllowed]
+
+    def post(self, request: Request, user_id: str) -> Response:
+        user = ManagedUserService().get_managed_user(user_id=user_id)
+        if user is None:
+            return _not_found("Managed user not found.")
+        link = PasswordSetupService().build_setup_link(user, request._request)
+        return Response(password_setup_payload(user, link))
+
+
+def _bad_request(detail: str) -> Response:
+    return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _not_found(detail: str) -> Response:
+    return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
+
+
+def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
+    errors = serializer.errors
+    detail = next(iter(cast(Mapping[str, object], errors).values()), "Invalid request.")
+    if isinstance(detail, list):
+        detail = detail[0]
+    return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)

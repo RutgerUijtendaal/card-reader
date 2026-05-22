@@ -4,24 +4,29 @@ from django.conf import settings
 from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 
+from card_reader_api.common.auth_access import (
+    can_access_maintenance,
+    can_manage_settings,
+    can_manage_users,
+)
+
 
 class AuthEnabledOrStaffAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
         if not settings.CARD_READER_AUTH_ENABLED:
             return True
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, "is_staff", False)
-        )
+        return can_manage_settings(request.user)
 
 
 class AuthEnabledOrSuperuserAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
         if not settings.CARD_READER_AUTH_ENABLED:
             return True
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and getattr(request.user, "is_superuser", False)
-        )
+        return can_access_maintenance(request.user)
+
+
+class AuthEnabledOrUserManagementAllowed(BasePermission):
+    def has_permission(self, request: Request, view: object) -> bool:
+        if not settings.CARD_READER_AUTH_ENABLED:
+            return True
+        return can_manage_users(request.user)

@@ -69,6 +69,33 @@ export type MaintenanceActionResponse = {
   removed_paths: string[];
 };
 
+export type ManagedUserRecord = {
+  id: string;
+  username: string;
+  is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  date_joined: string | null;
+  last_login: string | null;
+};
+
+export type ManagedUserListResponse = {
+  managed_results: ManagedUserRecord[];
+  unmanaged_results: ManagedUserRecord[];
+};
+
+export type CreateManagedUserRequest = {
+  username: string;
+};
+
+export type PasswordSetupResponse = {
+  user: ManagedUserRecord;
+  uid: string;
+  token: string;
+  setup_url: string;
+  expires_in_seconds: number;
+};
+
 export type CardGroupMemberRecord = {
   card_id: string;
   card_label: string;

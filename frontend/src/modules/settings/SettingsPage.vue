@@ -38,6 +38,16 @@
             <span>Card groups</span>
           </button>
           <button
+            v-if="auth.canManageUsers"
+            class="theme-tab"
+            type="button"
+            :class="activeTab === 'users' ? 'theme-tab-active' : ''"
+            @click="setActiveTab('users')"
+          >
+            <Users class="h-4 w-4" />
+            <span>Users</span>
+          </button>
+          <button
             v-if="auth.canAccessMaintenance"
             class="theme-tab"
             type="button"
@@ -52,6 +62,7 @@
     </div>
 
     <MaintenanceSettingsView v-if="activeTab === 'maintenance'" />
+    <UsersSettingsView v-else-if="activeTab === 'users'" />
     <CardGroupsSettingsView v-else-if="activeTab === 'card-groups'" />
     <TemplatesSettingsView v-else-if="activeTab === 'templates'" />
     <CatalogSettingsView v-else />
@@ -60,7 +71,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { Database, Layers3, LayoutTemplate, Settings, Tags } from 'lucide-vue-next';
+import { Database, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
@@ -72,6 +83,7 @@ import MaintenanceSettingsView from './views/MaintenanceSettingsView.vue';
 import CatalogSettingsView from './views/CatalogSettingsView.vue';
 import CardGroupsSettingsView from './views/CardGroupsSettingsView.vue';
 import TemplatesSettingsView from './views/TemplatesSettingsView.vue';
+import UsersSettingsView from './views/UsersSettingsView.vue';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -92,7 +104,10 @@ const setActiveTab = (tab: SettingsTab, options: { syncRoute?: boolean } = {}): 
 watch(
   () => route.query,
   (query) => {
-    const nextTab = parseSettingsTab(query, { allowMaintenance: auth.canAccessMaintenance });
+    const nextTab = parseSettingsTab(query, {
+      allowUsers: auth.canManageUsers,
+      allowMaintenance: auth.canAccessMaintenance,
+    });
     if (activeTab.value !== nextTab) {
       setActiveTab(nextTab, { syncRoute: false });
     }
