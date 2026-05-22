@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 from django.db import migrations, models
 
 
-def _migrate_card_version_template_keys_to_ids(apps, _schema_editor) -> None:
+def _migrate_card_version_template_keys_to_ids(apps: Any, _schema_editor: Any) -> None:
     CardVersion = apps.get_model("card_reader_core", "CardVersion")
     Template = apps.get_model("card_reader_core", "Template")
 
@@ -18,7 +20,7 @@ def _migrate_card_version_template_keys_to_ids(apps, _schema_editor) -> None:
         CardVersion.objects.filter(id=version.id).update(template_id=template_id)
 
 
-def _migrate_card_version_template_ids_to_keys(apps, _schema_editor) -> None:
+def _migrate_card_version_template_ids_to_keys(apps: Any, _schema_editor: Any) -> None:
     CardVersion = apps.get_model("card_reader_core", "CardVersion")
     Template = apps.get_model("card_reader_core", "Template")
 
