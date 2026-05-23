@@ -42,6 +42,10 @@ Core stack:
   - `api` depends on `core`; it must not import parser modules.
   - `parser` depends on `core`; it must not import API views, serializers, URLs, DRF settings, or API-only services.
   - `core` contains shared domain/runtime foundations only.
+- Before adding a new utility, abstraction, workflow, or UI pattern, check whether an existing solution can be extended cleanly.
+- Prefer unifying overlapping implementations over introducing parallel ones that solve the same problem in slightly different ways.
+- When similar logic exists in multiple places, move toward a shared, well-owned abstraction when the fit is real.
+- Do not generalize prematurely, but treat repeated patterns and near-duplicate solutions as a prompt to consolidate.
 - Before adding a new dependency, custom utility, or bespoke implementation for a common UI/backend pattern, scan the existing package dependencies and local shared utilities first, and prefer using them when the use-case fits cleanly.
 - Keep shared card filtering logic centralized in `frontend/src/modules/card-filters`.
   - Route/query parsing, stable key-based filter state, key/id translation, and API filter param building belong there.
