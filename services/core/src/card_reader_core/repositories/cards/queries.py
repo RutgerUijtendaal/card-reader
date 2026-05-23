@@ -226,7 +226,7 @@ def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> Qu
     if filters["mana_cost_max"] is not None:
         queryset = queryset.filter(mana_value__isnull=False, mana_value__lte=filters["mana_cost_max"])
     if filters["template_id"]:
-        queryset = queryset.filter(template_id=filters["template_id"])
+        queryset = queryset.filter(template__key=filters["template_id"])
     if filters["attack_min"] is not None:
         queryset = queryset.filter(attack__isnull=False, attack__gte=filters["attack_min"])
     if filters["attack_max"] is not None:

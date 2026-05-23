@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from card_reader_core.models import Card, CardGroup, CardGroupMember, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Type  # noqa: E402
+from card_reader_core.models import Card, CardGroup, CardGroupMember, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
 from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata_repository import (  # noqa: E402
@@ -469,6 +469,33 @@ def test_staff_can_manage_templates() -> None:
 
     assert list_response.status_code == 200
     assert create_response.status_code == 200
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_template_key_cannot_be_updated() -> None:
+    username = "staff-template-key-lock-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    template = Template.objects.create(
+        key="immutable-template-key",
+        label="Immutable Template",
+        definition_json=_valid_template_definition(),
+    )
+
+    response = client.patch(
+        f"/settings/templates/{template.id}",
+        data={"key": "renamed-template-key"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Template key cannot be changed"
+    template.refresh_from_db()
+    assert template.key == "immutable-template-key"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -1196,7 +1223,7 @@ def test_latest_card_reparse_queues_import_job() -> None:
     assert "Queued reparse job" in payload["message"]
 
     job = ImportJob.objects.get(id=payload["job_id"])
-    assert job.template_id == version.template_id
+    assert job.template_id == version.template.key
     assert job.options_json == {"reparse_existing": True}
     assert job.total_items == 1
 
@@ -1234,11 +1261,14 @@ def _login_and_get_csrf_token(client: Client, username: str, password: str) -> s
 
 
 def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
+    from card_reader_core.models import Template
+
+    template = Template.objects.get(key="mtg-like-v1")
     card = Card.objects.create(key=name.lower().replace(" ", "-"), label=name)
     version = CardVersion.objects.create(
         card_id=card.id,
         version_number=1,
-        template_id="mtg-like-v1",
+        template=template,
         image_hash=f"hash-{name}",
         name=name,
         type_line="Base Type",

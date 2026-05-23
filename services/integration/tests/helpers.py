@@ -96,7 +96,7 @@ def _load_db_state() -> dict[str, object]:
             "label": card.label,
         },
         "latest_version": {
-            "template_id": latest_version.template_id,
+            "template_id": latest_version.template.key,
             "name": latest_version.name,
             "type_line": latest_version.type_line,
             "mana_cost": latest_version.mana_cost,

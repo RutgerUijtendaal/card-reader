@@ -17,6 +17,7 @@ from ..metadata_repository import (
     replace_card_version_tags,
     replace_card_version_types,
 )
+from ..templates_repository import get_template_by_key
 from .images import save_image_record
 from .queries import get_card, get_latest_card_version
 from .snapshots import (
@@ -321,6 +322,10 @@ def create_new_version(
     normalized_fields: dict[str, str],
     confidence: dict[str, float],
 ) -> CardVersion:
+    template = get_template_by_key(key=template_id)
+    if template is None:
+        raise ValueError(f"Unknown template_id '{template_id}'")
+
     latest = get_latest_card_version(card.id)
     previous_version_id = None
     version_number = 1
@@ -334,7 +339,7 @@ def create_new_version(
     return CardVersion.objects.create(
         card=card,
         version_number=version_number,
-        template_id=template_id,
+        template=template,
         image_hash=checksum,
         name=normalized_fields.get("name", "").strip() or Path(item.source_file).stem,
         type_line=normalized_fields.get("type_line", ""),

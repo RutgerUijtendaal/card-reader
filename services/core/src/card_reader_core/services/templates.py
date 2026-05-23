@@ -77,9 +77,7 @@ class TemplateService:
             current_label = self._normalize_label(label)
             updates["label"] = current_label
         if key is not None:
-            normalized_key = self._normalize_key(key=key, label=current_label)
-            self._ensure_unique_template_key(normalized_key, exclude_id=row.id)
-            updates["key"] = normalized_key
+            raise ValueError("Template key cannot be changed")
         if definition_json is not None:
             updates["definition_json"] = self._normalize_definition_json(definition_json)
 
