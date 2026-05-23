@@ -18,6 +18,10 @@
             :card="card"
             :tooltip-enabled="controller.tooltipEnabled.value"
             :card-height-rem="controller.cardHeightRem.value"
+            activation-mode="emit"
+            activation-label="Add card to deck"
+            :activation-disabled="controller.galleryActionDisabled(card)"
+            @activate="handleActivate"
           />
 
           <button
@@ -54,6 +58,7 @@
 <script setup lang="ts">
 import { watchEffect, ref } from 'vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
+import type { GalleryItem } from '@/modules/card-detail/types';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 
 const props = defineProps<{
@@ -61,6 +66,13 @@ const props = defineProps<{
 }>();
 
 const sentinelRef = ref<HTMLElement | null>(null);
+
+const handleActivate = (card: GalleryItem): void => {
+  if (card.result_type !== 'card') {
+    return;
+  }
+  props.controller.handleGalleryAction(card);
+};
 
 watchEffect(() => {
   props.controller.loadMoreSentinelRef.value = sentinelRef.value;

@@ -6,9 +6,11 @@
     @mouseleave="hovered = false"
   >
     <div class="relative transition duration-200 hover:-translate-y-1">
-      <RouterLink
-        :to="detailLocation"
-        class="block"
+      <component
+        :is="activationTag"
+        v-bind="activationProps"
+        class="block w-full bg-transparent p-0 text-left disabled:cursor-not-allowed"
+        @click="handleActivate"
       >
         <template v-if="isCardGroup">
           <div
@@ -20,12 +22,12 @@
               :style="{ maxWidth: `${cardStackMaxWidthRem}rem` }"
             >
               <div
-                class="theme-card-frame-muted absolute inset-0 rounded-2xl"
-                :style="{ transform: 'translate(0.5rem, -0.0rem) rotate(7deg)' }"
+                class="theme-card-frame-muted absolute inset-2 rounded-2xl"
+                :style="{ transform: 'translate(0.3rem, -0.0rem) rotate(5deg)' }"
               />
               <div
-                class="theme-card-frame-muted absolute inset-0 rounded-2xl"
-                :style="{ transform: 'translate(0.3rem, 0.0rem) rotate(4deg)' }"
+                class="theme-card-frame-muted absolute inset-2 rounded-2xl"
+                :style="{ transform: 'translate(0.1rem, 0.0rem) rotate(2deg)' }"
               />
               <div class="relative h-full overflow-hidden rounded-2xl">
                 <img
@@ -74,7 +76,7 @@
             No image
           </div>
         </template>
-      </RouterLink>
+      </component>
 
       <Teleport to="body">
         <div
@@ -106,7 +108,8 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import type { RouteLocationRaw } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import { Pencil } from 'lucide-vue-next';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
@@ -119,12 +122,23 @@ const props = withDefaults(
     card: GalleryItem;
     tooltipEnabled?: boolean;
     cardHeightRem?: number;
+    activationMode?: 'navigate' | 'emit';
+    activationLabel?: string;
+    navigationTarget?: RouteLocationRaw | null;
+    activationDisabled?: boolean;
   }>(),
   {
     tooltipEnabled: true,
     cardHeightRem: 27,
+    activationMode: 'navigate',
+    activationLabel: 'Open card',
+    navigationTarget: null,
+    activationDisabled: false,
   },
 );
+const emit = defineEmits<{
+  (e: 'activate', card: GalleryItem): void;
+}>();
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -146,9 +160,28 @@ const cardItem = computed<CardListItem | null>(() => (isCard.value ? props.card 
 const groupItem = computed<CardGroupGalleryItem | null>(() => (isCardGroup.value ? props.card as CardGroupGalleryItem : null));
 const stackCards = computed(() => groupItem.value?.preview_cards.slice(0, 3) ?? []);
 const cardStackMaxWidthRem = computed(() => Number(((props.cardHeightRem * 63) / 88).toFixed(3)));
-const detailLocation = computed(() => buildGalleryItemLocation(props.card, route.query, 'detail'));
+const detailLocation = computed<RouteLocationRaw>(() => buildGalleryItemLocation(props.card, route.query, 'detail'));
 const editLocation = computed(() =>
   cardItem.value ? buildCardDetailLocation(cardItem.value.id, route.query, 'edit') : '/cards',
 );
+const navigationTarget = computed<RouteLocationRaw>(() => props.navigationTarget ?? detailLocation.value);
+const activationTag = computed(() => (props.activationMode === 'emit' ? 'button' : RouterLink));
+const activationProps = computed(() =>
+  props.activationMode === 'emit'
+    ? {
+        type: 'button',
+        'aria-label': props.activationLabel,
+        disabled: props.activationDisabled,
+      }
+    : {
+        to: navigationTarget.value,
+      },
+);
+
+const handleActivate = (): void => {
+  if (props.activationMode === 'emit' && !props.activationDisabled) {
+    emit('activate', props.card);
+  }
+};
 
 </script>
