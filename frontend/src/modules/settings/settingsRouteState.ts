@@ -1,5 +1,6 @@
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from 'vue-router';
 import type { CatalogKind } from '@/modules/settings/types';
+import { addReturnToQuery, clearLocationQueryKeys, mergeLocationQuery, queryString } from '@/router/routeState';
 
 export type SettingsTab = 'catalog' | 'templates' | 'card-groups' | 'users' | 'maintenance';
 
@@ -19,9 +20,6 @@ const CATALOG_KINDS: CatalogKind[] = [
 ];
 
 const SETTINGS_TABS: SettingsTab[] = ['catalog', 'templates', 'card-groups', 'users', 'maintenance'];
-
-const queryString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim().length > 0 ? value : null;
 
 export const parseSettingsTab = (
   query: LocationQuery,
@@ -59,33 +57,19 @@ export const buildSettingsQuery = (
     entryId?: string | null;
   },
 ): LocationQueryRaw => {
-  const nextQuery: LocationQueryRaw = { ...query };
+  const nextUpdates: Record<string, string | null | undefined> = {};
 
   if (updates.tab !== undefined) {
-    if (updates.tab) {
-      nextQuery[SETTINGS_TAB_QUERY_KEY] = updates.tab;
-    } else {
-      delete nextQuery[SETTINGS_TAB_QUERY_KEY];
-    }
+    nextUpdates[SETTINGS_TAB_QUERY_KEY] = updates.tab;
   }
-
   if (updates.kind !== undefined) {
-    if (updates.kind) {
-      nextQuery[SETTINGS_KIND_QUERY_KEY] = updates.kind;
-    } else {
-      delete nextQuery[SETTINGS_KIND_QUERY_KEY];
-    }
+    nextUpdates[SETTINGS_KIND_QUERY_KEY] = updates.kind;
   }
-
   if (updates.entryId !== undefined) {
-    if (updates.entryId) {
-      nextQuery[SETTINGS_ENTRY_QUERY_KEY] = updates.entryId;
-    } else {
-      delete nextQuery[SETTINGS_ENTRY_QUERY_KEY];
-    }
+    nextUpdates[SETTINGS_ENTRY_QUERY_KEY] = updates.entryId;
   }
 
-  return nextQuery;
+  return mergeLocationQuery(query, nextUpdates);
 };
 
 export const buildSettingsCardDetailLocation = (
@@ -93,20 +77,15 @@ export const buildSettingsCardDetailLocation = (
   query: LocationQuery,
 ): RouteLocationRaw => ({
   path: `/cards/${cardId}/edit`,
-  query: {
-    ...query,
-    [SETTINGS_RETURN_TO_QUERY_KEY]: SETTINGS_RETURN_TO,
-  },
+  query: addReturnToQuery(query, SETTINGS_RETURN_TO),
 });
 
 export const isSettingsReturnQuery = (query: LocationQuery): boolean =>
   queryString(query[SETTINGS_RETURN_TO_QUERY_KEY]) === SETTINGS_RETURN_TO;
 
 export const buildSettingsReturnLocation = (query: LocationQuery): RouteLocationRaw => {
-  const nextQuery: LocationQueryRaw = { ...query };
-  delete nextQuery[SETTINGS_RETURN_TO_QUERY_KEY];
   return {
     path: '/settings',
-    query: nextQuery,
+    query: clearLocationQueryKeys(query, [SETTINGS_RETURN_TO_QUERY_KEY]),
   };
 };

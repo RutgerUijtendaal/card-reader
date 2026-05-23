@@ -33,9 +33,11 @@ export const replaceGalleryPage = <TCard extends IdentifiableCard>(
 export const appendGalleryPage = <TCard extends IdentifiableCard>(
   current: GalleryPageState<TCard>,
   response: PaginatedCardsResponse<TCard>,
+  identity: ((card: TCard) => string) | null = null,
 ): GalleryPageState<TCard> => {
-  const seen = new Set(current.cards.map((card) => card.id));
-  const appended = response.results.filter((card) => !seen.has(card.id));
+  const readIdentity = identity ?? ((card: TCard) => card.id);
+  const seen = new Set(current.cards.map((card) => readIdentity(card)));
+  const appended = response.results.filter((card) => !seen.has(readIdentity(card)));
   return {
     cards: [...current.cards, ...appended],
     count: response.count,

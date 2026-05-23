@@ -127,3 +127,5 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     reset,
   };
 };
+
+export type ReturnTypeUseCardFilterState = ReturnType<typeof useCardFilterState>;

@@ -1,11 +1,9 @@
-import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from 'vue-router';
+import type { LocationQuery, RouteLocationRaw } from 'vue-router';
+import { addReturnToQuery, clearLocationQueryKeys, queryString } from '@/router/routeState';
 
 const DECK_RETURN_TO = 'deck';
 const DECK_RETURN_TO_QUERY_KEY = 'return_to';
 const DECK_ID_QUERY_KEY = 'deck_id';
-
-const queryString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim().length > 0 ? value : null;
 
 export const buildDeckCardDetailLocation = (
   cardId: string,
@@ -13,11 +11,9 @@ export const buildDeckCardDetailLocation = (
   query: LocationQuery,
 ): RouteLocationRaw => ({
   path: `/cards/${cardId}`,
-  query: {
-    ...query,
+  query: addReturnToQuery(query, DECK_RETURN_TO, {
     [DECK_ID_QUERY_KEY]: deckId,
-    [DECK_RETURN_TO_QUERY_KEY]: DECK_RETURN_TO,
-  },
+  }),
 });
 
 export const isDeckReturnQuery = (query: LocationQuery): boolean =>
@@ -25,11 +21,8 @@ export const isDeckReturnQuery = (query: LocationQuery): boolean =>
 
 export const buildDeckReturnLocation = (query: LocationQuery): RouteLocationRaw => {
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
-  const nextQuery: LocationQueryRaw = { ...query };
-  delete nextQuery[DECK_RETURN_TO_QUERY_KEY];
-  delete nextQuery[DECK_ID_QUERY_KEY];
   return {
     path: deckId ? `/decks/${deckId}` : '/decks',
-    query: nextQuery,
+    query: clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY]),
   };
 };

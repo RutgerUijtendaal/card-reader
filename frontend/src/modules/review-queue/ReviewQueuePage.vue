@@ -35,33 +35,27 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { api } from '@/api/client';
-import type { PaginatedCardsResponse } from '@/modules/card-detail/types';
+import { useCardCollection } from '@/modules/card-search/useCardCollection';
 
 type ReviewCard = { id: string; name: string; confidence: number };
-const cards = ref<ReviewCard[]>([]);
-const nextPage = ref<number | null>(1);
-
-const loadQueuePage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
-  const response = await api.get<PaginatedCardsResponse<ReviewCard>>('/cards', {
-    params: { max_confidence: 0.8, page, page_size: 100 },
-  });
-  cards.value = mode === 'replace' ? response.data.results : [...cards.value, ...response.data.results];
-  nextPage.value = response.data.next_page;
-};
-
-const loadQueue = async (): Promise<void> => {
-  await loadQueuePage(1, 'replace');
-};
+const filtersLoaded = ref(true);
+const collection = useCardCollection<ReviewCard>({
+  buildSearchParams: () => {
+    const params = new URLSearchParams();
+    params.set('max_confidence', '0.8');
+    return params;
+  },
+  filtersLoaded,
+  pageSize: 100,
+});
+const cards = collection.cards;
+const nextPage = collection.nextPage;
 
 const loadMore = async (): Promise<void> => {
-  if (nextPage.value === null) {
-    return;
-  }
-  await loadQueuePage(nextPage.value, 'append');
+  await collection.loadNextPage();
 };
 
 onMounted(() => {
-  void loadQueue();
+  void collection.searchCards();
 });
 </script>

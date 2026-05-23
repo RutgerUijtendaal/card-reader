@@ -12,13 +12,15 @@ type TestCard = {
   name: string;
 };
 
-const buildResponse = (overrides: Partial<PaginatedCardsResponse<TestCard>> = {}): PaginatedCardsResponse<TestCard> => ({
+const buildResponse = <TCard extends TestCard>(
+  overrides: Partial<PaginatedCardsResponse<TCard>> = {},
+): PaginatedCardsResponse<TCard> => ({
   count: 3,
   next_page: null,
   previous_page: null,
   page: 1,
   page_size: 2,
-  results: [],
+  results: [] as TCard[],
   ...overrides,
 });
 
@@ -64,6 +66,28 @@ describe('galleryState', () => {
 
     expect(next.cards.map((card) => card.id)).toEqual(['card-1', 'card-2', 'card-3']);
     expect(next.page).toBe(2);
+  });
+
+  test('supports custom identity keys when cards share ids across result types', () => {
+    type TypedCard = TestCard & { result_type: 'card' | 'card_group' };
+    const initial = replaceGalleryPage<TypedCard>(
+      buildResponse({
+        next_page: 2,
+        results: [{ id: 'same', name: 'Card', result_type: 'card' }],
+      }),
+    );
+
+    const next = appendGalleryPage(
+      initial,
+      buildResponse<TypedCard>({
+        page: 2,
+        previous_page: 1,
+        results: [{ id: 'same', name: 'Group', result_type: 'card_group' }],
+      }),
+      (card) => `${card.result_type}:${card.id}`,
+    );
+
+    expect(next.cards).toHaveLength(2);
   });
 
   test('resets to an empty state when filters restart the search', () => {

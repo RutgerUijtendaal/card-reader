@@ -72,13 +72,12 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { Database, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
-import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
-  buildSettingsQuery,
   parseSettingsTab,
   type SettingsTab,
 } from '@/modules/settings/settingsRouteState';
+import { useSettingsRouteSync } from '@/modules/settings/composables/useSettingsRouteSync';
 import MaintenanceSettingsView from './views/MaintenanceSettingsView.vue';
 import CatalogSettingsView from './views/CatalogSettingsView.vue';
 import CardGroupsSettingsView from './views/CardGroupsSettingsView.vue';
@@ -86,8 +85,7 @@ import TemplatesSettingsView from './views/TemplatesSettingsView.vue';
 import UsersSettingsView from './views/UsersSettingsView.vue';
 
 const auth = useAuthStore();
-const route = useRoute();
-const router = useRouter();
+const { route, replaceSettingsQuery } = useSettingsRouteSync();
 const activeTab = ref<SettingsTab>('catalog');
 
 const setActiveTab = (tab: SettingsTab, options: { syncRoute?: boolean } = {}): void => {
@@ -95,10 +93,7 @@ const setActiveTab = (tab: SettingsTab, options: { syncRoute?: boolean } = {}): 
   if (options.syncRoute === false) {
     return;
   }
-  void router.replace({
-    path: '/settings',
-    query: buildSettingsQuery(route.query, { tab }),
-  });
+  replaceSettingsQuery({ tab });
 };
 
 watch(
