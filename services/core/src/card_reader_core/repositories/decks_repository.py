@@ -118,7 +118,7 @@ def _deck_queryset() -> QuerySet[Deck]:
     )
 
 
-def _latest_version_metadata_prefetches(prefix: str) -> tuple[Prefetch, ...]:
+def _latest_version_metadata_prefetches(prefix: str) -> tuple[Prefetch[str], ...]:
     return (
         Prefetch(
             f"{prefix}__card_version_keywords",
