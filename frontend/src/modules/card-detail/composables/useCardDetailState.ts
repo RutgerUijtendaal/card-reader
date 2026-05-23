@@ -46,6 +46,7 @@ export const useCardDetailState = () => {
     attack: '',
     health: '',
     rules_text: '',
+    is_hero: false,
     keyword_ids: [],
     tag_ids: [],
     type_ids: [],
@@ -113,6 +114,7 @@ export const useCardDetailState = () => {
     form.attack = version.attack === null ? '' : String(version.attack);
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
+    form.is_hero = version.is_hero;
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
@@ -391,6 +393,10 @@ const buildManualUpdatePayload = (
     if (normalizeFormFieldValue(form, fieldName) !== normalizeFieldValue(version, fieldName)) {
       updates[fieldName === 'rules_text' ? 'rules_text_enriched' : fieldName] = form[fieldName];
     }
+  }
+
+  if (form.is_hero !== version.is_hero) {
+    updates.is_hero = form.is_hero;
   }
 
   if (!sameIds(form.keyword_ids, version.keyword_ids)) {

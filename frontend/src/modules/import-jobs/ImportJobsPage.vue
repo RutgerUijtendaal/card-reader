@@ -1,5 +1,5 @@
 <template>
-  <section class="grid gap-6 xl:h-[calc(100vh-4rem)] xl:grid-cols-[380px_minmax(0,1fr)] xl:items-start">
+  <section class="grid gap-6 xl:h-[calc(100vh-3rem)] xl:grid-cols-[380px_minmax(0,1fr)] xl:items-start">
     <div class="space-y-6 xl:sticky xl:top-0">
       <header class="page-card overflow-hidden">
         <div class="space-y-3">

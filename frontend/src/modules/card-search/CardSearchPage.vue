@@ -5,7 +5,7 @@
         <div class="space-y-2">
           <h2 class="theme-section-title flex items-center gap-2 text-xl font-semibold">
             <Images class="theme-section-muted h-5 w-5" />
-            <span>Card Gallery</span>
+            <span>Gallery</span>
           </h2>
           <p class="theme-section-muted text-sm">
             Filter the visible card pool by symbols, stats, and metadata.

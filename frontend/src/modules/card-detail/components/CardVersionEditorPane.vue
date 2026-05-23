@@ -81,6 +81,30 @@
           </p>
         </div>
 
+        <div class="theme-muted-panel p-3">
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <p class="theme-section-title text-sm font-semibold">
+                Hero Card
+              </p>
+              <p class="theme-section-muted text-xs">
+                Manual card-level deckbuilding flag.
+              </p>
+            </div>
+          </div>
+
+          <label class="theme-section-title flex items-center gap-3 text-sm font-semibold">
+            <input
+              :checked="form.is_hero"
+              type="checkbox"
+              class="theme-checkbox h-4 w-4"
+              :disabled="!version.editable || isBusy"
+              @change="$emit('update-hero', ($event.target as HTMLInputElement).checked)"
+            >
+            <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
+          </label>
+        </div>
+
         <div
           v-for="group in metadataGroups"
           :key="group.name"
@@ -239,5 +263,6 @@ defineEmits<{
   (e: 'toggle-group', groupName: MetadataGroupName, optionId: string, checked: boolean): void;
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
+  (e: 'update-hero', value: boolean): void;
 }>();
 </script>

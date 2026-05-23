@@ -143,6 +143,7 @@ export type EditorForm = {
   attack: string;
   health: string;
   rules_text: string;
+  is_hero: boolean;
   keyword_ids: string[];
   tag_ids: string[];
   type_ids: string[];

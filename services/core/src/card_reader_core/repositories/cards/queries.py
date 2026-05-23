@@ -45,6 +45,7 @@ def list_cards(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
+    is_hero: bool | None = None,
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -75,6 +76,7 @@ def list_cards(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
+        is_hero=is_hero,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -122,6 +124,7 @@ def list_matching_cards(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
+    is_hero: bool | None = None,
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -148,6 +151,7 @@ def list_matching_cards(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
+        is_hero=is_hero,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -227,6 +231,8 @@ def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> Qu
         queryset = queryset.filter(mana_value__isnull=False, mana_value__lte=filters["mana_cost_max"])
     if filters["template_id"]:
         queryset = queryset.filter(template__key=filters["template_id"])
+    if filters["is_hero"] is not None:
+        queryset = queryset.filter(card__is_hero=filters["is_hero"])
     if filters["attack_min"] is not None:
         queryset = queryset.filter(attack__isnull=False, attack__gte=filters["attack_min"])
     if filters["attack_max"] is not None:
@@ -284,6 +290,7 @@ def _build_filtered_versions_queryset(
     mana_cost_min: int | None,
     mana_cost_max: int | None,
     template_id: str | None,
+    is_hero: bool | None,
     attack_min: int | None,
     attack_max: int | None,
     health_min: int | None,
@@ -320,6 +327,7 @@ def _build_filtered_versions_queryset(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
+        is_hero=is_hero,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,

@@ -213,6 +213,8 @@ def update_latest_card_version(
             )
             field_sources["metadata"]["symbols"] = FIELD_SOURCE_MANUAL
             symbol_links_changed = True
+        if "is_hero" in updates:
+            card.is_hero = bool(updates["is_hero"])
 
         if symbol_links_changed:
             apply_manual_rule_text(version, version.rules_text_enriched)
@@ -220,8 +222,14 @@ def update_latest_card_version(
         if restored_name or "name" in updates:
             card.label = version.name
             card.key = normalize_slug_key(version.name)
+        if restored_name or "name" in updates or "is_hero" in updates:
             card.updated_at = now_utc()
-            card.save(update_fields=["label", "key", "updated_at"])
+            update_fields = ["updated_at"]
+            if restored_name or "name" in updates:
+                update_fields = ["label", "key", *update_fields]
+            if "is_hero" in updates:
+                update_fields = ["is_hero", *update_fields]
+            card.save(update_fields=list(dict.fromkeys(update_fields)))
 
         version.mana_value = infer_mana_value(
             mana_cost=version.mana_cost,

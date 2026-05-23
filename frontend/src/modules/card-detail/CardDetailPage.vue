@@ -116,6 +116,7 @@
           @toggle-group="toggleMetadataSelection"
           @update-group-search="setMetadataSearch"
           @update-field="updateField"
+          @update-hero="updateHero"
         />
       </div>
     </div>
@@ -186,6 +187,10 @@ const {
 
 const updateField = (fieldName: ScalarFieldName, value: string): void => {
   form[fieldName] = value;
+};
+
+const updateHero = (value: boolean): void => {
+  form.is_hero = value;
 };
 
 onMounted(loadCard);

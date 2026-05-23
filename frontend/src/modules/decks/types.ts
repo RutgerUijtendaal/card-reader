@@ -1,0 +1,45 @@
+export type DeckCardSummary = {
+  id: string;
+  key: string;
+  label: string;
+  name: string;
+  is_hero: boolean;
+  image_url: string | null;
+};
+
+export type DeckEntrySummary = {
+  quantity: number;
+  card: DeckCardSummary;
+};
+
+export type DeckRecord = {
+  id: string;
+  name: string;
+  description: string | null;
+  is_public: boolean;
+  owner: {
+    id: string;
+    username: string;
+  };
+  hero_card: DeckCardSummary;
+  mainboard: {
+    total_cards: number;
+    unique_cards: number;
+    entries: DeckEntrySummary[];
+  };
+  created_at: string;
+  updated_at: string;
+};
+
+export type DeckEntryInput = {
+  card_id: string;
+  quantity: number;
+};
+
+export type DeckUpsertRequest = {
+  name: string;
+  description: string | null;
+  is_public: boolean;
+  hero_card_id: string;
+  entries: DeckEntryInput[];
+};
