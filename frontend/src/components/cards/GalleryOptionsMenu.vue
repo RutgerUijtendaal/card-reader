@@ -35,7 +35,10 @@
             >
           </label>
 
-          <label class="flex items-start justify-between gap-3">
+          <label
+            v-if="showCardGroupsControl"
+            class="flex items-start justify-between gap-3"
+          >
             <div>
               <p class="theme-section-title text-sm font-semibold">
                 Card Groups
@@ -87,11 +90,17 @@ import { computed } from 'vue';
 import { SlidersHorizontal } from 'lucide-vue-next';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
 
-const props = defineProps<{
-  tooltipEnabled: boolean;
-  cardScale: number;
-  showCardGroups: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    tooltipEnabled: boolean;
+    cardScale: number;
+    showCardGroups: boolean;
+    showCardGroupsControl?: boolean;
+  }>(),
+  {
+    showCardGroupsControl: true,
+  },
+);
 
 defineEmits<{
   (e: 'update:tooltipEnabled', value: boolean): void;

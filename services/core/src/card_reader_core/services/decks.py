@@ -30,21 +30,40 @@ class DeckEntryInput:
     quantity: int
 
 
+@dataclass(frozen=True)
+class DeckValidationSummary:
+    is_valid: bool
+    status_label: str
+    total_cards: int
+    unique_cards: int
+    issues: list[str]
+
+
 class DeckService:
     def list_public_decks(self) -> list[Deck]:
-        return cast(list[Deck], list_public_decks())
+        return [deck for deck in cast(list[Deck], list_public_decks()) if self.get_deck_validation(deck).is_valid]
 
     def list_owner_decks(self, owner_id: str) -> list[Deck]:
         return cast(list[Deck], list_owner_decks(owner_id))
 
     def get_public_deck(self, deck_id: str) -> Deck | None:
-        return cast(Deck | None, get_public_deck(deck_id))
+        deck = cast(Deck | None, get_public_deck(deck_id))
+        if deck is None or not self.get_deck_validation(deck).is_valid:
+            return None
+        return deck
 
     def get_owner_deck(self, deck_id: str, owner_id: str) -> Deck | None:
         return cast(Deck | None, get_owner_deck(deck_id, owner_id))
 
     def get_deck_for_viewer(self, deck_id: str, *, viewer_id: str | None) -> Deck | None:
-        return cast(Deck | None, get_deck_for_viewer(deck_id, viewer_id=viewer_id))
+        deck = cast(Deck | None, get_deck_for_viewer(deck_id, viewer_id=viewer_id))
+        if deck is None:
+            return None
+        if viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id:
+            return deck
+        if not deck.is_public:
+            return None
+        return deck if self.get_deck_validation(deck).is_valid else None
 
     @transaction.atomic
     def create_owner_deck(
@@ -112,6 +131,39 @@ class DeckService:
     def delete_owner_deck(self, *, deck_id: str, owner_id: str) -> bool:
         return cast(bool, delete_deck(deck_id=deck_id, owner_id=owner_id))
 
+    def get_deck_validation(self, deck: Deck) -> DeckValidationSummary:
+        entries = list(cast(Any, deck).entries.all())
+        issues: list[str] = []
+        total_cards = 0
+
+        if not deck.hero_card.is_hero:
+            issues.append("Hero card must be marked as a hero.")
+
+        for entry in entries:
+            quantity = int(entry.quantity)
+            total_cards += quantity
+            if quantity < 1 or quantity > MAX_DECK_COPIES:
+                issues.append(f"Each mainboard card quantity must be between 1 and {MAX_DECK_COPIES}.")
+                break
+            if entry.card.is_hero:
+                issues.append("Hero cards cannot appear in mainboard entries.")
+                break
+            if entry.card.id == deck.hero_card.id:
+                issues.append("Hero card cannot also appear in the mainboard.")
+                break
+
+        if total_cards != MAINBOARD_CARD_COUNT:
+            issues.append(f"Deck must contain exactly {MAINBOARD_CARD_COUNT} mainboard cards.")
+
+        is_valid = len(issues) == 0
+        return DeckValidationSummary(
+            is_valid=is_valid,
+            status_label="Ready" if is_valid else "In Progress",
+            total_cards=total_cards,
+            unique_cards=len(entries),
+            issues=issues,
+        )
+
     def _normalize_deck_payload(
         self,
         *,
@@ -123,9 +175,6 @@ class DeckService:
             raise ValueError("Hero card not found.")
         if not hero_card.is_hero:
             raise ValueError("Hero card must be marked as a hero.")
-
-        if not entries:
-            raise ValueError("Deck must contain 60 mainboard cards.")
 
         ordered_entry_ids = [entry.card_id.strip() for entry in entries if entry.card_id.strip()]
         if len(ordered_entry_ids) != len(entries):
@@ -139,7 +188,6 @@ class DeckService:
             raise ValueError("One or more selected mainboard cards do not exist.")
 
         normalized_entries: list[tuple[str, int]] = []
-        total_quantity = 0
         for entry in entries:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
@@ -151,10 +199,6 @@ class DeckService:
             if card.id == hero_card.id:
                 raise ValueError("Hero card cannot also appear in the mainboard.")
             normalized_entries.append((card.id, quantity))
-            total_quantity += quantity
-
-        if total_quantity != MAINBOARD_CARD_COUNT:
-            raise ValueError(f"Deck must contain exactly {MAINBOARD_CARD_COUNT} mainboard cards.")
 
         return hero_card, normalized_entries
 

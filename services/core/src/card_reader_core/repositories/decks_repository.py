@@ -15,7 +15,7 @@ def get_cards_by_ids(card_ids: list[str]) -> dict[str, Card]:
             "latest_version",
             "latest_version__template",
             "latest_version__previous_version",
-        )
+        ).prefetch_related("latest_version__card_version_types__type")
     }
 
 
@@ -23,6 +23,7 @@ def get_deck_card(card_id: str) -> Card | None:
     return (
         Card.objects.filter(id=card_id)
         .select_related("latest_version", "latest_version__template", "latest_version__previous_version")
+        .prefetch_related("latest_version__card_version_types__type")
         .first()
     )
 
@@ -95,6 +96,7 @@ def _deck_queryset() -> QuerySet[Deck]:
         "hero_card__latest_version__template",
         "hero_card__latest_version__previous_version",
     ).prefetch_related(
+        "hero_card__latest_version__card_version_types__type",
         Prefetch(
             "entries",
             queryset=DeckEntry.objects.select_related(
@@ -102,6 +104,6 @@ def _deck_queryset() -> QuerySet[Deck]:
                 "card__latest_version",
                 "card__latest_version__template",
                 "card__latest_version__previous_version",
-            ).order_by("card__label", "created_at"),
+            ).prefetch_related("card__latest_version__card_version_types__type").order_by("card__label", "created_at"),
         )
     )

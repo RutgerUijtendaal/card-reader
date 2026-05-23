@@ -6,7 +6,7 @@ from itertools import count
 from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 
-from card_reader_core.models import Card, CardVersion, Deck, ParseResult, Template
+from card_reader_core.models import Card, CardVersion, CardVersionType, Deck, ParseResult, Template, Type
 from card_reader_core.services.decks import DeckEntryInput, DeckService
 
 _CARD_NAME_COUNTER = count()
@@ -56,7 +56,7 @@ def _login_and_get_csrf_token(client: Client, username: str, password: str) -> s
     return csrf_token
 
 
-def _create_card(*, name: str, is_hero: bool) -> Card:
+def _create_card(*, name: str, is_hero: bool, type_labels: list[str] | None = None) -> Card:
     template = _ensure_template()
     unique_name = f"{name} {next(_CARD_NAME_COUNTER)}"
     card = Card.objects.create(
@@ -112,6 +112,13 @@ def _create_card(*, name: str, is_hero: bool) -> Card:
         normalized_fields_json={},
         confidence_json={},
     )
+    for type_label in type_labels or []:
+        type_key = type_label.lower().replace(" ", "-")
+        type_row, _created = Type.objects.get_or_create(
+            key=type_key,
+            defaults={"label": type_label, "identifiers_json": []},
+        )
+        CardVersionType.objects.create(card_version=version, type=type_row)
     card.latest_version = version
     card.save(update_fields=["latest_version"])
     return card
@@ -153,6 +160,48 @@ def test_public_deck_list_excludes_private_decks() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert [row["id"] for row in payload] == [public_deck.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_excludes_invalid_public_decks() -> None:
+    owner = _create_user("deck-invalid-public-owner", "password")
+    hero = _create_card(name="Draft Hero", is_hero=True)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Draft Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks")
+
+    assert response.status_code == 200
+    assert deck.id not in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_payload_includes_card_types() -> None:
+    owner = _create_user("deck-types-owner", "password")
+    hero = _create_card(name="Typed Hero", is_hero=True, type_labels=["Hero", "Mage"])
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Typed Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
+
+    assert response.status_code == 200
+    assert [(row["key"], row["label"]) for row in response.json()["hero_card"]["types"]] == [
+        ("hero", "Hero"),
+        ("mage", "Mage"),
+    ]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -224,6 +273,7 @@ def test_authenticated_owner_can_crud_decks() -> None:
     assert patch_response.status_code == 200
     assert patch_response.json()["name"] == "Owner Deck Updated"
     assert patch_response.json()["is_public"] is False
+    assert patch_response.json()["status"]["is_valid"] is True
     assert delete_response.status_code == 204
     assert Deck.objects.filter(id=deck_id).count() == 0
 
@@ -303,7 +353,7 @@ def test_deck_create_rejects_non_hero_card_as_hero() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_deck_create_rejects_wrong_mainboard_count() -> None:
+def test_deck_create_allows_in_progress_drafts() -> None:
     username = "deck-invalid-count-user"
     password = "password"
     _create_user(username, password)
@@ -315,9 +365,9 @@ def test_deck_create_rejects_wrong_mainboard_count() -> None:
     response = client.post(
         "/my/decks",
         data={
-            "name": "Invalid Count Deck",
+            "name": "Draft Deck",
             "description": None,
-            "is_public": False,
+            "is_public": True,
             "hero_card_id": hero.id,
             "entries": [{"card_id": card.id, "quantity": 3} for card in mainboard_cards],
         },
@@ -325,8 +375,10 @@ def test_deck_create_rejects_wrong_mainboard_count() -> None:
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Deck must contain exactly 60 mainboard cards."
+    assert response.status_code == 201
+    assert response.json()["status"]["is_valid"] is False
+    assert response.json()["status"]["label"] == "In Progress"
+    assert response.json()["status"]["issues"] == ["Deck must contain exactly 60 mainboard cards."]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

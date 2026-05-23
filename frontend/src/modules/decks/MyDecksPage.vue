@@ -69,11 +69,28 @@
                 {{ deck.is_public ? 'Public' : 'Private' }}
               </span>
             </div>
-            <p class="theme-section-muted text-sm">
+            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              <span class="theme-section-muted">
+                <span class="theme-section-title font-medium">Cards</span>
+                {{ deck.mainboard.total_cards }} / 60
+              </span>
+              <span class="theme-section-muted">
+                <span class="theme-section-title font-medium">Unique</span>
+                {{ deck.mainboard.unique_cards }}
+              </span>
+              <span class="theme-section-muted">
+                <span class="theme-section-title font-medium">Status</span>
+                {{ deck.status.label }}
+              </span>
+            </div>
+            <p class="theme-section-muted mt-1 text-sm">
               Hero: {{ deck.hero_card.name }}
             </p>
-            <p class="theme-section-muted text-sm">
-              {{ deck.mainboard.total_cards }} cards / {{ deck.mainboard.unique_cards }} unique
+            <p
+              v-if="deck.status.issues.length > 0"
+              class="theme-section-muted mt-1 text-sm"
+            >
+              {{ deck.status.issues[0] }}
             </p>
             <p
               v-if="deck.description"

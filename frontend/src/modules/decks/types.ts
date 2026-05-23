@@ -1,8 +1,16 @@
+export type DeckMetadataOption = {
+  id: string;
+  key: string;
+  label: string;
+};
+
 export type DeckCardSummary = {
   id: string;
   key: string;
   label: string;
   name: string;
+  mana_cost: string;
+  types: DeckMetadataOption[];
   is_hero: boolean;
   image_url: string | null;
 };
@@ -26,6 +34,11 @@ export type DeckRecord = {
     total_cards: number;
     unique_cards: number;
     entries: DeckEntrySummary[];
+  };
+  status: {
+    is_valid: boolean;
+    label: string;
+    issues: string[];
   };
   created_at: string;
   updated_at: string;
