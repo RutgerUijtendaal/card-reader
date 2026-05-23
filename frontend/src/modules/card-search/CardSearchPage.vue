@@ -80,45 +80,33 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn, useIntersectionObserver, useScroll } from '@vueuse/core';
+import { useDebounceFn, useScroll } from '@vueuse/core';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Download, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
-import { api } from '@/api/client';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { useScrollContainer } from '@/composables/useScrollContainer';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import type {
-  CardFiltersResponse,
-  GalleryItem,
-  PaginatedCardsResponse,
-} from '@/modules/card-detail/types';
+import type { GalleryItem } from '@/modules/card-detail/types';
 import {
   buildCardFilterApiSearchParams,
   buildCardFilterRouteQuery,
-  createCardFilterCatalog,
   createEmptyCardFilterState,
   getCardFilterSignature,
   parseCardFilterRouteQuery,
   sameCardFilterState,
 } from '@/modules/card-filters/cardFilterState';
-import { useCardFilterState } from '@/modules/card-filters/useCardFilterState';
-import {
-  appendGalleryPage,
-  createEmptyGalleryPageState,
-  isLatestGalleryRequest,
-  replaceGalleryPage,
-} from '@/modules/card-search/galleryState';
+import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
 import {
   getGallerySnapshot,
   saveGallerySnapshot,
   setGalleryNavigationCards,
 } from '@/modules/card-search/galleryNavigation';
-import type { CardFilterSectionsState, MatchMode } from '@/modules/card-search/cardFilterSectionsState';
 import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
 import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
+import { useCardCollection } from '@/modules/card-search/useCardCollection';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 
 const route = useRoute();
@@ -127,234 +115,49 @@ const auth = useAuthStore();
 const scrollContainer = useScrollContainer();
 const { y: scrollTopRef } = useScroll(scrollContainer);
 
-const filters = ref<CardFiltersResponse>({
-  keywords: [],
-  tags: [],
-  symbols: [],
-  types: [],
-});
-const filterCatalog = computed(() => createCardFilterCatalog(filters.value));
+const filterController = useCardFilterController();
 const {
   query,
-  keywordMatch,
-  tagMatch,
-  typeMatch,
-  manaCostMin,
-  manaCostMax,
-  manaSymbolMatch,
-  affinitySymbolMatch,
-  devotionSymbolMatch,
-  otherSymbolMatch,
-  attackMin,
-  attackMax,
-  healthMin,
-  healthMax,
-  keywordIds: selectedKeywordIds,
-  tagIds: selectedTagIds,
-  manaTypeSymbolIds: selectedManaTypeSymbolIds,
-  affinitySymbolIds: selectedAffinitySymbolIds,
-  devotionSymbolIds: selectedDevotionSymbolIds,
-  otherSymbolIds: selectedOtherSymbolIds,
-  typeIds: selectedTypeIds,
+  filterSectionsState,
+  filtersLoaded,
   selectionState,
-  applyFilterState,
   readFilterState,
-  reset: resetCardFilterState,
-} = useCardFilterState(filterCatalog);
-const galleryState = ref(createEmptyGalleryPageState<GalleryItem>());
-const cards = computed(() => galleryState.value.cards);
-const totalCount = computed(() => galleryState.value.count);
-const nextPage = computed(() => galleryState.value.nextPage);
+  applyRouteFilterState,
+  resetFilters: resetCardFilterState,
+  updateQuery,
+  loadFilters,
+} = filterController;
 const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.query));
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
-const filtersLoaded = ref(false);
-const isLoadingInitial = ref(false);
-const isLoadingPage = ref(false);
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
-let latestSearchRequestId = 0;
 const { exportCardsCsv } = useCsvExport();
 const { tooltipEnabled, cardScale, showCardGroups } = useGalleryOptions();
-const manaTypeOptions = computed(() => filterCatalog.value.manaSymbols);
-const affinityTypeOptions = computed(() => filterCatalog.value.affinitySymbols);
-const devotionTypeOptions = computed(() => filterCatalog.value.devotionSymbols);
-const otherSymbolOptions = computed(() => filterCatalog.value.otherSymbols);
+const collection = useCardCollection<GalleryItem>({
+  buildSearchParams: () => {
+    const params = buildCardFilterApiSearchParams(selectionState.value);
+    if (showCardGroups.value) {
+      params.set('show_groups', 'true');
+    }
+    return params;
+  },
+  filtersLoaded,
+  pageSize: 72,
+  identity: (card) => `${card.result_type}:${card.id}`,
+});
+const cards = collection.cards;
+const totalCount = collection.totalCount;
+const nextPage = collection.nextPage;
+const isLoadingInitial = collection.isLoadingInitial;
+const isLoadingPage = collection.isLoadingPage;
 const cardHeightRem = computed(() => Number((27 * cardScale.value).toFixed(2)));
 const galleryGridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(290 * cardScale.value)}px, 1fr))`,
 }));
-const updateQuery = (value: string): void => {
-  query.value = value;
-};
-
-const updateArrayRef =
-  (target: { value: string[] }) =>
-  (value: string[]): void => {
-    target.value = value;
-  };
-
-const updateStringRef =
-  (target: { value: string }) =>
-  (value: string): void => {
-    target.value = value;
-  };
-
-const updateMatchModeRef =
-  (target: { value: MatchMode }) =>
-  (value: MatchMode): void => {
-    target.value = value;
-  };
-
-const filterSectionsState = computed<CardFilterSectionsState>(() => ({
-  selectedManaTypeSymbolIds: selectedManaTypeSymbolIds.value,
-  onUpdateSelectedManaTypeSymbolIds: updateArrayRef(selectedManaTypeSymbolIds),
-  manaSymbolMatch: manaSymbolMatch.value,
-  onUpdateManaSymbolMatch: updateMatchModeRef(manaSymbolMatch),
-  manaTypeOptions: manaTypeOptions.value,
-  manaCostMin: manaCostMin.value,
-  onUpdateManaCostMin: updateStringRef(manaCostMin),
-  manaCostMax: manaCostMax.value,
-  onUpdateManaCostMax: updateStringRef(manaCostMax),
-  resetManaGroup,
-  selectedTypeIds: selectedTypeIds.value,
-  onUpdateSelectedTypeIds: updateArrayRef(selectedTypeIds),
-  typeMatch: typeMatch.value,
-  onUpdateTypeMatch: updateMatchModeRef(typeMatch),
-  typeOptions: filters.value.types,
-  resetTypeGroup,
-  selectedAffinitySymbolIds: selectedAffinitySymbolIds.value,
-  onUpdateSelectedAffinitySymbolIds: updateArrayRef(selectedAffinitySymbolIds),
-  affinitySymbolMatch: affinitySymbolMatch.value,
-  onUpdateAffinitySymbolMatch: updateMatchModeRef(affinitySymbolMatch),
-  affinityTypeOptions: affinityTypeOptions.value,
-  resetAffinityGroup,
-  selectedDevotionSymbolIds: selectedDevotionSymbolIds.value,
-  onUpdateSelectedDevotionSymbolIds: updateArrayRef(selectedDevotionSymbolIds),
-  devotionSymbolMatch: devotionSymbolMatch.value,
-  onUpdateDevotionSymbolMatch: updateMatchModeRef(devotionSymbolMatch),
-  devotionTypeOptions: devotionTypeOptions.value,
-  resetDevotionGroup,
-  selectedOtherSymbolIds: selectedOtherSymbolIds.value,
-  onUpdateSelectedOtherSymbolIds: updateArrayRef(selectedOtherSymbolIds),
-  otherSymbolMatch: otherSymbolMatch.value,
-  onUpdateOtherSymbolMatch: updateMatchModeRef(otherSymbolMatch),
-  otherSymbolOptions: otherSymbolOptions.value,
-  resetGenericGroup,
-  attackMin: attackMin.value,
-  onUpdateAttackMin: updateStringRef(attackMin),
-  attackMax: attackMax.value,
-  onUpdateAttackMax: updateStringRef(attackMax),
-  healthMin: healthMin.value,
-  onUpdateHealthMin: updateStringRef(healthMin),
-  healthMax: healthMax.value,
-  onUpdateHealthMax: updateStringRef(healthMax),
-  selectedKeywordIds: selectedKeywordIds.value,
-  onUpdateSelectedKeywordIds: updateArrayRef(selectedKeywordIds),
-  keywordMatch: keywordMatch.value,
-  onUpdateKeywordMatch: updateMatchModeRef(keywordMatch),
-  keywordOptions: filters.value.keywords,
-  resetKeywordGroup,
-  selectedTagIds: selectedTagIds.value,
-  onUpdateSelectedTagIds: updateArrayRef(selectedTagIds),
-  tagMatch: tagMatch.value,
-  onUpdateTagMatch: updateMatchModeRef(tagMatch),
-  tagOptions: filters.value.tags,
-  resetTagGroup,
-}));
-
-const resetManaGroup = (): void => {
-  selectedManaTypeSymbolIds.value = [];
-  manaSymbolMatch.value = 'any';
-  manaCostMin.value = '';
-  manaCostMax.value = '';
-};
-
-const resetAffinityGroup = (): void => {
-  selectedAffinitySymbolIds.value = [];
-  affinitySymbolMatch.value = 'any';
-};
-
-const resetDevotionGroup = (): void => {
-  selectedDevotionSymbolIds.value = [];
-  devotionSymbolMatch.value = 'any';
-};
-
-const resetGenericGroup = (): void => {
-  selectedOtherSymbolIds.value = [];
-  otherSymbolMatch.value = 'any';
-  attackMin.value = '';
-  attackMax.value = '';
-  healthMin.value = '';
-  healthMax.value = '';
-};
-
-const resetKeywordGroup = (): void => {
-  selectedKeywordIds.value = [];
-  keywordMatch.value = 'any';
-};
-
-const resetTagGroup = (): void => {
-  selectedTagIds.value = [];
-  tagMatch.value = 'any';
-};
-
-const resetTypeGroup = (): void => {
-  selectedTypeIds.value = [];
-  typeMatch.value = 'any';
-};
-
-const loadFilters = async (): Promise<void> => {
-  const response = await api.get<CardFiltersResponse>('/cards/filters');
-  filters.value = response.data;
-  filtersLoaded.value = true;
-};
 
 const restoreScroll = (value: number): void => {
   window.requestAnimationFrame(() => {
     scrollTopRef.value = value;
   });
-};
-
-const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
-  const requestId = ++latestSearchRequestId;
-  const params = buildCardFilterApiSearchParams(selectionState.value);
-  if (showCardGroups.value) {
-    params.set('show_groups', 'true');
-  }
-  params.set('page', String(page));
-  params.set('page_size', '72');
-  if (mode === 'replace') {
-    isLoadingInitial.value = true;
-  } else {
-    isLoadingPage.value = true;
-  }
-
-  try {
-    const response = await api.get<PaginatedCardsResponse<GalleryItem>>(`/cards?${params.toString()}`);
-    if (!isLatestGalleryRequest(requestId, latestSearchRequestId)) {
-      return;
-    }
-    galleryState.value =
-      mode === 'replace'
-        ? replaceGalleryPage(response.data)
-        : appendGalleryPage(galleryState.value, response.data);
-  } finally {
-    if (isLatestGalleryRequest(requestId, latestSearchRequestId)) {
-      isLoadingInitial.value = false;
-      isLoadingPage.value = false;
-    }
-  }
-};
-
-const searchCards = async (): Promise<void> => {
-  galleryState.value = createEmptyGalleryPageState<GalleryItem>();
-  await loadCardsPage(1, 'replace');
-};
-
-const loadNextPage = async (): Promise<void> => {
-  if (isLoadingInitial.value || isLoadingPage.value || nextPage.value === null) {
-    return;
-  }
-  await loadCardsPage(nextPage.value, 'append');
 };
 
 const exportCsv = async (): Promise<void> => {
@@ -395,14 +198,12 @@ watch(
   { deep: true },
 );
 
-useIntersectionObserver(
+watch(
   loadMoreSentinelRef,
-  (entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) {
-      void loadNextPage();
-    }
+  (element) => {
+    collection.setLoadMoreSentinel(element);
   },
-  { rootMargin: '400px 0px' },
+  { immediate: true },
 );
 
 watch(
@@ -410,7 +211,7 @@ watch(
     cards: cards.value.map((card) => ({ id: card.id, result_type: card.result_type })),
     totalCount: totalCount.value,
     nextPage: nextPage.value,
-    pageSize: galleryState.value.pageSize,
+    pageSize: collection.galleryState.value.pageSize,
     searchParams: galleryNavigationSearchParams.value,
   }),
   ({ cards, totalCount, nextPage, pageSize, searchParams }) => {
@@ -428,12 +229,12 @@ watch(
 
     const routeState = currentRouteFilterState.value;
     if (!sameCardFilterState(readFilterState(), routeState)) {
-      applyFilterState(routeState);
+      applyRouteFilterState(routeState);
     }
 
     const snapshot = getGallerySnapshot<GalleryItem>(searchParams);
     if (snapshot) {
-      galleryState.value = snapshot.pageState;
+      collection.galleryState.value = snapshot.pageState;
       isLoadingInitial.value = false;
       isLoadingPage.value = false;
       saveGallerySnapshot(searchParams, snapshot.pageState, snapshot.scrollTop);
@@ -443,8 +244,8 @@ watch(
     }
 
     scrollTopRef.value = 0;
-    await searchCards();
-    saveGallerySnapshot(searchParams, galleryState.value, scrollTopRef.value);
+    await collection.searchCards();
+    saveGallerySnapshot(searchParams, collection.galleryState.value, scrollTopRef.value);
   },
   { immediate: true },
 );
@@ -455,7 +256,7 @@ const resetFilters = (): void => {
 };
 
 onBeforeRouteLeave(() => {
-  saveGallerySnapshot(galleryRequestSignature.value, galleryState.value, scrollTopRef.value);
+  saveGallerySnapshot(galleryRequestSignature.value, collection.galleryState.value, scrollTopRef.value);
 });
 
 onMounted(() => {

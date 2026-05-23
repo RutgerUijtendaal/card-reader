@@ -258,225 +258,34 @@
 </template>
 
 <script setup lang="ts">
-import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
-import { computed, onMounted, ref, watch } from 'vue';
-import { api } from '@/api/client';
-import { fetchTemplates } from '@/modules/settings/api/templates';
-import type { TemplateRecord } from '@/modules/settings/types';
+import { useImportJobsController } from '@/modules/import-jobs/composables/useImportJobsController';
 
-type ImportJobStatus = 'queued' | 'running' | 'canceling' | 'cancelled' | 'completed' | 'failed';
-
-type ImportJob = {
-  id: string;
-  source_path: string;
-  template_id: string;
-  status: ImportJobStatus;
-  total_items: number;
-  processed_items: number;
-  created_at: string;
-  updated_at: string;
-};
-
-const pickerTemplateId = ref('mtg-like-v1');
-const pickerMode = ref<'single' | 'directory'>('single');
-const pickedFiles = ref<File[]>([]);
-const errorMessage = ref('');
-const jobs = ref<ImportJob[]>([]);
-const isRefreshing = ref(false);
-const creatingJob = ref(false);
-const cancellingJobIds = ref<Set<string>>(new Set());
-const lastRefreshedAt = ref<string | null>(null);
-const templates = ref<TemplateRecord[]>([]);
-const documentVisibility = useDocumentVisibility();
-
-const queuedCount = computed(() => jobs.value.filter((job) => job.status === 'queued').length);
-const runningCount = computed(() => jobs.value.filter((job) => job.status === 'running').length);
-const cancelingCount = computed(() => jobs.value.filter((job) => job.status === 'canceling').length);
-const completedCount = computed(() => jobs.value.filter((job) => job.status === 'completed').length);
-const failedCount = computed(() => jobs.value.filter((job) => job.status === 'failed').length);
-const cancelledCount = computed(() => jobs.value.filter((job) => job.status === 'cancelled').length);
-
-const loadJobs = async (): Promise<void> => {
-  isRefreshing.value = true;
-  try {
-    const response = await api.get<ImportJob[]>('/imports');
-    jobs.value = response.data;
-    lastRefreshedAt.value = new Date().toLocaleTimeString();
-  } finally {
-    isRefreshing.value = false;
-  }
-};
-
-const createJobFromPicker = async (): Promise<void> => {
-  errorMessage.value = '';
-  if (pickedFiles.value.length === 0) {
-    errorMessage.value = 'Please select at least one file.';
-    return;
-  }
-
-  creatingJob.value = true;
-  const formData = new FormData();
-  formData.append('template_id', pickerTemplateId.value);
-  formData.append('options_json', JSON.stringify({}));
-  pickedFiles.value.forEach((file) => formData.append('files', file));
-
-  try {
-    await api.post('/imports/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    pickedFiles.value = [];
-  } catch (error) {
-    console.error('Create import from upload failed', error);
-    errorMessage.value = extractError(error);
-    return;
-  } finally {
-    creatingJob.value = false;
-  }
-
-  try {
-    await loadJobs();
-  } catch (error) {
-    console.error('Refresh imports after upload create failed', error);
-    errorMessage.value = 'Import was created, but refreshing the jobs list failed.';
-  }
-};
-
-const cancelJob = async (jobId: string): Promise<void> => {
-  const next = new Set(cancellingJobIds.value);
-  if (next.has(jobId)) return;
-  next.add(jobId);
-  cancellingJobIds.value = next;
-  errorMessage.value = '';
-
-  try {
-    await api.post(`/imports/${jobId}/cancel`);
-    await loadJobs();
-  } catch (error) {
-    console.error('Cancel import job failed', error);
-    errorMessage.value = extractError(error);
-  } finally {
-    const done = new Set(cancellingJobIds.value);
-    done.delete(jobId);
-    cancellingJobIds.value = done;
-  }
-};
-
-const loadTemplates = async (): Promise<void> => {
-  templates.value = await fetchTemplates();
-  if (templates.value.length === 0) {
-    pickerTemplateId.value = '';
-    return;
-  }
-  const stillExists = templates.value.some((item) => item.key === pickerTemplateId.value);
-  if (!stillExists) {
-    pickerTemplateId.value = templates.value[0].key;
-  }
-};
-
-const onSingleFileSelected = (event: Event): void => {
-  const input = event.target as HTMLInputElement;
-  pickedFiles.value = input.files ? Array.from(input.files).slice(0, 1) : [];
-};
-
-const onDirectorySelected = (event: Event): void => {
-  const input = event.target as HTMLInputElement;
-  pickedFiles.value = input.files ? Array.from(input.files) : [];
-};
-
-const canCancel = (job: ImportJob): boolean => job.status === 'queued' || job.status === 'running';
-
-const hasActiveJobs = computed<boolean>(() =>
-  jobs.value.some((job) => job.status === 'queued' || job.status === 'running' || job.status === 'canceling'));
-
-const progressPercent = (job: ImportJob): number => {
-  if (job.total_items <= 0) return 0;
-  return Math.max(0, Math.min(100, Math.round((job.processed_items / job.total_items) * 100)));
-};
-
-const statusClass = (status: ImportJobStatus): string => {
-  if (status === 'queued') return 'theme-pill-neutral';
-  if (status === 'running') return 'theme-pill-warning';
-  if (status === 'canceling') return 'theme-pill-warning';
-  if (status === 'cancelled') return 'theme-pill-neutral';
-  if (status === 'completed') return 'theme-pill-success';
-  return 'theme-pill-danger';
-};
-
-const progressClass = (status: ImportJobStatus): string => {
-  if (status === 'failed') return 'bg-rose-500';
-  if (status === 'cancelled' || status === 'canceling') return 'bg-amber-500';
-  if (status === 'completed') return 'bg-emerald-500';
-  return 'bg-slate-500';
-};
-
-const formatTimestamp = (value: string): string => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-};
-
-const extractError = (error: unknown): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown }; status?: number } })
-      .response;
-    const detail = maybeResponse?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) {
-      return detail;
-    }
-    if (Array.isArray(detail)) {
-      return detail
-        .map((entry) => {
-          if (typeof entry === 'string') return entry;
-          if (entry && typeof entry === 'object' && 'msg' in entry) {
-            return String((entry as { msg: unknown }).msg);
-          }
-          return JSON.stringify(entry);
-        })
-        .join('; ');
-    }
-    if (detail && typeof detail === 'object') {
-      return JSON.stringify(detail);
-    }
-    if (maybeResponse?.status) {
-      return `Request failed (HTTP ${maybeResponse.status}).`;
-    }
-  }
-  if (typeof error === 'object' && error && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return 'Import request failed.';
-};
-
-const pollJobs = async (): Promise<void> => {
-  if (documentVisibility.value !== 'visible') return;
-  if (!hasActiveJobs.value) return;
-  try {
-    await loadJobs();
-  } catch (error) {
-    console.error('Polling imports failed', error);
-  }
-};
-
-const { pause: pausePolling, resume: resumePolling } = useIntervalFn(() => {
-  void pollJobs();
-}, 2000, { immediate: false });
-
-watch(
-  [documentVisibility, hasActiveJobs],
-  ([visibility, hasActive]) => {
-    if (visibility === 'visible' && hasActive) {
-      resumePolling();
-      void pollJobs();
-      return;
-    }
-
-    pausePolling();
-  },
-  { immediate: true },
-);
-
-onMounted(async () => {
-  await loadTemplates();
-  await loadJobs();
-});
+const {
+  pickerTemplateId,
+  pickerMode,
+  pickedFiles,
+  errorMessage,
+  jobs,
+  isRefreshing,
+  creatingJob,
+  cancellingJobIds,
+  lastRefreshedAt,
+  templates,
+  queuedCount,
+  runningCount,
+  cancelingCount,
+  completedCount,
+  failedCount,
+  cancelledCount,
+  loadJobs,
+  createJobFromPicker,
+  cancelJob,
+  onSingleFileSelected,
+  onDirectorySelected,
+  canCancel,
+  progressPercent,
+  statusClass,
+  progressClass,
+  formatTimestamp,
+} = useImportJobsController();
 </script>

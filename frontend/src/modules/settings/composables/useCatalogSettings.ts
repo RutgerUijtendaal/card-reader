@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import {
   acceptSuggestionAsNew,
   acceptSuggestionToExisting,
@@ -15,10 +15,10 @@ import type {
   TypeRecord,
 } from '@/modules/settings/types';
 import {
-  buildSettingsQuery,
   parseSettingsCatalogKind,
   parseSettingsEntryId,
 } from '@/modules/settings/settingsRouteState';
+import { useSettingsRouteSync } from '@/modules/settings/composables/useSettingsRouteSync';
 import {
   CATALOG_KIND_GROUPS,
   CATALOG_KINDS,
@@ -41,7 +41,7 @@ export { detectionConfigExample, kindItemLabel, kindLabel, referenceAssetsExampl
 
 export const useCatalogSettings = () => {
   const route = useRoute();
-  const router = useRouter();
+  const { replaceSettingsQuery } = useSettingsRouteSync();
   const { newEntry: editorEntry, resetNewEntryForm: resetEditorEntry, setNewEntry: setEditorEntry } =
     useCatalogEntryForm();
   const catalogData = useCatalogData(resetEditorEntry);
@@ -87,13 +87,10 @@ export const useCatalogSettings = () => {
     selectedEntryId.value = null;
     selectedKnownDetail.value = null;
     resetEditorEntry();
-    void router.replace({
-      path: '/settings',
-      query: buildSettingsQuery(route.query, {
-        tab: 'catalog',
-        kind: catalogData.selectedKind.value,
-        entryId: null,
-      }),
+    replaceSettingsQuery({
+      tab: 'catalog',
+      kind: catalogData.selectedKind.value,
+      entryId: null,
     });
   };
 
@@ -106,23 +103,17 @@ export const useCatalogSettings = () => {
       suggestionExistingTargetId.value = '';
       suggestionNewLabel.value = row.display_value;
       suggestionNewKey.value = '';
-      void router.replace({
-        path: '/settings',
-        query: buildSettingsQuery(route.query, {
-          tab: 'catalog',
-          kind: catalogData.selectedKind.value,
-          entryId: row.id,
-        }),
-      });
-      return;
-    }
-    void router.replace({
-      path: '/settings',
-      query: buildSettingsQuery(route.query, {
+      replaceSettingsQuery({
         tab: 'catalog',
         kind: catalogData.selectedKind.value,
         entryId: row.id,
-      }),
+      });
+      return;
+    }
+    replaceSettingsQuery({
+      tab: 'catalog',
+      kind: catalogData.selectedKind.value,
+      entryId: row.id,
     });
     await loadKnownDetail(row.id);
   };
@@ -132,13 +123,10 @@ export const useCatalogSettings = () => {
     selectedEntryId.value = null;
     selectedKnownDetail.value = null;
     resetEditorEntry();
-    void router.replace({
-      path: '/settings',
-      query: buildSettingsQuery(route.query, {
-        tab: 'catalog',
-        kind,
-        entryId: null,
-      }),
+    replaceSettingsQuery({
+      tab: 'catalog',
+      kind,
+      entryId: null,
     });
   };
 

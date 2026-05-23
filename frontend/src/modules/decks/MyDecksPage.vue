@@ -36,72 +36,13 @@
       v-else
       class="grid gap-4"
     >
-      <div
+      <DeckListCard
         v-for="deck in decks"
         :key="deck.id"
-        class="page-card flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+        :deck="deck"
+        mode="owned"
       >
-        <div class="flex min-w-0 gap-4">
-          <div class="theme-card-frame-muted theme-card-image-well flex h-32 w-24 shrink-0 items-center justify-center rounded-xl">
-            <img
-              v-if="deck.hero_card.image_url"
-              :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
-              :alt="deck.hero_card.name"
-              class="h-full w-full object-contain"
-            >
-            <div
-              v-else
-              class="theme-kicker text-xs"
-            >
-              No image
-            </div>
-          </div>
-
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <h3 class="theme-section-title text-lg font-semibold">
-                {{ deck.name }}
-              </h3>
-              <span
-                class="theme-pill text-xs"
-                :class="deck.is_public ? 'theme-pill-accent' : 'theme-pill-neutral'"
-              >
-                {{ deck.is_public ? 'Public' : 'Private' }}
-              </span>
-            </div>
-            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <span class="theme-section-muted">
-                <span class="theme-section-title font-medium">Cards</span>
-                {{ deck.mainboard.total_cards }} / 60
-              </span>
-              <span class="theme-section-muted">
-                <span class="theme-section-title font-medium">Unique</span>
-                {{ deck.mainboard.unique_cards }}
-              </span>
-              <span class="theme-section-muted">
-                <span class="theme-section-title font-medium">Status</span>
-                {{ deck.status.label }}
-              </span>
-            </div>
-            <p class="theme-section-muted mt-1 text-sm">
-              Hero: {{ deck.hero_card.name }}
-            </p>
-            <p
-              v-if="deck.status.issues.length > 0"
-              class="theme-section-muted mt-1 text-sm"
-            >
-              {{ deck.status.issues[0] }}
-            </p>
-            <p
-              v-if="deck.description"
-              class="theme-section-title mt-2 text-sm"
-            >
-              {{ deck.description }}
-            </p>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
+        <template #actions>
           <RouterLink
             v-if="deck.is_public"
             class="btn-secondary"
@@ -122,8 +63,8 @@
           >
             Delete
           </button>
-        </div>
-      </div>
+        </template>
+      </DeckListCard>
     </div>
 
     <ConfirmModal
@@ -143,9 +84,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { toAbsoluteApiUrl } from '@/api/client';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { deleteDeck, fetchMyDecks } from '@/modules/decks/api';
+import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
 import type { DeckRecord } from '@/modules/decks/types';
 
 const decks = ref<DeckRecord[]>([]);
