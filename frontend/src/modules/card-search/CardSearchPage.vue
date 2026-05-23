@@ -101,7 +101,8 @@ import {
   saveGallerySnapshot,
   setGalleryNavigationCards,
 } from '@/modules/card-search/galleryNavigation';
-import CardFilterSections, { type CardFilterSectionsState } from '@/modules/card-search/components/CardFilterSections.vue';
+import type { CardFilterSectionsState, MatchMode } from '@/modules/card-search/cardFilterSectionsState';
+import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
 import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 
@@ -168,39 +169,78 @@ const galleryGridStyle = computed(() => ({
 const updateQuery = (value: string): void => {
   query.value = value;
 };
+
+const updateArrayRef =
+  (target: { value: string[] }) =>
+  (value: string[]): void => {
+    target.value = value;
+  };
+
+const updateStringRef =
+  (target: { value: string }) =>
+  (value: string): void => {
+    target.value = value;
+  };
+
+const updateMatchModeRef =
+  (target: { value: MatchMode }) =>
+  (value: MatchMode): void => {
+    target.value = value;
+  };
+
 const filterSectionsState = computed<CardFilterSectionsState>(() => ({
-  selectedManaTypeSymbolIds,
-  manaSymbolMatch,
+  selectedManaTypeSymbolIds: selectedManaTypeSymbolIds.value,
+  onUpdateSelectedManaTypeSymbolIds: updateArrayRef(selectedManaTypeSymbolIds),
+  manaSymbolMatch: manaSymbolMatch.value,
+  onUpdateManaSymbolMatch: updateMatchModeRef(manaSymbolMatch),
   manaTypeOptions: manaTypeOptions.value,
-  manaCostMin,
-  manaCostMax,
+  manaCostMin: manaCostMin.value,
+  onUpdateManaCostMin: updateStringRef(manaCostMin),
+  manaCostMax: manaCostMax.value,
+  onUpdateManaCostMax: updateStringRef(manaCostMax),
   resetManaGroup,
-  selectedTypeIds,
-  typeMatch,
+  selectedTypeIds: selectedTypeIds.value,
+  onUpdateSelectedTypeIds: updateArrayRef(selectedTypeIds),
+  typeMatch: typeMatch.value,
+  onUpdateTypeMatch: updateMatchModeRef(typeMatch),
   typeOptions: filters.value.types,
   resetTypeGroup,
-  selectedAffinitySymbolIds,
-  affinitySymbolMatch,
+  selectedAffinitySymbolIds: selectedAffinitySymbolIds.value,
+  onUpdateSelectedAffinitySymbolIds: updateArrayRef(selectedAffinitySymbolIds),
+  affinitySymbolMatch: affinitySymbolMatch.value,
+  onUpdateAffinitySymbolMatch: updateMatchModeRef(affinitySymbolMatch),
   affinityTypeOptions: affinityTypeOptions.value,
   resetAffinityGroup,
-  selectedDevotionSymbolIds,
-  devotionSymbolMatch,
+  selectedDevotionSymbolIds: selectedDevotionSymbolIds.value,
+  onUpdateSelectedDevotionSymbolIds: updateArrayRef(selectedDevotionSymbolIds),
+  devotionSymbolMatch: devotionSymbolMatch.value,
+  onUpdateDevotionSymbolMatch: updateMatchModeRef(devotionSymbolMatch),
   devotionTypeOptions: devotionTypeOptions.value,
   resetDevotionGroup,
-  selectedOtherSymbolIds,
-  otherSymbolMatch,
+  selectedOtherSymbolIds: selectedOtherSymbolIds.value,
+  onUpdateSelectedOtherSymbolIds: updateArrayRef(selectedOtherSymbolIds),
+  otherSymbolMatch: otherSymbolMatch.value,
+  onUpdateOtherSymbolMatch: updateMatchModeRef(otherSymbolMatch),
   otherSymbolOptions: otherSymbolOptions.value,
   resetGenericGroup,
-  attackMin,
-  attackMax,
-  healthMin,
-  healthMax,
-  selectedKeywordIds,
-  keywordMatch,
+  attackMin: attackMin.value,
+  onUpdateAttackMin: updateStringRef(attackMin),
+  attackMax: attackMax.value,
+  onUpdateAttackMax: updateStringRef(attackMax),
+  healthMin: healthMin.value,
+  onUpdateHealthMin: updateStringRef(healthMin),
+  healthMax: healthMax.value,
+  onUpdateHealthMax: updateStringRef(healthMax),
+  selectedKeywordIds: selectedKeywordIds.value,
+  onUpdateSelectedKeywordIds: updateArrayRef(selectedKeywordIds),
+  keywordMatch: keywordMatch.value,
+  onUpdateKeywordMatch: updateMatchModeRef(keywordMatch),
   keywordOptions: filters.value.keywords,
   resetKeywordGroup,
-  selectedTagIds,
-  tagMatch,
+  selectedTagIds: selectedTagIds.value,
+  onUpdateSelectedTagIds: updateArrayRef(selectedTagIds),
+  tagMatch: tagMatch.value,
+  onUpdateTagMatch: updateMatchModeRef(tagMatch),
   tagOptions: filters.value.tags,
   resetTagGroup,
 }));

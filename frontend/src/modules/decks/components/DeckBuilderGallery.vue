@@ -3,53 +3,53 @@
     <div class="space-y-6">
       <div
         class="grid gap-6"
-        :style="controller.galleryGridStyle.value"
+        :style="controller.gallery.galleryGridStyle.value"
       >
         <article
-          v-for="card in controller.galleryCards.value"
+          v-for="card in controller.gallery.galleryCards.value"
           :key="card.id"
           class="theme-card-frame justify-self-center space-y-3 rounded-3xl p-3"
           :style="{
-            width: `${controller.galleryTileWidthRem.value}rem`,
+            width: `${controller.gallery.galleryTileWidthRem.value}rem`,
             maxWidth: '100%',
           }"
         >
           <CardGalleryItem
             :card="card"
-            :tooltip-enabled="controller.tooltipEnabled.value"
-            :card-height-rem="controller.cardHeightRem.value"
+            :tooltip-enabled="controller.filters.tooltipEnabled.value"
+            :card-height-rem="controller.gallery.cardHeightRem.value"
             activation-mode="emit"
             activation-label="Add card to deck"
-            :activation-disabled="controller.galleryActionDisabled(card)"
+            :activation-disabled="controller.deck.galleryActionDisabled(card)"
             @activate="handleActivate"
           />
 
           <button
             class="btn-secondary w-full justify-center"
             type="button"
-            :disabled="controller.galleryActionDisabled(card)"
-            @click="controller.handleGalleryAction(card)"
+            :disabled="controller.deck.galleryActionDisabled(card)"
+            @click="controller.deck.handleGalleryAction(card)"
           >
-            {{ controller.galleryActionLabel(card) }}
+            {{ controller.deck.galleryActionLabel(card) }}
           </button>
         </article>
       </div>
 
       <div
-        v-if="controller.galleryCards.value.length > 0"
+        v-if="controller.gallery.galleryCards.value.length > 0"
         ref="sentinelRef"
         class="theme-section-muted flex justify-center py-4 text-sm"
       >
-        <span v-if="controller.isLoadingPage.value">Loading more cards...</span>
-        <span v-else-if="controller.nextPage.value === null">All cards loaded.</span>
+        <span v-if="controller.gallery.isLoadingPage.value">Loading more cards...</span>
+        <span v-else-if="controller.gallery.nextPage.value === null">All cards loaded.</span>
         <span v-else>Scroll to load more.</span>
       </div>
 
       <div
-        v-if="!controller.isLoadingInitial.value && controller.galleryCards.value.length === 0"
+        v-if="!controller.gallery.isLoadingInitial.value && controller.gallery.galleryCards.value.length === 0"
         class="page-card theme-section-muted text-sm"
       >
-        {{ controller.isSetupStep.value ? 'No hero cards found for the current search.' : 'No cards found for the current filters.' }}
+        {{ controller.deck.isSetupStep.value ? 'No hero cards found for the current search.' : 'No cards found for the current filters.' }}
       </div>
     </div>
   </div>
@@ -71,10 +71,10 @@ const handleActivate = (card: GalleryItem): void => {
   if (card.result_type !== 'card') {
     return;
   }
-  props.controller.handleGalleryAction(card);
+  props.controller.deck.handleGalleryAction(card);
 };
 
 watchEffect(() => {
-  props.controller.loadMoreSentinelRef.value = sentinelRef.value;
+  props.controller.gallery.setLoadMoreSentinel(sentinelRef.value);
 });
 </script>

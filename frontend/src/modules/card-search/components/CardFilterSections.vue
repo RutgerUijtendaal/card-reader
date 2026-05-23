@@ -1,8 +1,8 @@
 <template>
   <div class="space-y-3">
     <SymbolToggleGroup
-      v-model="state.selectedManaTypeSymbolIds.value"
-      v-model:match-mode="state.manaSymbolMatch.value"
+      v-model="selectedManaTypeSymbolIds"
+      v-model:match-mode="manaSymbolMatch"
       :default-open="true"
       label="Mana"
       :options="state.manaTypeOptions"
@@ -15,13 +15,13 @@
           </h4>
           <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
             <input
-              v-model="state.manaCostMin.value"
+              v-model="manaCostMin"
               class="input-base min-w-0"
               type="number"
               placeholder="Min"
             >
             <input
-              v-model="state.manaCostMax.value"
+              v-model="manaCostMax"
               class="input-base min-w-0"
               type="number"
               placeholder="Max"
@@ -32,8 +32,8 @@
     </SymbolToggleGroup>
 
     <MetadataPillGroup
-      v-model="state.selectedTypeIds.value"
-      v-model:match-mode="state.typeMatch.value"
+      v-model="selectedTypeIds"
+      v-model:match-mode="typeMatch"
       :default-open="true"
       :initial-visible-count="7"
       label="Types"
@@ -42,24 +42,24 @@
     />
 
     <SymbolToggleGroup
-      v-model="state.selectedAffinitySymbolIds.value"
-      v-model:match-mode="state.affinitySymbolMatch.value"
+      v-model="selectedAffinitySymbolIds"
+      v-model:match-mode="affinitySymbolMatch"
       label="Affinity"
       :options="state.affinityTypeOptions"
       @reset="state.resetAffinityGroup"
     />
 
     <SymbolToggleGroup
-      v-model="state.selectedDevotionSymbolIds.value"
-      v-model:match-mode="state.devotionSymbolMatch.value"
+      v-model="selectedDevotionSymbolIds"
+      v-model:match-mode="devotionSymbolMatch"
       label="Devotion"
       :options="state.devotionTypeOptions"
       @reset="state.resetDevotionGroup"
     />
 
     <SymbolToggleGroup
-      v-model="state.selectedOtherSymbolIds.value"
-      v-model:match-mode="state.otherSymbolMatch.value"
+      v-model="selectedOtherSymbolIds"
+      v-model:match-mode="otherSymbolMatch"
       label="Generic"
       :options="state.otherSymbolOptions"
       @reset="state.resetGenericGroup"
@@ -71,13 +71,13 @@
           </h4>
           <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
             <input
-              v-model="state.attackMin.value"
+              v-model="attackMin"
               class="input-base min-w-0"
               type="number"
               placeholder="Min"
             >
             <input
-              v-model="state.attackMax.value"
+              v-model="attackMax"
               class="input-base min-w-0"
               type="number"
               placeholder="Max"
@@ -91,13 +91,13 @@
           </h4>
           <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
             <input
-              v-model="state.healthMin.value"
+              v-model="healthMin"
               class="input-base min-w-0"
               type="number"
               placeholder="Min"
             >
             <input
-              v-model="state.healthMax.value"
+              v-model="healthMax"
               class="input-base min-w-0"
               type="number"
               placeholder="Max"
@@ -108,16 +108,16 @@
     </SymbolToggleGroup>
 
     <MetadataChecklistGroup
-      v-model="state.selectedKeywordIds.value"
-      v-model:match-mode="state.keywordMatch.value"
+      v-model="selectedKeywordIds"
+      v-model:match-mode="keywordMatch"
       label="Keywords"
       :options="state.keywordOptions"
       @reset="state.resetKeywordGroup"
     />
 
     <MetadataChecklistGroup
-      v-model="state.selectedTagIds.value"
-      v-model:match-mode="state.tagMatch.value"
+      v-model="selectedTagIds"
+      v-model:match-mode="tagMatch"
       label="Tags"
       :options="state.tagOptions"
       @reset="state.resetTagGroup"
@@ -126,50 +126,94 @@
 </template>
 
 <script setup lang="ts">
-import type { Ref } from 'vue';
+import { computed } from 'vue';
 import MetadataChecklistGroup from '@/components/filters/MetadataChecklistGroup.vue';
 import MetadataPillGroup from '@/components/filters/MetadataPillGroup.vue';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
-import type { MetadataOption, SymbolFilterOption } from '@/modules/card-detail/types';
+import type { CardFilterSectionsState } from '@/modules/card-search/cardFilterSectionsState';
 
-export type CardFilterSectionsState = {
-  selectedManaTypeSymbolIds: Ref<string[]>;
-  manaSymbolMatch: Ref<'any' | 'all'>;
-  manaTypeOptions: SymbolFilterOption[];
-  manaCostMin: Ref<string>;
-  manaCostMax: Ref<string>;
-  resetManaGroup: () => void;
-  selectedTypeIds: Ref<string[]>;
-  typeMatch: Ref<'any' | 'all'>;
-  typeOptions: MetadataOption[];
-  resetTypeGroup: () => void;
-  selectedAffinitySymbolIds: Ref<string[]>;
-  affinitySymbolMatch: Ref<'any' | 'all'>;
-  affinityTypeOptions: SymbolFilterOption[];
-  resetAffinityGroup: () => void;
-  selectedDevotionSymbolIds: Ref<string[]>;
-  devotionSymbolMatch: Ref<'any' | 'all'>;
-  devotionTypeOptions: SymbolFilterOption[];
-  resetDevotionGroup: () => void;
-  selectedOtherSymbolIds: Ref<string[]>;
-  otherSymbolMatch: Ref<'any' | 'all'>;
-  otherSymbolOptions: SymbolFilterOption[];
-  resetGenericGroup: () => void;
-  attackMin: Ref<string>;
-  attackMax: Ref<string>;
-  healthMin: Ref<string>;
-  healthMax: Ref<string>;
-  selectedKeywordIds: Ref<string[]>;
-  keywordMatch: Ref<'any' | 'all'>;
-  keywordOptions: MetadataOption[];
-  resetKeywordGroup: () => void;
-  selectedTagIds: Ref<string[]>;
-  tagMatch: Ref<'any' | 'all'>;
-  tagOptions: MetadataOption[];
-  resetTagGroup: () => void;
-};
-
-defineProps<{
+const props = defineProps<{
   state: CardFilterSectionsState;
 }>();
+
+const selectedManaTypeSymbolIds = computed({
+  get: () => props.state.selectedManaTypeSymbolIds,
+  set: props.state.onUpdateSelectedManaTypeSymbolIds,
+});
+const manaSymbolMatch = computed({
+  get: () => props.state.manaSymbolMatch,
+  set: props.state.onUpdateManaSymbolMatch,
+});
+const manaCostMin = computed({
+  get: () => props.state.manaCostMin,
+  set: props.state.onUpdateManaCostMin,
+});
+const manaCostMax = computed({
+  get: () => props.state.manaCostMax,
+  set: props.state.onUpdateManaCostMax,
+});
+const selectedTypeIds = computed({
+  get: () => props.state.selectedTypeIds,
+  set: props.state.onUpdateSelectedTypeIds,
+});
+const typeMatch = computed({
+  get: () => props.state.typeMatch,
+  set: props.state.onUpdateTypeMatch,
+});
+const selectedAffinitySymbolIds = computed({
+  get: () => props.state.selectedAffinitySymbolIds,
+  set: props.state.onUpdateSelectedAffinitySymbolIds,
+});
+const affinitySymbolMatch = computed({
+  get: () => props.state.affinitySymbolMatch,
+  set: props.state.onUpdateAffinitySymbolMatch,
+});
+const selectedDevotionSymbolIds = computed({
+  get: () => props.state.selectedDevotionSymbolIds,
+  set: props.state.onUpdateSelectedDevotionSymbolIds,
+});
+const devotionSymbolMatch = computed({
+  get: () => props.state.devotionSymbolMatch,
+  set: props.state.onUpdateDevotionSymbolMatch,
+});
+const selectedOtherSymbolIds = computed({
+  get: () => props.state.selectedOtherSymbolIds,
+  set: props.state.onUpdateSelectedOtherSymbolIds,
+});
+const otherSymbolMatch = computed({
+  get: () => props.state.otherSymbolMatch,
+  set: props.state.onUpdateOtherSymbolMatch,
+});
+const attackMin = computed({
+  get: () => props.state.attackMin,
+  set: props.state.onUpdateAttackMin,
+});
+const attackMax = computed({
+  get: () => props.state.attackMax,
+  set: props.state.onUpdateAttackMax,
+});
+const healthMin = computed({
+  get: () => props.state.healthMin,
+  set: props.state.onUpdateHealthMin,
+});
+const healthMax = computed({
+  get: () => props.state.healthMax,
+  set: props.state.onUpdateHealthMax,
+});
+const selectedKeywordIds = computed({
+  get: () => props.state.selectedKeywordIds,
+  set: props.state.onUpdateSelectedKeywordIds,
+});
+const keywordMatch = computed({
+  get: () => props.state.keywordMatch,
+  set: props.state.onUpdateKeywordMatch,
+});
+const selectedTagIds = computed({
+  get: () => props.state.selectedTagIds,
+  set: props.state.onUpdateSelectedTagIds,
+});
+const tagMatch = computed({
+  get: () => props.state.tagMatch,
+  set: props.state.onUpdateTagMatch,
+});
 </script>

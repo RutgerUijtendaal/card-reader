@@ -1,7 +1,7 @@
 <template>
   <aside class="page-card flex h-full min-h-0 flex-col">
     <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
-      <template v-if="controller.isSetupStep.value">
+      <template v-if="controller.deck.isSetupStep.value">
         <div class="space-y-1">
           <h3 class="theme-section-title text-lg font-semibold">
             Deck Setup
@@ -14,7 +14,7 @@
         <label class="field-label">
           Name
           <input
-            v-model="controller.form.name"
+            v-model="deckName"
             class="input-base"
             placeholder="Deck name"
           >
@@ -23,7 +23,7 @@
         <label class="field-label">
           Description
           <textarea
-            v-model="controller.form.description"
+            v-model="deckDescription"
             class="input-base min-h-28"
             placeholder="Optional description"
           />
@@ -31,9 +31,10 @@
 
         <label class="theme-section-title flex items-center gap-3 text-sm font-semibold">
           <input
-            v-model="controller.form.is_public"
+            :checked="isPublic"
             type="checkbox"
             class="theme-checkbox h-4 w-4"
+            @change="updateDeckPublic(($event.target as HTMLInputElement).checked)"
           >
           <span>Public deck</span>
         </label>
@@ -43,13 +44,13 @@
             Selected Hero
           </p>
           <div
-            v-if="controller.selectedHero.value"
+            v-if="controller.deck.selectedHero.value"
             class="space-y-3"
           >
             <img
-              v-if="controller.selectedHero.value.image_url"
-              :src="toAbsoluteApiUrl(controller.selectedHero.value.image_url)"
-              :alt="controller.selectedHero.value.name"
+              v-if="controller.deck.selectedHero.value.image_url"
+              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+              :alt="controller.deck.selectedHero.value.name"
               class="theme-card-frame max-h-80 w-full rounded-2xl object-contain"
             >
             <div
@@ -61,10 +62,10 @@
 
             <div class="space-y-1">
               <p class="theme-section-title text-sm font-semibold">
-                {{ controller.selectedHero.value.name }}
+                {{ controller.deck.selectedHero.value.name }}
               </p>
               <p class="theme-section-muted text-xs">
-                {{ controller.selectedHero.value.label }}
+                {{ controller.deck.selectedHero.value.label }}
               </p>
             </div>
           </div>
@@ -77,14 +78,14 @@
         </div>
 
         <div
-          v-if="controller.setupMessages.value.length > 0"
+          v-if="controller.deck.setupMessages.value.length > 0"
           class="theme-muted-panel space-y-2 p-3"
         >
           <p class="theme-section-title text-sm font-semibold">
             Missing Setup
           </p>
           <p
-            v-for="message in controller.setupMessages.value"
+            v-for="message in controller.deck.setupMessages.value"
             :key="message"
             class="theme-error-text text-sm"
           >
@@ -95,7 +96,7 @@
         <button
           class="btn-primary w-full justify-center"
           type="button"
-          :disabled="controller.setupMessages.value.length > 0"
+          :disabled="controller.deck.setupMessages.value.length > 0"
           @click="controller.lockSetup"
         >
           Continue
@@ -106,25 +107,25 @@
         <div class="theme-muted-panel space-y-3 p-3">
           <div class="flex items-start justify-between gap-3">
             <h3 class="theme-section-title truncate text-lg font-semibold">
-              {{ controller.form.name || 'Untitled Deck' }}
+              {{ controller.deck.form.name || 'Untitled Deck' }}
             </h3>
             <button
               class="btn-secondary px-2 py-1 text-xs"
               type="button"
-              @click="controller.builderStep.value = 'setup'"
+              @click="controller.setBuilderStep('setup')"
             >
               Change
             </button>
           </div>
 
           <div
-            v-if="controller.selectedHero.value"
+            v-if="controller.deck.selectedHero.value"
             class="space-y-3"
           >
             <img
-              v-if="controller.selectedHero.value.image_url"
-              :src="toAbsoluteApiUrl(controller.selectedHero.value.image_url)"
-              :alt="controller.selectedHero.value.name"
+              v-if="controller.deck.selectedHero.value.image_url"
+              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+              :alt="controller.deck.selectedHero.value.name"
               class="theme-card-frame max-h-[32rem] w-full rounded-2xl object-contain"
             >
             <div
@@ -137,14 +138,14 @@
         </div>
 
         <div
-          v-if="controller.validationMessages.value.length > 0"
+          v-if="controller.deck.validationMessages.value.length > 0"
           class="theme-muted-panel space-y-2 p-3"
         >
           <p class="theme-section-title text-sm font-semibold">
             Validation
           </p>
           <p
-            v-for="message in controller.validationMessages.value"
+            v-for="message in controller.deck.validationMessages.value"
             :key="message"
             class="theme-error-text text-sm"
           >
@@ -158,14 +159,14 @@
           </h4>
 
           <div
-            v-if="controller.detailedEntries.value.length === 0"
+            v-if="controller.deck.detailedEntries.value.length === 0"
             class="theme-empty-state"
           >
             No cards added yet.
           </div>
 
           <div
-            v-for="entry in controller.detailedEntries.value"
+            v-for="entry in controller.deck.detailedEntries.value"
             :key="entry.card.id"
             class="theme-card-frame space-y-3 rounded-2xl p-3"
           >
@@ -188,7 +189,7 @@
                 <button
                   class="btn-secondary h-8 w-8 px-0"
                   type="button"
-                  @click="controller.changeQuantity(entry.card.id, -1)"
+                  @click="controller.deck.changeQuantity(entry.card.id, -1)"
                 >
                   -
                 </button>
@@ -198,13 +199,13 @@
                   type="number"
                   min="1"
                   max="4"
-                  @input="controller.setQuantity(entry.card.id, ($event.target as HTMLInputElement).value)"
+                  @input="controller.deck.setQuantity(entry.card.id, ($event.target as HTMLInputElement).value)"
                 >
                 <button
                   class="btn-secondary h-8 w-8 px-0"
                   type="button"
                   :disabled="entry.quantity >= 4"
-                  @click="controller.changeQuantity(entry.card.id, 1)"
+                  @click="controller.deck.changeQuantity(entry.card.id, 1)"
                 >
                   +
                 </button>
@@ -213,7 +214,7 @@
               <button
                 class="btn-danger-secondary px-2 py-1 text-xs"
                 type="button"
-                @click="controller.removeEntry(entry.card.id)"
+                @click="controller.deck.removeEntry(entry.card.id)"
               >
                 Remove
               </button>
@@ -226,10 +227,27 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 
-defineProps<{
+const props = defineProps<{
   controller: DeckEditorController;
 }>();
+
+const deckName = computed({
+  get: () => props.controller.deck.form.name,
+  set: props.controller.deck.setDeckName,
+});
+
+const deckDescription = computed({
+  get: () => props.controller.deck.form.description,
+  set: props.controller.deck.setDeckDescription,
+});
+
+const isPublic = computed(() => props.controller.deck.form.is_public);
+
+const updateDeckPublic = (value: boolean): void => {
+  props.controller.deck.setDeckPublic(value);
+};
 </script>
