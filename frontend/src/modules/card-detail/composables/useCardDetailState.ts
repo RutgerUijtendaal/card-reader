@@ -2,14 +2,8 @@ import { onKeyStroke } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
-import {
-  buildGalleryLocation,
-  useGalleryCardNavigation,
-} from '@/modules/card-search/galleryNavigation';
-import {
-  buildSettingsReturnLocation,
-  isSettingsReturnQuery,
-} from '@/modules/settings/settingsRouteState';
+import { buildCardReturnLocation, getCardReturnLabel } from '@/modules/card-detail/cardReturnState';
+import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
 import type {
   CardDetail,
   CardFiltersResponse,
@@ -46,6 +40,7 @@ export const useCardDetailState = () => {
     attack: '',
     health: '',
     rules_text: '',
+    is_hero: false,
     keyword_ids: [],
     tag_ids: [],
     type_ids: [],
@@ -74,13 +69,10 @@ export const useCardDetailState = () => {
   );
 
   const isBusy = computed(() => isSaving.value || isQueuingReparse.value);
+  const backButtonLabel = computed(() => `Back to ${getCardReturnLabel(route.query)}`);
 
   const goBack = (): void => {
-    if (isSettingsReturnQuery(route.query)) {
-      void router.push(buildSettingsReturnLocation(route.query));
-      return;
-    }
-    void router.push(buildGalleryLocation(route.query));
+    void router.push(buildCardReturnLocation(route.query));
   };
 
   const loadCard = async (): Promise<void> => {
@@ -113,6 +105,7 @@ export const useCardDetailState = () => {
     form.attack = version.attack === null ? '' : String(version.attack);
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
+    form.is_hero = version.is_hero;
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
@@ -318,6 +311,7 @@ export const useCardDetailState = () => {
     metadataSearch,
     selectedVersion,
     isBusy,
+    backButtonLabel,
     goBack,
     goToPreviousCard: galleryNavigation.goToPreviousCard,
     goToNextCard: () => {
@@ -391,6 +385,10 @@ const buildManualUpdatePayload = (
     if (normalizeFormFieldValue(form, fieldName) !== normalizeFieldValue(version, fieldName)) {
       updates[fieldName === 'rules_text' ? 'rules_text_enriched' : fieldName] = form[fieldName];
     }
+  }
+
+  if (form.is_hero !== version.is_hero) {
+    updates.is_hero = form.is_hero;
   }
 
   if (!sameIds(form.keyword_ids, version.keyword_ids)) {

@@ -10,6 +10,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".card", __name__),
     import_module(".card_group", __name__),
     import_module(".card_version", __name__),
+    import_module(".deck", __name__),
     import_module(".import_job", __name__),
     import_module(".metadata", __name__),
     import_module(".template", __name__),
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from .card import Card
     from .card_group import CardGroup, CardGroupMember
     from .card_version import CardVersion, CardVersionImage, ParseResult
+    from .deck import Deck, DeckEntry
     from .import_job import ImportJob, ImportJobItem, ImportJobStatus
     from .metadata import (
         CardVersionMetadataSuggestion,
@@ -46,6 +48,8 @@ _EXPORTS = {
     "CardVersion": ".card_version",
     "CardVersionImage": ".card_version",
     "ParseResult": ".card_version",
+    "Deck": ".deck",
+    "DeckEntry": ".deck",
     "Tag": ".metadata",
     "Symbol": ".metadata",
     "Keyword": ".metadata",
@@ -70,6 +74,8 @@ __all__ = [
     "CardVersion",
     "CardVersionImage",
     "ParseResult",
+    "Deck",
+    "DeckEntry",
     "Tag",
     "Symbol",
     "Keyword",

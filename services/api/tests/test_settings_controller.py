@@ -9,7 +9,7 @@ from card_reader_api.catalog.views import _store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
 from card_reader_api.seeds.templates import DEFAULT_TEMPLATES_FILE, read_template_entries
-from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, ImportJob, ImportJobItem, Template
+from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.settings import settings
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
@@ -108,6 +108,8 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
 
     ImportJobItem.objects.all().delete()
     ImportJob.objects.all().delete()
+    DeckEntry.objects.all().delete()
+    Deck.objects.all().delete()
     CardVersionImage.objects.all().delete()
     CardVersion.objects.all().delete()
     CardGroup.objects.all().delete()

@@ -14,6 +14,7 @@ class Card(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
+    is_hero: models.BooleanField[bool, bool] = models.BooleanField(default=False, db_index=True)
     latest_version: models.ForeignKey[CardVersion | None, CardVersion | None] = models.ForeignKey(
         "CardVersion",
         on_delete=models.SET_NULL,

@@ -1,160 +1,17 @@
 <template>
-  <section class="grid gap-6 xl:grid-cols-[25rem_minmax(0,1fr)] xl:items-start">
-    <aside class="page-card flex min-h-0 flex-col xl:sticky xl:top-0 xl:h-[calc(100vh-2rem)]">
-      <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
-        <div class="space-y-2">
-          <h2 class="theme-section-title flex items-center gap-2 text-xl font-semibold">
-            <Images class="theme-section-muted h-5 w-5" />
-            <span>Card Gallery</span>
-          </h2>
-          <p class="theme-section-muted text-sm">
-            Filter the visible card pool by symbols, stats, and metadata.
-          </p>
-        </div>
+  <section class="grid gap-6 xl:grid-cols-[23rem_minmax(0,1fr)] xl:items-start">
+    <GalleryFilterSidebar
+      title="Gallery"
+      description="Filter the visible card pool by symbols, stats, and metadata."
+      :query="query"
+      :on-update-query="updateQuery"
+      search-placeholder="Search cards..."
+      :total-count="totalCount"
+      :on-reset="resetFilters"
+    >
+      <CardFilterSections :state="filterSectionsState" />
 
-        <div class="space-y-2">
-          <div class="flex items-center gap-2">
-            <input
-              v-model="query"
-              class="input-base flex-1"
-              placeholder="Search cards..."
-            >
-            <button
-              class="btn-secondary inline-flex h-11 w-11 shrink-0 items-center justify-center px-0"
-              type="button"
-              title="Reset filters"
-              aria-label="Reset filters"
-              @click="resetFilters"
-            >
-              <RotateCcw class="h-4 w-4" />
-            </button>
-          </div>
-          <p class="theme-section-muted text-xs">
-            {{ totalCount }} results
-          </p>
-        </div>
-
-        <div class="space-y-3">
-          <SymbolToggleGroup
-            v-model="selectedManaTypeSymbolIds"
-            v-model:match-mode="manaSymbolMatch"
-            :default-open="true"
-            label="Mana"
-            :options="manaTypeOptions"
-            @reset="resetManaGroup"
-          >
-            <div class="theme-muted-panel p-3">
-              <div class="flex items-center gap-3">
-                <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
-                  Cost
-                </h4>
-                <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                  <input
-                    v-model="manaCostMin"
-                    class="input-base min-w-0"
-                    type="number"
-                    placeholder="Min"
-                  >
-                  <input
-                    v-model="manaCostMax"
-                    class="input-base min-w-0"
-                    type="number"
-                    placeholder="Max"
-                  >
-                </div>
-              </div>
-            </div>
-          </SymbolToggleGroup>
-          <MetadataPillGroup
-            v-model="selectedTypeIds"
-            v-model:match-mode="typeMatch"
-            :default-open="true"
-            :initial-visible-count="7"
-            label="Types"
-            :options="filters.types"
-            @reset="resetTypeGroup"
-          />
-          <SymbolToggleGroup
-            v-model="selectedAffinitySymbolIds"
-            v-model:match-mode="affinitySymbolMatch"
-            label="Affinity"
-            :options="affinityTypeOptions"
-            @reset="resetAffinityGroup"
-          />
-          <SymbolToggleGroup
-            v-model="selectedDevotionSymbolIds"
-            v-model:match-mode="devotionSymbolMatch"
-            label="Devotion"
-            :options="devotionTypeOptions"
-            @reset="resetDevotionGroup"
-          />
-          <SymbolToggleGroup
-            v-model="selectedOtherSymbolIds"
-            v-model:match-mode="otherSymbolMatch"
-            label="Generic"
-            :options="otherSymbolOptions"
-            @reset="resetGenericGroup"
-          >
-            <div class="theme-muted-panel space-y-2 p-3">
-              <div class="flex items-center gap-3">
-                <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
-                  Attack
-                </h4>
-                <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                  <input
-                    v-model="attackMin"
-                    class="input-base min-w-0"
-                    type="number"
-                    placeholder="Min"
-                  >
-                  <input
-                    v-model="attackMax"
-                    class="input-base min-w-0"
-                    type="number"
-                    placeholder="Max"
-                  >
-                </div>
-              </div>
-
-              <div class="flex items-center gap-3">
-                <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
-                  Health
-                </h4>
-                <div class="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                  <input
-                    v-model="healthMin"
-                    class="input-base min-w-0"
-                    type="number"
-                    placeholder="Min"
-                  >
-                  <input
-                    v-model="healthMax"
-                    class="input-base min-w-0"
-                    type="number"
-                    placeholder="Max"
-                  >
-                </div>
-              </div>
-            </div>
-          </SymbolToggleGroup>
-          <MetadataChecklistGroup
-            v-model="selectedKeywordIds"
-            v-model:match-mode="keywordMatch"
-            label="Keywords"
-            :options="filters.keywords"
-            @reset="resetKeywordGroup"
-          />
-          <MetadataChecklistGroup
-            v-model="selectedTagIds"
-            v-model:match-mode="tagMatch"
-            label="Tags"
-            :options="filters.tags"
-            @reset="resetTagGroup"
-          />
-        </div>
-      </div>
-
-      <div class="theme-divider mt-4 flex flex-wrap gap-2 border-t pt-4">
+      <template #footer>
         <GalleryOptionsMenu
           :tooltip-enabled="tooltipEnabled"
           :card-scale="cardScale"
@@ -171,8 +28,8 @@
           <Download class="h-4 w-4" />
           <span>Export CSV</span>
         </button>
-      </div>
-    </aside>
+      </template>
+    </GalleryFilterSidebar>
 
     <div class="space-y-6">
       <div
@@ -185,7 +42,21 @@
           :card="card"
           :tooltip-enabled="tooltipEnabled"
           :card-height-rem="cardHeightRem"
-        />
+        >
+          <template
+            v-if="auth.canAccessStaffRoutes"
+            #hover-actions="{ cardItem, isCard, editLocation }"
+          >
+            <RouterLink
+              v-if="isCard && cardItem"
+              :to="editLocation"
+              class="btn-secondary pointer-events-auto gap-1.5 rounded-full px-3 py-1.5 text-xs shadow-xl"
+            >
+              <Pencil class="h-3.5 w-3.5" />
+              <span>Edit</span>
+            </RouterLink>
+          </template>
+        </CardGalleryItem>
       </div>
 
       <div
@@ -211,16 +82,14 @@
 <script setup lang="ts">
 import { useDebounceFn, useIntersectionObserver, useScroll } from '@vueuse/core';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { Download, Images, RotateCcw } from 'lucide-vue-next';
+import { Download, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { api } from '@/api/client';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { useScrollContainer } from '@/composables/useScrollContainer';
-import MetadataChecklistGroup from '@/components/filters/MetadataChecklistGroup.vue';
-import MetadataPillGroup from '@/components/filters/MetadataPillGroup.vue';
-import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
+import { useAuthStore } from '@/modules/auth/authStore';
 import type {
   CardFiltersResponse,
   GalleryItem,
@@ -247,10 +116,14 @@ import {
   saveGallerySnapshot,
   setGalleryNavigationCards,
 } from '@/modules/card-search/galleryNavigation';
+import type { CardFilterSectionsState, MatchMode } from '@/modules/card-search/cardFilterSectionsState';
+import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
+import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
 const scrollContainer = useScrollContainer();
 const { y: scrollTopRef } = useScroll(scrollContainer);
 
@@ -308,6 +181,84 @@ const otherSymbolOptions = computed(() => filterCatalog.value.otherSymbols);
 const cardHeightRem = computed(() => Number((27 * cardScale.value).toFixed(2)));
 const galleryGridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(290 * cardScale.value)}px, 1fr))`,
+}));
+const updateQuery = (value: string): void => {
+  query.value = value;
+};
+
+const updateArrayRef =
+  (target: { value: string[] }) =>
+  (value: string[]): void => {
+    target.value = value;
+  };
+
+const updateStringRef =
+  (target: { value: string }) =>
+  (value: string): void => {
+    target.value = value;
+  };
+
+const updateMatchModeRef =
+  (target: { value: MatchMode }) =>
+  (value: MatchMode): void => {
+    target.value = value;
+  };
+
+const filterSectionsState = computed<CardFilterSectionsState>(() => ({
+  selectedManaTypeSymbolIds: selectedManaTypeSymbolIds.value,
+  onUpdateSelectedManaTypeSymbolIds: updateArrayRef(selectedManaTypeSymbolIds),
+  manaSymbolMatch: manaSymbolMatch.value,
+  onUpdateManaSymbolMatch: updateMatchModeRef(manaSymbolMatch),
+  manaTypeOptions: manaTypeOptions.value,
+  manaCostMin: manaCostMin.value,
+  onUpdateManaCostMin: updateStringRef(manaCostMin),
+  manaCostMax: manaCostMax.value,
+  onUpdateManaCostMax: updateStringRef(manaCostMax),
+  resetManaGroup,
+  selectedTypeIds: selectedTypeIds.value,
+  onUpdateSelectedTypeIds: updateArrayRef(selectedTypeIds),
+  typeMatch: typeMatch.value,
+  onUpdateTypeMatch: updateMatchModeRef(typeMatch),
+  typeOptions: filters.value.types,
+  resetTypeGroup,
+  selectedAffinitySymbolIds: selectedAffinitySymbolIds.value,
+  onUpdateSelectedAffinitySymbolIds: updateArrayRef(selectedAffinitySymbolIds),
+  affinitySymbolMatch: affinitySymbolMatch.value,
+  onUpdateAffinitySymbolMatch: updateMatchModeRef(affinitySymbolMatch),
+  affinityTypeOptions: affinityTypeOptions.value,
+  resetAffinityGroup,
+  selectedDevotionSymbolIds: selectedDevotionSymbolIds.value,
+  onUpdateSelectedDevotionSymbolIds: updateArrayRef(selectedDevotionSymbolIds),
+  devotionSymbolMatch: devotionSymbolMatch.value,
+  onUpdateDevotionSymbolMatch: updateMatchModeRef(devotionSymbolMatch),
+  devotionTypeOptions: devotionTypeOptions.value,
+  resetDevotionGroup,
+  selectedOtherSymbolIds: selectedOtherSymbolIds.value,
+  onUpdateSelectedOtherSymbolIds: updateArrayRef(selectedOtherSymbolIds),
+  otherSymbolMatch: otherSymbolMatch.value,
+  onUpdateOtherSymbolMatch: updateMatchModeRef(otherSymbolMatch),
+  otherSymbolOptions: otherSymbolOptions.value,
+  resetGenericGroup,
+  attackMin: attackMin.value,
+  onUpdateAttackMin: updateStringRef(attackMin),
+  attackMax: attackMax.value,
+  onUpdateAttackMax: updateStringRef(attackMax),
+  healthMin: healthMin.value,
+  onUpdateHealthMin: updateStringRef(healthMin),
+  healthMax: healthMax.value,
+  onUpdateHealthMax: updateStringRef(healthMax),
+  selectedKeywordIds: selectedKeywordIds.value,
+  onUpdateSelectedKeywordIds: updateArrayRef(selectedKeywordIds),
+  keywordMatch: keywordMatch.value,
+  onUpdateKeywordMatch: updateMatchModeRef(keywordMatch),
+  keywordOptions: filters.value.keywords,
+  resetKeywordGroup,
+  selectedTagIds: selectedTagIds.value,
+  onUpdateSelectedTagIds: updateArrayRef(selectedTagIds),
+  tagMatch: tagMatch.value,
+  onUpdateTagMatch: updateMatchModeRef(tagMatch),
+  tagOptions: filters.value.tags,
+  resetTagGroup,
 }));
 
 const resetManaGroup = (): void => {

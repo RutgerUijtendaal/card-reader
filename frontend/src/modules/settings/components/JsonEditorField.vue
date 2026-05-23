@@ -87,7 +87,7 @@
         class="theme-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
         @click.self="showExample = false"
       >
-        <div class="theme-popover w-full max-w-2xl shadow-xl">
+        <div class="theme-popover flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden shadow-xl">
           <div class="flex items-start justify-between gap-4">
             <div>
               <h3 class="theme-section-title text-base font-semibold">
@@ -106,7 +106,7 @@
             </button>
           </div>
 
-          <pre class="theme-card-frame-muted theme-section-title mt-4 overflow-x-auto rounded-lg p-4 text-xs"><code>{{ exampleJson }}</code></pre>
+          <pre class="theme-card-frame-muted theme-section-title app-scrollbar mt-4 min-h-0 flex-1 overflow-auto rounded-lg p-4 text-xs"><code>{{ exampleJson }}</code></pre>
         </div>
       </div>
     </Teleport>

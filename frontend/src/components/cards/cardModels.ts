@@ -19,6 +19,7 @@ export type CardHoverTooltipModel = {
   id: string;
   key: string;
   label: string;
+  is_hero: boolean;
   template_id: string;
   version_id: string;
   version_number: number;

@@ -7,7 +7,7 @@
         @click="goBack"
       >
         <ArrowLeft class="h-4 w-4" />
-        <span>Back to Gallery</span>
+        <span>{{ backButtonLabel }}</span>
       </button>
 
       <div
@@ -116,6 +116,7 @@
           @toggle-group="toggleMetadataSelection"
           @update-group-search="setMetadataSearch"
           @update-field="updateField"
+          @update-hero="updateHero"
         />
       </div>
     </div>
@@ -155,6 +156,7 @@ const {
   form,
   selectedVersion,
   isBusy,
+  backButtonLabel,
   goBack,
   goToPreviousCard,
   goToNextCard,
@@ -186,6 +188,10 @@ const {
 
 const updateField = (fieldName: ScalarFieldName, value: string): void => {
   form[fieldName] = value;
+};
+
+const updateHero = (value: boolean): void => {
+  form.is_hero = value;
 };
 
 onMounted(loadCard);

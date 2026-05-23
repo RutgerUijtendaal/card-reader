@@ -11,6 +11,10 @@ def can_manage_settings(user: Any) -> bool:
     return is_authenticated(user) and bool(getattr(user, "is_staff", False))
 
 
+def can_access_authenticated_features(user: Any) -> bool:
+    return is_authenticated(user)
+
+
 def can_manage_users(user: Any) -> bool:
     return can_manage_settings(user)
 
@@ -21,6 +25,7 @@ def can_access_maintenance(user: Any) -> bool:
 
 def capability_payload(user: Any) -> dict[str, bool]:
     return {
+        "can_access_authenticated_features": can_access_authenticated_features(user),
         "can_manage_settings": can_manage_settings(user),
         "can_manage_users": can_manage_users(user),
         "can_access_maintenance": can_access_maintenance(user),

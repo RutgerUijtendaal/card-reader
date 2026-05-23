@@ -2,7 +2,7 @@
   <div class="grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-[260px_1fr]">
     <aside class="app-sidebar app-scrollbar flex h-full flex-col overflow-y-auto px-6 py-7">
       <h1 class="mb-4 text-2xl font-semibold">
-        Card Reader
+        Cards
       </h1>
       <nav class="grid gap-2">
         <RouterLink
@@ -10,7 +10,15 @@
           to="/cards"
         >
           <Images class="h-4 w-4" />
-          <span>Card Gallery</span>
+          <span>Gallery</span>
+        </RouterLink>
+
+        <RouterLink
+          class="nav-link"
+          to="/decks"
+        >
+          <BookOpen class="h-4 w-4" />
+          <span>Decks</span>
         </RouterLink>
 
         <RouterLink
@@ -84,7 +92,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ClipboardCheck, Images, LogIn, LogOut, Settings, Upload } from 'lucide-vue-next';
+import { BookOpen, ClipboardCheck, Images, LogIn, LogOut, Settings, Upload } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 import { useRouter } from 'vue-router';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';

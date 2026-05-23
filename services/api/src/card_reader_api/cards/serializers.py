@@ -36,6 +36,7 @@ class CardFilterParams(TypedDict):
     mana_cost_min: int | None
     mana_cost_max: int | None
     template_id: str | None
+    is_hero: bool | None
     attack_min: int | None
     attack_max: int | None
     health_min: int | None
@@ -64,6 +65,7 @@ def card_payload(
         "key": card.key,
         "label": card.label,
         "name": version.name,
+        "is_hero": card.is_hero,
         "template_id": version.template.key,
         "version_id": version.id,
         "version_number": version.version_number,
@@ -210,6 +212,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     mana_cost_min = serializers.IntegerField(required=False, allow_null=True)
     mana_cost_max = serializers.IntegerField(required=False, allow_null=True)
     template_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    is_hero = serializers.BooleanField(required=False, allow_null=True)
     attack_min = serializers.IntegerField(required=False, allow_null=True)
     attack_max = serializers.IntegerField(required=False, allow_null=True)
     health_min = serializers.IntegerField(required=False, allow_null=True)
@@ -240,6 +243,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "mana_cost_min": self._int_or_none("mana_cost_min"),
             "mana_cost_max": self._int_or_none("mana_cost_max"),
             "template_id": self._string_or_none("template_id"),
+            "is_hero": self._bool_or_none("is_hero"),
             "attack_min": self._int_or_none("attack_min"),
             "attack_max": self._int_or_none("attack_max"),
             "health_min": self._int_or_none("health_min"),
@@ -267,6 +271,10 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         value = self.validated_data.get(key)
         return value if isinstance(value, int) else None
 
+    def _bool_or_none(self, key: str) -> bool | None:
+        value = self.validated_data.get(key)
+        return value if isinstance(value, bool) else None
+
     def _required_int(self, key: str) -> int:
         value = self.validated_data.get(key)
         return value if isinstance(value, int) else 0
@@ -287,6 +295,7 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     health = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    is_hero = serializers.BooleanField(required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -315,6 +324,8 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
                 updates[field_name] = self.validated_data[field_name]
         if "rules_text_enriched" in self.validated_data:
             updates["rules_text"] = self.validated_data["rules_text_enriched"]
+        if "is_hero" in self.validated_data:
+            updates["is_hero"] = self.validated_data["is_hero"]
         for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):
             if field_name in self.validated_data:
                 updates[field_name] = self.validated_data[field_name]
