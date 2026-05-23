@@ -7,7 +7,7 @@
       @click="toggle"
     >
       <SlidersHorizontal class="h-4 w-4" />
-      <span>Gallery Options</span>
+      <span>View Options</span>
     </button>
 
     <Teleport to="body">
@@ -24,7 +24,7 @@
                 Tooltip
               </p>
               <p class="theme-section-muted text-xs">
-                Show card details on hover in the gallery.
+                Show card details on hover.
               </p>
             </div>
             <input
@@ -62,7 +62,7 @@
                   Card Size
                 </p>
                 <p class="theme-section-muted text-xs">
-                  Scale gallery cards.
+                  Scale card display.
                 </p>
               </div>
               <span class="theme-section-muted text-xs font-medium">

@@ -168,57 +168,48 @@
           <div
             v-for="entry in controller.deck.detailedEntries.value"
             :key="entry.card.id"
-            class="theme-card-frame space-y-3 rounded-2xl p-3"
+            class="theme-card-frame flex items-center gap-3 rounded-2xl px-3 py-2"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="theme-section-title truncate text-sm font-semibold">
-                  {{ entry.card.name }}
-                </p>
-                <p class="theme-section-muted truncate text-xs">
-                  {{ entry.card.label }}
-                </p>
-              </div>
-              <span class="theme-kicker whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide">
-                {{ entry.card.mana_cost || '-' }}
-              </span>
+            <div class="min-w-0 flex-1">
+              <p class="theme-section-title truncate text-sm font-semibold">
+                {{ entry.card.name }}
+              </p>
             </div>
 
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex items-center gap-2">
-                <button
-                  class="btn-secondary h-8 w-8 px-0"
-                  type="button"
-                  @click="controller.deck.changeQuantity(entry.card.id, -1)"
-                >
-                  -
-                </button>
-                <input
-                  :value="entry.quantity"
-                  class="input-base w-14 px-2 text-center"
-                  type="number"
-                  min="1"
-                  max="4"
-                  @input="controller.deck.setQuantity(entry.card.id, ($event.target as HTMLInputElement).value)"
-                >
-                <button
-                  class="btn-secondary h-8 w-8 px-0"
-                  type="button"
-                  :disabled="entry.quantity >= 4"
-                  @click="controller.deck.changeQuantity(entry.card.id, 1)"
-                >
-                  +
-                </button>
-              </div>
-
+            <div class="flex items-center gap-2">
               <button
-                class="btn-danger-secondary px-2 py-1 text-xs"
+                class="btn-secondary h-8 w-8 px-0"
                 type="button"
-                @click="controller.deck.removeEntry(entry.card.id)"
+                @click="controller.deck.changeQuantity(entry.card.id, -1)"
               >
-                Remove
+                -
+              </button>
+              <input
+                :value="entry.quantity"
+                class="input-base h-8 w-12 px-1 text-center text-sm"
+                type="number"
+                min="1"
+                max="4"
+                @input="controller.deck.setQuantity(entry.card.id, ($event.target as HTMLInputElement).value)"
+              >
+              <button
+                class="btn-secondary h-8 w-8 px-0"
+                type="button"
+                :disabled="entry.quantity >= 4"
+                @click="controller.deck.changeQuantity(entry.card.id, 1)"
+              >
+                +
               </button>
             </div>
+
+            <button
+              class="theme-section-muted shrink-0 px-1 text-base font-semibold transition hover:text-rose-300"
+              type="button"
+              aria-label="Remove card from deck"
+              @click="controller.deck.removeEntry(entry.card.id)"
+            >
+              X
+            </button>
           </div>
         </div>
       </template>

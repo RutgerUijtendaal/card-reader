@@ -8,7 +8,7 @@
           @click="goBack"
         >
           <ArrowLeft class="h-4 w-4" />
-          <span>Back to Gallery</span>
+          <span>{{ backButtonLabel }}</span>
         </button>
 
         <button
@@ -127,6 +127,7 @@ const {
   selectedVersion,
   symbolByKey,
   canEdit,
+  backButtonLabel,
   hasGalleryContext,
   previousCardId,
   nextCardId,

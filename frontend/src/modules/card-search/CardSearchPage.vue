@@ -42,7 +42,21 @@
           :card="card"
           :tooltip-enabled="tooltipEnabled"
           :card-height-rem="cardHeightRem"
-        />
+        >
+          <template
+            v-if="auth.canAccessStaffRoutes"
+            #hover-actions="{ cardItem, isCard, editLocation }"
+          >
+            <RouterLink
+              v-if="isCard && cardItem"
+              :to="editLocation"
+              class="btn-secondary pointer-events-auto gap-1.5 rounded-full px-3 py-1.5 text-xs shadow-xl"
+            >
+              <Pencil class="h-3.5 w-3.5" />
+              <span>Edit</span>
+            </RouterLink>
+          </template>
+        </CardGalleryItem>
       </div>
 
       <div
@@ -68,13 +82,14 @@
 <script setup lang="ts">
 import { useDebounceFn, useIntersectionObserver, useScroll } from '@vueuse/core';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { Download } from 'lucide-vue-next';
+import { Download, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { api } from '@/api/client';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { useScrollContainer } from '@/composables/useScrollContainer';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
+import { useAuthStore } from '@/modules/auth/authStore';
 import type {
   CardFiltersResponse,
   GalleryItem,
@@ -108,6 +123,7 @@ import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
 const scrollContainer = useScrollContainer();
 const { y: scrollTopRef } = useScroll(scrollContainer);
 

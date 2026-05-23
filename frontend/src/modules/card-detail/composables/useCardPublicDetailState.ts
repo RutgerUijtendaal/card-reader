@@ -3,9 +3,9 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import { useAuthStore } from '@/modules/auth/authStore';
+import { buildCardReturnLocation, getCardReturnLabel } from '@/modules/card-detail/cardReturnState';
 import {
   buildCardDetailLocation,
-  buildGalleryLocation,
   useGalleryCardNavigation,
 } from '@/modules/card-search/galleryNavigation';
 import type {
@@ -32,6 +32,7 @@ export const useCardPublicDetailState = () => {
   );
 
   const canEdit = computed(() => auth.canAccessStaffRoutes && selectedVersion.value?.editable);
+  const backButtonLabel = computed(() => `Back to ${getCardReturnLabel(route.query)}`);
 
   const loadCard = async (): Promise<void> => {
     const cardId = String(route.params.id);
@@ -53,7 +54,7 @@ export const useCardPublicDetailState = () => {
   };
 
   const goBack = (): void => {
-    void router.push(buildGalleryLocation(route.query));
+    void router.push(buildCardReturnLocation(route.query));
   };
 
   const openEditor = (): void => {
@@ -98,6 +99,7 @@ export const useCardPublicDetailState = () => {
     selectedVersion,
     symbolByKey,
     canEdit,
+    backButtonLabel,
     hasGalleryContext: galleryNavigation.hasGalleryContext,
     previousCardId: galleryNavigation.previousCardId,
     nextCardId: galleryNavigation.nextCardId,

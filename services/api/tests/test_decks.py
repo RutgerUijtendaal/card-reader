@@ -6,7 +6,21 @@ from itertools import count
 from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 
-from card_reader_core.models import Card, CardVersion, CardVersionType, Deck, ParseResult, Template, Type
+from card_reader_core.models import (
+    Card,
+    CardVersion,
+    CardVersionKeyword,
+    CardVersionSymbol,
+    CardVersionTag,
+    CardVersionType,
+    Deck,
+    Keyword,
+    ParseResult,
+    Symbol,
+    Tag,
+    Template,
+    Type,
+)
 from card_reader_core.services.decks import DeckEntryInput, DeckService
 
 _CARD_NAME_COUNTER = count()
@@ -124,6 +138,49 @@ def _create_card(*, name: str, is_hero: bool, type_labels: list[str] | None = No
     return card
 
 
+def _add_card_metadata(
+    card: Card,
+    *,
+    keyword_labels: list[str] | None = None,
+    tag_labels: list[str] | None = None,
+    symbol_specs: list[tuple[str, str, str]] | None = None,
+) -> None:
+    version = card.latest_version
+    assert version is not None
+
+    for keyword_label in keyword_labels or []:
+        keyword_key = keyword_label.lower().replace(" ", "-")
+        keyword, _created = Keyword.objects.get_or_create(
+            key=keyword_key,
+            defaults={"label": keyword_label, "identifiers_json": []},
+        )
+        CardVersionKeyword.objects.get_or_create(card_version=version, keyword=keyword)
+
+    for tag_label in tag_labels or []:
+        tag_key = tag_label.lower().replace(" ", "-")
+        tag, _created = Tag.objects.get_or_create(
+            key=tag_key,
+            defaults={"label": tag_label, "identifiers_json": []},
+        )
+        CardVersionTag.objects.get_or_create(card_version=version, tag=tag)
+
+    for symbol_key, symbol_label, text_token in symbol_specs or []:
+        symbol, _created = Symbol.objects.get_or_create(
+            key=symbol_key,
+            defaults={
+                "label": symbol_label,
+                "symbol_type": "mana",
+                "detector_type": "template",
+                "detection_config_json": {},
+                "text_enrichment_json": {},
+                "reference_assets_json": [],
+                "text_token": text_token,
+                "enabled": True,
+            },
+        )
+        CardVersionSymbol.objects.get_or_create(card_version=version, symbol=symbol)
+
+
 def _build_mainboard_cards(total_unique: int = 15) -> list[Card]:
     return [_create_card(name=f"Mainboard Card {index}", is_hero=False) for index in range(total_unique)]
 
@@ -201,6 +258,53 @@ def test_deck_payload_includes_card_types() -> None:
     assert [(row["key"], row["label"]) for row in response.json()["hero_card"]["types"]] == [
         ("hero", "Hero"),
         ("mage", "Mage"),
+    ]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_payload_includes_tooltip_metadata() -> None:
+    owner = _create_user("deck-tooltip-owner", "password")
+    hero = _create_card(name="Tooltip Hero", is_hero=True)
+    card = _create_card(name="Tooltip Card", is_hero=False, type_labels=["Equipment", "Amulet"])
+    _add_card_metadata(
+        card,
+        keyword_labels=["Gain"],
+        tag_labels=["Fire"],
+        symbol_specs=[("mana-fire", "Mana - Fire", "{fire}")],
+    )
+
+    filler_cards = [_create_card(name=f"Tooltip Filler {index}", is_hero=False) for index in range(14)]
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Tooltip Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=card.id, quantity=4),
+            *[DeckEntryInput(card_id=filler.id, quantity=4) for filler in filler_cards],
+        ],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
+
+    assert response.status_code == 200
+    payload_card = next(
+        row["card"]
+        for row in response.json()["mainboard"]["entries"]
+        if row["card"]["id"] == card.id
+    )
+    assert payload_card["template_id"] == "deck-test-template"
+    assert payload_card["version_number"] == 1
+    assert payload_card["type_line"] == "Follower"
+    assert payload_card["keywords"] == ["Gain"]
+    assert [(row["key"], row["label"]) for row in payload_card["tags"]] == [("fire", "Fire")]
+    assert [(row["key"], row["label"]) for row in payload_card["types"]] == [
+        ("amulet", "Amulet"),
+        ("equipment", "Equipment"),
+    ]
+    assert [(row["key"], row["label"], row["text_token"]) for row in payload_card["symbols"]] == [
+        ("mana-fire", "Mana - Fire", "{fire}")
     ]
 
 

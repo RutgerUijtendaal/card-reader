@@ -6,10 +6,10 @@ from typing import Any, cast
 from rest_framework import serializers
 from rest_framework.response import Response
 
-from card_reader_api.cards.serializers import metadata_option
-from card_reader_core.models import Card, Deck
+from card_reader_api.cards.serializers import card_payload
+from card_reader_core.models import Card, CardVersion, Deck, Keyword, Symbol, Tag, Type
 from card_reader_core.repositories.cards_repository import get_card_image
-from card_reader_core.services.cards import resolve_card_image_path
+from card_reader_core.services.cards import CardMetadata, resolve_card_image_path
 from card_reader_core.services.decks import DeckService
 
 
@@ -49,21 +49,62 @@ def deck_payload(deck: Deck) -> dict[str, object]:
 
 def deck_card_payload(card: Card) -> dict[str, object]:
     version = card.latest_version
-    image = None if version is None else get_card_image(version.id)
-    types = (
-        []
-        if version is None
-        else [metadata_option(link.type) for link in sorted(cast(Any, version).card_version_types.all(), key=lambda link: link.type.label)]
+    if version is None:
+        return {
+            "id": card.id,
+            "result_type": "card",
+            "key": card.key,
+            "label": card.label,
+            "is_hero": card.is_hero,
+            "template_id": "",
+            "version_id": "",
+            "version_number": 0,
+            "previous_version_id": None,
+            "is_latest": True,
+            "name": card.label,
+            "type_line": "",
+            "mana_cost": "",
+            "mana_symbols": [],
+            "attack": None,
+            "health": None,
+            "rules_text": "",
+            "confidence": 0.0,
+            "created_at": "",
+            "image_url": None,
+            "keywords": [],
+            "tags": [],
+            "symbols": [],
+            "types": [],
+        }
+
+    image = get_card_image(version.id)
+    metadata = _deck_card_metadata(version)
+    return card_payload(
+        card,
+        version,
+        image_url=f"/cards/{card.id}/image" if image and resolve_card_image_path(image) else None,
+        metadata=metadata,
     )
+
+
+def _deck_card_metadata(version: CardVersion) -> CardMetadata:
     return {
-        "id": card.id,
-        "key": card.key,
-        "label": card.label,
-        "name": version.name if version is not None else card.label,
-        "mana_cost": version.mana_cost if version is not None else "",
-        "types": types,
-        "is_hero": card.is_hero,
-        "image_url": f"/cards/{card.id}/image" if image and resolve_card_image_path(image) else None,
+        "keywords": [
+            cast(Keyword, row.keyword)
+            for row in sorted(cast(Any, version).card_version_keywords.all(), key=lambda row: row.keyword.label)
+        ],
+        "tags": [
+            cast(Tag, row.tag)
+            for row in sorted(cast(Any, version).card_version_tags.all(), key=lambda row: row.tag.label)
+        ],
+        "symbols": [
+            cast(Symbol, row.symbol)
+            for row in sorted(cast(Any, version).card_version_symbols.all(), key=lambda row: row.symbol.label)
+        ],
+        "types": [
+            cast(Type, row.type)
+            for row in sorted(cast(Any, version).card_version_types.all(), key=lambda row: row.type.label)
+        ],
     }
 
 

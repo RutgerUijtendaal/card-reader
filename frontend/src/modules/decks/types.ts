@@ -1,17 +1,13 @@
+import type { CardHoverTooltipModel } from '@/components/cards/cardModels';
+
 export type DeckMetadataOption = {
   id: string;
   key: string;
   label: string;
 };
 
-export type DeckCardSummary = {
-  id: string;
-  key: string;
-  label: string;
-  name: string;
-  mana_cost: string;
-  types: DeckMetadataOption[];
-  is_hero: boolean;
+export type DeckCardSummary = CardHoverTooltipModel & {
+  result_type?: 'card';
   image_url: string | null;
 };
 

@@ -3,7 +3,16 @@ from __future__ import annotations
 from django.db import transaction
 from django.db.models import Prefetch, QuerySet
 
-from card_reader_core.models import Card, Deck, DeckEntry, now_utc
+from card_reader_core.models import (
+    Card,
+    CardVersionKeyword,
+    CardVersionSymbol,
+    CardVersionTag,
+    CardVersionType,
+    Deck,
+    DeckEntry,
+    now_utc,
+)
 
 
 def get_cards_by_ids(card_ids: list[str]) -> dict[str, Card]:
@@ -15,7 +24,7 @@ def get_cards_by_ids(card_ids: list[str]) -> dict[str, Card]:
             "latest_version",
             "latest_version__template",
             "latest_version__previous_version",
-        ).prefetch_related("latest_version__card_version_types__type")
+        ).prefetch_related(*_latest_version_metadata_prefetches("latest_version"))
     }
 
 
@@ -23,7 +32,7 @@ def get_deck_card(card_id: str) -> Card | None:
     return (
         Card.objects.filter(id=card_id)
         .select_related("latest_version", "latest_version__template", "latest_version__previous_version")
-        .prefetch_related("latest_version__card_version_types__type")
+        .prefetch_related(*_latest_version_metadata_prefetches("latest_version"))
         .first()
     )
 
@@ -96,7 +105,7 @@ def _deck_queryset() -> QuerySet[Deck]:
         "hero_card__latest_version__template",
         "hero_card__latest_version__previous_version",
     ).prefetch_related(
-        "hero_card__latest_version__card_version_types__type",
+        *_latest_version_metadata_prefetches("hero_card__latest_version"),
         Prefetch(
             "entries",
             queryset=DeckEntry.objects.select_related(
@@ -104,6 +113,27 @@ def _deck_queryset() -> QuerySet[Deck]:
                 "card__latest_version",
                 "card__latest_version__template",
                 "card__latest_version__previous_version",
-            ).prefetch_related("card__latest_version__card_version_types__type").order_by("card__label", "created_at"),
+            ).prefetch_related(*_latest_version_metadata_prefetches("card__latest_version")).order_by("card__label", "created_at"),
         )
+    )
+
+
+def _latest_version_metadata_prefetches(prefix: str) -> tuple[Prefetch, ...]:
+    return (
+        Prefetch(
+            f"{prefix}__card_version_keywords",
+            queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
+        ),
+        Prefetch(
+            f"{prefix}__card_version_tags",
+            queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
+        ),
+        Prefetch(
+            f"{prefix}__card_version_symbols",
+            queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
+        ),
+        Prefetch(
+            f"{prefix}__card_version_types",
+            queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
+        ),
     )

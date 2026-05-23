@@ -22,14 +22,7 @@ export const useDeckEditor = () => {
     const nextLookup = { ...cardLookup.value };
     for (const card of cards) {
       nextLookup[card.id] = {
-        id: card.id,
-        key: card.key,
-        label: card.label,
-        name: card.name,
-        mana_cost: card.mana_cost,
-        types: card.types,
-        is_hero: card.is_hero,
-        image_url: card.image_url,
+        ...card,
       };
     }
     cardLookup.value = nextLookup;

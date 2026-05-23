@@ -2,37 +2,59 @@
   <div class="app-scrollbar min-h-0 overflow-y-auto pr-1">
     <div class="space-y-6">
       <div
-        class="grid gap-6"
+        class="grid gap-6 px-1 pb-3 pt-2"
         :style="controller.gallery.galleryGridStyle.value"
       >
-        <article
+        <CardGalleryItem
           v-for="card in controller.gallery.galleryCards.value"
           :key="card.id"
-          class="theme-card-frame justify-self-center space-y-3 rounded-3xl p-3"
+          class="justify-self-center"
           :style="{
             width: `${controller.gallery.galleryTileWidthRem.value}rem`,
             maxWidth: '100%',
           }"
+          :card="card"
+          :tooltip-enabled="controller.filters.tooltipEnabled.value"
+          :card-height-rem="controller.gallery.cardHeightRem.value"
+          activation-mode="emit"
+          activation-label="Add card to deck"
+          :activation-disabled="controller.deck.galleryActionDisabled(card)"
+          @activate="handleActivate"
         >
-          <CardGalleryItem
-            :card="card"
-            :tooltip-enabled="controller.filters.tooltipEnabled.value"
-            :card-height-rem="controller.gallery.cardHeightRem.value"
-            activation-mode="emit"
-            activation-label="Add card to deck"
-            :activation-disabled="controller.deck.galleryActionDisabled(card)"
-            @activate="handleActivate"
-          />
+          <template #overlay>
+            <div
+              v-if="!controller.deck.isSetupStep.value"
+              class="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3"
+            >
+              <DeckCardCountBadge
+                :quantity="getEntryQuantity(card.id)"
+                :hide-when-zero="true"
+              />
+              <div v-if="getEntryQuantity(card.id) === 0" />
 
-          <button
-            class="btn-secondary w-full justify-center"
-            type="button"
-            :disabled="controller.deck.galleryActionDisabled(card)"
-            @click="controller.deck.handleGalleryAction(card)"
-          >
-            {{ controller.deck.galleryActionLabel(card) }}
-          </button>
-        </article>
+              <div class="pointer-events-none flex items-center gap-2 opacity-0 transition duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
+                <button
+                  class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold disabled:cursor-not-allowed disabled:border-[color:var(--color-disabled-border)] disabled:bg-[color:var(--color-disabled-bg)] disabled:text-[color:var(--color-disabled-text)] disabled:opacity-100"
+                  type="button"
+                  :disabled="getEntryQuantity(card.id) === 0"
+                  aria-label="Remove copy from deck"
+                  @click.stop="removeCopy(card.id)"
+                >
+                  <Minus class="h-4 w-4" />
+                </button>
+                <button
+                  class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold disabled:cursor-not-allowed disabled:border-[color:var(--color-disabled-border)] disabled:bg-[color:var(--color-disabled-bg)] disabled:text-[color:var(--color-disabled-text)] disabled:opacity-100"
+                  type="button"
+                  :disabled="controller.deck.galleryActionDisabled(card)"
+                  aria-label="Add copy to deck"
+                  @click.stop="addCopy(card)"
+                >
+                  <Plus class="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </template>
+        </CardGalleryItem>
       </div>
 
       <div
@@ -57,8 +79,10 @@
 
 <script setup lang="ts">
 import { watchEffect, ref } from 'vue';
+import { Minus, Plus } from 'lucide-vue-next';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import type { GalleryItem } from '@/modules/card-detail/types';
+import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 
 const props = defineProps<{
@@ -72,6 +96,28 @@ const handleActivate = (card: GalleryItem): void => {
     return;
   }
   props.controller.deck.handleGalleryAction(card);
+};
+
+const getEntryQuantity = (cardId: string): number =>
+  props.controller.deck.form.entries.find((entry) => entry.card_id === cardId)?.quantity ?? 0;
+
+const addCopy = (card: GalleryItem): void => {
+  if (card.result_type !== 'card') {
+    return;
+  }
+  props.controller.deck.handleGalleryAction(card);
+};
+
+const removeCopy = (cardId: string): void => {
+  const quantity = getEntryQuantity(cardId);
+  if (quantity <= 0) {
+    return;
+  }
+  if (quantity === 1) {
+    props.controller.deck.removeEntry(cardId);
+    return;
+  }
+  props.controller.deck.changeQuantity(cardId, -1);
 };
 
 watchEffect(() => {

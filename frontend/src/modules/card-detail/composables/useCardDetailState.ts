@@ -2,14 +2,8 @@ import { onKeyStroke } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
-import {
-  buildGalleryLocation,
-  useGalleryCardNavigation,
-} from '@/modules/card-search/galleryNavigation';
-import {
-  buildSettingsReturnLocation,
-  isSettingsReturnQuery,
-} from '@/modules/settings/settingsRouteState';
+import { buildCardReturnLocation, getCardReturnLabel } from '@/modules/card-detail/cardReturnState';
+import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
 import type {
   CardDetail,
   CardFiltersResponse,
@@ -75,13 +69,10 @@ export const useCardDetailState = () => {
   );
 
   const isBusy = computed(() => isSaving.value || isQueuingReparse.value);
+  const backButtonLabel = computed(() => `Back to ${getCardReturnLabel(route.query)}`);
 
   const goBack = (): void => {
-    if (isSettingsReturnQuery(route.query)) {
-      void router.push(buildSettingsReturnLocation(route.query));
-      return;
-    }
-    void router.push(buildGalleryLocation(route.query));
+    void router.push(buildCardReturnLocation(route.query));
   };
 
   const loadCard = async (): Promise<void> => {
@@ -320,6 +311,7 @@ export const useCardDetailState = () => {
     metadataSearch,
     selectedVersion,
     isBusy,
+    backButtonLabel,
     goBack,
     goToPreviousCard: galleryNavigation.goToPreviousCard,
     goToNextCard: () => {
