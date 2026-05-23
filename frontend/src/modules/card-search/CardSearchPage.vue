@@ -38,7 +38,7 @@
       >
         <CardGalleryItem
           v-for="card in cards"
-          :key="card.id"
+          :key="`${card.result_type}:${card.id}`"
           :card="card"
           :tooltip-enabled="tooltipEnabled"
           :card-height-rem="cardHeightRem"
