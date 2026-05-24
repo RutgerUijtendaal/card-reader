@@ -104,7 +104,7 @@ For Docker or production-style local runs:
 cp .env.example .env
 ```
 
-Important settings in [.env.example](C:/Users/rutge/Documents/projects/card-reader/.env.example):
+Important settings in `./.env.example`:
 
 - `CARD_READER_DJANGO_SECRET_KEY`
 - `CARD_READER_ALLOWED_HOSTS`
@@ -119,7 +119,8 @@ Important settings in [.env.example](C:/Users/rutge/Documents/projects/card-read
 Auth is enabled by default.
 
 - Card gallery and card assets are public
-- Import jobs, review, settings, catalog, templates, and exports require a staff user
+- Public deck detail and deck TTS export are available to any viewer who can access the deck
+- Import jobs, review, settings, catalog, templates, and CSV exports require a staff user
 - Maintenance endpoints require a superuser
 
 Local user seed data lives at:
@@ -162,7 +163,7 @@ Set `CARD_READER_APP_DATA_DIR` to override the storage root.
 
 ## Versioning
 
-The root [VERSION](C:/Users/rutge/Documents/projects/card-reader/VERSION) file is the single source of truth for repo versioning.
+The root `VERSION` file is the single source of truth for repo versioning.
 
 Update every tracked manifest version together:
 

@@ -12,6 +12,13 @@ This directory contains the TTS-side importer for deck exports produced by the C
 6. Configure the source card containers in `CONFIG.source_container_guids`.
 7. Run `importCardReaderDeck("...base64...")` with the exported string.
 
+## Access Rules
+
+- TTS deck export is allowed for any viewer who can open the deck detail page.
+- Public decks can therefore be exported by anyone.
+- Private decks can only be exported by their owner.
+- This intentionally differs from the gallery CSV export, which remains staff-only.
+
 ## What The Export Contains
 
 The exported payload is a base64-encoded JSON object with this shape:
