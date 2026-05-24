@@ -6,6 +6,7 @@
 - Ask before editing `AGENTS.md`; update it when project guidance changes.
 - Update `.gitignore` when adding generated, private, or machine-local files.
 - Write scalable, readable code. Fix underlying issues cleanly instead of layering quick fixes.
+- Never write absolute local filesystem paths into committed repository files or docs; use repo-relative paths instead.
 
 ## Purpose
 Card Reader is a Django-backed card parsing platform with a Vue web UI and a

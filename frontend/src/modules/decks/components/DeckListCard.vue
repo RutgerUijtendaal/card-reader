@@ -54,7 +54,7 @@
         >
           <span class="theme-section-muted">
             <span class="theme-section-title font-medium">Cards</span>
-            {{ deck.mainboard.total_cards }} / 60
+            {{ deck.mainboard.total_cards }} / {{ MIN_MAINBOARD_CARD_COUNT }}-{{ MAX_MAINBOARD_CARD_COUNT }}
           </span>
           <span class="theme-section-muted">
             <span class="theme-section-title font-medium">Unique</span>
@@ -108,6 +108,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
+import { MAX_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_CARD_COUNT } from '@/modules/decks/constants';
 import type { DeckRecord } from '@/modules/decks/types';
 
 const props = defineProps<{

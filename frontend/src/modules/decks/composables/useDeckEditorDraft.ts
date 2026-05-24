@@ -1,5 +1,6 @@
 import { computed, reactive, type Ref } from 'vue';
 import type { CardListItem } from '@/modules/card-detail/types';
+import { MAX_DECK_COPIES, MAX_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_CARD_COUNT } from '@/modules/decks/constants';
 import type { DeckCardSummary, DeckMetadataOption, DeckRecord, DeckUpsertRequest } from '@/modules/decks/types';
 
 export type DeckForm = {
@@ -85,10 +86,12 @@ export const useDeckEditorDraft = ({
 
   const validationMessages = computed(() => {
     const messages = [...setupMessages.value];
-    if (totalMainboardCards.value !== 60) messages.push('Deck must contain exactly 60 mainboard cards.');
+    if (totalMainboardCards.value < MIN_MAINBOARD_CARD_COUNT || totalMainboardCards.value > MAX_MAINBOARD_CARD_COUNT) {
+      messages.push(`Deck must contain between ${MIN_MAINBOARD_CARD_COUNT} and ${MAX_MAINBOARD_CARD_COUNT} mainboard cards.`);
+    }
     for (const entry of form.entries) {
-      if (entry.quantity < 1 || entry.quantity > 4) {
-        messages.push('Each mainboard card quantity must stay between 1 and 4.');
+      if (entry.quantity < 1 || entry.quantity > MAX_DECK_COPIES) {
+        messages.push(`Each mainboard card quantity must stay between 1 and ${MAX_DECK_COPIES}.`);
         break;
       }
     }
@@ -144,7 +147,7 @@ export const useDeckEditorDraft = ({
   const addEntry = (card: CardListItem): void => {
     rememberCards([card]);
     const currentQuantity = getEntryQuantity(card.id);
-    if (currentQuantity >= 4 || totalMainboardCards.value >= 60) {
+    if (currentQuantity >= MAX_DECK_COPIES || totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) {
       return;
     }
     if (currentQuantity === 0) {
@@ -152,7 +155,7 @@ export const useDeckEditorDraft = ({
       return;
     }
     form.entries = form.entries.map((entry) =>
-      entry.card_id === card.id ? { ...entry, quantity: Math.min(4, entry.quantity + 1) } : entry,
+      entry.card_id === card.id ? { ...entry, quantity: Math.min(MAX_DECK_COPIES, entry.quantity + 1) } : entry,
     );
   };
 
@@ -163,14 +166,14 @@ export const useDeckEditorDraft = ({
   const changeQuantity = (cardId: string, delta: number): void => {
     form.entries = form.entries.map((entry) =>
       entry.card_id === cardId
-        ? { ...entry, quantity: Math.max(1, Math.min(4, entry.quantity + delta)) }
+        ? { ...entry, quantity: Math.max(1, Math.min(MAX_DECK_COPIES, entry.quantity + delta)) }
         : entry,
     );
   };
 
   const setQuantity = (cardId: string, rawValue: string): void => {
     const parsed = Number.parseInt(rawValue, 10);
-    const quantity = Number.isNaN(parsed) ? 1 : Math.max(1, Math.min(4, parsed));
+    const quantity = Number.isNaN(parsed) ? 1 : Math.max(1, Math.min(MAX_DECK_COPIES, parsed));
     form.entries = form.entries.map((entry) => (entry.card_id === cardId ? { ...entry, quantity } : entry));
   };
 
@@ -181,9 +184,9 @@ export const useDeckEditorDraft = ({
 
     const quantity = getEntryQuantity(card.id);
     if (quantity === 0) return 'Add To Deck';
-    if (quantity >= 4) return 'At Copy Limit';
-    if (totalMainboardCards.value >= 60) return `In Deck (${quantity})`;
-    return `Add Copy (${quantity}/4)`;
+    if (quantity >= MAX_DECK_COPIES) return 'At Copy Limit';
+    if (totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) return `In Deck (${quantity})`;
+    return `Add Copy (${quantity}/${MAX_DECK_COPIES})`;
   };
 
   const galleryActionDisabled = (card: CardListItem): boolean => {
@@ -192,7 +195,7 @@ export const useDeckEditorDraft = ({
     }
 
     const quantity = getEntryQuantity(card.id);
-    return quantity >= 4 || (quantity === 0 && totalMainboardCards.value >= 60);
+    return quantity >= MAX_DECK_COPIES || (quantity === 0 && totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT);
   };
 
   const handleGalleryAction = (card: CardListItem): void => {

@@ -189,6 +189,10 @@ def _valid_entries(cards: Iterable[Card]) -> list[dict[str, object]]:
     return [{"card_id": card.id, "quantity": 4} for card in cards]
 
 
+def _minimum_valid_entries(cards: Iterable[Card]) -> list[dict[str, object]]:
+    return [{"card_id": card.id, "quantity": 4} for card in list(cards)[:10]]
+
+
 @override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_excludes_private_decks() -> None:
     owner = _create_user("deck-public-owner", "password")
@@ -236,6 +240,26 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
 
     assert response.status_code == 200
     assert deck.id not in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_includes_40_card_public_decks() -> None:
+    owner = _create_user("deck-minimum-public-owner", "password")
+    hero = _create_card(name="Minimum Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Minimum Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card["card_id"], quantity=int(card["quantity"])) for card in _minimum_valid_entries(mainboard_cards)],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks")
+
+    assert response.status_code == 200
+    assert deck.id in [row["id"] for row in response.json()]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -457,7 +481,7 @@ def test_deck_create_rejects_non_hero_card_as_hero() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_deck_create_allows_in_progress_drafts() -> None:
+def test_deck_create_allows_invalid_in_progress_drafts() -> None:
     username = "deck-invalid-count-user"
     password = "password"
     _create_user(username, password)
@@ -473,7 +497,7 @@ def test_deck_create_allows_in_progress_drafts() -> None:
             "description": None,
             "is_public": True,
             "hero_card_id": hero.id,
-            "entries": [{"card_id": card.id, "quantity": 3} for card in mainboard_cards],
+            "entries": [{"card_id": card.id, "quantity": 2} for card in mainboard_cards],
         },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -482,7 +506,7 @@ def test_deck_create_allows_in_progress_drafts() -> None:
     assert response.status_code == 201
     assert response.json()["status"]["is_valid"] is False
     assert response.json()["status"]["label"] == "In Progress"
-    assert response.json()["status"]["issues"] == ["Deck must contain exactly 60 mainboard cards."]
+    assert response.json()["status"]["issues"] == ["Deck must contain between 40 and 60 mainboard cards."]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
