@@ -12,6 +12,7 @@ import {
   parseCardFilterRouteQuery,
 } from '@/modules/card-filters/cardFilterState';
 import type { GalleryPageState } from '@/modules/card-search/galleryState';
+import { DEFAULT_CARD_PAGE_SIZE } from '@/modules/card-search/pageSize';
 import type { GalleryItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 
 type GalleryNavigationCard = {
@@ -28,7 +29,7 @@ type GallerySnapshot<TCard extends GalleryNavigationCard> = {
 const galleryCards = ref<GalleryNavigationCard[]>([]);
 const galleryTotalCount = ref(0);
 const galleryNextPage = ref<number | null>(null);
-const galleryPageSize = ref(72);
+const galleryPageSize = ref(DEFAULT_CARD_PAGE_SIZE);
 const gallerySearchParams = ref('');
 const isLoadingMoreCards = ref(false);
 let pendingLoadMorePromise: Promise<void> | null = null;

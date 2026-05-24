@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from card_reader_core.models import Card, CardGroup, CardGroupMember, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
+from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version  # noqa: E402
 from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata_repository import (  # noqa: E402
@@ -599,7 +600,7 @@ def test_cards_list_returns_paginated_payload() -> None:
     payload = response.json()
     assert payload["count"] >= 2
     assert payload["page"] == 1
-    assert payload["page_size"] == 72
+    assert payload["page_size"] == DEFAULT_CARD_PAGE_SIZE
     assert payload["previous_page"] is None
     assert isinstance(payload["results"], list)
     result_ids = {row["id"] for row in payload["results"]}

@@ -20,6 +20,7 @@ CARD_SORT_VALUES = cast(
         CARD_SORT_MANA_DESC,
     ),
 )
+DEFAULT_CARD_PAGE_SIZE = 36
 
 
 @dataclass(frozen=True)

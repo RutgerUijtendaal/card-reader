@@ -106,6 +106,25 @@
           >
         </label>
 
+        <label class="field-label">
+          Cards Per Page
+          <select
+            v-model.number="pageSize"
+            class="input-base"
+          >
+            <option
+              v-for="option in cardPageSizeOptions"
+              :key="option"
+              :value="option"
+            >
+              {{ option }} cards
+            </option>
+          </select>
+          <span class="theme-section-muted text-sm">
+            Default gallery request size for card browsing.
+          </span>
+        </label>
+
         <div class="space-y-2">
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -138,10 +157,12 @@
 import { computed } from 'vue';
 import { Check, SlidersHorizontal } from 'lucide-vue-next';
 import { cardSortOptions } from '@/modules/card-search/cardSort';
+import { CARD_PAGE_SIZE_OPTIONS } from '@/modules/card-search/pageSize';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 import { useCardSortPreferences } from '@/modules/card-search/useCardSortPreferences';
 
 const { defaultSort } = useCardSortPreferences();
-const { tooltipEnabled, cardScale, showCardGroups } = useGalleryOptions();
+const { tooltipEnabled, cardScale, showCardGroups, pageSize } = useGalleryOptions();
+const cardPageSizeOptions = CARD_PAGE_SIZE_OPTIONS;
 const percentLabel = computed(() => `${Math.round(cardScale.value * 100)}%`);
 </script>

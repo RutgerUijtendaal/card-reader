@@ -67,7 +67,7 @@ Core stack:
 ## Auth Rules
 - Auth is enabled by default.
 - Card gallery and card assets are public.
-- Import jobs, review, settings, catalog, templates, and exports require `is_staff=true`.
+- Import jobs, review, admin, catalog, templates, and exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - The Vue app uses Django session auth with CSRF protection.
 - `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.

@@ -1,4 +1,5 @@
 import type { PaginatedCardsResponse } from '@/modules/card-detail/types';
+import { DEFAULT_CARD_PAGE_SIZE } from '@/modules/card-search/pageSize';
 
 type IdentifiableCard = {
   id: string;
@@ -17,7 +18,7 @@ export const createEmptyGalleryPageState = <TCard extends IdentifiableCard>(): G
   count: 0,
   nextPage: 1,
   page: 0,
-  pageSize: 72,
+  pageSize: DEFAULT_CARD_PAGE_SIZE,
 });
 
 export const replaceGalleryPage = <TCard extends IdentifiableCard>(

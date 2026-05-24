@@ -26,9 +26,12 @@
               :tooltip-enabled="tooltipEnabled"
               :card-scale="cardScale"
               :show-card-groups="showCardGroups"
+              :page-size="pageSize"
+              show-page-size-control
               @update:tooltip-enabled="tooltipEnabled = $event"
               @update:card-scale="cardScale = $event"
               @update:show-card-groups="showCardGroups = $event"
+              @update:page-size="pageSize = $event"
             />
           </div>
           <button
@@ -147,7 +150,7 @@ const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.q
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const { exportCardsCsv } = useCsvExport();
-const { tooltipEnabled, cardScale, showCardGroups } = useGalleryOptions();
+const { tooltipEnabled, cardScale, showCardGroups, pageSize } = useGalleryOptions();
 const { defaultSort, overrideSort, effectiveSort, setOverrideSort, clearOverrideSort } = useCardSortSurface('gallery');
 const collection = useCardCollection<GalleryItem>({
   buildSearchParams: () => {
@@ -158,7 +161,7 @@ const collection = useCardCollection<GalleryItem>({
     return appendCardSortSearchParam(params, effectiveSort.value);
   },
   filtersLoaded,
-  pageSize: 72,
+  pageSize,
   identity: (card) => `${card.result_type}:${card.id}`,
 });
 const cards = collection.cards;
@@ -215,7 +218,7 @@ const galleryNavigationSearchParams = computed(() => {
   return params.toString();
 });
 const galleryRequestSignature = computed(
-  () => `${currentRouteSignature.value}::${showCardGroups.value ? 'groups' : 'cards'}::${effectiveSort.value}`,
+  () => `${currentRouteSignature.value}::${showCardGroups.value ? 'groups' : 'cards'}::${effectiveSort.value}::${pageSize.value}`,
 );
 
 watch(

@@ -23,6 +23,7 @@ from .types import (
     CARD_SORT_NAME_ASC,
     CARD_SORT_UPDATED_DESC,
     CARD_SORT_VALUES,
+    DEFAULT_CARD_PAGE_SIZE,
     CardListRow,
     CardSort,
     FieldSourcesPayload,
@@ -35,6 +36,7 @@ from .writes import apply_parsed_fields_to_version, save_parsed_card, update_lat
 __all__ = [
     "CardListRow",
     "DEFAULT_FIELD_SOURCES",
+    "DEFAULT_CARD_PAGE_SIZE",
     "FIELD_SOURCE_AUTO",
     "FIELD_SOURCE_MANUAL",
     "FieldSourcesPayload",

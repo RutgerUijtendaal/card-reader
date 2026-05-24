@@ -6,6 +6,7 @@ import {
   getGallerySnapshot,
   saveGallerySnapshot,
 } from './galleryNavigation';
+import { DEFAULT_CARD_PAGE_SIZE } from './pageSize';
 
 describe('galleryNavigation', () => {
   test('preserves gallery query when building detail links', () => {
@@ -72,7 +73,7 @@ describe('galleryNavigation', () => {
         count: 1,
         nextPage: null,
         page: 1,
-        pageSize: 72,
+        pageSize: DEFAULT_CARD_PAGE_SIZE,
       },
       420,
     );
@@ -84,7 +85,7 @@ describe('galleryNavigation', () => {
         count: 1,
         nextPage: null,
         page: 1,
-        pageSize: 72,
+        pageSize: DEFAULT_CARD_PAGE_SIZE,
       },
       scrollTop: 420,
     });

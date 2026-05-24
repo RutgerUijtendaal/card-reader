@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 from rest_framework import serializers
 
 from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
+from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
 from card_reader_core.repositories.cards_repository import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
 from card_reader_core.rule_text import render_enriched_rule_text
 
@@ -224,7 +225,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     health_max = serializers.IntegerField(required=False, allow_null=True)
     sort = serializers.ChoiceField(choices=CARD_SORT_VALUES, required=False, default=CARD_SORT_UPDATED_DESC)
     page = serializers.IntegerField(required=False, min_value=1, default=1)
-    page_size = serializers.IntegerField(required=False, min_value=1, default=72)
+    page_size = serializers.IntegerField(required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE)
     show_groups = serializers.BooleanField(required=False, default=False)
 
     def validated_filters(self) -> CardFilterParams:

@@ -25,6 +25,7 @@ from .types import (
     CARD_SORT_MANA_DESC,
     CARD_SORT_NAME_ASC,
     CARD_SORT_UPDATED_DESC,
+    DEFAULT_CARD_PAGE_SIZE,
     CardListRow,
     CardSort,
     LatestCardVersionReparseSource,
@@ -61,7 +62,7 @@ def list_cards(
     health_max: int | None = None,
     sort: CardSort = CARD_SORT_UPDATED_DESC,
     page: int = 1,
-    page_size: int = 72,
+    page_size: int = DEFAULT_CARD_PAGE_SIZE,
 ) -> PaginatedCardList:
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
