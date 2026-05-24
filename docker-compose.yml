@@ -19,7 +19,7 @@ services:
     ports:
       - "${CARD_READER_API_BIND:-127.0.0.1}:8000:8000"
     volumes:
-      - "${CARD_READER_PRIVATE_APP_DATA_DIR:-/var/lib/card-reader/private}:/var/lib/card-reader"
+      - "${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}:/var/lib/card-reader"
       - "${CARD_READER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader/public}/images:/var/lib/card-reader/images"
       - "${CARD_READER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader/public}/symbols:/var/lib/card-reader/symbols"
     healthcheck:
@@ -53,7 +53,7 @@ services:
       OPENBLAS_NUM_THREADS: ${OPENBLAS_NUM_THREADS:-1}
       FLAGS_use_mkldnn: ${FLAGS_use_mkldnn:-0}
     volumes:
-      - "${CARD_READER_PRIVATE_APP_DATA_DIR:-/var/lib/card-reader/private}:/var/lib/card-reader"
+      - "${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}:/var/lib/card-reader"
       - "${CARD_READER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader/public}/images:/var/lib/card-reader/images"
       - "${CARD_READER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader/public}/symbols:/var/lib/card-reader/symbols"
     depends_on:
