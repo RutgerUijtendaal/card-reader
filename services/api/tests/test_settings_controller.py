@@ -10,7 +10,6 @@ from django.test import Client
 from card_reader_api.catalog.views import _store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
-from card_reader_api.seeds.templates import DEFAULT_TEMPLATES_FILE, read_template_entries
 from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.settings import settings
@@ -317,10 +316,8 @@ def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> N
 
 
 def test_default_template_seed_uses_region_handler_schema() -> None:
-    entries = read_template_entries(DEFAULT_TEMPLATES_FILE)
-
-    assert len(entries) == 1
-    validated = TemplateService()._validate_template_definition(entries[0].definition_json)
+    template = Template.objects.get(key="mtg-like-v1")
+    validated = TemplateService()._validate_template_definition(template.definition_json)
     assert validated["version"] == 7
     assert [region["parser_type"] for region in validated["regions"]] == [
         "name_mana_cost",
