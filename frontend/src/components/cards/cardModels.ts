@@ -29,11 +29,13 @@ export type CardHoverTooltipModel = {
   type_line: string;
   mana_cost: string;
   mana_symbols: string[];
+  mana_value: number | null;
   attack: number | null;
   health: number | null;
   rules_text: string;
   confidence: number;
   created_at: string;
+  updated_at: string;
   keywords: string[];
   tags: CardTooltipMetadata[];
   symbols: CardTooltipSymbol[];

@@ -2,9 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict, cast
 
 from card_reader_core.models import CardVersion, CardVersionImage, Keyword, Symbol, Tag, Type
+
+CardSort = Literal["updated_desc", "name_asc", "mana_asc", "mana_desc"]
+CARD_SORT_UPDATED_DESC: CardSort = "updated_desc"
+CARD_SORT_NAME_ASC: CardSort = "name_asc"
+CARD_SORT_MANA_ASC: CardSort = "mana_asc"
+CARD_SORT_MANA_DESC: CardSort = "mana_desc"
+CARD_SORT_VALUES = cast(
+    tuple[CardSort, ...],
+    (
+        CARD_SORT_UPDATED_DESC,
+        CARD_SORT_NAME_ASC,
+        CARD_SORT_MANA_ASC,
+        CARD_SORT_MANA_DESC,
+    ),
+)
+DEFAULT_CARD_PAGE_SIZE = 36
 
 
 @dataclass(frozen=True)

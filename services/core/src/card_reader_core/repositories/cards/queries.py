@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from django.db.models import Count, Prefetch, QuerySet
+from django.db.models import Count, F, Prefetch, QuerySet
 
 from card_reader_core.models import (
     Card,
@@ -20,7 +20,17 @@ from card_reader_core.models import (
 from card_reader_core.search.cards import apply_card_search
 
 from .images import resolve_image_file_path
-from .types import CardListRow, LatestCardVersionReparseSource, PaginatedCardList
+from .types import (
+    CARD_SORT_MANA_ASC,
+    CARD_SORT_MANA_DESC,
+    CARD_SORT_NAME_ASC,
+    CARD_SORT_UPDATED_DESC,
+    DEFAULT_CARD_PAGE_SIZE,
+    CardListRow,
+    CardSort,
+    LatestCardVersionReparseSource,
+    PaginatedCardList,
+)
 
 
 def list_cards(
@@ -50,8 +60,9 @@ def list_cards(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
+    sort: CardSort = CARD_SORT_UPDATED_DESC,
     page: int = 1,
-    page_size: int = 72,
+    page_size: int = DEFAULT_CARD_PAGE_SIZE,
 ) -> PaginatedCardList:
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
@@ -81,6 +92,7 @@ def list_cards(
         attack_max=attack_max,
         health_min=health_min,
         health_max=health_max,
+        sort=sort,
     )
 
     total_count = versions.count()
@@ -129,6 +141,7 @@ def list_matching_cards(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
+    sort: CardSort = CARD_SORT_UPDATED_DESC,
 ) -> list[CardListRow]:
     versions = _build_filtered_versions_queryset(
         query=query,
@@ -156,6 +169,7 @@ def list_matching_cards(
         attack_max=attack_max,
         health_min=health_min,
         health_max=health_max,
+        sort=sort,
     )
     return _build_card_list_rows(list(versions))
 
@@ -296,6 +310,7 @@ def _build_filtered_versions_queryset(
     attack_max: int | None,
     health_min: int | None,
     health_max: int | None,
+    sort: CardSort,
 ) -> QuerySet[CardVersion]:
     versions = (
         CardVersion.objects.filter(is_latest=True)
@@ -319,7 +334,6 @@ def _build_filtered_versions_queryset(
                 queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
             ),
         )
-        .order_by("-updated_at")
     )
     versions = apply_card_search(versions, query)
     versions = apply_card_filters(
@@ -346,7 +360,27 @@ def _build_filtered_versions_queryset(
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", other_symbol_ids, match_mode=other_symbol_match)
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
     versions = filter_by_links(versions, CardVersionType, "type_id", type_ids, match_mode=type_match)
-    return versions
+    return _apply_card_sort(versions, sort)
+
+
+def _apply_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySet[CardVersion]:
+    if sort == CARD_SORT_NAME_ASC:
+        return queryset.order_by("name", "card__label", "card__id")
+    if sort == CARD_SORT_MANA_ASC:
+        return queryset.order_by(
+            F("mana_value").asc(nulls_last=True),
+            "name",
+            "card__label",
+            "card__id",
+        )
+    if sort == CARD_SORT_MANA_DESC:
+        return queryset.order_by(
+            F("mana_value").desc(nulls_last=True),
+            "name",
+            "card__label",
+            "card__id",
+        )
+    return queryset.order_by("-updated_at", "card__label", "card__id")
 
 
 def _build_card_list_rows(version_rows: list[CardVersion]) -> list[CardListRow]:

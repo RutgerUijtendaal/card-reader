@@ -12,17 +12,31 @@
       <CardFilterSections :state="filterSectionsState" />
 
       <template #footer>
-        <div class="flex w-full flex-wrap items-center justify-between gap-3">
-          <GalleryOptionsMenu
-            :tooltip-enabled="tooltipEnabled"
-            :card-scale="cardScale"
-            :show-card-groups="showCardGroups"
-            @update:tooltip-enabled="tooltipEnabled = $event"
-            @update:card-scale="cardScale = $event"
-            @update:show-card-groups="showCardGroups = $event"
-          />
+        <div class="flex w-full flex-col gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <CardSortMenu
+              :sort="effectiveSort"
+              :default-sort="defaultSort"
+              :override-active="gallerySortOverride !== null"
+              allow-default-option
+              @update:sort="setGallerySortOverride"
+              @reset="clearGallerySortOverride"
+            />
+            <GalleryOptionsMenu
+              :tooltip-enabled="tooltipEnabled"
+              :card-scale="cardScale"
+              :show-card-groups="showCardGroups"
+              :page-size="pageSize"
+              show-page-size-control
+              @update:tooltip-enabled="tooltipEnabled = $event"
+              @update:card-scale="cardScale = $event"
+              @update:show-card-groups="showCardGroups = $event"
+              @update:page-size="pageSize = $event"
+            />
+          </div>
           <button
-            class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+            v-if="auth.canAccessStaffRoutes"
+            class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
             type="button"
             @click="exportCsv"
           >
@@ -89,6 +103,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/composables/useCsvExport';
 import { useScrollContainer } from '@/composables/useScrollContainer';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
+import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import type { GalleryItem } from '@/modules/card-detail/types';
@@ -106,6 +121,8 @@ import {
   saveGallerySnapshot,
   setGalleryNavigationCards,
 } from '@/modules/card-search/galleryNavigation';
+import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
+import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
 import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
 import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
 import { useCardCollection } from '@/modules/card-search/useCardCollection';
@@ -133,17 +150,18 @@ const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.q
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const { exportCardsCsv } = useCsvExport();
-const { tooltipEnabled, cardScale, showCardGroups } = useGalleryOptions();
+const { tooltipEnabled, cardScale, showCardGroups, pageSize } = useGalleryOptions();
+const { defaultSort, overrideSort, effectiveSort, setOverrideSort, clearOverrideSort } = useCardSortSurface('gallery');
 const collection = useCardCollection<GalleryItem>({
   buildSearchParams: () => {
     const params = buildCardFilterApiSearchParams(selectionState.value);
     if (showCardGroups.value) {
       params.set('show_groups', 'true');
     }
-    return params;
+    return appendCardSortSearchParam(params, effectiveSort.value);
   },
   filtersLoaded,
-  pageSize: 72,
+  pageSize,
   identity: (card) => `${card.result_type}:${card.id}`,
 });
 const cards = collection.cards;
@@ -155,6 +173,7 @@ const cardHeightRem = computed(() => Number((27 * cardScale.value).toFixed(2)));
 const galleryGridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(290 * cardScale.value)}px, 1fr))`,
 }));
+const gallerySortOverride = computed(() => overrideSort.value);
 
 const restoreScroll = (value: number): void => {
   window.requestAnimationFrame(() => {
@@ -163,7 +182,16 @@ const restoreScroll = (value: number): void => {
 };
 
 const exportCsv = async (): Promise<void> => {
-  await exportCardsCsv(buildCardFilterApiSearchParams(selectionState.value));
+  const params = buildCardFilterApiSearchParams(selectionState.value);
+  await exportCardsCsv(appendCardSortSearchParam(params, effectiveSort.value));
+};
+
+const setGallerySortOverride = (value: typeof effectiveSort.value): void => {
+  setOverrideSort(value);
+};
+
+const clearGallerySortOverride = (): void => {
+  clearOverrideSort();
 };
 
 const debouncedUpdateRoute = useDebounceFn(() => {
@@ -186,10 +214,11 @@ const galleryNavigationSearchParams = computed(() => {
   if (showCardGroups.value) {
     params.set('show_groups', 'true');
   }
+  appendCardSortSearchParam(params, effectiveSort.value);
   return params.toString();
 });
 const galleryRequestSignature = computed(
-  () => `${currentRouteSignature.value}::${showCardGroups.value ? 'groups' : 'cards'}`,
+  () => `${currentRouteSignature.value}::${showCardGroups.value ? 'groups' : 'cards'}::${effectiveSort.value}::${pageSize.value}`,
 );
 
 watch(

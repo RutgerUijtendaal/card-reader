@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import csv
 import io
+from typing import TYPE_CHECKING
 
 from card_reader_core.models import Symbol
+from card_reader_core.repositories.cards_repository import CARD_SORT_UPDATED_DESC
 from card_reader_core.rule_text import render_enriched_rule_text
 
 from .cards_repository import list_cards
 from .metadata_repository import (
     list_symbols,
 )
+
+if TYPE_CHECKING:
+    from card_reader_core.repositories.cards_repository import CardSort
 
 
 def export_cards_csv(
@@ -38,6 +43,7 @@ def export_cards_csv(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
+    sort: CardSort = CARD_SORT_UPDATED_DESC,
 ) -> str:
     stream = io.StringIO()
     writer = csv.DictWriter(
@@ -88,6 +94,7 @@ def export_cards_csv(
             attack_max=attack_max,
             health_min=health_min,
             health_max=health_max,
+            sort=sort,
             page=page,
             page_size=page_size,
         )

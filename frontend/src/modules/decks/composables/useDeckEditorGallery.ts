@@ -1,6 +1,7 @@
 import { computed, type Ref } from 'vue';
 import type { CardListItem } from '@/modules/card-detail/types';
 import type { CardFilterSelectionState } from '@/modules/card-filters/cardFilterState';
+import type { CardSort } from '@/modules/card-search/cardSort';
 import { useCardCollection } from '@/modules/card-search/useCardCollection';
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 
@@ -9,6 +10,7 @@ type UseDeckEditorGalleryOptions = {
   buildSearchParams: () => URLSearchParams;
   selectionState: Readonly<Ref<CardFilterSelectionState>>;
   builderStep: Ref<BuilderStep>;
+  sort: Ref<CardSort>;
   cardScale: Ref<number>;
   rememberCards: (cards: CardListItem[]) => void;
 };
@@ -18,6 +20,7 @@ export const useDeckEditorGallery = ({
   buildSearchParams,
   selectionState,
   builderStep,
+  sort,
   cardScale,
   rememberCards,
 }: UseDeckEditorGalleryOptions) => {
@@ -30,7 +33,7 @@ export const useDeckEditorGallery = ({
     },
     filtersLoaded,
     pageSize: computed(() => (isSetupStep.value ? 24 : 30)),
-    watchSource: [selectionState, isSetupStep],
+    watchSource: [selectionState, isSetupStep, sort],
     onResults: rememberCards,
   });
 

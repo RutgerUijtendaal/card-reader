@@ -1,16 +1,19 @@
 import { computed } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
+import { DEFAULT_CARD_PAGE_SIZE, normalizeCardPageSize } from '@/modules/card-search/pageSize';
 
 type GalleryOptionsState = {
   tooltipEnabled: boolean;
   cardScale: number;
   showCardGroups: boolean;
+  pageSize: number;
 };
 
 const DEFAULT_OPTIONS: GalleryOptionsState = {
   tooltipEnabled: true,
   cardScale: 1,
   showCardGroups: true,
+  pageSize: DEFAULT_CARD_PAGE_SIZE,
 };
 
 const clampScale = (value: number): number => Math.min(1.2, Math.max(0.8, value));
@@ -50,9 +53,20 @@ export const useGalleryOptions = () => {
     },
   });
 
+  const pageSize = computed({
+    get: () => normalizeCardPageSize(storedOptions.value.pageSize),
+    set: (value: number) => {
+      storedOptions.value = {
+        ...storedOptions.value,
+        pageSize: normalizeCardPageSize(value),
+      };
+    },
+  });
+
   return {
     tooltipEnabled,
     cardScale,
     showCardGroups,
+    pageSize,
   };
 };

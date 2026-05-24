@@ -59,11 +59,15 @@ Core stack:
 - Persist imported images under the configured storage root using hash-based filenames.
 - Keep parser provider-agnostic. PaddleOCR is the default behind parser-owned adapter boundaries.
 - Keep Vue API compatibility stable unless a requested change explicitly requires a contract change.
+- Card sorting follows collection ownership:
+  - paginated or query-backed card collections should sort in the backend
+  - already-loaded embedded card collections may sort client-side for presentation
+  - shared sort keys and semantics must stay aligned across both layers
 
 ## Auth Rules
 - Auth is enabled by default.
 - Card gallery and card assets are public.
-- Import jobs, review, settings, catalog, templates, and exports require `is_staff=true`.
+- Import jobs, review, admin, catalog, templates, and exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - The Vue app uses Django session auth with CSRF protection.
 - `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.

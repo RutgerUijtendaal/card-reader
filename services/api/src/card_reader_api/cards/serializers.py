@@ -4,10 +4,13 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 from rest_framework import serializers
 
 from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
+from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
+from card_reader_core.repositories.cards_repository import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
 from card_reader_core.rule_text import render_enriched_rule_text
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardGroup
+    from card_reader_core.repositories.cards_repository import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MetadataOption = Keyword | Tag | Type
@@ -41,6 +44,7 @@ class CardFilterParams(TypedDict):
     attack_max: int | None
     health_min: int | None
     health_max: int | None
+    sort: CardSort
 
 
 class CardListFilterParams(CardFilterParams):
@@ -74,12 +78,14 @@ def card_payload(
         "type_line": version.type_line,
         "mana_cost": version.mana_cost,
         "mana_symbols": _decode_mana_symbols(version.mana_symbols_json),
+        "mana_value": version.mana_value,
         "attack": version.attack,
         "health": version.health,
         "rules_text_enriched": version.rules_text_enriched or version.rules_text,
         "rules_text": rendered_rule_text,
         "confidence": version.confidence,
         "created_at": version.created_at.isoformat(),
+        "updated_at": version.updated_at.isoformat(),
         "image_url": image_url,
         "editable": version.is_latest,
         "keyword_ids": [],
@@ -217,8 +223,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     attack_max = serializers.IntegerField(required=False, allow_null=True)
     health_min = serializers.IntegerField(required=False, allow_null=True)
     health_max = serializers.IntegerField(required=False, allow_null=True)
+    sort = serializers.ChoiceField(choices=CARD_SORT_VALUES, required=False, default=CARD_SORT_UPDATED_DESC)
     page = serializers.IntegerField(required=False, min_value=1, default=1)
-    page_size = serializers.IntegerField(required=False, min_value=1, default=72)
+    page_size = serializers.IntegerField(required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE)
     show_groups = serializers.BooleanField(required=False, default=False)
 
     def validated_filters(self) -> CardFilterParams:
@@ -248,6 +255,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "attack_max": self._int_or_none("attack_max"),
             "health_min": self._int_or_none("health_min"),
             "health_max": self._int_or_none("health_max"),
+            "sort": self._sort_value("sort"),
         }
 
     def validated_list_filters(self) -> CardListFilterParams:
@@ -278,6 +286,10 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     def _required_int(self, key: str) -> int:
         value = self.validated_data.get(key)
         return value if isinstance(value, int) else 0
+
+    def _sort_value(self, key: str) -> CardSort:
+        value = self.validated_data.get(key)
+        return value if value in CARD_SORT_VALUES else CARD_SORT_UPDATED_DESC
 
     def _string_list_or_none(self, key: str) -> list[str] | None:
         value = self.validated_data.get(key)

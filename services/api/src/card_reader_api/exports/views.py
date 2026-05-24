@@ -51,6 +51,7 @@ class ExportCsvView(APIView):
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
             health_max=filters["health_max"],
+            sort=filters["sort"],
         )
         response = HttpResponse(content, content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=cards.csv"
@@ -76,7 +77,7 @@ class DeckTtsExportView(APIView):
 
 
 def _query_data(request: Request) -> dict[str, object]:
-    return {
+    data: dict[str, object] = {
         "query": request.query_params.get("q"),
         "max_confidence": request.query_params.get("max_confidence"),
         "keyword_ids": request.query_params.getlist("keyword_ids"),
@@ -102,6 +103,10 @@ def _query_data(request: Request) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+    sort = request.query_params.get("sort")
+    if sort is not None:
+        data["sort"] = sort
+    return data
 
 
 def _user_id(request: Request) -> str:
