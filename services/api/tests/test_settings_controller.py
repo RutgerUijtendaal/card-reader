@@ -316,7 +316,58 @@ def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> N
 
 
 def test_default_template_seed_uses_region_handler_schema() -> None:
-    template = Template.objects.get(key="mtg-like-v1")
+    template = Template.objects.create(
+        key="default-template-schema-test",
+        label="Default Template Schema Test",
+        definition_json={
+            "id": "mtg-like-v1",
+            "version": 7,
+            "regions": [
+                {
+                    "region_id": "top_bar",
+                    "parser_type": "name_mana_cost",
+                    "cut_region": {"unit": "relative", "x": 0.04, "y": 0.02, "w": 0.92, "h": 0.07},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "type_bar",
+                    "parser_type": "type_tag",
+                    "cut_region": {"unit": "relative", "x": 0.04, "y": 0.54, "w": 0.92, "h": 0.05},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "rules_text",
+                    "parser_type": "rules_text",
+                    "cut_region": {"unit": "relative", "x": 0.07, "y": 0.6, "w": 0.86, "h": 0.32},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "rules_text_fallback",
+                    "parser_type": "rules_text",
+                    "cut_region": {"unit": "relative", "x": 0.07, "y": 0.7, "w": 0.86, "h": 0.12},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "bottom_left",
+                    "parser_type": "attack",
+                    "cut_region": {"unit": "relative", "x": 0.01, "y": 0.9, "w": 0.14, "h": 0.09},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "bottom_middle",
+                    "parser_type": "affinity",
+                    "cut_region": {"unit": "relative", "x": 0.37, "y": 0.93, "w": 0.26, "h": 0.06},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "bottom_right",
+                    "parser_type": "health",
+                    "cut_region": {"unit": "relative", "x": 0.85, "y": 0.9, "w": 0.14, "h": 0.08},
+                    "ocr_config": {},
+                },
+            ],
+        },
+    )
     validated = TemplateService()._validate_template_definition(template.definition_json)
     assert validated["version"] == 7
     assert [region["parser_type"] for region in validated["regions"]] == [

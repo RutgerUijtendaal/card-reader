@@ -11,11 +11,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_api.project.setting
 
 import django  # noqa: E402
 from card_reader_core.database.connection import initialize_database  # noqa: E402
-from card_reader_core.models import Template  # noqa: E402
 from django.core.management import call_command  # noqa: E402
 
 initialize_database()
 django.setup()
+from card_reader_core.models import Keyword, Symbol, Tag, Template, Type  # noqa: E402
 
 
 def _default_template_definition() -> dict[str, object]:
@@ -69,6 +69,55 @@ def _default_template_definition() -> dict[str, object]:
     }
 
 
+def _seed_default_catalog_rows() -> None:
+    for key, label in [
+        ("arrival", "Arrival"),
+        ("banish", "Banish"),
+    ]:
+        Keyword.objects.update_or_create(
+            key=key,
+            defaults={"label": label, "identifiers_json": [label.lower()]},
+        )
+
+    for key, label in [
+        ("animal", "Animal"),
+        ("spirit", "Spirit"),
+    ]:
+        Tag.objects.update_or_create(
+            key=key,
+            defaults={"label": label, "identifiers_json": [label.lower()]},
+        )
+
+    for key, label in [
+        ("creature", "Creature"),
+        ("unique", "Unique"),
+    ]:
+        Type.objects.update_or_create(
+            key=key,
+            defaults={"label": label, "identifiers_json": [label.lower()]},
+        )
+
+    for key, label, symbol_type, text_token in [
+        ("arcane-mana", "Arcane Mana", "mana", "{AM}"),
+        ("occult-mana", "Occult Mana", "mana", "{OM}"),
+        ("arcane-affinity", "Arcane Affinity", "affinity", "{AFFINITY:ARCANE}"),
+        ("occult-affinity", "Occult Affinity", "affinity", "{AFFINITY:OCCULT}"),
+    ]:
+        Symbol.objects.update_or_create(
+            key=key,
+            defaults={
+                "label": label,
+                "symbol_type": symbol_type,
+                "detector_type": "template",
+                "detection_config_json": {},
+                "text_enrichment_json": {},
+                "reference_assets_json": [],
+                "text_token": text_token,
+                "enabled": True,
+            },
+        )
+
+
 call_command("migrate", interactive=False, verbosity=0)
 Template.objects.update_or_create(
     key="mtg-like-v1",
@@ -77,3 +126,4 @@ Template.objects.update_or_create(
         "definition_json": _default_template_definition(),
     },
 )
+_seed_default_catalog_rows()
