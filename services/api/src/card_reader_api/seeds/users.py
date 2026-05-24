@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import CommandError
-
-from .shared import resolve_seed_file
-
-LOCAL_USERS_SEED_FILE = resolve_seed_file("seed-users.local.json")
-
 
 @dataclass(frozen=True)
 class SeedUser:
@@ -119,3 +115,14 @@ def _optional_bool(raw_user: dict[str, Any], key: str, *, index: int) -> bool | 
     if not isinstance(value, bool):
         raise CommandError(f"Seed user at index {index} has invalid '{key}'.")
     return value
+
+
+def _resolve_seed_file(relative_from_seed_root: str) -> Path:
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", "")
+        if meipass:
+            return Path(meipass) / "seeds" / relative_from_seed_root
+    return Path(__file__).resolve().parent / relative_from_seed_root
+
+
+LOCAL_USERS_SEED_FILE = _resolve_seed_file("seed-users.local.json")

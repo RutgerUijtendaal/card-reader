@@ -32,6 +32,7 @@ services/*/build/
 .vscode/
 .idea/
 .tmp/
+services/integration/.runtime/
 *.spec
 services/api/src/card_reader_api/seeds/seed-users.local.json
 TICKET*

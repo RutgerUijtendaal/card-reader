@@ -36,7 +36,8 @@ class RuleTextEnricher:
             len(detected_symbols),
             len(symbols),
         )
-        cleaned_text = _normalize_ocr_text(raw_text)
+        normalized_raw_text = _normalize_ocr_text(raw_text)
+        cleaned_text = normalized_raw_text
         symbols_by_id = {symbol.id: symbol for symbol in symbols}
         symbol_tokens_by_key = {symbol.key: symbol.text_token for symbol in symbols}
         detections_by_symbol_id = _group_detections_by_symbol_id(detected_symbols)
@@ -161,7 +162,7 @@ class RuleTextEnricher:
             len(applied_anchors),
         )
         return RuleTextEnrichmentResult(
-            raw_text=raw_text,
+            raw_text=normalized_raw_text,
             cleaned_text=cleaned_text,
             enriched_text=enriched_text,
             rendered_text=rendered_text,

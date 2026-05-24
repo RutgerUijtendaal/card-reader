@@ -1,0 +1,120 @@
+{
+  "input": {
+    "image": "cards/ptuyan-raven.webp",
+    "template_key": "mtg-like-v1",
+    "job_options": {
+      "reparse_existing": true
+    }
+  },
+  "expected": {
+    "card": {
+      "key": "ptuyan-raven",
+      "label": "Ptuyan Raven"
+    },
+    "fields": {
+      "template_key": "mtg-like-v1",
+      "name": "Ptuyan Raven",
+      "type_line": "Creature - Animal Spirit",
+      "mana_cost": "2",
+      "mana_symbols": [
+        "arcane-mana",
+        "occult-mana"
+      ],
+      "attack": 0,
+      "health": 4,
+      "rules_text_raw": "Familiar.\n(Setup: If this is the only card with Familiar in this deck\nbanish it and you may play this card from any zone.)\nFlying.\nArrival, Turn start: Name a card.\nSpells targeting non-boss cards with\nthe chosen name cost 1 less to play.",
+      "rules_text_enriched": "Familiar.\n(Setup: If this is the only card with Familiar in this deck\nbanish it and you may play this card from any zone.)\nFlying.\nArrival, Turn start: Name a card.\nSpells targeting non-boss cards with\nthe chosen name cost [[symbol:colorless-mana-1]] less to play.",
+      "rules_text": "Familiar.\n(Setup: If this is the only card with Familiar in this deck\nbanish it and you may play this card from any zone.)\nFlying.\nArrival, Turn start: Name a card.\nSpells targeting non-boss cards with\nthe chosen name cost {C1} less to play.",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [
+        "arrival",
+        "banish",
+        "familiar",
+        "flying",
+        "name",
+        "setup",
+        "turn-start"
+      ],
+      "tags": [
+        "animal",
+        "spirit"
+      ],
+      "symbols": [
+        "arcane-mana",
+        "colorless-mana-1",
+        "occult-mana"
+      ],
+      "types": [
+        "creature"
+      ],
+      "symbol_types": {
+        "arcane-mana": "mana",
+        "colorless-mana-1": "mana",
+        "occult-mana": "mana"
+      }
+    },
+    "suggestions": {
+      "tags": [],
+      "types": []
+    },
+    "snapshot": {
+      "fields": {
+        "name": "Ptuyan Raven",
+        "type_line": "Creature - Animal Spirit",
+        "mana_cost": "2",
+        "attack": 0,
+        "health": 4,
+        "rules_text": "Familiar.\n(Setup: If this is the only card with Familiar in this deck\nbanish it and you may play this card from any zone.)\nFlying.\nArrival, Turn start: Name a card.\nSpells targeting non-boss cards with\nthe chosen name cost [[symbol:colorless-mana-1]] less to play."
+      },
+      "metadata": {
+        "keywords": [
+          "arrival",
+          "banish",
+          "familiar",
+          "flying",
+          "name",
+          "setup",
+          "turn-start"
+        ],
+        "tags": [
+          "animal",
+          "spirit"
+        ],
+        "types": [
+          "creature"
+        ],
+        "symbols": [
+          "arcane-mana",
+          "colorless-mana-1",
+          "occult-mana"
+        ]
+      }
+    },
+    "field_sources": {
+      "fields": {
+        "name": "auto",
+        "type_line": "auto",
+        "mana_cost": "auto",
+        "attack": "auto",
+        "health": "auto",
+        "rules_text": "auto"
+      },
+      "metadata": {
+        "keywords": "auto",
+        "tags": "auto",
+        "types": "auto",
+        "symbols": "auto"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}

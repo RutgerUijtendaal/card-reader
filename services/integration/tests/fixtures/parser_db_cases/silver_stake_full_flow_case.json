@@ -1,16 +1,18 @@
 {
-  "image": "cards/silver-stake.webp",
-  "template_id": "mtg-like-v1",
-  "job_options": {
-    "reparse_existing": true
+  "input": {
+    "image": "cards/silver-stake.webp",
+    "template_key": "mtg-like-v1",
+    "job_options": {
+      "reparse_existing": true
+    }
   },
-  "expected_db": {
+  "expected": {
     "card": {
       "key": "silver-stake",
       "label": "Silver Stake"
     },
-    "latest_version": {
-      "template_id": "mtg-like-v1",
+    "fields": {
+      "template_key": "mtg-like-v1",
       "name": "Silver Stake",
       "type_line": "Equipment - Silver Weapon",
       "mana_cost": "3",
@@ -21,17 +23,19 @@
       ],
       "attack": 2,
       "health": null,
+      "rules_text_raw": "Attach to target exhausted enemy Creature.\nYou cannot activate this card to gain its stats.\nWhile Attached to a non-Boss creature,\nattached creature is silenced, and cannot strike or ready.\nTurn Start: If this card is attached to a Blood, Darkness or\nUndead creature, deal this cards Attack as damage to\nattached creature. If this card is attached to a Boss creature,\ndeal this cards Attack as damage to attached creature.",
+      "rules_text_enriched": "Attach to target exhausted enemy Creature.\nYou cannot activate this card to gain its stats.\nWhile Attached to a non-Boss creature,\nattached creature is silenced, and cannot strike or ready.\nTurn Start: If this card is attached to a Blood, Darkness or\nUndead creature, deal this cards Attack as damage to\nattached creature. If this card is attached to a Boss creature,\ndeal this cards Attack as damage to attached creature.",
       "rules_text": "Attach to target exhausted enemy Creature.\nYou cannot activate this card to gain its stats.\nWhile Attached to a non-Boss creature,\nattached creature is silenced, and cannot strike or ready.\nTurn Start: If this card is attached to a Blood, Darkness or\nUndead creature, deal this cards Attack as damage to\nattached creature. If this card is attached to a Boss creature,\ndeal this cards Attack as damage to attached creature.",
       "version_number": 1
     },
     "metadata": {
       "keywords": [
-        "Attach",
-        "Turn Start"
+        "attach",
+        "turn-start"
       ],
       "tags": [
-        "Silver",
-        "Weapon"
+        "silver",
+        "weapon"
       ],
       "symbols": [
         "colorless-mana-1",
@@ -40,13 +44,62 @@
         "occult-mana"
       ],
       "types": [
-        "Equipment"
+        "equipment"
       ],
       "symbol_types": {
         "colorless-mana-1": "mana",
         "divine-mana": "mana",
-        "occult-mana": "mana",
-        "luna-affinity": "affinity"
+        "luna-affinity": "affinity",
+        "occult-mana": "mana"
+      }
+    },
+    "suggestions": {
+      "tags": [],
+      "types": []
+    },
+    "snapshot": {
+      "fields": {
+        "name": "Silver Stake",
+        "type_line": "Equipment - Silver Weapon",
+        "mana_cost": "3",
+        "attack": 2,
+        "health": null,
+        "rules_text": "Attach to target exhausted enemy Creature.\nYou cannot activate this card to gain its stats.\nWhile Attached to a non-Boss creature,\nattached creature is silenced, and cannot strike or ready.\nTurn Start: If this card is attached to a Blood, Darkness or\nUndead creature, deal this cards Attack as damage to\nattached creature. If this card is attached to a Boss creature,\ndeal this cards Attack as damage to attached creature."
+      },
+      "metadata": {
+        "keywords": [
+          "attach",
+          "turn-start"
+        ],
+        "tags": [
+          "silver",
+          "weapon"
+        ],
+        "types": [
+          "equipment"
+        ],
+        "symbols": [
+          "colorless-mana-1",
+          "divine-mana",
+          "occult-mana",
+          "luna-affinity"
+        ]
+      }
+    },
+    "field_sources": {
+      "fields": {
+        "name": "auto",
+        "type_line": "auto",
+        "mana_cost": "auto",
+        "attack": "auto",
+        "health": "auto",
+        "rules_text": "auto"
+      },
+      "metadata": {
+        "keywords": "auto",
+        "tags": "auto",
+        "types": "auto",
+        "symbols": "auto"
       }
     },
     "job": {

@@ -7,7 +7,7 @@ from pathlib import Path
 from django.core.management import call_command
 from django.db import connection, connections
 
-from card_reader_api.seeds.runner import run_registered_seeds
+from card_reader_api.seeds.users import seed_users_from_config
 from card_reader_core.database.connection import DATABASE_PATH, initialize_database
 from card_reader_core.repositories.cards_repository import list_latest_card_version_reparse_sources
 from card_reader_core.repositories.import_jobs_repository import ImportJobItemTarget, create_import_job_with_files
@@ -77,7 +77,7 @@ class MaintenanceService:
         reset_paths = self._reset_database()
         initialize_database()
         call_command("migrate", interactive=False, verbosity=0)
-        run_registered_seeds(force=False)
+        seed_users_from_config()
         return MaintenanceResult(
             message="Database rebuilt and migrated to latest schema.",
             removed_paths=reset_paths,

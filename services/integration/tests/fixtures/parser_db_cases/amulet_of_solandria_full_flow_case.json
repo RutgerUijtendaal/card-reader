@@ -1,17 +1,18 @@
-
 {
-  "image": "cards/amulet-of-solandria.webp",
-  "template_id": "mtg-like-v1",
-  "job_options": {
-    "reparse_existing": true
+  "input": {
+    "image": "cards/amulet-of-solandria.webp",
+    "template_key": "mtg-like-v1",
+    "job_options": {
+      "reparse_existing": true
+    }
   },
-  "expected_db": {
+  "expected": {
     "card": {
       "key": "amulet-of-solandria",
       "label": "Amulet of Solandria"
     },
-    "latest_version": {
-      "template_id": "mtg-like-v1",
+    "fields": {
+      "template_key": "mtg-like-v1",
       "name": "Amulet of Solandria",
       "type_line": "Equipment - Amulet (1), Fire",
       "mana_cost": "2",
@@ -21,29 +22,80 @@
       ],
       "attack": null,
       "health": null,
-      "rules_text": ": Deal damaget to target attacking\ncreature equal to half your devotion.",
+      "rules_text_raw": ": Deal damaget to target attacking\ncreature equal to half your devotion.",
+      "rules_text_enriched": "[[symbol:exhaust]]: Deal damaget to target attacking\ncreature equal to half your [[symbol:sola-devotion]] devotion.",
+      "rules_text": "{EXHAUST}: Deal damaget to target attacking\ncreature equal to half your {DEVOTION:SOLA} devotion.",
       "version_number": 1
     },
     "metadata": {
       "keywords": [],
       "tags": [
-        "Amulet (1)",
-        "Fire"
+        "amulet-1",
+        "fire"
       ],
       "symbols": [
         "divine-mana",
         "exhaust",
         "martial-mana",
-        "sola-affinity"
+        "sola-affinity",
+        "sola-devotion"
       ],
       "types": [
-        "Equipment"
+        "equipment"
       ],
       "symbol_types": {
         "divine-mana": "mana",
         "exhaust": "generic",
         "martial-mana": "mana",
-        "sola-affinity": "affinity"
+        "sola-affinity": "affinity",
+        "sola-devotion": "devotion"
+      }
+    },
+    "suggestions": {
+      "tags": [],
+      "types": []
+    },
+    "snapshot": {
+      "fields": {
+        "name": "Amulet of Solandria",
+        "type_line": "Equipment - Amulet (1), Fire",
+        "mana_cost": "2",
+        "attack": null,
+        "health": null,
+        "rules_text": "[[symbol:exhaust]]: Deal damaget to target attacking\ncreature equal to half your [[symbol:sola-devotion]] devotion."
+      },
+      "metadata": {
+        "keywords": [],
+        "tags": [
+          "amulet-1",
+          "fire"
+        ],
+        "types": [
+          "equipment"
+        ],
+        "symbols": [
+          "divine-mana",
+          "martial-mana",
+          "exhaust",
+          "sola-affinity",
+          "sola-devotion"
+        ]
+      }
+    },
+    "field_sources": {
+      "fields": {
+        "name": "auto",
+        "type_line": "auto",
+        "mana_cost": "auto",
+        "attack": "auto",
+        "health": "auto",
+        "rules_text": "auto"
+      },
+      "metadata": {
+        "keywords": "auto",
+        "tags": "auto",
+        "types": "auto",
+        "symbols": "auto"
       }
     },
     "job": {
