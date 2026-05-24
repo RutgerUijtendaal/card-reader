@@ -692,6 +692,21 @@ def test_card_payloads_fall_back_to_latest_route_when_stored_image_is_missing() 
     assert response.json()["image_url"] == f"/cards/{card.id}/image"
 
 
+def test_card_payloads_omit_image_url_when_no_readable_image_file_exists() -> None:
+    card, version = _create_editable_card_version(name="Missing Image File Card")
+    CardVersionImage.objects.create(
+        card_version_id=version.id,
+        source_file=build_storage_relative_path("uploads", f"missing-source-{version.id}.png"),
+        stored_path=build_storage_relative_path("images", f"missing-stored-{version.id}.png"),
+        checksum=f"missing-both-{version.id}",
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/cards/{card.id}")
+
+    assert response.status_code == 200
+    assert response.json()["image_url"] is None
+
+
 def test_filters_payload_keeps_symbol_asset_urls_public() -> None:
     symbol = Symbol.objects.create(
         key="asset-url-symbol-test",

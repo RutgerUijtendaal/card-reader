@@ -15,6 +15,8 @@ def card_image_asset_url(image: CardVersionImage | None, *, fallback_url: str | 
 
     stored_path = resolve_storage_path(image.stored_path)
     resolved_path = resolve_image_file_path(image)
+    if resolved_path is None:
+        return None
     if resolved_path is not None and resolved_path != stored_path:
         return fallback_url
 
