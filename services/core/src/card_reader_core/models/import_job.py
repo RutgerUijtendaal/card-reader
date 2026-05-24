@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
+
+if TYPE_CHECKING:
+    from .card import Card
+    from .card_version import CardVersion
 
 
 class ImportJobStatus(StrEnum):
@@ -38,6 +43,24 @@ class ImportJobItem(TimestampedModel):
         db_column="job_id",
     )
     source_file: models.TextField[str, str] = models.TextField()
+    target_card: models.ForeignKey[Card | None, Card | None] = models.ForeignKey(
+        "Card",
+        on_delete=models.SET_NULL,
+        related_name="+",
+        db_column="target_card_id",
+        default=None,
+        null=True,
+        blank=True,
+    )
+    target_card_version: models.ForeignKey[CardVersion | None, CardVersion | None] = models.ForeignKey(
+        "CardVersion",
+        on_delete=models.SET_NULL,
+        related_name="+",
+        db_column="target_card_version_id",
+        default=None,
+        null=True,
+        blank=True,
+    )
     status: models.TextField[str, str] = models.TextField(default=ImportJobStatus.queued)
     error_message: models.TextField[str | None, str | None] = models.TextField(
         default=None,

@@ -150,6 +150,12 @@ export type EditorForm = {
   symbol_ids: string[];
 };
 
+export type ReparseTemplateOption = {
+  id: string;
+  key: string;
+  label: string;
+};
+
 export type ScalarFieldConfig = {
   name: ScalarFieldName;
   label: string;

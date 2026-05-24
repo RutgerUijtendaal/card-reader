@@ -13,12 +13,14 @@ import type {
   MetadataGroupName,
   MetadataOption,
   MetadataSearchState,
+  ReparseTemplateOption,
   ScalarFieldName,
   SymbolFilterOption,
   SymbolLookupMap,
 } from '@/modules/card-detail/types';
 import { metadataGroups, scalarFields } from '@/modules/card-detail/types';
 import { isEditableKeyboardTarget } from '@/utils/keyboard';
+import { fetchTemplates } from '@/modules/admin/api/templates';
 
 export const useCardDetailState = () => {
   const route = useRoute();
@@ -28,6 +30,8 @@ export const useCardDetailState = () => {
   const selectedVersionId = ref<string>('');
   const filterOptions = ref<CardFiltersResponse>({ keywords: [], tags: [], symbols: [], types: [] });
   const symbolByKey = ref<SymbolLookupMap>({});
+  const reparseTemplates = ref<ReparseTemplateOption[]>([]);
+  const reparseTemplateId = ref('');
   const galleryNavigation = useGalleryCardNavigation(route, router, 'edit');
   const isSaving = ref(false);
   const isQueuingReparse = ref(false);
@@ -77,10 +81,11 @@ export const useCardDetailState = () => {
 
   const loadCard = async (): Promise<void> => {
     const cardId = String(route.params.id);
-    const [cardResponse, versionsResponse, filtersResponse] = await Promise.all([
+    const [cardResponse, versionsResponse, filtersResponse, templates] = await Promise.all([
       api.get<CardDetail>(`/cards/${cardId}`),
       api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
       api.get<CardFiltersResponse>('/cards/filters'),
+      fetchTemplates(),
     ]);
 
     card.value = cardResponse.data;
@@ -89,6 +94,11 @@ export const useCardDetailState = () => {
     symbolByKey.value = Object.fromEntries(
       (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
     );
+    reparseTemplates.value = templates.map((row) => ({
+      id: row.id,
+      key: row.key,
+      label: row.label,
+    }));
     selectedVersionId.value =
       versions.value.find((version) => version.is_latest)?.version_id ??
       versions.value[0]?.version_id ??
@@ -110,6 +120,7 @@ export const useCardDetailState = () => {
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
     form.symbol_ids = [...version.symbol_ids];
+    reparseTemplateId.value = version.template_id;
     saveMessage.value = '';
   };
 
@@ -188,7 +199,9 @@ export const useCardDetailState = () => {
     isQueuingReparse.value = true;
     saveMessage.value = '';
     try {
-      const response = await api.post<{ message: string }>(`/cards/${version.id}/reparse`);
+      const response = await api.post<{ message: string }>(`/cards/${version.id}/reparse`, {
+        template_id: reparseTemplateId.value,
+      });
       saveMessage.value = response.data.message;
     } finally {
       isQueuingReparse.value = false;
@@ -304,6 +317,8 @@ export const useCardDetailState = () => {
     hasMoreResults: galleryNavigation.hasMoreResults,
     isLoadingMoreCards: galleryNavigation.isLoadingMoreCards,
     positionLabel: galleryNavigation.positionLabel,
+    reparseTemplates,
+    reparseTemplateId,
     isSaving,
     isQueuingReparse,
     saveMessage,

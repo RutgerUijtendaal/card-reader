@@ -119,7 +119,7 @@
             v-if="templates.length === 0"
             class="theme-alert-warning"
           >
-            No templates available. Add one in Settings > Templates first.
+            No templates available. Add one in Admin > Templates first.
           </p>
 
           <button

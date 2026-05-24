@@ -10,8 +10,8 @@ from .views import (
 )
 
 urlpatterns = [
-    path("settings/maintenance/rebuild-database", RebuildDatabaseView.as_view()),
-    path("settings/maintenance/backfill-metadata-suggestions", BackfillMetadataSuggestionsView.as_view()),
-    path("settings/maintenance/queue-latest-reparse", QueueLatestReparseView.as_view()),
-    path("settings/maintenance/clear-storage", ClearStorageView.as_view()),
+    path("admin/maintenance/rebuild-database", RebuildDatabaseView.as_view()),
+    path("admin/maintenance/backfill-metadata-suggestions", BackfillMetadataSuggestionsView.as_view()),
+    path("admin/maintenance/queue-latest-reparse", QueueLatestReparseView.as_view()),
+    path("admin/maintenance/clear-storage", ClearStorageView.as_view()),
 ]

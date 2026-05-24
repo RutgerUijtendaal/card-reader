@@ -206,6 +206,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
             continue
         out.append(
             LatestCardVersionReparseSource(
+                card_id=version.card.id,
                 card_version_id=version.id,
                 template_id=version.template.key,
                 image_path=image_path,

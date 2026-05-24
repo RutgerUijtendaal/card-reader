@@ -10,7 +10,7 @@ from django.db import connection, connections
 from card_reader_api.seeds.runner import run_registered_seeds
 from card_reader_core.database.connection import DATABASE_PATH, initialize_database
 from card_reader_core.repositories.cards_repository import list_latest_card_version_reparse_sources
-from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files
+from card_reader_core.repositories.import_jobs_repository import ImportJobItemTarget, create_import_job_with_files
 from card_reader_core.settings import settings
 
 
@@ -51,11 +51,17 @@ class MaintenanceService:
 
         job_count = 0
         for template_id, files in grouped_files.items():
+            targets = [
+                ImportJobItemTarget(card_id=source.card_id, card_version_id=source.card_version_id)
+                for source in sources
+                if source.template_id == template_id
+            ]
             create_import_job_with_files(
                 source_path=settings.storage_root_dir / "maintenance" / f"reparse-latest-{template_id}",
                 template_id=template_id,
                 options={"reparse_existing": True},
                 files=files,
+                item_targets=targets,
             )
             job_count += 1
 

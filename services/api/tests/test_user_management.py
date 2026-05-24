@@ -22,7 +22,7 @@ def test_current_user_payload_includes_capabilities() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["can_manage_settings"] is True
+    assert payload["can_access_admin"] is True
     assert payload["can_manage_users"] is True
     assert payload["can_access_maintenance"] is False
 
@@ -36,7 +36,7 @@ def test_staff_can_create_list_archive_restore_and_reset_managed_users() -> None
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
     create_response = client.post(
-        "/settings/users",
+        "/admin/users",
         data={"username": "managed-viewer", "is_staff": True, "is_superuser": True},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -51,13 +51,13 @@ def test_staff_can_create_list_archive_restore_and_reset_managed_users() -> None
     assert created_user.is_superuser is False
     assert created_user.has_usable_password() is False
 
-    list_response = client.get("/settings/users")
+    list_response = client.get("/admin/users")
     assert list_response.status_code == 200
     listed_ids = {row["id"] for row in list_response.json()["managed_results"]}
     assert str(created_user.id) in listed_ids
 
     reset_response = client.post(
-        f"/settings/users/{created_user.id}/reset-password",
+        f"/admin/users/{created_user.id}/reset-password",
         data={},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -66,23 +66,23 @@ def test_staff_can_create_list_archive_restore_and_reset_managed_users() -> None
     assert reset_response.json()["user"]["id"] == str(created_user.id)
 
     archive_response = client.delete(
-        f"/settings/users/{created_user.id}",
+        f"/admin/users/{created_user.id}",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
     assert archive_response.status_code == 204
     created_user.refresh_from_db()
     assert created_user.is_active is False
 
-    active_list_response = client.get("/settings/users")
+    active_list_response = client.get("/admin/users")
     active_ids = {row["id"] for row in active_list_response.json()["managed_results"]}
     assert str(created_user.id) not in active_ids
 
-    archived_list_response = client.get("/settings/users", {"include_inactive": "true"})
+    archived_list_response = client.get("/admin/users", {"include_inactive": "true"})
     archived_ids = {row["id"] for row in archived_list_response.json()["managed_results"]}
     assert str(created_user.id) in archived_ids
 
     restore_response = client.post(
-        f"/settings/users/{created_user.id}/restore",
+        f"/admin/users/{created_user.id}/restore",
         data={},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -100,7 +100,7 @@ def test_non_staff_cannot_access_user_management_endpoints() -> None:
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
-    response = client.get("/settings/users", HTTP_X_CSRFTOKEN=csrf_token)
+    response = client.get("/admin/users", HTTP_X_CSRFTOKEN=csrf_token)
 
     assert response.status_code == 403
 
@@ -119,14 +119,14 @@ def test_staff_cannot_manage_privileged_accounts_through_managed_users_surface()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
-    list_response = client.get("/settings/users")
+    list_response = client.get("/admin/users")
     managed_usernames = {row["username"] for row in list_response.json()["managed_results"]}
     unmanaged_usernames = {row["username"] for row in list_response.json()["unmanaged_results"]}
     assert privileged_user.username not in managed_usernames
     assert privileged_user.username in unmanaged_usernames
 
     delete_response = client.delete(
-        f"/settings/users/{privileged_user.id}",
+        f"/admin/users/{privileged_user.id}",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
@@ -151,8 +151,8 @@ def test_only_superusers_can_see_last_login_for_unmanaged_users() -> None:
     staff_csrf = _login_and_get_csrf_token(staff_client, staff_username, password)
     superuser_csrf = _login_and_get_csrf_token(superuser_client, superuser_username, password)
 
-    staff_response = staff_client.get("/settings/users", HTTP_X_CSRFTOKEN=staff_csrf)
-    superuser_response = superuser_client.get("/settings/users", HTTP_X_CSRFTOKEN=superuser_csrf)
+    staff_response = staff_client.get("/admin/users", HTTP_X_CSRFTOKEN=staff_csrf)
+    superuser_response = superuser_client.get("/admin/users", HTTP_X_CSRFTOKEN=superuser_csrf)
 
     assert staff_response.status_code == 200
     assert superuser_response.status_code == 200
@@ -177,7 +177,7 @@ def test_managed_user_can_set_password_once_and_then_only_access_public_routes()
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
     create_response = client.post(
-        "/settings/users",
+        "/admin/users",
         data={"username": "managed-login-user"},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -217,7 +217,7 @@ def test_managed_user_can_set_password_once_and_then_only_access_public_routes()
         content_type="application/json",
     )
     assert login_response.status_code == 200
-    assert login_response.json()["can_manage_settings"] is False
+    assert login_response.json()["can_access_admin"] is False
 
     assert managed_client.get("/cards").status_code == 200
     assert managed_client.get("/imports").status_code == 403

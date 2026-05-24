@@ -22,12 +22,12 @@ describe('routeState', () => {
         },
         {
           deck_id: null,
-          settings_tab: 'catalog',
+          admin_tab: 'catalog',
         },
       ),
     ).toEqual({
       foo: 'bar',
-      settings_tab: 'catalog',
+      admin_tab: 'catalog',
     });
   });
 

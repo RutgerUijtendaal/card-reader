@@ -214,12 +214,12 @@ def test_auth_enabled_requires_superuser_for_maintenance() -> None:
     superuser_client.force_login(superuser)
 
     staff_response = staff_client.post(
-        "/settings/maintenance/clear-storage",
+        "/admin/maintenance/clear-storage",
         data={"include_images": False},
         content_type="application/json",
     )
     superuser_response = superuser_client.post(
-        "/settings/maintenance/clear-storage",
+        "/admin/maintenance/clear-storage",
         data={"include_images": False},
         content_type="application/json",
     )
@@ -236,9 +236,9 @@ def test_staff_can_manage_catalog_entries() -> None:
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
-    list_response = client.get("/settings/catalog")
+    list_response = client.get("/admin/catalog")
     create_response = client.post(
-        "/settings/keywords",
+        "/admin/keywords",
         data={"label": "Staff Catalog Keyword", "key": "staff-catalog-keyword"},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -270,7 +270,7 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
         parse_result=version.parse_result,
     )
 
-    response = client.get("/settings/catalog")
+    response = client.get("/admin/catalog")
 
     assert response.status_code == 200
     payload = response.json()
@@ -291,7 +291,7 @@ def test_staff_can_create_keyword_identifiers() -> None:
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
     response = client.post(
-        "/settings/keywords",
+        "/admin/keywords",
         data={
             "label": "Turn Start",
             "key": "turn-start-alias-test",
@@ -314,7 +314,7 @@ def test_staff_can_create_tag_and_type_identifiers() -> None:
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
     tag_response = client.post(
-        "/settings/tags",
+        "/admin/tags",
         data={
             "label": "Weapon",
             "key": "weapon-identifiers-test",
@@ -324,7 +324,7 @@ def test_staff_can_create_tag_and_type_identifiers() -> None:
         HTTP_X_CSRFTOKEN=csrf_token,
     )
     type_response = client.post(
-        "/settings/types",
+        "/admin/types",
         data={
             "label": "Persistent",
             "key": "persistent-identifiers-test",
@@ -394,7 +394,7 @@ def test_staff_can_accept_tag_suggestion_to_existing_and_preserve_manual_cards()
     )
 
     response = client.post(
-        f"/settings/suggestions/tag/{suggestion.id}/accept",
+        f"/admin/suggestions/tag/{suggestion.id}/accept",
         data={"target_id": target_tag.id},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -435,7 +435,7 @@ def test_staff_can_reject_type_suggestion() -> None:
     )
 
     response = client.post(
-        f"/settings/suggestions/type/{suggestion.id}/reject",
+        f"/admin/suggestions/type/{suggestion.id}/reject",
         data={},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -455,9 +455,9 @@ def test_staff_can_manage_templates() -> None:
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
-    list_response = client.get("/settings/templates")
+    list_response = client.get("/admin/templates")
     create_response = client.post(
-        "/settings/templates",
+        "/admin/templates",
         data={
             "label": "Staff Template",
             "key": "staff-template",
@@ -486,7 +486,7 @@ def test_template_key_cannot_be_updated() -> None:
     )
 
     response = client.patch(
-        f"/settings/templates/{template.id}",
+        f"/admin/templates/{template.id}",
         data={"key": "renamed-template-key"},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -507,7 +507,7 @@ def test_template_create_rejects_old_keyed_regions_schema() -> None:
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
     response = client.post(
-        "/settings/templates",
+        "/admin/templates",
         data={
             "label": "Invalid Template",
             "key": "invalid-template",
@@ -948,7 +948,7 @@ def test_staff_can_manage_card_groups() -> None:
     replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
 
     create_response = client.post(
-        "/settings/card-groups",
+        "/admin/card-groups",
         data={
             "name": "Staff Managed Group",
             "anchor_card_id": anchor_card.id,
@@ -965,7 +965,7 @@ def test_staff_can_manage_card_groups() -> None:
     group_id = create_response.json()["id"]
 
     patch_response = client.patch(
-        f"/settings/card-groups/{group_id}",
+        f"/admin/card-groups/{group_id}",
         data={
             "anchor_card_id": replacement_card.id,
             "members": [
@@ -976,9 +976,9 @@ def test_staff_can_manage_card_groups() -> None:
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
-    list_response = client.get("/settings/card-groups")
+    list_response = client.get("/admin/card-groups")
     delete_response = client.delete(
-        f"/settings/card-groups/{group_id}",
+        f"/admin/card-groups/{group_id}",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
@@ -987,7 +987,7 @@ def test_staff_can_manage_card_groups() -> None:
     assert delete_response.status_code == 204
     assert patch_response.json()["anchor_card_id"] == replacement_card.id
     assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
-    assert all(row["id"] != group_id for row in client.get("/settings/card-groups").json())
+    assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 
 def test_seed_users_creates_missing_configured_users(
@@ -1185,7 +1185,7 @@ def test_symbol_text_token_update_refreshes_rendered_rule_text_for_linked_cards(
     replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
 
     response = client.patch(
-        f"/settings/symbols/{symbol.id}",
+        f"/admin/symbols/{symbol.id}",
         data={"text_token": "{TAP}"},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -1230,6 +1230,58 @@ def test_latest_card_reparse_queues_import_job() -> None:
     items = list(ImportJobItem.objects.filter(job_id=job.id))
     assert len(items) == 1
     assert items[0].status == "queued"
+    assert items[0].target_card_id == card.id
+    assert items[0].target_card_version_id == version.id
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_card_reparse_accepts_template_switch() -> None:
+    username = "staff-card-reparse-template-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    Template.objects.create(
+        key="api-template-switch",
+        label="API Template Switch",
+        definition_json=_valid_template_definition(region_id="alt_top_bar"),
+    )
+    card, version = _create_editable_card_version(name="Template Switch Target")
+    _create_card_image(version)
+
+    response = client.post(
+        f"/cards/{card.id}/reparse",
+        data={"template_id": "api-template-switch"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 202
+    job = ImportJob.objects.get(id=response.json()["job_id"])
+    assert job.template_id == "api-template-switch"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_card_reparse_rejects_unknown_template() -> None:
+    username = "staff-card-reparse-template-missing-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    card, version = _create_editable_card_version(name="Template Missing Target")
+    _create_card_image(version)
+
+    response = client.post(
+        f"/cards/{card.id}/reparse",
+        data={"template_id": "missing-template"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unknown template_id 'missing-template'"
 
 
 def _create_user(
