@@ -91,6 +91,8 @@
         <CardVersionEditorPane
           :version="selectedVersion"
           :form="form"
+          :reparse-templates="reparseTemplates"
+          :reparse-template-id="reparseTemplateId"
           :is-busy="isBusy"
           :is-saving="isSaving"
           :is-queuing-reparse="isQueuingReparse"
@@ -113,6 +115,7 @@
           @unlock-group="unlockMetadataGroup"
           @reset-whole-card="resetWholeCardToAuto"
           @queue-reparse="queueLatestCardReparse"
+          @update-reparse-template="updateReparseTemplate"
           @toggle-group="toggleMetadataSelection"
           @update-group-search="setMetadataSearch"
           @update-field="updateField"
@@ -150,6 +153,8 @@ const {
   hasMoreResults,
   isLoadingMoreCards,
   positionLabel,
+  reparseTemplates,
+  reparseTemplateId,
   isSaving,
   isQueuingReparse,
   saveMessage,
@@ -192,6 +197,10 @@ const updateField = (fieldName: ScalarFieldName, value: string): void => {
 
 const updateHero = (value: boolean): void => {
   form.is_hero = value;
+};
+
+const updateReparseTemplate = (value: string): void => {
+  reparseTemplateId.value = value;
 };
 
 onMounted(loadCard);

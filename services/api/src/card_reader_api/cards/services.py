@@ -8,8 +8,9 @@ from card_reader_core.repositories.cards_repository import (
     get_latest_card_version,
     resolve_image_file_path,
 )
-from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files
+from card_reader_core.repositories.import_jobs_repository import ImportJobItemTarget, create_import_job_with_files
 from card_reader_core.settings import settings
+from card_reader_core.services.templates import TemplateService
 
 
 class CardReparseError(ValueError):
@@ -23,11 +24,20 @@ class CardReparseQueueResult:
 
 
 class CardActionService:
-    def queue_latest_version_reparse(self, card_id: str) -> CardReparseQueueResult | None:
+    def queue_latest_version_reparse(
+        self,
+        card_id: str,
+        *,
+        template_id: str | None = None,
+    ) -> CardReparseQueueResult | None:
         card = get_card(card_id)
         version = get_latest_card_version(card_id)
         if card is None or version is None:
             return None
+
+        resolved_template_id = template_id or version.template.key
+        if TemplateService().get_template_by_key(resolved_template_id) is None:
+            raise CardReparseError(f"Unknown template_id '{resolved_template_id}'")
 
         image = get_card_image(version.id)
         if image is None:
@@ -39,11 +49,12 @@ class CardActionService:
 
         job = create_import_job_with_files(
             source_path=settings.storage_root_dir / "cards" / card.id / "reparse-latest",
-            template_id=version.template.key,
+            template_id=resolved_template_id,
             options={"reparse_existing": True},
             files=[image_path],
+            item_targets=[ImportJobItemTarget(card_id=card.id, card_version_id=version.id)],
         )
         return CardReparseQueueResult(
             job_id=job.id,
-            message="Queued reparse job for the latest card image.",
+            message="Queued reparse job.",
         )

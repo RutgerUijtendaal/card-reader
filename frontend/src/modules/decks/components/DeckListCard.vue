@@ -1,5 +1,9 @@
 <template>
-  <div :class="layoutClass">
+  <component
+    :is="rootTag"
+    v-bind="rootProps"
+    :class="layoutClass"
+  >
     <div :class="mediaRowClass">
       <div
         class="theme-card-frame-muted theme-card-image-well flex shrink-0 items-center justify-center rounded-xl"
@@ -22,10 +26,10 @@
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">
           <component
-            :is="titleTo ? 'RouterLink' : 'h3'"
-            :to="titleTo"
+            :is="titleTag"
+            v-bind="titleProps"
             class="theme-section-title text-lg font-semibold"
-            :class="titleTo ? 'truncate' : ''"
+            :class="isCardLink ? '' : titleTo ? 'truncate' : ''"
           >
             {{ deck.name }}
           </component>
@@ -98,7 +102,7 @@
     >
       <slot name="actions" />
     </div>
-  </div>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -112,10 +116,15 @@ const props = defineProps<{
   titleTo?: string;
 }>();
 
+const isCardLink = computed(() => props.mode === 'browse' && Boolean(props.titleTo));
+const rootTag = computed(() => (isCardLink.value ? 'RouterLink' : 'div'));
+const rootProps = computed(() => (isCardLink.value ? { to: props.titleTo } : {}));
+const titleTag = computed(() => (isCardLink.value ? 'h3' : props.titleTo ? 'RouterLink' : 'h3'));
+const titleProps = computed(() => (!isCardLink.value && props.titleTo ? { to: props.titleTo } : {}));
 const formatDate = (value: string): string => new Date(value).toLocaleDateString();
 const layoutClass = computed(() =>
   props.mode === 'browse'
-    ? 'page-card flex gap-4 transition hover:-translate-y-0.5'
+    ? 'page-card block flex gap-4 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
     : 'page-card flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between',
 );
 const mediaRowClass = computed(() => (props.mode === 'browse' ? 'flex min-w-0 flex-1 gap-4' : 'flex min-w-0 gap-4'));

@@ -6,8 +6,8 @@ from rest_framework.request import Request
 
 from card_reader_api.common.auth_access import (
     can_access_authenticated_features,
+    can_access_admin,
     can_access_maintenance,
-    can_manage_settings,
     can_manage_users,
 )
 
@@ -16,7 +16,7 @@ class AuthEnabledOrStaffAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
         if not settings.CARD_READER_AUTH_ENABLED:
             return True
-        return can_manage_settings(request.user)
+        return can_access_admin(request.user)
 
 
 class AuthEnabledOrSuperuserAllowed(BasePermission):

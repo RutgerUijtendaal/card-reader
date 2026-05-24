@@ -42,10 +42,10 @@
         <RouterLink
           v-if="auth.canAccessStaffRoutes"
           class="nav-link"
-          to="/settings"
+          to="/admin"
         >
           <Settings class="h-4 w-4" />
-          <span>Settings</span>
+          <span>Admin</span>
         </RouterLink>
       </nav>
 

@@ -30,3 +30,7 @@ class TemplateWriteSerializer(serializers.Serializer[dict[str, object]]):
         if not isinstance(value, dict):
             raise serializers.ValidationError("definition_json must be a JSON object")
         return json.dumps(value)
+
+
+class TemplateReparseSerializer(serializers.Serializer[dict[str, object]]):
+    source_template_id = serializers.CharField(required=True, allow_blank=False)

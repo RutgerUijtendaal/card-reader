@@ -3,7 +3,7 @@
     v-if="deck"
     class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-5 overflow-hidden"
   >
-    <div class="page-card flex flex-col gap-4 lg:flex-row lg:justify-between">
+    <div class="page-card flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div class="min-w-0">
         <h2 class="theme-section-title text-xl font-semibold">
           {{ deck.name }}
@@ -19,7 +19,7 @@
         </p>
       </div>
 
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-2 lg:shrink-0">
         <RouterLink
           class="btn-secondary"
           to="/decks"

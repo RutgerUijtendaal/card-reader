@@ -185,19 +185,19 @@ def get_card_image(card_version_id: str) -> CardVersionImage | None:
 
 
 def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseSource]:
-    versions = [
-        card.latest_version
+    latest_versions = [
+        (card.id, card.latest_version)
         for card in Card.objects.exclude(latest_version__isnull=True)
         .select_related("latest_version__template")
         .prefetch_related("latest_version__images")
         .order_by("id")
         if card.latest_version is not None
     ]
-    if not versions:
+    if not latest_versions:
         return []
 
     out: list[LatestCardVersionReparseSource] = []
-    for version in versions:
+    for card_id, version in latest_versions:
         image = next(iter(cast(Any, version).images.all()), None)
         if image is None:
             continue
@@ -206,6 +206,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
             continue
         out.append(
             LatestCardVersionReparseSource(
+                card_id=card_id,
                 card_version_id=version.id,
                 template_id=version.template.key,
                 image_path=image_path,

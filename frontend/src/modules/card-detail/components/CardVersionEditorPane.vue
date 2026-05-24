@@ -185,10 +185,36 @@
       </div>
     </div>
 
-    <div class="theme-divider flex shrink-0 items-center justify-end gap-3 border-t pt-4">
+    <div class="theme-divider flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
+      <label
+        v-if="version.editable"
+        class="theme-section-title mr-auto flex min-w-0 items-center gap-3 text-sm font-semibold"
+      >
+        <span class="shrink-0">Template</span>
+        <select
+          :value="reparseTemplateId"
+          class="input-base min-w-48"
+          :disabled="isBusy"
+          @change="$emit('update-reparse-template', ($event.target as HTMLSelectElement).value)"
+        >
+          <option
+            v-for="option in reparseTemplates"
+            :key="option.key"
+            :value="option.key"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
       <p
-        v-if="saveMessage"
+        v-else-if="saveMessage"
         class="theme-success-text mr-auto text-sm"
+      >
+        {{ saveMessage }}
+      </p>
+      <p
+        v-if="version.editable && saveMessage"
+        class="theme-success-text text-sm"
       >
         {{ saveMessage }}
       </p>
@@ -227,6 +253,7 @@ import type {
   MetadataGroupName,
   MetadataOption,
   MetadataSearchState,
+  ReparseTemplateOption,
   ScalarFieldName,
   SymbolFilterOption,
 } from '@/modules/card-detail/types';
@@ -235,6 +262,8 @@ import { metadataGroups, scalarFields } from '@/modules/card-detail/types';
 defineProps<{
   version: CardVersionDetail;
   form: EditorForm;
+  reparseTemplates: ReparseTemplateOption[];
+  reparseTemplateId: string;
   isBusy: boolean;
   isSaving: boolean;
   isQueuingReparse: boolean;
@@ -260,6 +289,7 @@ defineEmits<{
   (e: 'unlock-group', groupName: MetadataGroupName): void;
   (e: 'reset-whole-card'): void;
   (e: 'queue-reparse'): void;
+  (e: 'update-reparse-template', templateId: string): void;
   (e: 'toggle-group', groupName: MetadataGroupName, optionId: string, checked: boolean): void;
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;

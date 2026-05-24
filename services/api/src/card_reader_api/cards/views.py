@@ -16,6 +16,7 @@ from card_reader_api.card_groups.serializers import card_group_gallery_payload
 from card_reader_api.cards.serializers import (
     CardListFilterParams,
     CardFiltersQuerySerializer,
+    LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
     card_group_summary_payload,
     card_payload,
@@ -211,9 +212,15 @@ class LatestCardVersionUpdateView(APIView):
 
 
 class LatestCardReparseView(APIView):
-    def post(self, _request: Request, card_id: str) -> Response:
+    def post(self, request: Request, card_id: str) -> Response:
+        serializer = LatestCardReparseSerializer(data=request.data)
+        if not serializer.is_valid():
+            return _serializer_error(serializer)
         try:
-            result = CardActionService().queue_latest_version_reparse(card_id)
+            result = CardActionService().queue_latest_version_reparse(
+                card_id,
+                template_id=serializer.validated_data.get("template_id"),
+            )
         except CardReparseError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

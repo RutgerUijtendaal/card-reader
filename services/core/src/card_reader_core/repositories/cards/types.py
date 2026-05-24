@@ -9,6 +9,7 @@ from card_reader_core.models import CardVersion, CardVersionImage, Keyword, Symb
 
 @dataclass(frozen=True)
 class LatestCardVersionReparseSource:
+    card_id: str
     card_version_id: str
     template_id: str
     image_path: Path

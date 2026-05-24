@@ -1,7 +1,7 @@
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
-import { fetchTemplates } from '@/modules/settings/api/templates';
-import type { TemplateRecord } from '@/modules/settings/types';
+import { fetchTemplates } from '@/modules/admin/api/templates';
+import type { TemplateRecord } from '@/modules/admin/types';
 import { cancelImportJob, createImportJob, fetchImportJobs } from '@/modules/import-jobs/api';
 import type { ImportJob } from '@/modules/import-jobs/types';
 import {

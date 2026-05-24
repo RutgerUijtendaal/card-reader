@@ -29,6 +29,9 @@ class TemplateService:
     def list_templates(self) -> list[Template]:
         return list_templates()
 
+    def get_template(self, entry_id: str) -> Template | None:
+        return get_template(entry_id)
+
     def get_template_by_key(self, key: str) -> Template | None:
         return get_template_by_key(key=key)
 

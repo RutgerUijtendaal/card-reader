@@ -11,7 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   const authEnabled = computed(() => user.value?.auth_enabled ?? true);
   const authenticated = computed(() => user.value?.authenticated ?? false);
   const canAccessStaffRoutes = computed(
-    () => !authEnabled.value || user.value?.can_manage_settings === true,
+    () => !authEnabled.value || user.value?.can_access_admin === true,
   );
   const canManageUsers = computed(
     () => !authEnabled.value || user.value?.can_manage_users === true,

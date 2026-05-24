@@ -12,7 +12,7 @@ import DeckDetailPage from '@/modules/decks/DeckDetailPage.vue';
 import DeckEditorPage from '@/modules/decks/DeckEditorPage.vue';
 import MyDecksPage from '@/modules/decks/MyDecksPage.vue';
 import ReviewQueuePage from '@/modules/review-queue/ReviewQueuePage.vue';
-import SettingsPage from '@/modules/settings/SettingsPage.vue';
+import AdminPage from '@/modules/admin/AdminPage.vue';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -31,7 +31,7 @@ export const router = createRouter({
     { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true } },
     { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true } },
     { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true } },
-    { path: '/settings', component: SettingsPage, meta: { requiresStaff: true } },
+    { path: '/admin', component: AdminPage, meta: { requiresStaff: true } },
   ],
 });
 

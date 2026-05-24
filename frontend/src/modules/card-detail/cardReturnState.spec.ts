@@ -2,17 +2,17 @@ import { describe, expect, test } from 'vitest';
 import { buildCardReturnLocation, getCardReturnLabel } from '@/modules/card-detail/cardReturnState';
 
 describe('cardReturnState', () => {
-  test('uses settings return context when present', () => {
+  test('uses admin return context when present', () => {
     const query = {
-      settings_tab: 'catalog',
-      return_to: 'settings',
+      admin_tab: 'catalog',
+      return_to: 'admin',
     };
 
-    expect(getCardReturnLabel(query)).toBe('Settings');
+    expect(getCardReturnLabel(query)).toBe('Admin');
     expect(buildCardReturnLocation(query)).toEqual({
-      path: '/settings',
+      path: '/admin',
       query: {
-        settings_tab: 'catalog',
+        admin_tab: 'catalog',
       },
     });
   });

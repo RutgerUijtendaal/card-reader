@@ -6,6 +6,6 @@ from .views import PublicCardGroupDetailView, StaffCardGroupDetailView, StaffCar
 
 urlpatterns = [
     path("card-groups/<str:group_id>", PublicCardGroupDetailView.as_view()),
-    path("settings/card-groups", StaffCardGroupListCreateView.as_view()),
-    path("settings/card-groups/<str:group_id>", StaffCardGroupDetailView.as_view()),
+    path("admin/card-groups", StaffCardGroupListCreateView.as_view()),
+    path("admin/card-groups/<str:group_id>", StaffCardGroupDetailView.as_view()),
 ]

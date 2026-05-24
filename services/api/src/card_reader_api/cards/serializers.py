@@ -332,6 +332,10 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
         return updates
 
 
+class LatestCardReparseSerializer(serializers.Serializer[dict[str, object]]):
+    template_id = serializers.CharField(required=False, allow_blank=False)
+
+
 def _validated_names(values: list[str], allowed: set[str], message: str) -> list[str]:
     if not all(value in allowed for value in values):
         raise serializers.ValidationError(message)

@@ -50,6 +50,22 @@ def save_parsed_card(
     type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
 ) -> CardVersion:
+    if item.target_card_version is not None:
+        return reparse_target_version(
+            item=item,
+            template_id=template_id,
+            checksum=checksum,
+            normalized_fields=normalized_fields,
+            confidence=confidence,
+            raw_ocr=raw_ocr,
+            keyword_ids=keyword_ids or [],
+            tag_ids=tag_ids or [],
+            type_ids=type_ids or [],
+            symbol_ids=symbol_ids or [],
+            tag_suggestions=tag_suggestions or [],
+            type_suggestions=type_suggestions or [],
+        )
+
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
     card_key = normalize_slug_key(parsed_name)
 
@@ -130,6 +146,54 @@ def save_parsed_card(
         card.updated_at = now_utc()
         card.save(update_fields=["label", "latest_version", "updated_at"])
         return version
+
+
+def reparse_target_version(
+    *,
+    item: ImportJobItem,
+    template_id: str,
+    checksum: str,
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+    raw_ocr: dict[str, object],
+    keyword_ids: list[str],
+    tag_ids: list[str],
+    type_ids: list[str],
+    symbol_ids: list[str],
+    tag_suggestions: list[SuggestionCandidate],
+    type_suggestions: list[SuggestionCandidate],
+) -> CardVersion:
+    target_version = item.target_card_version
+    if target_version is None:
+        raise ValueError("Target card version is required for targeted reparses")
+    version = (
+        CardVersion.objects.select_related("card", "template", "previous_version")
+        .filter(id=target_version.id)
+        .first()
+    )
+    if version is None:
+        raise ValueError(f"Target card version '{target_version.id}' does not exist")
+    if not version.is_latest:
+        raise ValueError("Only latest card versions can be reparsed")
+    if item.target_card is not None and version.card.id != item.target_card.id:
+        raise ValueError("Target card version does not belong to the requested card")
+
+    reset_manual_state = version.template.key != template_id
+    return update_existing_version(
+        item,
+        version,
+        normalized_fields,
+        confidence,
+        raw_ocr,
+        keyword_ids=keyword_ids,
+        tag_ids=tag_ids,
+        type_ids=type_ids,
+        symbol_ids=symbol_ids,
+        tag_suggestions=tag_suggestions,
+        type_suggestions=type_suggestions,
+        template_id=template_id,
+        reset_manual_state=reset_manual_state,
+    )
 
 
 def update_latest_card_version(
@@ -277,8 +341,17 @@ def update_existing_version(
     symbol_ids: list[str],
     tag_suggestions: list[SuggestionCandidate],
     type_suggestions: list[SuggestionCandidate],
+    template_id: str | None = None,
+    reset_manual_state: bool = False,
 ) -> CardVersion:
     previous_name = version.name
+    if template_id is not None:
+        template = get_template_by_key(key=template_id)
+        if template is None:
+            raise ValueError(f"Unknown template_id '{template_id}'")
+        version.template = template
+    if reset_manual_state:
+        version.field_sources_json = DEFAULT_FIELD_SOURCES
     apply_parsed_output_to_version(
         version,
         normalized_fields=normalized_fields,
@@ -311,13 +384,16 @@ def update_existing_version(
     )
     version.updated_at = now_utc()
     version.save()
-    if version.name != previous_name:
-        card = Card.objects.filter(id=version.card.id).first()
-        if card is not None:
+    card = Card.objects.filter(id=version.card.id).first()
+    if card is not None:
+        update_fields = ["latest_version", "updated_at"]
+        card.latest_version = version
+        card.updated_at = now_utc()
+        if version.name != previous_name or reset_manual_state:
             card.label = version.name
             card.key = normalize_slug_key(version.name)
-            card.updated_at = now_utc()
-            card.save(update_fields=["label", "key", "updated_at"])
+            update_fields = ["label", "key", *update_fields]
+        card.save(update_fields=list(dict.fromkeys(update_fields)))
     mark_item_completed(item)
     return version
 

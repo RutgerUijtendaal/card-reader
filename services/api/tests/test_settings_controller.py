@@ -3,7 +3,9 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client
 
 from card_reader_api.catalog.views import _store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
@@ -197,6 +199,106 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
         build_storage_relative_path("images", image_b.name),
         build_storage_relative_path("images", image_c.name),
     }
+    assert {(item.target_card_id, item.target_card_version_id) for item in items} == {
+        (card_a.id, version_a.id),
+        (card_b.id, version_b.id),
+        (card_c.id, version_c.id),
+    }
+
+
+def test_template_reparse_endpoint_queues_matching_latest_versions(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+
+    source_template = Template.objects.create(
+        key="template-reparse-source",
+        label="Template Reparse Source",
+        definition_json=_template_definition("source_top_bar"),
+    )
+    target_template = Template.objects.create(
+        key="template-reparse-target",
+        label="Template Reparse Target",
+        definition_json=_template_definition("target_top_bar"),
+    )
+    other_template = Template.objects.create(
+        key="template-reparse-other",
+        label="Template Reparse Other",
+        definition_json=_template_definition("other_top_bar"),
+    )
+
+    card_a = Card.objects.create(key="template-card-a", label="Template Card A")
+    card_b = Card.objects.create(key="template-card-b", label="Template Card B")
+
+    version_a = CardVersion.objects.create(
+        card_id=card_a.id,
+        version_number=1,
+        template=source_template,
+        image_hash="template-a",
+        name="Template Card A",
+        is_latest=True,
+    )
+    version_b = CardVersion.objects.create(
+        card_id=card_b.id,
+        version_number=1,
+        template=other_template,
+        image_hash="template-b",
+        name="Template Card B",
+        is_latest=True,
+    )
+    card_a.latest_version_id = version_a.id
+    card_b.latest_version_id = version_b.id
+    card_a.save(update_fields=["latest_version"])
+    card_b.save(update_fields=["latest_version"])
+
+    image_a = resolve_storage_path("images/template-reparse-a.webp")
+    image_b = resolve_storage_path("images/template-reparse-b.webp")
+    for image_path in [image_a, image_b]:
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"image")
+    CardVersionImage.objects.create(
+        card_version_id=version_a.id,
+        source_file=build_storage_relative_path("images", image_a.name),
+        stored_path=build_storage_relative_path("images", image_a.name),
+        checksum="template-a",
+    )
+    CardVersionImage.objects.create(
+        card_version_id=version_b.id,
+        source_file=build_storage_relative_path("images", image_b.name),
+        stored_path=build_storage_relative_path("images", image_b.name),
+        checksum="template-b",
+    )
+
+    username = "staff-template-reparse-user"
+    password = "password"
+    user_model = get_user_model()
+    user_model.objects.filter(username=username).delete()
+    user = user_model.objects.create_user(username=username, password=password)
+    user.is_staff = True
+    user.save(update_fields=["is_staff"])
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = client.post(
+        "/auth/login",
+        data={"username": username, "password": password},
+        content_type="application/json",
+    ).json()["csrf_token"]
+
+    response = client.post(
+        f"/admin/templates/{target_template.id}/reparse",
+        data={"source_template_id": source_template.key},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 202
+    job = ImportJob.objects.order_by("-created_at").first()
+    assert job is not None
+    assert job.template_id == target_template.key
+    items = list(ImportJobItem.objects.filter(job_id=job.id))
+    assert len(items) == 1
+    assert items[0].target_card_id == card_a.id
+    assert items[0].target_card_version_id == version_a.id
 
 
 def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> None:

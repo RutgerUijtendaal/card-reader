@@ -6,7 +6,7 @@ from django.urls import include, path
 from card_reader_api.common.views import HealthView
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("django-admin/", admin.site.urls),
     path("health", HealthView.as_view()),
     path("auth/", include("card_reader_api.auth.urls")),
     path("", include("card_reader_api.imports.urls")),
