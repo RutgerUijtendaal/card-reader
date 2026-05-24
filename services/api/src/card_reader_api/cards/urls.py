@@ -7,6 +7,7 @@ from .views import (
     CardFiltersView,
     CardGenerationsView,
     CardImageView,
+    ImmutableCardImageView,
     CardListView,
     LatestCardReparseView,
     CardVersionImageView,
@@ -15,6 +16,7 @@ from .views import (
 )
 
 urlpatterns = [
+    re_path(r"^card-images/(?P<relative_path>images/.*)$", ImmutableCardImageView.as_view()),
     path("cards", CardListView.as_view()),
     path("cards/filters", CardFiltersView.as_view()),
     path("cards/<str:card_id>", CardDetailView.as_view()),

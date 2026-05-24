@@ -6,10 +6,11 @@ from typing import Any, cast
 from rest_framework import serializers
 from rest_framework.response import Response
 
+from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
 from card_reader_core.models import CardGroup, CardGroupMember
 from card_reader_core.repositories.cards_repository import get_card_image
-from card_reader_core.services.cards import get_card_version_metadata, resolve_card_image_path
+from card_reader_core.services.cards import get_card_version_metadata
 
 
 def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
@@ -26,7 +27,7 @@ def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
                 "card_id": member.card.id,
                 "position": member.position,
                 "name": version.name,
-                "image_url": f"/cards/{member.card.id}/image" if image and resolve_card_image_path(image) else None,
+                "image_url": card_image_asset_url(image, fallback_url=f"/cards/{member.card.id}/image"),
             }
         )
     anchor_version = group.anchor_card.latest_version
@@ -58,7 +59,7 @@ def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
                 "card": card_payload(
                     member.card,
                     version,
-                    image_url=f"/cards/{member.card.id}/image" if image and resolve_card_image_path(image) else None,
+                    image_url=card_image_asset_url(image, fallback_url=f"/cards/{member.card.id}/image"),
                     metadata=get_card_version_metadata(version.id),
                     card_groups=[],
                 ),
@@ -99,7 +100,7 @@ def card_group_member_admin_payload(member: CardGroupMember, anchor_card_id: str
         "card_name": version.name if version is not None else member.card.label,
         "position": member.position,
         "is_anchor": card_id == anchor_card_id,
-        "image_url": f"/cards/{card_id}/image" if version is not None and image and resolve_card_image_path(image) else None,
+        "image_url": card_image_asset_url(image, fallback_url=f"/cards/{card_id}/image") if version is not None else None,
     }
 
 

@@ -6,10 +6,11 @@ from typing import Any, cast
 from rest_framework import serializers
 from rest_framework.response import Response
 
+from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
 from card_reader_core.models import Card, CardVersion, Deck, Keyword, Symbol, Tag, Type
 from card_reader_core.repositories.cards_repository import get_card_image
-from card_reader_core.services.cards import CardMetadata, resolve_card_image_path
+from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckService
 
 
@@ -82,7 +83,7 @@ def deck_card_payload(card: Card) -> dict[str, object]:
     return card_payload(
         card,
         version,
-        image_url=f"/cards/{card.id}/image" if image and resolve_card_image_path(image) else None,
+        image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/image"),
         metadata=metadata,
     )
 
