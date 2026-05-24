@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from django.http import FileResponse, Http404
@@ -14,6 +13,8 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
 from card_reader_api.card_groups.serializers import card_group_gallery_payload
+from card_reader_api.cards.file_views import file_response, immutable_card_image_response, symbol_asset_response
+from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import (
     CardListFilterParams,
     CardFiltersQuerySerializer,
@@ -36,7 +37,6 @@ from card_reader_core.repositories.cards_repository import (
     list_matching_cards,
     update_latest_card_version,
 )
-from card_reader_core.settings import settings
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -97,7 +97,7 @@ class CardListView(APIView):
                 card_payload(
                     row.version.card,
                     row.version,
-                    image_url=f"/cards/{row.version.card.id}/image" if row.image else None,
+                    image_url=card_image_asset_url(row.image),
                     metadata={
                         "keywords": row.keywords,
                         "tags": row.tags,
@@ -150,7 +150,7 @@ class CardDetailView(APIView):
             card_payload(
                 card,
                 version,
-                image_url=f"/cards/{card.id}/image" if image else None,
+                image_url=card_image_asset_url(image),
                 metadata=metadata,
                 edit_state=edit_state,
                 card_groups=card_groups,
@@ -179,7 +179,7 @@ class CardGenerationsView(APIView):
                 card_payload(
                     card,
                     version,
-                    image_url=f"/cards/{card_id}/versions/{version.id}/image" if image else None,
+                    image_url=card_image_asset_url(image),
                     metadata=metadata,
                     edit_state=edit_state,
                 )
@@ -212,7 +212,7 @@ class LatestCardVersionUpdateView(APIView):
             card_payload(
                 card,
                 version,
-                image_url=f"/cards/{card_id}/versions/{version.id}/image" if image else None,
+                image_url=card_image_asset_url(image),
                 metadata=metadata,
                 edit_state=edit_state,
             )
@@ -254,7 +254,7 @@ class CardImageView(APIView):
         image_path = resolve_card_image_path(image)
         if image_path is None:
             raise Http404("Card image file is missing")
-        return _file_response(image_path, "Card image file is missing")
+        return file_response(image_path, "Card image file is missing")
 
 
 class CardVersionImageView(APIView):
@@ -269,26 +269,21 @@ class CardVersionImageView(APIView):
         image_path = resolve_card_image_path(image)
         if image_path is None:
             raise Http404("Card image file is missing")
-        return _file_response(image_path, "Card image file is missing")
+        return file_response(image_path, "Card image file is missing")
+
+
+class ImmutableCardImageView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, _request: Request, relative_path: str) -> FileResponse:
+        return immutable_card_image_response(relative_path)
 
 
 class SymbolAssetView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, _request: Request, asset_path: str) -> FileResponse:
-        symbols_root = settings.storage_root_dir.resolve() / "symbols"
-        requested_path = (symbols_root / asset_path).resolve()
-        try:
-            requested_path.relative_to(symbols_root)
-        except ValueError as exc:
-            raise Http404("Symbol asset not found") from exc
-        return _file_response(requested_path, "Symbol asset not found")
-
-
-def _file_response(path: Path, detail: str) -> FileResponse:
-    if not path.exists() or not path.is_file():
-        raise Http404(detail)
-    return FileResponse(path.open("rb"))
+        return symbol_asset_response(asset_path)
 
 
 def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
@@ -397,7 +392,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
                 payload=card_payload(
                     row.version.card,
                     row.version,
-                    image_url=f"/cards/{row.version.card.id}/image" if row.image else None,
+                    image_url=card_image_asset_url(row.image),
                     metadata={
                         "keywords": row.keywords,
                         "tags": row.tags,

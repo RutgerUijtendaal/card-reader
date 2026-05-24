@@ -9,6 +9,7 @@ from django.test import Client, override_settings
 from card_reader_core.models import (
     Card,
     CardVersion,
+    CardVersionImage,
     CardVersionKeyword,
     CardVersionSymbol,
     CardVersionTag,
@@ -21,6 +22,8 @@ from card_reader_core.models import (
     Template,
     Type,
 )
+from card_reader_core.settings import settings
+from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService
 
 _CARD_NAME_COUNTER = count()
@@ -330,6 +333,38 @@ def test_deck_payload_includes_tooltip_metadata() -> None:
     assert [(row["key"], row["label"], row["text_token"]) for row in payload_card["symbols"]] == [
         ("mana-fire", "Mana - Fire", "{fire}")
     ]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_payload_uses_immutable_card_image_urls() -> None:
+    owner = _create_user("deck-image-owner", "password")
+    hero = _create_card(name="Image Hero", is_hero=True)
+    version = hero.latest_version
+    assert version is not None
+    image_name = f"deck-image-{version.id}.png"
+    image_path = settings.image_store_dir / image_name
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"deck-image")
+    CardVersionImage.objects.create(
+        card_version=version,
+        source_file=build_storage_relative_path("images", image_name),
+        stored_path=build_storage_relative_path("images", image_name),
+        checksum=f"checksum-{version.id}",
+    )
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Image Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
+
+    assert response.status_code == 200
+    assert response.json()["hero_card"]["image_url"] == f"/card-images/images/{image_name}"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

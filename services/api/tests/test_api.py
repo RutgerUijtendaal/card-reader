@@ -626,6 +626,74 @@ def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None
     assert b"".join(response.streaming_content) == b"fake-image"
 
 
+def test_card_image_asset_endpoint_serves_immutable_image_path() -> None:
+    card, version = _create_editable_card_version(name="Immutable Image Card")
+    image = _create_card_image(version)
+
+    response = Client(HTTP_HOST="localhost").get(f"/card-images/{image.stored_path}")
+
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content) == b"gallery-image"
+    assert card.id
+
+
+def test_card_payloads_use_immutable_image_urls() -> None:
+    card, version = _create_editable_card_version(name="Immutable Payload Card")
+    image = _create_card_image(version)
+    expected_image_url = f"/card-images/{image.stored_path}"
+    client = Client(HTTP_HOST="localhost")
+
+    list_response = client.get("/cards")
+    detail_response = client.get(f"/cards/{card.id}")
+    generations_response = client.get(f"/cards/{card.id}/generations")
+
+    assert list_response.status_code == 200
+    list_entry = next(row for row in list_response.json()["results"] if row["id"] == card.id)
+    assert list_entry["image_url"] == expected_image_url
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["image_url"] == expected_image_url
+
+    assert generations_response.status_code == 200
+    assert generations_response.json()[0]["image_url"] == expected_image_url
+
+
+def test_card_group_payloads_use_immutable_preview_image_urls() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(name="Immutable Group Anchor")
+    member_card, member_version = _create_editable_card_version(name="Immutable Group Member")
+    anchor_image = _create_card_image(anchor_version)
+    member_image = _create_card_image(member_version)
+    group = _create_card_group("immutable-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+
+    response = Client(HTTP_HOST="localhost").get(f"/card-groups/{group.id}")
+
+    assert response.status_code == 200
+    members = response.json()["members"]
+    assert members[0]["card"]["image_url"] == f"/card-images/{anchor_image.stored_path}"
+    assert members[1]["card"]["image_url"] == f"/card-images/{member_image.stored_path}"
+    group.delete()
+
+
+def test_filters_payload_keeps_symbol_asset_urls_public() -> None:
+    symbol = Symbol.objects.create(
+        key="asset-url-symbol-test",
+        label="Asset URL Symbol Test",
+        symbol_type="generic",
+        detector_type="template",
+        detection_config_json={},
+        text_enrichment_json={},
+        reference_assets_json=["mana/test-symbol.svg"],
+        text_token="{ASSET}",
+        enabled=True,
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/cards/filters")
+
+    assert response.status_code == 200
+    returned = next(row for row in response.json()["symbols"] if row["id"] == symbol.id)
+    assert returned["asset_url"] == "/symbols/assets/mana/test-symbol.svg"
+
+
 def test_storage_paths_resolve_relative_to_storage_root(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
 
