@@ -12,22 +12,24 @@
       <CardFilterSections :state="filterSectionsState" />
 
       <template #footer>
-        <GalleryOptionsMenu
-          :tooltip-enabled="tooltipEnabled"
-          :card-scale="cardScale"
-          :show-card-groups="showCardGroups"
-          @update:tooltip-enabled="tooltipEnabled = $event"
-          @update:card-scale="cardScale = $event"
-          @update:show-card-groups="showCardGroups = $event"
-        />
-        <button
-          class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
-          type="button"
-          @click="exportCsv"
-        >
-          <Download class="h-4 w-4" />
-          <span>Export CSV</span>
-        </button>
+        <div class="flex w-full flex-wrap items-center justify-between gap-3">
+          <GalleryOptionsMenu
+            :tooltip-enabled="tooltipEnabled"
+            :card-scale="cardScale"
+            :show-card-groups="showCardGroups"
+            @update:tooltip-enabled="tooltipEnabled = $event"
+            @update:card-scale="cardScale = $event"
+            @update:show-card-groups="showCardGroups = $event"
+          />
+          <button
+            class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+            type="button"
+            @click="exportCsv"
+          >
+            <Download class="h-4 w-4" />
+            <span>Export CSV</span>
+          </button>
+        </div>
       </template>
     </GalleryFilterSidebar>
 

@@ -6,7 +6,7 @@
 
 - REST API compatibility for the Vue app
 - Session login/logout/current-user endpoints
-- Staff-protected import, review, settings, catalog, template, and export endpoints
+- Staff-protected import, review, settings, catalog, template, and CSV export endpoints
 - Superuser-protected maintenance endpoints
 - Docker API entrypoint and health endpoint
 - Startup orchestration for migrations and seed commands
@@ -54,7 +54,8 @@ pnpm --filter @card-reader/api typecheck
 Auth is enabled by default with `CARD_READER_AUTH_ENABLED=true`.
 
 - `/cards`, `/cards/filters`, card image endpoints, symbol assets, `/health`, and `/auth/*` are public.
-- Import jobs, review, settings, catalog, templates, and exports require `is_staff=true`.
+- Public deck detail and deck TTS export are available to any viewer who can access the deck.
+- Import jobs, review, settings, catalog, templates, and CSV exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 
 The Vue app uses Django session auth with CSRF protection. `/auth/me` and `/auth/login` return the

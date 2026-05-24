@@ -34,3 +34,8 @@ export const updateDeck = async (deckId: string, payload: DeckUpsertRequest): Pr
 export const deleteDeck = async (deckId: string): Promise<void> => {
   await api.delete(`/my/decks/${deckId}`);
 };
+
+export const exportDeckTts = async (deckId: string): Promise<Blob> => {
+  const response = await api.get<Blob>(`/decks/${deckId}/exports/tts`, { responseType: 'blob' });
+  return response.data;
+};

@@ -64,7 +64,7 @@
           </div>
         </div>
 
-        <div class="theme-divider mt-4 flex shrink-0 justify-start border-t pt-4">
+        <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t pt-4">
           <GalleryOptionsMenu
             :tooltip-enabled="tooltipEnabled"
             :card-scale="cardScale"
@@ -73,6 +73,14 @@
             @update:tooltip-enabled="tooltipEnabled = $event"
             @update:card-scale="cardScale = $event"
           />
+          <button
+            class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+            type="button"
+            @click="handleTtsExport"
+          >
+            <Download class="h-4 w-4" />
+            <span>Export TTS</span>
+          </button>
         </div>
       </div>
 
@@ -125,6 +133,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { Download } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
@@ -136,11 +145,13 @@ import { fetchDeckDetail } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import { buildDeckCardDetailLocation } from '@/modules/decks/deckRouteState';
 import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
+import { useDeckExport } from '@/modules/decks/useDeckExport';
 
 const route = useRoute();
 const auth = useAuthStore();
 const deck = ref<DeckRecord | null>(null);
 const { tooltipEnabled, cardScale } = useGalleryOptions();
+const { exportTtsDeck } = useDeckExport();
 
 const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
 const mainboardCardHeightRem = computed(() => Number((24 * cardScale.value).toFixed(2)));
@@ -161,6 +172,13 @@ const toGalleryCard = (card: DeckCardSummary): CardListItem => ({
 
 const loadDeck = async (): Promise<void> => {
   deck.value = await fetchDeckDetail(String(route.params.id));
+};
+
+const handleTtsExport = async (): Promise<void> => {
+  if (!deck.value) {
+    return;
+  }
+  await exportTtsDeck(deck.value.id, deck.value.name);
 };
 
 onMounted(loadDeck);

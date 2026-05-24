@@ -21,7 +21,8 @@ from card_reader_core.repositories import (
 from card_reader_core.repositories.decks_repository import get_deck_card
 
 MAX_DECK_COPIES = 4
-MAINBOARD_CARD_COUNT = 60
+MIN_MAINBOARD_CARD_COUNT = 40
+MAX_MAINBOARD_CARD_COUNT = 60
 
 
 @dataclass(frozen=True)
@@ -152,8 +153,10 @@ class DeckService:
                 issues.append("Hero card cannot also appear in the mainboard.")
                 break
 
-        if total_cards != MAINBOARD_CARD_COUNT:
-            issues.append(f"Deck must contain exactly {MAINBOARD_CARD_COUNT} mainboard cards.")
+        if total_cards < MIN_MAINBOARD_CARD_COUNT or total_cards > MAX_MAINBOARD_CARD_COUNT:
+            issues.append(
+                f"Deck must contain between {MIN_MAINBOARD_CARD_COUNT} and {MAX_MAINBOARD_CARD_COUNT} mainboard cards."
+            )
 
         is_valid = len(issues) == 0
         return DeckValidationSummary(

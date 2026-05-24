@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import base64
+import json
 from collections.abc import Mapping
 from typing import Any, cast
 
 from django.http import HttpResponse
+from django.utils.text import slugify
+from rest_framework.permissions import AllowAny
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
+from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
+from card_reader_core.services.decks import DeckService
 from card_reader_core.repositories.exports_repository import export_cards_csv
 
 
@@ -51,6 +57,24 @@ class ExportCsvView(APIView):
         return response
 
 
+class DeckTtsExportView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request: Request, deck_id: str) -> HttpResponse | Response:
+        viewer_id = _user_id(request) if is_authenticated(request.user) else None
+        deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
+        if deck is None:
+            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not deck.is_public and str(getattr(deck.owner, "pk", "")) != viewer_id:
+            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        content = _encode_tts_export(_build_tts_export_payload(deck))
+        filename = _tts_export_filename(deck.name)
+        response = HttpResponse(content, content_type="text/plain; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+
 def _query_data(request: Request) -> dict[str, object]:
     return {
         "query": request.query_params.get("q"),
@@ -78,6 +102,56 @@ def _query_data(request: Request) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+
+
+def _user_id(request: Request) -> str:
+    return str(getattr(request.user, "pk", ""))
+
+
+def _build_tts_export_payload(deck: Any) -> dict[str, object]:
+    entries = list(cast(Any, deck).entries.select_related("card__latest_version").all())
+    validation = DeckService().get_deck_validation(deck)
+    hero_card = deck.hero_card
+
+    return {
+        "schema": "card-reader.tts-deck.v1",
+        "deck": {
+            "id": deck.id,
+            "name": deck.name,
+            "description": deck.description,
+            "total_cards": validation.total_cards,
+            "unique_cards": validation.unique_cards,
+        },
+        "lookup": {
+            "preferred_keys": ["card_id", "card_key", "name"],
+        },
+        "hero": _build_tts_export_card_ref(hero_card, quantity=1, role="hero"),
+        "cards": [
+            _build_tts_export_card_ref(entry.card, quantity=entry.quantity, role="mainboard")
+            for entry in entries
+        ],
+    }
+
+
+def _build_tts_export_card_ref(card: Any, *, quantity: int, role: str) -> dict[str, object]:
+    version = getattr(card, "latest_version", None)
+    return {
+        "role": role,
+        "quantity": quantity,
+        "card_id": card.id,
+        "card_key": card.key,
+        "name": getattr(version, "name", None) or card.label,
+    }
+
+
+def _encode_tts_export(payload: dict[str, object]) -> str:
+    json_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return base64.b64encode(json_bytes).decode("ascii")
+
+
+def _tts_export_filename(deck_name: str) -> str:
+    safe_name = slugify(deck_name) or "deck"
+    return f"{safe_name}.tts.txt"
 
 
 def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
