@@ -83,7 +83,7 @@ def deck_card_payload(card: Card) -> dict[str, object]:
     return card_payload(
         card,
         version,
-        image_url=card_image_asset_url(image),
+        image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/image"),
         metadata=metadata,
     )
 

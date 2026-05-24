@@ -674,6 +674,24 @@ def test_card_group_payloads_use_immutable_preview_image_urls() -> None:
     group.delete()
 
 
+def test_card_payloads_fall_back_to_latest_route_when_stored_image_is_missing() -> None:
+    card, version = _create_editable_card_version(name="Fallback Stored Path Card")
+    image_path = settings.storage_root_dir / "uploads" / f"{version.id}.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"fallback-image")
+    CardVersionImage.objects.create(
+        card_version_id=version.id,
+        source_file=build_storage_relative_path("uploads", image_path.name),
+        stored_path=build_storage_relative_path("images", f"missing-{version.id}.png"),
+        checksum=f"missing-{version.id}",
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/cards/{card.id}")
+
+    assert response.status_code == 200
+    assert response.json()["image_url"] == f"/cards/{card.id}/image"
+
+
 def test_filters_payload_keeps_symbol_asset_urls_public() -> None:
     symbol = Symbol.objects.create(
         key="asset-url-symbol-test",

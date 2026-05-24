@@ -97,7 +97,7 @@ class CardListView(APIView):
                 card_payload(
                     row.version.card,
                     row.version,
-                    image_url=card_image_asset_url(row.image),
+                    image_url=card_image_asset_url(row.image, fallback_url=f"/cards/{row.version.card.id}/image"),
                     metadata={
                         "keywords": row.keywords,
                         "tags": row.tags,
@@ -150,7 +150,7 @@ class CardDetailView(APIView):
             card_payload(
                 card,
                 version,
-                image_url=card_image_asset_url(image),
+                image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/image"),
                 metadata=metadata,
                 edit_state=edit_state,
                 card_groups=card_groups,
@@ -179,7 +179,7 @@ class CardGenerationsView(APIView):
                 card_payload(
                     card,
                     version,
-                    image_url=card_image_asset_url(image),
+                    image_url=card_image_asset_url(image, fallback_url=f"/cards/{card_id}/versions/{version.id}/image"),
                     metadata=metadata,
                     edit_state=edit_state,
                 )
@@ -212,7 +212,7 @@ class LatestCardVersionUpdateView(APIView):
             card_payload(
                 card,
                 version,
-                image_url=card_image_asset_url(image),
+                image_url=card_image_asset_url(image, fallback_url=f"/cards/{card_id}/versions/{version.id}/image"),
                 metadata=metadata,
                 edit_state=edit_state,
             )
@@ -392,7 +392,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
                 payload=card_payload(
                     row.version.card,
                     row.version,
-                    image_url=card_image_asset_url(row.image),
+                    image_url=card_image_asset_url(row.image, fallback_url=f"/cards/{row.version.card.id}/image"),
                     metadata={
                         "keywords": row.keywords,
                         "tags": row.tags,
