@@ -22,6 +22,14 @@
         </RouterLink>
 
         <RouterLink
+          class="nav-link"
+          to="/settings"
+        >
+          <SlidersHorizontal class="h-4 w-4" />
+          <span>Settings</span>
+        </RouterLink>
+
+        <RouterLink
           v-if="auth.canAccessStaffRoutes"
           class="nav-link"
           to="/import-jobs"
@@ -92,7 +100,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { BookOpen, ClipboardCheck, Images, LogIn, LogOut, Settings, Upload } from 'lucide-vue-next';
+import { BookOpen, ClipboardCheck, Images, LogIn, LogOut, Settings, SlidersHorizontal, Upload } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 import { useRouter } from 'vue-router';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';

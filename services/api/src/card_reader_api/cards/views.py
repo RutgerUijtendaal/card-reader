@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from django.http import FileResponse, Http404
 from rest_framework import status
@@ -25,6 +26,9 @@ from card_reader_api.cards.serializers import (
 )
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards_repository import (
+    CARD_SORT_MANA_ASC,
+    CARD_SORT_MANA_DESC,
+    CARD_SORT_NAME_ASC,
     get_card,
     get_card_image,
     list_card_generations,
@@ -41,6 +45,9 @@ from card_reader_core.services.cards import (
     get_filter_metadata,
     resolve_card_image_path,
 )
+
+if TYPE_CHECKING:
+    from card_reader_core.repositories.cards_repository import CardSort
 
 
 class CardListView(APIView):
@@ -80,6 +87,7 @@ class CardListView(APIView):
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
             health_max=filters["health_max"],
+            sort=filters["sort"],
             page=filters["page"],
             page_size=filters["page_size"],
         )
@@ -311,6 +319,9 @@ def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+    sort = request.query_params.get("sort")
+    if sort is not None:
+        data["sort"] = sort
     show_groups = request.query_params.get("show_groups")
     if show_groups is not None:
         data["show_groups"] = show_groups
@@ -361,6 +372,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
         attack_max=filters["attack_max"],
         health_min=filters["health_min"],
         health_max=filters["health_max"],
+        sort=filters["sort"],
     )
     matching_card_ids = [row.version.card.id for row in matching_rows]
     groups = CardGroupService().get_groups_for_cards(matching_card_ids)
@@ -371,15 +383,18 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
         for member in cast(Any, group).members.all()
     }
 
-    grouped_items: list[tuple[str, object, dict[str, object]]] = []
+    grouped_items: list[dict[str, object]] = []
     for row in matching_rows:
         if row.version.card.id in participant_card_ids:
             continue
         grouped_items.append(
-            (
-                row.version.updated_at.isoformat(),
-                row.version.card.id,
-                card_payload(
+            _build_grouped_gallery_item(
+                item_id=row.version.card.id,
+                label=row.version.card.label,
+                name=row.version.name,
+                mana_value=row.version.mana_value,
+                updated_at=row.version.updated_at,
+                payload=card_payload(
                     row.version.card,
                     row.version,
                     image_url=f"/cards/{row.version.card.id}/image" if row.image else None,
@@ -398,14 +413,23 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
         member_ids = {member.card.id for member in cast(Any, group).members.all()}
         if anchor_version is None or not member_ids.intersection(matching_card_ids):
             continue
-        grouped_items.append((anchor_version.updated_at.isoformat(), group.id, card_group_gallery_payload(group)))
+        grouped_items.append(
+            _build_grouped_gallery_item(
+                item_id=group.id,
+                label=group.anchor_card.label,
+                name=anchor_version.name,
+                mana_value=anchor_version.mana_value,
+                updated_at=anchor_version.updated_at,
+                payload=card_group_gallery_payload(group),
+            )
+        )
 
-    grouped_items.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    grouped_items.sort(key=lambda row: _grouped_gallery_sort_key(row, filters["sort"]))
     total_count = len(grouped_items)
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
     offset = (normalized_page - 1) * normalized_page_size
-    results = [payload for _sort_key, _id, payload in grouped_items[offset : offset + normalized_page_size]]
+    results = [cast(dict[str, object], row["payload"]) for row in grouped_items[offset : offset + normalized_page_size]]
     return {
         "count": total_count,
         "next_page": normalized_page + 1 if normalized_page * normalized_page_size < total_count else None,
@@ -414,3 +438,38 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
         "page_size": normalized_page_size,
         "results": results,
     }
+
+
+def _build_grouped_gallery_item(
+    *,
+    item_id: str,
+    label: str,
+    name: str,
+    mana_value: int | None,
+    updated_at: datetime,
+    payload: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "item_id": item_id,
+        "label": label,
+        "name": name,
+        "mana_value": mana_value,
+        "updated_at": updated_at,
+        "payload": payload,
+    }
+
+
+def _grouped_gallery_sort_key(item: dict[str, object], sort: CardSort) -> tuple[object, ...]:
+    item_id = str(item["item_id"])
+    label = str(item["label"]).casefold()
+    name = str(item["name"]).casefold()
+    mana_value = item["mana_value"] if isinstance(item["mana_value"], int) else None
+    updated_at = cast(datetime, item["updated_at"])
+
+    if sort == CARD_SORT_NAME_ASC:
+        return (name, label, item_id)
+    if sort == CARD_SORT_MANA_ASC:
+        return (mana_value is None, mana_value if mana_value is not None else 0, name, item_id)
+    if sort == CARD_SORT_MANA_DESC:
+        return (mana_value is None, -(mana_value if mana_value is not None else 0), name, item_id)
+    return (-updated_at.timestamp(), label, item_id)

@@ -1,10 +1,19 @@
 import { buildCardFilterApiSearchParams } from '@/modules/card-filters/cardFilterState';
+import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
 import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
+import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
 
 export const useDeckEditorFilters = () => {
   const filterController = useCardFilterController();
   const { tooltipEnabled, cardScale } = useGalleryOptions();
+  const {
+    defaultSort,
+    overrideSort,
+    effectiveSort,
+    setOverrideSort: setSortOverride,
+    clearOverrideSort: clearSortOverride,
+  } = useCardSortSurface('deckBuilder');
 
   const setTooltipEnabled = (value: boolean): void => {
     tooltipEnabled.value = value;
@@ -24,10 +33,18 @@ export const useDeckEditorFilters = () => {
     updateQuery: filterController.updateQuery,
     tooltipEnabled,
     cardScale,
+    defaultSort,
+    sortOverride: overrideSort,
+    effectiveSort,
     setTooltipEnabled,
     setCardScale,
+    setSortOverride,
+    clearSortOverride,
     loadFilters: filterController.loadFilters,
-    buildSearchParams: () => buildCardFilterApiSearchParams(filterController.selectionState.value),
+    buildSearchParams: () => appendCardSortSearchParam(
+      buildCardFilterApiSearchParams(filterController.selectionState.value),
+      effectiveSort.value,
+    ),
   };
 };
 

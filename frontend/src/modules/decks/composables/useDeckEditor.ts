@@ -39,6 +39,7 @@ export const useDeckEditor = () => {
     buildSearchParams: filters.buildSearchParams,
     selectionState: filters.selectionState,
     builderStep,
+    sort: filters.effectiveSort,
     cardScale: filters.cardScale,
     rememberCards,
   });

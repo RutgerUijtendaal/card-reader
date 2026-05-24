@@ -64,7 +64,7 @@
           </div>
         </div>
 
-        <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t pt-4">
+        <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
           <GalleryOptionsMenu
             :tooltip-enabled="tooltipEnabled"
             :card-scale="cardScale"
@@ -102,7 +102,7 @@
             :style="mainboardGridStyle"
           >
             <CardGalleryItem
-              v-for="entry in deck.mainboard.entries"
+              v-for="entry in sortedMainboardEntries"
               :key="entry.card.id"
               class="justify-self-center"
               :style="mainboardCardStyle"
@@ -140,6 +140,8 @@ import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import type { CardListItem } from '@/modules/card-detail/types';
+import { compareCardSort } from '@/modules/card-search/cardSort';
+import { useCardSortPreferences } from '@/modules/card-search/useCardSortPreferences';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 import { fetchDeckDetail } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
@@ -150,6 +152,7 @@ import { useDeckExport } from '@/modules/decks/useDeckExport';
 const route = useRoute();
 const auth = useAuthStore();
 const deck = ref<DeckRecord | null>(null);
+const { defaultSort } = useCardSortPreferences();
 const { tooltipEnabled, cardScale } = useGalleryOptions();
 const { exportTtsDeck } = useDeckExport();
 
@@ -163,6 +166,9 @@ const mainboardCardStyle = computed(() => ({
   width: '100%',
   maxWidth: `${mainboardCardWidthRem.value}rem`,
 }));
+const sortedMainboardEntries = computed(() =>
+  [...(deck.value?.mainboard.entries ?? [])].sort((left, right) => compareCardSort(left.card, right.card, defaultSort.value)),
+);
 const detailLocation = (cardId: string) => buildDeckCardDetailLocation(cardId, String(route.params.id), route.query);
 
 const toGalleryCard = (card: DeckCardSummary): CardListItem => ({

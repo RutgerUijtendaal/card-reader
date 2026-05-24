@@ -3,7 +3,7 @@
     <button
       ref="triggerRef"
       type="button"
-      class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+      class="btn-secondary inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs"
       @click="toggle"
     >
       <SlidersHorizontal class="h-4 w-4" />

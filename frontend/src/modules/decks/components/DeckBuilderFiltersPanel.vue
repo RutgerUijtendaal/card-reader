@@ -27,19 +27,30 @@
     />
 
     <template #footer>
-      <GalleryOptionsMenu
-        :tooltip-enabled="controller.filters.tooltipEnabled.value"
-        :card-scale="controller.filters.cardScale.value"
-        :show-card-groups="false"
-        :show-card-groups-control="false"
-        @update:tooltip-enabled="controller.filters.setTooltipEnabled"
-        @update:card-scale="controller.filters.setCardScale"
-      />
+      <div class="flex flex-wrap items-center gap-2">
+        <CardSortMenu
+          :sort="controller.filters.effectiveSort.value"
+          :default-sort="controller.filters.defaultSort.value"
+          :override-active="controller.filters.sortOverride.value !== null"
+          allow-default-option
+          @update:sort="controller.filters.setSortOverride"
+          @reset="controller.filters.clearSortOverride"
+        />
+        <GalleryOptionsMenu
+          :tooltip-enabled="controller.filters.tooltipEnabled.value"
+          :card-scale="controller.filters.cardScale.value"
+          :show-card-groups="false"
+          :show-card-groups-control="false"
+          @update:tooltip-enabled="controller.filters.setTooltipEnabled"
+          @update:card-scale="controller.filters.setCardScale"
+        />
+      </div>
     </template>
   </GalleryFilterSidebar>
 </template>
 
 <script setup lang="ts">
+import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
 import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';

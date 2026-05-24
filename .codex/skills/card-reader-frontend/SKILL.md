@@ -15,6 +15,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - For full-page application views, prefer inner scrolling within the main content segments instead of making the entire page scroll; match the layout behavior used by the current settings and deck builder pages.
 - Preserve and extend the shared theme/token system in `frontend/src/styles.css` and `frontend/src/composables/useTheme.ts`.
 - Prefer semantic theme primitives and shared classes over ad hoc color styling.
+- Keep user-facing page and section descriptions focused on the enduring purpose and end result of the screen; avoid copy that calls out specific implementation details, temporary workflow mechanics, or design decisions that may look out of place as the page grows.
 - Verify visible UI in both light and dark modes.
 
 ## Implementation Workflow

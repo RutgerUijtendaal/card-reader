@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,6 +22,7 @@ from django.db import connection  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from django.test.utils import CaptureQueriesContext  # noqa: E402
 from django.test import Client, override_settings  # noqa: E402
+from django.utils import timezone  # noqa: E402
 
 from card_reader_api.seeds.users import seed_users  # noqa: E402
 
@@ -911,6 +913,89 @@ def test_cards_list_can_return_card_groups() -> None:
     assert standalone_card.id in {row["id"] for row in card_rows}
     assert anchor_card.id not in {row["id"] for row in card_rows}
     assert member_card.id not in {row["id"] for row in card_rows}
+
+
+def test_cards_list_rejects_unknown_sort() -> None:
+    response = Client(HTTP_HOST="localhost").get("/cards", {"sort": "unknown"})
+
+    assert response.status_code == 400
+    assert "valid choice" in response.json()["detail"].lower()
+
+
+def test_cards_list_supports_name_and_mana_sorting() -> None:
+    low_card, low_version = _create_editable_card_version(name="Sort Probe Low Mana")
+    high_card, high_version = _create_editable_card_version(name="Sort Probe High Mana")
+    alpha_card, alpha_version = _create_editable_card_version(name="Sort Probe Alpha Name")
+    _create_card_image(low_version)
+    _create_card_image(high_version)
+    _create_card_image(alpha_version)
+    low_version.mana_value = 1
+    high_version.mana_value = 7
+    alpha_version.mana_value = 3
+    low_version.updated_at = timezone.now() - timedelta(days=2)
+    high_version.updated_at = timezone.now() - timedelta(days=1)
+    alpha_version.updated_at = timezone.now()
+    low_version.save(update_fields=["mana_value", "updated_at"])
+    high_version.save(update_fields=["mana_value", "updated_at"])
+    alpha_version.save(update_fields=["mana_value", "updated_at"])
+
+    client = Client(HTTP_HOST="localhost")
+    name_response = client.get("/cards", {"sort": "name_asc", "q": "Sort Probe"})
+    mana_response = client.get("/cards", {"sort": "mana_desc", "q": "Sort Probe"})
+
+    assert name_response.status_code == 200
+    assert mana_response.status_code == 200
+    name_ids = [row["id"] for row in name_response.json()["results"][:3]]
+    mana_ids = [row["id"] for row in mana_response.json()["results"][:3]]
+    assert name_ids == [alpha_card.id, high_card.id, low_card.id]
+    assert mana_ids == [high_card.id, alpha_card.id, low_card.id]
+
+
+def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(name="Sort Group Zephyr Group")
+    member_card, member_version = _create_editable_card_version(name="Sort Group Zephyr Member")
+    standalone_card, standalone_version = _create_editable_card_version(name="Sort Group Amber Solo")
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    _create_card_image(standalone_version)
+    anchor_version.mana_value = 6
+    standalone_version.mana_value = 2
+    anchor_version.updated_at = timezone.now() - timedelta(hours=1)
+    standalone_version.updated_at = timezone.now()
+    anchor_version.save(update_fields=["mana_value", "updated_at"])
+    standalone_version.save(update_fields=["mana_value", "updated_at"])
+    _create_card_group("sorted-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"show_groups": "true", "sort": "name_asc", "q": "Sort Group"},
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"][:2]
+    assert results[0]["result_type"] == "card"
+    assert results[0]["id"] == standalone_card.id
+    assert results[1]["result_type"] == "card_group"
+    assert results[1]["anchor_card_id"] == anchor_card.id
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_export_cards_csv_honors_selected_sort() -> None:
+    _zebra_card, zebra_version = _create_editable_card_version(name="Sort Export Zebra Export")
+    _alpha_card, alpha_version = _create_editable_card_version(name="Sort Export Alpha Export")
+    _create_card_image(zebra_version)
+    _create_card_image(alpha_version)
+    zebra_version.updated_at = timezone.now() - timedelta(days=1)
+    alpha_version.updated_at = timezone.now()
+    zebra_version.save(update_fields=["updated_at"])
+    alpha_version.save(update_fields=["updated_at"])
+
+    response = Client(HTTP_HOST="localhost").get("/exports/csv", {"sort": "name_asc", "q": "Sort Export"})
+
+    assert response.status_code == 200
+    rows = response.content.decode("utf-8").splitlines()
+    assert rows[1].split(",")[1] == "Sort Export Alpha Export"
+    assert rows[2].split(",")[1] == "Sort Export Zebra Export"
 
 
 def test_card_detail_and_group_detail_include_card_group_membership() -> None:
