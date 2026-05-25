@@ -217,13 +217,13 @@ def test_auth_enabled_requires_superuser_for_maintenance() -> None:
     superuser_client.force_login(superuser)
 
     staff_response = staff_client.post(
-        "/admin/maintenance/clear-storage",
-        data={"include_images": False},
+        "/admin/maintenance/queue-latest-reparse",
+        data={},
         content_type="application/json",
     )
     superuser_response = superuser_client.post(
-        "/admin/maintenance/clear-storage",
-        data={"include_images": False},
+        "/admin/maintenance/queue-latest-reparse",
+        data={},
         content_type="application/json",
     )
 

@@ -27,11 +27,10 @@ Adopt and verify an existing database:
 uv run --project . python manage.py adopt_schema
 ```
 
-Seed configured users and default catalog/template data:
+Seed configured users:
 
 ```bash
 uv run --project . python manage.py seed_users
-uv run --project . python manage.py seed_defaults
 ```
 
 Run the API locally:
@@ -95,7 +94,6 @@ The API container runs:
 ```bash
 python manage.py migrate_card_reader
 python manage.py seed_users
-python manage.py seed_defaults
 gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000
 ```
 

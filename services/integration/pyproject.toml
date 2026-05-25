@@ -21,12 +21,22 @@ dependencies = [
 
 [tool.pytest.ini_options]
 pythonpath = ["tests", "../parser/src", "../api/src", "../core/src"]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
 
+[tool.mypy]
+python_version = "3.12"
+files = ["tests"]
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
 [dependency-groups]
 dev = [
+    "mypy>=1.11.2",
     "pytest>=8.3.3",
     "ruff>=0.6.9",
 ]

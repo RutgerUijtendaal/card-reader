@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from .runner import run_registered_seeds
-
-__all__ = ["run_registered_seeds"]
+__all__ = ["seed_users", "seed_users_from_config"]
 
 
 def __getattr__(name: str) -> Any:
-    if name == "run_registered_seeds":
-        from .runner import run_registered_seeds as value
+    if name == "seed_users":
+        from .users import seed_users
 
-        return value
+        return seed_users
+    if name == "seed_users_from_config":
+        from .users import seed_users_from_config
+
+        return seed_users_from_config
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

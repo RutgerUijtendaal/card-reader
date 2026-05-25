@@ -45,6 +45,11 @@ class OcrRunner:
         logger.info("OCR run started. image_size=%sx%s", image.width, image.height)
         min_confidence = resolve_ocr_min_confidence(config)
         engine_config = build_ocr_engine_config(config)
+        logger.info(
+            "OCR run config resolved. min_confidence=%.3f engine_config=%s",
+            min_confidence,
+            engine_config,
+        )
         engine = self._get_ocr_engine(engine_config)
         if engine is None or np is None:
             logger.warning("OCR run skipped. engine_available=%s numpy_available=%s", engine is not None, np is not None)

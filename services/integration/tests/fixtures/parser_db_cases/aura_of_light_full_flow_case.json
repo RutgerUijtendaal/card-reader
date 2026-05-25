@@ -1,17 +1,18 @@
-
 {
-  "image": "cards/aura-of-light.webp",
-  "template_id": "mtg-like-v1",
-  "job_options": {
-    "reparse_existing": true
+  "input": {
+    "image": "cards/aura-of-light.webp",
+    "template_key": "mtg-like-v1",
+    "job_options": {
+      "reparse_existing": true
+    }
   },
-  "expected_db": {
+  "expected": {
     "card": {
       "key": "aura-of-light",
       "label": "Aura of Light"
     },
-    "latest_version": {
-      "template_id": "mtg-like-v1",
+    "fields": {
+      "template_key": "mtg-like-v1",
       "name": "Aura of Light",
       "type_line": "Persistent Spell - Light Abjuration Aura",
       "mana_cost": "2",
@@ -21,15 +22,17 @@
       ],
       "attack": null,
       "health": null,
-      "rules_text": ": All allied creatures gain 1 armor.",
+      "rules_text_raw": ": All allied creatures gain 1 armor.",
+      "rules_text_enriched": "[[symbol:exhaust]]: All allied creatures gain 1 armor.",
+      "rules_text": "{EXHAUST}: All allied creatures gain 1 armor.",
       "version_number": 1
     },
     "metadata": {
       "keywords": [],
       "tags": [
-        "Abjuration",
-        "Aura",
-        "Light"
+        "abjuration",
+        "aura",
+        "light"
       ],
       "symbols": [
         "dark-mana",
@@ -37,13 +40,60 @@
         "exhaust"
       ],
       "types": [
-        "Persistent",
-        "Spell"
+        "persistent",
+        "spell"
       ],
       "symbol_types": {
-        "divine-mana": "mana",
         "dark-mana": "mana",
+        "divine-mana": "mana",
         "exhaust": "generic"
+      }
+    },
+    "suggestions": {
+      "tags": [],
+      "types": []
+    },
+    "snapshot": {
+      "fields": {
+        "name": "Aura of Light",
+        "type_line": "Persistent Spell - Light Abjuration Aura",
+        "mana_cost": "2",
+        "attack": null,
+        "health": null,
+        "rules_text": "[[symbol:exhaust]]: All allied creatures gain 1 armor."
+      },
+      "metadata": {
+        "keywords": [],
+        "tags": [
+          "light",
+          "abjuration",
+          "aura"
+        ],
+        "types": [
+          "persistent",
+          "spell"
+        ],
+        "symbols": [
+          "dark-mana",
+          "divine-mana",
+          "exhaust"
+        ]
+      }
+    },
+    "field_sources": {
+      "fields": {
+        "name": "auto",
+        "type_line": "auto",
+        "mana_cost": "auto",
+        "attack": "auto",
+        "health": "auto",
+        "rules_text": "auto"
+      },
+      "metadata": {
+        "keywords": "auto",
+        "tags": "auto",
+        "types": "auto",
+        "symbols": "auto"
       }
     },
     "job": {

@@ -10,7 +10,6 @@ from django.test import Client
 from card_reader_api.catalog.views import _store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
-from card_reader_api.seeds.templates import DEFAULT_TEMPLATES_FILE, read_template_entries
 from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.settings import settings
@@ -51,52 +50,8 @@ def test_upload_symbol_asset_stores_under_uploads(tmp_path: Path, monkeypatch) -
 
     assert stored_path.parent == tmp_path / "symbols" / "uploads"
     assert stored_path.read_bytes() == b"symbol-asset"
-
-
-def test_clear_storage_preserves_active_logs(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
-    logs_dir = tmp_path / "logs"
-    uploads_dir = tmp_path / "uploads"
-    debug_dir = tmp_path / "debug-crops"
-    images_dir = tmp_path / "images"
-    for directory in [logs_dir, uploads_dir, debug_dir, images_dir]:
-        directory.mkdir(parents=True)
-        (directory / "sample.txt").write_text("data", encoding="utf-8")
-
-    result = MaintenanceService().clear_storage_data(include_images=True)
-
-    assert str(logs_dir) not in result.removed_paths
-    assert (logs_dir / "sample.txt").exists()
-    assert not (uploads_dir / "sample.txt").exists()
-    assert not (debug_dir / "sample.txt").exists()
-    assert images_dir.exists()
-    assert not (images_dir / "sample.txt").exists()
-
-
-def test_database_reset_uses_schema_drop_without_deleting_file(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    database_path = tmp_path / "card_reader.db"
-    database_path.write_text("locked", encoding="utf-8")
-    dropped = False
-
-    def fake_drop_schema() -> None:
-        nonlocal dropped
-        dropped = True
-
-    monkeypatch.setattr(maintenance_services, "DATABASE_PATH", database_path)
-    monkeypatch.setattr(MaintenanceService, "_drop_database_schema", staticmethod(fake_drop_schema))
-
-    removed_paths = MaintenanceService()._reset_database()
-
-    assert dropped
-    assert removed_paths == [f"{database_path} (schema reset)"]
-    assert database_path.exists()
-
-
 def test_queue_reparse_latest_versions_groups_jobs_by_template(
-    tmp_path: Path,
+    tmp_path,
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
@@ -207,7 +162,7 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
 
 
 def test_template_reparse_endpoint_queues_matching_latest_versions(
-    tmp_path: Path,
+    tmp_path,
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
@@ -317,10 +272,59 @@ def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> N
 
 
 def test_default_template_seed_uses_region_handler_schema() -> None:
-    entries = read_template_entries(DEFAULT_TEMPLATES_FILE)
-
-    assert len(entries) == 1
-    validated = TemplateService()._validate_template_definition(entries[0].definition_json)
+    template = Template.objects.create(
+        key="default-template-schema-test",
+        label="Default Template Schema Test",
+        definition_json={
+            "id": "mtg-like-v1",
+            "version": 7,
+            "regions": [
+                {
+                    "region_id": "top_bar",
+                    "parser_type": "name_mana_cost",
+                    "cut_region": {"unit": "relative", "x": 0.04, "y": 0.02, "w": 0.92, "h": 0.07},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "type_bar",
+                    "parser_type": "type_tag",
+                    "cut_region": {"unit": "relative", "x": 0.04, "y": 0.54, "w": 0.92, "h": 0.05},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "rules_text",
+                    "parser_type": "rules_text",
+                    "cut_region": {"unit": "relative", "x": 0.07, "y": 0.6, "w": 0.86, "h": 0.32},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "rules_text_fallback",
+                    "parser_type": "rules_text",
+                    "cut_region": {"unit": "relative", "x": 0.07, "y": 0.7, "w": 0.86, "h": 0.12},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "bottom_left",
+                    "parser_type": "attack",
+                    "cut_region": {"unit": "relative", "x": 0.01, "y": 0.9, "w": 0.14, "h": 0.09},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "bottom_middle",
+                    "parser_type": "affinity",
+                    "cut_region": {"unit": "relative", "x": 0.37, "y": 0.93, "w": 0.26, "h": 0.06},
+                    "ocr_config": {},
+                },
+                {
+                    "region_id": "bottom_right",
+                    "parser_type": "health",
+                    "cut_region": {"unit": "relative", "x": 0.85, "y": 0.9, "w": 0.14, "h": 0.08},
+                    "ocr_config": {},
+                },
+            ],
+        },
+    )
+    validated = TemplateService()._validate_template_definition(template.definition_json)
     assert validated["version"] == 7
     assert [region["parser_type"] for region in validated["regions"]] == [
         "name_mana_cost",

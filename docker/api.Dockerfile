@@ -42,4 +42,4 @@ WORKDIR /app/services/api
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uv run --frozen --package card-reader-api python manage.py migrate_card_reader && uv run --frozen --package card-reader-api python manage.py seed_users && uv run --frozen --package card-reader-api python manage.py seed_defaults && uv run --frozen --package card-reader-api gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000"]
+CMD ["sh", "-c", "uv run --frozen --package card-reader-api python manage.py migrate_card_reader && uv run --frozen --package card-reader-api python manage.py seed_users && uv run --frozen --package card-reader-api gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000"]

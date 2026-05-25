@@ -1,0 +1,96 @@
+{
+  "input": {
+    "image": "cards/basic-martial-mana.webp",
+    "template_key": "basic-mana",
+    "job_options": {
+      "reparse_existing": true
+    }
+  },
+  "expected": {
+    "card": {
+      "key": "basic-martial-mana",
+      "label": "Basic Martial Mana"
+    },
+    "fields": {
+      "template_key": "basic-mana",
+      "name": "Basic Martial Mana",
+      "type_line": "Mana - Martial",
+      "mana_cost": "0",
+      "mana_symbols": [],
+      "attack": null,
+      "health": null,
+      "rules_text_raw": ": Gain",
+      "rules_text_enriched": "[[symbol:exhaust]]: Gain [[symbol:martial-mana]]",
+      "rules_text": "{EXHAUST}: Gain {MM}",
+      "version_number": 1
+    },
+    "metadata": {
+      "keywords": [],
+      "tags": [
+        "martial"
+      ],
+      "symbols": [
+        "exhaust",
+        "martial-mana"
+      ],
+      "types": [
+        "mana"
+      ],
+      "symbol_types": {
+        "exhaust": "generic",
+        "martial-mana": "mana"
+      }
+    },
+    "suggestions": {
+      "tags": [],
+      "types": []
+    },
+    "snapshot": {
+      "fields": {
+        "name": "Basic Martial Mana",
+        "type_line": "Mana - Martial",
+        "mana_cost": "0",
+        "attack": null,
+        "health": null,
+        "rules_text": "[[symbol:exhaust]]: Gain [[symbol:martial-mana]]"
+      },
+      "metadata": {
+        "keywords": [],
+        "tags": [
+          "martial"
+        ],
+        "types": [
+          "mana"
+        ],
+        "symbols": [
+          "exhaust",
+          "martial-mana"
+        ]
+      }
+    },
+    "field_sources": {
+      "fields": {
+        "name": "auto",
+        "type_line": "auto",
+        "mana_cost": "auto",
+        "attack": "auto",
+        "health": "auto",
+        "rules_text": "auto"
+      },
+      "metadata": {
+        "keywords": "auto",
+        "tags": "auto",
+        "types": "auto",
+        "symbols": "auto"
+      }
+    },
+    "job": {
+      "status": "completed",
+      "total_items": 1,
+      "processed_items": 1,
+      "item_statuses": [
+        "completed"
+      ]
+    }
+  }
+}

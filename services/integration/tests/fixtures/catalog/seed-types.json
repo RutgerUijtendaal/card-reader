@@ -1,8 +1,9 @@
 [
   "2h",
+  "Creature",
   "Equipment",
+  "Mana",
   "Persistent",
   "Spell",
-  "Unique",
-  "Hero"
+  "Unique"
 ]

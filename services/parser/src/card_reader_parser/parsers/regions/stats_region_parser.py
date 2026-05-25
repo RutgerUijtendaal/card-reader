@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from PIL import Image
@@ -13,6 +14,15 @@ from ..region_config import resolve_region_ocr_config
 from .types import RegionParseResult
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class StatsOcrAttempt:
+    scale: float
+    grayscale: bool
+    pad: int = 0
+    autocontrast: bool = False
+    threshold: int | None = None
 
 
 class StatsRegionParser:
@@ -43,18 +53,20 @@ class StatsRegionParser:
         chosen_text = ""
         value: int | None = None
 
-        for attempt_scale, attempt_grayscale in attempts:
+        for attempt in attempts:
             logger.info(
-                "Stats OCR attempt. region=%s field=%s scale=%.2f grayscale=%s",
+                "Stats OCR attempt. region=%s field=%s scale=%.2f grayscale=%s pad=%s autocontrast=%s threshold=%s",
                 region_name,
                 field_name,
-                attempt_scale,
-                attempt_grayscale,
+                attempt.scale,
+                attempt.grayscale,
+                attempt.pad,
+                attempt.autocontrast,
+                attempt.threshold,
             )
             preprocessed_image = self._preprocess_image(
                 image,
-                scale=attempt_scale,
-                grayscale=attempt_grayscale,
+                attempt=attempt,
             )
             ocr_data = self._ocr_runner.run(preprocessed_image, config=ocr_config)
             text = str(ocr_data.get("text", ""))
@@ -123,22 +135,36 @@ class StatsRegionParser:
         target_height = max(1, int(height * scale))
         return image.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
-    def _preprocess_image(self, image: Image.Image, *, scale: float, grayscale: bool) -> Image.Image:
-        out = self._scale_image(image, scale)
-        if grayscale:
+    def _preprocess_image(self, image: Image.Image, *, attempt: StatsOcrAttempt) -> Image.Image:
+        out = image if image.mode in {"RGB", "L"} else image.convert("RGB")
+        if attempt.pad > 0:
+            out = ImageOps.expand(out, border=attempt.pad, fill="white")
+        out = self._scale_image(out, attempt.scale)
+        if attempt.autocontrast:
+            out = ImageOps.autocontrast(out)
+        if attempt.grayscale:
             out = ImageOps.grayscale(out)
+        if attempt.threshold is not None:
+            grayscale = out if out.mode == "L" else ImageOps.grayscale(out)
+            out = grayscale.point(lambda value: 255 if value >= attempt.threshold else 0)
         return out
 
-    def _build_ocr_attempts(self) -> list[tuple[float, bool]]:
-        # Always apply scaling + grayscale preprocessing for stat OCR.
-        candidates: list[tuple[float, bool]] = [
-            (0.5, True),
-            (1.0, True),
-            (2.0, True),
-            (3.0, True),
+    def _build_ocr_attempts(self) -> list[StatsOcrAttempt]:
+        candidates: list[StatsOcrAttempt] = [
+            StatsOcrAttempt(scale=1.0, grayscale=False),
+            StatsOcrAttempt(scale=1.0, grayscale=True),
+            StatsOcrAttempt(scale=2.0, grayscale=False),
+            StatsOcrAttempt(scale=2.0, grayscale=True),
+            StatsOcrAttempt(scale=3.0, grayscale=True),
+            StatsOcrAttempt(scale=4.0, grayscale=False, pad=8),
+            StatsOcrAttempt(scale=4.0, grayscale=True, pad=8),
+            StatsOcrAttempt(scale=4.0, grayscale=True, pad=8, autocontrast=True),
+            StatsOcrAttempt(scale=5.0, grayscale=True, pad=8, autocontrast=True),
+            StatsOcrAttempt(scale=5.0, grayscale=True, pad=8, autocontrast=True, threshold=180),
+            StatsOcrAttempt(scale=5.0, grayscale=True, pad=8, autocontrast=True, threshold=200),
         ]
-        out: list[tuple[float, bool]] = []
-        seen: set[tuple[float, bool]] = set()
+        out: list[StatsOcrAttempt] = []
+        seen: set[StatsOcrAttempt] = set()
         for candidate in candidates:
             if candidate in seen:
                 continue
