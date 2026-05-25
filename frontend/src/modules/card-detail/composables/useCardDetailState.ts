@@ -156,7 +156,13 @@ export const useCardDetailState = () => {
   const saveEdits = async (): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
+    const selectedTemplateId = reparseTemplateId.value;
+    const templateChanged = selectedTemplateId !== version.template_id;
     const updates = buildManualUpdatePayload(form, version);
+    if (Object.keys(updates).length === 0 && templateChanged) {
+      await queueLatestCardReparseForTemplate(selectedTemplateId);
+      return;
+    }
     if (Object.keys(updates).length === 0) {
       saveMessage.value = 'No changes to save.';
       return;
@@ -165,6 +171,9 @@ export const useCardDetailState = () => {
       updates,
       'Changes saved. Edited fields and metadata are now locked to manual ownership.',
     );
+    if (templateChanged) {
+      await queueLatestCardReparseForTemplate(selectedTemplateId);
+    }
   };
 
   const restoreField = async (fieldName: ScalarFieldName): Promise<void> => {
@@ -194,13 +203,17 @@ export const useCardDetailState = () => {
   };
 
   const queueLatestCardReparse = async (): Promise<void> => {
+    await queueLatestCardReparseForTemplate(reparseTemplateId.value);
+  };
+
+  const queueLatestCardReparseForTemplate = async (templateId: string): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
     isQueuingReparse.value = true;
     saveMessage.value = '';
     try {
       const response = await api.post<{ message: string }>(`/cards/${version.id}/reparse`, {
-        template_id: reparseTemplateId.value,
+        template_id: templateId,
       });
       saveMessage.value = response.data.message;
     } finally {

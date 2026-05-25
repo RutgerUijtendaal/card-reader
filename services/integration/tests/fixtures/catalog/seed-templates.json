@@ -92,5 +92,53 @@
         }
       ]
     }
+  },
+  {
+    "key": "basic-mana",
+    "label": "Basic mana",
+    "definition": {
+      "id": "basic-mana",
+      "version": 7,
+      "regions": [
+        {
+          "region_id": "top_bar",
+          "parser_type": "name_mana_cost",
+          "cut_region": {
+            "unit": "relative",
+            "x": 0.04,
+            "y": 0.02,
+            "w": 0.92,
+            "h": 0.07
+          },
+          "ocr_config": {
+            "ocr_min_confidence": 0.55
+          }
+        },
+        {
+          "region_id": "type_bar",
+          "parser_type": "type_tag",
+          "cut_region": {
+            "unit": "relative",
+            "x": 0.04,
+            "y": 0.9,
+            "w": 0.4,
+            "h": 0.07
+          },
+          "ocr_config": {}
+        },
+        {
+          "region_id": "rules_text",
+          "parser_type": "rules_text",
+          "cut_region": {
+            "unit": "relative",
+            "x": 0.54,
+            "y": 0.9,
+            "w": 0.4,
+            "h": 0.07
+          },
+          "ocr_config": {}
+        }
+      ]
+    }
   }
 ]
