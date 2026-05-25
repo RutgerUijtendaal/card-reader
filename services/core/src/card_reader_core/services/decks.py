@@ -73,8 +73,24 @@ class DeckUpdateInput:
 
 
 class DeckService:
-    def list_public_decks(self) -> list[Deck]:
-        return [deck for deck in list_public_decks() if self.get_deck_validation(deck).is_valid]
+    def list_public_decks(
+        self,
+        *,
+        hero_query: str | None = None,
+        card_query: str | None = None,
+        affinity_symbol_ids: list[str] | None = None,
+        affinity_symbol_match: str | None = None,
+    ) -> list[Deck]:
+        return [
+            deck
+            for deck in list_public_decks(
+                hero_query=hero_query,
+                card_query=card_query,
+                affinity_symbol_ids=affinity_symbol_ids,
+                affinity_symbol_match=affinity_symbol_match,
+            )
+            if self.get_deck_validation(deck).is_valid
+        ]
 
     def list_owner_decks(self, owner_id: str) -> list[Deck]:
         return list_owner_decks(owner_id)

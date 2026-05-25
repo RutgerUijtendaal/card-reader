@@ -8,7 +8,12 @@ from rest_framework.views import APIView
 
 from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.permissions import AuthEnabledOrAuthenticatedAllowed
-from card_reader_api.decks.serializers import DeckWriteSerializer, deck_payload, serializer_error
+from card_reader_api.decks.serializers import (
+    DeckListQuerySerializer,
+    DeckWriteSerializer,
+    deck_payload,
+    serializer_error,
+)
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput, DeckUpdateInput
 
 
@@ -19,8 +24,24 @@ def _user_id(request: Request) -> str:
 class PublicDeckListView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request) -> Response:
-        decks = DeckService().list_public_decks()
+    def get(self, request: Request) -> Response:
+        serializer = DeckListQuerySerializer(
+            data={
+                "hero_q": request.query_params.get("hero_q"),
+                "card_q": request.query_params.get("card_q"),
+                "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
+                "affinity_symbol_match": request.query_params.get("affinity_symbol_match"),
+            }
+        )
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        filters = serializer.validated_list_filters()
+        decks = DeckService().list_public_decks(
+            hero_query=filters["hero_query"],
+            card_query=filters["card_query"],
+            affinity_symbol_ids=filters["affinity_symbol_ids"],
+            affinity_symbol_match=filters["affinity_symbol_match"],
+        )
         return Response([deck_payload(deck) for deck in decks])
 
 

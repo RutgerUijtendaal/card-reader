@@ -1,0 +1,60 @@
+<template>
+  <GalleryFilterSidebar
+    title="Deck Filters"
+    description="Filter public decks by hero, included cards, and affinity."
+    :query="controller.heroQuery.value"
+    :on-update-query="controller.updateHeroQuery"
+    search-placeholder="Search hero cards..."
+    :total-count="totalCount"
+    :on-reset="controller.resetFilters"
+    :sticky-to-viewport="false"
+  >
+    <div class="theme-muted-panel space-y-2 p-3">
+      <div class="space-y-1">
+        <h4 class="theme-section-title text-sm font-semibold">
+          Cards In Deck
+        </h4>
+        <p class="theme-section-muted text-xs">
+          Match decks containing any mainboard or sideboard card with this name.
+        </p>
+      </div>
+      <input
+        :value="controller.cardQuery.value"
+        class="input-base"
+        placeholder="Search deck cards..."
+        @input="controller.updateCardQuery(($event.target as HTMLInputElement).value)"
+      >
+    </div>
+
+    <SymbolToggleGroup
+      v-model="selectedAffinitySymbolIds"
+      v-model:match-mode="affinitySymbolMatch"
+      :default-open="true"
+      label="Affinity"
+      :options="controller.filterCatalog.value.affinitySymbols"
+      @reset="controller.resetAffinitySymbols"
+    />
+  </GalleryFilterSidebar>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
+import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
+import type { DeckBrowseFiltersController } from '@/modules/decks/composables/useDeckBrowseFilters';
+
+const props = defineProps<{
+  controller: DeckBrowseFiltersController;
+  totalCount: number;
+}>();
+
+const selectedAffinitySymbolIds = computed({
+  get: () => props.controller.affinitySymbolIds.value,
+  set: props.controller.updateAffinitySymbolIds,
+});
+
+const affinitySymbolMatch = computed({
+  get: () => props.controller.affinitySymbolMatch.value,
+  set: props.controller.updateAffinitySymbolMatch,
+});
+</script>
