@@ -4,20 +4,22 @@
   >
     <div
       class="flex items-start justify-between gap-3"
-      :class="compact ? 'space-y-0' : ''"
     >
-      <div class="space-y-1">
+      <div
+        class="min-w-0"
+        :class="compact ? '' : 'flex items-baseline gap-2'"
+      >
         <h4
           class="theme-section-title font-semibold"
-          :class="compact ? 'text-[11px] uppercase tracking-[0.16em]' : 'text-sm'"
+          :class="compact ? 'text-sm' : 'text-base'"
         >
           {{ title }}
         </h4>
         <p
-          class="theme-section-muted"
-          :class="compact ? 'text-[10px]' : 'text-xs'"
+          v-if="!compact"
+          class="theme-section-muted text-sm"
         >
-          {{ totalCardsLabel }}
+          - {{ totalCardsLabel }}
         </p>
       </div>
       <span
@@ -31,38 +33,28 @@
 
     <div
       v-if="hasVisibleCurve"
-      class="grid grid-cols-8"
-      :class="compact ? 'gap-0.5' : 'gap-2'"
+      :class="chartShellClass"
     >
-      <div
-        v-for="bucket in curveSummary.buckets"
-        :key="bucket.label"
-        :class="compact ? 'space-y-0.5' : 'space-y-2'"
-      >
+      <div :class="chartGridClass">
         <div
-          class="flex items-end"
-          :class="compact ? 'h-10' : 'h-28'"
-        >
-          <div
-            class="mana-curve-bar w-full rounded-t-lg"
-            :class="bucket.count > 0 ? 'mana-curve-bar-filled' : 'mana-curve-bar-empty'"
-            :style="{ height: `${Math.max(bucket.heightRatio * 100, bucket.count > 0 ? 14 : 6)}%` }"
-          />
-        </div>
-        <div
-          class="text-center"
-          :class="compact ? 'space-y-0.5' : 'space-y-1'"
+          v-for="bucket in curveSummary.buckets"
+          :key="bucket.label"
+          :class="bucketColumnClass"
         >
           <p
-            class="theme-section-title font-semibold"
-            :class="compact ? 'text-[11px]' : 'text-sm'"
+            class="text-center font-semibold tabular-nums"
+            :class="bucket.count > 0 ? countClass : zeroCountClass"
           >
             {{ bucket.count }}
           </p>
-          <p
-            class="theme-kicker font-semibold uppercase tracking-wide"
-            :class="compact ? 'text-[8px]' : 'text-[11px]'"
-          >
+          <div :class="barTrackClass">
+            <div
+              class="mana-curve-bar w-full"
+              :class="bucket.count > 0 ? filledBarClass : emptyBarClass"
+              :style="barStyle(bucket.count, bucket.heightRatio)"
+            />
+          </div>
+          <p :class="labelClass">
             {{ bucket.label }}
           </p>
         </div>
@@ -106,14 +98,39 @@ const emptyStateLabel = computed(() =>
     : props.emptyLabel,
 );
 const containerClass = computed(() =>
-  props.compact ? 'deck-mana-curve-compact space-y-1.5 rounded-xl border px-2.5 py-2' : 'theme-muted-panel space-y-4 p-4',
+  props.compact ? 'space-y-2' : 'space-y-4',
 );
+const chartShellClass = computed(() =>
+  props.compact
+    ? 'deck-mana-curve-shell-compact rounded-lg px-2 py-1.5'
+    : 'deck-mana-curve-shell rounded-xl px-3 py-3',
+);
+const chartGridClass = computed(() => (props.compact ? 'grid grid-cols-8 gap-1.5' : 'grid grid-cols-8 gap-3'));
+const bucketColumnClass = computed(() => (props.compact ? 'space-y-1' : 'space-y-2'));
+const countClass = computed(() => (props.compact ? 'theme-section-title text-[10px]' : 'theme-section-title text-sm'));
+const zeroCountClass = computed(() => (props.compact ? 'theme-kicker text-[10px]' : 'theme-kicker text-sm'));
+const labelClass = computed(() =>
+  props.compact
+    ? 'theme-kicker text-center text-[9px] font-medium uppercase tracking-[0.14em]'
+    : 'theme-kicker text-center text-[11px] font-semibold uppercase tracking-[0.16em]',
+);
+const barTrackClass = computed(() =>
+  props.compact
+    ? 'flex h-14 items-end border-b pb-1 theme-divider'
+    : 'flex h-24 items-end border-b pb-1.5 theme-divider',
+);
+const filledBarClass = computed(() => (props.compact ? 'mana-curve-bar-filled-compact' : 'mana-curve-bar-filled'));
+const emptyBarClass = computed(() => (props.compact ? 'mana-curve-bar-empty-compact' : 'mana-curve-bar-empty'));
+const barStyle = (count: number, heightRatio: number): Record<string, string> => ({
+  height: `${Math.max(heightRatio * 100, count > 0 ? (props.compact ? 12 : 10) : props.compact ? 3 : 2)}%`,
+});
 </script>
 
 <style scoped>
-.deck-mana-curve-compact {
-  border-color: var(--color-border);
-  background: color-mix(in srgb, var(--color-surface-soft) 72%, transparent 28%);
+.deck-mana-curve-shell,
+.deck-mana-curve-shell-compact {
+  border: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent 38%);
+  background: color-mix(in srgb, var(--color-surface-soft) 42%, transparent 58%);
 }
 
 .mana-curve-bar {
@@ -121,15 +138,28 @@ const containerClass = computed(() =>
     height 180ms ease,
     background 180ms ease,
     border-color 180ms ease;
-  border: 1px solid var(--color-border);
+  border-radius: 6px 6px 0 0;
 }
 
 .mana-curve-bar-filled {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary-to) 84%, white 16%) 0%, var(--color-primary-from) 100%);
-  border-color: color-mix(in srgb, var(--color-primary-from) 40%, var(--color-border) 60%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary-to) 74%, white 26%) 0%, color-mix(in srgb, var(--color-primary-from) 88%, white 12%) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 8px 18px rgba(99, 102, 241, 0.12);
+}
+
+.mana-curve-bar-filled-compact {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary-to) 72%, white 28%) 0%, color-mix(in srgb, var(--color-primary-from) 84%, white 16%) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 6px 14px rgba(99, 102, 241, 0.1);
 }
 
 .mana-curve-bar-empty {
-  background: var(--color-surface-soft);
+  background: color-mix(in srgb, var(--color-border) 26%, transparent 74%);
+}
+
+.mana-curve-bar-empty-compact {
+  background: color-mix(in srgb, var(--color-border) 24%, transparent 76%);
 }
 </style>
