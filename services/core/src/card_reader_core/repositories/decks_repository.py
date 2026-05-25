@@ -11,6 +11,8 @@ from card_reader_core.models import (
     CardVersionType,
     Deck,
     DeckEntry,
+    DeckSideboard,
+    DeckSideboardEntry,
     now_utc,
 )
 
@@ -87,7 +89,7 @@ def delete_deck(*, deck_id: str, owner_id: str) -> bool:
 
 
 @transaction.atomic
-def replace_deck_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> None:
+def replace_mainboard_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> None:
     DeckEntry.objects.filter(deck=deck).delete()
     DeckEntry.objects.bulk_create(
         [
@@ -95,6 +97,29 @@ def replace_deck_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> None:
             for card_id, quantity in entries
         ]
     )
+
+
+@transaction.atomic
+def replace_sideboards(*, deck: Deck, sideboards: list[dict[str, object]]) -> None:
+    DeckSideboard.objects.filter(deck=deck).delete()
+    for sideboard in sideboards:
+        created_sideboard = DeckSideboard.objects.create(
+            deck=deck,
+            name=str(sideboard["name"]),
+        )
+        entries = sideboard["entries"]
+        if not isinstance(entries, list) or len(entries) == 0:
+            continue
+        DeckSideboardEntry.objects.bulk_create(
+            [
+                DeckSideboardEntry(
+                    sideboard=created_sideboard,
+                    card_id=str(card_id),
+                    quantity=int(quantity),
+                )
+                for card_id, quantity in entries
+            ]
+        )
 
 
 def _deck_queryset() -> QuerySet[Deck]:
@@ -114,7 +139,23 @@ def _deck_queryset() -> QuerySet[Deck]:
                 "card__latest_version__template",
                 "card__latest_version__previous_version",
             ).prefetch_related(*_latest_version_metadata_prefetches("card__latest_version")).order_by("card__label", "created_at"),
-        )
+        ),
+        Prefetch(
+            "sideboards",
+            queryset=DeckSideboard.objects.prefetch_related(
+                Prefetch(
+                    "entries",
+                    queryset=DeckSideboardEntry.objects.select_related(
+                        "card",
+                        "card__latest_version",
+                        "card__latest_version__template",
+                        "card__latest_version__previous_version",
+                    )
+                    .prefetch_related(*_latest_version_metadata_prefetches("card__latest_version"))
+                    .order_by("card__label", "created_at"),
+                )
+            ).order_by("created_at", "id"),
+        ),
     )
 
 

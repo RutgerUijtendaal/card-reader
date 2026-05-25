@@ -16,7 +16,9 @@ from card_reader_core.services.decks import DeckService
 
 def deck_payload(deck: Deck) -> dict[str, object]:
     validation = DeckService().get_deck_validation(deck)
+    totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
+    sideboards = list(deck.sideboards.all())
     return {
         "id": deck.id,
         "name": deck.name,
@@ -28,8 +30,8 @@ def deck_payload(deck: Deck) -> dict[str, object]:
         },
         "hero_card": deck_card_payload(deck.hero_card),
         "mainboard": {
-            "total_cards": validation.total_cards,
-            "unique_cards": validation.unique_cards,
+            "total_cards": totals.mainboard_total_cards,
+            "unique_cards": totals.mainboard_unique_cards,
             "entries": [
                 {
                     "quantity": entry.quantity,
@@ -37,6 +39,28 @@ def deck_payload(deck: Deck) -> dict[str, object]:
                 }
                 for entry in entries
             ],
+        },
+        "sideboards": [
+            {
+                "id": sideboard.id,
+                "name": sideboard.name,
+                "total_cards": sum(int(entry.quantity) for entry in sideboard.entries.all()),
+                "unique_cards": sideboard.entries.count(),
+                "entries": [
+                    {
+                        "quantity": entry.quantity,
+                        "card": deck_card_payload(entry.card),
+                    }
+                    for entry in sideboard.entries.all()
+                ],
+            }
+            for sideboard in sideboards
+        ],
+        "totals": {
+            "overall_total_cards": totals.overall_total_cards,
+            "overall_unique_cards": totals.overall_unique_cards,
+            "mainboard_total_cards": totals.mainboard_total_cards,
+            "mainboard_unique_cards": totals.mainboard_unique_cards,
         },
         "status": {
             "is_valid": validation.is_valid,
@@ -109,9 +133,19 @@ def _deck_card_metadata(version: CardVersion) -> CardMetadata:
     }
 
 
-class DeckEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
+class MainboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
     card_id = serializers.CharField()
     quantity = serializers.IntegerField(min_value=1, max_value=4)
+
+
+class SideboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
+    card_id = serializers.CharField()
+    quantity = serializers.IntegerField(min_value=1, max_value=100)
+
+
+class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
+    name = serializers.CharField(required=True, allow_blank=False)
+    entries = SideboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
 
 
 class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
@@ -119,7 +153,8 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     is_public = serializers.BooleanField(required=True)
     hero_card_id = serializers.CharField(required=True)
-    entries = DeckEntryWriteSerializer(many=True, required=True, allow_empty=True)
+    entries = MainboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
+    sideboards = DeckSideboardWriteSerializer(many=True, required=False, allow_empty=True, default=list)
 
 
 def serializer_error(serializer: serializers.BaseSerializer[Any]) -> Response:

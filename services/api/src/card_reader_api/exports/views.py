@@ -115,7 +115,9 @@ def _user_id(request: Request) -> str:
 
 def _build_tts_export_payload(deck: Any) -> dict[str, object]:
     entries = list(deck.entries.select_related("card__latest_version").all())
+    sideboards = list(deck.sideboards.all())
     validation = DeckService().get_deck_validation(deck)
+    totals = DeckService().get_deck_totals(deck)
     hero_card = deck.hero_card
 
     return {
@@ -126,6 +128,10 @@ def _build_tts_export_payload(deck: Any) -> dict[str, object]:
             "description": deck.description,
             "total_cards": validation.total_cards,
             "unique_cards": validation.unique_cards,
+            "overall_total_cards": totals.overall_total_cards,
+            "overall_unique_cards": totals.overall_unique_cards,
+            "mainboard_total_cards": totals.mainboard_total_cards,
+            "mainboard_unique_cards": totals.mainboard_unique_cards,
         },
         "lookup": {
             "preferred_keys": ["card_id", "card_key", "name"],
@@ -135,10 +141,29 @@ def _build_tts_export_payload(deck: Any) -> dict[str, object]:
             _build_tts_export_card_ref(entry.card, quantity=entry.quantity, role="mainboard")
             for entry in entries
         ],
+        "sideboards": [
+            {
+                "name": sideboard.name,
+                "cards": [
+                    _build_tts_export_card_ref(
+                        entry.card,
+                        quantity=entry.quantity,
+                        role="sideboard",
+                    )
+                    for entry in sideboard.entries.all()
+                ],
+            }
+            for sideboard in sideboards
+        ],
     }
 
 
-def _build_tts_export_card_ref(card: Any, *, quantity: int, role: str) -> dict[str, object]:
+def _build_tts_export_card_ref(
+    card: Any,
+    *,
+    quantity: int,
+    role: str,
+) -> dict[str, object]:
     version = getattr(card, "latest_version", None)
     return {
         "role": role,
