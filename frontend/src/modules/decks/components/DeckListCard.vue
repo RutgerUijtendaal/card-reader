@@ -62,7 +62,7 @@
               </span>
               <span class="theme-section-muted">
                 <span class="theme-section-title font-medium">Main</span>
-                {{ deck.mainboard.total_cards }} / {{ MIN_MAINBOARD_CARD_COUNT }}-{{ MAX_MAINBOARD_CARD_COUNT }}
+                {{ deck.mainboard.total_cards }} / {{ MIN_MAINBOARD_CARD_COUNT }}+
               </span>
               <span class="theme-section-muted">
                 <span class="theme-section-title font-medium">Unique</span>
@@ -129,7 +129,7 @@
 import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
-import { MAX_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_CARD_COUNT } from '@/modules/decks/constants';
+import { MIN_MAINBOARD_CARD_COUNT } from '@/modules/decks/constants';
 import type { DeckRecord } from '@/modules/decks/types';
 
 const props = defineProps<{

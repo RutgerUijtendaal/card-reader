@@ -6,7 +6,7 @@
           {{ controller.deckId.value ? 'Edit Deck' : 'Build Deck' }}
         </h2>
         <p class="theme-section-muted text-sm">
-          {{ controller.deck.isSetupStep.value ? 'Select a hero and enter the deck details to continue.' : `Add cards until the deck reaches ${MIN_MAINBOARD_CARD_COUNT}-${MAX_MAINBOARD_CARD_COUNT} mainboard cards.` }}
+          {{ controller.deck.isSetupStep.value ? 'Select a hero and enter the deck details to continue.' : `Build a mainboard with at least ${MIN_MAINBOARD_CARD_COUNT} cards, including ${MIN_MAINBOARD_MANA_TYPE_COUNT} Mana cards.` }}
         </p>
       </div>
 
@@ -23,7 +23,14 @@
             <div class="theme-divider hidden h-4 border-l lg:block" />
             <div class="flex items-baseline gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
-              <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardCards.value }} / {{ MAX_MAINBOARD_CARD_COUNT }}</span>
+              <span class="theme-section-title text-base font-semibold">
+                {{ controller.deck.totalMainboardCards.value }}<template v-if="controller.deck.totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT"> / {{ MAX_MAINBOARD_CARD_COUNT }}</template>
+              </span>
+            </div>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div class="flex items-baseline gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
+              <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardManaTypeCards.value }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
 
@@ -119,7 +126,7 @@ import DeckBuilderFiltersPanel from '@/modules/decks/components/DeckBuilderFilte
 import DeckBuilderGallery from '@/modules/decks/components/DeckBuilderGallery.vue';
 import DeckBuilderSummaryPanel from '@/modules/decks/components/DeckBuilderSummaryPanel.vue';
 import { useDeckEditor } from '@/modules/decks/composables/useDeckEditor';
-import { MAX_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_CARD_COUNT } from '@/modules/decks/constants';
+import { MAX_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_MANA_TYPE_COUNT } from '@/modules/decks/constants';
 
 const controller = useDeckEditor();
 </script>

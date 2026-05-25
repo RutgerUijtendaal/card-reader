@@ -185,7 +185,11 @@ def _add_card_metadata(
 
 
 def _build_mainboard_cards(total_unique: int = 15) -> list[Card]:
-    return [_create_card(name=f"Mainboard Card {index}", is_hero=False) for index in range(total_unique)]
+    cards: list[Card] = []
+    for index in range(total_unique):
+        type_labels = ["Mana"] if index < 3 else None
+        cards.append(_create_card(name=f"Mainboard Card {index}", is_hero=False, type_labels=type_labels))
+    return cards
 
 
 def _valid_entries(cards: Iterable[Card]) -> list[dict[str, object]]:
@@ -249,7 +253,7 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_public_deck_list_includes_40_card_public_decks() -> None:
+def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
     owner = _create_user("deck-minimum-public-owner", "password")
     hero = _create_card(name="Minimum Hero", is_hero=True)
     mainboard_cards = _build_mainboard_cards()
@@ -305,7 +309,7 @@ def test_deck_payload_includes_tooltip_metadata() -> None:
         symbol_specs=[("mana-fire", "Mana - Fire", "{fire}")],
     )
 
-    filler_cards = [_create_card(name=f"Tooltip Filler {index}", is_hero=False) for index in range(14)]
+    filler_cards = _build_mainboard_cards(total_unique=14)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
         name="Tooltip Deck",
@@ -680,7 +684,7 @@ def test_deck_create_rejects_non_hero_card_as_hero() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_deck_create_allows_invalid_in_progress_drafts() -> None:
+def test_deck_create_allows_invalid_in_progress_drafts_below_minimum_card_count() -> None:
     username = "deck-invalid-count-user"
     password = "password"
     _create_user(username, password)
@@ -696,7 +700,7 @@ def test_deck_create_allows_invalid_in_progress_drafts() -> None:
             "description": None,
             "is_public": True,
             "hero_card_id": hero.id,
-            "entries": [{"card_id": card.id, "quantity": 2} for card in mainboard_cards],
+            "entries": [{"card_id": card.id, "quantity": 1} for card in mainboard_cards[:10]],
         },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -705,7 +709,35 @@ def test_deck_create_allows_invalid_in_progress_drafts() -> None:
     assert response.status_code == 201
     assert response.json()["status"]["is_valid"] is False
     assert response.json()["status"]["label"] == "In Progress"
-    assert response.json()["status"]["issues"] == ["Deck must contain between 40 and 60 mainboard cards."]
+    assert response.json()["status"]["issues"] == ["Deck must contain at least 20 mainboard cards."]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_create_marks_deck_invalid_without_enough_mana_type_cards() -> None:
+    username = "deck-invalid-mana-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Mana Count Hero", is_hero=True)
+    non_mana_cards = [_create_card(name=f"Non Mana Card {index}", is_hero=False) for index in range(20)]
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "No Mana Deck",
+            "description": None,
+            "is_public": True,
+            "hero_card_id": hero.id,
+            "entries": [{"card_id": card.id, "quantity": 1} for card in non_mana_cards],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"]["is_valid"] is False
+    assert response.json()["status"]["issues"] == ["Deck must contain at least 3 mainboard cards with type 'Mana'."]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

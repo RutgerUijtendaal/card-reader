@@ -46,35 +46,41 @@
 
     <div class="grid min-h-0 flex-1 gap-5 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
       <div class="page-card flex min-h-0 flex-col">
-        <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
-          <h3 class="theme-section-title text-base font-semibold">
-            Hero
-          </h3>
-          <div class="space-y-3">
-            <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
-              <img
-                v-if="deck.hero_card.image_url"
-                :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
-                :alt="deck.hero_card.name"
-                class="h-full w-full object-cover"
-              >
-              <div
-                v-else
-                class="theme-kicker flex h-full items-center justify-center text-xs"
-              >
-                No image
+        <div class="app-scrollbar flex-1 overflow-y-auto pr-1">
+          <div class="flex min-h-full flex-col">
+            <div class="space-y-4">
+              <h3 class="theme-section-title text-base font-semibold">
+                Hero
+              </h3>
+              <div class="space-y-3">
+                <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
+                  <img
+                    v-if="deck.hero_card.image_url"
+                    :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
+                    :alt="deck.hero_card.name"
+                    class="h-full w-full object-cover"
+                  >
+                  <div
+                    v-else
+                    class="theme-kicker flex h-full items-center justify-center text-xs"
+                  >
+                    No image
+                  </div>
+                </div>
+
+                <p class="theme-section-title text-lg font-semibold">
+                  {{ deck.hero_card.name }}
+                </p>
               </div>
             </div>
 
-            <p class="theme-section-title text-lg font-semibold">
-              {{ deck.hero_card.name }}
-            </p>
+            <div class="mt-auto pt-6">
+              <DeckManaCurve
+                :entries="activeBoardEntries"
+                :empty-label="activeBoardEmptyLabel"
+              />
+            </div>
           </div>
-
-          <DeckManaCurve
-            :entries="activeBoardEntries"
-            :empty-label="activeBoardEmptyLabel"
-          />
         </div>
 
         <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
@@ -98,37 +104,43 @@
       </div>
 
       <div class="page-card flex min-h-0 flex-col space-y-4">
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            class="theme-pill text-xs"
-            :class="activeBoardId === 'mainboard' ? 'theme-pill-accent' : 'theme-pill-neutral'"
-            type="button"
-            @click="activeBoardId = 'mainboard'"
-          >
-            Mainboard ({{ deck.mainboard.total_cards }})
-          </button>
-          <button
-            v-for="sideboard in deck.sideboards"
-            :key="sideboard.id"
-            class="theme-pill text-xs"
-            :class="activeBoardId === sideboard.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
-            type="button"
-            @click="activeBoardId = sideboard.id"
-          >
-            {{ sideboard.name }} ({{ sideboard.total_cards }})
-          </button>
-        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              class="theme-pill text-xs"
+              :class="activeBoardId === 'mainboard' ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="activeBoardId = 'mainboard'"
+            >
+              Mainboard
+              <span class="ml-1 opacity-80">
+                {{ deck.mainboard.total_cards }} / {{ deck.mainboard.unique_cards }}
+              </span>
+            </button>
+            <button
+              v-for="sideboard in deck.sideboards"
+              :key="sideboard.id"
+              class="theme-pill text-xs"
+              :class="activeBoardId === sideboard.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="activeBoardId = sideboard.id"
+            >
+              {{ sideboard.name }}
+              <span class="ml-1 opacity-80">
+                {{ sideboard.total_cards }} / {{ sideboard.unique_cards }}
+              </span>
+            </button>
+          </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <h3 class="theme-section-title text-base font-semibold">
-            {{ activeBoardTitle }}
-          </h3>
-          <span class="theme-pill theme-pill-accent text-xs">
-            {{ activeBoardTotalCards }} cards / {{ activeBoardUniqueCards }} unique
-          </span>
-          <span class="theme-pill theme-pill-neutral text-xs">
+          <span class="theme-pill theme-pill-neutral shrink-0 text-xs">
             {{ deck.totals.overall_total_cards }} total across all boards
           </span>
+        </div>
+
+        <div class="sr-only">
+          <h3>
+            {{ activeBoardTitle }}
+          </h3>
         </div>
 
         <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
@@ -214,12 +226,6 @@ const activeBoardEntries = computed<DeckEntrySummary[]>(() => {
 });
 const activeBoardTitle = computed(() =>
   activeBoardId.value === 'mainboard' ? 'Mainboard' : (activeSideboard.value?.name ?? 'Sideboard'),
-);
-const activeBoardTotalCards = computed(() =>
-  activeBoardId.value === 'mainboard' ? (deck.value?.mainboard.total_cards ?? 0) : (activeSideboard.value?.total_cards ?? 0),
-);
-const activeBoardUniqueCards = computed(() =>
-  activeBoardId.value === 'mainboard' ? (deck.value?.mainboard.unique_cards ?? 0) : (activeSideboard.value?.unique_cards ?? 0),
 );
 const activeBoardEmptyLabel = computed(() =>
   activeBoardId.value === 'mainboard' ? 'This deck does not have any mainboard cards yet.' : 'This sideboard does not have any cards yet.',

@@ -1,3 +1,4 @@
-export const MIN_MAINBOARD_CARD_COUNT = 40;
-export const MAX_MAINBOARD_CARD_COUNT = 60;
+export const MIN_MAINBOARD_CARD_COUNT = 20;
+export const MAX_MAINBOARD_CARD_COUNT = 100;
+export const MIN_MAINBOARD_MANA_TYPE_COUNT = 3;
 export const MAX_DECK_COPIES = 4;

@@ -1,6 +1,11 @@
 import { computed, reactive, ref, type Ref } from 'vue';
 import type { CardListItem } from '@/modules/card-detail/types';
-import { MAX_DECK_COPIES, MAX_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_CARD_COUNT } from '@/modules/decks/constants';
+import {
+  MAX_DECK_COPIES,
+  MAX_MAINBOARD_CARD_COUNT,
+  MIN_MAINBOARD_CARD_COUNT,
+  MIN_MAINBOARD_MANA_TYPE_COUNT,
+} from '@/modules/decks/constants';
 import type { DeckCardSummary, DeckMetadataOption, DeckRecord, DeckUpsertRequest } from '@/modules/decks/types';
 
 export type DeckFormEntry = {
@@ -83,6 +88,12 @@ export const useDeckEditorDraft = ({
 
   const detailedMainboardEntries = computed(() => mapDetailedEntries(form.entries));
   const detailedActiveBoardEntries = computed(() => mapDetailedEntries(activeBoardEntries.value));
+  const totalMainboardManaTypeCards = computed(() =>
+    detailedMainboardEntries.value.reduce(
+      (sum, entry) => sum + (entry.card.types.some((type) => type.key.toLowerCase() === 'mana') ? entry.quantity : 0),
+      0,
+    ),
+  );
 
   const deckTypeCounts = computed(() => {
     const counts = new Map<string, { type: DeckMetadataOption; count: number }>();
@@ -126,8 +137,14 @@ export const useDeckEditorDraft = ({
 
   const validationMessages = computed(() => {
     const messages = [...setupMessages.value];
-    if (totalMainboardCards.value < MIN_MAINBOARD_CARD_COUNT || totalMainboardCards.value > MAX_MAINBOARD_CARD_COUNT) {
-      messages.push(`Deck must contain between ${MIN_MAINBOARD_CARD_COUNT} and ${MAX_MAINBOARD_CARD_COUNT} mainboard cards.`);
+    if (totalMainboardCards.value < MIN_MAINBOARD_CARD_COUNT) {
+      messages.push(`Deck must contain at least ${MIN_MAINBOARD_CARD_COUNT} mainboard cards.`);
+    }
+    if (totalMainboardCards.value > MAX_MAINBOARD_CARD_COUNT) {
+      messages.push(`Deck cannot contain more than ${MAX_MAINBOARD_CARD_COUNT} mainboard cards.`);
+    }
+    if (totalMainboardManaTypeCards.value < MIN_MAINBOARD_MANA_TYPE_COUNT) {
+      messages.push(`Deck must contain at least ${MIN_MAINBOARD_MANA_TYPE_COUNT} mainboard cards with type 'Mana'.`);
     }
     for (const entry of form.entries) {
       if (entry.quantity < 1 || entry.quantity > MAX_DECK_COPIES) {
@@ -332,9 +349,10 @@ export const useDeckEditorDraft = ({
     const boardId = activeBoardId.value;
     const quantity = getEntryQuantity(card.id, boardId);
     if (boardId === MAINBOARD_ID) {
+      if (quantity === 0 && totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) return 'Mainboard Full';
       if (quantity === 0) return 'Add To Mainboard';
       if (quantity >= MAX_DECK_COPIES) return 'At Copy Limit';
-      if (totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) return `In Mainboard (${quantity})`;
+      if (totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) return `At Mainboard Limit (${quantity})`;
       return `Add Copy (${quantity}/${MAX_DECK_COPIES})`;
     }
     if (quantity === 0) return 'Add To Sideboard';
@@ -373,6 +391,7 @@ export const useDeckEditorDraft = ({
     selectedHero,
     detailedMainboardEntries,
     detailedActiveBoardEntries,
+    totalMainboardManaTypeCards,
     activeSideboard,
     sideboardTabs,
     deckTypeCounts,
