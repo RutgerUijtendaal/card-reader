@@ -4,8 +4,8 @@ import json
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
 from card_reader_core.repositories.helpers import normalize_slug_key
-from card_reader_core.storage import resolve_storage_path
 
 from runtime import REPO_ROOT
 
@@ -186,6 +186,8 @@ def _seed_symbols(seed_file: Path, *, assets_dir: Path) -> None:
 
 
 def _copy_assets_and_build_references(asset_files: list[str], *, assets_dir: Path) -> list[str]:
+    from card_reader_core.storage import resolve_storage_path
+
     references: list[str] = []
     if not asset_files:
         return references
