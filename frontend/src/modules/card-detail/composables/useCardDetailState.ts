@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import { buildCardReturnLocation, getCardReturnLabel } from '@/modules/card-detail/cardReturnState';
+import { buildEffectiveSymbolIds, getRuleTextSymbolState } from '@/modules/card-detail/ruleTextSymbols';
 import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
 import type {
   CardDetail,
@@ -48,7 +49,7 @@ export const useCardDetailState = () => {
     keyword_ids: [],
     tag_ids: [],
     type_ids: [],
-    symbol_ids: [],
+    additional_symbol_ids: [],
   });
   const metadataSearch = reactive<MetadataSearchState>({
     keywords: '',
@@ -70,6 +71,29 @@ export const useCardDetailState = () => {
         ...(filterOptions.value.symbols ?? []),
       ].map((row) => [row.id, row]),
     ),
+  );
+  const symbolOptionsById = computed<Record<string, SymbolFilterOption>>(() =>
+    Object.fromEntries((filterOptions.value.symbols ?? []).map((row) => [row.id, row])),
+  );
+  const ruleTextSymbolState = computed(() =>
+    getRuleTextSymbolState(form.rules_text, filterOptions.value.symbols ?? []),
+  );
+  const effectiveSymbolIds = computed(() =>
+    buildEffectiveSymbolIds(ruleTextSymbolState.value.referencedSymbolIds, form.additional_symbol_ids),
+  );
+  const ruleTextUnknownSymbolKeys = computed(() => ruleTextSymbolState.value.unknownKeys);
+  const rulesTextSymbols = computed<SymbolFilterOption[]>(() =>
+    ruleTextSymbolState.value.referencedSymbolIds
+      .map((id) => symbolOptionsById.value[id])
+      .filter((symbol): symbol is SymbolFilterOption => Boolean(symbol)),
+  );
+  const additionalSymbols = computed<SymbolFilterOption[]>(() =>
+    form.additional_symbol_ids
+      .map((id) => symbolOptionsById.value[id])
+      .filter(
+        (symbol): symbol is SymbolFilterOption =>
+          Boolean(symbol) && !ruleTextSymbolState.value.referencedSymbolIds.includes(symbol.id),
+      ),
   );
 
   const isBusy = computed(() => isSaving.value || isQueuingReparse.value);
@@ -119,7 +143,7 @@ export const useCardDetailState = () => {
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
-    form.symbol_ids = [...version.symbol_ids];
+    form.additional_symbol_ids = uniqueIds(version.symbol_ids);
     reparseTemplateId.value = version.template_id;
     saveMessage.value = '';
   };
@@ -158,7 +182,7 @@ export const useCardDetailState = () => {
     if (!version?.editable) return;
     const selectedTemplateId = reparseTemplateId.value;
     const templateChanged = selectedTemplateId !== version.template_id;
-    const updates = buildManualUpdatePayload(form, version);
+    const updates = buildManualUpdatePayload(form, version, effectiveSymbolIds.value);
     if (Object.keys(updates).length === 0 && templateChanged) {
       await queueLatestCardReparseForTemplate(selectedTemplateId);
       return;
@@ -249,14 +273,14 @@ export const useCardDetailState = () => {
   const metadataHasParsedSuggestion = (groupName: MetadataGroupName): boolean => {
     const version = selectedVersion.value;
     if (!version?.editable) return false;
-    return JSON.stringify(sortedIds(selectedIdsFromVersion(version, groupName))) !== JSON.stringify(sortedIds(parsedIds(groupName, version)));
+    return JSON.stringify(sortedIds(selectedIdsFromVersion(version, groupName, effectiveSymbolIds.value))) !== JSON.stringify(sortedIds(parsedIds(groupName, version)));
   };
 
   const selectedIds = (groupName: MetadataGroupName): string[] => {
     if (groupName === 'keywords') return form.keyword_ids;
     if (groupName === 'tags') return form.tag_ids;
     if (groupName === 'types') return form.type_ids;
-    return form.symbol_ids;
+    return effectiveSymbolIds.value;
   };
 
   const parsedMetadataLabels = (groupName: MetadataGroupName): string[] =>
@@ -286,7 +310,14 @@ export const useCardDetailState = () => {
     if (groupName === 'keywords') form.keyword_ids = next;
     else if (groupName === 'tags') form.tag_ids = next;
     else if (groupName === 'types') form.type_ids = next;
-    else form.symbol_ids = next;
+    else form.additional_symbol_ids = next.filter((item) => !ruleTextSymbolState.value.referencedSymbolIds.includes(item));
+  };
+
+  const toggleAdditionalSymbol = (id: string, checked: boolean): void => {
+    const next = checked
+      ? [...form.additional_symbol_ids, id]
+      : form.additional_symbol_ids.filter((item) => item !== id);
+    form.additional_symbol_ids = uniqueIds(next);
   };
 
   const formatDate = (value: string): string => {
@@ -339,6 +370,10 @@ export const useCardDetailState = () => {
     metadataSearch,
     selectedVersion,
     isBusy,
+    ruleTextUnknownSymbolKeys,
+    rulesTextSymbols,
+    additionalSymbols,
+    effectiveSymbolIds,
     backButtonLabel,
     goBack,
     goToPreviousCard: galleryNavigation.goToPreviousCard,
@@ -366,6 +401,7 @@ export const useCardDetailState = () => {
     optionsForGroup,
     setMetadataSearch,
     toggleMetadataSelection,
+    toggleAdditionalSymbol,
     toAbsoluteApiUrl,
     formatDate,
   };
@@ -386,11 +422,15 @@ const normalizeParsedFieldValue = (version: CardVersionDetail, fieldName: Scalar
   return String(value ?? '');
 };
 
-const selectedIdsFromVersion = (version: CardVersionDetail, groupName: MetadataGroupName): string[] => {
+const selectedIdsFromVersion = (
+  version: CardVersionDetail,
+  groupName: MetadataGroupName,
+  effectiveSymbolIds: string[],
+): string[] => {
   if (groupName === 'keywords') return version.keyword_ids;
   if (groupName === 'tags') return version.tag_ids;
   if (groupName === 'types') return version.type_ids;
-  return version.symbol_ids;
+  return effectiveSymbolIds;
 };
 
 const parsedIds = (groupName: MetadataGroupName, selectedVersion?: CardVersionDetail | null): string[] => {
@@ -406,6 +446,7 @@ const sortedIds = (ids: string[]): string[] => [...ids].sort((a, b) => a.localeC
 const buildManualUpdatePayload = (
   form: EditorForm,
   version: CardVersionDetail,
+  effectiveSymbolIds: string[],
 ): Record<string, unknown> => {
   const updates: Record<string, unknown> = {};
 
@@ -428,8 +469,8 @@ const buildManualUpdatePayload = (
   if (!sameIds(form.type_ids, version.type_ids)) {
     updates.type_ids = form.type_ids;
   }
-  if (!sameIds(form.symbol_ids, version.symbol_ids)) {
-    updates.symbol_ids = form.symbol_ids;
+  if (!sameIds(effectiveSymbolIds, version.symbol_ids)) {
+    updates.symbol_ids = effectiveSymbolIds;
   }
 
   return updates;
@@ -440,6 +481,8 @@ const normalizeFormFieldValue = (form: EditorForm, fieldName: ScalarFieldName): 
 
 const sameIds = (left: string[], right: string[]): boolean =>
   JSON.stringify(sortedIds(left)) === JSON.stringify(sortedIds(right));
+
+const uniqueIds = (ids: string[]): string[] => Array.from(new Set(ids));
 
 const filterMetadataOptions = <T extends MetadataOption | SymbolFilterOption>(
   options: T[],

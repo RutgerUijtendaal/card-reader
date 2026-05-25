@@ -108,6 +108,9 @@
           :selected-ids="selectedIds"
           :parsed-metadata-labels="parsedMetadataLabels"
           :options-for-group="optionsForGroup"
+          :rule-text-symbols="rulesTextSymbols"
+          :additional-symbol-ids="form.additional_symbol_ids"
+          :rule-text-unknown-symbol-keys="ruleTextUnknownSymbolKeys"
           @save="saveEdits"
           @restore-field="restoreField"
           @unlock-field="unlockField"
@@ -117,6 +120,7 @@
           @queue-reparse="queueLatestCardReparse"
           @update-reparse-template="updateReparseTemplate"
           @toggle-group="toggleMetadataSelection"
+          @toggle-additional-symbol="toggleAdditionalSymbol"
           @update-group-search="setMetadataSearch"
           @update-field="updateField"
           @update-hero="updateHero"
@@ -161,6 +165,8 @@ const {
   form,
   selectedVersion,
   isBusy,
+  ruleTextUnknownSymbolKeys,
+  rulesTextSymbols,
   backButtonLabel,
   goBack,
   goToPreviousCard,
@@ -187,6 +193,7 @@ const {
   optionsForGroup,
   setMetadataSearch,
   toggleMetadataSelection,
+  toggleAdditionalSymbol,
   toAbsoluteApiUrl,
   formatDate,
 } = useCardDetailState();

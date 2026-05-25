@@ -23,6 +23,30 @@
 
     <div class="min-h-0 flex-1 overflow-y-auto pr-1 pt-5">
       <div class="space-y-4">
+        <div class="theme-muted-panel p-3">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="theme-section-title text-sm font-semibold">
+                Hero Card
+              </p>
+              <p class="theme-section-muted text-xs">
+                Manual card-level deckbuilding flag.
+              </p>
+            </div>
+
+            <label class="theme-section-title flex items-center gap-3 text-sm font-semibold">
+              <input
+                :checked="form.is_hero"
+                type="checkbox"
+                class="theme-checkbox h-4 w-4"
+                :disabled="!version.editable || isBusy"
+                @change="$emit('update-hero', ($event.target as HTMLInputElement).checked)"
+              >
+              <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
+            </label>
+          </div>
+        </div>
+
         <div
           v-for="field in scalarFields"
           :key="field.name"
@@ -57,13 +81,112 @@
             </div>
           </div>
 
-          <textarea
-            v-if="field.multiline"
-            :value="form[field.name]"
-            class="input-base min-h-32"
-            :disabled="!version.editable || isBusy"
-            @input="$emit('update-field', field.name, ($event.target as HTMLTextAreaElement).value)"
-          />
+          <template v-if="field.name === 'rules_text'">
+            <div class="mb-3 theme-card-frame-muted rounded-lg px-3 py-3 text-xs">
+              <p class="theme-section-title font-semibold">
+                Symbol autocomplete
+              </p>
+              <p class="theme-section-muted mt-2">
+                Type <code>[[</code> or <code>[[symbol:</code> inside the rules text to open symbol autocomplete, then use arrow keys and Enter to insert the selected symbol.
+              </p>
+            </div>
+
+            <div class="relative">
+              <textarea
+                ref="rulesTextTextarea"
+                :value="rulesTextValue"
+                class="input-base min-h-32"
+                :disabled="!version.editable || isBusy"
+                @input="onRulesTextInput"
+                @click="syncRulesTextCaret"
+                @keyup="syncRulesTextCaret"
+                @select="syncRulesTextCaret"
+                @keydown="onRulesTextKeydown"
+              />
+
+              <div
+                v-if="showSymbolAutocomplete"
+                class="theme-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] z-10 p-2"
+              >
+                <p class="theme-kicker px-2 pb-2 text-[11px] font-medium uppercase tracking-wide">
+                  Symbols
+                </p>
+                <div class="grid gap-1">
+                  <button
+                    v-for="(option, index) in filteredSymbolInsertOptions"
+                    :key="`autocomplete-${option.id}`"
+                    type="button"
+                    class="theme-section-title flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
+                    :class="index === activeAutocompleteIndex ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    @mousedown.prevent="applyAutocompleteOption(option.key)"
+                  >
+                    <SymbolToken
+                      :asset-url="option.asset_url"
+                      :label="option.label"
+                      :text-token="option.text_token"
+                      class="h-4 w-4"
+                    />
+                    <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+                    <span class="theme-kicker text-xs">{{ option.text_token || option.key }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="mt-3 grid gap-3"
+              :class="ruleTextUnknownSymbolKeys.length > 0 ? 'lg:grid-cols-2' : ''"
+            >
+              <div class="theme-card-frame-muted rounded-lg px-3 py-3">
+                <p class="theme-section-title text-xs font-semibold uppercase tracking-wide">
+                  Referenced In Rules Text
+                </p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="symbol in ruleTextSymbols"
+                    :key="`rules-${symbol.id}`"
+                    class="theme-pill theme-pill-symbol inline-flex items-center gap-2 px-2 py-1 text-xs"
+                  >
+                    <SymbolToken
+                      :asset-url="symbol.asset_url"
+                      :label="symbol.label"
+                      :text-token="symbol.text_token"
+                      class="h-4 w-4"
+                    />
+                    <span>{{ symbol.label }}</span>
+                  </span>
+                  <span
+                    v-if="ruleTextSymbols.length === 0"
+                    class="theme-kicker text-xs"
+                  >
+                    No linked symbols yet
+                  </span>
+                </div>
+              </div>
+
+              <div
+                v-if="ruleTextUnknownSymbolKeys.length > 0"
+                class="theme-card-frame-muted rounded-lg border border-amber-400/40 px-3 py-3"
+              >
+                <p class="theme-section-title text-xs font-semibold uppercase tracking-wide">
+                  Unknown Placeholders
+                </p>
+                <p class="theme-section-muted mt-1 text-xs">
+                  These keys are not in the symbol catalog and will not render as tokens.
+                </p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="symbolKey in ruleTextUnknownSymbolKeys"
+                    :key="`unknown-${symbolKey}`"
+                    class="theme-pill theme-pill-warning px-2 py-1 text-xs"
+                  >
+                    {{ symbolKey }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <input
             v-else
             :value="form[field.name]"
@@ -82,31 +205,91 @@
         </div>
 
         <div class="theme-muted-panel p-3">
-          <div class="mb-2 flex items-center justify-between gap-3">
+          <div class="mb-3 flex items-center justify-between gap-3">
             <div>
               <p class="theme-section-title text-sm font-semibold">
-                Hero Card
+                Symbols
               </p>
               <p class="theme-section-muted text-xs">
-                Manual card-level deckbuilding flag.
+                Source: {{ metadataSourceLabel('symbols') }}
               </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                class="btn-secondary h-9"
+                type="button"
+                :disabled="!version.editable || isBusy"
+                @click="$emit('restore-group', 'symbols')"
+              >
+                Reset to Parsed
+              </button>
+              <button
+                class="btn-secondary h-9"
+                type="button"
+                :disabled="!version.editable || isBusy || metadataSource('symbols') === 'auto'"
+                @click="$emit('unlock-group', 'symbols')"
+              >
+                Unlock for Reparse
+              </button>
             </div>
           </div>
 
-          <label class="theme-section-title flex items-center gap-3 text-sm font-semibold">
-            <input
-              :checked="form.is_hero"
-              type="checkbox"
-              class="theme-checkbox h-4 w-4"
-              :disabled="!version.editable || isBusy"
-              @change="$emit('update-hero', ($event.target as HTMLInputElement).checked)"
+          <div>
+            <p class="theme-section-title text-xs font-semibold uppercase tracking-wide">
+              Linked Symbols
+            </p>
+            <p class="theme-section-muted mt-1 text-xs">
+              Symbols referenced in rules text stay linked automatically. Other symbols can still be linked manually.
+            </p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              <label
+                v-for="option in symbolInsertOptions"
+                :key="`symbol-${option.id}`"
+                class="theme-card-frame-muted theme-section-title flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
+              >
+                <input
+                  :checked="additionalSymbolIds.includes(option.id) || rulesTextSymbolIds.includes(option.id)"
+                  type="checkbox"
+                  class="theme-checkbox h-4 w-4"
+                  :disabled="!version.editable || isBusy || rulesTextSymbolIds.includes(option.id)"
+                  @change="$emit('toggle-additional-symbol', option.id, ($event.target as HTMLInputElement).checked)"
+                >
+                <SymbolToken
+                  :asset-url="option.asset_url"
+                  :label="option.label"
+                  :text-token="option.text_token"
+                  class="h-4 w-4"
+                />
+                <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+                <span
+                  v-if="rulesTextSymbolIds.includes(option.id)"
+                  class="theme-pill theme-pill-neutral inline-flex items-center gap-1 px-2 py-0.5 text-[10px]"
+                  title="Linked from rules text"
+                >
+                  <Lock class="h-3 w-3" />
+                  <span>Locked</span>
+                </span>
+              </label>
+            </div>
+            <p
+              v-if="symbolInsertOptions.length === 0"
+              class="theme-empty-state mt-2"
             >
-            <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
-          </label>
+              No symbols match this filter.
+            </p>
+          </div>
+
+          <p
+            v-if="metadataHasParsedSuggestion('symbols')"
+            class="theme-card-frame-muted theme-section-muted mt-3 rounded-lg px-3 py-2 text-xs"
+          >
+            <span class="theme-section-title font-semibold">Parser suggestion:</span>
+            {{ parsedMetadataLabels('symbols').join(', ') || 'None' }}
+          </p>
         </div>
 
         <div
-          v-for="group in metadataGroups"
+          v-for="group in nonSymbolMetadataGroups"
           :key="group.name"
           class="theme-muted-panel p-3"
         >
@@ -247,6 +430,13 @@
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, ref, watch } from 'vue';
+import { Lock } from 'lucide-vue-next';
+import SymbolToken from '@/components/SymbolToken.vue';
+import {
+  applySymbolAutocomplete,
+  findActiveSymbolTrigger,
+} from '@/modules/card-detail/ruleTextSymbols';
 import type {
   CardVersionDetail,
   EditorForm,
@@ -259,7 +449,7 @@ import type {
 } from '@/modules/card-detail/types';
 import { metadataGroups, scalarFields } from '@/modules/card-detail/types';
 
-defineProps<{
+const props = defineProps<{
   version: CardVersionDetail;
   form: EditorForm;
   reparseTemplates: ReparseTemplateOption[];
@@ -279,9 +469,12 @@ defineProps<{
   selectedIds: (groupName: MetadataGroupName) => string[];
   parsedMetadataLabels: (groupName: MetadataGroupName) => string[];
   optionsForGroup: (groupName: MetadataGroupName) => Array<MetadataOption | SymbolFilterOption>;
+  ruleTextSymbols: SymbolFilterOption[];
+  additionalSymbolIds: string[];
+  ruleTextUnknownSymbolKeys: string[];
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'save'): void;
   (e: 'restore-field', fieldName: ScalarFieldName): void;
   (e: 'unlock-field', fieldName: ScalarFieldName): void;
@@ -291,8 +484,139 @@ defineEmits<{
   (e: 'queue-reparse'): void;
   (e: 'update-reparse-template', templateId: string): void;
   (e: 'toggle-group', groupName: MetadataGroupName, optionId: string, checked: boolean): void;
+  (e: 'toggle-additional-symbol', optionId: string, checked: boolean): void;
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
   (e: 'update-hero', value: boolean): void;
 }>();
+
+const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
+const rulesTextValue = ref('');
+const rulesTextCaretIndex = ref(0);
+const activeAutocompleteIndex = ref(0);
+const dismissedTriggerStart = ref<number | null>(null);
+const nonSymbolMetadataGroups = metadataGroups.filter((group) => group.name !== 'symbols');
+const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
+const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
+const additionalSymbolIds = computed(() => props.additionalSymbolIds);
+const activeSymbolTrigger = computed(() =>
+  findActiveSymbolTrigger(rulesTextValue.value, rulesTextCaretIndex.value),
+);
+const filteredSymbolInsertOptions = computed(() => {
+  const trigger = activeSymbolTrigger.value;
+  if (!trigger) {
+    return [];
+  }
+
+  const normalizedQuery = trigger.query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return symbolInsertOptions.value.slice(0, 8);
+  }
+
+  return symbolInsertOptions.value
+    .filter((option) =>
+      [option.label, option.key, option.text_token].some((value) =>
+        value.toLowerCase().includes(normalizedQuery),
+      ),
+    )
+    .slice(0, 8);
+});
+const showSymbolAutocomplete = computed(() => {
+  const trigger = activeSymbolTrigger.value;
+  if (!trigger || filteredSymbolInsertOptions.value.length === 0) {
+    return false;
+  }
+  return dismissedTriggerStart.value !== trigger.start;
+});
+
+watch(
+  () => props.form.rules_text,
+  (value) => {
+    rulesTextValue.value = value;
+  },
+  { immediate: true },
+);
+
+watch(activeSymbolTrigger, () => {
+  activeAutocompleteIndex.value = 0;
+});
+
+watch(filteredSymbolInsertOptions, (options) => {
+  if (options.length === 0) {
+    activeAutocompleteIndex.value = 0;
+    return;
+  }
+  activeAutocompleteIndex.value = Math.min(activeAutocompleteIndex.value, options.length - 1);
+});
+
+const onRulesTextInput = (event: Event): void => {
+  const target = event.target as HTMLTextAreaElement;
+  rulesTextValue.value = target.value;
+  rulesTextCaretIndex.value = target.selectionStart ?? target.value.length;
+  dismissedTriggerStart.value = null;
+  emit('update-field', 'rules_text', target.value);
+};
+
+const syncRulesTextCaret = (event: Event): void => {
+  const target = event.target as HTMLTextAreaElement;
+  rulesTextCaretIndex.value = target.selectionStart ?? target.value.length;
+  dismissedTriggerStart.value = null;
+};
+
+const onRulesTextKeydown = (event: KeyboardEvent): void => {
+  if (!showSymbolAutocomplete.value) {
+    return;
+  }
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    activeAutocompleteIndex.value =
+      (activeAutocompleteIndex.value + 1) % filteredSymbolInsertOptions.value.length;
+    return;
+  }
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    activeAutocompleteIndex.value =
+      (activeAutocompleteIndex.value - 1 + filteredSymbolInsertOptions.value.length) %
+      filteredSymbolInsertOptions.value.length;
+    return;
+  }
+
+  if (event.key === 'Enter' || event.key === 'Tab') {
+    event.preventDefault();
+    const option = filteredSymbolInsertOptions.value[activeAutocompleteIndex.value];
+    if (option) {
+      void applyAutocompleteOption(option.key);
+    }
+    return;
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    dismissedTriggerStart.value = activeSymbolTrigger.value?.start ?? null;
+  }
+};
+
+const applyAutocompleteOption = async (symbolKey: string): Promise<void> => {
+  const trigger = activeSymbolTrigger.value;
+  if (!trigger) {
+    return;
+  }
+
+  const { nextText, nextCaretIndex } = applySymbolAutocomplete(
+    rulesTextValue.value,
+    trigger,
+    symbolKey,
+  );
+
+  rulesTextValue.value = nextText;
+  rulesTextCaretIndex.value = nextCaretIndex;
+  dismissedTriggerStart.value = null;
+  emit('update-field', 'rules_text', nextText);
+
+  await nextTick();
+  rulesTextTextarea.value?.focus();
+  rulesTextTextarea.value?.setSelectionRange(nextCaretIndex, nextCaretIndex);
+};
 </script>

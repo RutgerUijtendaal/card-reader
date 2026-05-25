@@ -147,7 +147,7 @@ export type EditorForm = {
   keyword_ids: string[];
   tag_ids: string[];
   type_ids: string[];
-  symbol_ids: string[];
+  additional_symbol_ids: string[];
 };
 
 export type ReparseTemplateOption = {
