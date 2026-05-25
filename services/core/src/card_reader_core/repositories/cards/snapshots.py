@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import cast
 
 from card_reader_core.models import CardVersion
 
@@ -55,13 +54,13 @@ def decode_field_sources(raw: object) -> FieldSourcesPayload:
     if isinstance(fields, dict):
         for field_name in SCALAR_FIELD_NAMES:
             value = fields.get(field_name)
-            if value in {FIELD_SOURCE_AUTO, FIELD_SOURCE_MANUAL}:
-                default["fields"][field_name] = cast(str, value)
+            if value == FIELD_SOURCE_AUTO or value == FIELD_SOURCE_MANUAL:
+                default["fields"][field_name] = value
     if isinstance(metadata, dict):
         for group_name in METADATA_GROUP_NAMES:
             value = metadata.get(group_name)
-            if value in {FIELD_SOURCE_AUTO, FIELD_SOURCE_MANUAL}:
-                default["metadata"][group_name] = cast(str, value)
+            if value == FIELD_SOURCE_AUTO or value == FIELD_SOURCE_MANUAL:
+                default["metadata"][group_name] = value
     return default
 
 

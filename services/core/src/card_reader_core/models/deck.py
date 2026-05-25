@@ -9,11 +9,15 @@ from .base import TimestampedModel, uuid_str
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
+    from django.db.models.manager import Manager
 
     from .card import Card
 
 
 class Deck(TimestampedModel):
+    if TYPE_CHECKING:
+        entries: Manager[DeckEntry]
+
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     owner: models.ForeignKey[AbstractBaseUser, AbstractBaseUser] = models.ForeignKey(
         settings.AUTH_USER_MODEL,

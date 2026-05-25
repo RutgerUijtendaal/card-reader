@@ -7,10 +7,15 @@ from django.db import models
 from .base import TimestampedModel, uuid_str
 
 if TYPE_CHECKING:
+    from django.db.models.manager import Manager
+
     from .card import Card
 
 
 class CardGroup(TimestampedModel):
+    if TYPE_CHECKING:
+        members: Manager[CardGroupMember]
+
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     name: models.TextField[str, str] = models.TextField(default="")

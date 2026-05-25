@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 
 from django.db import transaction
 from django.db.models import Count, Q, QuerySet
@@ -286,9 +286,13 @@ class CatalogService:
         key: str | None = None,
         identifiers: list[str] | None = None,
     ) -> Keyword:
-        return cast(
-            Keyword,
-            self._create_simple("keyword", label=label, key=key, identifiers=identifiers),
+        normalized_label = self._normalize_label(label)
+        normalized_key = self._normalize_key(key=key, label=normalized_label)
+        self._ensure_unique("keyword", normalized_key)
+        return create_keyword(
+            key=normalized_key,
+            label=normalized_label,
+            identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
         )
 
     def create_tag(
@@ -298,7 +302,14 @@ class CatalogService:
         key: str | None = None,
         identifiers: list[str] | None = None,
     ) -> Tag:
-        return cast(Tag, self._create_simple("tag", label=label, key=key, identifiers=identifiers))
+        normalized_label = self._normalize_label(label)
+        normalized_key = self._normalize_key(key=key, label=normalized_label)
+        self._ensure_unique("tag", normalized_key)
+        return create_tag(
+            key=normalized_key,
+            label=normalized_label,
+            identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
+        )
 
     def create_type(
         self,
@@ -307,7 +318,14 @@ class CatalogService:
         key: str | None = None,
         identifiers: list[str] | None = None,
     ) -> Type:
-        return cast(Type, self._create_simple("type", label=label, key=key, identifiers=identifiers))
+        normalized_label = self._normalize_label(label)
+        normalized_key = self._normalize_key(key=key, label=normalized_label)
+        self._ensure_unique("type", normalized_key)
+        return create_type(
+            key=normalized_key,
+            label=normalized_label,
+            identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
+        )
 
     def update_keyword(
         self,
@@ -317,10 +335,21 @@ class CatalogService:
         key: str | None = None,
         identifiers: list[str] | None = None,
     ) -> Keyword | None:
-        return cast(
-            Keyword | None,
-            self._update_simple("keyword", entry_id=entry_id, label=label, key=key, identifiers=identifiers),
-        )
+        row = get_keyword(entry_id)
+        if row is None:
+            return None
+        updates: dict[str, object] = {}
+        current_label = row.label
+        if label is not None:
+            current_label = self._normalize_label(label)
+            updates["label"] = current_label
+        if key is not None:
+            normalized_key = self._normalize_key(key=key, label=current_label)
+            self._ensure_unique("keyword", normalized_key, exclude_id=row.id)
+            updates["key"] = normalized_key
+        if identifiers is not None:
+            updates["identifiers_json"] = self._normalize_identifiers_json(current_label, identifiers)
+        return update_keyword(entry_id=entry_id, updates=updates)
 
     def update_tag(
         self,
@@ -330,10 +359,21 @@ class CatalogService:
         key: str | None = None,
         identifiers: list[str] | None = None,
     ) -> Tag | None:
-        return cast(
-            Tag | None,
-            self._update_simple("tag", entry_id=entry_id, label=label, key=key, identifiers=identifiers),
-        )
+        row = get_tag(entry_id)
+        if row is None:
+            return None
+        updates: dict[str, object] = {}
+        current_label = row.label
+        if label is not None:
+            current_label = self._normalize_label(label)
+            updates["label"] = current_label
+        if key is not None:
+            normalized_key = self._normalize_key(key=key, label=current_label)
+            self._ensure_unique("tag", normalized_key, exclude_id=row.id)
+            updates["key"] = normalized_key
+        if identifiers is not None:
+            updates["identifiers_json"] = self._normalize_identifiers_json(current_label, identifiers)
+        return update_tag(entry_id=entry_id, updates=updates)
 
     def update_type(
         self,
@@ -343,10 +383,21 @@ class CatalogService:
         key: str | None = None,
         identifiers: list[str] | None = None,
     ) -> Type | None:
-        return cast(
-            Type | None,
-            self._update_simple("type", entry_id=entry_id, label=label, key=key, identifiers=identifiers),
-        )
+        row = get_type(entry_id)
+        if row is None:
+            return None
+        updates: dict[str, object] = {}
+        current_label = row.label
+        if label is not None:
+            current_label = self._normalize_label(label)
+            updates["label"] = current_label
+        if key is not None:
+            normalized_key = self._normalize_key(key=key, label=current_label)
+            self._ensure_unique("type", normalized_key, exclude_id=row.id)
+            updates["key"] = normalized_key
+        if identifiers is not None:
+            updates["identifiers_json"] = self._normalize_identifiers_json(current_label, identifiers)
+        return update_type(entry_id=entry_id, updates=updates)
 
     def create_symbol(
         self,
@@ -447,74 +498,6 @@ class CatalogService:
     def delete_symbol(self, *, entry_id: str) -> bool:
         return delete_symbol(entry_id=entry_id)
 
-    def _create_simple(
-        self,
-        kind: str,
-        *,
-        label: str,
-        key: str | None,
-        identifiers: list[str] | None = None,
-    ) -> Any:
-        normalized_label = self._normalize_label(label)
-        normalized_key = self._normalize_key(key=key, label=normalized_label)
-        self._ensure_unique(kind, normalized_key)
-        if kind == "keyword":
-            return create_keyword(
-                key=normalized_key,
-                label=normalized_label,
-                identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
-            )
-        if kind == "tag":
-            return create_tag(
-                key=normalized_key,
-                label=normalized_label,
-                identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
-            )
-        return create_type(
-            key=normalized_key,
-            label=normalized_label,
-            identifiers_json=self._normalize_identifiers_json(normalized_label, identifiers),
-        )
-
-    def _update_simple(
-        self,
-        kind: str,
-        *,
-        entry_id: str,
-        label: str | None,
-        key: str | None,
-        identifiers: list[str] | None = None,
-    ) -> Any | None:
-        getters = {
-            "keyword": get_keyword,
-            "tag": get_tag,
-            "type": get_type,
-        }
-        getter = getters[kind]
-        row = getter(entry_id)
-        if row is None:
-            return None
-
-        updates: dict[str, object] = {}
-        current_label = row.label
-        if label is not None:
-            current_label = self._normalize_label(label)
-            updates["label"] = current_label
-        if key is not None:
-            normalized_key = self._normalize_key(key=key, label=current_label)
-            self._ensure_unique(kind, normalized_key, exclude_id=row.id)
-            updates["key"] = normalized_key
-        if kind in {"keyword", "tag", "type"} and identifiers is not None:
-            updates["identifiers_json"] = self._normalize_identifiers_json(current_label, identifiers)
-
-        updaters = {
-            "keyword": update_keyword,
-            "tag": update_tag,
-            "type": update_type,
-        }
-        updater = updaters[kind]
-        return updater(entry_id=entry_id, updates=updates)
-
     def _apply_symbol_updates(
         self,
         updates: dict[str, object],
@@ -566,7 +549,7 @@ class CatalogService:
         for occurrence in occurrences[:5]:
             card_version = occurrence.card_version
             card = card_version.card
-            image = next(iter(cast(Any, card_version).images.all()), None)
+            image = next(iter(card_version.images.all()), None)
             previews.append(
                 {
                     "card_id": card.id,
@@ -646,7 +629,7 @@ class CatalogService:
         linked_card_count = versions.count()
         previews: list[LinkedCardPreview] = []
         for version in versions[:limit]:
-            image = next(iter(cast(Any, version).images.all()), None)
+            image = next(iter(version.images.all()), None)
             previews.append(
                 {
                     "card_id": version.card.id,

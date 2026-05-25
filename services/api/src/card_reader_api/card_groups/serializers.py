@@ -14,7 +14,7 @@ from card_reader_core.services.cards import get_card_version_metadata
 
 
 def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
-    members = list(cast(Any, group).members.all())
+    members = list(group.members.all())
     anchor_card_id = group.anchor_card.id
     preview_cards = []
     for member in members[:3]:
@@ -47,7 +47,7 @@ def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
 def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
     anchor_card_id = group.anchor_card.id
     members_payload = []
-    for member in cast(Any, group).members.all():
+    for member in group.members.all():
         version = member.card.latest_version
         if version is None:
             continue
@@ -78,7 +78,7 @@ def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
 def card_group_admin_payload(group: CardGroup) -> dict[str, object]:
     anchor_version = group.anchor_card.latest_version
     anchor_card_id = group.anchor_card.id
-    members = list(cast(Any, group).members.all())
+    members = list(group.members.all())
     return {
         "id": group.id,
         "key": group.key,

@@ -1,25 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, cast
 
 from django.db import transaction
 
 from card_reader_core.models import Card, CardGroup
-from card_reader_core.repositories import (
+from card_reader_core.repositories.cards_repository import get_card
+from card_reader_core.repositories.card_groups_repository import (
     card_group_key_exists,
     create_card_group,
     delete_card_group,
-    get_card,
     get_card_group,
     get_cards,
     list_card_groups,
     list_card_groups_for_card,
     list_card_groups_for_cards,
-    normalize_slug_key,
     replace_card_group_members,
     update_card_group,
 )
+from card_reader_core.repositories.helpers import normalize_slug_key
 
 
 @dataclass(frozen=True)
@@ -30,16 +29,16 @@ class CardGroupMemberInput:
 
 class CardGroupService:
     def list_groups(self) -> list[CardGroup]:
-        return cast(list[CardGroup], list_card_groups())
+        return list_card_groups()
 
     def get_group(self, group_id: str) -> CardGroup | None:
-        return cast(CardGroup | None, get_card_group(group_id))
+        return get_card_group(group_id)
 
     def get_groups_for_card(self, card_id: str) -> list[CardGroup]:
-        return cast(list[CardGroup], list_card_groups_for_card(card_id))
+        return list_card_groups_for_card(card_id)
 
     def get_groups_for_cards(self, card_ids: list[str]) -> list[CardGroup]:
-        return cast(list[CardGroup], list_card_groups_for_cards(card_ids))
+        return list_card_groups_for_cards(card_ids)
 
     @transaction.atomic
     def create_group(
@@ -75,6 +74,7 @@ class CardGroupService:
         resolved_anchor_card_id = anchor_card_id or existing_group.anchor_card.id
         resolved_name = name if name is not None else existing_group.name
         ordered_card_ids: list[str] | None = None
+        anchor_card: Card
 
         if members is not None:
             ordered_card_ids, anchor_card, normalized_name = self._normalize_membership_payload(
@@ -83,10 +83,11 @@ class CardGroupService:
                 members=members,
             )
         else:
-            anchor_card = get_card(resolved_anchor_card_id)
-            if anchor_card is None:
+            fetched_anchor_card = get_card(resolved_anchor_card_id)
+            if fetched_anchor_card is None:
                 raise ValueError("Anchor card not found.")
-            existing_member_ids = [member.card.id for member in cast(Any, existing_group).members.all()]
+            anchor_card = fetched_anchor_card
+            existing_member_ids = [member.card.id for member in existing_group.members.all()]
             if anchor_card.id not in existing_member_ids:
                 raise ValueError("Anchor card must already be a member of the card group.")
             normalized_name = self._normalize_name(resolved_name, anchor_card)
@@ -103,7 +104,7 @@ class CardGroupService:
         return self.get_group(group_id) or updated
 
     def delete_group(self, *, group_id: str) -> bool:
-        return cast(bool, delete_card_group(group_id=group_id))
+        return delete_card_group(group_id=group_id)
 
     def _normalize_membership_payload(
         self,
@@ -145,7 +146,7 @@ class CardGroupService:
         return candidate
 
     def _build_unique_key(self, name: str) -> str:
-        base_key = cast(str, normalize_slug_key(name))
+        base_key = normalize_slug_key(name)
         if not base_key:
             raise ValueError("Card group key is invalid.")
         key = base_key
