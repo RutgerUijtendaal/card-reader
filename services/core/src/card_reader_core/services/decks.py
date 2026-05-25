@@ -21,8 +21,9 @@ from card_reader_core.repositories.decks_repository import (
 from card_reader_core.repositories.decks_repository import get_deck_card
 
 MAX_DECK_COPIES = 4
-MIN_MAINBOARD_CARD_COUNT = 40
-MAX_MAINBOARD_CARD_COUNT = 60
+MIN_MAINBOARD_CARD_COUNT = 20
+MAX_MAINBOARD_CARD_COUNT = 100
+MIN_MAINBOARD_MANA_TYPE_COUNT = 3
 
 
 @dataclass(frozen=True)
@@ -156,6 +157,7 @@ class DeckService:
         entries = list(deck.entries.all())
         issues: list[str] = []
         total_cards = 0
+        mana_type_cards = 0
 
         if not deck.hero_card.is_hero:
             issues.append("Hero card must be marked as a hero.")
@@ -172,11 +174,15 @@ class DeckService:
             if entry.card.id == deck.hero_card.id:
                 issues.append("Hero card cannot also appear in the mainboard.")
                 break
+            if self._card_has_type(entry.card, "mana"):
+                mana_type_cards += quantity
 
-        if total_cards < MIN_MAINBOARD_CARD_COUNT or total_cards > MAX_MAINBOARD_CARD_COUNT:
-            issues.append(
-                f"Deck must contain between {MIN_MAINBOARD_CARD_COUNT} and {MAX_MAINBOARD_CARD_COUNT} mainboard cards."
-            )
+        if total_cards < MIN_MAINBOARD_CARD_COUNT:
+            issues.append(f"Deck must contain at least {MIN_MAINBOARD_CARD_COUNT} mainboard cards.")
+        if total_cards > MAX_MAINBOARD_CARD_COUNT:
+            issues.append(f"Deck cannot contain more than {MAX_MAINBOARD_CARD_COUNT} mainboard cards.")
+        if mana_type_cards < MIN_MAINBOARD_MANA_TYPE_COUNT:
+            issues.append(f"Deck must contain at least {MIN_MAINBOARD_MANA_TYPE_COUNT} mainboard cards with type 'Mana'.")
 
         is_valid = len(issues) == 0
         return DeckValidationSummary(
@@ -296,3 +302,10 @@ class DeckService:
         if not normalized:
             raise ValueError("Sideboard name is required.")
         return normalized
+
+    def _card_has_type(self, card: Card, type_key: str) -> bool:
+        version = card.latest_version
+        if version is None:
+            return False
+        normalized_key = type_key.strip().lower()
+        return any(row.type.key.strip().lower() == normalized_key for row in version.card_version_types.all())
