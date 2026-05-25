@@ -99,7 +99,7 @@ const handleActivate = (card: GalleryItem): void => {
 };
 
 const getEntryQuantity = (cardId: string): number =>
-  props.controller.deck.form.entries.find((entry) => entry.card_id === cardId)?.quantity ?? 0;
+  props.controller.deck.getEntryQuantity(cardId);
 
 const addCopy = (card: GalleryItem): void => {
   if (card.result_type !== 'card') {

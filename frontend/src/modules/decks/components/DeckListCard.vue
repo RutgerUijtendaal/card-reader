@@ -48,7 +48,7 @@
                 v-else
                 class="theme-pill theme-pill-accent text-xs"
               >
-                {{ deck.mainboard.total_cards }} cards
+                {{ deck.totals.overall_total_cards }} cards
               </span>
             </div>
 
@@ -57,12 +57,16 @@
               class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
             >
               <span class="theme-section-muted">
-                <span class="theme-section-title font-medium">Cards</span>
+                <span class="theme-section-title font-medium">Total</span>
+                {{ deck.totals.overall_total_cards }}
+              </span>
+              <span class="theme-section-muted">
+                <span class="theme-section-title font-medium">Main</span>
                 {{ deck.mainboard.total_cards }} / {{ MIN_MAINBOARD_CARD_COUNT }}-{{ MAX_MAINBOARD_CARD_COUNT }}
               </span>
               <span class="theme-section-muted">
                 <span class="theme-section-title font-medium">Unique</span>
-                {{ deck.mainboard.unique_cards }}
+                {{ deck.totals.overall_unique_cards }}
               </span>
               <span class="theme-section-muted">
                 <span class="theme-section-title font-medium">Status</span>

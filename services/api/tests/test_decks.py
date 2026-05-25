@@ -24,7 +24,7 @@ from card_reader_core.models import (
 )
 from card_reader_core.settings import settings
 from card_reader_core.storage import build_storage_relative_path
-from card_reader_core.services.decks import DeckEntryInput, DeckService
+from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 
 _CARD_NAME_COUNTER = count()
 
@@ -209,6 +209,7 @@ def test_public_deck_list_excludes_private_decks() -> None:
         is_public=True,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
     DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -217,6 +218,7 @@ def test_public_deck_list_excludes_private_decks() -> None:
         is_public=False,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get("/decks")
@@ -237,6 +239,7 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
         is_public=True,
         hero_card_id=hero.id,
         entries=[],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get("/decks")
@@ -257,6 +260,7 @@ def test_public_deck_list_includes_40_card_public_decks() -> None:
         is_public=True,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card["card_id"], quantity=int(card["quantity"])) for card in _minimum_valid_entries(mainboard_cards)],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get("/decks")
@@ -277,6 +281,7 @@ def test_deck_payload_includes_card_types() -> None:
         is_public=True,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
@@ -311,6 +316,7 @@ def test_deck_payload_includes_tooltip_metadata() -> None:
             DeckEntryInput(card_id=card.id, quantity=4),
             *[DeckEntryInput(card_id=filler.id, quantity=4) for filler in filler_cards],
         ],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
@@ -359,6 +365,7 @@ def test_deck_payload_uses_immutable_card_image_urls() -> None:
         is_public=True,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
@@ -379,6 +386,7 @@ def test_public_deck_detail_hides_private_decks_from_non_owners() -> None:
         is_public=False,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
@@ -442,6 +450,161 @@ def test_authenticated_owner_can_crud_decks() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_payload_includes_sideboards_and_aggregate_totals() -> None:
+    owner = _create_user("deck-sideboard-owner", "password")
+    hero = _create_card(name="Sideboard Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="Sideboard Card", is_hero=False)
+    extra_sideboard_card = _create_card(name="Second Sideboard Card", is_hero=False)
+
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Sideboard Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[
+            DeckSideboardInput(
+                name="Matchups",
+                entries=[
+                    DeckEntryInput(card_id=sideboard_card.id, quantity=7),
+                    DeckEntryInput(card_id=mainboard_cards[0].id, quantity=2),
+                ],
+            ),
+            DeckSideboardInput(
+                name="Control",
+                entries=[
+                    DeckEntryInput(card_id=extra_sideboard_card.id, quantity=3),
+                ],
+            ),
+        ],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["totals"] == {
+        "overall_total_cards": 72,
+        "overall_unique_cards": 17,
+        "mainboard_total_cards": 60,
+        "mainboard_unique_cards": 15,
+    }
+    assert [(sideboard["name"], sideboard["total_cards"]) for sideboard in payload["sideboards"]] == [
+        ("Matchups", 9),
+        ("Control", 3),
+    ]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
+    username = "deck-sideboard-crud-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Sideboard CRUD Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="CRUD Sideboard Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Owner Sideboard Deck",
+            "description": "Has sideboards",
+            "is_public": True,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "Flex",
+                    "entries": [
+                        {"card_id": sideboard_card.id, "quantity": 9},
+                        {"card_id": mainboard_cards[0].id, "quantity": 1},
+                    ],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["sideboards"][0]["name"] == "Flex"
+    assert payload["sideboards"][0]["total_cards"] == 10
+    assert payload["totals"]["overall_total_cards"] == 70
+    assert payload["status"]["is_valid"] is True
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_sideboard_name_is_required() -> None:
+    username = "deck-sideboard-name-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Sideboard Name Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="Nameless Sideboard Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Invalid Sideboard Deck",
+            "description": None,
+            "is_public": False,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "",
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 2}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_sideboards_reject_hero_cards() -> None:
+    username = "deck-sideboard-hero-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Sideboard Hero Reject", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Invalid Hero Sideboard Deck",
+            "description": None,
+            "is_public": False,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "Heroes?",
+                    "entries": [{"card_id": hero.id, "quantity": 2}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Hero cards cannot appear in sideboards."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_non_owner_cannot_update_or_delete_deck() -> None:
     owner = _create_user("deck-owner-locked", "password")
     other_user = _create_user("deck-other-locked", "password")
@@ -454,6 +617,7 @@ def test_non_owner_cannot_update_or_delete_deck() -> None:
         is_public=True,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, other_user.username, "password")

@@ -14,7 +14,8 @@ from card_reader_core.repositories.decks_repository import (
     get_public_deck,
     list_owner_decks,
     list_public_decks,
-    replace_deck_entries,
+    replace_mainboard_entries,
+    replace_sideboards,
     update_deck,
 )
 from card_reader_core.repositories.decks_repository import get_deck_card
@@ -37,6 +38,20 @@ class DeckValidationSummary:
     total_cards: int
     unique_cards: int
     issues: list[str]
+
+
+@dataclass(frozen=True)
+class DeckSideboardInput:
+    name: str
+    entries: list[DeckEntryInput]
+
+
+@dataclass(frozen=True)
+class DeckTotals:
+    overall_total_cards: int
+    overall_unique_cards: int
+    mainboard_total_cards: int
+    mainboard_unique_cards: int
 
 
 class DeckService:
@@ -75,12 +90,14 @@ class DeckService:
         is_public: bool,
         hero_card_id: str,
         entries: list[DeckEntryInput],
+        sideboards: list[DeckSideboardInput],
     ) -> Deck:
         normalized_name = self._normalize_name(name)
         normalized_description = self._normalize_description(description)
-        hero_card, normalized_entries = self._normalize_deck_payload(
+        hero_card, normalized_entries, normalized_sideboards = self._normalize_deck_payload(
             hero_card_id=hero_card_id,
             entries=entries,
+            sideboards=sideboards,
         )
         deck = create_deck(
             owner_id=owner_id,
@@ -89,7 +106,8 @@ class DeckService:
             is_public=is_public,
             hero_card=hero_card,
         )
-        replace_deck_entries(deck=deck, entries=normalized_entries)
+        replace_mainboard_entries(deck=deck, entries=normalized_entries)
+        replace_sideboards(deck=deck, sideboards=normalized_sideboards)
         return self.get_owner_deck(deck.id, owner_id) or deck
 
     @transaction.atomic
@@ -103,6 +121,7 @@ class DeckService:
         is_public: bool,
         hero_card_id: str,
         entries: list[DeckEntryInput],
+        sideboards: list[DeckSideboardInput],
     ) -> Deck | None:
         existing_deck = self.get_owner_deck(deck_id, owner_id)
         if existing_deck is None:
@@ -110,9 +129,10 @@ class DeckService:
 
         normalized_name = self._normalize_name(name)
         normalized_description = self._normalize_description(description)
-        hero_card, normalized_entries = self._normalize_deck_payload(
+        hero_card, normalized_entries, normalized_sideboards = self._normalize_deck_payload(
             hero_card_id=hero_card_id,
             entries=entries,
+            sideboards=sideboards,
         )
         updated = update_deck(
             deck_id=deck_id,
@@ -125,7 +145,8 @@ class DeckService:
         )
         if updated is None:
             return None
-        replace_deck_entries(deck=updated, entries=normalized_entries)
+        replace_mainboard_entries(deck=updated, entries=normalized_entries)
+        replace_sideboards(deck=updated, sideboards=normalized_sideboards)
         return self.get_owner_deck(deck_id, owner_id) or updated
 
     def delete_owner_deck(self, *, deck_id: str, owner_id: str) -> bool:
@@ -166,12 +187,37 @@ class DeckService:
             issues=issues,
         )
 
+    def get_deck_totals(self, deck: Deck) -> DeckTotals:
+        mainboard_entries = list(deck.entries.all())
+        sideboards = list(deck.sideboards.all())
+        mainboard_total_cards = sum(int(entry.quantity) for entry in mainboard_entries)
+        overall_total_cards = mainboard_total_cards + sum(
+            int(entry.quantity)
+            for sideboard in sideboards
+            for entry in sideboard.entries.all()
+        )
+        unique_card_ids = {
+            str(entry.card.id)
+            for entry in mainboard_entries
+        } | {
+            str(entry.card.id)
+            for sideboard in sideboards
+            for entry in sideboard.entries.all()
+        }
+        return DeckTotals(
+            overall_total_cards=overall_total_cards,
+            overall_unique_cards=len(unique_card_ids),
+            mainboard_total_cards=mainboard_total_cards,
+            mainboard_unique_cards=len(mainboard_entries),
+        )
+
     def _normalize_deck_payload(
         self,
         *,
         hero_card_id: str,
         entries: list[DeckEntryInput],
-    ) -> tuple[Card, list[tuple[str, int]]]:
+        sideboards: list[DeckSideboardInput],
+    ) -> tuple[Card, list[tuple[str, int]], list[dict[str, object]]]:
         hero_card = get_deck_card(hero_card_id)
         if hero_card is None:
             raise ValueError("Hero card not found.")
@@ -184,10 +230,19 @@ class DeckService:
         if len(set(ordered_entry_ids)) != len(ordered_entry_ids):
             raise ValueError("Each card can only appear once in the mainboard entries.")
 
-        cards_by_id = get_cards_by_ids(ordered_entry_ids)
+        sideboard_entry_ids = [entry.card_id.strip() for sideboard in sideboards for entry in sideboard.entries if entry.card_id.strip()]
+        sideboard_missing_card_id = any(not entry.card_id.strip() for sideboard in sideboards for entry in sideboard.entries)
+        if sideboard_missing_card_id:
+            raise ValueError("Each sideboard entry must reference a card.")
+
+        all_card_ids = list(dict.fromkeys([*ordered_entry_ids, *sideboard_entry_ids]))
+        cards_by_id = get_cards_by_ids(all_card_ids)
         missing_ids = [card_id for card_id in ordered_entry_ids if card_id not in cards_by_id]
         if missing_ids:
             raise ValueError("One or more selected mainboard cards do not exist.")
+        missing_sideboard_ids = [card_id for card_id in sideboard_entry_ids if card_id not in cards_by_id]
+        if missing_sideboard_ids:
+            raise ValueError("One or more selected sideboard cards do not exist.")
 
         normalized_entries: list[tuple[str, int]] = []
         for entry in entries:
@@ -202,7 +257,27 @@ class DeckService:
                 raise ValueError("Hero card cannot also appear in the mainboard.")
             normalized_entries.append((card.id, quantity))
 
-        return hero_card, normalized_entries
+        normalized_sideboards: list[dict[str, object]] = []
+        for sideboard in sideboards:
+            normalized_sideboard_name = self._normalize_sideboard_name(sideboard.name)
+            normalized_sideboard_entries: list[tuple[str, int]] = []
+            for entry in sideboard.entries:
+                card_id = entry.card_id.strip()
+                quantity = int(entry.quantity)
+                if quantity < 1:
+                    raise ValueError("Each sideboard card quantity must be at least 1.")
+                card = cards_by_id[card_id]
+                if card.is_hero or card.id == hero_card.id:
+                    raise ValueError("Hero cards cannot appear in sideboards.")
+                normalized_sideboard_entries.append((card.id, quantity))
+            normalized_sideboards.append(
+                {
+                    "name": normalized_sideboard_name,
+                    "entries": normalized_sideboard_entries,
+                }
+            )
+
+        return hero_card, normalized_entries, normalized_sideboards
 
     def _normalize_name(self, name: str) -> str:
         normalized = " ".join(name.split()).strip()
@@ -215,3 +290,9 @@ class DeckService:
             return None
         normalized = " ".join(description.split()).strip()
         return normalized or None
+
+    def _normalize_sideboard_name(self, name: str) -> str:
+        normalized = " ".join(name.split()).strip()
+        if not normalized:
+            raise ValueError("Sideboard name is required.")
+        return normalized

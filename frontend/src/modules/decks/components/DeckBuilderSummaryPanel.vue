@@ -154,24 +154,107 @@
         </div>
 
         <DeckManaCurve
-          :entries="controller.deck.detailedEntries.value"
+          :entries="controller.deck.detailedMainboardEntries.value"
           empty-label="Add mainboard cards to see the mana curve."
         />
 
         <div class="space-y-3">
-          <h4 class="theme-section-title text-sm font-semibold">
-            Deck List
-          </h4>
-
-          <div
-            v-if="controller.deck.detailedEntries.value.length === 0"
-            class="theme-empty-state"
-          >
-            No cards added yet.
+          <div class="flex items-center justify-between gap-3">
+            <h4 class="theme-section-title text-sm font-semibold">
+              Deck Boards
+            </h4>
+            <button
+              class="btn-secondary px-2 py-1 text-xs"
+              type="button"
+              @click="controller.deck.addSideboard()"
+            >
+              Add Sideboard
+            </button>
           </div>
 
           <div
-            v-for="entry in controller.deck.detailedEntries.value"
+            v-if="controller.deck.sideboardTabs.value.length > 0"
+            class="flex flex-wrap gap-2"
+          >
+            <button
+              class="theme-pill text-xs"
+              :class="controller.deck.activeBoardId.value === 'mainboard' ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="controller.deck.selectBoard('mainboard')"
+            >
+              Mainboard ({{ controller.deck.totalMainboardCards.value }})
+            </button>
+            <button
+              v-for="sideboard in controller.deck.sideboardTabs.value"
+              :key="sideboard.id"
+              class="theme-pill text-xs"
+              :class="controller.deck.activeBoardId.value === sideboard.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="selectSideboard(sideboard.id)"
+            >
+              {{ sideboard.name }} ({{ sideboard.totalCards }})
+            </button>
+          </div>
+
+          <div
+            v-if="controller.deck.activeSideboard.value"
+            class="theme-muted-panel space-y-3 p-3"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="theme-section-title truncate text-sm font-semibold">
+                  {{ controller.deck.activeSideboard.value.name || 'Untitled Sideboard' }}
+                </p>
+                <p class="theme-section-muted text-xs">
+                  {{ controller.deck.activeSideboard.value.entries.length }} unique / {{ controller.deck.activeSideboard.value.entries.reduce((sum, entry) => sum + entry.quantity, 0) }} cards
+                </p>
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <button
+                  class="btn-secondary px-2 py-1 text-xs"
+                  type="button"
+                  @click="toggleRename()"
+                >
+                  {{ renamingSideboard ? 'Done' : 'Rename' }}
+                </button>
+                <button
+                  class="btn-secondary px-2 py-1 text-xs"
+                  type="button"
+                  @click="controller.deck.removeSideboard(controller.deck.activeSideboard.value.id)"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            <label
+              v-if="renamingSideboard"
+              class="field-label"
+            >
+              Sideboard Name
+              <input
+                :value="controller.deck.activeSideboard.value.name"
+                class="input-base"
+                placeholder="Sideboard name"
+                @input="controller.deck.renameSideboard(controller.deck.activeSideboard.value?.id ?? '', ($event.target as HTMLInputElement).value)"
+              >
+            </label>
+            <p
+              v-else
+              class="theme-section-muted text-xs"
+            >
+              Active sideboard cards are managed from the gallery and list below.
+            </p>
+          </div>
+
+          <div
+            v-if="controller.deck.detailedActiveBoardEntries.value.length === 0"
+            class="theme-empty-state"
+          >
+            No cards added to this board yet.
+          </div>
+
+          <div
+            v-for="entry in controller.deck.detailedActiveBoardEntries.value"
             :key="entry.card.id"
             class="theme-card-frame flex items-center gap-3 rounded-2xl px-3 py-2"
           >
@@ -194,13 +277,13 @@
                 class="input-base h-8 w-12 px-1 text-center text-sm"
                 type="number"
                 min="1"
-                max="4"
+                :max="controller.deck.activeBoardId.value === 'mainboard' ? 4 : undefined"
                 @input="controller.deck.setQuantity(entry.card.id, ($event.target as HTMLInputElement).value)"
               >
               <button
                 class="btn-secondary h-8 w-8 px-0"
                 type="button"
-                :disabled="entry.quantity >= 4"
+                :disabled="controller.deck.activeBoardId.value === 'mainboard' && entry.quantity >= 4"
                 @click="controller.deck.changeQuantity(entry.card.id, 1)"
               >
                 +
@@ -210,7 +293,7 @@
             <button
               class="theme-section-muted shrink-0 px-1 text-base font-semibold transition hover:text-rose-300"
               type="button"
-              aria-label="Remove card from deck"
+              aria-label="Remove card from board"
               @click="controller.deck.removeEntry(entry.card.id)"
             >
               X
@@ -223,7 +306,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
@@ -243,8 +326,18 @@ const deckDescription = computed({
 });
 
 const isPublic = computed(() => props.controller.deck.form.is_public);
+const renamingSideboard = ref(false);
 
 const updateDeckPublic = (value: boolean): void => {
   props.controller.deck.setDeckPublic(value);
+};
+
+const selectSideboard = (sideboardId: string): void => {
+  props.controller.deck.selectBoard(sideboardId);
+  renamingSideboard.value = false;
+};
+
+const toggleRename = (): void => {
+  renamingSideboard.value = !renamingSideboard.value;
 };
 </script>

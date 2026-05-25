@@ -17,7 +17,12 @@
         >
           <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
             <div class="flex items-baseline gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Cards</span>
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
+              <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallTotalCards.value }}</span>
+            </div>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div class="flex items-baseline gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
               <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardCards.value }} / {{ MAX_MAINBOARD_CARD_COUNT }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
@@ -53,7 +58,7 @@
             <div class="theme-divider hidden h-4 border-l lg:block" />
             <div class="flex items-baseline gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
-              <span class="theme-section-title text-base font-semibold">{{ controller.deck.form.entries.length }}</span>
+              <span class="theme-section-title text-base font-semibold">{{ controller.deck.form.entries.length + controller.deck.form.sideboards.reduce((sum, sideboard) => sum + sideboard.entries.length, 0) }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
             <div class="flex items-baseline gap-2">

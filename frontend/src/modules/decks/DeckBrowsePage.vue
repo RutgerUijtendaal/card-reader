@@ -6,7 +6,7 @@
           Decks
         </h2>
         <p class="theme-section-muted text-sm">
-          Browse public decks and inspect their hero plus full mainboard.
+          Browse public decks and inspect their hero, mainboard, and sideboards.
         </p>
       </div>
 

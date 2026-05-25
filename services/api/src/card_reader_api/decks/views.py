@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.permissions import AuthEnabledOrAuthenticatedAllowed
 from card_reader_api.decks.serializers import DeckWriteSerializer, deck_payload, serializer_error
-from card_reader_core.services.decks import DeckEntryInput, DeckService
+from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 
 
 def _user_id(request: Request) -> str:
@@ -57,6 +57,13 @@ class OwnerDeckListCreateView(APIView):
                 is_public=serializer.validated_data["is_public"],
                 hero_card_id=serializer.validated_data["hero_card_id"],
                 entries=[DeckEntryInput(**entry) for entry in serializer.validated_data["entries"]],
+                sideboards=[
+                    DeckSideboardInput(
+                        name=sideboard["name"],
+                        entries=[DeckEntryInput(**entry) for entry in sideboard["entries"]],
+                    )
+                    for sideboard in serializer.validated_data.get("sideboards", [])
+                ],
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -85,6 +92,13 @@ class OwnerDeckDetailView(APIView):
                 is_public=serializer.validated_data["is_public"],
                 hero_card_id=serializer.validated_data["hero_card_id"],
                 entries=[DeckEntryInput(**entry) for entry in serializer.validated_data["entries"]],
+                sideboards=[
+                    DeckSideboardInput(
+                        name=sideboard["name"],
+                        entries=[DeckEntryInput(**entry) for entry in sideboard["entries"]],
+                    )
+                    for sideboard in serializer.validated_data.get("sideboards", [])
+                ],
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
