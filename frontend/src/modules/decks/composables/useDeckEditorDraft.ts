@@ -68,6 +68,15 @@ export const useDeckEditorDraft = ({
     form.sideboards.reduce((sum, sideboard) => sum + sideboard.entries.reduce((boardSum, entry) => boardSum + entry.quantity, 0), 0),
   );
   const overallTotalCards = computed(() => totalMainboardCards.value + totalSideboardCards.value);
+  const overallUniqueCards = computed(() => {
+    const uniqueCardIds = new Set(form.entries.map((entry) => entry.card_id));
+    for (const sideboard of form.sideboards) {
+      for (const entry of sideboard.entries) {
+        uniqueCardIds.add(entry.card_id);
+      }
+    }
+    return uniqueCardIds.size;
+  });
   const sideboardTabs = computed(() =>
     form.sideboards.map((sideboard) => ({
       id: sideboard.id,
@@ -398,6 +407,7 @@ export const useDeckEditorDraft = ({
     totalMainboardCards,
     totalSideboardCards,
     overallTotalCards,
+    overallUniqueCards,
     selectedHero,
     detailedMainboardEntries,
     detailedActiveBoardEntries,

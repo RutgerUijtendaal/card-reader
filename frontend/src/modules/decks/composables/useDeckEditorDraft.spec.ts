@@ -115,4 +115,28 @@ describe('useDeckEditorDraft', () => {
     expect(controller.overallTotalCards.value).toBe(45);
     expect(controller.sideboardTabs.value[0]?.totalCards).toBe(5);
   });
+
+  test('deduplicates overall unique cards across mainboard and sideboards', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+      cardB: buildCard('cardB', 'Card B', 4),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 4 }];
+    controller.addSideboard();
+    controller.activeSideboard.value?.entries.push(
+      { card_id: 'cardA', quantity: 2 },
+      { card_id: 'cardB', quantity: 1 },
+    );
+
+    expect(controller.overallUniqueCards.value).toBe(2);
+  });
 });

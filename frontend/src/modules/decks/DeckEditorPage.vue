@@ -65,7 +65,7 @@
             <div class="theme-divider hidden h-4 border-l lg:block" />
             <div class="flex items-baseline gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
-              <span class="theme-section-title text-base font-semibold">{{ controller.deck.form.entries.length + controller.deck.form.sideboards.reduce((sum, sideboard) => sum + sideboard.entries.length, 0) }}</span>
+              <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallUniqueCards.value }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
             <div class="flex items-baseline gap-2">
