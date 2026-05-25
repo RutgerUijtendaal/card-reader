@@ -13,7 +13,7 @@
       <div class="flex flex-col gap-4 lg:min-w-0 lg:flex-row lg:items-center">
         <div
           v-if="!controller.deck.isSetupStep.value"
-          class="min-w-0 flex-1 space-y-3"
+          class="min-w-0 flex-1"
         >
           <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
             <div class="flex items-baseline gap-2">
@@ -21,23 +21,7 @@
               <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardCards.value }} / {{ MAX_MAINBOARD_CARD_COUNT }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-baseline gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
-              <span class="theme-section-title text-base font-semibold">{{ controller.deck.form.entries.length }}</span>
-            </div>
-            <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-baseline gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Status</span>
-              <span
-                class="text-base font-semibold"
-                :class="controller.deck.isDeckValid.value ? 'text-emerald-300' : 'theme-section-title'"
-              >
-                {{ controller.deck.deckStatusLabel.value }}
-              </span>
-            </div>
-          </div>
 
-          <div class="min-w-0">
             <div
               v-if="controller.deck.headerDeckTypeCounts.value.length > 0"
               class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
@@ -60,10 +44,27 @@
             </div>
             <p
               v-else
-              class="theme-section-muted text-xs"
+              class="theme-section-muted flex items-center gap-2 text-xs"
             >
-              No type data yet.
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
+              <span>No type data yet.</span>
             </p>
+
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div class="flex items-baseline gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
+              <span class="theme-section-title text-base font-semibold">{{ controller.deck.form.entries.length }}</span>
+            </div>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div class="flex items-baseline gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Status</span>
+              <span
+                class="text-base font-semibold"
+                :class="controller.deck.isDeckValid.value ? 'text-emerald-300' : 'theme-section-title'"
+              >
+                {{ controller.deck.deckStatusLabel.value }}
+              </span>
+            </div>
           </div>
         </div>
 
