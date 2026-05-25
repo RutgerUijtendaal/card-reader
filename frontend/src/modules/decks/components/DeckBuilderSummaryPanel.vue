@@ -153,6 +153,11 @@
           </p>
         </div>
 
+        <DeckManaCurve
+          :entries="controller.deck.detailedEntries.value"
+          empty-label="Add mainboard cards to see the mana curve."
+        />
+
         <div class="space-y-3">
           <h4 class="theme-section-title text-sm font-semibold">
             Deck List
@@ -220,6 +225,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
+import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 
 const props = defineProps<{

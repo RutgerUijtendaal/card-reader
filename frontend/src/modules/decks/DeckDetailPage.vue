@@ -62,6 +62,11 @@
               {{ deck.hero_card.name }}
             </p>
           </div>
+
+          <DeckManaCurve
+            :entries="deck.mainboard.entries"
+            empty-label="This deck does not have any mainboard cards yet."
+          />
         </div>
 
         <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
@@ -145,6 +150,7 @@ import { useCardSortPreferences } from '@/modules/card-search/useCardSortPrefere
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 import { fetchDeckDetail } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
+import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import { buildDeckCardDetailLocation } from '@/modules/decks/deckRouteState';
 import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/modules/decks/useDeckExport';
