@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, cast
-
 from django.db.models import Count, F, Prefetch, QuerySet
 
 from card_reader_core.models import (
@@ -12,10 +10,6 @@ from card_reader_core.models import (
     CardVersionSymbol,
     CardVersionTag,
     CardVersionType,
-    Keyword,
-    Symbol,
-    Tag,
-    Type,
 )
 from card_reader_core.search.cards import apply_card_search
 
@@ -212,7 +206,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
 
     out: list[LatestCardVersionReparseSource] = []
     for card_id, version in latest_versions:
-        image = next(iter(cast(Any, version).images.all()), None)
+        image = next(iter(version.images.all()), None)
         if image is None:
             continue
         image_path = resolve_image_file_path(image)
@@ -386,19 +380,19 @@ def _apply_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySe
 def _build_card_list_rows(version_rows: list[CardVersion]) -> list[CardListRow]:
     results: list[CardListRow] = []
     for version in version_rows:
-        images = cast(Any, version).images.all()
-        keywords = cast(Any, version).card_version_keywords.all()
-        tags = cast(Any, version).card_version_tags.all()
-        symbols = cast(Any, version).card_version_symbols.all()
-        types = cast(Any, version).card_version_types.all()
+        images = version.images.all()
+        keywords = version.card_version_keywords.all()
+        tags = version.card_version_tags.all()
+        symbols = version.card_version_symbols.all()
+        types = version.card_version_types.all()
         results.append(
             CardListRow(
                 version=version,
                 image=next(iter(images), None),
-                keywords=[cast(Keyword, row.keyword) for row in keywords],
-                tags=[cast(Tag, row.tag) for row in tags],
-                symbols=[cast(Symbol, row.symbol) for row in symbols],
-                types=[cast(Type, row.type) for row in types],
+                keywords=[row.keyword for row in keywords],
+                tags=[row.tag for row in tags],
+                symbols=[row.symbol for row in symbols],
+                types=[row.type for row in types],
             )
         )
     return results

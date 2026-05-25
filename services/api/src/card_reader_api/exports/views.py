@@ -114,7 +114,7 @@ def _user_id(request: Request) -> str:
 
 
 def _build_tts_export_payload(deck: Any) -> dict[str, object]:
-    entries = list(cast(Any, deck).entries.select_related("card__latest_version").all())
+    entries = list(deck.entries.select_related("card__latest_version").all())
     validation = DeckService().get_deck_validation(deck)
     hero_card = deck.hero_card
 

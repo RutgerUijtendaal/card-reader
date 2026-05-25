@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from django.http import FileResponse, Http404
 from rest_framework import status
@@ -48,6 +48,15 @@ from card_reader_core.services.cards import (
 
 if TYPE_CHECKING:
     from card_reader_core.repositories.cards_repository import CardSort
+
+
+class GroupedGalleryItem(TypedDict):
+    item_id: str
+    label: str
+    name: str
+    mana_value: int | None
+    updated_at: datetime
+    payload: dict[str, object]
 
 
 class CardListView(APIView):
@@ -375,10 +384,10 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
     participant_card_ids = {
         member.card.id
         for group in groups
-        for member in cast(Any, group).members.all()
+        for member in group.members.all()
     }
 
-    grouped_items: list[dict[str, object]] = []
+    grouped_items: list[GroupedGalleryItem] = []
     for row in matching_rows:
         if row.version.card.id in participant_card_ids:
             continue
@@ -405,7 +414,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
 
     for group in groups:
         anchor_version = group.anchor_card.latest_version
-        member_ids = {member.card.id for member in cast(Any, group).members.all()}
+        member_ids = {member.card.id for member in group.members.all()}
         if anchor_version is None or not member_ids.intersection(matching_card_ids):
             continue
         grouped_items.append(
@@ -424,7 +433,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
     offset = (normalized_page - 1) * normalized_page_size
-    results = [cast(dict[str, object], row["payload"]) for row in grouped_items[offset : offset + normalized_page_size]]
+    results = [row["payload"] for row in grouped_items[offset : offset + normalized_page_size]]
     return {
         "count": total_count,
         "next_page": normalized_page + 1 if normalized_page * normalized_page_size < total_count else None,
@@ -443,7 +452,7 @@ def _build_grouped_gallery_item(
     mana_value: int | None,
     updated_at: datetime,
     payload: dict[str, object],
-) -> dict[str, object]:
+) -> GroupedGalleryItem:
     return {
         "item_id": item_id,
         "label": label,
@@ -454,12 +463,12 @@ def _build_grouped_gallery_item(
     }
 
 
-def _grouped_gallery_sort_key(item: dict[str, object], sort: CardSort) -> tuple[object, ...]:
-    item_id = str(item["item_id"])
-    label = str(item["label"]).casefold()
-    name = str(item["name"]).casefold()
-    mana_value = item["mana_value"] if isinstance(item["mana_value"], int) else None
-    updated_at = cast(datetime, item["updated_at"])
+def _grouped_gallery_sort_key(item: GroupedGalleryItem, sort: CardSort) -> tuple[object, ...]:
+    item_id = item["item_id"]
+    label = item["label"].casefold()
+    name = item["name"].casefold()
+    mana_value = item["mana_value"]
+    updated_at = item["updated_at"]
 
     if sort == CARD_SORT_NAME_ASC:
         return (name, label, item_id)

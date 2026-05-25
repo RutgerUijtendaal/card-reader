@@ -7,11 +7,29 @@ from django.db import models
 from .base import TimestampedModel, uuid_str
 
 if TYPE_CHECKING:
+    from django.db.models.manager import Manager
+
     from .card import Card
+    from .metadata import (
+        CardVersionKeyword,
+        CardVersionMetadataSuggestion,
+        CardVersionSymbol,
+        CardVersionTag,
+        CardVersionType,
+    )
     from .template import Template
 
 
 class CardVersion(TimestampedModel):
+    if TYPE_CHECKING:
+        images: Manager[CardVersionImage]
+        parse_results: Manager[ParseResult]
+        card_version_keywords: Manager[CardVersionKeyword]
+        card_version_tags: Manager[CardVersionTag]
+        card_version_symbols: Manager[CardVersionSymbol]
+        card_version_types: Manager[CardVersionType]
+        card_version_metadata_suggestions: Manager[CardVersionMetadataSuggestion]
+
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     card: models.ForeignKey[Card, Card] = models.ForeignKey(
         "Card", on_delete=models.CASCADE, related_name="versions", db_column="card_id"

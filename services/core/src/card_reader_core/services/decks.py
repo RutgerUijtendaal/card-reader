@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, cast
 
 from django.db import transaction
 
 from card_reader_core.models import Card, Deck
-from card_reader_core.repositories import (
+from card_reader_core.repositories.decks_repository import (
     create_deck,
     delete_deck,
     get_cards_by_ids,
@@ -42,22 +41,22 @@ class DeckValidationSummary:
 
 class DeckService:
     def list_public_decks(self) -> list[Deck]:
-        return [deck for deck in cast(list[Deck], list_public_decks()) if self.get_deck_validation(deck).is_valid]
+        return [deck for deck in list_public_decks() if self.get_deck_validation(deck).is_valid]
 
     def list_owner_decks(self, owner_id: str) -> list[Deck]:
-        return cast(list[Deck], list_owner_decks(owner_id))
+        return list_owner_decks(owner_id)
 
     def get_public_deck(self, deck_id: str) -> Deck | None:
-        deck = cast(Deck | None, get_public_deck(deck_id))
+        deck = get_public_deck(deck_id)
         if deck is None or not self.get_deck_validation(deck).is_valid:
             return None
         return deck
 
     def get_owner_deck(self, deck_id: str, owner_id: str) -> Deck | None:
-        return cast(Deck | None, get_owner_deck(deck_id, owner_id))
+        return get_owner_deck(deck_id, owner_id)
 
     def get_deck_for_viewer(self, deck_id: str, *, viewer_id: str | None) -> Deck | None:
-        deck = cast(Deck | None, get_deck_for_viewer(deck_id, viewer_id=viewer_id))
+        deck = get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return None
         if viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id:
@@ -130,10 +129,10 @@ class DeckService:
         return self.get_owner_deck(deck_id, owner_id) or updated
 
     def delete_owner_deck(self, *, deck_id: str, owner_id: str) -> bool:
-        return cast(bool, delete_deck(deck_id=deck_id, owner_id=owner_id))
+        return delete_deck(deck_id=deck_id, owner_id=owner_id)
 
     def get_deck_validation(self, deck: Deck) -> DeckValidationSummary:
-        entries = list(cast(Any, deck).entries.all())
+        entries = list(deck.entries.all())
         issues: list[str] = []
         total_cards = 0
 

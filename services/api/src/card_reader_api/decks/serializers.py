@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
-from card_reader_core.models import Card, CardVersion, Deck, Keyword, Symbol, Tag, Type
+from card_reader_core.models import Card, CardVersion, Deck
 from card_reader_core.repositories.cards_repository import get_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckService
@@ -16,7 +16,7 @@ from card_reader_core.services.decks import DeckService
 
 def deck_payload(deck: Deck) -> dict[str, object]:
     validation = DeckService().get_deck_validation(deck)
-    entries = list(cast(Any, deck).entries.all())
+    entries = list(deck.entries.all())
     return {
         "id": deck.id,
         "name": deck.name,
@@ -91,20 +91,20 @@ def deck_card_payload(card: Card) -> dict[str, object]:
 def _deck_card_metadata(version: CardVersion) -> CardMetadata:
     return {
         "keywords": [
-            cast(Keyword, row.keyword)
-            for row in sorted(cast(Any, version).card_version_keywords.all(), key=lambda row: row.keyword.label)
+            row.keyword
+            for row in sorted(version.card_version_keywords.all(), key=lambda row: row.keyword.label)
         ],
         "tags": [
-            cast(Tag, row.tag)
-            for row in sorted(cast(Any, version).card_version_tags.all(), key=lambda row: row.tag.label)
+            row.tag
+            for row in sorted(version.card_version_tags.all(), key=lambda row: row.tag.label)
         ],
         "symbols": [
-            cast(Symbol, row.symbol)
-            for row in sorted(cast(Any, version).card_version_symbols.all(), key=lambda row: row.symbol.label)
+            row.symbol
+            for row in sorted(version.card_version_symbols.all(), key=lambda row: row.symbol.label)
         ],
         "types": [
-            cast(Type, row.type)
-            for row in sorted(cast(Any, version).card_version_types.all(), key=lambda row: row.type.label)
+            row.type
+            for row in sorted(version.card_version_types.all(), key=lambda row: row.type.label)
         ],
     }
 
