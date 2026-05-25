@@ -1,7 +1,7 @@
 <template>
   <aside
     class="page-card flex min-h-0 flex-col"
-    :class="stickyToViewport ? 'xl:sticky xl:top-0 xl:h-[calc(100vh-2rem)]' : 'h-full'"
+    :class="stickyToViewport ? 'xl:sticky xl:top-0 xl:h-[calc(100vh-3rem)]' : 'h-full'"
   >
     <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
       <div class="space-y-2">
