@@ -24,6 +24,7 @@ MAX_DECK_COPIES = 4
 MIN_MAINBOARD_CARD_COUNT = 20
 MAX_MAINBOARD_CARD_COUNT = 100
 MIN_MAINBOARD_MANA_TYPE_COUNT = 3
+MAX_SIDEBOARD_ENTRY_QUANTITY = 100
 
 
 @dataclass(frozen=True)
@@ -266,12 +267,19 @@ class DeckService:
         normalized_sideboards: list[dict[str, object]] = []
         for sideboard in sideboards:
             normalized_sideboard_name = self._normalize_sideboard_name(sideboard.name)
+            ordered_sideboard_entry_ids = [entry.card_id.strip() for entry in sideboard.entries if entry.card_id.strip()]
+            if len(ordered_sideboard_entry_ids) != len(sideboard.entries):
+                raise ValueError("Each sideboard entry must reference a card.")
+            if len(set(ordered_sideboard_entry_ids)) != len(ordered_sideboard_entry_ids):
+                raise ValueError("Each card can only appear once within a sideboard.")
             normalized_sideboard_entries: list[tuple[str, int]] = []
             for entry in sideboard.entries:
                 card_id = entry.card_id.strip()
                 quantity = int(entry.quantity)
-                if quantity < 1:
-                    raise ValueError("Each sideboard card quantity must be at least 1.")
+                if quantity < 1 or quantity > MAX_SIDEBOARD_ENTRY_QUANTITY:
+                    raise ValueError(
+                        f"Each sideboard card quantity must be between 1 and {MAX_SIDEBOARD_ENTRY_QUANTITY}."
+                    )
                 card = cards_by_id[card_id]
                 if card.is_hero or card.id == hero_card.id:
                     raise ValueError("Hero cards cannot appear in sideboards.")

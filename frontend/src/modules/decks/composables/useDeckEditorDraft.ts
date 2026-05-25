@@ -3,6 +3,7 @@ import type { CardListItem } from '@/modules/card-detail/types';
 import {
   MAX_DECK_COPIES,
   MAX_MAINBOARD_CARD_COUNT,
+  MAX_SIDEBOARD_ENTRY_QUANTITY,
   MIN_MAINBOARD_CARD_COUNT,
   MIN_MAINBOARD_MANA_TYPE_COUNT,
 } from '@/modules/decks/constants';
@@ -158,7 +159,11 @@ export const useDeckEditorDraft = ({
         break;
       }
       if (sideboard.entries.some((entry) => entry.quantity < 1)) {
-        messages.push('Each sideboard card quantity must be at least 1.');
+        messages.push('Each sideboard card quantity must be between 1 and 100.');
+        break;
+      }
+      if (sideboard.entries.some((entry) => entry.quantity > MAX_SIDEBOARD_ENTRY_QUANTITY)) {
+        messages.push(`Each sideboard card quantity must be between 1 and ${MAX_SIDEBOARD_ENTRY_QUANTITY}.`);
         break;
       }
     }
@@ -300,7 +305,11 @@ export const useDeckEditorDraft = ({
     }
     updateBoardEntries(
       boardId,
-      boardEntries.map((entry) => (entry.card_id === card.id ? { ...entry, quantity: entry.quantity + 1 } : entry)),
+      boardEntries.map((entry) =>
+        entry.card_id === card.id
+          ? { ...entry, quantity: Math.min(MAX_SIDEBOARD_ENTRY_QUANTITY, entry.quantity + 1) }
+          : entry,
+      ),
     );
   };
 
@@ -322,7 +331,7 @@ export const useDeckEditorDraft = ({
         const nextQuantity =
           boardId === MAINBOARD_ID
             ? Math.max(1, Math.min(MAX_DECK_COPIES, entry.quantity + delta))
-            : Math.max(1, entry.quantity + delta);
+            : Math.max(1, Math.min(MAX_SIDEBOARD_ENTRY_QUANTITY, entry.quantity + delta));
         return { ...entry, quantity: nextQuantity };
       }),
     );
@@ -334,7 +343,7 @@ export const useDeckEditorDraft = ({
       ? 1
       : boardId === MAINBOARD_ID
         ? Math.max(1, Math.min(MAX_DECK_COPIES, parsed))
-        : Math.max(1, parsed);
+        : Math.max(1, Math.min(MAX_SIDEBOARD_ENTRY_QUANTITY, parsed));
     updateBoardEntries(
       boardId,
       getBoardEntries(boardId).map((entry) => (entry.card_id === cardId ? { ...entry, quantity } : entry)),
@@ -356,6 +365,7 @@ export const useDeckEditorDraft = ({
       return `Add Copy (${quantity}/${MAX_DECK_COPIES})`;
     }
     if (quantity === 0) return 'Add To Sideboard';
+    if (quantity >= MAX_SIDEBOARD_ENTRY_QUANTITY) return 'At Sideboard Limit';
     return `Add Copy (${quantity})`;
   };
 
@@ -369,7 +379,7 @@ export const useDeckEditorDraft = ({
     if (boardId === MAINBOARD_ID) {
       return quantity >= MAX_DECK_COPIES || (quantity === 0 && totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT);
     }
-    return false;
+    return quantity >= MAX_SIDEBOARD_ENTRY_QUANTITY;
   };
 
   const handleGalleryAction = (card: CardListItem): void => {

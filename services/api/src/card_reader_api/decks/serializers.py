@@ -140,7 +140,7 @@ class MainboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 class SideboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
     card_id = serializers.CharField()
-    quantity = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, max_value=100)
 
 
 class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):

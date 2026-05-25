@@ -101,4 +101,5 @@ class DeckSideboardEntry(TimestampedModel):
 
     class Meta:
         db_table = "deck_sideboard_entry"
+        constraints = [models.UniqueConstraint(fields=("sideboard", "card"), name="ux_deck_sideboard_entry_card")]
         indexes = [models.Index(fields=["sideboard", "created_at"], name="ix_deck_sideboard_entry_created")]

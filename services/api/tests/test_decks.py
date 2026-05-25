@@ -495,9 +495,9 @@ def test_deck_payload_includes_sideboards_and_aggregate_totals() -> None:
         "mainboard_total_cards": 60,
         "mainboard_unique_cards": 15,
     }
-    assert [(sideboard["name"], sideboard["total_cards"]) for sideboard in payload["sideboards"]] == [
-        ("Matchups", 9),
+    assert sorted((sideboard["name"], sideboard["total_cards"]) for sideboard in payload["sideboards"]) == [
         ("Control", 3),
+        ("Matchups", 9),
     ]
 
 
@@ -606,6 +606,76 @@ def test_sideboards_reject_hero_cards() -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Hero cards cannot appear in sideboards."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_sideboards_reject_quantities_above_100() -> None:
+    username = "deck-sideboard-quantity-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Sideboard Quantity Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="Large Sideboard Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Too Large Sideboard Deck",
+            "description": None,
+            "is_public": False,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "Overflow",
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 101}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
+    username = "deck-sideboard-duplicate-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Sideboard Duplicate Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="Duplicate Sideboard Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Duplicate Sideboard Deck",
+            "description": None,
+            "is_public": False,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "Dupes",
+                    "entries": [
+                        {"card_id": sideboard_card.id, "quantity": 2},
+                        {"card_id": sideboard_card.id, "quantity": 3},
+                    ],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Each card can only appear once within a sideboard."
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
