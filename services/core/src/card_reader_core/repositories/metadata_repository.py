@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
+from django.db.models import Count, Q
+
 from card_reader_core.models import (
     CardVersion,
     CardVersionMetadataSuggestion,
@@ -17,7 +19,6 @@ from card_reader_core.models import (
     Type,
     now_utc,
 )
-from django.db.models import Count
 from card_reader_core.rule_text import render_enriched_rule_text, replace_symbol_placeholder_key
 
 MetadataModel = Keyword | Tag | Symbol | Type
@@ -91,6 +92,16 @@ def get_metadata_suggestion(entry_id: str) -> MetadataSuggestion | None:
     )
 
 
+def reject_metadata_suggestion(*, suggestion_id: str) -> MetadataSuggestion | None:
+    suggestion = get_metadata_suggestion(suggestion_id)
+    if suggestion is None:
+        return None
+    suggestion.status = "rejected"
+    suggestion.updated_at = now_utc()
+    suggestion.save(update_fields=["status", "updated_at"])
+    return suggestion
+
+
 def _key_exists(model: Any, *, key: str, exclude_id: str | None = None) -> bool:
     query = model.objects.filter(key=key)
     if exclude_id is not None:
@@ -148,6 +159,17 @@ def get_or_create_metadata_suggestion(
         normalized_value=normalized_value,
         display_value=display_value,
     )
+
+
+def append_metadata_identifier(*, entry: Tag | Type, identifier: str) -> None:
+    normalized_identifiers = _normalized_identifiers(entry.label, [identifier])
+    for existing in entry.identifiers_json:
+        normalized = " ".join(str(existing).split()).strip().lower()
+        if normalized and normalized not in normalized_identifiers:
+            normalized_identifiers.append(normalized)
+    entry.identifiers_json = normalized_identifiers
+    entry.updated_at = now_utc()
+    entry.save(update_fields=["identifiers_json", "updated_at"])
 
 
 def create_symbol(
@@ -356,6 +378,54 @@ def list_metadata_suggestions(
     ]
 
 
+def list_keywords_with_linked_card_counts() -> list[Keyword]:
+    return list(
+        Keyword.objects.order_by("label").annotate(
+            linked_card_count=Count(
+                "card_version_keywords",
+                filter=Q(card_version_keywords__card_version__is_latest=True),
+                distinct=True,
+            ),
+        )
+    )
+
+
+def list_tags_with_linked_card_counts() -> list[Tag]:
+    return list(
+        Tag.objects.order_by("label").annotate(
+            linked_card_count=Count(
+                "card_version_tags",
+                filter=Q(card_version_tags__card_version__is_latest=True),
+                distinct=True,
+            ),
+        )
+    )
+
+
+def list_types_with_linked_card_counts() -> list[Type]:
+    return list(
+        Type.objects.order_by("label").annotate(
+            linked_card_count=Count(
+                "card_version_types",
+                filter=Q(card_version_types__card_version__is_latest=True),
+                distinct=True,
+            ),
+        )
+    )
+
+
+def list_symbols_with_linked_card_counts() -> list[Symbol]:
+    return list(
+        Symbol.objects.order_by("label").annotate(
+            linked_card_count=Count(
+                "card_version_symbols",
+                filter=Q(card_version_symbols__card_version__is_latest=True),
+                distinct=True,
+            ),
+        )
+    )
+
+
 def list_card_version_suggestion_occurrences(
     suggestion_id: str,
 ) -> list[CardVersionMetadataSuggestion]:
@@ -364,6 +434,38 @@ def list_card_version_suggestion_occurrences(
         .select_related("card_version__card", "parse_result")
         .prefetch_related("card_version__images")
         .order_by("-created_at")
+    )
+
+
+def list_latest_versions_for_keyword_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+    return _list_latest_versions_for_detail(
+        relation_filter="card_version_keywords__keyword_id",
+        entry_id=entry_id,
+        limit=limit,
+    )
+
+
+def list_latest_versions_for_tag_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+    return _list_latest_versions_for_detail(
+        relation_filter="card_version_tags__tag_id",
+        entry_id=entry_id,
+        limit=limit,
+    )
+
+
+def list_latest_versions_for_type_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+    return _list_latest_versions_for_detail(
+        relation_filter="card_version_types__type_id",
+        entry_id=entry_id,
+        limit=limit,
+    )
+
+
+def list_latest_versions_for_symbol_detail(*, entry_id: str, limit: int = 12) -> tuple[list[CardVersion], int]:
+    return _list_latest_versions_for_detail(
+        relation_filter="card_version_symbols__symbol_id",
+        entry_id=entry_id,
+        limit=limit,
     )
 
 
@@ -447,3 +549,40 @@ def _link_rows(link_model: Any, card_version_ids: list[str], relation_name: str)
         .select_related(relation_name)
         .order_by(f"{relation_name}__label")
     )
+
+
+def _list_latest_versions_for_detail(
+    *,
+    relation_filter: str,
+    entry_id: str,
+    limit: int,
+) -> tuple[list[CardVersion], int]:
+    versions = (
+        CardVersion.objects.filter(is_latest=True, **{relation_filter: entry_id})
+        .select_related("card")
+        .prefetch_related("images")
+        .order_by("-updated_at")
+        .distinct()
+    )
+    return list(versions[:limit]), versions.count()
+
+
+def _normalized_identifiers(label: str, identifiers: list[str] | None) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+
+    canonical_identifier = " ".join(label.split()).strip().lower()
+    if canonical_identifier:
+        seen.add(canonical_identifier)
+        out.append(canonical_identifier)
+
+    if identifiers is None:
+        return out
+
+    for raw_identifier in identifiers:
+        compact = " ".join(str(raw_identifier).split()).strip().lower()
+        if not compact or compact in seen:
+            continue
+        seen.add(compact)
+        out.append(compact)
+    return out

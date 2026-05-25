@@ -4,7 +4,6 @@ import json
 from typing import TypedDict
 
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
 
 from card_reader_core.models import (
     CardVersion,
@@ -20,6 +19,7 @@ from card_reader_core.repositories.cards_repository import decode_field_sources
 from card_reader_core.repositories.helpers import normalize_slug_key
 from card_reader_core.repositories.metadata_repository import (
     MetadataSuggestionListRow,
+    append_metadata_identifier,
     create_keyword,
     create_symbol,
     create_tag,
@@ -33,13 +33,22 @@ from card_reader_core.repositories.metadata_repository import (
     get_symbol,
     get_tag,
     get_type,
-    keyword_key_exists,
-    list_card_version_suggestion_occurrences,
-    list_metadata_suggestions,
     get_tags_for_card_version,
     get_types_for_card_version,
+    keyword_key_exists,
+    list_card_version_suggestion_occurrences,
+    list_keywords_with_linked_card_counts,
+    list_latest_versions_for_keyword_detail,
+    list_latest_versions_for_symbol_detail,
+    list_latest_versions_for_tag_detail,
+    list_latest_versions_for_type_detail,
+    list_metadata_suggestions,
+    list_symbols_with_linked_card_counts,
+    list_tags_with_linked_card_counts,
+    list_types_with_linked_card_counts,
     replace_card_version_tags,
     replace_card_version_types,
+    reject_metadata_suggestion,
     symbol_key_exists,
     tag_key_exists,
     type_key_exists,
@@ -128,10 +137,10 @@ class CatalogService:
     def list_catalog(self) -> CatalogData:
         return {
             "known": {
-                "keywords": self._list_keywords_with_counts(),
-                "tags": self._list_tags_with_counts(),
-                "symbols": self._list_symbols_with_counts(),
-                "types": self._list_types_with_counts(),
+                "keywords": list_keywords_with_linked_card_counts(),
+                "tags": list_tags_with_linked_card_counts(),
+                "symbols": list_symbols_with_linked_card_counts(),
+                "types": list_types_with_linked_card_counts(),
             },
             "suggested": {
                 "tags": self.list_suggestions(kind="tag"),
@@ -151,23 +160,14 @@ class CatalogService:
         return self._suggestion_detail(suggestion, occurrence_count=occurrence_count)
 
     def reject_suggestion(self, *, suggestion_id: str) -> MetadataSuggestion | None:
-        suggestion = get_metadata_suggestion(suggestion_id)
-        if suggestion is None:
-            return None
-        suggestion.status = "rejected"
-        suggestion.updated_at = now_utc()
-        suggestion.save(update_fields=["status", "updated_at"])
-        return suggestion
+        return reject_metadata_suggestion(suggestion_id=suggestion_id)
 
     def get_keyword_detail(self, *, entry_id: str) -> KeywordDetail | None:
         entry = get_keyword(entry_id)
         if entry is None:
             return None
-        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
-            CardVersion.objects.filter(
-                is_latest=True,
-                card_version_keywords__keyword_id=entry_id,
-            ),
+        linked_cards, linked_card_count = self._linked_cards_for_versions(
+            *list_latest_versions_for_keyword_detail(entry_id=entry_id)
         )
         return {
             "entry": entry,
@@ -179,11 +179,8 @@ class CatalogService:
         entry = get_tag(entry_id)
         if entry is None:
             return None
-        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
-            CardVersion.objects.filter(
-                is_latest=True,
-                card_version_tags__tag_id=entry_id,
-            ),
+        linked_cards, linked_card_count = self._linked_cards_for_versions(
+            *list_latest_versions_for_tag_detail(entry_id=entry_id)
         )
         return {
             "entry": entry,
@@ -195,11 +192,8 @@ class CatalogService:
         entry = get_type(entry_id)
         if entry is None:
             return None
-        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
-            CardVersion.objects.filter(
-                is_latest=True,
-                card_version_types__type_id=entry_id,
-            ),
+        linked_cards, linked_card_count = self._linked_cards_for_versions(
+            *list_latest_versions_for_type_detail(entry_id=entry_id)
         )
         return {
             "entry": entry,
@@ -211,11 +205,8 @@ class CatalogService:
         entry = get_symbol(entry_id)
         if entry is None:
             return None
-        linked_cards, linked_card_count = self._linked_cards_for_latest_versions(
-            CardVersion.objects.filter(
-                is_latest=True,
-                card_version_symbols__symbol_id=entry_id,
-            ),
+        linked_cards, linked_card_count = self._linked_cards_for_versions(
+            *list_latest_versions_for_symbol_detail(entry_id=entry_id)
         )
         return {
             "entry": entry,
@@ -238,7 +229,7 @@ class CatalogService:
             if target_tag is None:
                 raise ValueError("Tag not found")
             with transaction.atomic():
-                self._append_identifier(target_tag, suggestion.normalized_value)
+                append_metadata_identifier(entry=target_tag, identifier=suggestion.normalized_value)
                 self._apply_suggestion_to_auto_versions(suggestion, target_tag=target_tag)
             return get_metadata_suggestion(suggestion_id)
 
@@ -246,7 +237,7 @@ class CatalogService:
         if target_type is None:
             raise ValueError("Type not found")
         with transaction.atomic():
-            self._append_identifier(target_type, suggestion.normalized_value)
+            append_metadata_identifier(entry=target_type, identifier=suggestion.normalized_value)
             self._apply_suggestion_to_auto_versions(suggestion, target_type=target_type)
         return get_metadata_suggestion(suggestion_id)
 
@@ -573,16 +564,6 @@ class CatalogService:
             "occurrences": previews,
         }
 
-    def _append_identifier(self, row: Tag | Type, identifier: str) -> None:
-        normalized_identifiers = self._normalize_identifiers(row.label, [identifier])
-        for existing in row.identifiers_json:
-            normalized = " ".join(str(existing).split()).strip().lower()
-            if normalized and normalized not in normalized_identifiers:
-                normalized_identifiers.append(normalized)
-        row.identifiers_json = normalized_identifiers
-        row.updated_at = now_utc()
-        row.save(update_fields=["identifiers_json", "updated_at"])
-
     def _apply_suggestion_to_auto_versions(
         self,
         suggestion: MetadataSuggestion,
@@ -619,16 +600,13 @@ class CatalogService:
         suggestion.updated_at = now_utc()
         suggestion.save(update_fields=["status", "accepted_tag", "accepted_type", "updated_at"])
 
-    def _linked_cards_for_latest_versions(
+    def _linked_cards_for_versions(
         self,
-        queryset: QuerySet[CardVersion],
-        *,
-        limit: int = 12,
+        versions: list[CardVersion],
+        linked_card_count: int,
     ) -> tuple[list[LinkedCardPreview], int]:
-        versions = queryset.select_related("card").prefetch_related("images").order_by("-updated_at").distinct()
-        linked_card_count = versions.count()
         previews: list[LinkedCardPreview] = []
-        for version in versions[:limit]:
+        for version in versions:
             image = next(iter(version.images.all()), None)
             previews.append(
                 {
@@ -650,50 +628,6 @@ class CatalogService:
         if image is None:
             return None
         return f"/cards/{card_id}/versions/{card_version_id}/image"
-
-    def _list_keywords_with_counts(self) -> list[Keyword]:
-        return list(
-            Keyword.objects.order_by("label").annotate(
-                linked_card_count=Count(
-                    "card_version_keywords",
-                    filter=Q(card_version_keywords__card_version__is_latest=True),
-                    distinct=True,
-                ),
-            )
-        )
-
-    def _list_tags_with_counts(self) -> list[Tag]:
-        return list(
-            Tag.objects.order_by("label").annotate(
-                linked_card_count=Count(
-                    "card_version_tags",
-                    filter=Q(card_version_tags__card_version__is_latest=True),
-                    distinct=True,
-                ),
-            )
-        )
-
-    def _list_types_with_counts(self) -> list[Type]:
-        return list(
-            Type.objects.order_by("label").annotate(
-                linked_card_count=Count(
-                    "card_version_types",
-                    filter=Q(card_version_types__card_version__is_latest=True),
-                    distinct=True,
-                ),
-            )
-        )
-
-    def _list_symbols_with_counts(self) -> list[Symbol]:
-        return list(
-            Symbol.objects.order_by("label").annotate(
-                linked_card_count=Count(
-                    "card_version_symbols",
-                    filter=Q(card_version_symbols__card_version__is_latest=True),
-                    distinct=True,
-                ),
-            )
-        )
 
     def _ensure_unique(self, kind: str, key: str, exclude_id: str | None = None) -> None:
         exists_checks = {
