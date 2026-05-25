@@ -543,6 +543,149 @@ def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_patch_preserves_sideboards_when_omitted() -> None:
+    username = "deck-patch-preserve-sideboards-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Patch Preserve Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="Patch Preserve Sideboard Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Patch Preserve Deck",
+            "description": "Before update",
+            "is_public": True,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "Flex",
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 3}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+
+    patch_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"name": "Patch Preserve Deck Updated"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert patch_response.status_code == 200
+    payload = patch_response.json()
+    assert payload["name"] == "Patch Preserve Deck Updated"
+    assert payload["description"] == "Before update"
+    assert payload["sideboards"] == [
+        {
+            "id": payload["sideboards"][0]["id"],
+            "name": "Flex",
+            "total_cards": 3,
+            "unique_cards": 1,
+            "entries": [
+                {
+                    "quantity": 3,
+                    "card": payload["sideboards"][0]["entries"][0]["card"],
+                }
+            ],
+        }
+    ]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_patch_clears_sideboards_when_explicitly_empty() -> None:
+    username = "deck-patch-clear-sideboards-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Patch Clear Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="Patch Clear Sideboard Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Patch Clear Deck",
+            "description": None,
+            "is_public": False,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "Flex",
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 2}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+
+    patch_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"sideboards": []},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert patch_response.status_code == 200
+    payload = patch_response.json()
+    assert payload["sideboards"] == []
+    assert payload["totals"]["overall_total_cards"] == payload["totals"]["mainboard_total_cards"] == 60
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_patch_preserves_mainboard_when_entries_omitted() -> None:
+    username = "deck-patch-preserve-entries-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Patch Preserve Entries Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Patch Preserve Entries Deck",
+            "description": None,
+            "is_public": True,
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+
+    patch_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"description": "Entries unchanged"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert patch_response.status_code == 200
+    payload = patch_response.json()
+    assert payload["description"] == "Entries unchanged"
+    assert payload["mainboard"]["total_cards"] == 60
+    assert len(payload["mainboard"]["entries"]) == 15
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_sideboard_name_is_required() -> None:
     username = "deck-sideboard-name-user"
     password = "password"

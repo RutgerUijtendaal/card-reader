@@ -56,6 +56,22 @@ class DeckTotals:
     mainboard_unique_cards: int
 
 
+@dataclass(frozen=True)
+class DeckUpdateInput:
+    name: str | None = None
+    description: str | None = None
+    is_public: bool | None = None
+    hero_card_id: str | None = None
+    entries: list[DeckEntryInput] | None = None
+    sideboards: list[DeckSideboardInput] | None = None
+    update_name: bool = False
+    update_description: bool = False
+    update_is_public: bool = False
+    update_hero_card_id: bool = False
+    update_entries: bool = False
+    update_sideboards: bool = False
+
+
 class DeckService:
     def list_public_decks(self) -> list[Deck]:
         return [deck for deck in list_public_decks() if self.get_deck_validation(deck).is_valid]
@@ -118,37 +134,72 @@ class DeckService:
         *,
         deck_id: str,
         owner_id: str,
-        name: str,
-        description: str | None,
-        is_public: bool,
-        hero_card_id: str,
-        entries: list[DeckEntryInput],
-        sideboards: list[DeckSideboardInput],
+        updates: DeckUpdateInput,
     ) -> Deck | None:
         existing_deck = self.get_owner_deck(deck_id, owner_id)
         if existing_deck is None:
             return None
 
-        normalized_name = self._normalize_name(name)
-        normalized_description = self._normalize_description(description)
+        effective_name = existing_deck.name if not updates.update_name else updates.name
+        effective_description = existing_deck.description if not updates.update_description else updates.description
+        effective_is_public = existing_deck.is_public if not updates.update_is_public else updates.is_public
+        effective_hero_card_id = existing_deck.hero_card.id if not updates.update_hero_card_id else updates.hero_card_id
+        effective_entries = (
+            [
+                DeckEntryInput(card_id=entry.card.id, quantity=int(entry.quantity))
+                for entry in existing_deck.entries.all()
+            ]
+            if not updates.update_entries
+            else updates.entries
+        )
+        effective_sideboards = (
+            [
+                DeckSideboardInput(
+                    name=sideboard.name,
+                    entries=[
+                        DeckEntryInput(card_id=entry.card.id, quantity=int(entry.quantity))
+                        for entry in sideboard.entries.all()
+                    ],
+                )
+                for sideboard in existing_deck.sideboards.all()
+            ]
+            if not updates.update_sideboards
+            else updates.sideboards
+        )
+
+        if effective_name is None:
+            raise ValueError("Deck name is required.")
+        if effective_is_public is None:
+            raise ValueError("Deck visibility is required.")
+        if effective_hero_card_id is None:
+            raise ValueError("Hero card is required.")
+        if effective_entries is None:
+            raise ValueError("Deck entries are required.")
+        if effective_sideboards is None:
+            raise ValueError("Sideboards are required.")
+
+        normalized_name = self._normalize_name(effective_name)
+        normalized_description = self._normalize_description(effective_description)
         hero_card, normalized_entries, normalized_sideboards = self._normalize_deck_payload(
-            hero_card_id=hero_card_id,
-            entries=entries,
-            sideboards=sideboards,
+            hero_card_id=effective_hero_card_id,
+            entries=effective_entries,
+            sideboards=effective_sideboards,
         )
         updated = update_deck(
             deck_id=deck_id,
             updates={
                 "name": normalized_name,
                 "description": normalized_description,
-                "is_public": is_public,
+                "is_public": effective_is_public,
                 "hero_card": hero_card,
             },
         )
         if updated is None:
             return None
-        replace_mainboard_entries(deck=updated, entries=normalized_entries)
-        replace_sideboards(deck=updated, sideboards=normalized_sideboards)
+        if updates.update_entries:
+            replace_mainboard_entries(deck=updated, entries=normalized_entries)
+        if updates.update_sideboards:
+            replace_sideboards(deck=updated, sideboards=normalized_sideboards)
         return self.get_owner_deck(deck_id, owner_id) or updated
 
     def delete_owner_deck(self, *, deck_id: str, owner_id: str) -> bool:
