@@ -75,9 +75,12 @@ export const useDeckBrowseFilters = () => {
   };
 
   const loadFilters = async (): Promise<void> => {
-    const response = await api.get<CardFiltersResponse>('/cards/filters');
-    filters.value = response.data;
-    filtersLoaded.value = true;
+    try {
+      const response = await api.get<CardFiltersResponse>('/cards/filters');
+      filters.value = response.data;
+    } finally {
+      filtersLoaded.value = true;
+    }
   };
 
   return {

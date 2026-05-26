@@ -23,131 +23,105 @@
       </div>
 
       <div class="theme-divider space-y-3 border-t pt-5">
-        <div>
-          <h4 class="theme-section-title text-sm font-semibold">
-            Default Card Sort
-          </h4>
-          <p class="theme-section-muted mt-1 text-sm">
-            Used by card-browsing screens unless that screen has its own override selected.
-          </p>
-        </div>
-
-        <div class="space-y-2">
-          <label
-            v-for="option in cardSortOptions"
-            :key="option.value"
-            class="theme-card-frame flex cursor-pointer items-start justify-between gap-3 rounded-xl px-4 py-3 transition hover:-translate-y-0.5"
-            :class="defaultSort === option.value ? 'theme-selected-surface-strong' : ''"
-          >
-            <div class="min-w-0">
-              <p class="theme-section-title text-sm font-semibold">
-                {{ option.label }}
-              </p>
-              <p class="theme-section-muted mt-1 text-sm">
-                {{ option.description }}
-              </p>
-            </div>
-            <div class="flex shrink-0 items-center gap-2 pt-0.5">
-              <Check
-                v-if="defaultSort === option.value"
-                class="h-4 w-4"
-              />
-              <input
-                :checked="defaultSort === option.value"
-                type="radio"
-                name="default-card-sort"
-                class="theme-checkbox h-4 w-4 rounded-full border-slate-300"
-                @change="defaultSort = option.value"
-              >
-            </div>
-          </label>
-        </div>
+        <PopoverOptionList
+          title="Default Card Sort"
+          description="Used by card-browsing screens unless that screen has its own override selected."
+          appearance="list"
+          :options="cardSortMenuOptions"
+          :selected-value="defaultSort"
+          :selection-active="true"
+          @select="handleDefaultSortSelect"
+        />
       </div>
 
       <div class="theme-divider space-y-4 border-t pt-5">
-        <div>
-          <h4 class="theme-section-title text-sm font-semibold">
-            View Options
-          </h4>
-          <p class="theme-section-muted mt-1 text-sm">
-            These control how cards appear when browsing the gallery and deck builder.
-          </p>
-        </div>
+        <PopoverOptionList
+          title="Default Hover Preview"
+          description="Choose the default card hover behavior for gallery and deck browsing views."
+          appearance="list"
+          :options="hoverModeMenuOptions"
+          :selected-value="defaultHoverMode"
+          :selection-active="true"
+          @select="handleDefaultHoverModeSelect"
+        />
 
-        <label class="flex items-start justify-between gap-4">
+        <section class="space-y-2">
           <div>
             <p class="theme-section-title text-sm font-semibold">
-              Tooltip
+              Display
             </p>
-            <p class="theme-section-muted mt-1 text-sm">
-              Show card details when hovering over a card.
-            </p>
-          </div>
-          <input
-            v-model="tooltipEnabled"
-            type="checkbox"
-            class="theme-checkbox mt-1 h-4 w-4 rounded border-slate-300"
-          >
-        </label>
-
-        <label class="flex items-start justify-between gap-4">
-          <div>
-            <p class="theme-section-title text-sm font-semibold">
-              Card Groups
-            </p>
-            <p class="theme-section-muted mt-1 text-sm">
-              Show grouped cards as stacked gallery results when available.
+            <p class="theme-section-muted text-sm">
+              Control the default gallery layout and request size.
             </p>
           </div>
-          <input
-            v-model="showCardGroups"
-            type="checkbox"
-            class="theme-checkbox mt-1 h-4 w-4 rounded border-slate-300"
-          >
-        </label>
 
-        <label class="field-label">
-          Cards Per Page
-          <select
-            v-model.number="pageSize"
-            class="input-base"
-          >
-            <option
-              v-for="option in cardPageSizeOptions"
-              :key="option"
-              :value="option"
-            >
-              {{ option }} cards
-            </option>
-          </select>
-          <span class="theme-section-muted text-sm">
-            Default gallery request size for card browsing.
-          </span>
-        </label>
+          <div class="theme-muted-panel space-y-0 p-0">
+            <label class="flex items-start justify-between gap-4 px-4 py-3">
+              <div class="min-w-0">
+                <p class="theme-section-title text-sm font-semibold">
+                  Card Groups
+                </p>
+                <p class="theme-section-muted mt-1 text-sm">
+                  Show grouped cards as stacked gallery results when available.
+                </p>
+              </div>
+              <input
+                v-model="showCardGroups"
+                type="checkbox"
+                class="theme-checkbox mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
+              >
+            </label>
 
-        <div class="space-y-2">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="theme-section-title text-sm font-semibold">
-                Card Size
-              </p>
-              <p class="theme-section-muted mt-1 text-sm">
-                Scale card thumbnails in gallery-style views.
-              </p>
+            <div class="theme-divider border-t px-4 py-3">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div class="min-w-0">
+                  <p class="theme-section-title text-sm font-semibold">
+                    Cards Per Page
+                  </p>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Default gallery request size for card browsing.
+                  </p>
+                </div>
+                <select
+                  v-model.number="pageSize"
+                  class="input-base w-full sm:ml-auto sm:w-[8rem] sm:shrink-0"
+                >
+                  <option
+                    v-for="option in cardPageSizeOptions"
+                    :key="option"
+                    :value="option"
+                  >
+                    {{ option }} cards
+                  </option>
+                </select>
+              </div>
             </div>
-            <span class="theme-section-muted text-sm font-medium">
-              {{ percentLabel }}
-            </span>
+
+            <div class="theme-divider border-t px-4 py-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="theme-section-title text-sm font-semibold">
+                    Card Size
+                  </p>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Scale card thumbnails in gallery-style views.
+                  </p>
+                </div>
+                <span class="theme-section-muted text-sm font-medium">
+                  {{ percentLabel }}
+                </span>
+              </div>
+              <input
+                v-model="cardScale"
+                type="range"
+                min="0.8"
+                max="1.2"
+                step="0.05"
+                class="theme-range mt-3 w-full"
+              >
+            </div>
           </div>
-          <input
-            v-model="cardScale"
-            type="range"
-            min="0.8"
-            max="1.2"
-            step="0.05"
-            class="theme-range w-full"
-          >
-        </div>
+        </section>
       </div>
     </section>
   </section>
@@ -155,14 +129,43 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Check, SlidersHorizontal } from 'lucide-vue-next';
+import { SlidersHorizontal } from 'lucide-vue-next';
+import PopoverOptionList, { type PopoverOptionItem } from '@/components/cards/PopoverOptionList.vue';
+import type { CardSort } from '@/modules/card-search/cardSort';
+import type { HoverMode } from '@/modules/card-search/hoverMode';
+import { HOVER_MODE_OPTIONS } from '@/modules/card-search/hoverMode';
 import { cardSortOptions } from '@/modules/card-search/cardSort';
 import { CARD_PAGE_SIZE_OPTIONS } from '@/modules/card-search/pageSize';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
+import { useHoverModePreferences } from '@/modules/card-search/useHoverModePreferences';
 import { useCardSortPreferences } from '@/modules/card-search/useCardSortPreferences';
 
 const { defaultSort } = useCardSortPreferences();
-const { tooltipEnabled, cardScale, showCardGroups, pageSize } = useGalleryOptions();
+const { defaultHoverMode } = useHoverModePreferences();
+const { cardScale, showCardGroups, pageSize } = useGalleryOptions();
+const hoverModeOptions = HOVER_MODE_OPTIONS;
+const cardSortMenuOptions = computed<PopoverOptionItem[]>(() =>
+  cardSortOptions.map((option) => ({
+    value: option.value,
+    label: option.label,
+    description: option.description,
+  })),
+);
+const hoverModeMenuOptions = computed<PopoverOptionItem[]>(() =>
+  hoverModeOptions.map((option) => ({
+    value: option.value,
+    label: option.label,
+    description: option.description,
+  })),
+);
 const cardPageSizeOptions = CARD_PAGE_SIZE_OPTIONS;
 const percentLabel = computed(() => `${Math.round(cardScale.value * 100)}%`);
+
+const handleDefaultHoverModeSelect = (value: string): void => {
+  defaultHoverMode.value = value as HoverMode;
+};
+
+const handleDefaultSortSelect = (value: string): void => {
+  defaultSort.value = value as CardSort;
+};
 </script>

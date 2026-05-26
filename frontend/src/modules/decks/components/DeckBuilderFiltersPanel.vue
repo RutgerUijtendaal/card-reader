@@ -37,11 +37,15 @@
           @reset="controller.filters.clearSortOverride"
         />
         <GalleryOptionsMenu
-          :tooltip-enabled="controller.filters.tooltipEnabled.value"
+          :hover-mode="controller.filters.hoverMode.value"
+          :default-hover-mode="controller.filters.defaultHoverMode.value"
+          :hover-mode-override-active="controller.filters.hoverModeOverride.value !== null"
+          allow-hover-mode-default-option
           :card-scale="controller.filters.cardScale.value"
           :show-card-groups="false"
           :show-card-groups-control="false"
-          @update:tooltip-enabled="controller.filters.setTooltipEnabled"
+          @update:hover-mode="controller.filters.setHoverMode"
+          @reset:hover-mode="controller.filters.clearHoverModeOverride"
           @update:card-scale="controller.filters.setCardScale"
         />
       </div>

@@ -14,7 +14,7 @@
             maxWidth: '100%',
           }"
           :card="card"
-          :tooltip-enabled="controller.filters.tooltipEnabled.value"
+          :hover-mode="controller.filters.hoverMode.value"
           :card-height-rem="controller.gallery.cardHeightRem.value"
           activation-mode="emit"
           activation-label="Add card to deck"

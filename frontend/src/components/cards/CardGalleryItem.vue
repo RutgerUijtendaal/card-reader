@@ -76,12 +76,45 @@
 
       <Teleport to="body">
         <div
-          v-if="tooltipEnabled && hovered && cardItem"
-          ref="tooltipRef"
-          class="z-30 hidden md:block"
-          :style="{ position: 'fixed', left: `${tooltipX}px`, top: `${tooltipY}px` }"
+          v-if="showHoverOverlay"
+          ref="hoverPanelRef"
+          class="pointer-events-none z-30 hidden md:block"
+          :style="{ position: 'fixed', left: `${hoverPanelX}px`, top: `${hoverPanelY}px` }"
         >
-          <CardHoverTooltip :card="cardItem" />
+          <div
+            v-if="showEnlargedPreview && showDetailsPreview && detailsCard"
+            class="flex items-start gap-4"
+          >
+            <div
+              v-if="previewImageUrl"
+              class="theme-card-frame w-[380px] overflow-hidden rounded-xl shadow-2xl"
+            >
+              <div class="theme-card-image-well aspect-[63/88]">
+                <img
+                  :src="toAbsoluteApiUrl(previewImageUrl)"
+                  :alt="previewImageAlt"
+                  class="h-full w-full object-cover"
+                >
+              </div>
+            </div>
+            <CardHoverTooltip :card="detailsCard" />
+          </div>
+          <div
+            v-else-if="showEnlargedPreview && previewImageUrl"
+            class="theme-card-frame w-[380px] overflow-hidden rounded-xl shadow-2xl"
+          >
+            <div class="theme-card-image-well aspect-[63/88]">
+              <img
+                :src="toAbsoluteApiUrl(previewImageUrl)"
+                :alt="previewImageAlt"
+                class="h-full w-full object-cover"
+              >
+            </div>
+          </div>
+          <CardHoverTooltip
+            v-else-if="showDetailsPreview && detailsCard"
+            :card="detailsCard"
+          />
         </div>
       </Teleport>
 
@@ -103,18 +136,20 @@
 
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 import { RouterLink, useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
+import { fetchHoverPreviewCard } from '@/components/cards/cardHoverPreview';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import { buildCardDetailLocation, buildGalleryItemLocation } from '@/modules/card-search/galleryNavigation';
+import { DEFAULT_HOVER_MODE, type HoverMode } from '@/modules/card-search/hoverMode';
 import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';
 
 const props = withDefaults(
   defineProps<{
     card: GalleryItem;
-    tooltipEnabled?: boolean;
+    hoverMode?: HoverMode;
     cardHeightRem?: number;
     activationMode?: 'navigate' | 'emit';
     activationLabel?: string;
@@ -122,7 +157,7 @@ const props = withDefaults(
     activationDisabled?: boolean;
   }>(),
   {
-    tooltipEnabled: true,
+    hoverMode: DEFAULT_HOVER_MODE,
     cardHeightRem: 27,
     activationMode: 'navigate',
     activationLabel: 'Open card',
@@ -134,25 +169,40 @@ const emit = defineEmits<{
   (e: 'activate', card: GalleryItem): void;
 }>();
 
+const DEFAULT_CARD_ASPECT_RATIO = '63 / 88';
 const route = useRoute();
 const hovered = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
-const tooltipRef = ref<HTMLElement | null>(null);
-const floating = useFloating(triggerRef, tooltipRef, {
-  open: computed(() => hovered.value),
-  placement: 'right-start',
-  strategy: 'fixed',
-  middleware: [offset(16), flip(), shift({ padding: 12 })],
-  whileElementsMounted: autoUpdate,
-});
-const tooltipX = computed(() => floating.x.value ?? 0);
-const tooltipY = computed(() => floating.y.value ?? 0);
+const hoverPanelRef = ref<HTMLElement | null>(null);
+const groupHoverCard = ref<CardListItem | null>(null);
 const isCard = computed((): boolean => props.card.result_type === 'card');
 const isCardGroup = computed((): boolean => props.card.result_type === 'card_group');
 const cardItem = computed<CardListItem | null>(() => (isCard.value ? props.card as CardListItem : null));
 const groupItem = computed<CardGroupGalleryItem | null>(() => (isCardGroup.value ? props.card as CardGroupGalleryItem : null));
 const stackCards = computed(() => groupItem.value?.preview_cards.slice(0, 3) ?? []);
-const DEFAULT_CARD_ASPECT_RATIO = '63 / 88';
+const detailsCard = computed<CardListItem | null>(() => cardItem.value ?? groupHoverCard.value);
+const previewCard = computed(() => stackCards.value[0] ?? null);
+const previewImageUrl = computed(() => cardItem.value?.image_url ?? previewCard.value?.image_url ?? null);
+const previewImageAlt = computed(() => cardItem.value?.name ?? previewCard.value?.name ?? groupItem.value?.anchor_card_name ?? 'Card preview');
+const showEnlargedPreview = computed(() => props.hoverMode === 'enlarged' || props.hoverMode === 'enlarged-details');
+const showDetailsPreview = computed(() => props.hoverMode === 'details' || props.hoverMode === 'enlarged-details');
+const showHoverOverlay = computed(() => {
+  if (!hovered.value || props.hoverMode === 'none') {
+    return false;
+  }
+
+  return (showEnlargedPreview.value && previewImageUrl.value !== null)
+    || (showDetailsPreview.value && detailsCard.value !== null);
+});
+const floating = useFloating(triggerRef, hoverPanelRef, {
+  open: showHoverOverlay,
+  placement: 'right-start',
+  strategy: 'fixed',
+  middleware: [offset(16), flip(), shift({ padding: 12 })],
+  whileElementsMounted: autoUpdate,
+});
+const hoverPanelX = computed(() => floating.x.value ?? 0);
+const hoverPanelY = computed(() => floating.y.value ?? 0);
 const cardFrameWidthRem = computed(() => Number(((props.cardHeightRem * 63) / 88).toFixed(3)));
 const cardFrameStyle = computed(() =>
   isCardGroup.value
@@ -189,5 +239,33 @@ const handleActivate = (): void => {
     emit('activate', props.card);
   }
 };
+
+watch(
+  () => groupItem.value?.anchor_card_id ?? null,
+  () => {
+    groupHoverCard.value = null;
+  },
+);
+
+watch(
+  [hovered, showDetailsPreview, groupItem],
+  async ([isHovered, shouldShowDetails, currentGroup]) => {
+    if (!isHovered || !shouldShowDetails || !currentGroup) {
+      return;
+    }
+
+    if (groupHoverCard.value?.id === currentGroup.anchor_card_id) {
+      return;
+    }
+
+    const expectedAnchorId = currentGroup.anchor_card_id;
+    const loadedCard = await fetchHoverPreviewCard(expectedAnchorId);
+    if (groupItem.value?.anchor_card_id !== expectedAnchorId) {
+      return;
+    }
+    groupHoverCard.value = loadedCard;
+  },
+  { immediate: true },
+);
 
 </script>

@@ -23,12 +23,16 @@
               @reset="clearGallerySortOverride"
             />
             <GalleryOptionsMenu
-              :tooltip-enabled="tooltipEnabled"
+              :hover-mode="effectiveHoverMode"
+              :default-hover-mode="defaultHoverMode"
+              :hover-mode-override-active="galleryHoverModeOverride !== null"
+              allow-hover-mode-default-option
               :card-scale="cardScale"
               :show-card-groups="showCardGroups"
               :page-size="pageSize"
               show-page-size-control
-              @update:tooltip-enabled="tooltipEnabled = $event"
+              @update:hover-mode="setGalleryHoverModeOverride"
+              @reset:hover-mode="clearGalleryHoverModeOverride"
               @update:card-scale="cardScale = $event"
               @update:show-card-groups="showCardGroups = $event"
               @update:page-size="pageSize = $event"
@@ -56,7 +60,7 @@
           v-for="card in cards"
           :key="`${card.result_type}:${card.id}`"
           :card="card"
-          :tooltip-enabled="tooltipEnabled"
+          :hover-mode="effectiveHoverMode"
           :card-height-rem="cardHeightRem"
         >
           <template
@@ -127,6 +131,7 @@ import CardFilterSections from '@/modules/card-search/components/CardFilterSecti
 import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
 import { useCardCollection } from '@/modules/card-search/useCardCollection';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
+import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
 
 const route = useRoute();
 const router = useRouter();
@@ -150,8 +155,15 @@ const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.q
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const { exportCardsCsv } = useCsvExport();
-const { tooltipEnabled, cardScale, showCardGroups, pageSize } = useGalleryOptions();
+const { cardScale, showCardGroups, pageSize } = useGalleryOptions();
 const { defaultSort, overrideSort, effectiveSort, setOverrideSort, clearOverrideSort } = useCardSortSurface('gallery');
+const {
+  defaultHoverMode,
+  overrideHoverMode: galleryHoverModeOverride,
+  effectiveHoverMode,
+  setOverrideHoverMode,
+  clearOverrideHoverMode,
+} = useHoverModeSurface('gallery');
 const collection = useCardCollection<GalleryItem>({
   buildSearchParams: () => {
     const params = buildCardFilterApiSearchParams(selectionState.value);
@@ -192,6 +204,14 @@ const setGallerySortOverride = (value: typeof effectiveSort.value): void => {
 
 const clearGallerySortOverride = (): void => {
   clearOverrideSort();
+};
+
+const setGalleryHoverModeOverride = (value: typeof effectiveHoverMode.value): void => {
+  setOverrideHoverMode(value);
+};
+
+const clearGalleryHoverModeOverride = (): void => {
+  clearOverrideHoverMode();
 };
 
 const debouncedUpdateRoute = useDebounceFn(() => {
