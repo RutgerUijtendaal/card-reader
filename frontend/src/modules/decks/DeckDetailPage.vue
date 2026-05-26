@@ -85,11 +85,15 @@
 
         <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
           <GalleryOptionsMenu
-            :tooltip-enabled="tooltipEnabled"
+            :hover-mode="effectiveHoverMode"
+            :default-hover-mode="defaultHoverMode"
+            :hover-mode-override-active="deckDetailHoverModeOverride !== null"
+            allow-hover-mode-default-option
             :card-scale="cardScale"
             :show-card-groups="false"
             :show-card-groups-control="false"
-            @update:tooltip-enabled="tooltipEnabled = $event"
+            @update:hover-mode="setDeckDetailHoverModeOverride"
+            @reset:hover-mode="clearDeckDetailHoverModeOverride"
             @update:card-scale="cardScale = $event"
           />
           <button
@@ -155,7 +159,7 @@
               :style="mainboardCardStyle"
               :card="toGalleryCard(entry.card)"
               :card-height-rem="mainboardCardHeightRem"
-              :tooltip-enabled="tooltipEnabled"
+              :hover-mode="effectiveHoverMode"
               :navigation-target="detailLocation(entry.card.id)"
             >
               <template #overlay>
@@ -190,6 +194,7 @@ import type { CardListItem } from '@/modules/card-detail/types';
 import { compareCardSort } from '@/modules/card-search/cardSort';
 import { useCardSortPreferences } from '@/modules/card-search/useCardSortPreferences';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
+import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
 import { fetchDeckDetail } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
@@ -201,7 +206,14 @@ const route = useRoute();
 const auth = useAuthStore();
 const deck = ref<DeckRecord | null>(null);
 const { defaultSort } = useCardSortPreferences();
-const { tooltipEnabled, cardScale } = useGalleryOptions();
+const { cardScale } = useGalleryOptions();
+const {
+  defaultHoverMode,
+  overrideHoverMode: deckDetailHoverModeOverride,
+  effectiveHoverMode,
+  setOverrideHoverMode,
+  clearOverrideHoverMode,
+} = useHoverModeSurface('deckDetail');
 const { exportTtsDeck } = useDeckExport();
 const activeBoardId = ref('mainboard');
 
@@ -234,6 +246,14 @@ const sortedActiveBoardEntries = computed(() =>
   [...activeBoardEntries.value].sort((left, right) => compareCardSort(left.card, right.card, defaultSort.value)),
 );
 const detailLocation = (cardId: string) => buildDeckCardDetailLocation(cardId, String(route.params.id), route.query);
+
+const setDeckDetailHoverModeOverride = (value: typeof effectiveHoverMode.value): void => {
+  setOverrideHoverMode(value);
+};
+
+const clearDeckDetailHoverModeOverride = (): void => {
+  clearOverrideHoverMode();
+};
 
 const toGalleryCard = (card: DeckCardSummary): CardListItem => ({
   ...card,

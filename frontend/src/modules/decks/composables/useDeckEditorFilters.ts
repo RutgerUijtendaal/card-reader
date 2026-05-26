@@ -1,12 +1,21 @@
 import { buildCardFilterApiSearchParams } from '@/modules/card-filters/cardFilterState';
+import type { HoverMode } from '@/modules/card-search/hoverMode';
 import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
 import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
+import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
 import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
 
 export const useDeckEditorFilters = () => {
   const filterController = useCardFilterController();
-  const { tooltipEnabled, cardScale } = useGalleryOptions();
+  const { cardScale } = useGalleryOptions();
+  const {
+    defaultHoverMode,
+    overrideHoverMode,
+    effectiveHoverMode,
+    setOverrideHoverMode,
+    clearOverrideHoverMode,
+  } = useHoverModeSurface('deckBuilder');
   const {
     defaultSort,
     overrideSort,
@@ -15,8 +24,8 @@ export const useDeckEditorFilters = () => {
     clearOverrideSort: clearSortOverride,
   } = useCardSortSurface('deckBuilder');
 
-  const setTooltipEnabled = (value: boolean): void => {
-    tooltipEnabled.value = value;
+  const setHoverMode = (value: HoverMode): void => {
+    setOverrideHoverMode(value);
   };
 
   const setCardScale = (value: number): void => {
@@ -31,12 +40,15 @@ export const useDeckEditorFilters = () => {
     selectionState: filterController.selectionState,
     resetFilters: filterController.resetFilters,
     updateQuery: filterController.updateQuery,
-    tooltipEnabled,
+    defaultHoverMode,
+    hoverModeOverride: overrideHoverMode,
+    hoverMode: effectiveHoverMode,
     cardScale,
     defaultSort,
     sortOverride: overrideSort,
     effectiveSort,
-    setTooltipEnabled,
+    setHoverMode,
+    clearHoverModeOverride: clearOverrideHoverMode,
     setCardScale,
     setSortOverride,
     clearSortOverride,

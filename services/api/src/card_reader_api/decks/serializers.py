@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 from rest_framework import serializers
 from rest_framework.response import Response
@@ -12,6 +12,13 @@ from card_reader_core.models import Card, CardVersion, Deck
 from card_reader_core.repositories.cards_repository import get_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckService
+
+
+class DeckListFilterParams(TypedDict):
+    hero_query: str | None
+    card_query: str | None
+    affinity_symbol_ids: list[str] | None
+    affinity_symbol_match: str | None
 
 
 def deck_payload(deck: Deck) -> dict[str, object]:
@@ -155,6 +162,32 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     hero_card_id = serializers.CharField(required=True)
     entries = MainboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
     sideboards = DeckSideboardWriteSerializer(many=True, required=False, allow_empty=True, default=list)
+
+
+class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
+    hero_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    card_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    affinity_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+
+    def validated_list_filters(self) -> DeckListFilterParams:
+        return {
+            "hero_query": self._string_or_none("hero_q"),
+            "card_query": self._string_or_none("card_q"),
+            "affinity_symbol_ids": self._string_list_or_none("affinity_symbol_ids"),
+            "affinity_symbol_match": self._string_or_none("affinity_symbol_match"),
+        }
+
+    def _string_or_none(self, key: str) -> str | None:
+        value = self.validated_data.get(key)
+        return value if isinstance(value, str) else None
+
+    def _string_list_or_none(self, key: str) -> list[str] | None:
+        value = self.validated_data.get(key)
+        if not isinstance(value, list):
+            return None
+        out = [item for item in value if isinstance(item, str)]
+        return out or None
 
 
 def serializer_error(serializer: serializers.BaseSerializer[Any]) -> Response:

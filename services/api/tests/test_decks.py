@@ -146,7 +146,7 @@ def _add_card_metadata(
     *,
     keyword_labels: list[str] | None = None,
     tag_labels: list[str] | None = None,
-    symbol_specs: list[tuple[str, str, str]] | None = None,
+    symbol_specs: list[tuple[str, str, str] | tuple[str, str, str, str]] | None = None,
 ) -> None:
     version = card.latest_version
     assert version is not None
@@ -167,12 +167,14 @@ def _add_card_metadata(
         )
         CardVersionTag.objects.get_or_create(card_version=version, tag=tag)
 
-    for symbol_key, symbol_label, text_token in symbol_specs or []:
+    for symbol_spec in symbol_specs or []:
+        symbol_key, symbol_label, text_token = symbol_spec[:3]
+        symbol_type = symbol_spec[3] if len(symbol_spec) > 3 else "mana"
         symbol, _created = Symbol.objects.get_or_create(
             key=symbol_key,
             defaults={
                 "label": symbol_label,
-                "symbol_type": "mana",
+                "symbol_type": symbol_type,
                 "detector_type": "template",
                 "detection_config_json": {},
                 "text_enrichment_json": {},
@@ -271,6 +273,304 @@ def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
 
     assert response.status_code == 200
     assert deck.id in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_by_hero_name() -> None:
+    owner = _create_user("deck-filter-hero-owner", "password")
+    target_hero = _create_card(name="Aurora Captain", is_hero=True)
+    other_hero = _create_card(name="Shadow Caller", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+
+    target_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Aurora Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=target_hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Shadow Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=other_hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"hero_q": "Aurora"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [target_deck.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_by_mainboard_card_name() -> None:
+    owner = _create_user("deck-filter-mainboard-owner", "password")
+    hero = _create_card(name="Mainboard Hero", is_hero=True)
+    featured_card = _create_card(name="Sun Spear", is_hero=False)
+    filler_cards = _build_mainboard_cards(total_unique=14)
+
+    target_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Sun Spear Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=featured_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in filler_cards],
+        ],
+        sideboards=[],
+    )
+    other_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Other Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"card_q": "Sun Spear"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [target_deck.id]
+    assert other_deck.id not in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_by_sideboard_card_name() -> None:
+    owner = _create_user("deck-filter-sideboard-owner", "password")
+    hero = _create_card(name="Sideboard Filter Hero", is_hero=True)
+    sideboard_card = _create_card(name="Moon Trap", is_hero=False)
+    mainboard_cards = _build_mainboard_cards()
+
+    target_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Moon Trap Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[
+            DeckSideboardInput(
+                name="Flex",
+                entries=[DeckEntryInput(card_id=sideboard_card.id, quantity=2)],
+            )
+        ],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="No Match Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"card_q": "Moon Trap"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [target_deck.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
+    owner = _create_user("deck-filter-and-owner", "password")
+    matching_hero = _create_card(name="Ember Warden", is_hero=True)
+    non_matching_hero = _create_card(name="Frost Sage", is_hero=True)
+    featured_card = _create_card(name="Solar Flare", is_hero=False)
+    filler_cards = _build_mainboard_cards(total_unique=14)
+
+    target_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Matching Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=matching_hero.id,
+        entries=[
+            DeckEntryInput(card_id=featured_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in filler_cards],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Hero Only Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=matching_hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Card Only Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=non_matching_hero.id,
+        entries=[
+            DeckEntryInput(card_id=featured_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"hero_q": "Ember", "card_q": "Solar"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [target_deck.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_by_affinity_symbols_with_any_match() -> None:
+    owner = _create_user("deck-filter-affinity-any-owner", "password")
+    hero = _create_card(name="Affinity Any Hero", is_hero=True)
+    fire_card = _create_card(name="Firecard", is_hero=False)
+    water_card = _create_card(name="Watercard", is_hero=False)
+    _add_card_metadata(fire_card, symbol_specs=[("aff-fire", "Fire Affinity", "{AF}", "affinity")])
+    _add_card_metadata(water_card, symbol_specs=[("aff-water", "Water Affinity", "{AW}", "affinity")])
+    fire_symbol_id = Symbol.objects.get(key="aff-fire").id
+    water_symbol_id = Symbol.objects.get(key="aff-water").id
+
+    fire_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Fire Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=fire_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+    water_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Water Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=water_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {"affinity_symbol_ids": [fire_symbol_id, water_symbol_id], "affinity_symbol_match": "any"},
+    )
+
+    assert response.status_code == 200
+    assert {row["id"] for row in response.json()} == {fire_deck.id, water_deck.id}
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
+    owner = _create_user("deck-filter-affinity-all-owner", "password")
+    hero = _create_card(name="Affinity All Hero", is_hero=True)
+    dual_card = _create_card(name="Dual Affinity Card", is_hero=False)
+    fire_only_card = _create_card(name="Fire Only Card", is_hero=False)
+    _add_card_metadata(
+        dual_card,
+        symbol_specs=[
+            ("aff-fire-all", "Fire Affinity", "{AF}", "affinity"),
+            ("aff-water-all", "Water Affinity", "{AW}", "affinity"),
+        ],
+    )
+    _add_card_metadata(fire_only_card, symbol_specs=[("aff-fire-all", "Fire Affinity", "{AF}", "affinity")])
+    fire_symbol_id = Symbol.objects.get(key="aff-fire-all").id
+    water_symbol_id = Symbol.objects.get(key="aff-water-all").id
+
+    dual_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Dual Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=dual_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Fire Only Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=fire_only_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {"affinity_symbol_ids": [fire_symbol_id, water_symbol_id], "affinity_symbol_match": "all"},
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [dual_deck.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> None:
+    owner = _create_user("deck-filter-visibility-owner", "password")
+    target_hero = _create_card(name="Visible Filter Hero", is_hero=True)
+    private_hero = _create_card(name="Hidden Filter Hero", is_hero=True)
+    invalid_hero = _create_card(name="Draft Filter Hero", is_hero=True)
+    featured_card = _create_card(name="Comet Blade", is_hero=False)
+    filler_cards = _build_mainboard_cards(total_unique=14)
+
+    public_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Visible Filter Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=target_hero.id,
+        entries=[
+            DeckEntryInput(card_id=featured_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in filler_cards],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Private Filter Deck",
+        description=None,
+        is_public=False,
+        hero_card_id=private_hero.id,
+        entries=[
+            DeckEntryInput(card_id=featured_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Invalid Filter Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=invalid_hero.id,
+        entries=[DeckEntryInput(card_id=featured_card.id, quantity=1)],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"card_q": "Comet Blade"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [public_deck.id]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
