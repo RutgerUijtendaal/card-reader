@@ -70,6 +70,13 @@ pnpm test
 pnpm check
 ```
 
+When running ad hoc checks in this repo, prefer the helper below so temporary
+files, UV cache data, and pytest scratch paths stay inside `.tmp/codex/`:
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File scripts/run-in-agent-env.ps1 -TaskName lint uv run --project . ruff check services/core/src
+```
+
 Targeted commands:
 
 ```bash
@@ -160,6 +167,29 @@ Default storage locations:
 - Docker: `/var/lib/card-reader`
 
 Set `CARD_READER_APP_DATA_DIR` to override the storage root.
+
+## Backups
+
+Card Reader backup and restore are repo-owned scripts that operate on the deployed
+runtime paths and are intended to be scheduled by server automation.
+
+Create a backup archive:
+
+```bash
+uv run --project . python scripts/create-backup.py --backup-root /mnt/strawberry_volume/backups/card-reader
+```
+
+Restore an archive:
+
+```bash
+uv run --project . python scripts/restore-backup.py /mnt/strawberry_volume/backups/card-reader/card-reader-YYYYMMDD-HHMMSS.tar.gz
+```
+
+Runtime paths are resolved from the deployed environment:
+
+- `CARD_READER_APP_DATA_DIR`
+- `CARD_READER_PUBLIC_APP_DATA_DIR`
+- `CARD_READER_DATABASE_PATH`
 
 ## Versioning
 
