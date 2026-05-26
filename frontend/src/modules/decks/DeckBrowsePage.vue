@@ -142,6 +142,6 @@ watch(
 );
 
 onMounted(() => {
-  void loadFilters();
+  void loadFilters().catch(() => undefined);
 });
 </script>
