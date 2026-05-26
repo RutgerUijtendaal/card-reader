@@ -194,13 +194,13 @@
 import { computed, onMounted, ref } from 'vue';
 import { Download } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
-import { toAbsoluteApiUrl } from '@/api/client';
+import { api, toAbsoluteApiUrl } from '@/api/client';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import type { CardListItem } from '@/modules/card-detail/types';
-import { compareCardSort } from '@/modules/card-search/cardSort';
+import type { CardFiltersResponse, CardListItem } from '@/modules/card-detail/types';
+import { buildTypeSortLookup, compareCardSort } from '@/modules/card-search/cardSort';
 import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
@@ -214,6 +214,12 @@ import { useDeckExport } from '@/modules/decks/useDeckExport';
 const route = useRoute();
 const auth = useAuthStore();
 const deck = ref<DeckRecord | null>(null);
+const filterOptions = ref<CardFiltersResponse>({
+  keywords: [],
+  tags: [],
+  symbols: [],
+  types: [],
+});
 const { cardScale } = useGalleryOptions();
 const {
   defaultSort,
@@ -260,8 +266,11 @@ const activeBoardTitle = computed(() =>
 const activeBoardEmptyLabel = computed(() =>
   activeBoardId.value === 'mainboard' ? 'This deck does not have any mainboard cards yet.' : 'This sideboard does not have any cards yet.',
 );
+const typeSortLookup = computed(() => buildTypeSortLookup(filterOptions.value.types));
 const sortedActiveBoardEntries = computed(() =>
-  [...activeBoardEntries.value].sort((left, right) => compareCardSort(left.card, right.card, effectiveSort.value)),
+  [...activeBoardEntries.value].sort((left, right) =>
+    compareCardSort(left.card, right.card, effectiveSort.value, typeSortLookup.value),
+  ),
 );
 const detailLocation = (cardId: string) => buildDeckCardDetailLocation(cardId, String(route.params.id), route.query);
 
@@ -291,6 +300,11 @@ const loadDeck = async (): Promise<void> => {
   activeBoardId.value = 'mainboard';
 };
 
+const loadFilterOptions = async (): Promise<void> => {
+  const response = await api.get<CardFiltersResponse>('/cards/filters');
+  filterOptions.value = response.data;
+};
+
 const handleTtsExport = async (): Promise<void> => {
   if (!deck.value) {
     return;
@@ -298,5 +312,7 @@ const handleTtsExport = async (): Promise<void> => {
   await exportTtsDeck(deck.value.id, deck.value.name);
 };
 
-onMounted(loadDeck);
+onMounted(async () => {
+  await Promise.all([loadDeck(), loadFilterOptions()]);
+});
 </script>

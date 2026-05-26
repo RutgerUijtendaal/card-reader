@@ -30,6 +30,7 @@ from card_reader_core.repositories.cards_repository import (
     CARD_SORT_MANA_ASC,
     CARD_SORT_MANA_DESC,
     CARD_SORT_NAME_ASC,
+    CARD_SORT_TYPES_ASC,
     get_card,
     get_card_image,
     list_card_generations,
@@ -37,9 +38,11 @@ from card_reader_core.repositories.cards_repository import (
     list_matching_cards,
     update_latest_card_version,
 )
+from card_reader_core.repositories.metadata_repository import list_types_for_card_sort
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
+    get_card_versions_metadata,
     get_card_version_metadata,
     get_card_with_image,
     get_filter_metadata,
@@ -47,7 +50,10 @@ from card_reader_core.services.cards import (
 )
 
 if TYPE_CHECKING:
+    from card_reader_core.models import Type
     from card_reader_core.repositories.cards_repository import CardSort
+
+MANA_TYPE_KEY = "mana"
 
 
 class GroupedGalleryItem(TypedDict):
@@ -56,6 +62,7 @@ class GroupedGalleryItem(TypedDict):
     name: str
     mana_value: int | None
     updated_at: datetime
+    types: list["Type"]
     payload: dict[str, object]
 
 
@@ -401,6 +408,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
                 name=row.version.name,
                 mana_value=row.version.mana_value,
                 updated_at=row.version.updated_at,
+                types=row.types,
                 payload=card_payload(
                     row.version.card,
                     row.version,
@@ -415,8 +423,14 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
             )
         )
 
+    anchor_versions = {
+        group.id: group.anchor_card.latest_version
+        for group in groups
+        if group.anchor_card.latest_version is not None
+    }
+    anchor_metadata = get_card_versions_metadata([version.id for version in anchor_versions.values()])
     for group in groups:
-        anchor_version = group.anchor_card.latest_version
+        anchor_version = anchor_versions.get(group.id)
         member_ids = {member.card.id for member in group.members.all()}
         if anchor_version is None or not member_ids.intersection(matching_card_ids):
             continue
@@ -427,11 +441,13 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
                 name=anchor_version.name,
                 mana_value=anchor_version.mana_value,
                 updated_at=anchor_version.updated_at,
+                types=anchor_metadata.get(anchor_version.id, {"types": []})["types"],
                 payload=card_group_gallery_payload(group),
             )
         )
 
-    grouped_items.sort(key=lambda row: _grouped_gallery_sort_key(row, filters["sort"]))
+    type_sort_lookup = _build_type_sort_lookup() if filters["sort"] == CARD_SORT_TYPES_ASC else None
+    grouped_items.sort(key=lambda row: _grouped_gallery_sort_key(row, filters["sort"], type_sort_lookup))
     total_count = len(grouped_items)
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
@@ -454,6 +470,7 @@ def _build_grouped_gallery_item(
     name: str,
     mana_value: int | None,
     updated_at: datetime,
+    types: list["Type"],
     payload: dict[str, object],
 ) -> GroupedGalleryItem:
     return {
@@ -462,11 +479,16 @@ def _build_grouped_gallery_item(
         "name": name,
         "mana_value": mana_value,
         "updated_at": updated_at,
+        "types": types,
         "payload": payload,
     }
 
 
-def _grouped_gallery_sort_key(item: GroupedGalleryItem, sort: CardSort) -> tuple[object, ...]:
+def _grouped_gallery_sort_key(
+    item: GroupedGalleryItem,
+    sort: CardSort,
+    type_sort_lookup: dict[str, tuple[int, str]] | None = None,
+) -> tuple[object, ...]:
     item_id = item["item_id"]
     label = item["label"].casefold()
     name = item["name"].casefold()
@@ -479,4 +501,39 @@ def _grouped_gallery_sort_key(item: GroupedGalleryItem, sort: CardSort) -> tuple
         return (mana_value is None, mana_value if mana_value is not None else 0, name, item_id)
     if sort == CARD_SORT_MANA_DESC:
         return (mana_value is None, -(mana_value if mana_value is not None else 0), name, item_id)
+    if sort == CARD_SORT_TYPES_ASC:
+        bucket, linked_card_count, type_label = _grouped_gallery_type_sort_value(item["types"], type_sort_lookup)
+        return (bucket, -linked_card_count, type_label, name, label, item_id)
     return (-updated_at.timestamp(), label, item_id)
+
+
+def _build_type_sort_lookup() -> dict[str, tuple[int, str]]:
+    lookup: dict[str, tuple[int, str]] = {}
+    for row in list_types_for_card_sort():
+        key = str(row.key).strip().casefold()
+        lookup[key] = (int(getattr(row, "linked_card_count", 0)), str(row.label).casefold())
+    return lookup
+
+
+def _grouped_gallery_type_sort_value(
+    types: list["Type"],
+    type_sort_lookup: dict[str, tuple[int, str]] | None,
+) -> tuple[int, int, str]:
+    if not types:
+        return (1, 0, "")
+
+    best_value: tuple[int, int, str] | None = None
+    for row in types:
+        key = str(row.key).strip().casefold()
+        label = str(row.label).casefold()
+        if key == MANA_TYPE_KEY:
+            candidate = (2, 0, label)
+        else:
+            linked_card_count, ranked_label = (type_sort_lookup or {}).get(key, (0, label))
+            candidate = (0, -linked_card_count, ranked_label)
+        if best_value is None or candidate < best_value:
+            best_value = candidate
+
+    if best_value is None:
+        return (1, 0, "")
+    return (best_value[0], -best_value[1], best_value[2])

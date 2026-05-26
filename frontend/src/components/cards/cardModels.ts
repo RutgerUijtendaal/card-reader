@@ -7,6 +7,7 @@ export type CardTooltipMetadata = {
   id: string;
   key: string;
   label: string;
+  linked_card_count?: number;
 };
 
 export type CardTooltipSymbol = CardTooltipMetadata & {

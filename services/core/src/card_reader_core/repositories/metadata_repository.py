@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
-from django.db.models import Count, Q
+from django.db.models import Case, Count, IntegerField, Q, Value, When
 
 from card_reader_core.models import (
     CardVersion,
@@ -23,6 +23,7 @@ from card_reader_core.rule_text import render_enriched_rule_text, replace_symbol
 
 MetadataModel = Keyword | Tag | Symbol | Type
 MetadataRow = TypeVar("MetadataRow", bound=MetadataModel)
+MANA_TYPE_KEY = "mana"
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,28 @@ def list_detectable_symbols() -> list[Symbol]:
 
 def list_types(*, keys: set[str] | None = None) -> list[Type]:
     return _list(Type, keys=keys)
+
+
+def list_types_for_card_sort() -> list[Type]:
+    return list(
+        Type.objects.annotate(
+            linked_card_count=Count(
+                "card_version_types",
+                filter=Q(card_version_types__card_version__is_latest=True),
+                distinct=True,
+            ),
+            type_sort_is_mana=Case(
+                When(key__iexact=MANA_TYPE_KEY, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            ),
+        ).order_by(
+            "type_sort_is_mana",
+            "-linked_card_count",
+            "label",
+            "id",
+        )
+    )
 
 
 def get_keyword(entry_id: str) -> Keyword | None:

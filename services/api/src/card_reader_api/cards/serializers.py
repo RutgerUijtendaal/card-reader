@@ -136,8 +136,12 @@ def edit_state_payload(edit_state: CardEditState) -> dict[str, object]:
     }
 
 
-def metadata_option(row: MetadataOption) -> dict[str, str]:
-    return {"id": str(row.id), "key": str(row.key), "label": str(row.label)}
+def metadata_option(row: MetadataOption) -> dict[str, object]:
+    payload: dict[str, object] = {"id": str(row.id), "key": str(row.key), "label": str(row.label)}
+    linked_card_count = getattr(row, "linked_card_count", None)
+    if isinstance(linked_card_count, int):
+        payload["linked_card_count"] = linked_card_count
+    return payload
 
 
 def symbol_option(symbol: Symbol) -> dict[str, object]:
