@@ -52,4 +52,17 @@ describe('useCardSortPreferences', () => {
     expect(deckBuilder.overrideSort.value).toBeNull();
     expect(deckBuilder.effectiveSort.value).toBe('updated_desc');
   });
+
+  test('deck detail sort override is isolated from other surfaces', async () => {
+    const deckDetail = useCardSortSurface('deckDetail');
+    const gallery = useCardSortSurface('gallery');
+
+    deckDetail.setOverrideSort('name_asc');
+    await nextTick();
+
+    expect(deckDetail.overrideSort.value).toBe('name_asc');
+    expect(deckDetail.effectiveSort.value).toBe('name_asc');
+    expect(gallery.overrideSort.value).toBeNull();
+    expect(gallery.effectiveSort.value).toBe('updated_desc');
+  });
 });

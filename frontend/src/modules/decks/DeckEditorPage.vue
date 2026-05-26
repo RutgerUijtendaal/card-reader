@@ -31,10 +31,8 @@
             <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
               <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardManaTypeCards.value }}</span>
-              <span
-                class="inline-flex items-center"
-                title="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
-                aria-label="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
+              <InfoTooltip
+                text="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
               >
                 <CircleCheckBig
                   v-if="controller.deck.hasFreeMulliganManaRatio.value"
@@ -44,7 +42,7 @@
                   v-else
                   class="h-4 w-4 text-rose-400"
                 />
-              </span>
+              </InfoTooltip>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
 
@@ -137,6 +135,7 @@
 
 <script setup lang="ts">
 import { CircleCheckBig, CircleX } from 'lucide-vue-next';
+import InfoTooltip from '@/components/InfoTooltip.vue';
 import DeckBuilderFiltersPanel from '@/modules/decks/components/DeckBuilderFiltersPanel.vue';
 import DeckBuilderGallery from '@/modules/decks/components/DeckBuilderGallery.vue';
 import DeckBuilderSummaryPanel from '@/modules/decks/components/DeckBuilderSummaryPanel.vue';
