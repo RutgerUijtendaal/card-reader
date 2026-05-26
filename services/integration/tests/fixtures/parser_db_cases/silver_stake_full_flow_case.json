@@ -41,6 +41,7 @@
         "colorless-mana-1",
         "divine-mana",
         "luna-affinity",
+        "luna-devotion",
         "occult-mana"
       ],
       "types": [
@@ -50,6 +51,7 @@
         "colorless-mana-1": "mana",
         "divine-mana": "mana",
         "luna-affinity": "affinity",
+        "luna-devotion": "devotion",
         "occult-mana": "mana"
       }
     },
@@ -81,8 +83,9 @@
         "symbols": [
           "colorless-mana-1",
           "divine-mana",
-          "occult-mana",
-          "luna-affinity"
+          "luna-affinity",
+          "luna-devotion",
+          "occult-mana"
         ]
       }
     },

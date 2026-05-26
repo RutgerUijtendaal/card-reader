@@ -36,6 +36,10 @@
             class="input-base"
             placeholder="mana"
           >
+          <span class="theme-section-muted text-xs font-normal">
+            Keep affinity and devotion as separate symbol types. For affinity symbols that should also count as devotion, use
+            <span class="font-mono">implied_symbol_keys</span> in detection config.
+          </span>
         </label>
         <label class="theme-section-title inline-flex items-center gap-2 text-sm">
           <input
@@ -53,7 +57,7 @@
         <JsonEditorField
           v-model="detectionConfigModel"
           label="Detection config JSON"
-          hint="Configure detection thresholds and matching behavior for this symbol."
+          hint="Configure detection thresholds and matching behavior for this symbol. Affinity symbols can also declare implied linked symbols with implied_symbol_keys."
           example-title="Detection config example"
           :example-json="formattedDetectionConfigExample"
           min-height="14rem"

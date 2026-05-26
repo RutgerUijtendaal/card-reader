@@ -88,6 +88,7 @@ export const detectionConfigExample = JSON.stringify(
     max_detections_per_symbol: 8,
     nms_iou_threshold: 0.25,
     center_crop_ratio: 0.7,
+    implied_symbol_keys: [],
   },
   null,
   2,

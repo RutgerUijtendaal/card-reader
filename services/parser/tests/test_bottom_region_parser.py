@@ -3,6 +3,7 @@ from __future__ import annotations
 from PIL import Image
 
 from card_reader_core.models import Keyword, Symbol
+from card_reader_parser.parsers.regions.affinity_parser import AffinityParser
 from card_reader_parser.parsers.regions.rules_text_parser import RulesTextParser
 from card_reader_parser.parsers.symbol_detector import DetectedSymbol, DetectionBBox
 
@@ -109,3 +110,47 @@ def test_rules_text_parser_detects_mana_devotion_and_generic_symbols_in_rules_te
     }
     assert result.extracted_keyword_ids == ["keyword-1"]
     assert [row.symbol_id for row in result.detected_symbols] == ["mana-1", "devotion-1", "misc-1"]
+
+
+def test_affinity_parser_adds_implied_devotion_symbols_without_changing_affinity_field() -> None:
+    detections = [
+        DetectedSymbol(
+            symbol_id="affinity-1",
+            key="luna-affinity",
+            symbol_type="affinity",
+            confidence=0.96,
+            bbox=DetectionBBox(x=10, y=5, w=12, h=12),
+            detector_type="template",
+            match_metadata={},
+        )
+    ]
+    symbol_detector = StubSymbolDetector(detections)
+    parser = AffinityParser(symbol_detector)
+    image = Image.new("RGB", (120, 40), "white")
+
+    result = parser.parse(
+        region_name="affinity",
+        image=image,
+        region_spec={},
+        symbols=[
+            Symbol(
+                id="affinity-1",
+                key="luna-affinity",
+                label="Luna Affinity",
+                symbol_type="affinity",
+                detection_config_json={"implied_symbol_keys": ["luna-devotion"]},
+            ),
+            Symbol(
+                id="devotion-1",
+                key="luna-devotion",
+                label="Luna Devotion",
+                symbol_type="devotion",
+            ),
+        ],
+    )
+
+    assert symbol_detector.last_expected_symbol_types == {"affinity"}
+    assert result.normalized_fields == {"affinity_symbols": "luna-affinity"}
+    assert [row.symbol_id for row in result.detected_symbols] == ["affinity-1", "devotion-1"]
+    assert result.detected_symbols[1].match_metadata["implied"] is True
+    assert result.detected_symbols[1].match_metadata["implied_by_symbol_id"] == "affinity-1"
