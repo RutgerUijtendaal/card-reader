@@ -27,6 +27,7 @@ export const router = createRouter({
     { path: '/login', component: LoginPage, meta: { public: true } },
     { path: '/password-setup', component: PasswordSetupPage, meta: { public: true } },
     { path: '/my/decks', component: MyDecksPage, meta: { requiresAuth: true } },
+    { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true }, props: true },
     { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true } },
     { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true }, props: true },
     { path: '/settings', component: SettingsPage },

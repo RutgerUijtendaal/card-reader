@@ -34,7 +34,7 @@
 
     <div
       v-else
-      class="grid gap-4"
+      class="grid gap-4 xl:grid-cols-2"
     >
       <DeckListCard
         v-for="deck in decks"
@@ -44,9 +44,8 @@
       >
         <template #actions>
           <RouterLink
-            v-if="deck.is_public"
             class="btn-secondary"
-            :to="`/decks/${deck.id}`"
+            :to="`/my/decks/${deck.id}`"
           >
             Open
           </RouterLink>
@@ -56,6 +55,14 @@
           >
             Edit
           </RouterLink>
+          <button
+            class="btn-secondary"
+            type="button"
+            :disabled="savingDeckIds.has(deck.id)"
+            @click="toggleDeckVisibility(deck)"
+          >
+            {{ savingDeckIds.has(deck.id) ? 'Saving...' : deck.is_public ? 'Make Private' : 'Make Public' }}
+          </button>
           <button
             class="btn-danger-secondary"
             type="button"
@@ -85,14 +92,16 @@
 import { onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
-import { deleteDeck, fetchMyDecks } from '@/modules/decks/api';
+import { deleteDeck, fetchMyDecks, updateDeck } from '@/modules/decks/api';
 import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
+import { buildDeckUpsertRequestFromRecord } from '@/modules/decks/deckPayload';
 import type { DeckRecord } from '@/modules/decks/types';
 
 const decks = ref<DeckRecord[]>([]);
 const loading = ref(false);
 const deleting = ref(false);
 const deleteTarget = ref<DeckRecord | null>(null);
+const savingDeckIds = ref(new Set<string>());
 
 const loadDecks = async (): Promise<void> => {
   loading.value = true;
@@ -105,6 +114,24 @@ const loadDecks = async (): Promise<void> => {
 
 const promptDelete = (deck: DeckRecord): void => {
   deleteTarget.value = deck;
+};
+
+const toggleDeckVisibility = async (deck: DeckRecord): Promise<void> => {
+  savingDeckIds.value = new Set(savingDeckIds.value).add(deck.id);
+  try {
+    const nextDeck = await updateDeck(deck.id, {
+      ...buildDeckUpsertRequestFromRecord(deck),
+      is_public: !deck.is_public,
+    });
+    decks.value = decks.value.map((entry) => (entry.id === nextDeck.id ? nextDeck : entry));
+    toast.success(nextDeck.is_public ? 'Deck is now public.' : 'Deck is now private.');
+  } catch {
+    toast.error('Unable to update deck visibility.');
+  } finally {
+    const nextSavingDeckIds = new Set(savingDeckIds.value);
+    nextSavingDeckIds.delete(deck.id);
+    savingDeckIds.value = nextSavingDeckIds;
+  }
 };
 
 const confirmDelete = async (): Promise<void> => {

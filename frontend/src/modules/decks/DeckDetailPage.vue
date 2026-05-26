@@ -30,9 +30,9 @@
       <div class="flex flex-wrap gap-2 lg:shrink-0">
         <RouterLink
           class="btn-secondary"
-          to="/decks"
+          :to="backLink"
         >
-          Back to Decks
+          {{ backLabel }}
         </RouterLink>
         <RouterLink
           v-if="canEdit"
@@ -195,7 +195,7 @@ import { compareCardSort } from '@/modules/card-search/cardSort';
 import { useCardSortPreferences } from '@/modules/card-search/useCardSortPreferences';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
-import { fetchDeckDetail } from '@/modules/decks/api';
+import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import { buildDeckCardDetailLocation } from '@/modules/decks/deckRouteState';
@@ -216,8 +216,11 @@ const {
 } = useHoverModeSurface('deckDetail');
 const { exportTtsDeck } = useDeckExport();
 const activeBoardId = ref('mainboard');
+const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
 const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
+const backLink = computed(() => (isOwnedRoute.value ? '/my/decks' : '/decks'));
+const backLabel = computed(() => (isOwnedRoute.value ? 'Back to My Decks' : 'Back to Decks'));
 const mainboardCardHeightRem = computed(() => Number((24 * cardScale.value).toFixed(2)));
 const mainboardCardWidthRem = computed(() => Number(((mainboardCardHeightRem.value * 63) / 88).toFixed(2)));
 const mainboardGridStyle = computed(() => ({
@@ -261,7 +264,7 @@ const toGalleryCard = (card: DeckCardSummary): CardListItem => ({
 });
 
 const loadDeck = async (): Promise<void> => {
-  deck.value = await fetchDeckDetail(String(route.params.id));
+  deck.value = isOwnedRoute.value ? await fetchMyDeck(String(route.params.id)) : await fetchDeckDetail(String(route.params.id));
   activeBoardId.value = 'mainboard';
 };
 
