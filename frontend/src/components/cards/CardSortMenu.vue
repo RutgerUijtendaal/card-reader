@@ -27,7 +27,7 @@
           :options="sortOptions"
           :selected-value="sort"
           :selection-active="overrideActive"
-          :default-option="allowDefaultOption ? { label: 'Use Default', description: defaultDescription } : null"
+          :default-option="allowDefaultOption ? { label: 'Use Global Default', description: defaultDescription } : null"
           @select="handleSelect"
           @reset="handleReset"
         />
@@ -67,8 +67,12 @@ const { isOpen, triggerRef, panelRef, x, y, toggle, close } = useFloatingPopover
 
 const currentLabel = computed(() => getCardSortCompactLabel(props.sort));
 const defaultDescription = computed(() => `Follow your global default: ${getCardSortLabel(props.defaultSort)}.`);
-const sortOptions = computed<PopoverOptionItem[]>(() => cardSortOptions);
-
+const sortOptions = computed<PopoverOptionItem[]>(() =>
+  cardSortOptions.map((option) => ({
+    value: option.value,
+    label: option.label,
+  })),
+);
 const handleSelect = (value: string): void => {
   emit('update:sort', value as CardSort);
   close();
