@@ -27,8 +27,12 @@
           class="flex items-center gap-3"
           to="/cards"
         >
-          <span class="theme-card-frame-muted flex h-10 w-10 items-center justify-center rounded-xl text-sm font-semibold">
-            M
+          <span class="flex h-11 w-11 items-center justify-center rounded-xl">
+            <img
+              :src="cardLogoUrl"
+              alt=""
+              class="h-full w-full object-contain"
+            >
           </span>
           <span class="text-sm font-semibold">Maity's Card Game</span>
         </RouterLink>
@@ -89,6 +93,7 @@ const mobileNavOpen = ref(false);
 const isSidebarCollapsed = useLocalStorage('card-reader.sidebar-collapsed', false, {
   writeDefaults: true,
 });
+const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
 
 provideScrollContainer(scrollContainerRef);
 

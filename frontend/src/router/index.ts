@@ -15,26 +15,29 @@ import ReviewQueuePage from '@/modules/review-queue/ReviewQueuePage.vue';
 import SettingsPage from '@/modules/settings/SettingsPage.vue';
 import AdminPage from '@/modules/admin/AdminPage.vue';
 
+const APP_TITLE = "Maity's Card Game";
+const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/cards' },
-    { path: '/cards', component: CardSearchPage },
-    { path: '/cards/:id', component: CardPublicDetailPage, props: true },
-    { path: '/card-groups/:id', component: CardGroupDetailPage, props: true },
-    { path: '/decks', component: DeckBrowsePage },
-    { path: '/decks/:id', component: DeckDetailPage, props: true },
-    { path: '/login', component: LoginPage, meta: { public: true } },
-    { path: '/password-setup', component: PasswordSetupPage, meta: { public: true } },
-    { path: '/my/decks', component: MyDecksPage, meta: { requiresAuth: true } },
-    { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true }, props: true },
-    { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true } },
-    { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true }, props: true },
-    { path: '/settings', component: SettingsPage },
-    { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true } },
-    { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true } },
-    { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true } },
-    { path: '/admin', component: AdminPage, meta: { requiresStaff: true } },
+    { path: '/cards', component: CardSearchPage, meta: { title: 'Gallery' } },
+    { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { title: 'Card' } },
+    { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { title: 'Card Group' } },
+    { path: '/decks', component: DeckBrowsePage, meta: { title: 'Decks' } },
+    { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck' } },
+    { path: '/login', component: LoginPage, meta: { public: true, title: 'Sign In' } },
+    { path: '/password-setup', component: PasswordSetupPage, meta: { public: true, title: 'Password Setup' } },
+    { path: '/my/decks', component: MyDecksPage, meta: { requiresAuth: true, title: 'My Decks' } },
+    { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true, title: 'My Deck' }, props: true },
+    { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true, title: 'New Deck' } },
+    { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, title: 'Edit Deck' }, props: true },
+    { path: '/settings', component: SettingsPage, meta: { title: 'Settings' } },
+    { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Import Jobs' } },
+    { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true, title: 'Edit Card' } },
+    { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue' } },
+    { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin' } },
   ],
 });
 
@@ -66,4 +69,12 @@ router.beforeEach(async (to) => {
   }
 
   return true;
+});
+
+router.afterEach((to) => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.title = buildDocumentTitle(typeof to.meta.title === 'string' ? to.meta.title : undefined);
 });

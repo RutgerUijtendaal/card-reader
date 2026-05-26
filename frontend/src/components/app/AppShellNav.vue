@@ -10,14 +10,18 @@
       <button
         v-if="collapsed && !mobile"
         type="button"
-        class="group relative inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl transition"
+        class="hover:theme-card-frame-muted group relative inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl transition"
         aria-label="Expand sidebar"
         title="Expand sidebar"
         @click="$emit('toggleCollapse')"
       >
-        <span class="theme-card-frame-muted absolute inset-0 rounded-xl" />
-        <span class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-white transition-opacity group-hover:opacity-0">
-          M
+        <span class="absolute inset-0 rounded-xl" />
+        <span class="absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
+          <img
+            :src="cardLogoUrl"
+            alt=""
+            class="h-full w-full object-contain"
+          >
         </span>
         <ChevronRight
           class="pointer-events-none absolute inset-0 m-auto h-4 w-4 text-white opacity-0 transition-opacity group-hover:opacity-100"
@@ -31,8 +35,12 @@
         to="/cards"
         @click="handleNavClick"
       >
-        <span class="theme-card-frame-muted flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold">
-          M
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
+          <img
+            :src="cardLogoUrl"
+            alt=""
+            class="h-full w-full object-contain"
+          >
         </span>
         <span
           v-if="!collapsed"
@@ -158,6 +166,7 @@ const emit = defineEmits<{
 
 const auth = useAuthStore();
 const router = useRouter();
+const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
 
 const items: NavItem[] = [
   { label: 'Gallery', to: '/cards', icon: Images },
