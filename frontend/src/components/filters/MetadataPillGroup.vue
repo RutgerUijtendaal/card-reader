@@ -2,7 +2,7 @@
   <section class="theme-muted-panel flex min-w-[12rem] flex-col gap-3">
     <button
       type="button"
-      class="flex items-start justify-between gap-3 text-left"
+      class="flex min-h-9 items-center justify-between gap-2 text-left"
       @click="isOpen = !isOpen"
     >
       <div class="min-w-0">
@@ -10,7 +10,28 @@
           {{ label }}
         </h3>
       </div>
-      <div class="theme-section-muted flex items-center gap-2">
+      <div class="theme-section-muted flex min-h-9 items-center gap-2">
+        <div
+          v-if="isOpen"
+          class="theme-toggle-shell theme-toggle-shell-compact"
+        >
+          <button
+            type="button"
+            class="theme-toggle-option theme-toggle-option-compact"
+            :class="matchMode === 'all' ? 'theme-toggle-option-active' : ''"
+            @click.stop="emit('update:matchMode', 'all')"
+          >
+            AND
+          </button>
+          <button
+            type="button"
+            class="theme-toggle-option theme-toggle-option-compact"
+            :class="matchMode === 'any' ? 'theme-toggle-option-active' : ''"
+            @click.stop="emit('update:matchMode', 'any')"
+          >
+            OR
+          </button>
+        </div>
         <button
           v-if="showReset"
           type="button"
@@ -36,29 +57,8 @@
 
     <div
       v-if="isOpen"
-      class="space-y-3"
+      class="theme-divider space-y-3 border-t pt-3"
     >
-      <div class="flex justify-end">
-        <div class="theme-toggle-shell">
-          <button
-            type="button"
-            class="theme-toggle-option"
-            :class="matchMode === 'all' ? 'theme-toggle-option-active' : ''"
-            @click.stop="emit('update:matchMode', 'all')"
-          >
-            AND
-          </button>
-          <button
-            type="button"
-            class="theme-toggle-option"
-            :class="matchMode === 'any' ? 'theme-toggle-option-active' : ''"
-            @click.stop="emit('update:matchMode', 'any')"
-          >
-            OR
-          </button>
-        </div>
-      </div>
-
       <div
         v-if="visibleOptions.length > 0"
         class="flex flex-wrap gap-2"
