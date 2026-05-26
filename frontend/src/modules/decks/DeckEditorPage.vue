@@ -98,9 +98,9 @@
         >
           <RouterLink
             class="btn-secondary"
-            to="/my/decks"
+            :to="controller.backLink.value"
           >
-            Back to My Decks
+            {{ controller.backLabel.value }}
           </RouterLink>
           <button
             v-if="!controller.deck.isSetupStep.value"

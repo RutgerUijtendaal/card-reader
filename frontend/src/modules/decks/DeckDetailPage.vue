@@ -37,7 +37,7 @@
         <RouterLink
           v-if="canEdit"
           class="btn-primary"
-          :to="`/my/decks/${deck.id}/edit`"
+          :to="buildDeckDetailEditorLocation(deck.id)"
         >
           Edit Deck
         </RouterLink>
@@ -207,7 +207,7 @@ import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferenc
 import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
-import { buildDeckCardDetailLocation } from '@/modules/decks/deckRouteState';
+import { buildDeckCardDetailLocation, buildDeckDetailEditorLocation } from '@/modules/decks/deckRouteState';
 import type { DeckCardSummary, DeckEntrySummary, DeckRecord, DeckSideboardRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/modules/decks/useDeckExport';
 

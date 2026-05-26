@@ -6,6 +6,11 @@ import { createDeck, fetchMyDeck, updateDeck } from '@/modules/decks/api';
 import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { useDeckEditorFilters } from '@/modules/decks/composables/useDeckEditorFilters';
 import { useDeckEditorGallery } from '@/modules/decks/composables/useDeckEditorGallery';
+import {
+  buildDeckEditorLocation,
+  buildDeckEditorReturnLocation,
+  getDeckEditorReturnLabel,
+} from '@/modules/decks/deckRouteState';
 import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
 
 export const useDeckEditor = () => {
@@ -17,6 +22,8 @@ export const useDeckEditor = () => {
   const loading = ref(false);
   const saving = ref(false);
   const cardLookup = ref<Record<string, DeckCardSummary>>({});
+  const backLink = computed(() => buildDeckEditorReturnLocation(route.query));
+  const backLabel = computed(() => `Back to ${getDeckEditorReturnLabel(route.query)}`);
 
   const rememberCards = (cards: CardListItem[]): void => {
     const nextLookup = { ...cardLookup.value };
@@ -86,7 +93,7 @@ export const useDeckEditor = () => {
       const record = await persistDeck();
       setBuilderStep('build');
       if (!deckId.value) {
-        await router.replace(`/my/decks/${record.id}/edit`);
+        await router.replace(buildDeckEditorLocation(record.id, route.query));
       }
       toast.success('Deck saved.');
       filters.resetFilters();
@@ -100,7 +107,7 @@ export const useDeckEditor = () => {
     try {
       const record = await persistDeck();
       if (!deckId.value) {
-        await router.replace(`/my/decks/${record.id}/edit`);
+        await router.replace(buildDeckEditorLocation(record.id, route.query));
       }
       toast.success(record.status.is_valid ? 'Deck saved.' : 'Draft saved.');
     } finally {
@@ -115,6 +122,8 @@ export const useDeckEditor = () => {
 
   return {
     deckId,
+    backLink,
+    backLabel,
     builderStep,
     loading,
     saving,

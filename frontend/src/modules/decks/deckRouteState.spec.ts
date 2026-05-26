@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildDeckCardDetailLocation,
+  buildDeckDetailEditorLocation,
+  buildDeckEditorReturnLocation,
   buildDeckReturnLocation,
+  buildMyDeckEditorLocation,
+  getDeckEditorReturnLabel,
   isDeckReturnQuery,
 } from '@/modules/decks/deckRouteState';
 
@@ -31,6 +35,56 @@ describe('deckRouteState', () => {
     expect(isDeckReturnQuery(query)).toBe(true);
     expect(buildDeckReturnLocation(query)).toEqual({
       path: '/decks/deck-1',
+      query: {
+        foo: 'bar',
+      },
+    });
+  });
+
+  test('builds a my decks editor location with return context', () => {
+    expect(buildMyDeckEditorLocation('deck-1')).toEqual({
+      path: '/my/decks/deck-1/edit',
+      query: {
+        return_to: 'my_decks',
+      },
+    });
+  });
+
+  test('builds a deck detail editor location with return context', () => {
+    expect(buildDeckDetailEditorLocation('deck-1')).toEqual({
+      path: '/my/decks/deck-1/edit',
+      query: {
+        return_to: 'deck',
+        deck_id: 'deck-1',
+      },
+    });
+  });
+
+  test('returns deck detail from the editor when deck context is present', () => {
+    const query = {
+      foo: 'bar',
+      return_to: 'deck',
+      deck_id: 'deck-1',
+    };
+
+    expect(getDeckEditorReturnLabel(query)).toBe('Deck');
+    expect(buildDeckEditorReturnLocation(query)).toEqual({
+      path: '/my/decks/deck-1',
+      query: {
+        foo: 'bar',
+      },
+    });
+  });
+
+  test('falls back to my decks from the editor without deck detail context', () => {
+    const query = {
+      foo: 'bar',
+      return_to: 'my_decks',
+    };
+
+    expect(getDeckEditorReturnLabel(query)).toBe('My Decks');
+    expect(buildDeckEditorReturnLocation(query)).toEqual({
+      path: '/my/decks',
       query: {
         foo: 'bar',
       },
