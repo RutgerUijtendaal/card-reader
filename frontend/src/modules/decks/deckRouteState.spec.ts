@@ -5,6 +5,7 @@ import {
   buildDeckEditorReturnLocation,
   buildDeckReturnLocation,
   buildMyDeckEditorLocation,
+  buildNewDeckEditorLocation,
   getDeckEditorReturnLabel,
   isDeckReturnQuery,
 } from '@/modules/decks/deckRouteState';
@@ -50,6 +51,15 @@ describe('deckRouteState', () => {
     });
   });
 
+  test('builds a new deck editor location with public decks return context', () => {
+    expect(buildNewDeckEditorLocation('decks')).toEqual({
+      path: '/my/decks/new',
+      query: {
+        return_to: 'decks',
+      },
+    });
+  });
+
   test('builds a deck detail editor location with return context', () => {
     expect(buildDeckDetailEditorLocation('deck-1')).toEqual({
       path: '/my/decks/deck-1/edit',
@@ -85,6 +95,21 @@ describe('deckRouteState', () => {
     expect(getDeckEditorReturnLabel(query)).toBe('My Decks');
     expect(buildDeckEditorReturnLocation(query)).toEqual({
       path: '/my/decks',
+      query: {
+        foo: 'bar',
+      },
+    });
+  });
+
+  test('returns public decks from the editor when public browse context is present', () => {
+    const query = {
+      foo: 'bar',
+      return_to: 'decks',
+    };
+
+    expect(getDeckEditorReturnLabel(query)).toBe('Decks');
+    expect(buildDeckEditorReturnLocation(query)).toEqual({
+      path: '/decks',
       query: {
         foo: 'bar',
       },

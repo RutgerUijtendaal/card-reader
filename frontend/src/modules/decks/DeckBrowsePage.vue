@@ -18,7 +18,7 @@
         <RouterLink
           v-if="auth.authenticated"
           class="btn-primary"
-          to="/my/decks/new"
+          :to="buildNewDeckEditorLocation('decks')"
         >
           New Deck
         </RouterLink>
@@ -80,6 +80,7 @@ import {
   parseDeckBrowseFilterRouteQuery,
   sameDeckBrowseFilterState,
 } from '@/modules/decks/deckBrowseFilterState';
+import { buildNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
 import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
 import type { DeckRecord } from '@/modules/decks/types';
 

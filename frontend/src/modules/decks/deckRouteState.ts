@@ -2,6 +2,7 @@ import type { LocationQuery, RouteLocationRaw } from 'vue-router';
 import { addReturnToQuery, clearLocationQueryKeys, queryString } from '@/router/routeState';
 
 const DECK_RETURN_TO = 'deck';
+const DECKS_RETURN_TO = 'decks';
 const MY_DECKS_RETURN_TO = 'my_decks';
 const DECK_RETURN_TO_QUERY_KEY = 'return_to';
 const DECK_ID_QUERY_KEY = 'deck_id';
@@ -49,10 +50,12 @@ export const buildMyDeckEditorLocation = (deckId: string): RouteLocationRaw => (
   },
 });
 
-export const buildNewDeckEditorLocation = (): RouteLocationRaw => ({
+export const buildNewDeckEditorLocation = (
+  returnTo: typeof MY_DECKS_RETURN_TO | typeof DECKS_RETURN_TO = MY_DECKS_RETURN_TO,
+): RouteLocationRaw => ({
   path: '/my/decks/new',
   query: {
-    return_to: MY_DECKS_RETURN_TO,
+    return_to: returnTo,
   },
 });
 
@@ -67,22 +70,36 @@ export const buildDeckDetailEditorLocation = (deckId: string): RouteLocationRaw 
 export const buildDeckEditorReturnLocation = (query: LocationQuery): RouteLocationRaw => {
   const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
+  const clearedQuery = clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY]);
 
   if (returnTo === DECK_RETURN_TO && deckId) {
     return {
       path: `/my/decks/${deckId}`,
-      query: clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY]),
+      query: clearedQuery,
+    };
+  }
+
+  if (returnTo === DECKS_RETURN_TO) {
+    return {
+      path: '/decks',
+      query: clearedQuery,
     };
   }
 
   return {
     path: '/my/decks',
-    query: clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY]),
+    query: clearedQuery,
   };
 };
 
-export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'My Decks' => {
+export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks' | 'My Decks' => {
   const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
-  return returnTo === DECK_RETURN_TO && deckId ? 'Deck' : 'My Decks';
+  if (returnTo === DECK_RETURN_TO && deckId) {
+    return 'Deck';
+  }
+  if (returnTo === DECKS_RETURN_TO) {
+    return 'Decks';
+  }
+  return 'My Decks';
 };
