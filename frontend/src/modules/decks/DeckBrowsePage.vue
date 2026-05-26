@@ -1,7 +1,7 @@
 <template>
   <section class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-5 overflow-hidden">
     <AppPageHeader
-      :icon="LibraryBig"
+      :icon="BookOpen"
       title="Decks"
       subtitle="Browse public decks and inspect their hero, mainboard, and sideboards."
       title-tag="h2"
@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
-import { LibraryBig } from 'lucide-vue-next';
+import { BookOpen } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
