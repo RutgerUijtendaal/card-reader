@@ -1591,6 +1591,40 @@ def test_latest_card_reparse_rejects_unknown_template() -> None:
     assert response.json()["detail"] == "Unknown template_id 'missing-template'"
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_filtered_maintenance_reparse_queues_only_matching_latest_versions() -> None:
+    username = "superuser-filtered-reparse-user"
+    password = "password"
+    _create_user(username, password, is_staff=True, is_superuser=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    alpha_card, alpha_version = _create_editable_card_version(name="Filtered Alpha Target")
+    beta_card, beta_version = _create_editable_card_version(name="Filtered Beta Target")
+    _create_card_image(alpha_version)
+    _create_card_image(beta_version)
+
+    response = client.post(
+        "/admin/maintenance/queue-filtered-latest-reparse",
+        data={"q": "Alpha"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == (
+        "Queued 1 reparse job for 1 latest card image matching the selected filters."
+    )
+
+    job = ImportJob.objects.order_by("-created_at").first()
+    assert job is not None
+    items = list(ImportJobItem.objects.filter(job_id=job.id))
+    assert len(items) == 1
+    assert items[0].target_card_id == alpha_card.id
+    assert items[0].target_card_version_id == alpha_version.id
+    assert items[0].target_card_id != beta_card.id
+
+
 def _create_user(
     username: str,
     password: str,

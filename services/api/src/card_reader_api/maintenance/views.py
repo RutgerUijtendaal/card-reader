@@ -4,6 +4,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.permissions import AuthEnabledOrSuperuserAllowed
 
 from .services import MaintenanceService
@@ -22,4 +23,19 @@ class QueueLatestReparseView(APIView):
 
     def post(self, _request: Request) -> Response:
         result = MaintenanceService().queue_reparse_latest_versions()
+        return Response({"message": result.message, "removed_paths": result.removed_paths})
+
+
+class QueueFilteredLatestReparseView(APIView):
+    permission_classes = [AuthEnabledOrSuperuserAllowed]
+
+    def post(self, request: Request) -> Response:
+        data = dict(request.data)
+        if "query" not in data and "q" in data:
+            data["query"] = data.get("q")
+        serializer = CardFiltersQuerySerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        result = MaintenanceService().queue_reparse_latest_versions_by_filters(
+            filters=serializer.validated_filters(),
+        )
         return Response({"message": result.message, "removed_paths": result.removed_paths})

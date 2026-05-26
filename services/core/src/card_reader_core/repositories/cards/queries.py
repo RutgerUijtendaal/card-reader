@@ -231,6 +231,84 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
     return out
 
 
+def list_filtered_latest_card_version_reparse_sources(
+    *,
+    query: str | None,
+    max_confidence: float | None,
+    card_ids: list[str] | None = None,
+    keyword_ids: list[str] | None = None,
+    keyword_match: str | None = None,
+    tag_ids: list[str] | None = None,
+    tag_match: str | None = None,
+    mana_symbol_ids: list[str] | None = None,
+    mana_symbol_match: str | None = None,
+    affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_match: str | None = None,
+    devotion_symbol_ids: list[str] | None = None,
+    devotion_symbol_match: str | None = None,
+    other_symbol_ids: list[str] | None = None,
+    other_symbol_match: str | None = None,
+    symbol_ids: list[str] | None = None,
+    type_ids: list[str] | None = None,
+    type_match: str | None = None,
+    mana_cost_min: int | None = None,
+    mana_cost_max: int | None = None,
+    template_id: str | None = None,
+    is_hero: bool | None = None,
+    attack_min: int | None = None,
+    attack_max: int | None = None,
+    health_min: int | None = None,
+    health_max: int | None = None,
+    sort: CardSort = CARD_SORT_UPDATED_DESC,
+) -> list[LatestCardVersionReparseSource]:
+    versions = _build_filtered_versions_queryset(
+        query=query,
+        card_ids=card_ids,
+        max_confidence=max_confidence,
+        keyword_ids=keyword_ids,
+        keyword_match=keyword_match,
+        tag_ids=tag_ids,
+        tag_match=tag_match,
+        mana_symbol_ids=mana_symbol_ids,
+        mana_symbol_match=mana_symbol_match,
+        affinity_symbol_ids=affinity_symbol_ids,
+        affinity_symbol_match=affinity_symbol_match,
+        devotion_symbol_ids=devotion_symbol_ids,
+        devotion_symbol_match=devotion_symbol_match,
+        other_symbol_ids=other_symbol_ids,
+        other_symbol_match=other_symbol_match,
+        symbol_ids=symbol_ids,
+        type_ids=type_ids,
+        type_match=type_match,
+        mana_cost_min=mana_cost_min,
+        mana_cost_max=mana_cost_max,
+        template_id=template_id,
+        is_hero=is_hero,
+        attack_min=attack_min,
+        attack_max=attack_max,
+        health_min=health_min,
+        health_max=health_max,
+        sort=sort,
+    )
+    out: list[LatestCardVersionReparseSource] = []
+    for version in versions:
+        image = next(iter(version.images.all()), None)
+        if image is None:
+            continue
+        image_path = resolve_image_file_path(image)
+        if image_path is None:
+            continue
+        out.append(
+            LatestCardVersionReparseSource(
+                card_id=version.card.id,
+                card_version_id=version.id,
+                template_id=version.template.key,
+                image_path=image_path,
+            )
+        )
+    return out
+
+
 def list_card_generations(card_id: str) -> list[CardVersion]:
     return list(
         CardVersion.objects.filter(card_id=card_id)

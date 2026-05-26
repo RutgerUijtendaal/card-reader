@@ -6,6 +6,7 @@ from .queries import (
     list_card_generations,
     list_cards,
     list_matching_cards,
+    list_filtered_latest_card_version_reparse_sources,
     list_latest_card_version_reparse_sources,
 )
 from .snapshots import (
@@ -62,6 +63,7 @@ __all__ = [
     "list_card_generations",
     "list_cards",
     "list_matching_cards",
+    "list_filtered_latest_card_version_reparse_sources",
     "list_latest_card_version_reparse_sources",
     "resolve_image_file_path",
     "save_parsed_card",
