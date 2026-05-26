@@ -27,6 +27,13 @@ export const buildPublicDeckPath = (deckId: string): string => `/decks/${deckId}
 export const isDeckReturnQuery = (query: LocationQuery): boolean =>
   queryString(query[DECK_RETURN_TO_QUERY_KEY]) === DECK_RETURN_TO && queryString(query[DECK_ID_QUERY_KEY]) !== null;
 
+export const buildMyDecksLocation = (
+  returnTo: typeof DECKS_RETURN_TO | typeof MY_DECKS_RETURN_TO = MY_DECKS_RETURN_TO,
+): RouteLocationRaw => ({
+  path: '/my/decks',
+  query: returnTo === DECKS_RETURN_TO ? { return_to: DECKS_RETURN_TO } : {},
+});
+
 export const buildDeckReturnLocation = (query: LocationQuery): RouteLocationRaw => {
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
   return {
@@ -102,4 +109,20 @@ export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks'
     return 'Decks';
   }
   return 'My Decks';
+};
+
+export const buildMyDecksReturnLocation = (query: LocationQuery): RouteLocationRaw | null => {
+  const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
+  if (returnTo === DECKS_RETURN_TO) {
+    return {
+      path: '/decks',
+      query: clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY]),
+    };
+  }
+  return null;
+};
+
+export const getMyDecksReturnLabel = (query: LocationQuery): 'Decks' | '' => {
+  const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
+  return returnTo === DECKS_RETURN_TO ? 'Decks' : '';
 };

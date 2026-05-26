@@ -11,7 +11,7 @@
         <RouterLink
           v-if="auth.authenticated"
           class="btn-secondary"
-          to="/my/decks"
+          :to="buildMyDecksLocation('decks')"
         >
           My Decks
         </RouterLink>
@@ -80,7 +80,7 @@ import {
   parseDeckBrowseFilterRouteQuery,
   sameDeckBrowseFilterState,
 } from '@/modules/decks/deckBrowseFilterState';
-import { buildNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
+import { buildMyDecksLocation, buildNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
 import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
 import type { DeckRecord } from '@/modules/decks/types';
 

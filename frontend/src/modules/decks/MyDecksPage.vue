@@ -4,13 +4,15 @@
       :icon="Folders"
       title="My Decks"
       subtitle="Manage your private, unlisted, and public decks."
+      :back-to="backLink"
+      :back-label="backLabel"
       title-tag="h2"
       title-class="text-xl"
     >
       <template #actions>
         <RouterLink
           class="btn-primary"
-          :to="buildNewDeckEditorLocation()"
+          :to="newDeckLocation"
         >
           New Deck
         </RouterLink>
@@ -119,8 +121,10 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { Folders } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
+import { useRoute } from 'vue-router';
 import AppSelect from '@/components/app/AppSelect.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
@@ -128,12 +132,18 @@ import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { deleteDeck, fetchMyDecks, updateDeck } from '@/modules/decks/api';
 import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
 import { buildDeckUpsertRequestFromRecord } from '@/modules/decks/deckPayload';
-import { buildMyDeckEditorLocation, buildNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
+import {
+  buildMyDeckEditorLocation,
+  buildMyDecksReturnLocation,
+  buildNewDeckEditorLocation,
+  getMyDecksReturnLabel,
+} from '@/modules/decks/deckRouteState';
 import { buildDeckShareUrl, canShareDeck } from '@/modules/decks/share';
 import type { DeckRecord, DeckVisibility } from '@/modules/decks/types';
 import { useDeckExport } from '@/modules/decks/useDeckExport';
 import { deckVisibilityLabels, deckVisibilityOptions } from '@/modules/decks/visibility';
 
+const route = useRoute();
 const decks = ref<DeckRecord[]>([]);
 const loading = ref(false);
 const deleting = ref(false);
@@ -141,6 +151,12 @@ const deleteTarget = ref<DeckRecord | null>(null);
 const savingDeckIds = ref(new Set<string>());
 const visibilityOptions = deckVisibilityOptions;
 const { exportTtsDeck } = useDeckExport();
+const backLink = computed(() => buildMyDecksReturnLocation(route.query));
+const backDestinationLabel = computed(() => getMyDecksReturnLabel(route.query));
+const backLabel = computed(() => (backDestinationLabel.value ? `Back to ${backDestinationLabel.value}` : ''));
+const newDeckLocation = computed(() =>
+  buildNewDeckEditorLocation(backDestinationLabel.value === 'Decks' ? 'decks' : 'my_decks'),
+);
 
 const loadDecks = async (): Promise<void> => {
   loading.value = true;
