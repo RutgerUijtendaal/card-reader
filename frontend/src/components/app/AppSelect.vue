@@ -48,6 +48,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+
 defineOptions({
   inheritAttrs: false,
 });
@@ -84,8 +86,9 @@ const emit = defineEmits<{
 }>();
 
 const placeholderValue = '__placeholder__';
-const normalizedValue =
-  props.modelValue === null || props.modelValue === undefined ? placeholderValue : String(props.modelValue);
+const normalizedValue = computed(() =>
+  props.modelValue === null || props.modelValue === undefined ? placeholderValue : String(props.modelValue),
+);
 
 const handleChange = (event: Event): void => {
   const nextRawValue = (event.target as HTMLSelectElement).value;

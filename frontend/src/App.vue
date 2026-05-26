@@ -1,97 +1,71 @@
 <template>
-  <div class="grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-[260px_1fr]">
-    <aside class="app-sidebar app-scrollbar flex h-full flex-col overflow-y-auto px-6 py-7">
-      <h1 class="mb-4 text-2xl font-semibold">
-        Cards
-      </h1>
-      <nav class="grid gap-2">
-        <RouterLink
-          class="nav-link"
-          to="/cards"
-        >
-          <Images class="h-4 w-4" />
-          <span>Gallery</span>
-        </RouterLink>
-
-        <RouterLink
-          class="nav-link"
-          to="/decks"
-        >
-          <BookOpen class="h-4 w-4" />
-          <span>Decks</span>
-        </RouterLink>
-
-        <RouterLink
-          class="nav-link"
-          to="/settings"
-        >
-          <SlidersHorizontal class="h-4 w-4" />
-          <span>Settings</span>
-        </RouterLink>
-
-        <RouterLink
-          v-if="auth.canAccessStaffRoutes"
-          class="nav-link"
-          to="/import-jobs"
-        >
-          <Upload class="h-4 w-4" />
-          <span>Import Jobs</span>
-        </RouterLink>
-
-        <RouterLink
-          v-if="auth.canAccessStaffRoutes"
-          class="nav-link"
-          to="/review"
-        >
-          <ClipboardCheck class="h-4 w-4" />
-          <span>Review Queue</span>
-        </RouterLink>
-
-        <RouterLink
-          v-if="auth.canAccessStaffRoutes"
-          class="nav-link"
-          to="/admin"
-        >
-          <Settings class="h-4 w-4" />
-          <span>Admin</span>
-        </RouterLink>
-      </nav>
-
-      <div class="mt-auto space-y-4 pt-6">
-        <div class="app-sidebar-divider pt-4">
-          <ThemeModeMenu />
-        </div>
-
-        <div class="app-sidebar-divider pt-4">
-          <RouterLink
-            v-if="auth.authEnabled && !auth.authenticated"
-            class="nav-link"
-            to="/login"
-          >
-            <LogIn class="h-4 w-4" />
-            <span>Sign in</span>
-          </RouterLink>
-
-          <button
-            v-if="auth.authEnabled && auth.authenticated"
-            class="nav-link w-full"
-            type="button"
-            @click="signOut"
-          >
-            <LogOut class="h-4 w-4" />
-            <span>Sign out</span>
-          </button>
-        </div>
-      </div>
+  <div class="flex h-screen overflow-hidden">
+    <aside
+      v-if="isDesktop"
+      class="h-full shrink-0 transition-[width] duration-200"
+      :class="isSidebarCollapsed ? 'w-[5.75rem]' : 'w-[17rem]'"
+    >
+      <AppShellNav
+        :collapsed="isSidebarCollapsed"
+        :can-collapse="true"
+        @toggle-collapse="isSidebarCollapsed = !isSidebarCollapsed"
+      />
     </aside>
 
-    <main
-      ref="scrollContainerRef"
-      class="app-scrollbar h-full overflow-y-auto p-4 sm:p-6"
-    >
-      <RouterView />
-    </main>
+    <div class="min-w-0 flex-1 overflow-hidden">
+      <div class="theme-panel-shell m-3 flex items-center justify-between rounded-2xl px-4 py-3 lg:hidden">
+        <button
+          type="button"
+          class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-10 w-10 items-center justify-center rounded-xl"
+          aria-label="Open navigation"
+          @click="mobileNavOpen = true"
+        >
+          <Menu class="h-5 w-5" />
+        </button>
+
+        <RouterLink
+          class="flex items-center gap-3"
+          to="/cards"
+        >
+          <span class="theme-card-frame-muted flex h-10 w-10 items-center justify-center rounded-xl text-sm font-semibold">
+            M
+          </span>
+          <span class="text-sm font-semibold">Maity's Card Game</span>
+        </RouterLink>
+
+        <div class="h-10 w-10" />
+      </div>
+
+      <main
+        ref="scrollContainerRef"
+        class="app-scrollbar h-full overflow-y-auto p-4 pt-1 sm:p-6 sm:pt-2 lg:p-6"
+      >
+        <RouterView />
+      </main>
+    </div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="mobileNavOpen && !isDesktop"
+      class="fixed inset-0 z-50 lg:hidden"
+    >
+      <button
+        type="button"
+        class="theme-overlay absolute inset-0"
+        aria-label="Close navigation"
+        @click="mobileNavOpen = false"
+      />
+
+      <aside class="absolute inset-y-0 left-0 w-[19rem] max-w-[85vw]">
+        <AppShellNav
+          mobile
+          @close-mobile="mobileNavOpen = false"
+        />
+      </aside>
+    </div>
+  </Teleport>
+
   <Toaster
     rich-colors
     position="bottom-right"
@@ -100,22 +74,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { BookOpen, ClipboardCheck, Images, LogIn, LogOut, Settings, SlidersHorizontal, Upload } from 'lucide-vue-next';
+import { ref, watch } from 'vue';
+import { useLocalStorage, useMediaQuery } from '@vueuse/core';
+import { Menu } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
-import { useRouter } from 'vue-router';
-import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
+import { RouterLink, useRoute } from 'vue-router';
+import AppShellNav from '@/components/app/AppShellNav.vue';
 import { provideScrollContainer } from '@/composables/useScrollContainer';
-import { useAuthStore } from '@/modules/auth/authStore';
 
-const auth = useAuthStore();
-const router = useRouter();
+const route = useRoute();
 const scrollContainerRef = ref<HTMLElement | null>(null);
+const isDesktop = useMediaQuery('(min-width: 1024px)');
+const mobileNavOpen = ref(false);
+const isSidebarCollapsed = useLocalStorage('card-reader.sidebar-collapsed', false, {
+  writeDefaults: true,
+});
 
 provideScrollContainer(scrollContainerRef);
 
-const signOut = async (): Promise<void> => {
-  await auth.logout();
-  await router.push('/cards');
-};
+watch(
+  () => route.fullPath,
+  () => {
+    mobileNavOpen.value = false;
+  },
+);
+
+watch(isDesktop, (desktop) => {
+  if (desktop) {
+    mobileNavOpen.value = false;
+  }
+});
 </script>
