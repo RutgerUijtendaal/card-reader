@@ -36,10 +36,6 @@
             class="input-base"
             placeholder="mana"
           >
-          <span class="theme-section-muted text-xs font-normal">
-            Keep affinity and devotion as separate symbol types. For affinity symbols that should also count as devotion, use
-            <span class="font-mono">implied_symbol_keys</span> in detection config.
-          </span>
         </label>
         <label class="theme-section-title inline-flex items-center gap-2 text-sm">
           <input

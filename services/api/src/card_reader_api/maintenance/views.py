@@ -30,10 +30,7 @@ class QueueFilteredLatestReparseView(APIView):
     permission_classes = [AuthEnabledOrSuperuserAllowed]
 
     def post(self, request: Request) -> Response:
-        data = dict(request.data)
-        if "query" not in data and "q" in data:
-            data["query"] = data.get("q")
-        serializer = CardFiltersQuerySerializer(data=data)
+        serializer = CardFiltersQuerySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = MaintenanceService().queue_reparse_latest_versions_by_filters(
             filters=serializer.validated_filters(),
