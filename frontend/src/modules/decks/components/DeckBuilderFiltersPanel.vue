@@ -21,8 +21,21 @@
       </p>
     </div>
 
+    <label
+      v-if="!controller.deck.isSetupStep.value"
+      class="theme-muted-panel flex items-center gap-3 p-3 text-sm"
+    >
+      <input
+        :checked="controller.filters.currentDeckOnly.value"
+        type="checkbox"
+        class="theme-checkbox h-4 w-4"
+        @change="controller.filters.setCurrentDeckOnly(($event.target as HTMLInputElement).checked)"
+      >
+      <span class="theme-section-title font-medium">Current Deck Only</span>
+    </label>
+
     <CardFilterSections
-      v-else
+      v-if="!controller.deck.isSetupStep.value"
       :state="controller.filters.filterSectionsState.value"
     />
 
@@ -37,11 +50,15 @@
           @reset="controller.filters.clearSortOverride"
         />
         <GalleryOptionsMenu
-          :tooltip-enabled="controller.filters.tooltipEnabled.value"
+          :hover-mode="controller.filters.hoverMode.value"
+          :default-hover-mode="controller.filters.defaultHoverMode.value"
+          :hover-mode-override-active="controller.filters.hoverModeOverride.value !== null"
+          allow-hover-mode-default-option
           :card-scale="controller.filters.cardScale.value"
           :show-card-groups="false"
           :show-card-groups-control="false"
-          @update:tooltip-enabled="controller.filters.setTooltipEnabled"
+          @update:hover-mode="controller.filters.setHoverMode"
+          @reset:hover-mode="controller.filters.clearHoverModeOverride"
           @update:card-scale="controller.filters.setCardScale"
         />
       </div>

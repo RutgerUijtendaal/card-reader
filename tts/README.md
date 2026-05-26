@@ -10,7 +10,7 @@ This directory contains the TTS-side importer for deck exports produced by the C
 4. Open Tabletop Simulator.
 5. Paste `tts/importer.lua` into the Global script or another script object.
 6. Configure the source card containers in `CONFIG.source_container_guids`.
-7. Run `importCardReaderDeck("...base64...")` with the exported string.
+7. Run `importCardReaderDeck("...base64...")` inside TTS.
 
 ## Access Rules
 
@@ -51,9 +51,27 @@ The exported payload is a base64-encoded JSON object with this shape:
       "card_key": "card-key",
       "name": "Card Name"
     }
+  ],
+  "sideboards": [
+    {
+      "name": "Tech",
+      "cards": [
+        {
+          "role": "sideboard",
+          "quantity": 2,
+          "card_id": "sideboard-card-id",
+          "card_key": "sideboard-card-key",
+          "name": "Sideboard Card Name"
+        }
+      ]
+    }
   ]
 }
 ```
+
+Current importer behavior:
+- `cards` is the mainboard import list.
+- `sideboards` is exported for future use and is currently ignored by `tts/importer.lua`.
 
 ## How The Lua Importer Matches Cards
 
@@ -90,6 +108,41 @@ Then import:
 ```lua
 importCardReaderDeck("PASTE_BASE64_HERE")
 ```
+
+## How To Actually Run It In TTS
+
+There are two practical ways to execute the import function after `tts/importer.lua` is loaded into the Global script.
+
+### Option 1: System Console
+
+1. Load the Lua script into the Global script in the TTS scripting editor.
+2. Click `Save and Play` so TTS reloads the script.
+3. Open the TTS system console with the backtick key.
+4. Run:
+
+```text
+lua importCardReaderDeck("PASTE_BASE64_HERE")
+```
+
+This executes the Lua call against the current mod after the script has been loaded.
+
+### Option 2: Temporary Wrapper Function
+
+If the base64 payload is too long to paste comfortably into the console, add a small helper in the Global script:
+
+```lua
+function importLatestDeck()
+    importCardReaderDeck("PASTE_BASE64_HERE")
+end
+```
+
+Then `Save and Play`, open the system console, and run:
+
+```text
+lua importLatestDeck()
+```
+
+This is usually the easier option for long payloads.
 
 To inspect what the importer can currently match:
 

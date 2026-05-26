@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from .card_group import CardGroup, CardGroupMember
     from .card_version import CardVersion
-    from .deck import Deck, DeckEntry
+    from .deck import Deck, DeckEntry, DeckSideboardEntry
 
 
 class Card(TimestampedModel):
@@ -20,6 +20,7 @@ class Card(TimestampedModel):
         card_group_memberships: Manager[CardGroupMember]
         hero_decks: Manager[Deck]
         deck_entries: Manager[DeckEntry]
+        deck_sideboard_entries: Manager[DeckSideboardEntry]
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)

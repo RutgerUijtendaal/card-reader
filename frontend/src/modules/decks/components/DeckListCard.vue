@@ -48,37 +48,36 @@
                 v-else
                 class="theme-pill theme-pill-accent text-xs"
               >
-                {{ deck.mainboard.total_cards }} cards
+                {{ deck.totals.overall_total_cards }} cards
               </span>
             </div>
 
             <div
               v-if="mode === 'owned'"
-              class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+              class="theme-section-muted mt-2 space-y-1 text-sm"
             >
-              <span class="theme-section-muted">
-                <span class="theme-section-title font-medium">Cards</span>
-                {{ deck.mainboard.total_cards }} / {{ MIN_MAINBOARD_CARD_COUNT }}-{{ MAX_MAINBOARD_CARD_COUNT }}
-              </span>
-              <span class="theme-section-muted">
-                <span class="theme-section-title font-medium">Unique</span>
-                {{ deck.mainboard.unique_cards }}
-              </span>
-              <span class="theme-section-muted">
-                <span class="theme-section-title font-medium">Status</span>
-                {{ deck.status.label }}
-              </span>
+              <p><span class="theme-section-title font-medium">Hero</span> {{ deck.hero_card.name }}</p>
+              <p><span class="theme-section-title font-medium">Total / Main</span> {{ deck.totals.overall_total_cards }} / {{ deck.mainboard.total_cards }}</p>
+              <p><span class="theme-section-title font-medium">Unique</span> {{ deck.totals.overall_unique_cards }}</p>
+              <p><span class="theme-section-title font-medium">Side Decks</span> {{ deck.sideboards.length }}</p>
+              <p><span class="theme-section-title font-medium">Status</span> {{ deck.status.label }}</p>
             </div>
 
-            <p class="theme-section-muted mt-1 text-sm">
-              Hero: {{ deck.hero_card.name }}
-            </p>
             <p
               v-if="mode === 'browse'"
-              class="theme-section-muted text-sm"
+              class="theme-section-muted mt-1 text-sm"
             >
-              By {{ deck.owner.username }}
+              Hero: {{ deck.hero_card.name }}
             </p>
+            <div
+              v-if="mode === 'browse'"
+              class="theme-section-muted mt-2 flex items-center gap-2 text-sm"
+            >
+              <span>By</span>
+              <span class="theme-pill theme-pill-keyword text-xs">
+                {{ deck.owner.username }}
+              </span>
+            </div>
             <p
               v-else-if="deck.status.issues.length > 0"
               class="theme-section-muted mt-1 text-sm"
@@ -93,7 +92,7 @@
             </p>
             <p
               v-if="mode === 'browse'"
-              class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]"
+              class="theme-kicker mt-2 text-xs font-medium uppercase tracking-[0.16em]"
             >
               Updated {{ formatDate(deck.updated_at) }}
             </p>
@@ -101,7 +100,10 @@
         </div>
       </div>
 
-      <div :class="curveColumnClass">
+      <div
+        v-if="mode === 'browse'"
+        :class="curveColumnClass"
+      >
         <DeckManaCurve
           class="w-full"
           :entries="deck.mainboard.entries"
@@ -113,7 +115,7 @@
 
       <div
         v-if="$slots.actions"
-        class="flex flex-wrap gap-2 lg:shrink-0"
+        :class="actionsColumnClass"
       >
         <slot name="actions" />
       </div>
@@ -125,7 +127,6 @@
 import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
-import { MAX_MAINBOARD_CARD_COUNT, MIN_MAINBOARD_CARD_COUNT } from '@/modules/decks/constants';
 import type { DeckRecord } from '@/modules/decks/types';
 
 const props = defineProps<{
@@ -148,11 +149,16 @@ const layoutClass = computed(() => [
 ]);
 const contentLayoutClass = computed(() =>
   props.mode === 'owned'
-    ? 'flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'
+    ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_11rem] xl:items-start'
     : 'flex flex-col gap-4 xl:flex-row xl:items-start',
 );
 const mainColumnClass = computed(() => 'min-w-0 flex-1');
 const mediaRowClass = computed(() => (props.mode === 'browse' ? 'flex min-w-0 gap-4' : 'flex min-w-0 gap-4'));
-const imageFrameClass = computed(() => (props.mode === 'browse' ? 'h-36 w-28' : 'h-32 w-24'));
+const imageFrameClass = computed(() => (props.mode === 'browse' ? 'h-36 w-28' : 'h-44 w-31'));
 const curveColumnClass = computed(() => (props.mode === 'browse' ? 'w-full xl:w-[13rem] xl:shrink-0' : 'w-full xl:w-[16.5rem] xl:shrink-0'));
+const actionsColumnClass = computed(() =>
+  props.mode === 'owned'
+    ? 'flex flex-wrap gap-2 border-t border-[var(--theme-border)]/70 pt-4 xl:w-[11rem] xl:flex-col xl:items-stretch xl:border-t-0 xl:border-l xl:pl-4 xl:pt-0'
+    : 'flex flex-wrap gap-2 lg:shrink-0',
+);
 </script>

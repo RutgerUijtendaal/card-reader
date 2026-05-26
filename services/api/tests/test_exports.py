@@ -5,7 +5,7 @@ import json
 
 from django.test import Client, override_settings
 
-from card_reader_core.services.decks import DeckEntryInput, DeckService
+from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
 
 
@@ -21,6 +21,7 @@ def test_public_deck_tts_export_returns_base64_payload() -> None:
         is_public=True,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
@@ -50,6 +51,7 @@ def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner()
         is_public=False,
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
     )
 
     public_response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
@@ -60,3 +62,46 @@ def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner()
 
     assert public_response.status_code == 404
     assert owner_response.status_code == 200
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_tts_export_includes_sideboard_entries() -> None:
+    owner = _create_user("tts-export-sideboard-owner", "password")
+    hero = _create_card(name="TTS Export Sideboard Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="TTS Sideboard Card", is_hero=False)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Sideboard Deck",
+        description=None,
+        is_public=True,
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[
+            DeckSideboardInput(
+                name="Tech",
+                entries=[DeckEntryInput(card_id=sideboard_card.id, quantity=6)],
+            )
+        ],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 200
+    payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
+    assert len(payload["cards"]) == len(mainboard_cards)
+    assert payload["sideboards"] == [
+        {
+            "name": "Tech",
+            "cards": [
+                {
+                    "role": "sideboard",
+                    "quantity": 6,
+                    "card_id": sideboard_card.id,
+                    "card_key": sideboard_card.key,
+                    "name": sideboard_card.latest_version.name,
+                }
+            ],
+        }
+    ]
+    assert payload["deck"]["overall_total_cards"] == 66

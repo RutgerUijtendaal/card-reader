@@ -17,14 +17,22 @@
         >
           {{ deck.description }}
         </p>
+        <div class="mt-3 flex flex-wrap gap-2 text-xs">
+          <span class="theme-pill theme-pill-accent">
+            {{ deck.totals.overall_total_cards }} total cards
+          </span>
+          <span class="theme-pill theme-pill-neutral">
+            {{ deck.totals.mainboard_total_cards }} mainboard cards
+          </span>
+        </div>
       </div>
 
       <div class="flex flex-wrap gap-2 lg:shrink-0">
         <RouterLink
           class="btn-secondary"
-          to="/decks"
+          :to="backLink"
         >
-          Back to Decks
+          {{ backLabel }}
         </RouterLink>
         <RouterLink
           v-if="canEdit"
@@ -38,44 +46,62 @@
 
     <div class="grid min-h-0 flex-1 gap-5 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
       <div class="page-card flex min-h-0 flex-col">
-        <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
-          <h3 class="theme-section-title text-base font-semibold">
-            Hero
-          </h3>
-          <div class="space-y-3">
-            <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
-              <img
-                v-if="deck.hero_card.image_url"
-                :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
-                :alt="deck.hero_card.name"
-                class="h-full w-full object-cover"
-              >
-              <div
-                v-else
-                class="theme-kicker flex h-full items-center justify-center text-xs"
-              >
-                No image
+        <div class="app-scrollbar flex-1 overflow-y-auto pr-1">
+          <div class="flex min-h-full flex-col">
+            <div class="space-y-4">
+              <h3 class="theme-section-title text-base font-semibold">
+                Hero
+              </h3>
+              <div class="space-y-3">
+                <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
+                  <img
+                    v-if="deck.hero_card.image_url"
+                    :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
+                    :alt="deck.hero_card.name"
+                    class="h-full w-full object-cover"
+                  >
+                  <div
+                    v-else
+                    class="theme-kicker flex h-full items-center justify-center text-xs"
+                  >
+                    No image
+                  </div>
+                </div>
+
+                <p class="theme-section-title text-lg font-semibold">
+                  {{ deck.hero_card.name }}
+                </p>
               </div>
             </div>
 
-            <p class="theme-section-title text-lg font-semibold">
-              {{ deck.hero_card.name }}
-            </p>
+            <div class="mt-auto pt-6">
+              <DeckManaCurve
+                :entries="activeBoardEntries"
+                :empty-label="activeBoardEmptyLabel"
+              />
+            </div>
           </div>
-
-          <DeckManaCurve
-            :entries="deck.mainboard.entries"
-            empty-label="This deck does not have any mainboard cards yet."
-          />
         </div>
 
         <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
+          <CardSortMenu
+            :sort="effectiveSort"
+            :default-sort="defaultSort"
+            :override-active="deckDetailSortOverride !== null"
+            allow-default-option
+            @update:sort="setDeckDetailSortOverride"
+            @reset="clearDeckDetailSortOverride"
+          />
           <GalleryOptionsMenu
-            :tooltip-enabled="tooltipEnabled"
+            :hover-mode="effectiveHoverMode"
+            :default-hover-mode="defaultHoverMode"
+            :hover-mode-override-active="deckDetailHoverModeOverride !== null"
+            allow-hover-mode-default-option
             :card-scale="cardScale"
             :show-card-groups="false"
             :show-card-groups-control="false"
-            @update:tooltip-enabled="tooltipEnabled = $event"
+            @update:hover-mode="setDeckDetailHoverModeOverride"
+            @reset:hover-mode="clearDeckDetailHoverModeOverride"
             @update:card-scale="cardScale = $event"
           />
           <button
@@ -91,14 +117,42 @@
 
       <div class="page-card flex min-h-0 flex-col space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-3">
-            <h3 class="theme-section-title text-base font-semibold">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              class="theme-pill text-xs"
+              :class="activeBoardId === 'mainboard' ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="activeBoardId = 'mainboard'"
+            >
               Mainboard
-            </h3>
-            <span class="theme-pill theme-pill-accent text-xs">
-              {{ deck.mainboard.total_cards }} cards / {{ deck.mainboard.unique_cards }} unique
-            </span>
+              <span class="ml-1 opacity-80">
+                {{ deck.mainboard.total_cards }} / {{ deck.mainboard.unique_cards }}
+              </span>
+            </button>
+            <button
+              v-for="sideboard in deck.sideboards"
+              :key="sideboard.id"
+              class="theme-pill text-xs"
+              :class="activeBoardId === sideboard.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="activeBoardId = sideboard.id"
+            >
+              {{ sideboard.name }}
+              <span class="ml-1 opacity-80">
+                {{ sideboard.total_cards }} / {{ sideboard.unique_cards }}
+              </span>
+            </button>
           </div>
+
+          <span class="theme-pill theme-pill-neutral shrink-0 text-xs">
+            {{ deck.totals.overall_total_cards }} total across all boards
+          </span>
+        </div>
+
+        <div class="sr-only">
+          <h3>
+            {{ activeBoardTitle }}
+          </h3>
         </div>
 
         <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
@@ -107,13 +161,13 @@
             :style="mainboardGridStyle"
           >
             <CardGalleryItem
-              v-for="entry in sortedMainboardEntries"
+              v-for="entry in sortedActiveBoardEntries"
               :key="entry.card.id"
               class="justify-self-center"
               :style="mainboardCardStyle"
               :card="toGalleryCard(entry.card)"
               :card-height-rem="mainboardCardHeightRem"
-              :tooltip-enabled="tooltipEnabled"
+              :hover-mode="effectiveHoverMode"
               :navigation-target="detailLocation(entry.card.id)"
             >
               <template #overlay>
@@ -142,27 +196,46 @@ import { Download } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
+import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import type { CardListItem } from '@/modules/card-detail/types';
 import { compareCardSort } from '@/modules/card-search/cardSort';
-import { useCardSortPreferences } from '@/modules/card-search/useCardSortPreferences';
+import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
-import { fetchDeckDetail } from '@/modules/decks/api';
+import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
+import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import { buildDeckCardDetailLocation } from '@/modules/decks/deckRouteState';
-import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
+import type { DeckCardSummary, DeckEntrySummary, DeckRecord, DeckSideboardRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/modules/decks/useDeckExport';
 
 const route = useRoute();
 const auth = useAuthStore();
 const deck = ref<DeckRecord | null>(null);
-const { defaultSort } = useCardSortPreferences();
-const { tooltipEnabled, cardScale } = useGalleryOptions();
+const { cardScale } = useGalleryOptions();
+const {
+  defaultSort,
+  overrideSort: deckDetailSortOverride,
+  effectiveSort,
+  setOverrideSort,
+  clearOverrideSort,
+} = useCardSortSurface('deckDetail');
+const {
+  defaultHoverMode,
+  overrideHoverMode: deckDetailHoverModeOverride,
+  effectiveHoverMode,
+  setOverrideHoverMode,
+  clearOverrideHoverMode,
+} = useHoverModeSurface('deckDetail');
 const { exportTtsDeck } = useDeckExport();
+const activeBoardId = ref('mainboard');
+const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
 const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
+const backLink = computed(() => (isOwnedRoute.value ? '/my/decks' : '/decks'));
+const backLabel = computed(() => (isOwnedRoute.value ? 'Back to My Decks' : 'Back to Decks'));
 const mainboardCardHeightRem = computed(() => Number((24 * cardScale.value).toFixed(2)));
 const mainboardCardWidthRem = computed(() => Number(((mainboardCardHeightRem.value * 63) / 88).toFixed(2)));
 const mainboardGridStyle = computed(() => ({
@@ -172,10 +245,41 @@ const mainboardCardStyle = computed(() => ({
   width: '100%',
   maxWidth: `${mainboardCardWidthRem.value}rem`,
 }));
-const sortedMainboardEntries = computed(() =>
-  [...(deck.value?.mainboard.entries ?? [])].sort((left, right) => compareCardSort(left.card, right.card, defaultSort.value)),
+const activeSideboard = computed<DeckSideboardRecord | null>(
+  () => deck.value?.sideboards.find((sideboard) => sideboard.id === activeBoardId.value) ?? null,
+);
+const activeBoardEntries = computed<DeckEntrySummary[]>(() => {
+  if (!deck.value) {
+    return [];
+  }
+  return activeBoardId.value === 'mainboard' ? deck.value.mainboard.entries : (activeSideboard.value?.entries ?? []);
+});
+const activeBoardTitle = computed(() =>
+  activeBoardId.value === 'mainboard' ? 'Mainboard' : (activeSideboard.value?.name ?? 'Sideboard'),
+);
+const activeBoardEmptyLabel = computed(() =>
+  activeBoardId.value === 'mainboard' ? 'This deck does not have any mainboard cards yet.' : 'This sideboard does not have any cards yet.',
+);
+const sortedActiveBoardEntries = computed(() =>
+  [...activeBoardEntries.value].sort((left, right) => compareCardSort(left.card, right.card, effectiveSort.value)),
 );
 const detailLocation = (cardId: string) => buildDeckCardDetailLocation(cardId, String(route.params.id), route.query);
+
+const setDeckDetailSortOverride = (value: typeof effectiveSort.value): void => {
+  setOverrideSort(value);
+};
+
+const clearDeckDetailSortOverride = (): void => {
+  clearOverrideSort();
+};
+
+const setDeckDetailHoverModeOverride = (value: typeof effectiveHoverMode.value): void => {
+  setOverrideHoverMode(value);
+};
+
+const clearDeckDetailHoverModeOverride = (): void => {
+  clearOverrideHoverMode();
+};
 
 const toGalleryCard = (card: DeckCardSummary): CardListItem => ({
   ...card,
@@ -183,7 +287,8 @@ const toGalleryCard = (card: DeckCardSummary): CardListItem => ({
 });
 
 const loadDeck = async (): Promise<void> => {
-  deck.value = await fetchDeckDetail(String(route.params.id));
+  deck.value = isOwnedRoute.value ? await fetchMyDeck(String(route.params.id)) : await fetchDeckDetail(String(route.params.id));
+  activeBoardId.value = 'mainboard';
 };
 
 const handleTtsExport = async (): Promise<void> => {

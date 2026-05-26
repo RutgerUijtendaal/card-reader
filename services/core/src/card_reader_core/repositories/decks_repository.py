@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from django.db import transaction
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
 
 from card_reader_core.models import (
     Card,
@@ -11,6 +11,8 @@ from card_reader_core.models import (
     CardVersionType,
     Deck,
     DeckEntry,
+    DeckSideboard,
+    DeckSideboardEntry,
     now_utc,
 )
 
@@ -37,8 +39,22 @@ def get_deck_card(card_id: str) -> Card | None:
     )
 
 
-def list_public_decks() -> list[Deck]:
-    return list(_deck_queryset().filter(is_public=True).order_by("-updated_at", "-created_at"))
+def list_public_decks(
+    *,
+    hero_query: str | None = None,
+    card_query: str | None = None,
+    affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_match: str | None = None,
+) -> list[Deck]:
+    return list(
+        _apply_public_deck_filters(
+            _deck_queryset().filter(is_public=True),
+            hero_query=hero_query,
+            card_query=card_query,
+            affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_match=affinity_symbol_match,
+        ).order_by("-updated_at", "-created_at")
+    )
 
 
 def list_owner_decks(owner_id: str) -> list[Deck]:
@@ -87,7 +103,7 @@ def delete_deck(*, deck_id: str, owner_id: str) -> bool:
 
 
 @transaction.atomic
-def replace_deck_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> None:
+def replace_mainboard_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> None:
     DeckEntry.objects.filter(deck=deck).delete()
     DeckEntry.objects.bulk_create(
         [
@@ -95,6 +111,29 @@ def replace_deck_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> None:
             for card_id, quantity in entries
         ]
     )
+
+
+@transaction.atomic
+def replace_sideboards(*, deck: Deck, sideboards: list[dict[str, object]]) -> None:
+    DeckSideboard.objects.filter(deck=deck).delete()
+    for sideboard in sideboards:
+        created_sideboard = DeckSideboard.objects.create(
+            deck=deck,
+            name=str(sideboard["name"]),
+        )
+        entries = sideboard["entries"]
+        if not isinstance(entries, list) or len(entries) == 0:
+            continue
+        DeckSideboardEntry.objects.bulk_create(
+            [
+                DeckSideboardEntry(
+                    sideboard=created_sideboard,
+                    card_id=str(card_id),
+                    quantity=int(quantity),
+                )
+                for card_id, quantity in entries
+            ]
+        )
 
 
 def _deck_queryset() -> QuerySet[Deck]:
@@ -114,6 +153,80 @@ def _deck_queryset() -> QuerySet[Deck]:
                 "card__latest_version__template",
                 "card__latest_version__previous_version",
             ).prefetch_related(*_latest_version_metadata_prefetches("card__latest_version")).order_by("card__label", "created_at"),
+        ),
+        Prefetch(
+            "sideboards",
+            queryset=DeckSideboard.objects.prefetch_related(
+                Prefetch(
+                    "entries",
+                    queryset=DeckSideboardEntry.objects.select_related(
+                        "card",
+                        "card__latest_version",
+                        "card__latest_version__template",
+                        "card__latest_version__previous_version",
+                    )
+                    .prefetch_related(*_latest_version_metadata_prefetches("card__latest_version"))
+                    .order_by("card__label", "created_at"),
+                )
+            ).order_by("created_at", "id"),
+        ),
+    )
+
+
+def _apply_public_deck_filters(
+    queryset: QuerySet[Deck],
+    *,
+    hero_query: str | None,
+    card_query: str | None,
+    affinity_symbol_ids: list[str] | None,
+    affinity_symbol_match: str | None,
+) -> QuerySet[Deck]:
+    filtered = queryset
+
+    normalized_hero_query = (hero_query or "").strip()
+    if normalized_hero_query:
+        filtered = filtered.filter(
+            Q(hero_card__label__icontains=normalized_hero_query)
+            | Q(hero_card__latest_version__name__icontains=normalized_hero_query)
+        )
+
+    normalized_card_query = (card_query or "").strip()
+    if normalized_card_query:
+        filtered = filtered.filter(
+            Q(entries__card__label__icontains=normalized_card_query)
+            | Q(entries__card__latest_version__name__icontains=normalized_card_query)
+            | Q(sideboards__entries__card__label__icontains=normalized_card_query)
+            | Q(sideboards__entries__card__latest_version__name__icontains=normalized_card_query)
+        )
+
+    normalized_affinity_symbol_ids = [symbol_id.strip() for symbol_id in affinity_symbol_ids or [] if symbol_id.strip()]
+    if normalized_affinity_symbol_ids:
+        match_all = affinity_symbol_match == "all"
+        if match_all:
+            for symbol_id in normalized_affinity_symbol_ids:
+                filtered = filtered.filter(_affinity_symbol_query(symbol_id))
+        else:
+            affinity_query = Q()
+            for symbol_id in normalized_affinity_symbol_ids:
+                affinity_query |= _affinity_symbol_query(symbol_id)
+            filtered = filtered.filter(affinity_query)
+
+    return filtered.distinct()
+
+
+def _affinity_symbol_query(symbol_id: str) -> Q:
+    return (
+        Q(
+            hero_card__latest_version__card_version_symbols__symbol_id=symbol_id,
+            hero_card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
+        )
+        | Q(
+            entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
+            entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
+        )
+        | Q(
+            sideboards__entries__card__latest_version__card_version_symbols__symbol_id=symbol_id,
+            sideboards__entries__card__latest_version__card_version_symbols__symbol__symbol_type="affinity",
         )
     )
 

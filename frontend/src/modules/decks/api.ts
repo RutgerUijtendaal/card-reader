@@ -1,8 +1,8 @@
 import { api } from '@/api/client';
 import type { DeckRecord, DeckUpsertRequest } from '@/modules/decks/types';
 
-export const fetchPublicDecks = async (): Promise<DeckRecord[]> => {
-  const response = await api.get<DeckRecord[]>('/decks');
+export const fetchPublicDecks = async (params?: URLSearchParams): Promise<DeckRecord[]> => {
+  const response = await api.get<DeckRecord[]>('/decks', { params });
   return response.data;
 };
 

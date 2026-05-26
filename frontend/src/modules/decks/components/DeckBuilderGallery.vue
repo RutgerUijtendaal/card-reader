@@ -14,7 +14,7 @@
             maxWidth: '100%',
           }"
           :card="card"
-          :tooltip-enabled="controller.filters.tooltipEnabled.value"
+          :hover-mode="controller.filters.hoverMode.value"
           :card-height-rem="controller.gallery.cardHeightRem.value"
           activation-mode="emit"
           activation-label="Add card to deck"
@@ -99,7 +99,7 @@ const handleActivate = (card: GalleryItem): void => {
 };
 
 const getEntryQuantity = (cardId: string): number =>
-  props.controller.deck.form.entries.find((entry) => entry.card_id === cardId)?.quantity ?? 0;
+  props.controller.deck.getEntryQuantity(cardId);
 
 const addCopy = (card: GalleryItem): void => {
   if (card.result_type !== 'card') {

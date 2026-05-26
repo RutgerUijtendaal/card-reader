@@ -2,16 +2,18 @@ import { computed } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
 import { DEFAULT_CARD_SORT, type CardSort } from '@/modules/card-search/cardSort';
 
-type CardSortSurface = 'gallery' | 'deckBuilder';
+type CardSortSurface = 'gallery' | 'deckBuilder' | 'deckDetail';
 
 type CardSortOverrideState = {
   gallery: CardSort | null;
   deckBuilder: CardSort | null;
+  deckDetail: CardSort | null;
 };
 
 const DEFAULT_OVERRIDES: CardSortOverrideState = {
   gallery: null,
   deckBuilder: null,
+  deckDetail: null,
 };
 
 export const useCardSortPreferences = () => {
