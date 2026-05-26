@@ -6,6 +6,7 @@ from typing import Any
 from card_reader_core.models import Symbol
 from PIL import Image
 
+from ..implied_symbols import expand_implied_detections
 from ..symbol_detector import SymbolDetector
 
 from .types import RegionParseResult
@@ -40,7 +41,15 @@ class AffinityParser:
             symbols=symbols,
             expected_symbol_types=self._EXPECTED_SYMBOL_TYPES,
         )
-        affinity_keys = [row.key for row in sorted(detected_symbols, key=lambda row: row.bbox.x)]
+        detected_symbols = expand_implied_detections(
+            detected_symbols=detected_symbols,
+            symbols=symbols,
+        )
+        affinity_keys = [
+            row.key
+            for row in sorted(detected_symbols, key=lambda row: row.bbox.x)
+            if row.symbol_type.strip().lower() == "affinity"
+        ]
         logger.info(
             "Affinity parser finished. region=%s symbols=%s affinity_keys=%s",
             region_name,

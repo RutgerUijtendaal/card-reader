@@ -271,7 +271,7 @@
     "symbol_type": "affinity",
     "detector_type": "template",
     "text_token": "{AFFINITY:JORIN}",
-    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7,\"implied_symbol_keys\":[\"jorin-devotion\"]}",
     "text_enrichment_json": {},
     "enabled": true,
     "asset_files": ["jorin-affinity.webp"]
@@ -282,7 +282,7 @@
     "symbol_type": "affinity",
     "detector_type": "template",
     "text_token": "{AFFINITY:LUNA}",
-    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7,\"implied_symbol_keys\":[\"luna-devotion\"]}",
     "text_enrichment_json": {},
     "enabled": true,
     "asset_files": ["luna-affinity.webp"]
@@ -326,7 +326,7 @@
     "symbol_type": "affinity",
     "detector_type": "template",
     "text_token": "{AFFINITY:SOLA}",
-    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7,\"implied_symbol_keys\":[\"sola-devotion\"]}",
     "text_enrichment_json": {},
     "enabled": true,
     "asset_files": ["sola-affinity.webp"]
@@ -337,7 +337,7 @@
     "symbol_type": "affinity",
     "detector_type": "template",
     "text_token": "{AFFINITY:STEVE}",
-    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.7,\"implied_symbol_keys\":[\"steve-devotion\"]}",
     "text_enrichment_json": {},
     "enabled": true,
     "asset_files": ["steve-affinity.webp"]

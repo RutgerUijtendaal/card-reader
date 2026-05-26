@@ -53,7 +53,7 @@
         <JsonEditorField
           v-model="detectionConfigModel"
           label="Detection config JSON"
-          hint="Configure detection thresholds and matching behavior for this symbol."
+          hint="Configure detection thresholds and matching behavior for this symbol. Affinity symbols can also declare implied linked symbols with implied_symbol_keys."
           example-title="Detection config example"
           :example-json="formattedDetectionConfigExample"
           min-height="14rem"

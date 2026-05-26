@@ -78,7 +78,7 @@ class DeckTtsExportView(APIView):
 
 def _query_data(request: Request) -> dict[str, object]:
     data: dict[str, object] = {
-        "query": request.query_params.get("q"),
+        "q": request.query_params.get("q"),
         "max_confidence": request.query_params.get("max_confidence"),
         "keyword_ids": request.query_params.getlist("keyword_ids"),
         "keyword_match": request.query_params.get("keyword_match"),

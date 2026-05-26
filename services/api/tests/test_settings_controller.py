@@ -161,6 +161,115 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     }
 
 
+def test_queue_reparse_latest_versions_by_filters_targets_only_matching_cards(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+
+    image_a = resolve_storage_path("images/filtered-image-a.webp")
+    image_b = resolve_storage_path("images/filtered-image-b.webp")
+    for image_path in [image_a, image_b]:
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"image")
+
+    ImportJobItem.objects.all().delete()
+    ImportJob.objects.all().delete()
+    DeckEntry.objects.all().delete()
+    Deck.objects.all().delete()
+    CardVersionImage.objects.all().delete()
+    CardVersion.objects.all().delete()
+    CardGroup.objects.all().delete()
+    Card.objects.all().delete()
+    Template.objects.filter(key="mtg-like-v1").delete()
+
+    template = Template.objects.create(
+        key="mtg-like-v1",
+        label="MTG",
+        definition_json=_template_definition("top_bar"),
+    )
+
+    alpha_card = Card.objects.create(key="alpha-card", label="Alpha Card")
+    beta_card = Card.objects.create(key="beta-card", label="Beta Card")
+
+    alpha_version = CardVersion.objects.create(
+        card_id=alpha_card.id,
+        version_number=1,
+        template=template,
+        image_hash="filtered-a",
+        name="Alpha Card",
+        is_latest=True,
+    )
+    beta_version = CardVersion.objects.create(
+        card_id=beta_card.id,
+        version_number=1,
+        template=template,
+        image_hash="filtered-b",
+        name="Beta Card",
+        is_latest=True,
+    )
+
+    alpha_card.latest_version_id = alpha_version.id
+    beta_card.latest_version_id = beta_version.id
+    alpha_card.save(update_fields=["latest_version"])
+    beta_card.save(update_fields=["latest_version"])
+
+    CardVersionImage.objects.create(
+        card_version_id=alpha_version.id,
+        source_file=build_storage_relative_path("images", image_a.name),
+        stored_path=build_storage_relative_path("images", image_a.name),
+        checksum="filtered-a",
+    )
+    CardVersionImage.objects.create(
+        card_version_id=beta_version.id,
+        source_file=build_storage_relative_path("images", image_b.name),
+        stored_path=build_storage_relative_path("images", image_b.name),
+        checksum="filtered-b",
+    )
+
+    result = MaintenanceService().queue_reparse_latest_versions_by_filters(
+        filters={
+            "query": "Alpha",
+            "card_ids": None,
+            "max_confidence": None,
+            "keyword_ids": None,
+            "keyword_match": None,
+            "tag_ids": None,
+            "tag_match": None,
+            "mana_symbol_ids": None,
+            "mana_symbol_match": None,
+            "affinity_symbol_ids": None,
+            "affinity_symbol_match": None,
+            "devotion_symbol_ids": None,
+            "devotion_symbol_match": None,
+            "other_symbol_ids": None,
+            "other_symbol_match": None,
+            "symbol_ids": None,
+            "type_ids": None,
+            "type_match": None,
+            "mana_cost_min": None,
+            "mana_cost_max": None,
+            "template_id": None,
+            "is_hero": None,
+            "attack_min": None,
+            "attack_max": None,
+            "health_min": None,
+            "health_max": None,
+            "sort": "updated_desc",
+        }
+    )
+
+    jobs = list(ImportJob.objects.order_by("created_at"))
+    items = list(ImportJobItem.objects.order_by("created_at"))
+
+    assert result.message == "Queued 1 reparse job for 1 latest card image matching the selected filters."
+    assert len(jobs) == 1
+    assert jobs[0].template_id == template.key
+    assert len(items) == 1
+    assert items[0].target_card_id == alpha_card.id
+    assert items[0].target_card_version_id == alpha_version.id
+
+
 def test_template_reparse_endpoint_queues_matching_latest_versions(
     tmp_path,
     monkeypatch,

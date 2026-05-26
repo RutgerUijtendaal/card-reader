@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import {
+  buildCardFilterApiPayload,
   buildCardFilterApiSearchParams,
   buildCardFilterSelectionState,
   buildCardFilterStateFromSelection,
   createCardFilterCatalog,
 } from './cardFilterState';
 import type { CardFiltersResponse } from '@/modules/card-detail/types';
+import type { CardFilterSelectionState } from './cardFilterState';
 
 const filters: CardFiltersResponse = {
   keywords: [{ id: 'kw-1', key: 'flying', label: 'Flying' }],
@@ -114,7 +116,7 @@ describe('cardFilterState adapters', () => {
   });
 
   test('builds API params with UUID ids only', () => {
-    const params = buildCardFilterApiSearchParams({
+    const selection: CardFilterSelectionState = {
       query: '',
       keywordMatch: 'all',
       tagMatch: 'all',
@@ -137,7 +139,9 @@ describe('cardFilterState adapters', () => {
       devotionSymbolIds: ['sym-3'],
       otherSymbolIds: ['sym-4'],
       typeIds: ['type-1'],
-    });
+    };
+    const params = buildCardFilterApiSearchParams(selection);
+    const payload = buildCardFilterApiPayload(selection);
 
     expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
     expect(params.get('keyword_match')).toBe('all');
@@ -157,6 +161,19 @@ describe('cardFilterState adapters', () => {
     expect(params.get('mana_cost_min')).toBe('2');
     expect(params.get('mana_cost_max')).toBe('7');
     expect(params.getAll('keyword_keys')).toEqual([]);
+    expect(payload).toMatchObject({
+      keyword_ids: ['kw-1'],
+      keyword_match: 'all',
+      tag_ids: ['tag-1'],
+      tag_match: 'all',
+      mana_symbol_ids: ['sym-1'],
+      affinity_symbol_ids: ['sym-2'],
+      devotion_symbol_ids: ['sym-3'],
+      other_symbol_ids: ['sym-4'],
+      type_ids: ['type-1'],
+      mana_cost_min: '2',
+      mana_cost_max: '7',
+    });
   });
 
   test('excludes colorless mana symbols from the mana toggle catalog', () => {

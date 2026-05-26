@@ -305,7 +305,7 @@ class SymbolAssetView(APIView):
 
 def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
     data: dict[str, object] = {
-        "query": request.query_params.get("q"),
+        "q": request.query_params.get("q"),
         "card_ids": request.query_params.getlist("card_ids"),
         "max_confidence": request.query_params.get("max_confidence"),
         "keyword_ids": request.query_params.getlist("keyword_ids"),

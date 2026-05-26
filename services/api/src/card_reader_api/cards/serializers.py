@@ -203,6 +203,7 @@ def _first_symbol_asset_url(raw: object) -> str | None:
 
 
 class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
+    q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     query = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     card_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     max_confidence = serializers.FloatField(required=False, allow_null=True)
@@ -236,7 +237,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
 
     def validated_filters(self) -> CardFilterParams:
         return {
-            "query": self._string_or_none("query"),
+            "query": self._query_or_none(),
             "card_ids": self._string_list_or_none("card_ids"),
             "max_confidence": self._float_or_none("max_confidence"),
             "keyword_ids": self._string_list_or_none("keyword_ids"),
@@ -273,6 +274,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "page_size": self._required_int("page_size"),
             "show_groups": bool(self.validated_data.get("show_groups", False)),
         }
+
+    def _query_or_none(self) -> str | None:
+        return self._string_or_none("q") or self._string_or_none("query")
 
     def _string_or_none(self, key: str) -> str | None:
         value = self.validated_data.get(key)
