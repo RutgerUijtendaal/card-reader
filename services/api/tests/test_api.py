@@ -1606,7 +1606,7 @@ def test_filtered_maintenance_reparse_queues_only_matching_latest_versions() -> 
 
     response = client.post(
         "/admin/maintenance/queue-filtered-latest-reparse",
-        data={"q": "Alpha"},
+        data={"card_ids": [alpha_card.id]},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
