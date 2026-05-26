@@ -20,6 +20,7 @@ METADATA_GROUPS = {"keywords", "tags", "types", "symbols"}
 
 class CardFilterParams(TypedDict):
     query: str | None
+    card_ids: list[str] | None
     max_confidence: float | None
     keyword_ids: list[str] | None
     keyword_match: str | None
@@ -199,6 +200,7 @@ def _first_symbol_asset_url(raw: object) -> str | None:
 
 class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     query = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    card_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     max_confidence = serializers.FloatField(required=False, allow_null=True)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     keyword_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
@@ -231,6 +233,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     def validated_filters(self) -> CardFilterParams:
         return {
             "query": self._string_or_none("query"),
+            "card_ids": self._string_list_or_none("card_ids"),
             "max_confidence": self._float_or_none("max_confidence"),
             "keyword_ids": self._string_list_or_none("keyword_ids"),
             "keyword_match": self._string_or_none("keyword_match"),

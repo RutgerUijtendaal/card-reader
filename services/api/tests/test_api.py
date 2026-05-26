@@ -799,6 +799,22 @@ def test_cards_list_filters_preserve_count() -> None:
     assert payload["results"][0]["id"] in returned_ids
 
 
+def test_cards_list_filters_by_card_ids() -> None:
+    card_a, version_a = _create_editable_card_version(name="Card Id Match A")
+    card_b, version_b = _create_editable_card_version(name="Card Id Match B")
+    _card_c, version_c = _create_editable_card_version(name="Card Id Miss")
+    _create_card_image(version_a)
+    _create_card_image(version_b)
+    _create_card_image(version_c)
+
+    response = Client(HTTP_HOST="localhost").get("/cards", {"card_ids": [card_b.id, card_a.id]})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert {row["id"] for row in payload["results"]} == {card_a.id, card_b.id}
+
+
 def test_cards_list_metadata_match_modes() -> None:
     keywords = list(Keyword.objects.order_by("label")[:2])
     tags = list(Tag.objects.order_by("label")[:2])

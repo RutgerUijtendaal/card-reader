@@ -77,6 +77,18 @@ export const useDeckEditorDraft = ({
     }
     return uniqueCardIds.size;
   });
+  const allCardIds = computed(() => {
+    const uniqueCardIds = new Set<string>();
+    for (const entry of form.entries) {
+      uniqueCardIds.add(entry.card_id);
+    }
+    for (const sideboard of form.sideboards) {
+      for (const entry of sideboard.entries) {
+        uniqueCardIds.add(entry.card_id);
+      }
+    }
+    return [...uniqueCardIds].sort((left, right) => left.localeCompare(right));
+  });
   const sideboardTabs = computed(() =>
     form.sideboards.map((sideboard) => ({
       id: sideboard.id,
@@ -408,6 +420,7 @@ export const useDeckEditorDraft = ({
     totalSideboardCards,
     overallTotalCards,
     overallUniqueCards,
+    allCardIds,
     selectedHero,
     detailedMainboardEntries,
     detailedActiveBoardEntries,

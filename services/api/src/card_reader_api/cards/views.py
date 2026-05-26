@@ -72,6 +72,7 @@ class CardListView(APIView):
             return Response(_grouped_gallery_payload(filters))
         cards = list_cards(
             query=filters["query"],
+            card_ids=filters["card_ids"],
             max_confidence=filters["max_confidence"],
             keyword_ids=filters["keyword_ids"],
             keyword_match=filters["keyword_match"],
@@ -298,6 +299,7 @@ class SymbolAssetView(APIView):
 def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
     data: dict[str, object] = {
         "query": request.query_params.get("q"),
+        "card_ids": request.query_params.getlist("card_ids"),
         "max_confidence": request.query_params.get("max_confidence"),
         "keyword_ids": request.query_params.getlist("keyword_ids"),
         "keyword_match": request.query_params.get("keyword_match"),
@@ -352,6 +354,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
     page_size = filters["page_size"]
     matching_rows = list_matching_cards(
         query=filters["query"],
+        card_ids=filters["card_ids"],
         max_confidence=filters["max_confidence"],
         keyword_ids=filters["keyword_ids"],
         keyword_match=filters["keyword_match"],
