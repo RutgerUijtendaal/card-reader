@@ -87,7 +87,7 @@
           >
             <div
               v-if="previewImageUrl"
-              class="theme-card-frame w-[380px] overflow-hidden rounded-xl shadow-2xl"
+              class="theme-card-frame w-[420px] overflow-hidden rounded-xl shadow-2xl"
             >
               <div class="theme-card-image-well aspect-[63/88]">
                 <img
