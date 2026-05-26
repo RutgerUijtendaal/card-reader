@@ -139,4 +139,31 @@ describe('useDeckEditorDraft', () => {
 
     expect(controller.overallUniqueCards.value).toBe(2);
   });
+
+  test('flags whether mainboard Mana cards reach the free mulligan threshold', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      manaA: { ...buildCard('manaA', 'Mana A', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] },
+      spellA: buildCard('spellA', 'Spell A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [
+      { card_id: 'manaA', quantity: 1 },
+      { card_id: 'spellA', quantity: 3 },
+    ];
+    expect(controller.hasFreeMulliganManaRatio.value).toBe(true);
+
+    controller.form.entries = [
+      { card_id: 'manaA', quantity: 1 },
+      { card_id: 'spellA', quantity: 4 },
+    ];
+    expect(controller.hasFreeMulliganManaRatio.value).toBe(false);
+  });
 });

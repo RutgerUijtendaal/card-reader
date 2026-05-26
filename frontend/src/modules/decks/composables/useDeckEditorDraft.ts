@@ -116,6 +116,10 @@ export const useDeckEditorDraft = ({
       0,
     ),
   );
+  const hasFreeMulliganManaRatio = computed(() =>
+    totalMainboardCards.value > 0
+    && totalMainboardManaTypeCards.value / totalMainboardCards.value >= 0.25,
+  );
 
   const deckTypeCounts = computed(() => {
     const counts = new Map<string, { type: DeckMetadataOption; count: number }>();
@@ -425,6 +429,7 @@ export const useDeckEditorDraft = ({
     detailedMainboardEntries,
     detailedActiveBoardEntries,
     totalMainboardManaTypeCards,
+    hasFreeMulliganManaRatio,
     activeSideboard,
     sideboardTabs,
     deckTypeCounts,

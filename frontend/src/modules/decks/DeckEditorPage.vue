@@ -16,21 +16,35 @@
           class="min-w-0 flex-1"
         >
           <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div class="flex items-baseline gap-2">
+            <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
               <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallTotalCards.value }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-baseline gap-2">
+            <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
               <span class="theme-section-title text-base font-semibold">
                 {{ controller.deck.totalMainboardCards.value }}<template v-if="controller.deck.totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT"> / {{ MAX_MAINBOARD_CARD_COUNT }}</template>
               </span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-baseline gap-2">
+            <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
               <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardManaTypeCards.value }}</span>
+              <span
+                class="inline-flex items-center"
+                title="Free Mulligan for 0 Mana starting hand"
+                aria-label="Free Mulligan for 0 Mana starting hand"
+              >
+                <CircleCheckBig
+                  v-if="controller.deck.hasFreeMulliganManaRatio.value"
+                  class="h-4 w-4 text-emerald-400"
+                />
+                <CircleX
+                  v-else
+                  class="h-4 w-4 text-rose-400"
+                />
+              </span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
 
@@ -63,12 +77,12 @@
             </p>
 
             <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-baseline gap-2">
+            <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
               <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallUniqueCards.value }}</span>
             </div>
             <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-baseline gap-2">
+            <div class="flex items-center gap-2">
               <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Status</span>
               <span
                 class="text-base font-semibold"
@@ -122,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import { CircleCheckBig, CircleX } from 'lucide-vue-next';
 import DeckBuilderFiltersPanel from '@/modules/decks/components/DeckBuilderFiltersPanel.vue';
 import DeckBuilderGallery from '@/modules/decks/components/DeckBuilderGallery.vue';
 import DeckBuilderSummaryPanel from '@/modules/decks/components/DeckBuilderSummaryPanel.vue';
