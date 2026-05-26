@@ -292,10 +292,11 @@ def list_filtered_latest_card_version_reparse_sources(
     )
     out: list[LatestCardVersionReparseSource] = []
     for version in versions:
-        image = next(iter(version.images.all()), None)
-        if image is None:
-            continue
-        image_path = resolve_image_file_path(image)
+        image_path = None
+        for image in version.images.all():
+            image_path = resolve_image_file_path(image)
+            if image_path is not None:
+                break
         if image_path is None:
             continue
         out.append(
