@@ -94,7 +94,7 @@
   </div>
   <Toaster
     rich-colors
-    position="top-right"
+    position="bottom-right"
   />
 </template>
 
@@ -105,6 +105,7 @@ import { Toaster } from 'vue-sonner';
 import { useRouter } from 'vue-router';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
 import { provideScrollContainer } from '@/composables/useScrollContainer';
+import { useToastDismissOnClick } from '@/composables/useToastDismissOnClick';
 import { useAuthStore } from '@/modules/auth/authStore';
 
 const auth = useAuthStore();
@@ -112,6 +113,7 @@ const router = useRouter();
 const scrollContainerRef = ref<HTMLElement | null>(null);
 
 provideScrollContainer(scrollContainerRef);
+useToastDismissOnClick();
 
 const signOut = async (): Promise<void> => {
   await auth.logout();
