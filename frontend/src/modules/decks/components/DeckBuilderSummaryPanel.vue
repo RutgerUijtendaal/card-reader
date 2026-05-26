@@ -257,7 +257,7 @@
             v-for="entry in controller.deck.detailedActiveBoardEntries.value"
             :key="entry.card.id"
             :entry="entry"
-            :hover-mode="controller.filters.defaultHoverMode.value"
+            :hover-mode="controller.filters.hoverMode.value"
             :quantity-max="controller.deck.activeBoardId.value === 'mainboard' ? 4 : undefined"
             @decrement="controller.deck.changeQuantity($event, -1)"
             @increment="controller.deck.changeQuantity($event, 1)"

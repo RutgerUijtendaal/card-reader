@@ -1,3 +1,4 @@
+import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { computed, ref, type Ref } from 'vue';
 import { buildCardFilterApiSearchParams } from '@/modules/card-filters/cardFilterState';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
@@ -9,11 +10,12 @@ import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences
 
 type UseDeckEditorFiltersOptions = {
   deckCardIds: Ref<string[]>;
+  builderStep: Ref<BuilderStep>;
 };
 
 const EMPTY_DECK_SENTINEL_CARD_ID = '__deck-builder-empty__';
 
-export const useDeckEditorFilters = ({ deckCardIds }: UseDeckEditorFiltersOptions) => {
+export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditorFiltersOptions) => {
   const filterController = useCardFilterController();
   const { cardScale } = useGalleryOptions();
   const currentDeckOnly = ref(false);
@@ -45,7 +47,7 @@ export const useDeckEditorFilters = ({ deckCardIds }: UseDeckEditorFiltersOption
   };
 
   const currentDeckCardIds = computed(() =>
-    currentDeckOnly.value
+    currentDeckOnly.value && builderStep.value === 'build'
       ? (
           deckCardIds.value.length > 0
             ? [...new Set(deckCardIds.value)].sort((left, right) => left.localeCompare(right))

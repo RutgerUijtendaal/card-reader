@@ -35,6 +35,7 @@ export const useDeckEditor = () => {
   });
   const filters = useDeckEditorFilters({
     deckCardIds: deck.allCardIds,
+    builderStep,
   });
   const gallery = useDeckEditorGallery({
     filtersLoaded: filters.filtersLoaded,
