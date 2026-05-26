@@ -26,8 +26,8 @@ from card_reader_core.repositories.metadata_repository import (
     list_keywords,
     list_symbols,
     list_tags,
+    list_types_for_card_sort,
 )
-from django.db.models import Count, Q
 
 
 class CardMetadata(TypedDict):
@@ -48,15 +48,7 @@ def get_filter_metadata() -> CardMetadata:
         "keywords": list_keywords(),
         "tags": list_tags(),
         "symbols": list_symbols(),
-        "types": list(
-            Type.objects.annotate(
-                linked_card_count=Count(
-                    "card_version_types",
-                    filter=Q(card_version_types__card_version__is_latest=True),
-                    distinct=True,
-                ),
-            ).order_by("-linked_card_count", "label")
-        ),
+        "types": list_types_for_card_sort(),
     }
 
 

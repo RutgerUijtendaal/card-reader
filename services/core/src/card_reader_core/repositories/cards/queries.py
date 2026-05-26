@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db.models import Count, F, Prefetch, QuerySet
+from django.db.models import Case, CharField, Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, QuerySet, Subquery, Value, When
 
 from card_reader_core.models import (
     Card,
@@ -10,6 +10,7 @@ from card_reader_core.models import (
     CardVersionSymbol,
     CardVersionTag,
     CardVersionType,
+    Type,
 )
 from card_reader_core.search.cards import apply_card_search
 
@@ -18,6 +19,7 @@ from .types import (
     CARD_SORT_MANA_ASC,
     CARD_SORT_MANA_DESC,
     CARD_SORT_NAME_ASC,
+    CARD_SORT_TYPES_ASC,
     CARD_SORT_UPDATED_DESC,
     DEFAULT_CARD_PAGE_SIZE,
     CardListRow,
@@ -25,6 +27,8 @@ from .types import (
     LatestCardVersionReparseSource,
     PaginatedCardList,
 )
+
+MANA_TYPE_KEY = "mana"
 
 
 def list_cards(
@@ -377,6 +381,58 @@ def _apply_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySe
     if sort == CARD_SORT_MANA_DESC:
         return queryset.order_by(
             F("mana_value").desc(nulls_last=True),
+            "name",
+            "card__label",
+            "card__id",
+        )
+    if sort == CARD_SORT_TYPES_ASC:
+        global_type_link_counts = (
+            Type.objects.filter(pk=OuterRef("type_id"))
+            .annotate(
+                linked_card_count=Count(
+                    "card_version_types",
+                    filter=Q(card_version_types__card_version__is_latest=True),
+                    distinct=True,
+                )
+            )
+            .values("linked_card_count")[:1]
+        )
+        best_non_mana_types = (
+            CardVersionType.objects.filter(card_version_id=OuterRef("pk"))
+            .exclude(type__key__iexact=MANA_TYPE_KEY)
+            .annotate(
+                type_linked_card_count=Subquery(global_type_link_counts, output_field=IntegerField()),
+                type_label=F("type__label"),
+            )
+            .order_by(F("type_linked_card_count").desc(nulls_last=True), "type_label", "type_id")
+        )
+        queryset = queryset.annotate(
+            has_mana_type=Exists(
+                CardVersionType.objects.filter(
+                    card_version_id=OuterRef("pk"),
+                    type__key__iexact=MANA_TYPE_KEY,
+                )
+            ),
+            primary_type_count=Subquery(
+                best_non_mana_types.values("type_linked_card_count")[:1],
+                output_field=IntegerField(),
+            ),
+            primary_type_label=Subquery(
+                best_non_mana_types.values("type_label")[:1],
+                output_field=CharField(),
+            ),
+        ).annotate(
+            type_sort_bucket=Case(
+                When(primary_type_count__isnull=False, then=Value(0)),
+                When(has_mana_type=True, then=Value(2)),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+        )
+        return queryset.order_by(
+            "type_sort_bucket",
+            F("primary_type_count").desc(nulls_last=True),
+            F("primary_type_label").asc(nulls_last=True),
             "name",
             "card__label",
             "card__id",

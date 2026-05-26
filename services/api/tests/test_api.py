@@ -727,6 +727,18 @@ def test_filters_payload_keeps_symbol_asset_urls_public() -> None:
     assert returned["asset_url"] == "/symbols/assets/mana/test-symbol.svg"
 
 
+def test_filters_payload_includes_type_linked_card_counts() -> None:
+    counted_type = _create_type(key="filters-counted-type", label="Filters Counted Type")
+    _card, version = _create_editable_card_version(name="Filters Counted Card")
+    replace_card_version_types(card_version_id=version.id, type_ids=[counted_type.id])
+
+    response = Client(HTTP_HOST="localhost").get("/cards/filters")
+
+    assert response.status_code == 200
+    returned = next(row for row in response.json()["types"] if row["id"] == counted_type.id)
+    assert returned["linked_card_count"] == 1
+
+
 def test_storage_paths_resolve_relative_to_storage_root(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
 
@@ -1069,6 +1081,66 @@ def test_cards_list_supports_name_and_mana_sorting() -> None:
     assert mana_ids == [high_card.id, alpha_card.id, low_card.id]
 
 
+def test_cards_list_supports_type_sorting() -> None:
+    spell_type = _create_type(key="sort-type-spell", label="Spell")
+    creature_type = _create_type(key="sort-type-creature", label="Creature")
+    alpha_type = _create_type(key="sort-type-alpha", label="Alpha")
+    zeta_type = _create_type(key="sort-type-zeta", label="Zeta")
+    mana_type = _create_type(key="mana", label="Mana")
+
+    arcane_card, arcane_version = _create_editable_card_version(name="Sort Type Arcane Multi")
+    hybrid_card, hybrid_version = _create_editable_card_version(name="Sort Type Mana Hybrid")
+    blade_card, blade_version = _create_editable_card_version(name="Sort Type Blade Solo")
+    alpha_card, alpha_version = _create_editable_card_version(name="Sort Type Alpha Solo")
+    zeta_card, zeta_version = _create_editable_card_version(name="Sort Type Zeta Solo")
+    untyped_card, untyped_version = _create_editable_card_version(name="Sort Type Untyped")
+    mana_card, mana_version = _create_editable_card_version(name="Sort Type Mana Solo")
+    _filler_spell_card, filler_spell_version = _create_editable_card_version(name="Priority Spell Filler")
+    _filler_mana_one_card, filler_mana_one_version = _create_editable_card_version(name="Priority Mana Filler One")
+    _filler_mana_two_card, filler_mana_two_version = _create_editable_card_version(name="Priority Mana Filler Two")
+    _filler_mana_three_card, filler_mana_three_version = _create_editable_card_version(name="Priority Mana Filler Three")
+
+    for version in (
+        arcane_version,
+        hybrid_version,
+        blade_version,
+        alpha_version,
+        zeta_version,
+        untyped_version,
+        mana_version,
+        filler_spell_version,
+        filler_mana_one_version,
+        filler_mana_two_version,
+        filler_mana_three_version,
+    ):
+        _create_card_image(version)
+
+    replace_card_version_types(card_version_id=arcane_version.id, type_ids=[creature_type.id, spell_type.id])
+    replace_card_version_types(card_version_id=hybrid_version.id, type_ids=[spell_type.id, mana_type.id])
+    replace_card_version_types(card_version_id=blade_version.id, type_ids=[creature_type.id])
+    replace_card_version_types(card_version_id=alpha_version.id, type_ids=[alpha_type.id])
+    replace_card_version_types(card_version_id=zeta_version.id, type_ids=[zeta_type.id])
+    replace_card_version_types(card_version_id=mana_version.id, type_ids=[mana_type.id])
+    replace_card_version_types(card_version_id=filler_spell_version.id, type_ids=[spell_type.id])
+    replace_card_version_types(card_version_id=filler_mana_one_version.id, type_ids=[mana_type.id])
+    replace_card_version_types(card_version_id=filler_mana_two_version.id, type_ids=[mana_type.id])
+    replace_card_version_types(card_version_id=filler_mana_three_version.id, type_ids=[mana_type.id])
+
+    response = Client(HTTP_HOST="localhost").get("/cards", {"sort": "types_asc", "q": "Sort Type"})
+
+    assert response.status_code == 200
+    result_ids = [row["id"] for row in response.json()["results"][:7]]
+    assert result_ids == [
+        arcane_card.id,
+        hybrid_card.id,
+        blade_card.id,
+        alpha_card.id,
+        zeta_card.id,
+        untyped_card.id,
+        mana_card.id,
+    ]
+
+
 def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Sort Group Zephyr Group")
     member_card, member_version = _create_editable_card_version(name="Sort Group Zephyr Member")
@@ -1087,6 +1159,38 @@ def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     response = Client(HTTP_HOST="localhost").get(
         "/cards",
         {"show_groups": "true", "sort": "name_asc", "q": "Sort Group"},
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"][:2]
+    assert results[0]["result_type"] == "card"
+    assert results[0]["id"] == standalone_card.id
+    assert results[1]["result_type"] == "card_group"
+    assert results[1]["anchor_card_id"] == anchor_card.id
+
+
+def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
+    spell_type = _create_type(key="sort-group-spell", label="Spell")
+    creature_type = _create_type(key="sort-group-creature", label="Creature")
+    mana_type = _create_type(key="mana", label="Mana")
+
+    anchor_card, anchor_version = _create_editable_card_version(name="Sort Type Group Mana Anchor")
+    member_card, member_version = _create_editable_card_version(name="Sort Type Group Spell Member")
+    standalone_card, standalone_version = _create_editable_card_version(name="Sort Type Group Creature Solo")
+    _filler_spell_card, filler_spell_version = _create_editable_card_version(name="Grouped Priority Spell Filler")
+
+    for version in (anchor_version, member_version, standalone_version, filler_spell_version):
+        _create_card_image(version)
+
+    replace_card_version_types(card_version_id=anchor_version.id, type_ids=[mana_type.id])
+    replace_card_version_types(card_version_id=member_version.id, type_ids=[spell_type.id])
+    replace_card_version_types(card_version_id=standalone_version.id, type_ids=[creature_type.id])
+    replace_card_version_types(card_version_id=filler_spell_version.id, type_ids=[spell_type.id])
+    _create_card_group("sorted-type-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"show_groups": "true", "sort": "types_asc", "q": "Sort Type Group"},
     )
 
     assert response.status_code == 200
@@ -1593,6 +1697,17 @@ def _create_card_image(version: CardVersion) -> CardVersionImage:
         stored_path=build_storage_relative_path("images", image_path.name),
         checksum=f"checksum-{version.id}",
     )
+
+
+def _create_type(*, key: str, label: str) -> Type:
+    row, _created = Type.objects.update_or_create(
+        key=key,
+        defaults={
+            "label": label,
+            "identifiers_json": [label.lower()],
+        },
+    )
+    return row
 
 
 def _create_card_group(name: str, *, anchor_card: Card, members: list[Card]) -> CardGroup:
