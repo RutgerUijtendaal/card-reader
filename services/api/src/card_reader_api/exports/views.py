@@ -66,8 +66,6 @@ class DeckTtsExportView(APIView):
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
-        if not deck.is_public and str(getattr(deck.owner, "pk", "")) != viewer_id:
-            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
 
         content = _encode_tts_export(_build_tts_export_payload(deck))
         filename = _tts_export_filename(deck.name)

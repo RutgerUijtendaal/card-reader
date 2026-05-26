@@ -53,8 +53,6 @@ class PublicDeckDetailView(APIView):
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
-        if not deck.is_public and str(getattr(deck.owner, "pk", "")) != viewer_id:
-            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(deck_payload(deck))
 
 
@@ -75,7 +73,7 @@ class OwnerDeckListCreateView(APIView):
                 owner_id=_user_id(request),
                 name=serializer.validated_data["name"],
                 description=serializer.validated_data.get("description"),
-                is_public=serializer.validated_data["is_public"],
+                visibility=serializer.validated_data["visibility"],
                 hero_card_id=serializer.validated_data["hero_card_id"],
                 entries=[DeckEntryInput(**entry) for entry in serializer.validated_data["entries"]],
                 sideboards=[
@@ -111,7 +109,7 @@ class OwnerDeckDetailView(APIView):
                 updates=DeckUpdateInput(
                     name=serializer.validated_data.get("name"),
                     description=serializer.validated_data.get("description"),
-                    is_public=serializer.validated_data.get("is_public"),
+                    visibility=serializer.validated_data.get("visibility"),
                     hero_card_id=serializer.validated_data.get("hero_card_id"),
                     entries=(
                         [DeckEntryInput(**entry) for entry in serializer.validated_data["entries"]]
@@ -131,7 +129,7 @@ class OwnerDeckDetailView(APIView):
                     ),
                     update_name="name" in serializer.validated_data,
                     update_description="description" in serializer.validated_data,
-                    update_is_public="is_public" in serializer.validated_data,
+                    update_visibility="visibility" in serializer.validated_data,
                     update_hero_card_id="hero_card_id" in serializer.validated_data,
                     update_entries="entries" in serializer.validated_data,
                     update_sideboards="sideboards" in serializer.validated_data,

@@ -111,19 +111,11 @@
             <template v-if="!createMode">
               <label class="field-label min-w-72">
                 Reparse cards from template
-                <select
+                <AppSelect
                   v-model="reparseSourceTemplateId"
-                  class="input-base"
+                  :options="reparseSourceOptions"
                   :disabled="queueingReparse || templates.length === 0"
-                >
-                  <option
-                    v-for="item in templates"
-                    :key="item.id"
-                    :value="item.key"
-                  >
-                    {{ item.label }} ({{ item.key }})
-                  </option>
-                </select>
+                />
               </label>
               <button
                 class="btn-secondary"
@@ -176,6 +168,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import AppSelect from '@/components/app/AppSelect.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import JsonEditorField from '@/modules/admin/components/JsonEditorField.vue';
 import TemplatePreviewPane from '@/modules/admin/components/TemplatePreviewPane.vue';
@@ -306,6 +299,12 @@ const form = reactive<TemplateForm>({
 
 const createMode = computed(() => selectedId.value === null);
 const templateKeyForPreview = computed(() => form.key.trim());
+const reparseSourceOptions = computed(() =>
+  templates.value.map((item) => ({
+    value: item.key,
+    label: `${item.label} (${item.key})`,
+  })),
+);
 
 const {
   previewCards,

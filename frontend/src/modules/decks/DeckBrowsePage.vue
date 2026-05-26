@@ -1,16 +1,13 @@
 <template>
   <section class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-5 overflow-hidden">
-    <div class="page-card flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h2 class="theme-section-title text-xl font-semibold">
-          Decks
-        </h2>
-        <p class="theme-section-muted text-sm">
-          Browse public decks and inspect their hero, mainboard, and sideboards.
-        </p>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
+    <AppPageHeader
+      :icon="LibraryBig"
+      title="Decks"
+      subtitle="Browse public decks and inspect their hero, mainboard, and sideboards."
+      title-tag="h2"
+      title-class="text-xl"
+    >
+      <template #actions>
         <RouterLink
           v-if="auth.authenticated"
           class="btn-secondary"
@@ -25,8 +22,8 @@
         >
           New Deck
         </RouterLink>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <section class="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[23rem_minmax(0,1fr)]">
       <DeckBrowseFiltersPanel
@@ -69,7 +66,9 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
+import { LibraryBig } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
+import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { fetchPublicDecks } from '@/modules/decks/api';
 import DeckBrowseFiltersPanel from '@/modules/decks/components/DeckBrowseFiltersPanel.vue';

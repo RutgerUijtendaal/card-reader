@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
-from card_reader_core.models import Card, Deck
+from card_reader_core.models import Card, Deck, DeckVisibility
 from card_reader_core.repositories.decks_repository import (
     create_deck,
     delete_deck,
@@ -60,13 +60,13 @@ class DeckTotals:
 class DeckUpdateInput:
     name: str | None = None
     description: str | None = None
-    is_public: bool | None = None
+    visibility: DeckVisibility | None = None
     hero_card_id: str | None = None
     entries: list[DeckEntryInput] | None = None
     sideboards: list[DeckSideboardInput] | None = None
     update_name: bool = False
     update_description: bool = False
-    update_is_public: bool = False
+    update_visibility: bool = False
     update_hero_card_id: bool = False
     update_entries: bool = False
     update_sideboards: bool = False
@@ -110,7 +110,7 @@ class DeckService:
             return None
         if viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id:
             return deck
-        if not deck.is_public:
+        if deck.visibility == "private":
             return None
         return deck if self.get_deck_validation(deck).is_valid else None
 
@@ -121,7 +121,7 @@ class DeckService:
         owner_id: str,
         name: str,
         description: str | None,
-        is_public: bool,
+        visibility: DeckVisibility,
         hero_card_id: str,
         entries: list[DeckEntryInput],
         sideboards: list[DeckSideboardInput],
@@ -137,7 +137,7 @@ class DeckService:
             owner_id=owner_id,
             name=normalized_name,
             description=normalized_description,
-            is_public=is_public,
+            visibility=visibility,
             hero_card=hero_card,
         )
         replace_mainboard_entries(deck=deck, entries=normalized_entries)
@@ -158,7 +158,7 @@ class DeckService:
 
         effective_name = existing_deck.name if not updates.update_name else updates.name
         effective_description = existing_deck.description if not updates.update_description else updates.description
-        effective_is_public = existing_deck.is_public if not updates.update_is_public else updates.is_public
+        effective_visibility = existing_deck.visibility if not updates.update_visibility else updates.visibility
         effective_hero_card_id = existing_deck.hero_card.id if not updates.update_hero_card_id else updates.hero_card_id
         effective_entries = (
             [
@@ -185,7 +185,7 @@ class DeckService:
 
         if effective_name is None:
             raise ValueError("Deck name is required.")
-        if effective_is_public is None:
+        if effective_visibility is None:
             raise ValueError("Deck visibility is required.")
         if effective_hero_card_id is None:
             raise ValueError("Hero card is required.")
@@ -206,7 +206,7 @@ class DeckService:
             updates={
                 "name": normalized_name,
                 "description": normalized_description,
-                "is_public": effective_is_public,
+                "visibility": effective_visibility,
                 "hero_card": hero_card,
             },
         )

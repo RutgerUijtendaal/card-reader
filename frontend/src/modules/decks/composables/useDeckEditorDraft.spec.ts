@@ -58,7 +58,7 @@ describe('useDeckEditorDraft', () => {
     expect(controller.buildPayload()).toEqual({
       name: 'Example',
       description: null,
-      is_public: false,
+      visibility: 'private',
       hero_card_id: 'hero',
       entries: [{ card_id: 'cardA', quantity: 4 }],
       sideboards: [
@@ -167,3 +167,4 @@ describe('useDeckEditorDraft', () => {
     expect(controller.hasFreeMulliganManaRatio.value).toBe(false);
   });
 });
+

@@ -13,8 +13,12 @@ from card_reader_core.models import (
     DeckEntry,
     DeckSideboard,
     DeckSideboardEntry,
+    DeckVisibility,
     now_utc,
 )
+
+
+PUBLIC_DECK_VISIBILITIES: tuple[DeckVisibility, DeckVisibility] = ("public", "unlisted")
 
 
 def get_cards_by_ids(card_ids: list[str]) -> dict[str, Card]:
@@ -48,7 +52,7 @@ def list_public_decks(
 ) -> list[Deck]:
     return list(
         _apply_public_deck_filters(
-            _deck_queryset().filter(is_public=True),
+            _deck_queryset().filter(visibility="public"),
             hero_query=hero_query,
             card_query=card_query,
             affinity_symbol_ids=affinity_symbol_ids,
@@ -62,7 +66,7 @@ def list_owner_decks(owner_id: str) -> list[Deck]:
 
 
 def get_public_deck(deck_id: str) -> Deck | None:
-    return _deck_queryset().filter(id=deck_id, is_public=True).first()
+    return _deck_queryset().filter(id=deck_id, visibility="public").first()
 
 
 def get_owner_deck(deck_id: str, owner_id: str) -> Deck | None:
@@ -72,16 +76,16 @@ def get_owner_deck(deck_id: str, owner_id: str) -> Deck | None:
 def get_deck_for_viewer(deck_id: str, *, viewer_id: str | None = None) -> Deck | None:
     query = _deck_queryset().filter(id=deck_id)
     if viewer_id:
-        return query.filter(is_public=True).first() or query.filter(owner_id=viewer_id).first()
-    return query.filter(is_public=True).first()
+        return query.filter(visibility__in=PUBLIC_DECK_VISIBILITIES).first() or query.filter(owner_id=viewer_id).first()
+    return query.filter(visibility__in=PUBLIC_DECK_VISIBILITIES).first()
 
 
-def create_deck(*, owner_id: str, name: str, description: str | None, is_public: bool, hero_card: Card) -> Deck:
+def create_deck(*, owner_id: str, name: str, description: str | None, visibility: DeckVisibility, hero_card: Card) -> Deck:
     return Deck.objects.create(
         owner_id=owner_id,
         name=name,
         description=description,
-        is_public=is_public,
+        visibility=visibility,
         hero_card=hero_card,
     )
 

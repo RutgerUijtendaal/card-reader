@@ -374,20 +374,13 @@
         class="theme-section-title mr-auto flex min-w-0 items-center gap-3 text-sm font-semibold"
       >
         <span class="shrink-0">Template</span>
-        <select
-          :value="reparseTemplateId"
-          class="input-base min-w-48"
+        <AppSelect
+          :model-value="reparseTemplateId"
+          :options="reparseTemplateOptions"
+          wrapper-class="min-w-48"
           :disabled="isBusy"
-          @change="$emit('update-reparse-template', ($event.target as HTMLSelectElement).value)"
-        >
-          <option
-            v-for="option in reparseTemplates"
-            :key="option.key"
-            :value="option.key"
-          >
-            {{ option.label }}
-          </option>
-        </select>
+          @update:model-value="handleReparseTemplateChange"
+        />
       </label>
       <p
         v-else-if="saveMessage"
@@ -432,6 +425,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { Lock } from 'lucide-vue-next';
+import AppSelect from '@/components/app/AppSelect.vue';
 import SymbolToken from '@/components/SymbolToken.vue';
 import {
   applySymbolAutocomplete,
@@ -499,6 +493,12 @@ const nonSymbolMetadataGroups = metadataGroups.filter((group) => group.name !== 
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
 const additionalSymbolIds = computed(() => props.additionalSymbolIds);
+const reparseTemplateOptions = computed(() =>
+  props.reparseTemplates.map((option) => ({
+    value: option.key,
+    label: option.label,
+  })),
+);
 const activeSymbolTrigger = computed(() =>
   findActiveSymbolTrigger(rulesTextValue.value, rulesTextCaretIndex.value),
 );
@@ -618,5 +618,11 @@ const applyAutocompleteOption = async (symbolKey: string): Promise<void> => {
   await nextTick();
   rulesTextTextarea.value?.focus();
   rulesTextTextarea.value?.setSelectionRange(nextCaretIndex, nextCaretIndex);
+};
+
+const handleReparseTemplateChange = (value: string | number | null): void => {
+  if (typeof value === 'string') {
+    emit('update-reparse-template', value);
+  }
 };
 </script>

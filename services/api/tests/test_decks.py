@@ -212,7 +212,7 @@ def test_public_deck_list_excludes_private_decks() -> None:
         owner_id=str(owner.id),
         name="Public Deck",
         description="Visible",
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -221,7 +221,16 @@ def test_public_deck_list_excludes_private_decks() -> None:
         owner_id=str(owner.id),
         name="Private Deck",
         description="Hidden",
-        is_public=False,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Unlisted Deck",
+        description="Share only",
+        visibility="unlisted",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -242,7 +251,7 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
         owner_id=str(owner.id),
         name="Draft Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[],
         sideboards=[],
@@ -263,7 +272,7 @@ def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
         owner_id=str(owner.id),
         name="Minimum Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card["card_id"], quantity=int(card["quantity"])) for card in _minimum_valid_entries(mainboard_cards)],
         sideboards=[],
@@ -286,7 +295,7 @@ def test_public_deck_list_filters_by_hero_name() -> None:
         owner_id=str(owner.id),
         name="Aurora Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=target_hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -295,7 +304,7 @@ def test_public_deck_list_filters_by_hero_name() -> None:
         owner_id=str(owner.id),
         name="Shadow Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=other_hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -318,7 +327,7 @@ def test_public_deck_list_filters_by_mainboard_card_name() -> None:
         owner_id=str(owner.id),
         name="Sun Spear Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[
             DeckEntryInput(card_id=featured_card.id, quantity=4),
@@ -330,7 +339,7 @@ def test_public_deck_list_filters_by_mainboard_card_name() -> None:
         owner_id=str(owner.id),
         name="Other Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
         sideboards=[],
@@ -354,7 +363,7 @@ def test_public_deck_list_filters_by_sideboard_card_name() -> None:
         owner_id=str(owner.id),
         name="Moon Trap Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[
@@ -368,7 +377,7 @@ def test_public_deck_list_filters_by_sideboard_card_name() -> None:
         owner_id=str(owner.id),
         name="No Match Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
         sideboards=[],
@@ -392,7 +401,7 @@ def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
         owner_id=str(owner.id),
         name="Matching Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=matching_hero.id,
         entries=[
             DeckEntryInput(card_id=featured_card.id, quantity=4),
@@ -404,7 +413,7 @@ def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
         owner_id=str(owner.id),
         name="Hero Only Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=matching_hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
         sideboards=[],
@@ -413,7 +422,7 @@ def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
         owner_id=str(owner.id),
         name="Card Only Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=non_matching_hero.id,
         entries=[
             DeckEntryInput(card_id=featured_card.id, quantity=4),
@@ -443,7 +452,7 @@ def test_public_deck_list_filters_by_affinity_symbols_with_any_match() -> None:
         owner_id=str(owner.id),
         name="Fire Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[
             DeckEntryInput(card_id=fire_card.id, quantity=4),
@@ -455,7 +464,7 @@ def test_public_deck_list_filters_by_affinity_symbols_with_any_match() -> None:
         owner_id=str(owner.id),
         name="Water Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[
             DeckEntryInput(card_id=water_card.id, quantity=4),
@@ -494,7 +503,7 @@ def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
         owner_id=str(owner.id),
         name="Dual Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[
             DeckEntryInput(card_id=dual_card.id, quantity=4),
@@ -506,7 +515,7 @@ def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
         owner_id=str(owner.id),
         name="Fire Only Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[
             DeckEntryInput(card_id=fire_only_card.id, quantity=4),
@@ -537,7 +546,7 @@ def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> N
         owner_id=str(owner.id),
         name="Visible Filter Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=target_hero.id,
         entries=[
             DeckEntryInput(card_id=featured_card.id, quantity=4),
@@ -549,7 +558,7 @@ def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> N
         owner_id=str(owner.id),
         name="Private Filter Deck",
         description=None,
-        is_public=False,
+        visibility="private",
         hero_card_id=private_hero.id,
         entries=[
             DeckEntryInput(card_id=featured_card.id, quantity=4),
@@ -561,7 +570,7 @@ def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> N
         owner_id=str(owner.id),
         name="Invalid Filter Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=invalid_hero.id,
         entries=[DeckEntryInput(card_id=featured_card.id, quantity=1)],
         sideboards=[],
@@ -582,7 +591,7 @@ def test_deck_payload_includes_card_types() -> None:
         owner_id=str(owner.id),
         name="Typed Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -614,7 +623,7 @@ def test_deck_payload_includes_tooltip_metadata() -> None:
         owner_id=str(owner.id),
         name="Tooltip Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[
             DeckEntryInput(card_id=card.id, quantity=4),
@@ -666,7 +675,7 @@ def test_deck_payload_uses_immutable_card_image_urls() -> None:
         owner_id=str(owner.id),
         name="Image Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -687,7 +696,7 @@ def test_public_deck_detail_hides_private_decks_from_non_owners() -> None:
         owner_id=str(owner.id),
         name="Private Deck",
         description=None,
-        is_public=False,
+        visibility="private",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -696,6 +705,27 @@ def test_public_deck_detail_hides_private_decks_from_non_owners() -> None:
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
 
     assert response.status_code == 404
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_detail_allows_unlisted_decks_for_guests() -> None:
+    owner = _create_user("deck-unlisted-owner", "password")
+    hero = _create_card(name="Unlisted Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Unlisted Deck",
+        description="Share me",
+        visibility="unlisted",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
+
+    assert response.status_code == 200
+    assert response.json()["visibility"] == "unlisted"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -713,7 +743,7 @@ def test_authenticated_owner_can_crud_decks() -> None:
         data={
             "name": "Owner Deck",
             "description": "Owner description",
-            "is_public": True,
+            "visibility": "unlisted",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
         },
@@ -731,7 +761,7 @@ def test_authenticated_owner_can_crud_decks() -> None:
         data={
             "name": "Owner Deck Updated",
             "description": "Updated description",
-            "is_public": False,
+            "visibility": "public",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
         },
@@ -745,9 +775,10 @@ def test_authenticated_owner_can_crud_decks() -> None:
 
     assert list_response.status_code == 200
     assert detail_response.status_code == 200
+    assert create_response.json()["visibility"] == "unlisted"
     assert patch_response.status_code == 200
     assert patch_response.json()["name"] == "Owner Deck Updated"
-    assert patch_response.json()["is_public"] is False
+    assert patch_response.json()["visibility"] == "public"
     assert patch_response.json()["status"]["is_valid"] is True
     assert delete_response.status_code == 204
     assert Deck.objects.filter(id=deck_id).count() == 0
@@ -765,7 +796,7 @@ def test_deck_payload_includes_sideboards_and_aggregate_totals() -> None:
         owner_id=str(owner.id),
         name="Sideboard Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[
@@ -817,7 +848,7 @@ def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
         data={
             "name": "Owner Sideboard Deck",
             "description": "Has sideboards",
-            "is_public": True,
+            "visibility": "public",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
             "sideboards": [
@@ -858,7 +889,7 @@ def test_patch_preserves_sideboards_when_omitted() -> None:
         data={
             "name": "Patch Preserve Deck",
             "description": "Before update",
-            "is_public": True,
+            "visibility": "public",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
             "sideboards": [
@@ -917,7 +948,7 @@ def test_patch_clears_sideboards_when_explicitly_empty() -> None:
         data={
             "name": "Patch Clear Deck",
             "description": None,
-            "is_public": False,
+            "visibility": "private",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
             "sideboards": [
@@ -961,7 +992,7 @@ def test_patch_preserves_mainboard_when_entries_omitted() -> None:
         data={
             "name": "Patch Preserve Entries Deck",
             "description": None,
-            "is_public": True,
+            "visibility": "public",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
         },
@@ -1001,7 +1032,7 @@ def test_sideboard_name_is_required() -> None:
         data={
             "name": "Invalid Sideboard Deck",
             "description": None,
-            "is_public": False,
+            "visibility": "private",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
             "sideboards": [
@@ -1033,7 +1064,7 @@ def test_sideboards_reject_hero_cards() -> None:
         data={
             "name": "Invalid Hero Sideboard Deck",
             "description": None,
-            "is_public": False,
+            "visibility": "private",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
             "sideboards": [
@@ -1067,7 +1098,7 @@ def test_sideboards_reject_quantities_above_100() -> None:
         data={
             "name": "Too Large Sideboard Deck",
             "description": None,
-            "is_public": False,
+            "visibility": "private",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
             "sideboards": [
@@ -1100,7 +1131,7 @@ def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
         data={
             "name": "Duplicate Sideboard Deck",
             "description": None,
-            "is_public": False,
+            "visibility": "private",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
             "sideboards": [
@@ -1131,7 +1162,7 @@ def test_non_owner_cannot_update_or_delete_deck() -> None:
         owner_id=str(owner.id),
         name="Locked Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -1144,7 +1175,7 @@ def test_non_owner_cannot_update_or_delete_deck() -> None:
         data={
             "name": "Nope",
             "description": None,
-            "is_public": True,
+            "visibility": "public",
             "hero_card_id": hero.id,
             "entries": _valid_entries(mainboard_cards),
         },
@@ -1184,7 +1215,7 @@ def test_deck_create_rejects_non_hero_card_as_hero() -> None:
         data={
             "name": "Invalid Hero Deck",
             "description": None,
-            "is_public": False,
+            "visibility": "private",
             "hero_card_id": non_hero.id,
             "entries": _valid_entries(mainboard_cards),
         },
@@ -1211,7 +1242,7 @@ def test_deck_create_allows_invalid_in_progress_drafts_below_minimum_card_count(
         data={
             "name": "Draft Deck",
             "description": None,
-            "is_public": True,
+            "visibility": "public",
             "hero_card_id": hero.id,
             "entries": [{"card_id": card.id, "quantity": 1} for card in mainboard_cards[:10]],
         },
@@ -1240,7 +1271,7 @@ def test_deck_create_marks_deck_invalid_without_enough_mana_type_cards() -> None
         data={
             "name": "No Mana Deck",
             "description": None,
-            "is_public": True,
+            "visibility": "public",
             "hero_card_id": hero.id,
             "entries": [{"card_id": card.id, "quantity": 1} for card in non_mana_cards],
         },
@@ -1268,7 +1299,7 @@ def test_deck_create_rejects_hero_in_mainboard() -> None:
         data={
             "name": "Invalid Duplicate Hero Deck",
             "description": None,
-            "is_public": False,
+            "visibility": "private",
             "hero_card_id": hero.id,
             "entries": [
                 *_valid_entries(mainboard_cards),
@@ -1319,3 +1350,5 @@ def test_latest_version_patch_can_toggle_is_hero() -> None:
     card.refresh_from_db()
     assert card.is_hero is True
     assert response.json()["is_hero"] is True
+
+

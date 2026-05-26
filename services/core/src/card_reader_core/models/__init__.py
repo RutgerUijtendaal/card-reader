@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .card import Card
     from .card_group import CardGroup, CardGroupMember
     from .card_version import CardVersion, CardVersionImage, ParseResult
-    from .deck import Deck, DeckEntry, DeckSideboard, DeckSideboardEntry
+    from .deck import Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility
     from .import_job import ImportJob, ImportJobItem, ImportJobStatus
     from .metadata import (
         CardVersionMetadataSuggestion,
@@ -49,6 +49,7 @@ _EXPORTS = {
     "CardVersionImage": ".card_version",
     "ParseResult": ".card_version",
     "Deck": ".deck",
+    "DeckVisibility": ".deck",
     "DeckEntry": ".deck",
     "DeckSideboard": ".deck",
     "DeckSideboardEntry": ".deck",
@@ -77,6 +78,7 @@ __all__ = [
     "CardVersionImage",
     "ParseResult",
     "Deck",
+    "DeckVisibility",
     "DeckEntry",
     "DeckSideboard",
     "DeckSideboardEntry",

@@ -3,37 +3,41 @@
     v-if="deck"
     class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-5 overflow-hidden"
   >
-    <div class="page-card flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-      <div class="min-w-0">
-        <h2 class="theme-section-title text-xl font-semibold">
-          {{ deck.name }}
-        </h2>
-        <p class="theme-section-muted text-sm">
-          By {{ deck.owner.username }}
-        </p>
-        <p
-          v-if="deck.description"
-          class="theme-section-title mt-3 text-sm"
-        >
-          {{ deck.description }}
-        </p>
-        <div class="mt-3 flex flex-wrap gap-2 text-xs">
-          <span class="theme-pill theme-pill-accent">
-            {{ deck.totals.overall_total_cards }} total cards
-          </span>
-          <span class="theme-pill theme-pill-neutral">
-            {{ deck.totals.mainboard_total_cards }} mainboard cards
+    <AppPageHeader
+      :icon="BookOpenText"
+      :title="deck.name"
+      :subtitle="deck.description || 'Inspect hero, boards, and included cards.'"
+      :back-to="backLink"
+      :back-label="backLabel"
+      title-tag="h2"
+      title-class="text-xl"
+    >
+      <template #titleMeta>
+        <div class="theme-section-muted flex items-center gap-2 text-sm">
+          <span>By</span>
+          <span class="theme-pill theme-pill-keyword text-xs">
+            {{ deck.owner.username }}
           </span>
         </div>
-      </div>
+      </template>
 
-      <div class="flex flex-wrap gap-2 lg:shrink-0">
-        <RouterLink
+      <template #actions>
+        <button
+          v-if="canEdit && canShare"
           class="btn-secondary"
-          :to="backLink"
+          type="button"
+          @click="copyShareLink"
         >
-          {{ backLabel }}
-        </RouterLink>
+          Copy Share Link
+        </button>
+        <button
+          class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+          type="button"
+          @click="handleTtsExport"
+        >
+          <Download class="h-4 w-4" />
+          <span>Export TTS</span>
+        </button>
         <RouterLink
           v-if="canEdit"
           class="btn-primary"
@@ -41,8 +45,8 @@
         >
           Edit Deck
         </RouterLink>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <div class="grid min-h-0 flex-1 gap-5 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
       <div class="page-card flex min-h-0 flex-col">
@@ -104,14 +108,6 @@
             @reset:hover-mode="clearDeckDetailHoverModeOverride"
             @update:card-scale="cardScale = $event"
           />
-          <button
-            class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
-            type="button"
-            @click="handleTtsExport"
-          >
-            <Download class="h-4 w-4" />
-            <span>Export TTS</span>
-          </button>
         </div>
       </div>
 
@@ -192,9 +188,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Download } from 'lucide-vue-next';
+import { BookOpenText, Download } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
+import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
+import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
@@ -208,6 +206,7 @@ import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import { buildDeckCardDetailLocation, buildDeckDetailEditorLocation } from '@/modules/decks/deckRouteState';
+import { buildDeckShareUrl, canShareDeck } from '@/modules/decks/share';
 import type { DeckCardSummary, DeckEntrySummary, DeckRecord, DeckSideboardRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/modules/decks/useDeckExport';
 
@@ -240,6 +239,7 @@ const activeBoardId = ref('mainboard');
 const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
 const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
+const canShare = computed(() => (deck.value ? canShareDeck(deck.value) : false));
 const backLink = computed(() => (isOwnedRoute.value ? '/my/decks' : '/decks'));
 const backLabel = computed(() => (isOwnedRoute.value ? 'Back to My Decks' : 'Back to Decks'));
 const mainboardCardHeightRem = computed(() => Number((24 * cardScale.value).toFixed(2)));
@@ -310,6 +310,14 @@ const handleTtsExport = async (): Promise<void> => {
     return;
   }
   await exportTtsDeck(deck.value.id, deck.value.name);
+};
+
+const copyShareLink = async (): Promise<void> => {
+  if (!deck.value || !canShare.value) {
+    return;
+  }
+  await navigator.clipboard.writeText(buildDeckShareUrl(deck.value.id));
+  toast.success('Share link copied.');
 };
 
 onMounted(async () => {

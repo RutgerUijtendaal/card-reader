@@ -217,6 +217,27 @@
     box-shadow: 0 0 0 3px var(--color-input-ring);
   }
 
+  .app-select {
+    @apply relative;
+  }
+
+  .app-select-input {
+    @apply appearance-none pr-10;
+  }
+
+  .app-select-chevron {
+    @apply pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3;
+    color: var(--color-text-soft);
+  }
+
+  .app-select:focus-within .app-select-chevron {
+    color: var(--color-text);
+  }
+
+  .app-select:has(.app-select-input:disabled) .app-select-chevron {
+    color: var(--color-disabled-text);
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
     background: linear-gradient(135deg, var(--color-primary-from) 0%, var(--color-primary-to) 100%);

@@ -17,6 +17,12 @@ export const buildDeckCardDetailLocation = (
   }),
 });
 
+export const buildPublicDeckLocation = (deckId: string): RouteLocationRaw => ({
+  path: `/decks/${deckId}`,
+});
+
+export const buildPublicDeckPath = (deckId: string): string => `/decks/${deckId}`;
+
 export const isDeckReturnQuery = (query: LocationQuery): boolean =>
   queryString(query[DECK_RETURN_TO_QUERY_KEY]) === DECK_RETURN_TO && queryString(query[DECK_ID_QUERY_KEY]) !== null;
 

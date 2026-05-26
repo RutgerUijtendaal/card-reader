@@ -7,7 +7,7 @@ import {
   MIN_MAINBOARD_CARD_COUNT,
   MIN_MAINBOARD_MANA_TYPE_COUNT,
 } from '@/modules/decks/constants';
-import type { DeckCardSummary, DeckMetadataOption, DeckRecord, DeckUpsertRequest } from '@/modules/decks/types';
+import type { DeckCardSummary, DeckMetadataOption, DeckRecord, DeckUpsertRequest, DeckVisibility } from '@/modules/decks/types';
 
 export type DeckFormEntry = {
   card_id: string;
@@ -23,7 +23,7 @@ export type DeckFormSideboard = {
 export type DeckForm = {
   name: string;
   description: string;
-  is_public: boolean;
+  visibility: DeckVisibility;
   hero_card_id: string;
   entries: DeckFormEntry[];
   sideboards: DeckFormSideboard[];
@@ -54,7 +54,7 @@ export const useDeckEditorDraft = ({
   const form = reactive<DeckForm>({
     name: '',
     description: '',
-    is_public: false,
+    visibility: 'private',
     hero_card_id: '',
     entries: [],
     sideboards: [],
@@ -206,8 +206,8 @@ export const useDeckEditorDraft = ({
     form.description = value;
   };
 
-  const setDeckPublic = (value: boolean): void => {
-    form.is_public = value;
+  const setDeckVisibility = (value: DeckVisibility): void => {
+    form.visibility = value;
   };
 
   const selectBoard = (boardId: string): void => {
@@ -241,7 +241,7 @@ export const useDeckEditorDraft = ({
   const hydrateFromDeck = (deck: DeckRecord): void => {
     form.name = deck.name;
     form.description = deck.description ?? '';
-    form.is_public = deck.is_public;
+    form.visibility = deck.visibility;
     form.hero_card_id = deck.hero_card.id;
     form.entries = deck.mainboard.entries.map((entry) => ({
       card_id: entry.card.id,
@@ -272,7 +272,7 @@ export const useDeckEditorDraft = ({
   const buildPayload = (): DeckUpsertRequest => ({
     name: form.name.trim(),
     description: form.description.trim() || null,
-    is_public: form.is_public,
+    visibility: form.visibility,
     hero_card_id: form.hero_card_id,
     entries: form.entries.map((entry) => ({
       card_id: entry.card_id,
@@ -441,7 +441,7 @@ export const useDeckEditorDraft = ({
     deckStatusLabel,
     setDeckName,
     setDeckDescription,
-    setDeckPublic,
+    setDeckVisibility,
     selectBoard,
     addSideboard,
     renameSideboard,

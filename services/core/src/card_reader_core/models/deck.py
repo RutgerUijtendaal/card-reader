@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from django.conf import settings
 from django.db import models
@@ -28,7 +28,16 @@ class Deck(TimestampedModel):
     )
     name: models.TextField[str, str] = models.TextField(default="")
     description: models.TextField[str | None, str | None] = models.TextField(default=None, null=True, blank=True)
-    is_public: models.BooleanField[bool, bool] = models.BooleanField(default=False, db_index=True)
+    visibility: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=[
+            ("private", "Private"),
+            ("unlisted", "Unlisted"),
+            ("public", "Public"),
+        ],
+        default="private",
+        db_index=True,
+    )
     hero_card: models.ForeignKey[Card, Card] = models.ForeignKey(
         "Card",
         on_delete=models.PROTECT,
@@ -39,6 +48,9 @@ class Deck(TimestampedModel):
     class Meta:
         db_table = "deck"
         indexes = [models.Index(fields=["owner", "updated_at"], name="ix_deck_owner_updated")]
+
+
+DeckVisibility = Literal["private", "unlisted", "public"]
 
 
 class DeckEntry(TimestampedModel):
