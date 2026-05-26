@@ -31,6 +31,7 @@ def list_cards(
     *,
     query: str | None,
     max_confidence: float | None,
+    card_ids: list[str] | None = None,
     keyword_ids: list[str] | None = None,
     keyword_match: str | None = None,
     tag_ids: list[str] | None = None,
@@ -62,6 +63,7 @@ def list_cards(
     normalized_page_size = max(1, min(page_size, 100))
     versions = _build_filtered_versions_queryset(
         query=query,
+        card_ids=card_ids,
         max_confidence=max_confidence,
         keyword_ids=keyword_ids,
         keyword_match=keyword_match,
@@ -112,6 +114,7 @@ def list_matching_cards(
     *,
     query: str | None,
     max_confidence: float | None,
+    card_ids: list[str] | None = None,
     keyword_ids: list[str] | None = None,
     keyword_match: str | None = None,
     tag_ids: list[str] | None = None,
@@ -139,6 +142,7 @@ def list_matching_cards(
 ) -> list[CardListRow]:
     versions = _build_filtered_versions_queryset(
         query=query,
+        card_ids=card_ids,
         max_confidence=max_confidence,
         keyword_ids=keyword_ids,
         keyword_match=keyword_match,
@@ -280,6 +284,7 @@ def filter_by_links(
 def _build_filtered_versions_queryset(
     *,
     query: str | None,
+    card_ids: list[str] | None,
     max_confidence: float | None,
     keyword_ids: list[str] | None,
     keyword_match: str | None,
@@ -330,6 +335,8 @@ def _build_filtered_versions_queryset(
         )
     )
     versions = apply_card_search(versions, query)
+    if card_ids:
+        versions = versions.filter(card_id__in=list(dict.fromkeys(card_ids)))
     versions = apply_card_filters(
         versions,
         max_confidence=max_confidence,

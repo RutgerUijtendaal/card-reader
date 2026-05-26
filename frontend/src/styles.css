@@ -322,7 +322,7 @@
   }
 
   .theme-muted-panel {
-    @apply rounded-xl border p-4;
+    @apply rounded-xl border px-4 py-2;
     border-color: var(--color-border);
     background: var(--color-surface-muted);
   }
@@ -557,6 +557,14 @@
     border-color: var(--color-selected-border);
     background: var(--color-selected-bg);
     color: var(--color-selected-text);
+  }
+
+  .theme-toggle-shell-compact {
+    @apply p-0.5;
+  }
+
+  .theme-toggle-option-compact {
+    @apply px-3 py-0.5;
   }
 
   .theme-choice-chip {

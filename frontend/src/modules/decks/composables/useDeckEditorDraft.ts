@@ -77,6 +77,18 @@ export const useDeckEditorDraft = ({
     }
     return uniqueCardIds.size;
   });
+  const allCardIds = computed(() => {
+    const uniqueCardIds = new Set<string>();
+    for (const entry of form.entries) {
+      uniqueCardIds.add(entry.card_id);
+    }
+    for (const sideboard of form.sideboards) {
+      for (const entry of sideboard.entries) {
+        uniqueCardIds.add(entry.card_id);
+      }
+    }
+    return [...uniqueCardIds].sort((left, right) => left.localeCompare(right));
+  });
   const sideboardTabs = computed(() =>
     form.sideboards.map((sideboard) => ({
       id: sideboard.id,
@@ -103,6 +115,10 @@ export const useDeckEditorDraft = ({
       (sum, entry) => sum + (entry.card.types.some((type) => type.key.toLowerCase() === 'mana') ? entry.quantity : 0),
       0,
     ),
+  );
+  const hasFreeMulliganManaRatio = computed(() =>
+    totalMainboardCards.value > 0
+    && totalMainboardManaTypeCards.value / totalMainboardCards.value >= 0.25,
   );
 
   const deckTypeCounts = computed(() => {
@@ -408,10 +424,12 @@ export const useDeckEditorDraft = ({
     totalSideboardCards,
     overallTotalCards,
     overallUniqueCards,
+    allCardIds,
     selectedHero,
     detailedMainboardEntries,
     detailedActiveBoardEntries,
     totalMainboardManaTypeCards,
+    hasFreeMulliganManaRatio,
     activeSideboard,
     sideboardTabs,
     deckTypeCounts,

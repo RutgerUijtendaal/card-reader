@@ -7,7 +7,7 @@ export type DeckMetadataOption = {
 };
 
 export type DeckCardSummary = CardHoverTooltipModel & {
-  result_type?: 'card';
+  result_type: 'card';
   image_url: string | null;
 };
 

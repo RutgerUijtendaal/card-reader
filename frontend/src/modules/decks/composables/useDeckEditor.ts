@@ -28,16 +28,21 @@ export const useDeckEditor = () => {
     cardLookup.value = nextLookup;
   };
 
-  const filters = useDeckEditorFilters();
   const deck = useDeckEditorDraft({
     builderStep,
     cardLookup,
     rememberCards,
   });
+  const filters = useDeckEditorFilters({
+    deckCardIds: deck.allCardIds,
+    builderStep,
+  });
   const gallery = useDeckEditorGallery({
     filtersLoaded: filters.filtersLoaded,
     buildSearchParams: filters.buildSearchParams,
     selectionState: filters.selectionState,
+    currentDeckOnly: filters.currentDeckOnly,
+    currentDeckCardIds: filters.currentDeckCardIds,
     builderStep,
     sort: filters.effectiveSort,
     cardScale: filters.cardScale,

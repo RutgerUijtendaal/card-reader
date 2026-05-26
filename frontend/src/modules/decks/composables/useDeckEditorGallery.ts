@@ -9,6 +9,8 @@ type UseDeckEditorGalleryOptions = {
   filtersLoaded: Ref<boolean>;
   buildSearchParams: () => URLSearchParams;
   selectionState: Readonly<Ref<CardFilterSelectionState>>;
+  currentDeckOnly: Ref<boolean>;
+  currentDeckCardIds: Readonly<Ref<string[]>>;
   builderStep: Ref<BuilderStep>;
   sort: Ref<CardSort>;
   cardScale: Ref<number>;
@@ -19,6 +21,8 @@ export const useDeckEditorGallery = ({
   filtersLoaded,
   buildSearchParams,
   selectionState,
+  currentDeckOnly,
+  currentDeckCardIds,
   builderStep,
   sort,
   cardScale,
@@ -33,7 +37,7 @@ export const useDeckEditorGallery = ({
     },
     filtersLoaded,
     pageSize: computed(() => (isSetupStep.value ? 24 : 30)),
-    watchSource: [selectionState, isSetupStep, sort],
+    watchSource: [selectionState, currentDeckOnly, currentDeckCardIds, isSetupStep, sort],
     onResults: rememberCards,
   });
 

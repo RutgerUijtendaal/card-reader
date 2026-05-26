@@ -21,8 +21,21 @@
       </p>
     </div>
 
+    <label
+      v-if="!controller.deck.isSetupStep.value"
+      class="theme-muted-panel flex items-center gap-3 p-3 text-sm"
+    >
+      <input
+        :checked="controller.filters.currentDeckOnly.value"
+        type="checkbox"
+        class="theme-checkbox h-4 w-4"
+        @change="controller.filters.setCurrentDeckOnly(($event.target as HTMLInputElement).checked)"
+      >
+      <span class="theme-section-title font-medium">Current Deck Only</span>
+    </label>
+
     <CardFilterSections
-      v-else
+      v-if="!controller.deck.isSetupStep.value"
       :state="controller.filters.filterSectionsState.value"
     />
 

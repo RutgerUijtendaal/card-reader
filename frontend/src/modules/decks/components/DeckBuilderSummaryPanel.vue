@@ -253,52 +253,17 @@
             No cards added to this board yet.
           </div>
 
-          <div
+          <DeckBuilderBoardEntryRow
             v-for="entry in controller.deck.detailedActiveBoardEntries.value"
             :key="entry.card.id"
-            class="theme-card-frame flex items-center gap-3 rounded-2xl px-3 py-2"
-          >
-            <div class="min-w-0 flex-1">
-              <p class="theme-section-title truncate text-sm font-semibold">
-                {{ entry.card.name }}
-              </p>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <button
-                class="btn-secondary h-8 w-8 px-0"
-                type="button"
-                @click="controller.deck.changeQuantity(entry.card.id, -1)"
-              >
-                -
-              </button>
-              <input
-                :value="entry.quantity"
-                class="input-base h-8 w-12 px-1 text-center text-sm"
-                type="number"
-                min="1"
-                :max="controller.deck.activeBoardId.value === 'mainboard' ? 4 : undefined"
-                @input="controller.deck.setQuantity(entry.card.id, ($event.target as HTMLInputElement).value)"
-              >
-              <button
-                class="btn-secondary h-8 w-8 px-0"
-                type="button"
-                :disabled="controller.deck.activeBoardId.value === 'mainboard' && entry.quantity >= 4"
-                @click="controller.deck.changeQuantity(entry.card.id, 1)"
-              >
-                +
-              </button>
-            </div>
-
-            <button
-              class="theme-section-muted shrink-0 px-1 text-base font-semibold transition hover:text-rose-300"
-              type="button"
-              aria-label="Remove card from board"
-              @click="controller.deck.removeEntry(entry.card.id)"
-            >
-              X
-            </button>
-          </div>
+            :entry="entry"
+            :hover-mode="controller.filters.hoverMode.value"
+            :quantity-max="controller.deck.activeBoardId.value === 'mainboard' ? 4 : undefined"
+            @decrement="controller.deck.changeQuantity($event, -1)"
+            @increment="controller.deck.changeQuantity($event, 1)"
+            @set-quantity="controller.deck.setQuantity"
+            @remove="controller.deck.removeEntry"
+          />
         </div>
       </template>
     </div>
@@ -308,6 +273,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
+import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 

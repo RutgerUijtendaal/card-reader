@@ -84,6 +84,14 @@
         </div>
 
         <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
+          <CardSortMenu
+            :sort="effectiveSort"
+            :default-sort="defaultSort"
+            :override-active="deckDetailSortOverride !== null"
+            allow-default-option
+            @update:sort="setDeckDetailSortOverride"
+            @reset="clearDeckDetailSortOverride"
+          />
           <GalleryOptionsMenu
             :hover-mode="effectiveHoverMode"
             :default-hover-mode="defaultHoverMode"
@@ -188,11 +196,12 @@ import { Download } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
+import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import type { CardListItem } from '@/modules/card-detail/types';
 import { compareCardSort } from '@/modules/card-search/cardSort';
-import { useCardSortPreferences } from '@/modules/card-search/useCardSortPreferences';
+import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
 import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
@@ -205,8 +214,14 @@ import { useDeckExport } from '@/modules/decks/useDeckExport';
 const route = useRoute();
 const auth = useAuthStore();
 const deck = ref<DeckRecord | null>(null);
-const { defaultSort } = useCardSortPreferences();
 const { cardScale } = useGalleryOptions();
+const {
+  defaultSort,
+  overrideSort: deckDetailSortOverride,
+  effectiveSort,
+  setOverrideSort,
+  clearOverrideSort,
+} = useCardSortSurface('deckDetail');
 const {
   defaultHoverMode,
   overrideHoverMode: deckDetailHoverModeOverride,
@@ -246,9 +261,17 @@ const activeBoardEmptyLabel = computed(() =>
   activeBoardId.value === 'mainboard' ? 'This deck does not have any mainboard cards yet.' : 'This sideboard does not have any cards yet.',
 );
 const sortedActiveBoardEntries = computed(() =>
-  [...activeBoardEntries.value].sort((left, right) => compareCardSort(left.card, right.card, defaultSort.value)),
+  [...activeBoardEntries.value].sort((left, right) => compareCardSort(left.card, right.card, effectiveSort.value)),
 );
 const detailLocation = (cardId: string) => buildDeckCardDetailLocation(cardId, String(route.params.id), route.query);
+
+const setDeckDetailSortOverride = (value: typeof effectiveSort.value): void => {
+  setOverrideSort(value);
+};
+
+const clearDeckDetailSortOverride = (): void => {
+  clearOverrideSort();
+};
 
 const setDeckDetailHoverModeOverride = (value: typeof effectiveHoverMode.value): void => {
   setOverrideHoverMode(value);
