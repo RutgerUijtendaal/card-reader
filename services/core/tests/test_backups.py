@@ -66,7 +66,6 @@ def test_restore_backup_archive_restores_runtime_state(tmp_path: Path) -> None:
     archive = create_backup_archive(runtime_paths=source_runtime, backup_root=tmp_path / "backups").archive_path
 
     target_runtime = _build_runtime(tmp_path / "target-runtime")
-    _write_text(target_runtime.database_path, "not-a-sqlite-db")
     _write_text(target_runtime.app_data_dir / "uploads" / "upload.txt", "target upload")
     _write_text(target_runtime.public_app_data_dir / "images" / "card.png", "target image")
 
@@ -81,6 +80,31 @@ def test_restore_backup_archive_restores_runtime_state(tmp_path: Path) -> None:
 
     assert safety_archive is not None
     assert safety_archive.exists()
+    assert _read_count(target_runtime.database_path) == 1
+    assert (target_runtime.app_data_dir / "uploads" / "upload.txt").read_text(encoding="utf-8") == "upload"
+    assert (target_runtime.public_app_data_dir / "images" / "card.png").read_text(encoding="utf-8") == "image"
+    assert (target_runtime.public_app_data_dir / "symbols" / "symbol.svg").read_text(encoding="utf-8") == "symbol"
+
+
+def test_restore_backup_archive_recovers_when_safety_backup_fails(tmp_path: Path) -> None:
+    source_runtime = _build_runtime(tmp_path / "source-runtime")
+    archive = create_backup_archive(runtime_paths=source_runtime, backup_root=tmp_path / "backups").archive_path
+
+    target_runtime = _build_runtime(tmp_path / "target-runtime")
+    _write_text(target_runtime.database_path, "not-a-sqlite-db")
+    _write_text(target_runtime.app_data_dir / "uploads" / "upload.txt", "target upload")
+    _write_text(target_runtime.public_app_data_dir / "images" / "card.png", "target image")
+
+    safety_archive = restore_backup_archive(
+        archive_path=archive,
+        runtime_paths=target_runtime,
+        backup_root=tmp_path / "safety",
+        include_logs=True,
+        compose_config=None,
+        healthcheck_url=None,
+    )
+
+    assert safety_archive is None
     assert _read_count(target_runtime.database_path) == 1
     assert (target_runtime.app_data_dir / "uploads" / "upload.txt").read_text(encoding="utf-8") == "upload"
     assert (target_runtime.public_app_data_dir / "images" / "card.png").read_text(encoding="utf-8") == "image"

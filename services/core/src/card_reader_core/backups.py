@@ -160,15 +160,20 @@ def restore_backup_archive(
             _run_compose(compose_config, "down")
 
         safety_archive_path: Path | None = None
+        safety_backup_error: Exception | None = None
         try:
             if backup_root is not None:
-                safety_backup = create_backup_archive(
-                    runtime_paths=runtime_paths,
-                    backup_root=backup_root,
-                    include_logs=include_logs,
-                    prefix="pre-restore-card-reader",
-                )
-                safety_archive_path = safety_backup.archive_path
+                try:
+                    safety_backup = create_backup_archive(
+                        runtime_paths=runtime_paths,
+                        backup_root=backup_root,
+                        include_logs=include_logs,
+                        prefix="pre-restore-card-reader",
+                    )
+                except Exception as exc:
+                    safety_backup_error = exc
+                else:
+                    safety_archive_path = safety_backup.archive_path
 
             _replace_live_runtime(runtime_paths, validated)
 
@@ -187,6 +192,15 @@ def restore_backup_archive(
                     _run_compose(compose_config, "up", "-d", "--remove-orphans")
                 except Exception:
                     pass
+            if safety_backup_error is not None:
+                try:
+                    raise
+                except Exception as restore_error:
+                    restore_error.add_note(
+                        "Pre-restore safety backup creation failed before restore: "
+                        f"{safety_backup_error!r}"
+                    )
+                    raise
             raise
 
         return safety_archive_path
