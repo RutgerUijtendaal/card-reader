@@ -81,24 +81,12 @@
           class="pointer-events-none z-30 hidden md:block"
           :style="{ position: 'fixed', left: `${hoverPanelX}px`, top: `${hoverPanelY}px` }"
         >
-          <div
+          <CardHoverTooltip
             v-if="showEnlargedPreview && showDetailsPreview && detailsCard"
-            class="flex items-start gap-4"
-          >
-            <div
-              v-if="previewImageUrl"
-              class="theme-card-frame w-[420px] overflow-hidden rounded-xl shadow-2xl"
-            >
-              <div class="theme-card-image-well aspect-[63/88]">
-                <img
-                  :src="toAbsoluteApiUrl(previewImageUrl)"
-                  :alt="previewImageAlt"
-                  class="h-full w-full object-cover"
-                >
-              </div>
-            </div>
-            <CardHoverTooltip :card="detailsCard" />
-          </div>
+            :card="detailsCard"
+            :image-url="previewImageUrl"
+            :image-alt="previewImageAlt"
+          />
           <div
             v-else-if="showEnlargedPreview && previewImageUrl"
             class="theme-card-frame w-[380px] overflow-hidden rounded-xl shadow-2xl"
