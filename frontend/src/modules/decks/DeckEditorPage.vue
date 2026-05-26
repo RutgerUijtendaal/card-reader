@@ -33,8 +33,8 @@
               <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardManaTypeCards.value }}</span>
               <span
                 class="inline-flex items-center"
-                title="Free Mulligan for 0 Mana starting hand"
-                aria-label="Free Mulligan for 0 Mana starting hand"
+                title="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
+                aria-label="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
               >
                 <CircleCheckBig
                   v-if="controller.deck.hasFreeMulliganManaRatio.value"
