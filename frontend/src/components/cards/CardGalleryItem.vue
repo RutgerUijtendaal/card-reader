@@ -89,7 +89,7 @@
           />
           <div
             v-else-if="showEnlargedPreview && previewImageUrl"
-            class="theme-card-frame w-[380px] overflow-hidden rounded-xl shadow-2xl"
+            class="theme-card-frame w-[28rem] overflow-hidden rounded-xl shadow-2xl"
           >
             <div class="theme-card-image-well aspect-[63/88]">
               <img

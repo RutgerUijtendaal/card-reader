@@ -1,11 +1,11 @@
 <template>
   <div
     class="theme-popover pointer-events-none shadow-2xl"
-    :class="imageUrl ? 'w-[56rem]' : 'w-[35rem]'"
+    :class="imageUrl ? 'w-[64rem]' : 'w-[35rem]'"
   >
     <div
       class="gap-4"
-      :class="imageUrl ? 'grid grid-cols-[20rem_minmax(0,1fr)] items-start' : 'space-y-4'"
+      :class="imageUrl ? 'grid grid-cols-[28rem_minmax(0,1fr)] items-start' : 'space-y-4'"
     >
       <div
         v-if="imageUrl"
