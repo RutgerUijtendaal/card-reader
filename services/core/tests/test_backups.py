@@ -9,7 +9,9 @@ import pytest
 
 from card_reader_core.backups import (
     BackupError,
+    ComposeConfig,
     RuntimePaths,
+    _run_compose,
     create_backup_archive,
     restore_backup_archive,
     validate_backup_archive,
@@ -134,6 +136,56 @@ def test_restore_backup_archive_rejects_checksum_mismatch(tmp_path: Path) -> Non
             compose_config=None,
             healthcheck_url=None,
         )
+
+
+def test_restore_backup_archive_rejects_unexpected_files(tmp_path: Path) -> None:
+    runtime_paths = _build_runtime(tmp_path / "runtime")
+    archive_path = create_backup_archive(
+        runtime_paths=runtime_paths,
+        backup_root=tmp_path / "backups",
+    ).archive_path
+
+    tampered_archive_path = tmp_path / "tampered-extra-file.tar.gz"
+    with tarfile.open(archive_path, "r:gz") as source_archive:
+        source_archive.extractall(tmp_path / "tampered-extra")
+    _write_text(tmp_path / "tampered-extra" / "content" / "public" / "images" / "unexpected.txt", "injected")
+    with tarfile.open(tampered_archive_path, "w:gz") as tampered_archive:
+        for path in sorted((tmp_path / "tampered-extra").rglob("*")):
+            tampered_archive.add(path, arcname=path.relative_to(tmp_path / "tampered-extra").as_posix())
+
+    with pytest.raises(BackupError, match="Backup contains unexpected files"):
+        restore_backup_archive(
+            archive_path=tampered_archive_path,
+            runtime_paths=_build_runtime(tmp_path / "restore-runtime"),
+            backup_root=tmp_path / "safety",
+            compose_config=None,
+            healthcheck_url=None,
+        )
+
+
+def test_run_compose_supports_two_word_compose_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(command: list[str], *, cwd: Path, check: bool) -> None:
+        captured["command"] = command
+        captured["cwd"] = cwd
+        captured["check"] = check
+
+    monkeypatch.setattr("card_reader_core.backups.subprocess.run", fake_run)
+
+    compose_config = ComposeConfig(
+        command="docker compose",
+        compose_file=tmp_path / "docker-compose.yml",
+        project_dir=tmp_path,
+    )
+
+    _run_compose(compose_config, "down")
+
+    assert captured["command"] == ["docker", "compose", "-f", str(compose_config.compose_file), "down"]
+    assert captured["cwd"] == tmp_path
+    assert captured["check"] is True
 
 
 def _build_runtime(root: Path) -> RuntimePaths:

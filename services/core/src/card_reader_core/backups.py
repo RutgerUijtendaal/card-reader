@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -336,16 +337,25 @@ def _validate_extracted_backup(extraction_root: Path) -> ValidatedBackup:
     if not isinstance(files, list):
         raise BackupError("Backup manifest is missing the files list.")
 
+    manifest_paths: set[str] = set()
     for entry in files:
         path_value = entry.get("path")
         checksum = entry.get("sha256")
         if not isinstance(path_value, str) or not isinstance(checksum, str):
             raise BackupError("Backup manifest contains an invalid file entry.")
+        if path_value in manifest_paths:
+            raise BackupError(f"Backup manifest contains a duplicate file entry: {path_value}")
+        manifest_paths.add(path_value)
         file_path = content_root / path_value
         if not file_path.exists():
             raise BackupError(f"Backup file is missing: {path_value}")
         if _sha256(file_path) != checksum:
             raise BackupError(f"Checksum mismatch for backup file: {path_value}")
+
+    extracted_paths = {path.relative_to(content_root).as_posix() for path in content_root.rglob("*") if path.is_file()}
+    unexpected_paths = sorted(extracted_paths - manifest_paths)
+    if unexpected_paths:
+        raise BackupError(f"Backup contains unexpected files: {', '.join(unexpected_paths)}")
 
     db_dir = content_root / "db"
     database_files = sorted(path for path in db_dir.glob("*") if path.is_file())
@@ -386,12 +396,20 @@ def _replace_directory(target_dir: Path, source_dir: Path) -> None:
 
 
 def _run_compose(compose_config: ComposeConfig, *args: str) -> None:
-    command = [compose_config.command, "-f", str(compose_config.compose_file), *args]
+    command = _split_command(compose_config.command)
+    command.extend(["-f", str(compose_config.compose_file), *args])
     subprocess.run(
         command,
         cwd=compose_config.project_dir,
         check=True,
     )
+
+
+def _split_command(command: str) -> list[str]:
+    parts = shlex.split(command, posix=os.name != "nt")
+    if not parts:
+        raise BackupError("Compose command is empty.")
+    return parts
 
 
 def _wait_for_healthcheck(url: str, *, attempts: int, delay_seconds: float) -> None:
