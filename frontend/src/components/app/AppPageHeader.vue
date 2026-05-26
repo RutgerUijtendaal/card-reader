@@ -1,10 +1,11 @@
 <template>
   <header
-    class="page-card flex flex-col gap-6"
-    :class="cardClass"
+    class="rounded-xl border backdrop-blur-sm"
+    :style="headerStyle"
   >
     <div
-      class="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between"
+      class="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-stretch lg:justify-between"
+      :class="topRowClass"
     >
       <div class="flex min-w-0 flex-1 items-start gap-3">
         <div class="theme-card-frame-muted theme-section-title flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
@@ -63,7 +64,8 @@
 
     <div
       v-if="$slots.bottomRight"
-      class="theme-divider flex justify-end border-t pt-4"
+      class="theme-divider theme-subheader-row flex justify-end border-t px-5 py-4"
+      :class="bottomRowClass"
     >
       <div class="lg:flex lg:self-stretch lg:items-center lg:justify-end">
         <div class="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -89,13 +91,11 @@ const props = withDefaults(
     backTo?: RouteLocationRaw | null;
     backLabel?: string;
     titleTag?: 'h1' | 'h2' | 'h3';
-    cardClass?: string;
     titleClass?: string;
     subtitleClass?: string;
   }>(),
   {
     titleTag: 'h1',
-    cardClass: '',
     titleClass: 'text-2xl',
     subtitleClass: 'text-sm',
     backTo: null,
@@ -106,5 +106,16 @@ const props = withDefaults(
 const slots = useSlots();
 const hasBackLink = computed(() => Boolean(props.backTo && props.backLabel));
 const hasHeaderActions = computed(() => hasBackLink.value || Boolean(slots.actions));
+const hasBottomRow = computed(() => Boolean(slots.bottomRight));
 const resolvedBackTo = computed<RouteLocationRaw>(() => props.backTo ?? '/');
+const headerStyle = computed(() => ({
+  borderColor: 'var(--color-border)',
+  background: 'var(--color-surface)',
+  color: 'var(--color-text)',
+}));
+const topRowClass = computed(() => [
+  'bg-[var(--color-surface)]',
+  hasBottomRow.value ? 'rounded-t-xl' : 'rounded-xl',
+]);
+const bottomRowClass = computed(() => 'bg-[var(--color-surface)] rounded-b-xl');
 </script>

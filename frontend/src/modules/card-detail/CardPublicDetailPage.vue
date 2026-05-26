@@ -6,7 +6,6 @@
       subtitle="Browse parsed versions and full card metadata."
       :back-to="buildCardReturnLocation(route.query)"
       :back-label="backButtonLabel"
-      card-class="shadow-none"
       title-tag="h2"
       title-class="text-2xl"
     >
@@ -38,30 +37,31 @@
         </div>
       </template>
 
-      <template #bottomRight>
-        <template v-if="hasGalleryContext">
-          <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
-            {{ positionLabel }}
-          </span>
-          <button
-            class="btn-secondary inline-flex items-center gap-2"
-            type="button"
-            :disabled="!previousCardId"
-            @click="goToPreviousCard"
-          >
-            <ChevronLeft class="h-4 w-4" />
-            <span>Previous Card</span>
-          </button>
-          <button
-            class="btn-secondary inline-flex items-center gap-2"
-            type="button"
-            :disabled="!nextCardId && !hasMoreResults"
-            @click="goToNextCard"
-          >
-            <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next Card' }}</span>
-            <ChevronRight class="h-4 w-4" />
-          </button>
-        </template>
+      <template
+        v-if="hasGalleryContext"
+        #bottomRight
+      >
+        <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
+          {{ positionLabel }}
+        </span>
+        <button
+          class="btn-secondary inline-flex items-center gap-2"
+          type="button"
+          :disabled="!previousCardId"
+          @click="goToPreviousCard"
+        >
+          <ChevronLeft class="h-4 w-4" />
+          <span>Previous Card</span>
+        </button>
+        <button
+          class="btn-secondary inline-flex items-center gap-2"
+          type="button"
+          :disabled="!nextCardId && !hasMoreResults"
+          @click="goToNextCard"
+        >
+          <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next Card' }}</span>
+          <ChevronRight class="h-4 w-4" />
+        </button>
       </template>
     </AppPageHeader>
 

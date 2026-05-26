@@ -358,6 +358,10 @@
     border-color: var(--color-border);
   }
 
+  .theme-subheader-row {
+    background: var(--color-surface);
+  }
+
   .theme-info-box {
     @apply rounded-xl border px-3 py-2;
     border-color: var(--color-border);
