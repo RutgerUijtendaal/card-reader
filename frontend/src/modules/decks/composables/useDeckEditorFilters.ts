@@ -14,6 +14,8 @@ type UseDeckEditorFiltersOptions = {
 };
 
 const EMPTY_DECK_SENTINEL_CARD_ID = '__deck-builder-empty__';
+const EMPTY_CARD_IDS: string[] = [];
+const EMPTY_DECK_SENTINEL_CARD_IDS = [EMPTY_DECK_SENTINEL_CARD_ID];
 
 export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditorFiltersOptions) => {
   const filterController = useCardFilterController();
@@ -46,15 +48,33 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
     currentDeckOnly.value = value;
   };
 
-  const currentDeckCardIds = computed(() =>
-    currentDeckOnly.value && builderStep.value === 'build'
-      ? (
-          deckCardIds.value.length > 0
-            ? [...new Set(deckCardIds.value)].sort((left, right) => left.localeCompare(right))
-            : [EMPTY_DECK_SENTINEL_CARD_ID]
-        )
-      : [],
-  );
+  let previousCurrentDeckCardIdsSignature = '';
+  let previousCurrentDeckCardIds = EMPTY_CARD_IDS;
+
+  const currentDeckCardIds = computed(() => {
+    if (!currentDeckOnly.value || builderStep.value !== 'build') {
+      previousCurrentDeckCardIdsSignature = '';
+      previousCurrentDeckCardIds = EMPTY_CARD_IDS;
+      return EMPTY_CARD_IDS;
+    }
+
+    if (deckCardIds.value.length === 0) {
+      previousCurrentDeckCardIdsSignature = EMPTY_DECK_SENTINEL_CARD_ID;
+      previousCurrentDeckCardIds = EMPTY_DECK_SENTINEL_CARD_IDS;
+      return EMPTY_DECK_SENTINEL_CARD_IDS;
+    }
+
+    const normalizedCardIds = [...new Set(deckCardIds.value)].sort((left, right) => left.localeCompare(right));
+    const signature = normalizedCardIds.join('\u0000');
+
+    if (signature === previousCurrentDeckCardIdsSignature) {
+      return previousCurrentDeckCardIds;
+    }
+
+    previousCurrentDeckCardIdsSignature = signature;
+    previousCurrentDeckCardIds = normalizedCardIds;
+    return normalizedCardIds;
+  });
 
   const resetFilters = (): void => {
     filterController.resetFilters();

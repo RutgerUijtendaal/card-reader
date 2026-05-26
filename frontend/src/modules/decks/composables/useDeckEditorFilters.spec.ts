@@ -75,4 +75,20 @@ describe('useDeckEditorFilters', () => {
     builderStep.value = 'setup';
     expect(controller.buildSearchParams().getAll('card_ids')).toEqual([]);
   });
+
+  test('reuses the same current deck card id array when membership is unchanged', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const deckCardIds = ref(['card-a', 'card-b']);
+    const controller = useDeckEditorFilters({
+      deckCardIds,
+      builderStep,
+    });
+
+    controller.setCurrentDeckOnly(true);
+    const initialValue = controller.currentDeckCardIds.value;
+
+    deckCardIds.value = ['card-b', 'card-a', 'card-a'];
+
+    expect(controller.currentDeckCardIds.value).toBe(initialValue);
+  });
 });
