@@ -64,8 +64,10 @@ export const useHoverModePreferences = () => {
       },
     });
 
-  const getEffectiveHoverMode = (surface: HoverModeSurface) =>
-    computed<HoverMode>(() => getOverrideHoverMode(surface).value ?? defaultHoverMode.value);
+  const getEffectiveHoverMode = (surface: HoverModeSurface) => {
+    const overrideHoverMode = getOverrideHoverMode(surface);
+    return computed<HoverMode>(() => overrideHoverMode.value ?? defaultHoverMode.value);
+  };
 
   return {
     defaultHoverMode,

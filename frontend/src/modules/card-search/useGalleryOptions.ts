@@ -39,6 +39,7 @@ export const useGalleryOptions = () => {
     set: (value: number) => {
       const normalized = normalizeStoredOptions(storedOptions.value);
       storedOptions.value = {
+        ...storedOptions.value,
         ...normalized,
         cardScale: clampScale(value),
       };
@@ -50,6 +51,7 @@ export const useGalleryOptions = () => {
     set: (value: boolean) => {
       const normalized = normalizeStoredOptions(storedOptions.value);
       storedOptions.value = {
+        ...storedOptions.value,
         ...normalized,
         showCardGroups: value,
       };
@@ -61,6 +63,7 @@ export const useGalleryOptions = () => {
     set: (value: number) => {
       const normalized = normalizeStoredOptions(storedOptions.value);
       storedOptions.value = {
+        ...storedOptions.value,
         ...normalized,
         pageSize: normalizeCardPageSize(value),
       };

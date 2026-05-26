@@ -51,7 +51,7 @@
 
         <div
           v-else
-          class="grid gap-4 lg:grid-cols-2"
+          class="grid gap-4 px-1 pb-3 pt-2 lg:grid-cols-2"
         >
           <DeckListCard
             v-for="deck in decks"
