@@ -12,7 +12,7 @@
 
       <RouterLink
         class="btn-primary"
-        to="/my/decks/new"
+        :to="buildNewDeckEditorLocation()"
       >
         New Deck
       </RouterLink>
@@ -51,7 +51,7 @@
           </RouterLink>
           <RouterLink
             class="btn-secondary"
-            :to="`/my/decks/${deck.id}/edit`"
+            :to="buildMyDeckEditorLocation(deck.id)"
           >
             Edit
           </RouterLink>
@@ -95,6 +95,7 @@ import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { deleteDeck, fetchMyDecks, updateDeck } from '@/modules/decks/api';
 import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
 import { buildDeckUpsertRequestFromRecord } from '@/modules/decks/deckPayload';
+import { buildMyDeckEditorLocation, buildNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
 import type { DeckRecord } from '@/modules/decks/types';
 
 const decks = ref<DeckRecord[]>([]);

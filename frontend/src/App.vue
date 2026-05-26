@@ -94,7 +94,8 @@
   </div>
   <Toaster
     rich-colors
-    position="top-right"
+    position="bottom-right"
+    close-button
   />
 </template>
 
