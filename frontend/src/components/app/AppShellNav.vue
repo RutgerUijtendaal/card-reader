@@ -46,7 +46,7 @@
           v-if="!collapsed"
           class="min-w-0"
         >
-          <span class="block truncate text-base font-semibold text-white">Maity's Card Game</span>
+          <span class="block truncate text-sm font-semibold text-white">Maity's Card Game</span>
         </span>
       </RouterLink>
 

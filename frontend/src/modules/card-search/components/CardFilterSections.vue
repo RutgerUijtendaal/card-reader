@@ -124,8 +124,11 @@
       v-model="selectedKeywordIds"
       v-model:match-mode="keywordMatch"
       :default-open="isSectionOpenByDefault('keywords')"
+      :favorite-group="state.keywordFavoriteGroup"
+      :favorite-keys="state.keywordFavoriteKeys"
       label="Keywords"
       :options="state.keywordOptions"
+      @toggle-favorite="state.toggleKeywordFavorite"
       @reset="state.resetKeywordGroup"
     />
 
@@ -134,8 +137,11 @@
       v-model="selectedTagIds"
       v-model:match-mode="tagMatch"
       :default-open="isSectionOpenByDefault('tags')"
+      :favorite-group="state.tagFavoriteGroup"
+      :favorite-keys="state.tagFavoriteKeys"
       label="Tags"
       :options="state.tagOptions"
+      @toggle-favorite="state.toggleTagFavorite"
       @reset="state.resetTagGroup"
     />
   </div>

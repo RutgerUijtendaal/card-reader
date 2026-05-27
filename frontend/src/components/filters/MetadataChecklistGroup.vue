@@ -69,19 +69,38 @@
         v-if="filteredOptions.length > 0"
         class="app-scrollbar h-64 space-y-2 overflow-auto pr-1"
       >
-        <label
+        <div
           v-for="option in filteredOptions"
           :key="option.id"
-          class="theme-checkbox-row"
+          class="theme-checkbox-row group justify-between gap-2"
+          :data-option-key="option.key"
         >
-          <input
-            :checked="selectedIds.has(option.id)"
-            type="checkbox"
-            class="theme-checkbox mt-0.5 h-4 w-4 rounded border-slate-300"
-            @change="toggle(option.id)"
+          <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+            <input
+              :checked="selectedIds.has(option.id)"
+              type="checkbox"
+              class="theme-checkbox mt-0.5 h-4 w-4 rounded border-slate-300"
+              @change="toggle(option.id)"
+            >
+            <span class="min-w-0 flex-1">
+              {{ option.label }}
+            </span>
+          </label>
+          <button
+            v-if="favoriteGroup"
+            type="button"
+            class="theme-filter-favorite-button shrink-0"
+            :class="isFavorited(option.key) ? 'theme-filter-favorite-button-active' : ''"
+            :aria-label="`${isFavorited(option.key) ? 'Remove favorite' : 'Add favorite'} ${option.label}`"
+            :title="`${isFavorited(option.key) ? 'Remove favorite' : 'Add favorite'} ${option.label}`"
+            @click.stop.prevent="emit('toggle-favorite', option.key)"
           >
-          <span>{{ option.label }}</span>
-        </label>
+            <Star
+              class="h-4 w-4"
+              :fill="isFavorited(option.key) ? 'currentColor' : 'none'"
+            />
+          </button>
+        </div>
       </div>
 
       <p
@@ -96,37 +115,40 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { ChevronDown, RotateCcw } from 'lucide-vue-next';
-
-type Option = {
-  id: string;
-  label: string;
-};
+import { ChevronDown, RotateCcw, Star } from 'lucide-vue-next';
+import type { MetadataOption } from '@/modules/card-detail/types';
+import type { MetadataFavoriteGroup } from '@/modules/card-filters/useMetadataFilterFavorites';
 
 const props = withDefaults(
   defineProps<{
     label: string;
-    options: Option[];
+    options: MetadataOption[];
     modelValue: string[];
     matchMode: 'any' | 'all';
     defaultOpen?: boolean;
     showReset?: boolean;
+    favoriteGroup?: MetadataFavoriteGroup;
+    favoriteKeys?: string[];
   }>(),
   {
     defaultOpen: false,
     showReset: true,
+    favoriteGroup: undefined,
+    favoriteKeys: () => [],
   },
 );
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string[]): void;
   (e: 'update:matchMode', value: 'any' | 'all'): void;
+  (e: 'toggle-favorite', value: string): void;
   (e: 'reset'): void;
 }>();
 
 const isOpen = ref(props.defaultOpen);
 const searchTerm = ref('');
 const selectedIds = computed(() => new Set(props.modelValue));
+const favoriteKeysSet = computed(() => new Set(props.favoriteKeys));
 
 watch(isOpen, (open) => {
   if (!open) {
@@ -136,10 +158,13 @@ watch(isOpen, (open) => {
 
 const filteredOptions = computed(() => {
   const term = searchTerm.value.trim().toLowerCase();
-  if (!term) {
-    return props.options;
-  }
-  return props.options.filter((option) => option.label.toLowerCase().includes(term));
+  const matchingOptions = !term
+    ? props.options
+    : props.options.filter((option) => option.label.toLowerCase().includes(term));
+
+  const favoriteOptions = matchingOptions.filter((option) => favoriteKeysSet.value.has(option.key));
+  const normalOptions = matchingOptions.filter((option) => !favoriteKeysSet.value.has(option.key));
+  return [...favoriteOptions, ...normalOptions];
 });
 
 const emptyState = computed(() =>
@@ -155,4 +180,6 @@ const toggle = (id: string): void => {
   }
   emit('update:modelValue', Array.from(next));
 };
+
+const isFavorited = (key: string): boolean => favoriteKeysSet.value.has(key);
 </script>

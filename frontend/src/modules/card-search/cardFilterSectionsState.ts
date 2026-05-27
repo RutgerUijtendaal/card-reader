@@ -1,4 +1,5 @@
 import type { MetadataOption, SymbolFilterOption } from '@/modules/card-detail/types';
+import type { MetadataFavoriteGroup } from '@/modules/card-filters/useMetadataFilterFavorites';
 
 export type MatchMode = 'any' | 'all';
 export type SymbolFilterTriState = 'off' | 'include' | 'exclude';
@@ -67,11 +68,17 @@ export type CardFilterSectionsState = {
   keywordMatch: MatchMode;
   onUpdateKeywordMatch: (value: MatchMode) => void;
   keywordOptions: MetadataOption[];
+  keywordFavoriteGroup: MetadataFavoriteGroup;
+  keywordFavoriteKeys: string[];
+  toggleKeywordFavorite: (key: string) => void;
   resetKeywordGroup: () => void;
   selectedTagIds: string[];
   onUpdateSelectedTagIds: (value: string[]) => void;
   tagMatch: MatchMode;
   onUpdateTagMatch: (value: MatchMode) => void;
   tagOptions: MetadataOption[];
+  tagFavoriteGroup: MetadataFavoriteGroup;
+  tagFavoriteKeys: string[];
+  toggleTagFavorite: (key: string) => void;
   resetTagGroup: () => void;
 };

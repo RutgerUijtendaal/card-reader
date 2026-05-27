@@ -788,6 +788,31 @@
     background: var(--color-surface-soft);
   }
 
+  .theme-filter-favorite-button {
+    @apply rounded-full p-1 transition-opacity;
+    color: var(--color-text-soft);
+    opacity: 0;
+  }
+
+  .group:hover .theme-filter-favorite-button {
+    opacity: 1;
+  }
+
+  .theme-filter-favorite-button:hover {
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+  }
+
+  .theme-filter-favorite-button-active {
+    color: var(--color-text-muted);
+    background: var(--color-surface-soft);
+    opacity: 1;
+  }
+
+  .theme-filter-favorite-button-active:hover {
+    color: var(--color-text);
+  }
+
   .theme-inline-muted {
     color: var(--color-text-muted);
   }
