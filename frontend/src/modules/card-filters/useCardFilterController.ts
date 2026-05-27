@@ -4,6 +4,7 @@ import type { CardFiltersResponse } from '@/modules/card-detail/types';
 import { createCardFilterCatalog, type CardFilterState } from '@/modules/card-filters/cardFilterState';
 import { useCardFilterSectionsState } from '@/modules/card-filters/useCardFilterSectionsState';
 import { useCardFilterState } from '@/modules/card-filters/useCardFilterState';
+import { useMetadataFilterFavorites } from '@/modules/card-filters/useMetadataFilterFavorites';
 
 const EMPTY_FILTERS: CardFiltersResponse = {
   keywords: [],
@@ -17,7 +18,17 @@ export const useCardFilterController = () => {
   const filtersLoaded = ref(false);
   const filterCatalog = computed(() => createCardFilterCatalog(filters.value));
   const filterState = useCardFilterState(filterCatalog);
-  const sections = useCardFilterSectionsState(filterState, filters, filterCatalog);
+  const favorites = useMetadataFilterFavorites();
+  const sections = useCardFilterSectionsState(
+    filterState,
+    filters,
+    filterCatalog,
+    {
+      keywords: favorites.getFavoriteKeys('keywords'),
+      tags: favorites.getFavoriteKeys('tags'),
+    },
+    favorites.toggleFavorite,
+  );
 
   const updateQuery = (value: string): void => {
     filterState.query.value = value;

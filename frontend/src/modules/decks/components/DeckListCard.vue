@@ -9,9 +9,7 @@
   >
     <div :class="contentLayoutClass">
       <div :class="mainColumnClass">
-        <div
-          :class="mediaRowClass"
-        >
+        <div :class="mediaRowClass">
           <div
             class="theme-card-frame-muted theme-card-image-well flex shrink-0 items-center justify-center rounded-xl"
             :class="imageFrameClass"
@@ -101,19 +99,42 @@
             </p>
           </div>
         </div>
-      </div>
 
-      <div
-        v-if="mode === 'browse'"
-        :class="curveColumnClass"
-      >
-        <DeckManaCurve
-          class="w-full"
-          :entries="deck.mainboard.entries"
-          title="Curve"
-          empty-label="No mainboard cards yet."
-          compact
-        />
+        <div
+          v-if="mode === 'browse'"
+          class="deck-list-card-browse-details"
+        >
+          <div class="deck-list-card-browse-details-inner theme-divider grid gap-4 border-t pt-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(12rem,1.05fr)]">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <article
+                v-for="item in browseMetadata"
+                :key="item.label"
+                class="theme-card-frame-muted rounded-xl px-3 py-3"
+              >
+                <p class="theme-kicker text-[10px] font-semibold uppercase tracking-[0.16em]">
+                  {{ item.label }}
+                </p>
+                <p class="theme-section-title mt-1 text-sm font-semibold">
+                  {{ item.value }}
+                </p>
+                <p
+                  v-if="item.hint"
+                  class="theme-section-muted mt-1 text-xs"
+                >
+                  {{ item.hint }}
+                </p>
+              </article>
+            </div>
+
+            <DeckManaCurve
+              class="w-full"
+              :entries="deck.mainboard.entries"
+              title="Mainboard Curve"
+              empty-label="No mainboard cards yet."
+              compact
+            />
+          </div>
+        </div>
       </div>
 
       <div
@@ -162,10 +183,13 @@ const rootProps = computed(() => {
 const titleTag = computed(() => (isCardLink.value ? 'h3' : props.titleTo ? 'RouterLink' : 'h3'));
 const titleProps = computed(() => (!isCardLink.value && props.titleTo ? { to: props.titleTo } : {}));
 const formatDate = (value: string): string => new Date(value).toLocaleDateString();
+const formatCountLabel = (count: number, singular: string, plural: string): string => (count === 1 ? singular : plural);
 const visibilityLabel = computed(() => deckVisibilityLabels[props.deck.visibility]);
 const visibilityBadgeClass = computed(() => deckVisibilityBadgeClasses[props.deck.visibility]);
 const layoutClass = computed(() => [
+  'deck-list-card',
   'page-card',
+  props.mode === 'browse' ? 'deck-list-card--browse group transition duration-200 xl:hover:-translate-y-1' : '',
   props.titleTo
     ? 'block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
     : '',
@@ -173,17 +197,38 @@ const layoutClass = computed(() => [
 const contentLayoutClass = computed(() =>
   props.mode === 'owned'
     ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-stretch'
-    : 'flex flex-col gap-4 xl:flex-row xl:items-start',
+    : 'flex flex-col gap-4',
 );
 const mainColumnClass = computed(() => 'min-w-0 flex-1');
 const mediaRowClass = computed(() => (props.mode === 'browse' ? 'flex min-w-0 gap-4' : 'flex min-w-0 gap-4'));
 const imageFrameClass = computed(() => (props.mode === 'browse' ? 'h-36 w-28' : 'h-44 w-31'));
-const curveColumnClass = computed(() => (props.mode === 'browse' ? 'w-full xl:w-[13rem] xl:shrink-0' : 'w-full xl:w-[16.5rem] xl:shrink-0'));
 const actionsColumnClass = computed(() =>
   props.mode === 'owned'
     ? 'theme-divider flex h-full items-stretch justify-end xl:border-l xl:pl-4'
     : 'flex flex-wrap gap-2 lg:shrink-0',
 );
+const browseMetadata = computed(() => [
+  {
+    label: 'Mainboard',
+    value: `${props.deck.mainboard.total_cards} cards`,
+    hint: `${props.deck.mainboard.unique_cards} unique`,
+  },
+  {
+    label: 'All Boards',
+    value: `${props.deck.totals.overall_total_cards} cards`,
+    hint: `${props.deck.totals.overall_unique_cards} unique`,
+  },
+  {
+    label: 'Side Decks',
+    value: `${props.deck.sideboards.length}`,
+    hint: formatCountLabel(props.deck.sideboards.length, '1 side deck', `${props.deck.sideboards.length} side decks`),
+  },
+  {
+    label: 'Status',
+    value: props.deck.status.label,
+    hint: props.deck.status.issues[0] ?? 'Ready to inspect',
+  },
+]);
 
 const interactiveSelector =
   'a, button, input, select, textarea, summary, details, [role="button"], [data-card-click-ignore="true"]';
@@ -216,3 +261,94 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
   navigateToCard();
 };
 </script>
+
+<style scoped>
+@media (min-width: 1280px) {
+  .deck-list-card--browse {
+    position: relative;
+    overflow: visible;
+    isolation: isolate;
+    transition:
+      transform 200ms ease,
+      box-shadow 220ms ease,
+      border-color 220ms ease;
+  }
+
+  .deck-list-card--browse:hover,
+  .deck-list-card--browse:focus-visible,
+  .deck-list-card--browse:focus-within {
+    z-index: 20;
+    box-shadow:
+      0 22px 40px rgba(15, 23, 42, 0.12),
+      0 8px 16px rgba(15, 23, 42, 0.08);
+  }
+
+  .deck-list-card-browse-details {
+    position: absolute;
+    top: calc(100% - 1.1rem);
+    left: 0.85rem;
+    right: 0.85rem;
+    z-index: 30;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-0.8rem) scaleY(0.98);
+    transform-origin: top center;
+    transition:
+      opacity 180ms ease,
+      transform 220ms ease;
+  }
+
+  .deck-list-card-browse-details::before {
+    content: '';
+    position: absolute;
+    top: -0.85rem;
+    left: 1.75rem;
+    width: 8.5rem;
+    height: 1.4rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent 26%);
+    border-bottom: none;
+    border-radius: 1rem 1rem 0 0;
+    background: color-mix(in srgb, var(--color-surface) 94%, transparent 6%);
+    box-shadow: 0 -6px 12px rgba(15, 23, 42, 0.04);
+  }
+
+  .deck-list-card-browse-details-inner {
+    position: relative;
+    border: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent 26%);
+    border-radius: 1.15rem;
+    background: color-mix(in srgb, var(--color-surface) 94%, transparent 6%);
+    box-shadow:
+      0 24px 44px rgba(15, 23, 42, 0.18),
+      0 10px 18px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(10px);
+  }
+
+  .deck-list-card-browse-details-inner::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 1.25rem;
+    width: 9rem;
+    height: 1.1rem;
+    background: color-mix(in srgb, var(--color-surface) 94%, transparent 6%);
+    border-top-left-radius: 0.9rem;
+    border-top-right-radius: 0.9rem;
+  }
+
+  .deck-list-card--browse:hover .deck-list-card-browse-details,
+  .deck-list-card--browse:focus-visible .deck-list-card-browse-details,
+  .deck-list-card--browse:focus-within .deck-list-card-browse-details {
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@media (max-width: 1279px) {
+  .deck-list-card-browse-details {
+    max-height: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+</style>

@@ -20,6 +20,7 @@
           activation-label="Add card to deck"
           :activation-disabled="card.result_type !== 'card' || controller.deck.galleryActionDisabled(card)"
           @activate="handleActivate"
+          @contextmenu="handleContextMenu($event, card)"
         >
           <template #overlay>
             <div
@@ -36,7 +37,7 @@
                 <button
                   class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold disabled:cursor-not-allowed disabled:border-[color:var(--color-disabled-border)] disabled:bg-[color:var(--color-disabled-bg)] disabled:text-[color:var(--color-disabled-text)] disabled:opacity-100"
                   type="button"
-                  :disabled="getEntryQuantity(card.id) === 0"
+                  :disabled="controller.deck.galleryRemoveActionDisabled(card.id)"
                   aria-label="Remove copy from deck"
                   @click.stop="removeCopy(card.id)"
                 >
@@ -81,7 +82,7 @@
 import { computed, watchEffect, ref } from 'vue';
 import { Minus, Plus } from 'lucide-vue-next';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
-import { createLoadingShimItems } from '@/components/cards/galleryDisplayItems';
+import { createLoadingShimItems, type GalleryDisplayItem } from '@/components/cards/galleryDisplayItems';
 import type { GalleryItem } from '@/modules/card-detail/types';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
@@ -115,15 +116,16 @@ const addCopy = (card: GalleryItem): void => {
 };
 
 const removeCopy = (cardId: string): void => {
-  const quantity = getEntryQuantity(cardId);
-  if (quantity <= 0) {
+  props.controller.deck.handleGalleryRemoveAction(cardId);
+};
+
+const handleContextMenu = (event: MouseEvent, card: GalleryDisplayItem): void => {
+  if (card.result_type !== 'card' || props.controller.deck.galleryRemoveActionDisabled(card.id)) {
     return;
   }
-  if (quantity === 1) {
-    props.controller.deck.removeEntry(cardId);
-    return;
-  }
-  props.controller.deck.changeQuantity(cardId, -1);
+
+  event.preventDefault();
+  props.controller.deck.handleGalleryRemoveAction(card.id);
 };
 
 watchEffect(() => {

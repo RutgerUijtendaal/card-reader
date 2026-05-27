@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import type { ComputedRef, Ref } from 'vue';
 import type { CardFiltersResponse } from '@/modules/card-detail/types';
 import type { CardFilterCatalog } from '@/modules/card-filters/cardFilterState';
+import type { MetadataFavoriteGroup } from '@/modules/card-filters/useMetadataFilterFavorites';
 import type { ReturnTypeUseCardFilterState } from '@/modules/card-filters/useCardFilterState';
 import type { CardFilterSectionsState, MatchMode } from '@/modules/card-search/cardFilterSectionsState';
 
@@ -27,6 +28,8 @@ export const useCardFilterSectionsState = (
   filterState: ReturnTypeUseCardFilterState,
   filters: Ref<CardFiltersResponse>,
   filterCatalog: ComputedRef<CardFilterCatalog>,
+  favoriteKeys: Record<MetadataFavoriteGroup, ComputedRef<string[]>>,
+  toggleFavorite: (group: MetadataFavoriteGroup, key: string) => void,
 ) => {
   const resetManaGroup = (): void => {
     filterState.manaTypeSymbolIds.value = [];
@@ -129,12 +132,18 @@ export const useCardFilterSectionsState = (
     keywordMatch: filterState.keywordMatch.value,
     onUpdateKeywordMatch: createMatchModeUpdater(filterState.keywordMatch),
     keywordOptions: filters.value.keywords,
+    keywordFavoriteGroup: 'keywords',
+    keywordFavoriteKeys: favoriteKeys.keywords.value,
+    toggleKeywordFavorite: (key: string) => toggleFavorite('keywords', key),
     resetKeywordGroup,
     selectedTagIds: filterState.tagIds.value,
     onUpdateSelectedTagIds: createArrayUpdater(filterState.tagIds),
     tagMatch: filterState.tagMatch.value,
     onUpdateTagMatch: createMatchModeUpdater(filterState.tagMatch),
     tagOptions: filters.value.tags,
+    tagFavoriteGroup: 'tags',
+    tagFavoriteKeys: favoriteKeys.tags.value,
+    toggleTagFavorite: (key: string) => toggleFavorite('tags', key),
     resetTagGroup,
   }));
 
