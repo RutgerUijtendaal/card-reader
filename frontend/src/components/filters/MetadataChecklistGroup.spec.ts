@@ -101,6 +101,24 @@ describe('MetadataChecklistGroup', () => {
     mounted.unmount();
   });
 
+  test('keyboard focus reveals favourite actions within the row', async () => {
+    const mounted = await mountChecklist();
+
+    const favoriteButtons = mounted.container.querySelectorAll<HTMLButtonElement>('.theme-filter-favorite-button');
+    const button = favoriteButtons[1];
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error('expected favorite button');
+    }
+
+    button.focus();
+    await nextTick();
+
+    expect(document.activeElement).toBe(button);
+    expect(button.closest('.theme-checkbox-row')?.matches(':focus-within')).toBe(true);
+
+    mounted.unmount();
+  });
+
   test('search results keep favourites at the top of the filtered subset', async () => {
     const mounted = await mountChecklist(['delta']);
 

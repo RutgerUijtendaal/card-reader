@@ -788,19 +788,32 @@
     background: var(--color-surface-soft);
   }
 
+  .theme-checkbox-row:focus-within {
+    background: var(--color-surface-soft);
+  }
+
   .theme-filter-favorite-button {
     @apply rounded-full p-1 transition-opacity;
     color: var(--color-text-soft);
     opacity: 0;
   }
 
-  .group:hover .theme-filter-favorite-button {
+  .group:hover .theme-filter-favorite-button,
+  .theme-checkbox-row:focus-within .theme-filter-favorite-button {
     opacity: 1;
   }
 
   .theme-filter-favorite-button:hover {
     background: var(--color-surface-soft);
     color: var(--color-text);
+  }
+
+  .theme-filter-favorite-button:focus-visible {
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+    opacity: 1;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-input-ring);
   }
 
   .theme-filter-favorite-button-active {
