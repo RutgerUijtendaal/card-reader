@@ -1,12 +1,13 @@
 <template>
   <div
     class="group flex w-full justify-center"
-    @mouseenter="hovered = true"
-    @mouseleave="hovered = false"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
   >
     <div
       ref="triggerRef"
-      class="relative origin-center transition duration-200 hover:-translate-y-1 hover:scale-[1.02]"
+      class="relative origin-center"
+      :class="isLoadingShim ? '' : 'transition duration-200 hover:-translate-y-1 hover:scale-[1.02]'"
       :style="cardFrameStyle"
     >
       <component
@@ -15,7 +16,10 @@
         class="block w-full bg-transparent p-0 text-left disabled:cursor-not-allowed"
         @click="handleActivate"
       >
-        <template v-if="isCardGroup">
+        <template v-if="isLoadingShim">
+          <CardLoadingSkeleton />
+        </template>
+        <template v-else-if="isCardGroup">
           <div class="relative h-full w-full rounded-2xl">
             <div
               class="theme-card-frame-muted absolute inset-2 rounded-2xl"
@@ -25,14 +29,21 @@
               class="theme-card-frame-muted absolute inset-2 rounded-2xl"
               :style="{ transform: 'translate(0.1rem, 0.0rem) rotate(2deg)' }"
             />
-            <div class="relative h-full overflow-hidden rounded-2xl">
+            <div class="theme-card-image-well relative h-full overflow-hidden rounded-2xl">
+              <CardLoadingSkeleton
+                v-if="!groupImageLoaded"
+                class="absolute inset-0"
+              />
               <img
                 v-if="stackCards[0]?.image_url"
                 :src="toAbsoluteApiUrl(stackCards[0].image_url)"
                 :alt="stackCards[0].name"
-                class="block h-full w-full object-contain"
+                class="block h-full w-full object-contain transition duration-300"
+                :class="groupImageLoaded ? 'opacity-100' : 'opacity-0'"
                 loading="lazy"
                 decoding="async"
+                @load="groupImageLoaded = true"
+                @error="groupImageLoaded = true"
               >
               <div
                 v-else
@@ -54,19 +65,28 @@
           </div>
         </template>
         <template v-else>
-          <div class="relative w-full overflow-hidden rounded-2xl">
+          <div
+            class="theme-card-image-well relative w-full overflow-hidden rounded-2xl"
+            :style="{ aspectRatio: DEFAULT_CARD_ASPECT_RATIO }"
+          >
+            <CardLoadingSkeleton
+              v-if="!cardImageLoaded"
+              class="absolute inset-0"
+            />
             <img
               v-if="cardItem?.image_url"
               :src="toAbsoluteApiUrl(cardItem.image_url)"
               alt="Card image"
-              class="block h-auto w-full object-contain"
+              class="absolute inset-0 h-full w-full object-contain transition duration-300"
+              :class="cardImageLoaded ? 'opacity-100' : 'opacity-0'"
               loading="lazy"
               decoding="async"
+              @load="cardImageLoaded = true"
+              @error="cardImageLoaded = true"
             >
             <div
               v-else
-              class="theme-empty-state flex w-full items-center justify-center rounded-xl text-sm"
-              :style="{ aspectRatio: DEFAULT_CARD_ASPECT_RATIO }"
+              class="theme-empty-state absolute inset-0 flex items-center justify-center rounded-xl text-sm"
             >
               No image
             </div>
@@ -110,7 +130,10 @@
         <slot name="overlay" />
       </div>
 
-      <div class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3 opacity-0 transition duration-200 group-hover:opacity-100">
+      <div
+        v-if="!isLoadingShim"
+        class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3 opacity-0 transition duration-200 group-hover:opacity-100"
+      >
         <slot
           name="hover-actions"
           :card-item="cardItem"
@@ -129,14 +152,16 @@ import type { RouteLocationRaw } from 'vue-router';
 import { RouterLink, useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import { fetchHoverPreviewCard } from '@/components/cards/cardHoverPreview';
+import type { GalleryDisplayItem } from '@/components/cards/galleryDisplayItems';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
+import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
 import { buildCardDetailLocation, buildGalleryItemLocation } from '@/modules/card-search/galleryNavigation';
 import { DEFAULT_HOVER_MODE, type HoverMode } from '@/modules/card-search/hoverMode';
 import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';
 
 const props = withDefaults(
   defineProps<{
-    card: GalleryItem;
+    card: GalleryDisplayItem;
     hoverMode?: HoverMode;
     cardHeightRem?: number;
     activationMode?: 'navigate' | 'emit';
@@ -163,6 +188,9 @@ const hovered = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
 const hoverPanelRef = ref<HTMLElement | null>(null);
 const groupHoverCard = ref<CardListItem | null>(null);
+const cardImageLoaded = ref(false);
+const groupImageLoaded = ref(false);
+const isLoadingShim = computed((): boolean => props.card.result_type === 'loading_shim');
 const isCard = computed((): boolean => props.card.result_type === 'card');
 const isCardGroup = computed((): boolean => props.card.result_type === 'card_group');
 const cardItem = computed<CardListItem | null>(() => (isCard.value ? props.card as CardListItem : null));
@@ -175,7 +203,7 @@ const previewImageAlt = computed(() => cardItem.value?.name ?? previewCard.value
 const showEnlargedPreview = computed(() => props.hoverMode === 'enlarged' || props.hoverMode === 'enlarged-details');
 const showDetailsPreview = computed(() => props.hoverMode === 'details' || props.hoverMode === 'enlarged-details');
 const showHoverOverlay = computed(() => {
-  if (!hovered.value || props.hoverMode === 'none') {
+  if (!hovered.value || props.hoverMode === 'none' || isLoadingShim.value) {
     return false;
   }
 
@@ -204,14 +232,23 @@ const cardFrameStyle = computed(() =>
         maxWidth: '100%',
       },
 );
-const detailLocation = computed<RouteLocationRaw>(() => buildGalleryItemLocation(props.card, route.query, 'detail'));
+const detailLocation = computed<RouteLocationRaw>(() =>
+  isLoadingShim.value ? '/cards' : buildGalleryItemLocation(props.card as GalleryItem, route.query, 'detail'),
+);
 const editLocation = computed(() =>
   cardItem.value ? buildCardDetailLocation(cardItem.value.id, route.query, 'edit') : '/cards',
 );
 const navigationTarget = computed<RouteLocationRaw>(() => props.navigationTarget ?? detailLocation.value);
-const activationTag = computed(() => (props.activationMode === 'emit' ? 'button' : RouterLink));
+const activationTag = computed(() => {
+  if (isLoadingShim.value) {
+    return 'div';
+  }
+  return props.activationMode === 'emit' ? 'button' : RouterLink;
+});
 const activationProps = computed(() =>
-  props.activationMode === 'emit'
+  isLoadingShim.value
+    ? {}
+    : props.activationMode === 'emit'
     ? {
         type: 'button',
         'aria-label': props.activationLabel,
@@ -223,10 +260,40 @@ const activationProps = computed(() =>
 );
 
 const handleActivate = (): void => {
+  if (isLoadingShim.value) {
+    return;
+  }
   if (props.activationMode === 'emit' && !props.activationDisabled) {
-    emit('activate', props.card);
+    emit('activate', props.card as GalleryItem);
   }
 };
+
+const handleMouseEnter = (): void => {
+  if (isLoadingShim.value) {
+    return;
+  }
+  hovered.value = true;
+};
+
+const handleMouseLeave = (): void => {
+  hovered.value = false;
+};
+
+watch(
+  () => cardItem.value?.image_url ?? null,
+  () => {
+    cardImageLoaded.value = false;
+  },
+  { immediate: true },
+);
+
+watch(
+  () => stackCards.value[0]?.image_url ?? null,
+  () => {
+    groupImageLoaded.value = false;
+  },
+  { immediate: true },
+);
 
 watch(
   () => groupItem.value?.anchor_card_id ?? null,

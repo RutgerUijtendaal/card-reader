@@ -33,7 +33,9 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
 }: UseCardCollectionOptions<TCard>) => {
   const galleryState = shallowRef(createEmptyGalleryPageState<TCard>());
   const isLoadingInitial = ref(false);
+  const isRefreshing = ref(false);
   const isLoadingPage = ref(false);
+  const hasLoadedOnce = ref(false);
   const loadMoreSentinelRef = ref<HTMLElement | null>(null);
   let latestSearchRequestId = 0;
 
@@ -47,8 +49,10 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     params.set('page', String(page));
     params.set('page_size', String(readPageSize(pageSize)));
 
-    if (mode === 'replace') {
+    if (mode === 'replace' && !hasLoadedOnce.value) {
       isLoadingInitial.value = true;
+    } else if (mode === 'replace') {
+      isRefreshing.value = true;
     } else {
       isLoadingPage.value = true;
     }
@@ -63,21 +67,22 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
         mode === 'replace'
           ? replaceGalleryPage(response.data)
           : appendGalleryPage(galleryState.value, response.data, identity);
+      hasLoadedOnce.value = true;
     } finally {
       if (requestId === latestSearchRequestId) {
         isLoadingInitial.value = false;
+        isRefreshing.value = false;
         isLoadingPage.value = false;
       }
     }
   };
 
   const searchCards = async (): Promise<void> => {
-    galleryState.value = createEmptyGalleryPageState<TCard>();
     await loadCardsPage(1, 'replace');
   };
 
   const loadNextPage = async (): Promise<void> => {
-    if (isLoadingInitial.value || isLoadingPage.value || nextPage.value === null) {
+    if (isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
       return;
     }
     await loadCardsPage(nextPage.value, 'append');
@@ -120,7 +125,9 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     totalCount,
     nextPage,
     isLoadingInitial,
+    isRefreshing,
     isLoadingPage,
+    hasLoadedOnce,
     searchCards,
     loadNextPage,
     setLoadMoreSentinel,

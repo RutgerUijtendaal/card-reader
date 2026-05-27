@@ -6,7 +6,7 @@
         :style="controller.gallery.galleryGridStyle.value"
       >
         <CardGalleryItem
-          v-for="card in controller.gallery.galleryCards.value"
+          v-for="card in displayItems"
           :key="card.id"
           class="justify-self-center"
           :style="{
@@ -18,12 +18,12 @@
           :card-height-rem="controller.gallery.cardHeightRem.value"
           activation-mode="emit"
           activation-label="Add card to deck"
-          :activation-disabled="controller.deck.galleryActionDisabled(card)"
+          :activation-disabled="card.result_type !== 'card' || controller.deck.galleryActionDisabled(card)"
           @activate="handleActivate"
         >
           <template #overlay>
             <div
-              v-if="!controller.deck.isSetupStep.value"
+              v-if="!controller.deck.isSetupStep.value && card.result_type === 'card'"
               class="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3"
             >
               <DeckCardCountBadge
@@ -58,7 +58,7 @@
       </div>
 
       <div
-        v-if="controller.gallery.galleryCards.value.length > 0"
+        v-if="controller.gallery.hasLoadedOnce.value && !controller.gallery.isRefreshing.value && controller.gallery.galleryCards.value.length > 0"
         ref="sentinelRef"
         class="theme-section-muted flex justify-center py-4 text-sm"
       >
@@ -68,7 +68,7 @@
       </div>
 
       <div
-        v-if="!controller.gallery.isLoadingInitial.value && controller.gallery.galleryCards.value.length === 0"
+        v-if="controller.gallery.hasLoadedOnce.value && !controller.gallery.isLoadingInitial.value && !controller.gallery.isRefreshing.value && controller.gallery.galleryCards.value.length === 0"
         class="page-card theme-section-muted text-sm"
       >
         {{ controller.deck.isSetupStep.value ? 'No hero cards found for the current search.' : 'No cards found for the current filters.' }}
@@ -78,9 +78,10 @@
 </template>
 
 <script setup lang="ts">
-import { watchEffect, ref } from 'vue';
+import { computed, watchEffect, ref } from 'vue';
 import { Minus, Plus } from 'lucide-vue-next';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
+import { createLoadingShimItems } from '@/components/cards/galleryDisplayItems';
 import type { GalleryItem } from '@/modules/card-detail/types';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
@@ -90,6 +91,11 @@ const props = defineProps<{
 }>();
 
 const sentinelRef = ref<HTMLElement | null>(null);
+const displayItems = computed(() =>
+  (!props.controller.gallery.hasLoadedOnce.value || props.controller.gallery.isRefreshing.value)
+    ? createLoadingShimItems(props.controller.gallery.loadingShimCount.value)
+    : props.controller.gallery.galleryCards.value,
+);
 
 const handleActivate = (card: GalleryItem): void => {
   if (card.result_type !== 'card') {

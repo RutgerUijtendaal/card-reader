@@ -57,7 +57,7 @@
         :style="galleryGridStyle"
       >
         <CardGalleryItem
-          v-for="card in cards"
+          v-for="card in displayItems"
           :key="`${card.result_type}:${card.id}`"
           :card="card"
           :hover-mode="effectiveHoverMode"
@@ -80,7 +80,7 @@
       </div>
 
       <div
-        v-if="cards.length > 0"
+        v-if="hasLoadedOnce && !isRefreshing && cards.length > 0"
         ref="loadMoreSentinelRef"
         class="theme-section-muted flex justify-center py-4 text-sm"
       >
@@ -90,7 +90,7 @@
       </div>
 
       <div
-        v-if="!isLoadingInitial && cards.length === 0"
+        v-if="hasLoadedOnce && !isLoadingInitial && !isRefreshing && cards.length === 0"
         class="page-card theme-section-muted text-sm"
       >
         No cards found for the current filters.
@@ -105,6 +105,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Download, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/composables/useCsvExport';
+import { createLoadingShimItems } from '@/components/cards/galleryDisplayItems';
 import { useScrollContainer } from '@/composables/useScrollContainer';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
@@ -180,12 +181,20 @@ const cards = collection.cards;
 const totalCount = collection.totalCount;
 const nextPage = collection.nextPage;
 const isLoadingInitial = collection.isLoadingInitial;
+const isRefreshing = collection.isRefreshing;
 const isLoadingPage = collection.isLoadingPage;
+const hasLoadedOnce = collection.hasLoadedOnce;
 const cardHeightRem = computed(() => Number((27 * cardScale.value).toFixed(2)));
 const galleryGridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(290 * cardScale.value)}px, 1fr))`,
 }));
 const gallerySortOverride = computed(() => overrideSort.value);
+const loadingShimCount = computed(() => pageSize.value);
+const displayItems = computed(() =>
+  (!hasLoadedOnce.value || isRefreshing.value)
+    ? createLoadingShimItems(loadingShimCount.value)
+    : cards.value,
+);
 
 const restoreScroll = (value: number): void => {
   window.requestAnimationFrame(() => {
@@ -287,7 +296,9 @@ watch(
     if (snapshot) {
       collection.galleryState.value = snapshot.pageState;
       isLoadingInitial.value = false;
+      isRefreshing.value = false;
       isLoadingPage.value = false;
+      collection.hasLoadedOnce.value = true;
       saveGallerySnapshot(searchParams, snapshot.pageState, snapshot.scrollTop);
       await nextTick();
       restoreScroll(snapshot.scrollTop);

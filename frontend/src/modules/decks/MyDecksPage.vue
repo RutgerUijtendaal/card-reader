@@ -42,15 +42,16 @@
         :key="deck.id"
         :deck="deck"
         mode="owned"
+        :title-to="`/my/decks/${deck.id}`"
       >
         <template #actions>
           <div class="flex h-full min-h-[7.5rem] min-w-[11rem] max-w-[11rem] flex-col justify-between">
             <div class="flex items-center gap-2">
               <RouterLink
                 class="btn-secondary flex-1"
-                :to="`/my/decks/${deck.id}`"
+                :to="buildMyDeckEditorLocation(deck.id)"
               >
-                Open
+                Edit
               </RouterLink>
               <ExtraActionsMenu button-label="Open deck actions">
                 <template #default="{ close }">
