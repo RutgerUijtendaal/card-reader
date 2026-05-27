@@ -120,11 +120,14 @@ const removeCopy = (cardId: string): void => {
 };
 
 const handleContextMenu = (event: MouseEvent, card: GalleryDisplayItem): void => {
-  if (card.result_type !== 'card' || props.controller.deck.galleryRemoveActionDisabled(card.id)) {
+  if (card.result_type !== 'card') {
     return;
   }
 
   event.preventDefault();
+  if (props.controller.deck.galleryRemoveActionDisabled(card.id)) {
+    return;
+  }
   props.controller.deck.handleGalleryRemoveAction(card.id);
 };
 

@@ -30,6 +30,12 @@ export type DeckForm = {
 };
 
 export type BuilderStep = 'setup' | 'build';
+export type DeckBoardMoveDestination = {
+  boardId: string;
+  label: string;
+  description?: string;
+  disabled: boolean;
+};
 
 type UseDeckEditorDraftOptions = {
   builderStep: Ref<BuilderStep>;
@@ -297,6 +303,13 @@ export const useDeckEditorDraft = ({
   const getEntryQuantity = (cardId: string, boardId = activeBoardId.value): number =>
     getBoardEntries(boardId).find((entry) => entry.card_id === cardId)?.quantity ?? 0;
 
+  const getBoardLabel = (boardId: string): string => {
+    if (boardId === MAINBOARD_ID) {
+      return 'Mainboard';
+    }
+    return form.sideboards.find((sideboard) => sideboard.id === boardId)?.name.trim() || 'Untitled Sideboard';
+  };
+
   const updateBoardEntries = (boardId: string, entries: DeckFormEntry[]): void => {
     if (boardId === MAINBOARD_ID) {
       form.entries = entries;
@@ -414,6 +427,96 @@ export const useDeckEditorDraft = ({
     return getEntryQuantity(cardId, boardId) <= 0;
   };
 
+  const boardRowActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
+    if (isSetupStep.value) {
+      return true;
+    }
+
+    const quantity = getEntryQuantity(cardId, boardId);
+    if (quantity <= 0) {
+      return true;
+    }
+    if (boardId === MAINBOARD_ID) {
+      return quantity >= MAX_DECK_COPIES || totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT;
+    }
+    return quantity >= MAX_SIDEBOARD_ENTRY_QUANTITY;
+  };
+
+  const boardRowSecondaryActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
+    if (isSetupStep.value) {
+      return true;
+    }
+    return getEntryQuantity(cardId, boardId) <= 1;
+  };
+
+  const getMoveEntryToBoardValidationError = (
+    cardId: string,
+    destinationBoardId: string,
+    sourceBoardId = activeBoardId.value,
+  ): string | null => {
+    if (isSetupStep.value) {
+      return 'Cards cannot be moved during setup.';
+    }
+    if (destinationBoardId === sourceBoardId) {
+      return 'Card is already on that board.';
+    }
+
+    const sourceQuantity = getEntryQuantity(cardId, sourceBoardId);
+    if (sourceQuantity <= 0) {
+      return 'Card is not on the current board.';
+    }
+
+    const destinationQuantity = getEntryQuantity(cardId, destinationBoardId);
+    const nextDestinationQuantity = destinationQuantity + sourceQuantity;
+
+    if (destinationBoardId === MAINBOARD_ID) {
+      if (nextDestinationQuantity > MAX_DECK_COPIES) {
+        return `Mainboard copy limit is ${MAX_DECK_COPIES}.`;
+      }
+      if (totalMainboardCards.value + sourceQuantity > MAX_MAINBOARD_CARD_COUNT) {
+        return `Mainboard cannot exceed ${MAX_MAINBOARD_CARD_COUNT} cards.`;
+      }
+      return null;
+    }
+
+    if (nextDestinationQuantity > MAX_SIDEBOARD_ENTRY_QUANTITY) {
+      return `Sideboard copy limit is ${MAX_SIDEBOARD_ENTRY_QUANTITY}.`;
+    }
+    return null;
+  };
+
+  const getBoardMoveDestinations = (cardId: string, sourceBoardId = activeBoardId.value): DeckBoardMoveDestination[] => {
+    if (isSetupStep.value) {
+      return [];
+    }
+
+    const destinations: DeckBoardMoveDestination[] = [];
+    if (sourceBoardId !== MAINBOARD_ID) {
+      const error = getMoveEntryToBoardValidationError(cardId, MAINBOARD_ID, sourceBoardId);
+      destinations.push({
+        boardId: MAINBOARD_ID,
+        label: getBoardLabel(MAINBOARD_ID),
+        description: error ?? undefined,
+        disabled: error !== null,
+      });
+    }
+
+    for (const sideboard of form.sideboards) {
+      if (sideboard.id === sourceBoardId) {
+        continue;
+      }
+      const error = getMoveEntryToBoardValidationError(cardId, sideboard.id, sourceBoardId);
+      destinations.push({
+        boardId: sideboard.id,
+        label: getBoardLabel(sideboard.id),
+        description: error ?? undefined,
+        disabled: error !== null,
+      });
+    }
+
+    return destinations;
+  };
+
   const handleGalleryAction = (card: CardListItem): void => {
     if (isSetupStep.value) {
       rememberCards([card]);
@@ -435,6 +538,53 @@ export const useDeckEditorDraft = ({
     }
 
     changeQuantity(cardId, -1, boardId);
+  };
+
+  const handleBoardRowAction = (cardId: string, boardId = activeBoardId.value): void => {
+    if (boardRowActionDisabled(cardId, boardId)) {
+      return;
+    }
+    changeQuantity(cardId, 1, boardId);
+  };
+
+  const handleBoardRowSecondaryAction = (cardId: string, boardId = activeBoardId.value): void => {
+    if (boardRowSecondaryActionDisabled(cardId, boardId)) {
+      return;
+    }
+    changeQuantity(cardId, -1, boardId);
+  };
+
+  const moveEntryToBoard = (cardId: string, destinationBoardId: string, sourceBoardId = activeBoardId.value): boolean => {
+    const error = getMoveEntryToBoardValidationError(cardId, destinationBoardId, sourceBoardId);
+    if (error !== null) {
+      return false;
+    }
+
+    const sourceEntries = getBoardEntries(sourceBoardId);
+    const sourceEntry = sourceEntries.find((entry) => entry.card_id === cardId);
+    if (!sourceEntry) {
+      return false;
+    }
+
+    const destinationEntries = getBoardEntries(destinationBoardId);
+    const destinationEntry = destinationEntries.find((entry) => entry.card_id === cardId);
+
+    updateBoardEntries(
+      sourceBoardId,
+      sourceEntries.filter((entry) => entry.card_id !== cardId),
+    );
+    updateBoardEntries(
+      destinationBoardId,
+      destinationEntry
+        ? destinationEntries.map((entry) =>
+            entry.card_id === cardId
+              ? { ...entry, quantity: entry.quantity + sourceEntry.quantity }
+              : entry,
+          )
+        : [...destinationEntries, { card_id: cardId, quantity: sourceEntry.quantity }],
+    );
+
+    return true;
   };
 
   return {
@@ -476,8 +626,15 @@ export const useDeckEditorDraft = ({
     galleryActionLabel,
     galleryActionDisabled,
     galleryRemoveActionDisabled,
+    boardRowActionDisabled,
+    boardRowSecondaryActionDisabled,
+    getMoveEntryToBoardValidationError,
+    getBoardMoveDestinations,
     handleGalleryAction,
     handleGalleryRemoveAction,
+    handleBoardRowAction,
+    handleBoardRowSecondaryAction,
+    moveEntryToBoard,
   };
 };
 

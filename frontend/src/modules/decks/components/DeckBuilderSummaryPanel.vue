@@ -249,12 +249,6 @@
                 @input="controller.deck.renameSideboard(controller.deck.activeSideboard.value?.id ?? '', ($event.target as HTMLInputElement).value)"
               >
             </label>
-            <p
-              v-else
-              class="theme-section-muted text-xs"
-            >
-              Active sideboard cards are managed from the gallery and list below.
-            </p>
           </div>
 
           <div
@@ -270,10 +264,15 @@
             :entry="entry"
             :hover-mode="controller.filters.hoverMode.value"
             :quantity-max="controller.deck.activeBoardId.value === 'mainboard' ? 4 : undefined"
+            :move-destinations="getMoveDestinations(entry.card.id)"
+            :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
+            :row-secondary-action-disabled="controller.deck.boardRowSecondaryActionDisabled(entry.card.id)"
             @decrement="controller.deck.changeQuantity($event, -1)"
             @increment="controller.deck.changeQuantity($event, 1)"
-            @set-quantity="controller.deck.setQuantity"
             @remove="controller.deck.removeEntry"
+            @row-action="controller.deck.handleBoardRowAction"
+            @row-secondary-action="controller.deck.handleBoardRowSecondaryAction"
+            @move-to-board="handleMoveToBoard"
           />
         </div>
       </template>
@@ -287,6 +286,7 @@ import { toAbsoluteApiUrl } from '@/api/client';
 import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
+import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
 import type { DeckVisibility } from '@/modules/decks/types';
 import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/modules/decks/visibility';
 
@@ -320,5 +320,12 @@ const selectSideboard = (sideboardId: string): void => {
 
 const toggleRename = (): void => {
   renamingSideboard.value = !renamingSideboard.value;
+};
+
+const getMoveDestinations = (cardId: string): DeckBoardMoveDestination[] =>
+  props.controller.deck.getBoardMoveDestinations(cardId);
+
+const handleMoveToBoard = (cardId: string, destinationBoardId: string): void => {
+  props.controller.deck.moveEntryToBoard(cardId, destinationBoardId);
 };
 </script>
