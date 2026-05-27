@@ -30,6 +30,7 @@ export const useCardFilterSectionsState = (
 ) => {
   const resetManaGroup = (): void => {
     filterState.manaTypeSymbolIds.value = [];
+    filterState.manaTypeSymbolExcludeIds.value = [];
     filterState.manaSymbolMatch.value = 'any';
     filterState.manaCostMin.value = '';
     filterState.manaCostMax.value = '';
@@ -37,16 +38,19 @@ export const useCardFilterSectionsState = (
 
   const resetAffinityGroup = (): void => {
     filterState.affinitySymbolIds.value = [];
+    filterState.affinitySymbolExcludeIds.value = [];
     filterState.affinitySymbolMatch.value = 'any';
   };
 
   const resetDevotionGroup = (): void => {
     filterState.devotionSymbolIds.value = [];
+    filterState.devotionSymbolExcludeIds.value = [];
     filterState.devotionSymbolMatch.value = 'any';
   };
 
   const resetGenericGroup = (): void => {
     filterState.otherSymbolIds.value = [];
+    filterState.otherSymbolExcludeIds.value = [];
     filterState.otherSymbolMatch.value = 'any';
     filterState.attackMin.value = '';
     filterState.attackMax.value = '';
@@ -72,6 +76,8 @@ export const useCardFilterSectionsState = (
   const filterSectionsState = computed<CardFilterSectionsState>(() => ({
     selectedManaTypeSymbolIds: filterState.manaTypeSymbolIds.value,
     onUpdateSelectedManaTypeSymbolIds: createArrayUpdater(filterState.manaTypeSymbolIds),
+    excludedManaTypeSymbolIds: filterState.manaTypeSymbolExcludeIds.value,
+    onUpdateExcludedManaTypeSymbolIds: createArrayUpdater(filterState.manaTypeSymbolExcludeIds),
     manaSymbolMatch: filterState.manaSymbolMatch.value,
     onUpdateManaSymbolMatch: createMatchModeUpdater(filterState.manaSymbolMatch),
     manaTypeOptions: filterCatalog.value.manaSymbols,
@@ -88,18 +94,24 @@ export const useCardFilterSectionsState = (
     resetTypeGroup,
     selectedAffinitySymbolIds: filterState.affinitySymbolIds.value,
     onUpdateSelectedAffinitySymbolIds: createArrayUpdater(filterState.affinitySymbolIds),
+    excludedAffinitySymbolIds: filterState.affinitySymbolExcludeIds.value,
+    onUpdateExcludedAffinitySymbolIds: createArrayUpdater(filterState.affinitySymbolExcludeIds),
     affinitySymbolMatch: filterState.affinitySymbolMatch.value,
     onUpdateAffinitySymbolMatch: createMatchModeUpdater(filterState.affinitySymbolMatch),
     affinityTypeOptions: filterCatalog.value.affinitySymbols,
     resetAffinityGroup,
     selectedDevotionSymbolIds: filterState.devotionSymbolIds.value,
     onUpdateSelectedDevotionSymbolIds: createArrayUpdater(filterState.devotionSymbolIds),
+    excludedDevotionSymbolIds: filterState.devotionSymbolExcludeIds.value,
+    onUpdateExcludedDevotionSymbolIds: createArrayUpdater(filterState.devotionSymbolExcludeIds),
     devotionSymbolMatch: filterState.devotionSymbolMatch.value,
     onUpdateDevotionSymbolMatch: createMatchModeUpdater(filterState.devotionSymbolMatch),
     devotionTypeOptions: filterCatalog.value.devotionSymbols,
     resetDevotionGroup,
     selectedOtherSymbolIds: filterState.otherSymbolIds.value,
     onUpdateSelectedOtherSymbolIds: createArrayUpdater(filterState.otherSymbolIds),
+    excludedOtherSymbolIds: filterState.otherSymbolExcludeIds.value,
+    onUpdateExcludedOtherSymbolIds: createArrayUpdater(filterState.otherSymbolExcludeIds),
     otherSymbolMatch: filterState.otherSymbolMatch.value,
     onUpdateOtherSymbolMatch: createMatchModeUpdater(filterState.otherSymbolMatch),
     otherSymbolOptions: filterCatalog.value.otherSymbols,

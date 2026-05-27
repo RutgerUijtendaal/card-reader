@@ -79,6 +79,7 @@ class DeckService:
         hero_query: str | None = None,
         card_query: str | None = None,
         affinity_symbol_ids: list[str] | None = None,
+        affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
     ) -> list[Deck]:
         return [
@@ -87,6 +88,7 @@ class DeckService:
                 hero_query=hero_query,
                 card_query=card_query,
                 affinity_symbol_ids=affinity_symbol_ids,
+                affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
                 affinity_symbol_match=affinity_symbol_match,
             )
             if self.get_deck_validation(deck).is_valid

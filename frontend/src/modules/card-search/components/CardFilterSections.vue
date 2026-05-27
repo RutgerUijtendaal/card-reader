@@ -1,9 +1,11 @@
 <template>
   <div class="space-y-3">
     <SymbolToggleGroup
-      v-model="selectedManaTypeSymbolIds"
+      v-if="isSectionVisible('mana')"
+      v-model:included-value="selectedManaTypeSymbolIds"
+      v-model:excluded-value="excludedManaTypeSymbolIds"
       v-model:match-mode="manaSymbolMatch"
-      :default-open="true"
+      :default-open="isSectionOpenByDefault('mana', true)"
       label="Mana"
       :options="state.manaTypeOptions"
       @reset="state.resetManaGroup"
@@ -32,9 +34,10 @@
     </SymbolToggleGroup>
 
     <MetadataPillGroup
+      v-if="isSectionVisible('types')"
       v-model="selectedTypeIds"
       v-model:match-mode="typeMatch"
-      :default-open="true"
+      :default-open="isSectionOpenByDefault('types', true)"
       :initial-visible-count="7"
       label="Types"
       :options="state.typeOptions"
@@ -42,24 +45,33 @@
     />
 
     <SymbolToggleGroup
-      v-model="selectedAffinitySymbolIds"
+      v-if="isSectionVisible('affinity')"
+      v-model:included-value="selectedAffinitySymbolIds"
+      v-model:excluded-value="excludedAffinitySymbolIds"
       v-model:match-mode="affinitySymbolMatch"
+      :default-open="isSectionOpenByDefault('affinity')"
       label="Affinity"
       :options="state.affinityTypeOptions"
       @reset="state.resetAffinityGroup"
     />
 
     <SymbolToggleGroup
-      v-model="selectedDevotionSymbolIds"
+      v-if="isSectionVisible('devotion')"
+      v-model:included-value="selectedDevotionSymbolIds"
+      v-model:excluded-value="excludedDevotionSymbolIds"
       v-model:match-mode="devotionSymbolMatch"
+      :default-open="isSectionOpenByDefault('devotion')"
       label="Devotion"
       :options="state.devotionTypeOptions"
       @reset="state.resetDevotionGroup"
     />
 
     <SymbolToggleGroup
-      v-model="selectedOtherSymbolIds"
+      v-if="isSectionVisible('generic')"
+      v-model:included-value="selectedOtherSymbolIds"
+      v-model:excluded-value="excludedOtherSymbolIds"
       v-model:match-mode="otherSymbolMatch"
+      :default-open="isSectionOpenByDefault('generic')"
       label="Generic"
       :options="state.otherSymbolOptions"
       @reset="state.resetGenericGroup"
@@ -108,16 +120,20 @@
     </SymbolToggleGroup>
 
     <MetadataChecklistGroup
+      v-if="isSectionVisible('keywords')"
       v-model="selectedKeywordIds"
       v-model:match-mode="keywordMatch"
+      :default-open="isSectionOpenByDefault('keywords')"
       label="Keywords"
       :options="state.keywordOptions"
       @reset="state.resetKeywordGroup"
     />
 
     <MetadataChecklistGroup
+      v-if="isSectionVisible('tags')"
       v-model="selectedTagIds"
       v-model:match-mode="tagMatch"
+      :default-open="isSectionOpenByDefault('tags')"
       label="Tags"
       :options="state.tagOptions"
       @reset="state.resetTagGroup"
@@ -130,15 +146,33 @@ import { computed } from 'vue';
 import MetadataChecklistGroup from '@/components/filters/MetadataChecklistGroup.vue';
 import MetadataPillGroup from '@/components/filters/MetadataPillGroup.vue';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
-import type { CardFilterSectionsState } from '@/modules/card-search/cardFilterSectionsState';
+import type { CardFilterSectionKey, CardFilterSectionsState } from '@/modules/card-search/cardFilterSectionsState';
 
 const props = defineProps<{
   state: CardFilterSectionsState;
+  visibleSections?: CardFilterSectionKey[];
+  defaultOpenSections?: CardFilterSectionKey[];
 }>();
+
+const visibleSections = computed(
+  () => (props.visibleSections ? new Set(props.visibleSections) : null),
+);
+const defaultOpenSections = computed(
+  () => (props.defaultOpenSections ? new Set(props.defaultOpenSections) : null),
+);
+
+const isSectionVisible = (section: CardFilterSectionKey): boolean =>
+  visibleSections.value?.has(section) ?? true;
+const isSectionOpenByDefault = (section: CardFilterSectionKey, fallback = false): boolean =>
+  defaultOpenSections.value?.has(section) ?? fallback;
 
 const selectedManaTypeSymbolIds = computed({
   get: () => props.state.selectedManaTypeSymbolIds,
   set: props.state.onUpdateSelectedManaTypeSymbolIds,
+});
+const excludedManaTypeSymbolIds = computed({
+  get: () => props.state.excludedManaTypeSymbolIds,
+  set: props.state.onUpdateExcludedManaTypeSymbolIds,
 });
 const manaSymbolMatch = computed({
   get: () => props.state.manaSymbolMatch,
@@ -164,6 +198,10 @@ const selectedAffinitySymbolIds = computed({
   get: () => props.state.selectedAffinitySymbolIds,
   set: props.state.onUpdateSelectedAffinitySymbolIds,
 });
+const excludedAffinitySymbolIds = computed({
+  get: () => props.state.excludedAffinitySymbolIds,
+  set: props.state.onUpdateExcludedAffinitySymbolIds,
+});
 const affinitySymbolMatch = computed({
   get: () => props.state.affinitySymbolMatch,
   set: props.state.onUpdateAffinitySymbolMatch,
@@ -172,6 +210,10 @@ const selectedDevotionSymbolIds = computed({
   get: () => props.state.selectedDevotionSymbolIds,
   set: props.state.onUpdateSelectedDevotionSymbolIds,
 });
+const excludedDevotionSymbolIds = computed({
+  get: () => props.state.excludedDevotionSymbolIds,
+  set: props.state.onUpdateExcludedDevotionSymbolIds,
+});
 const devotionSymbolMatch = computed({
   get: () => props.state.devotionSymbolMatch,
   set: props.state.onUpdateDevotionSymbolMatch,
@@ -179,6 +221,10 @@ const devotionSymbolMatch = computed({
 const selectedOtherSymbolIds = computed({
   get: () => props.state.selectedOtherSymbolIds,
   set: props.state.onUpdateSelectedOtherSymbolIds,
+});
+const excludedOtherSymbolIds = computed({
+  get: () => props.state.excludedOtherSymbolIds,
+  set: props.state.onUpdateExcludedOtherSymbolIds,
 });
 const otherSymbolMatch = computed({
   get: () => props.state.otherSymbolMatch,

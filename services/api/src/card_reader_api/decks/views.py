@@ -30,6 +30,7 @@ class PublicDeckListView(APIView):
                 "hero_q": request.query_params.get("hero_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
+                "affinity_symbol_exclude_ids": request.query_params.getlist("affinity_symbol_exclude_ids"),
                 "affinity_symbol_match": request.query_params.get("affinity_symbol_match"),
             }
         )
@@ -40,6 +41,7 @@ class PublicDeckListView(APIView):
             hero_query=filters["hero_query"],
             card_query=filters["card_query"],
             affinity_symbol_ids=filters["affinity_symbol_ids"],
+            affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
             affinity_symbol_match=filters["affinity_symbol_match"],
         )
         return Response([deck_payload(deck) for deck in decks])

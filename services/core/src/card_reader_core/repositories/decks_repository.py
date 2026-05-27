@@ -48,6 +48,7 @@ def list_public_decks(
     hero_query: str | None = None,
     card_query: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
 ) -> list[Deck]:
     return list(
@@ -56,6 +57,7 @@ def list_public_decks(
             hero_query=hero_query,
             card_query=card_query,
             affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
         ).order_by("-updated_at", "-created_at")
     )
@@ -183,6 +185,7 @@ def _apply_public_deck_filters(
     hero_query: str | None,
     card_query: str | None,
     affinity_symbol_ids: list[str] | None,
+    affinity_symbol_exclude_ids: list[str] | None,
     affinity_symbol_match: str | None,
 ) -> QuerySet[Deck]:
     filtered = queryset
@@ -214,6 +217,15 @@ def _apply_public_deck_filters(
             for symbol_id in normalized_affinity_symbol_ids:
                 affinity_query |= _affinity_symbol_query(symbol_id)
             filtered = filtered.filter(affinity_query)
+
+    normalized_affinity_symbol_exclude_ids = [
+        symbol_id.strip() for symbol_id in affinity_symbol_exclude_ids or [] if symbol_id.strip()
+    ]
+    if normalized_affinity_symbol_exclude_ids:
+        excluded_affinity_query = Q()
+        for symbol_id in normalized_affinity_symbol_exclude_ids:
+            excluded_affinity_query |= _affinity_symbol_query(symbol_id)
+        filtered = filtered.exclude(excluded_affinity_query)
 
     return filtered.distinct()
 

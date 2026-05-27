@@ -28,9 +28,13 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const keywordIds = ref<string[]>([]);
   const tagIds = ref<string[]>([]);
   const manaTypeSymbolIds = ref<string[]>([]);
+  const manaTypeSymbolExcludeIds = ref<string[]>([]);
   const affinitySymbolIds = ref<string[]>([]);
+  const affinitySymbolExcludeIds = ref<string[]>([]);
   const devotionSymbolIds = ref<string[]>([]);
+  const devotionSymbolExcludeIds = ref<string[]>([]);
   const otherSymbolIds = ref<string[]>([]);
+  const otherSymbolExcludeIds = ref<string[]>([]);
   const typeIds = ref<string[]>([]);
 
   const selectionState = computed<CardFilterSelectionState>(() =>
@@ -53,9 +57,13 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
       keywordIds: keywordIds.value,
       tagIds: tagIds.value,
       manaTypeSymbolIds: manaTypeSymbolIds.value,
+      manaTypeSymbolExcludeIds: manaTypeSymbolExcludeIds.value,
       affinitySymbolIds: affinitySymbolIds.value,
+      affinitySymbolExcludeIds: affinitySymbolExcludeIds.value,
       devotionSymbolIds: devotionSymbolIds.value,
+      devotionSymbolExcludeIds: devotionSymbolExcludeIds.value,
       otherSymbolIds: otherSymbolIds.value,
+      otherSymbolExcludeIds: otherSymbolExcludeIds.value,
       typeIds: typeIds.value,
     }),
   );
@@ -80,9 +88,13 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     keywordIds.value = [...normalized.keywordIds];
     tagIds.value = [...normalized.tagIds];
     manaTypeSymbolIds.value = [...normalized.manaTypeSymbolIds];
+    manaTypeSymbolExcludeIds.value = [...normalized.manaTypeSymbolExcludeIds];
     affinitySymbolIds.value = [...normalized.affinitySymbolIds];
+    affinitySymbolExcludeIds.value = [...normalized.affinitySymbolExcludeIds];
     devotionSymbolIds.value = [...normalized.devotionSymbolIds];
+    devotionSymbolExcludeIds.value = [...normalized.devotionSymbolExcludeIds];
     otherSymbolIds.value = [...normalized.otherSymbolIds];
+    otherSymbolExcludeIds.value = [...normalized.otherSymbolExcludeIds];
     typeIds.value = [...normalized.typeIds];
   };
 
@@ -116,9 +128,13 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     keywordIds,
     tagIds,
     manaTypeSymbolIds,
+    manaTypeSymbolExcludeIds,
     affinitySymbolIds,
+    affinitySymbolExcludeIds,
     devotionSymbolIds,
+    devotionSymbolExcludeIds,
     otherSymbolIds,
+    otherSymbolExcludeIds,
     typeIds,
     selectionState,
     applySelectionState,

@@ -611,6 +611,26 @@
     color: var(--color-selected-text);
   }
 
+  .theme-choice-chip-include {
+    border-color: var(--color-selected-border);
+    background: var(--color-selected-bg-strong);
+    color: var(--color-selected-text);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-selected-border) 72%, transparent 28%),
+      0 0 0 2px color-mix(in srgb, var(--color-selected-border) 28%, transparent 72%),
+      0 1px 2px rgba(15, 23, 42, 0.18);
+  }
+
+  .theme-choice-chip-exclude {
+    border-color: var(--color-danger-border);
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-danger-border) 68%, transparent 32%),
+      0 0 0 2px color-mix(in srgb, var(--color-danger-border) 24%, transparent 76%),
+      0 1px 2px rgba(15, 23, 42, 0.18);
+  }
+
   .theme-choice-chip-dashed {
     border-style: dashed;
   }

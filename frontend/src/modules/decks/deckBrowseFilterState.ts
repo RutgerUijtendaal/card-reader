@@ -6,6 +6,7 @@ export type DeckBrowseFilterState = {
   cardQuery: string;
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolKeys: string[];
+  affinitySymbolExcludeKeys: string[];
 };
 
 export type DeckBrowseFilterSelectionState = {
@@ -13,6 +14,7 @@ export type DeckBrowseFilterSelectionState = {
   cardQuery: string;
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolIds: string[];
+  affinitySymbolExcludeIds: string[];
 };
 
 export type DeckBrowseFilterCatalog = {
@@ -55,6 +57,7 @@ export const createEmptyDeckBrowseFilterState = (): DeckBrowseFilterState => ({
   cardQuery: '',
   affinitySymbolMatch: 'any',
   affinitySymbolKeys: [],
+  affinitySymbolExcludeKeys: [],
 });
 
 export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): DeckBrowseFilterState => ({
@@ -62,6 +65,7 @@ export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): De
   cardQuery: normalizeStringValue(state.cardQuery),
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolKeys: normalizeStringArray(state.affinitySymbolKeys),
+  affinitySymbolExcludeKeys: normalizeStringArray(state.affinitySymbolExcludeKeys),
 });
 
 export const normalizeDeckBrowseFilterSelectionState = (
@@ -71,6 +75,7 @@ export const normalizeDeckBrowseFilterSelectionState = (
   cardQuery: normalizeStringValue(state.cardQuery),
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolIds: normalizeStringArray(state.affinitySymbolIds),
+  affinitySymbolExcludeIds: normalizeStringArray(state.affinitySymbolExcludeIds),
 });
 
 export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrowseFilterState =>
@@ -79,6 +84,7 @@ export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrows
     cardQuery: typeof query.card_q === 'string' ? query.card_q : '',
     affinitySymbolMatch: query.affinity_symbol_match === 'all' ? 'all' : 'any',
     affinitySymbolKeys: readQueryValues(query.affinity_symbol_keys),
+    affinitySymbolExcludeKeys: readQueryValues(query.affinity_symbol_exclude_keys),
   });
 
 export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): LocationQueryRaw => {
@@ -89,6 +95,9 @@ export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): L
   if (normalized.cardQuery) query.card_q = normalized.cardQuery;
   if (normalized.affinitySymbolMatch === 'all') query.affinity_symbol_match = 'all';
   if (normalized.affinitySymbolKeys.length > 0) query.affinity_symbol_keys = normalized.affinitySymbolKeys;
+  if (normalized.affinitySymbolExcludeKeys.length > 0) {
+    query.affinity_symbol_exclude_keys = normalized.affinitySymbolExcludeKeys;
+  }
 
   return query;
 };
@@ -129,6 +138,7 @@ export const buildDeckBrowseFilterSelectionState = (
     cardQuery: state.cardQuery,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolIds: resolveIdsFromKeys(state.affinitySymbolKeys, catalog.affinitySymbols),
+    affinitySymbolExcludeIds: resolveIdsFromKeys(state.affinitySymbolExcludeKeys, catalog.affinitySymbols),
   });
 
 export const buildDeckBrowseFilterStateFromSelection = (
@@ -140,6 +150,7 @@ export const buildDeckBrowseFilterStateFromSelection = (
     cardQuery: state.cardQuery,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.affinitySymbols),
+    affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.affinitySymbols),
   });
 
 export const buildDeckBrowseFilterApiSearchParams = (
@@ -153,6 +164,9 @@ export const buildDeckBrowseFilterApiSearchParams = (
   if (normalized.affinitySymbolIds.length > 0) {
     normalized.affinitySymbolIds.forEach((id) => params.append('affinity_symbol_ids', id));
     params.set('affinity_symbol_match', normalized.affinitySymbolMatch);
+  }
+  if (normalized.affinitySymbolExcludeIds.length > 0) {
+    normalized.affinitySymbolExcludeIds.forEach((id) => params.append('affinity_symbol_exclude_ids', id));
   }
 
   return params;

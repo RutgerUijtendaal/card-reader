@@ -44,9 +44,13 @@ describe('cardFilterState adapters', () => {
         keywordKeys: ['flying'],
         tagKeys: ['rare'],
         manaSymbolKeys: ['mana-fire'],
+        manaSymbolExcludeKeys: [],
         affinitySymbolKeys: ['air'],
+        affinitySymbolExcludeKeys: [],
         devotionSymbolKeys: ['pray'],
+        devotionSymbolExcludeKeys: [],
         otherSymbolKeys: ['tap'],
+        otherSymbolExcludeKeys: [],
         typeKeys: ['creature'],
       },
       createCardFilterCatalog(filters),
@@ -62,9 +66,13 @@ describe('cardFilterState adapters', () => {
       keywordIds: ['kw-1'],
       tagIds: ['tag-1'],
       manaTypeSymbolIds: ['sym-1'],
+      manaTypeSymbolExcludeIds: [],
       affinitySymbolIds: ['sym-2'],
+      affinitySymbolExcludeIds: [],
       devotionSymbolIds: ['sym-3'],
+      devotionSymbolExcludeIds: [],
       otherSymbolIds: ['sym-4'],
+      otherSymbolExcludeIds: [],
       typeIds: ['type-1'],
     });
   });
@@ -90,9 +98,13 @@ describe('cardFilterState adapters', () => {
         keywordIds: ['kw-1'],
         tagIds: ['tag-1'],
         manaTypeSymbolIds: ['sym-1'],
+        manaTypeSymbolExcludeIds: ['sym-1'],
         affinitySymbolIds: ['sym-2'],
+        affinitySymbolExcludeIds: ['sym-2'],
         devotionSymbolIds: ['sym-3'],
+        devotionSymbolExcludeIds: ['sym-3'],
         otherSymbolIds: ['sym-4'],
+        otherSymbolExcludeIds: ['sym-4'],
         typeIds: ['type-1'],
       },
       createCardFilterCatalog(filters),
@@ -108,9 +120,13 @@ describe('cardFilterState adapters', () => {
       keywordKeys: ['flying'],
       tagKeys: ['rare'],
       manaSymbolKeys: ['mana-fire'],
+      manaSymbolExcludeKeys: ['mana-fire'],
       affinitySymbolKeys: ['air'],
+      affinitySymbolExcludeKeys: ['air'],
       devotionSymbolKeys: ['pray'],
+      devotionSymbolExcludeKeys: ['pray'],
       otherSymbolKeys: ['tap'],
+      otherSymbolExcludeKeys: ['tap'],
       typeKeys: ['creature'],
     });
   });
@@ -135,9 +151,13 @@ describe('cardFilterState adapters', () => {
       keywordIds: ['kw-1'],
       tagIds: ['tag-1'],
       manaTypeSymbolIds: ['sym-1'],
+      manaTypeSymbolExcludeIds: ['sym-1'],
       affinitySymbolIds: ['sym-2'],
+      affinitySymbolExcludeIds: ['sym-2'],
       devotionSymbolIds: ['sym-3'],
+      devotionSymbolExcludeIds: ['sym-3'],
       otherSymbolIds: ['sym-4'],
+      otherSymbolExcludeIds: ['sym-4'],
       typeIds: ['type-1'],
     };
     const params = buildCardFilterApiSearchParams(selection);
@@ -148,12 +168,16 @@ describe('cardFilterState adapters', () => {
     expect(params.getAll('tag_ids')).toEqual(['tag-1']);
     expect(params.get('tag_match')).toBe('all');
     expect(params.getAll('mana_symbol_ids')).toEqual(['sym-1']);
+    expect(params.getAll('mana_symbol_exclude_ids')).toEqual(['sym-1']);
     expect(params.get('mana_symbol_match')).toBe('all');
     expect(params.getAll('affinity_symbol_ids')).toEqual(['sym-2']);
+    expect(params.getAll('affinity_symbol_exclude_ids')).toEqual(['sym-2']);
     expect(params.get('affinity_symbol_match')).toBe('all');
     expect(params.getAll('devotion_symbol_ids')).toEqual(['sym-3']);
+    expect(params.getAll('devotion_symbol_exclude_ids')).toEqual(['sym-3']);
     expect(params.get('devotion_symbol_match')).toBe('any');
     expect(params.getAll('other_symbol_ids')).toEqual(['sym-4']);
+    expect(params.getAll('other_symbol_exclude_ids')).toEqual(['sym-4']);
     expect(params.get('other_symbol_match')).toBe('any');
     expect(params.getAll('symbol_ids')).toEqual([]);
     expect(params.getAll('type_ids')).toEqual(['type-1']);
@@ -167,9 +191,13 @@ describe('cardFilterState adapters', () => {
       tag_ids: ['tag-1'],
       tag_match: 'all',
       mana_symbol_ids: ['sym-1'],
+      mana_symbol_exclude_ids: ['sym-1'],
       affinity_symbol_ids: ['sym-2'],
+      affinity_symbol_exclude_ids: ['sym-2'],
       devotion_symbol_ids: ['sym-3'],
+      devotion_symbol_exclude_ids: ['sym-3'],
       other_symbol_ids: ['sym-4'],
+      other_symbol_exclude_ids: ['sym-4'],
       type_ids: ['type-1'],
       mana_cost_min: '2',
       mana_cost_max: '7',
