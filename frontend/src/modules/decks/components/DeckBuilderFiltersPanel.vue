@@ -17,7 +17,7 @@
         Setup
       </p>
       <p class="theme-section-muted text-sm">
-        Select a hero to continue.
+        Select a hero to continue. Use affinity to narrow the hero pool.
       </p>
     </div>
 
@@ -35,8 +35,9 @@
     </label>
 
     <CardFilterSections
-      v-if="!controller.deck.isSetupStep.value"
       :state="controller.filters.filterSectionsState.value"
+      :visible-sections="controller.deck.isSetupStep.value ? ['affinity'] : undefined"
+      :default-open-sections="controller.deck.isSetupStep.value ? ['affinity'] : undefined"
     />
 
     <template #footer>

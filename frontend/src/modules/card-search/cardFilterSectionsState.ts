@@ -2,6 +2,14 @@ import type { MetadataOption, SymbolFilterOption } from '@/modules/card-detail/t
 
 export type MatchMode = 'any' | 'all';
 export type SymbolFilterTriState = 'off' | 'include' | 'exclude';
+export type CardFilterSectionKey =
+  | 'mana'
+  | 'types'
+  | 'affinity'
+  | 'devotion'
+  | 'generic'
+  | 'keywords'
+  | 'tags';
 
 export type CardFilterSectionsState = {
   selectedManaTypeSymbolIds: string[];
