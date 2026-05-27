@@ -1,8 +1,25 @@
 import { createApp, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
 import type { DeckRecord } from '@/modules/decks/types';
+
+const { exportTtsDeckMock, toastSuccessMock } = vi.hoisted(() => ({
+  exportTtsDeckMock: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+  toastSuccessMock: vi.fn(),
+}));
+
+vi.mock('@/modules/decks/useDeckExport', () => ({
+  useDeckExport: () => ({
+    exportTtsDeck: exportTtsDeckMock,
+  }),
+}));
+
+vi.mock('vue-sonner', () => ({
+  toast: {
+    success: toastSuccessMock,
+  },
+}));
 
 const buildDeck = (): DeckRecord => ({
   id: 'deck-1',
@@ -36,47 +53,24 @@ const buildDeck = (): DeckRecord => ({
     updated_at: '2025-01-01T00:00:00Z',
     keywords: [],
     tags: [],
-    symbols: [],
+    symbols: [
+      {
+        id: 'sym-1',
+        key: 'fire',
+        label: 'Fire',
+        symbol_type: 'affinity',
+        text_token: '{F}',
+        asset_url: null,
+      },
+    ],
     types: [],
-    image_url: null,
+    image_url: '/media/cards/hero.png',
     result_type: 'card',
   },
   mainboard: {
     total_cards: 40,
     unique_cards: 24,
-    entries: [
-      {
-        quantity: 4,
-        card: {
-          id: 'card-2',
-          key: 'card-2',
-          label: 'Spark Mage',
-          is_hero: false,
-          template_id: 'template-1',
-          version_id: 'version-1',
-          version_number: 1,
-          previous_version_id: null,
-          is_latest: true,
-          name: 'Spark Mage',
-          type_line: 'Unit',
-          mana_cost: '2',
-          mana_symbols: [],
-          mana_value: 2,
-          attack: 2,
-          health: 2,
-          rules_text: '',
-          confidence: 1,
-          created_at: '2025-01-01T00:00:00Z',
-          updated_at: '2025-01-01T00:00:00Z',
-          keywords: [],
-          tags: [],
-          symbols: [],
-          types: [],
-          image_url: null,
-          result_type: 'card',
-        },
-      },
-    ],
+    entries: [],
   },
   sideboards: [
     {
@@ -128,6 +122,7 @@ const mountDeckListCard = async (mode: 'browse' | 'owned') => {
 
   return {
     container,
+    router,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -136,32 +131,104 @@ const mountDeckListCard = async (mode: 'browse' | 'owned') => {
 };
 
 describe('DeckListCard', () => {
-  afterEach(() => {
-    document.body.innerHTML = '';
+  beforeEach(() => {
+    exportTtsDeckMock.mockClear();
+    toastSuccessMock.mockClear();
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
-  test('renders fold-down browse metadata and moves the curve into the detail area', async () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.unstubAllGlobals();
+  });
+
+  test('renders browse mode as a static horizontal card without foldout controls', async () => {
     const mounted = await mountDeckListCard('browse');
     const text = mounted.container.textContent ?? '';
 
-    expect(mounted.container.querySelector('.deck-list-card-browse-details')).not.toBeNull();
-    expect(text).toContain('Mainboard Curve');
-    expect(text).toContain('Mainboard');
-    expect(text).toContain('All Boards');
-    expect(text).toContain('Side Decks');
+    expect(mounted.container.querySelector('.deck-list-card-browse')).not.toBeNull();
+    expect(mounted.container.querySelector('.deck-list-card-browse-description')).not.toBeNull();
+    expect(mounted.container.querySelector('button[aria-label="Toggle deck details"]')).toBeNull();
+    expect(mounted.container.querySelector('.deck-list-card-browse-details')).toBeNull();
+    expect(text).toContain('Azure Tempo');
+    expect(text).toContain('Hero: Azure Hero');
+    expect(text).toContain('maitys');
+    expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
+    expect(text).toContain('{F}');
+    expect(text).toContain('Pressure early, then pivot into efficient trades.');
+    expect(text).not.toContain('Mainboard 40 · 24 unique · 1 sideboard');
+    expect(text).toContain('Updated');
+
+    mounted.unmount();
+  });
+
+  test('keeps owned deck cards on the management layout', async () => {
+    const mounted = await mountDeckListCard('owned');
+    const text = mounted.container.textContent ?? '';
+
+    expect(mounted.container.querySelector('.deck-list-card-browse')).toBeNull();
+    expect(text).toContain('Hero');
+    expect(text).toContain('Total / Main');
     expect(text).toContain('Status');
 
     mounted.unmount();
   });
 
-  test('keeps owned deck cards on the non-expanded management layout', async () => {
-    const mounted = await mountDeckListCard('owned');
-    const text = mounted.container.textContent ?? '';
+  test('browse card keeps the expected navigation target', async () => {
+    const mounted = await mountDeckListCard('browse');
+    const card = mounted.container.querySelector('.deck-list-card-browse');
 
-    expect(mounted.container.querySelector('.deck-list-card-browse-details')).toBeNull();
-    expect(text).toContain('Hero');
-    expect(text).toContain('Total / Main');
-    expect(text).not.toContain('Mainboard Curve');
+    expect(card).not.toBeNull();
+    expect(card?.getAttribute('data-navigation-target')).toBe('/decks/deck-1');
+
+    mounted.unmount();
+  });
+
+  test('copy share link action writes to clipboard without navigating the card', async () => {
+    const mounted = await mountDeckListCard('browse');
+    const menuTrigger = mounted.container.querySelector('button[aria-label="Open deck actions"]');
+    const clipboardWriteText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>;
+
+    menuTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+
+    const copyButton = document.body.querySelector('button');
+    const matchingButtons = Array.from(document.body.querySelectorAll('button'));
+    const copyShareButton = matchingButtons.find((button) => button.textContent?.includes('Copy Share Link'));
+
+    expect(copyButton).not.toBeNull();
+    expect(copyShareButton).not.toBeNull();
+
+    copyShareButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+
+    expect(clipboardWriteText).toHaveBeenCalledWith(expect.stringContaining('/decks/deck-1'));
+    expect(toastSuccessMock).toHaveBeenCalledWith('Share link copied.');
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/decks');
+
+    mounted.unmount();
+  });
+
+  test('export tts action reuses the deck export helper without navigating the card', async () => {
+    const mounted = await mountDeckListCard('browse');
+    const menuTrigger = mounted.container.querySelector('button[aria-label="Open deck actions"]');
+
+    menuTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+
+    const exportButton = Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent?.includes('Export TTS'));
+
+    expect(exportButton).not.toBeNull();
+
+    exportButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+
+    expect(exportTtsDeckMock).toHaveBeenCalledWith('deck-1', 'Azure Tempo');
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/decks');
 
     mounted.unmount();
   });

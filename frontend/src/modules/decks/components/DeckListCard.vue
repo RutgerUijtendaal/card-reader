@@ -1,8 +1,122 @@
 <template>
+  <div
+    v-if="isBrowseMode"
+    class="deck-list-card-browse-shell"
+  >
+    <div
+      :class="browseCardClass"
+      :data-navigation-target="titleTo"
+      @click="handleCardClick"
+      @keydown.enter="handleCardKeydown"
+      @keydown.space.prevent="handleCardKeydown"
+    >
+      <div class="deck-list-card-browse-art">
+        <img
+          v-if="deck.hero_card.image_url"
+          :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
+          :alt="deck.hero_card.name"
+          class="deck-list-card-browse-art-image"
+        >
+        <div
+          v-else
+          class="deck-list-card-browse-art-fallback"
+          aria-hidden="true"
+        />
+        <div
+          class="deck-list-card-browse-art-overlay"
+          aria-hidden="true"
+        />
+      </div>
+
+      <div class="deck-list-card-browse-content">
+        <div class="flex items-start gap-3">
+          <div class="min-w-0 flex-1 space-y-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="theme-section-title truncate text-lg font-semibold">
+                {{ deck.name }}
+              </h3>
+              <span class="theme-pill theme-pill-keyword shrink-0 text-xs">
+                {{ deck.owner.username }}
+              </span>
+            </div>
+
+            <p class="theme-section-muted text-sm">
+              Hero: {{ deck.hero_card.name }}
+            </p>
+
+            <p class="theme-section-muted text-sm">
+              {{ boardSummary }}
+            </p>
+
+            <p
+              v-if="deck.description"
+              class="deck-list-card-browse-description theme-section-title text-sm"
+            >
+              {{ deck.description }}
+            </p>
+            <p
+              v-else
+              class="deck-list-card-browse-description theme-section-muted text-sm"
+            >
+              No description available.
+            </p>
+          </div>
+
+          <div
+            class="shrink-0"
+            data-card-click-ignore="true"
+          >
+            <ExtraActionsMenu button-label="Open deck actions">
+              <template #default="{ close }">
+                <button
+                  v-if="canShareDeck(deck)"
+                  class="btn-secondary w-full justify-center"
+                  type="button"
+                  @click="copyShareLink(close)"
+                >
+                  Copy Share Link
+                </button>
+
+                <button
+                  class="btn-secondary w-full justify-center"
+                  type="button"
+                  @click="exportDeck(close)"
+                >
+                  Export TTS
+                </button>
+              </template>
+            </ExtraActionsMenu>
+          </div>
+        </div>
+
+        <div class="mt-auto flex items-end justify-between gap-3 pt-3">
+          <p class="theme-section-muted text-xs">
+            Updated {{ formatDate(deck.updated_at) }}
+          </p>
+
+          <div
+            v-if="heroAffinitySymbols.length > 0"
+            class="flex flex-wrap items-center justify-end gap-1.5"
+          >
+            <SymbolToken
+              v-for="symbol in heroAffinitySymbols"
+              :key="symbol.id"
+              :asset-url="symbol.asset_url"
+              :label="symbol.label"
+              :text-token="symbol.text_token"
+              class="h-6 w-6 p-0.5"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <component
     :is="rootTag"
+    v-else
     v-bind="rootProps"
-    :class="layoutClass"
+    :class="ownedLayoutClass"
     @click="handleCardClick"
     @keydown.enter="handleCardKeydown"
     @keydown.space.prevent="handleCardKeydown"
@@ -34,29 +148,19 @@
                 :is="titleTag"
                 v-bind="titleProps"
                 class="theme-section-title text-lg font-semibold"
-                :class="isCardLink ? '' : titleTo ? 'truncate' : ''"
+                :class="titleTo ? 'truncate' : ''"
               >
                 {{ deck.name }}
               </component>
               <span
-                v-if="mode === 'owned'"
                 class="theme-pill text-xs"
                 :class="visibilityBadgeClass"
               >
                 {{ visibilityLabel }}
               </span>
-              <span
-                v-else
-                class="theme-pill theme-pill-accent text-xs"
-              >
-                {{ deck.totals.overall_total_cards }} cards
-              </span>
             </div>
 
-            <div
-              v-if="mode === 'owned'"
-              class="theme-section-muted mt-2 space-y-1 text-sm"
-            >
+            <div class="theme-section-muted mt-2 space-y-1 text-sm">
               <p><span class="theme-section-title font-medium">Hero</span> {{ deck.hero_card.name }}</p>
               <p><span class="theme-section-title font-medium">Total / Main</span> {{ deck.totals.overall_total_cards }} / {{ deck.mainboard.total_cards }}</p>
               <p><span class="theme-section-title font-medium">Unique</span> {{ deck.totals.overall_unique_cards }}</p>
@@ -65,22 +169,7 @@
             </div>
 
             <p
-              v-if="mode === 'browse'"
-              class="theme-section-muted mt-1 text-sm"
-            >
-              Hero: {{ deck.hero_card.name }}
-            </p>
-            <div
-              v-if="mode === 'browse'"
-              class="theme-section-muted mt-2 flex items-center gap-2 text-sm"
-            >
-              <span>By</span>
-              <span class="theme-pill theme-pill-keyword text-xs">
-                {{ deck.owner.username }}
-              </span>
-            </div>
-            <p
-              v-else-if="deck.status.issues.length > 0"
+              v-if="deck.status.issues.length > 0"
               class="theme-section-muted mt-1 text-sm"
             >
               {{ deck.status.issues[0] }}
@@ -91,48 +180,6 @@
             >
               {{ deck.description }}
             </p>
-            <p
-              v-if="mode === 'browse'"
-              class="theme-kicker mt-2 text-xs font-medium uppercase tracking-[0.16em]"
-            >
-              Updated {{ formatDate(deck.updated_at) }}
-            </p>
-          </div>
-        </div>
-
-        <div
-          v-if="mode === 'browse'"
-          class="deck-list-card-browse-details"
-        >
-          <div class="deck-list-card-browse-details-inner theme-divider grid gap-4 border-t pt-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(12rem,1.05fr)]">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <article
-                v-for="item in browseMetadata"
-                :key="item.label"
-                class="theme-card-frame-muted rounded-xl px-3 py-3"
-              >
-                <p class="theme-kicker text-[10px] font-semibold uppercase tracking-[0.16em]">
-                  {{ item.label }}
-                </p>
-                <p class="theme-section-title mt-1 text-sm font-semibold">
-                  {{ item.value }}
-                </p>
-                <p
-                  v-if="item.hint"
-                  class="theme-section-muted mt-1 text-xs"
-                >
-                  {{ item.hint }}
-                </p>
-              </article>
-            </div>
-
-            <DeckManaCurve
-              class="w-full"
-              :entries="deck.mainboard.entries"
-              title="Mainboard Curve"
-              empty-label="No mainboard cards yet."
-              compact
-            />
           </div>
         </div>
       </div>
@@ -151,9 +198,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/api/client';
-import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
+import SymbolToken from '@/components/SymbolToken.vue';
+import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
+import { buildDeckShareUrl, canShareDeck } from '@/modules/decks/share';
 import type { DeckRecord } from '@/modules/decks/types';
+import { useDeckExport } from '@/modules/decks/useDeckExport';
 import { deckVisibilityBadgeClasses, deckVisibilityLabels } from '@/modules/decks/visibility';
 
 const props = defineProps<{
@@ -163,72 +214,57 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
-const isCardLink = computed(() => props.mode === 'browse' && Boolean(props.titleTo));
-const isClickableCard = computed(() => props.mode === 'owned' && Boolean(props.titleTo));
-const rootTag = computed(() => (isCardLink.value ? 'RouterLink' : 'div'));
-const rootProps = computed(() => {
-  if (isCardLink.value) {
-    return { to: props.titleTo };
-  }
+const { exportTtsDeck } = useDeckExport();
 
-  if (isClickableCard.value) {
-    return {
-      role: 'link',
-      tabindex: 0,
-    };
-  }
-
-  return {};
-});
-const titleTag = computed(() => (isCardLink.value ? 'h3' : props.titleTo ? 'RouterLink' : 'h3'));
-const titleProps = computed(() => (!isCardLink.value && props.titleTo ? { to: props.titleTo } : {}));
-const formatDate = (value: string): string => new Date(value).toLocaleDateString();
-const formatCountLabel = (count: number, singular: string, plural: string): string => (count === 1 ? singular : plural);
+const isBrowseMode = computed(() => props.mode === 'browse');
+const isClickableCard = computed(() => Boolean(props.titleTo));
 const visibilityLabel = computed(() => deckVisibilityLabels[props.deck.visibility]);
 const visibilityBadgeClass = computed(() => deckVisibilityBadgeClasses[props.deck.visibility]);
-const layoutClass = computed(() => [
+const rootTag = computed(() => (props.titleTo ? 'div' : 'div'));
+const rootProps = computed(() => {
+  if (!props.titleTo) {
+    return {};
+  }
+
+  return {
+    role: 'link',
+    tabindex: 0,
+  };
+});
+const titleTag = computed(() => (props.titleTo ? 'RouterLink' : 'h3'));
+const titleProps = computed(() => (props.titleTo ? { to: props.titleTo } : {}));
+const formatDate = (value: string): string => new Date(value).toLocaleDateString();
+const sideboardSummary = computed(() => {
+  if (props.deck.sideboards.length === 0) {
+    return 'No sideboards';
+  }
+  return `${props.deck.sideboards.length} sideboard${props.deck.sideboards.length === 1 ? '' : 's'}`;
+});
+const boardSummary = computed(() => `Maindeck ${props.deck.mainboard.total_cards} · ${props.deck.mainboard.unique_cards} unique · ${sideboardSummary.value}`);
+const heroAffinitySymbols = computed(() => props.deck.hero_card.symbols.filter((symbol) => symbol.symbol_type === 'affinity'));
+const browseCardClass = computed(() => [
+  'deck-list-card-browse',
+  'page-card',
+  isClickableCard.value
+    ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
+    : '',
+]);
+const ownedLayoutClass = computed(() => [
   'deck-list-card',
   'page-card',
-  props.mode === 'browse' ? 'deck-list-card--browse group transition duration-200 xl:hover:-translate-y-1' : '',
   props.titleTo
     ? 'block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
     : '',
 ]);
 const contentLayoutClass = computed(() =>
-  props.mode === 'owned'
-    ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-stretch'
-    : 'flex flex-col gap-4',
+  'grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-stretch',
 );
 const mainColumnClass = computed(() => 'min-w-0 flex-1');
-const mediaRowClass = computed(() => (props.mode === 'browse' ? 'flex min-w-0 gap-4' : 'flex min-w-0 gap-4'));
-const imageFrameClass = computed(() => (props.mode === 'browse' ? 'h-36 w-28' : 'h-44 w-31'));
+const mediaRowClass = computed(() => 'flex min-w-0 gap-4');
+const imageFrameClass = computed(() => 'h-44 w-31');
 const actionsColumnClass = computed(() =>
-  props.mode === 'owned'
-    ? 'theme-divider flex h-full items-stretch justify-end xl:border-l xl:pl-4'
-    : 'flex flex-wrap gap-2 lg:shrink-0',
+  'theme-divider flex h-full items-stretch justify-end xl:border-l xl:pl-4',
 );
-const browseMetadata = computed(() => [
-  {
-    label: 'Mainboard',
-    value: `${props.deck.mainboard.total_cards} cards`,
-    hint: `${props.deck.mainboard.unique_cards} unique`,
-  },
-  {
-    label: 'All Boards',
-    value: `${props.deck.totals.overall_total_cards} cards`,
-    hint: `${props.deck.totals.overall_unique_cards} unique`,
-  },
-  {
-    label: 'Side Decks',
-    value: `${props.deck.sideboards.length}`,
-    hint: formatCountLabel(props.deck.sideboards.length, '1 side deck', `${props.deck.sideboards.length} side decks`),
-  },
-  {
-    label: 'Status',
-    value: props.deck.status.label,
-    hint: props.deck.status.issues[0] ?? 'Ready to inspect',
-  },
-]);
 
 const interactiveSelector =
   'a, button, input, select, textarea, summary, details, [role="button"], [data-card-click-ignore="true"]';
@@ -241,10 +277,24 @@ const shouldIgnoreCardNavigation = (target: EventTarget | null): boolean => {
 };
 
 const navigateToCard = (): void => {
-  if (!props.titleTo || isCardLink.value) {
+  if (!props.titleTo) {
     return;
   }
   void router.push(props.titleTo);
+};
+
+const copyShareLink = async (close: () => void): Promise<void> => {
+  if (!canShareDeck(props.deck)) {
+    return;
+  }
+  await navigator.clipboard.writeText(buildDeckShareUrl(props.deck.id));
+  toast.success('Share link copied.');
+  close();
+};
+
+const exportDeck = async (close: () => void): Promise<void> => {
+  await exportTtsDeck(props.deck.id, props.deck.name);
+  close();
 };
 
 const handleCardClick = (event: MouseEvent): void => {
@@ -263,92 +313,94 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
 </script>
 
 <style scoped>
-@media (min-width: 1280px) {
-  .deck-list-card--browse {
-    position: relative;
-    overflow: visible;
-    isolation: isolate;
-    transition:
-      transform 200ms ease,
-      box-shadow 220ms ease,
-      border-color 220ms ease;
-  }
-
-  .deck-list-card--browse:hover,
-  .deck-list-card--browse:focus-visible,
-  .deck-list-card--browse:focus-within {
-    z-index: 20;
-    box-shadow:
-      0 22px 40px rgba(15, 23, 42, 0.12),
-      0 8px 16px rgba(15, 23, 42, 0.08);
-  }
-
-  .deck-list-card-browse-details {
-    position: absolute;
-    top: calc(100% - 1.1rem);
-    left: 0.85rem;
-    right: 0.85rem;
-    z-index: 30;
-    pointer-events: none;
-    opacity: 0;
-    transform: translateY(-0.8rem) scaleY(0.98);
-    transform-origin: top center;
-    transition:
-      opacity 180ms ease,
-      transform 220ms ease;
-  }
-
-  .deck-list-card-browse-details::before {
-    content: '';
-    position: absolute;
-    top: -0.85rem;
-    left: 1.75rem;
-    width: 8.5rem;
-    height: 1.4rem;
-    border: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent 26%);
-    border-bottom: none;
-    border-radius: 1rem 1rem 0 0;
-    background: color-mix(in srgb, var(--color-surface) 94%, transparent 6%);
-    box-shadow: 0 -6px 12px rgba(15, 23, 42, 0.04);
-  }
-
-  .deck-list-card-browse-details-inner {
-    position: relative;
-    border: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent 26%);
-    border-radius: 1.15rem;
-    background: color-mix(in srgb, var(--color-surface) 94%, transparent 6%);
-    box-shadow:
-      0 24px 44px rgba(15, 23, 42, 0.18),
-      0 10px 18px rgba(15, 23, 42, 0.12);
-    backdrop-filter: blur(10px);
-  }
-
-  .deck-list-card-browse-details-inner::before {
-    content: '';
-    position: absolute;
-    top: -1px;
-    left: 1.25rem;
-    width: 9rem;
-    height: 1.1rem;
-    background: color-mix(in srgb, var(--color-surface) 94%, transparent 6%);
-    border-top-left-radius: 0.9rem;
-    border-top-right-radius: 0.9rem;
-  }
-
-  .deck-list-card--browse:hover .deck-list-card-browse-details,
-  .deck-list-card--browse:focus-visible .deck-list-card-browse-details,
-  .deck-list-card--browse:focus-within .deck-list-card-browse-details {
-    pointer-events: auto;
-    opacity: 1;
-    transform: translateY(0) scaleY(1);
-  }
+.deck-list-card-browse-shell {
+  min-width: 0;
 }
 
-@media (max-width: 1279px) {
-  .deck-list-card-browse-details {
-    max-height: none;
-    opacity: 1;
-    transform: none;
+.deck-list-card-browse {
+  --deck-browse-art-width: min(21rem, 64%);
+  --deck-browse-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 42%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.28) 74%, rgba(0, 0, 0, 0.08) 86%, transparent 100%);
+  --deck-browse-art-position: 23% 10%;
+  --deck-browse-art-scale: 1.2;
+  --deck-browse-art-hover-scale: 1.27;
+  --deck-browse-art-hover-shift-x: 0.2rem;
+  --deck-browse-content-padding-left: clamp(19.5rem, 21%, 11rem);
+  position: relative;
+  height: 14.5rem;
+  overflow: hidden;
+  padding: 0;
+}
+
+.deck-list-card-browse-art {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--deck-browse-art-width);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(148, 163, 184, 0.26), transparent 55%),
+    linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
+  -webkit-mask-image: var(--deck-browse-art-mask);
+  mask-image: var(--deck-browse-art-mask);
+}
+
+.deck-list-card-browse-art-image {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: var(--deck-browse-art-position);
+  transform: scale(var(--deck-browse-art-scale));
+  transition: transform 240ms ease;
+}
+
+.deck-list-card-browse:hover .deck-list-card-browse-art-image,
+.deck-list-card-browse:focus-within .deck-list-card-browse-art-image {
+  transform: scale(var(--deck-browse-art-hover-scale)) translateX(var(--deck-browse-art-hover-shift-x));
+}
+
+.deck-list-card-browse-art-fallback {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.32), transparent 45%),
+    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.24), transparent 48%),
+    linear-gradient(140deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.96));
+}
+
+.deck-list-card-browse-art-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.08) 38%, rgba(15, 23, 42, 0.22) 56%, rgba(15, 23, 42, 0.1) 70%, transparent 100%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.04));
+  pointer-events: none;
+}
+
+.deck-list-card-browse-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+  padding: 1.1rem 1.2rem 1.1rem var(--deck-browse-content-padding-left);
+}
+
+.deck-list-card-browse-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 767px) {
+  .deck-list-card-browse {
+    --deck-browse-art-width: min(15rem, 70%);
+    --deck-browse-content-padding-left: clamp(5.4rem, 24%, 7.5rem);
+    height: 12rem;
+  }
+
+  .deck-list-card-browse-content {
+    padding: 0.95rem 1rem 0.95rem var(--deck-browse-content-padding-left);
   }
 }
 </style>

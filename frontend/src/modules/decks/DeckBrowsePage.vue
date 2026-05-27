@@ -48,7 +48,7 @@
 
         <div
           v-else
-          class="grid gap-4 px-1 pb-3 pt-2 lg:grid-cols-2"
+          class="deck-browse-grid grid gap-4 px-1 pb-3 pt-2"
         >
           <DeckListCard
             v-for="deck in decks"
@@ -145,3 +145,9 @@ onMounted(() => {
   void loadFilters().catch(() => undefined);
 });
 </script>
+
+<style scoped>
+.deck-browse-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 44rem), 1fr));
+}
+</style>
