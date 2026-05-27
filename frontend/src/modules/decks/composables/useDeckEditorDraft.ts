@@ -407,6 +407,13 @@ export const useDeckEditorDraft = ({
     return quantity >= MAX_SIDEBOARD_ENTRY_QUANTITY;
   };
 
+  const galleryRemoveActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
+    if (isSetupStep.value) {
+      return true;
+    }
+    return getEntryQuantity(cardId, boardId) <= 0;
+  };
+
   const handleGalleryAction = (card: CardListItem): void => {
     if (isSetupStep.value) {
       rememberCards([card]);
@@ -414,6 +421,20 @@ export const useDeckEditorDraft = ({
       return;
     }
     addEntry(card);
+  };
+
+  const handleGalleryRemoveAction = (cardId: string, boardId = activeBoardId.value): void => {
+    if (galleryRemoveActionDisabled(cardId, boardId)) {
+      return;
+    }
+
+    const quantity = getEntryQuantity(cardId, boardId);
+    if (quantity <= 1) {
+      removeEntry(cardId, boardId);
+      return;
+    }
+
+    changeQuantity(cardId, -1, boardId);
   };
 
   return {
@@ -454,7 +475,9 @@ export const useDeckEditorDraft = ({
     removeEntry,
     galleryActionLabel,
     galleryActionDisabled,
+    galleryRemoveActionDisabled,
     handleGalleryAction,
+    handleGalleryRemoveAction,
   };
 };
 

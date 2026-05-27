@@ -88,8 +88,51 @@ describe('useDeckEditorDraft', () => {
 
     controller.addSideboard();
     controller.handleGalleryAction({ ...cardLookup.value.cardA, result_type: 'card' });
+    controller.handleGalleryRemoveAction('cardA');
     expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
-    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([]);
+  });
+
+  test('removes one gallery copy at a time and deletes the final copy', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 3 }];
+
+    controller.handleGalleryRemoveAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
+
+    controller.handleGalleryRemoveAction('cardA');
+    controller.handleGalleryRemoveAction('cardA');
+    expect(controller.form.entries).toEqual([]);
+  });
+
+  test('does not remove gallery cards during setup mode', () => {
+    const builderStep = ref<BuilderStep>('setup');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 2 }];
+
+    controller.handleGalleryRemoveAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
   });
 
   test('tracks mainboard and overall totals separately', () => {
