@@ -167,4 +167,37 @@ describe('useCardCollection', () => {
     expect(collection.isRefreshing.value).toBe(false);
     expect(collection.cards.value).toEqual([{ id: 'card-2', name: 'Second Card' }]);
   });
+
+  test('does not start pagination while a replace refresh is in flight', async () => {
+    mockedGet.mockResolvedValueOnce(
+      buildResponse([{ id: 'card-1', name: 'First Card' }], 2),
+    );
+
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      pageSize: 30,
+    });
+
+    await collection.searchCards();
+
+    const refreshDeferred = createDeferred<ReturnType<typeof buildResponse>>();
+    mockedGet.mockReturnValueOnce(refreshDeferred.promise);
+
+    const refreshSearch = collection.searchCards();
+
+    expect(collection.isRefreshing.value).toBe(true);
+
+    await collection.loadNextPage();
+
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+    expect(collection.isLoadingPage.value).toBe(false);
+    expect(collection.cards.value).toEqual([{ id: 'card-1', name: 'First Card' }]);
+
+    refreshDeferred.resolve(buildResponse([{ id: 'card-2', name: 'Refreshed Card' }], null));
+    await refreshSearch;
+
+    expect(collection.isRefreshing.value).toBe(false);
+    expect(collection.cards.value).toEqual([{ id: 'card-2', name: 'Refreshed Card' }]);
+  });
 });

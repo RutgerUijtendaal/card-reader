@@ -82,7 +82,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   };
 
   const loadNextPage = async (): Promise<void> => {
-    if (isLoadingInitial.value || isLoadingPage.value || nextPage.value === null) {
+    if (isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
       return;
     }
     await loadCardsPage(nextPage.value, 'append');
