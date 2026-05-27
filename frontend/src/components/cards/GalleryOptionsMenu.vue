@@ -83,19 +83,12 @@
                       Choose how many cards each gallery request loads.
                     </p>
                   </div>
-                  <select
-                    :value="pageSize ?? undefined"
-                    class="input-base w-full sm:ml-auto sm:w-[7rem] sm:shrink-0"
-                    @change="emit('update:pageSize', Number(($event.target as HTMLSelectElement).value))"
-                  >
-                    <option
-                      v-for="option in pageSizeOptions"
-                      :key="option"
-                      :value="option"
-                    >
-                      {{ option }} cards
-                    </option>
-                  </select>
+                  <AppSelect
+                    :model-value="pageSize ?? null"
+                    :options="pageSizeSelectOptions"
+                    wrapper-class="w-full sm:ml-auto sm:w-[7rem] sm:shrink-0"
+                    @update:model-value="handlePageSizeChange"
+                  />
                 </div>
               </div>
 
@@ -137,6 +130,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { SlidersHorizontal } from 'lucide-vue-next';
+import AppSelect from '@/components/app/AppSelect.vue';
 import PopoverOptionList, { type PopoverOptionItem } from '@/components/cards/PopoverOptionList.vue';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
 import { HOVER_MODE_OPTIONS, type HoverMode } from '@/modules/card-search/hoverMode';
@@ -184,6 +178,12 @@ const hoverModeMenuOptions = computed<PopoverOptionItem[]>(() =>
     label: option.label,
   })),
 );
+const pageSizeSelectOptions = computed(() =>
+  props.pageSizeOptions.map((option) => ({
+    value: option,
+    label: `${option} cards`,
+  })),
+);
 const defaultHoverModeLabel = computed(() =>
   props.defaultHoverMode === null
     ? 'No default selected'
@@ -199,5 +199,11 @@ const handleHoverModeSelect = (value: string): void => {
 const handleHoverModeReset = (): void => {
   emit('reset:hoverMode');
   close();
+};
+
+const handlePageSizeChange = (value: string | number | null): void => {
+  if (typeof value === 'number') {
+    emit('update:pageSize', value);
+  }
 };
 </script>

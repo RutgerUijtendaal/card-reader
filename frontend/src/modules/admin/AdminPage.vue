@@ -1,14 +1,13 @@
 <template>
   <section class="space-y-6">
-    <div class="page-card">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div class="space-y-2">
-          <h2 class="theme-section-title flex items-center gap-2 text-xl font-semibold">
-            <Settings class="theme-section-muted h-5 w-5" />
-            <span>Admin</span>
-          </h2>
-        </div>
-
+    <AppPageHeader
+      :icon="Settings"
+      title="Admin"
+      subtitle="Manage catalog data, templates, card groups, users, and maintenance tools."
+      title-tag="h2"
+      title-class="text-xl"
+    >
+      <template #actions>
         <div class="theme-tablist">
           <button
             class="theme-tab"
@@ -58,8 +57,8 @@
             <span>Maintenance</span>
           </button>
         </div>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <MaintenanceAdminView v-if="activeTab === 'maintenance'" />
     <UsersAdminView v-else-if="activeTab === 'users'" />
@@ -72,6 +71,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { Database, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
+import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
   parseAdminTab,

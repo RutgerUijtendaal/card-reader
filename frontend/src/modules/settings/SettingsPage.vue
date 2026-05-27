@@ -1,16 +1,12 @@
 <template>
   <section class="flex w-full flex-col gap-6">
-    <div class="page-card flex flex-col gap-3">
-      <div class="flex items-center gap-2">
-        <SlidersHorizontal class="theme-section-muted h-5 w-5" />
-        <h2 class="theme-section-title text-xl font-semibold">
-          Settings
-        </h2>
-      </div>
-      <p class="theme-section-muted text-sm">
-        Configure default browsing and viewing preferences.
-      </p>
-    </div>
+    <AppPageHeader
+      :icon="SlidersHorizontal"
+      title="Settings"
+      subtitle="Configure default browsing and viewing preferences."
+      title-tag="h2"
+      title-class="text-xl"
+    />
 
     <section class="page-card mx-auto w-full max-w-3xl space-y-6">
       <div class="space-y-1">
@@ -82,18 +78,11 @@
                     Default gallery request size for card browsing.
                   </p>
                 </div>
-                <select
-                  v-model.number="pageSize"
-                  class="input-base w-full sm:ml-auto sm:w-[8rem] sm:shrink-0"
-                >
-                  <option
-                    v-for="option in cardPageSizeOptions"
-                    :key="option"
-                    :value="option"
-                  >
-                    {{ option }} cards
-                  </option>
-                </select>
+                <AppSelect
+                  v-model="pageSize"
+                  :options="cardPageSizeSelectOptions"
+                  wrapper-class="w-full sm:ml-auto sm:w-[8rem] sm:shrink-0"
+                />
               </div>
             </div>
 
@@ -130,6 +119,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { SlidersHorizontal } from 'lucide-vue-next';
+import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppSelect from '@/components/app/AppSelect.vue';
 import PopoverOptionList, { type PopoverOptionItem } from '@/components/cards/PopoverOptionList.vue';
 import type { CardSort } from '@/modules/card-search/cardSort';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
@@ -159,6 +150,12 @@ const hoverModeMenuOptions = computed<PopoverOptionItem[]>(() =>
   })),
 );
 const cardPageSizeOptions = CARD_PAGE_SIZE_OPTIONS;
+const cardPageSizeSelectOptions = computed(() =>
+  cardPageSizeOptions.map((option) => ({
+    value: option,
+    label: `${option} cards`,
+  })),
+);
 const percentLabel = computed(() => `${Math.round(cardScale.value * 100)}%`);
 
 const handleDefaultHoverModeSelect = (value: string): void => {

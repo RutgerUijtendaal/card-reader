@@ -48,21 +48,11 @@
           <div class="mt-3 flex flex-col gap-3">
             <label class="field-label">
               Existing {{ selectedKind === 'suggested-tags' ? 'tag' : 'type' }}
-              <select
+              <AppSelect
                 v-model="existingTargetIdModel"
-                class="input-base"
-              >
-                <option value="">
-                  Select existing {{ selectedKind === 'suggested-tags' ? 'tag' : 'type' }}
-                </option>
-                <option
-                  v-for="option in existingOptions"
-                  :key="option.id"
-                  :value="option.id"
-                >
-                  {{ option.label }} ({{ option.key }})
-                </option>
-              </select>
+                :options="existingSelectOptions"
+                :placeholder="`Select existing ${selectedKind === 'suggested-tags' ? 'tag' : 'type'}`"
+              />
             </label>
             <button
               class="btn-primary w-fit"
@@ -139,6 +129,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import AppSelect from '@/components/app/AppSelect.vue';
 import CatalogLinkedCardsGrid from '@/modules/admin/components/CatalogLinkedCardsGrid.vue';
 import type {
   CatalogKind,
@@ -172,6 +163,12 @@ const existingTargetIdModel = computed({
   get: () => props.existingTargetId,
   set: (value: string) => emit('update:existing-target-id', value),
 });
+const existingSelectOptions = computed(() =>
+  props.existingOptions.map((option) => ({
+    value: option.id,
+    label: `${option.label} (${option.key})`,
+  })),
+);
 
 const newLabelModel = computed({
   get: () => props.newLabel,

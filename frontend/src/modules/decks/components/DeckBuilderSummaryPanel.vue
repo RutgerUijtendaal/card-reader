@@ -29,15 +29,26 @@
           />
         </label>
 
-        <label class="theme-section-title flex items-center gap-3 text-sm font-semibold">
-          <input
-            :checked="isPublic"
-            type="checkbox"
-            class="theme-checkbox h-4 w-4"
-            @change="updateDeckPublic(($event.target as HTMLInputElement).checked)"
-          >
-          <span>Public deck</span>
-        </label>
+        <div class="space-y-2">
+          <p class="theme-section-title text-sm font-semibold">
+            Visibility
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="option in visibilityOptions"
+              :key="option.value"
+              class="theme-pill text-xs"
+              :class="visibility === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
+              type="button"
+              @click="updateDeckVisibility(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          <p class="theme-section-muted text-xs">
+            {{ selectedVisibilityDescription }}
+          </p>
+        </div>
 
         <div class="theme-muted-panel space-y-3 p-3">
           <p class="theme-section-title text-sm font-semibold">
@@ -276,6 +287,8 @@ import { toAbsoluteApiUrl } from '@/api/client';
 import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
+import type { DeckVisibility } from '@/modules/decks/types';
+import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/modules/decks/visibility';
 
 const props = defineProps<{
   controller: DeckEditorController;
@@ -291,11 +304,13 @@ const deckDescription = computed({
   set: props.controller.deck.setDeckDescription,
 });
 
-const isPublic = computed(() => props.controller.deck.form.is_public);
+const visibilityOptions = deckVisibilityOptions;
+const visibility = computed(() => props.controller.deck.form.visibility);
+const selectedVisibilityDescription = computed(() => deckVisibilityDescriptions[visibility.value] ?? '');
 const renamingSideboard = ref(false);
 
-const updateDeckPublic = (value: boolean): void => {
-  props.controller.deck.setDeckPublic(value);
+const updateDeckVisibility = (value: DeckVisibility): void => {
+  props.controller.deck.setDeckVisibility(value);
 };
 
 const selectSideboard = (sideboardId: string): void => {

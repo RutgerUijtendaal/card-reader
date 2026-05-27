@@ -3,22 +3,26 @@
     <button
       ref="triggerRef"
       type="button"
-      class="theme-mode-button"
+      :class="compact ? 'theme-mode-button-compact' : 'theme-mode-button'"
       :title="buttonTitle"
       aria-label="Open theme menu"
       @click="toggle"
     >
-      <span class="theme-mode-icon-wrap">
+      <span :class="compact ? 'theme-mode-icon-wrap-compact' : 'theme-mode-icon-wrap'">
         <component
           :is="activeIcon"
           class="h-4 w-4"
         />
       </span>
-      <span class="min-w-0 flex-1 text-left">
+      <span
+        v-if="!compact"
+        class="min-w-0 flex-1 text-left"
+      >
         <span class="block text-sm font-semibold">Theme</span>
         <span class="block text-xs opacity-75">{{ activeLabel }}</span>
       </span>
       <ChevronDown
+        v-if="!compact"
         class="h-4 w-4 shrink-0 transition"
         :class="isOpen ? 'rotate-180' : ''"
       />
@@ -73,6 +77,15 @@ const { preference, resolvedTheme, setPreference } = useTheme();
 const { isOpen, triggerRef, panelRef, x, y, toggle, close } = useFloatingPopover({
   placement: 'right-end',
 });
+
+withDefaults(
+  defineProps<{
+    compact?: boolean;
+  }>(),
+  {
+    compact: false,
+  },
+);
 
 const options = [
   {

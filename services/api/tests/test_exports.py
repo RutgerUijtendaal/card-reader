@@ -18,7 +18,7 @@ def test_public_deck_tts_export_returns_base64_payload() -> None:
         owner_id=str(owner.id),
         name="TTS Export Deck",
         description="Export me",
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -48,7 +48,7 @@ def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner()
         owner_id=str(owner.id),
         name="Private Export Deck",
         description=None,
-        is_public=False,
+        visibility="private",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
@@ -65,6 +65,26 @@ def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner()
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_unlisted_deck_tts_export_is_visible_to_non_owner_by_link() -> None:
+    owner = _create_user("tts-export-unlisted-owner", "password")
+    hero = _create_card(name="Unlisted Export Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Unlisted Export Deck",
+        description=None,
+        visibility="unlisted",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 200
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_tts_export_includes_sideboard_entries() -> None:
     owner = _create_user("tts-export-sideboard-owner", "password")
     hero = _create_card(name="TTS Export Sideboard Hero", is_hero=True)
@@ -74,7 +94,7 @@ def test_tts_export_includes_sideboard_entries() -> None:
         owner_id=str(owner.id),
         name="TTS Export Sideboard Deck",
         description=None,
-        is_public=True,
+        visibility="public",
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[
@@ -105,3 +125,4 @@ def test_tts_export_includes_sideboard_entries() -> None:
         }
     ]
     assert payload["deck"]["overall_total_cards"] == 66
+

@@ -217,6 +217,27 @@
     box-shadow: 0 0 0 3px var(--color-input-ring);
   }
 
+  .app-select {
+    @apply relative;
+  }
+
+  .app-select-input {
+    @apply appearance-none pr-10;
+  }
+
+  .app-select-chevron {
+    @apply pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3;
+    color: var(--color-text-soft);
+  }
+
+  .app-select:focus-within .app-select-chevron {
+    color: var(--color-text);
+  }
+
+  .app-select:has(.app-select-input:disabled) .app-select-chevron {
+    color: var(--color-disabled-text);
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
     background: linear-gradient(135deg, var(--color-primary-from) 0%, var(--color-primary-to) 100%);
@@ -335,6 +356,10 @@
 
   .theme-divider {
     border-color: var(--color-border);
+  }
+
+  .theme-subheader-row {
+    background: var(--color-surface);
   }
 
   .theme-info-box {
@@ -623,6 +648,24 @@
     color: var(--color-text);
   }
 
+  .theme-mode-button-compact {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition;
+    border-color: var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+  }
+
+  .theme-mode-button-compact:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-strong);
+  }
+
+  .theme-mode-icon-wrap-compact {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-full;
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(148, 163, 184, 0.22) 100%);
+    color: var(--color-text);
+  }
+
   .theme-mode-option {
     @apply flex w-full items-start gap-3 rounded-xl border px-3 py-3 transition;
     border-color: transparent;
@@ -658,6 +701,22 @@
   }
 
   .app-sidebar .theme-mode-icon-wrap {
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(148, 163, 184, 0.2) 100%);
+    color: var(--color-sidebar-text);
+  }
+
+  .app-sidebar .theme-mode-button-compact {
+    border-color: var(--color-sidebar-border);
+    background: var(--color-sidebar-surface);
+    color: var(--color-sidebar-text);
+  }
+
+  .app-sidebar .theme-mode-button-compact:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-sidebar-surface-hover);
+  }
+
+  .app-sidebar .theme-mode-icon-wrap-compact {
     background: linear-gradient(135deg, rgba(250, 204, 21, 0.18) 0%, rgba(148, 163, 184, 0.2) 100%);
     color: var(--color-sidebar-text);
   }

@@ -3,7 +3,7 @@ import type { DeckRecord, DeckUpsertRequest } from '@/modules/decks/types';
 export const buildDeckUpsertRequestFromRecord = (deck: DeckRecord): DeckUpsertRequest => ({
   name: deck.name.trim(),
   description: deck.description?.trim() || null,
-  is_public: deck.is_public,
+  visibility: deck.visibility,
   hero_card_id: deck.hero_card.id,
   entries: deck.mainboard.entries.map((entry) => ({
     card_id: entry.card.id,

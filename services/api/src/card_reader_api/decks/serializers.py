@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
-from card_reader_core.models import Card, CardVersion, Deck
+from card_reader_core.models import Card, CardVersion, Deck, DeckVisibility
 from card_reader_core.repositories.cards_repository import get_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckService
@@ -30,7 +30,7 @@ def deck_payload(deck: Deck) -> dict[str, object]:
         "id": deck.id,
         "name": deck.name,
         "description": deck.description,
-        "is_public": deck.is_public,
+        "visibility": deck.visibility,
         "owner": {
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
@@ -158,7 +158,7 @@ class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
 class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=True, allow_blank=False)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    is_public = serializers.BooleanField(required=True)
+    visibility = serializers.ChoiceField(choices=cast(tuple[DeckVisibility, ...], ("private", "unlisted", "public")), required=True)
     hero_card_id = serializers.CharField(required=True)
     entries = MainboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
     sideboards = DeckSideboardWriteSerializer(many=True, required=False, allow_empty=True, default=list)

@@ -6,6 +6,8 @@ export type DeckMetadataOption = {
   label: string;
 };
 
+export type DeckVisibility = 'private' | 'unlisted' | 'public';
+
 export type DeckCardSummary = CardHoverTooltipModel & {
   result_type: 'card';
   image_url: string | null;
@@ -28,7 +30,7 @@ export type DeckRecord = {
   id: string;
   name: string;
   description: string | null;
-  is_public: boolean;
+  visibility: DeckVisibility;
   owner: {
     id: string;
     username: string;
@@ -63,7 +65,7 @@ export type DeckEntryInput = {
 export type DeckUpsertRequest = {
   name: string;
   description: string | null;
-  is_public: boolean;
+  visibility: DeckVisibility;
   hero_card_id: string;
   entries: DeckEntryInput[];
   sideboards: Array<{

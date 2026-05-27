@@ -52,30 +52,19 @@
         <div class="grid gap-4">
           <label class="field-label">
             Template
-            <select
+            <AppSelect
               v-model="pickerTemplateId"
-              class="input-base"
+              :options="templateOptions"
               required
-            >
-              <option
-                v-for="item in templates"
-                :key="item.id"
-                :value="item.key"
-              >
-                {{ item.label }} ({{ item.key }})
-              </option>
-            </select>
+            />
           </label>
 
           <label class="field-label">
             Pick mode
-            <select
+            <AppSelect
               v-model="pickerMode"
-              class="input-base"
-            >
-              <option value="single">Single file</option>
-              <option value="directory">Directory</option>
-            </select>
+              :options="pickerModeOptions"
+            />
           </label>
 
           <label
@@ -258,6 +247,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import AppSelect from '@/components/app/AppSelect.vue';
 import { useImportJobsController } from '@/modules/import-jobs/composables/useImportJobsController';
 
 const {
@@ -288,4 +279,16 @@ const {
   progressClass,
   formatTimestamp,
 } = useImportJobsController();
+
+const templateOptions = computed(() =>
+  templates.value.map((item) => ({
+    value: item.key,
+    label: `${item.label} (${item.key})`,
+  })),
+);
+
+const pickerModeOptions = [
+  { value: 'single', label: 'Single file' },
+  { value: 'directory', label: 'Directory' },
+] as const;
 </script>

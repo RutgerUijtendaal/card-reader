@@ -40,9 +40,9 @@
               <span
                 v-if="mode === 'owned'"
                 class="theme-pill text-xs"
-                :class="deck.is_public ? 'theme-pill-accent' : 'theme-pill-neutral'"
+                :class="visibilityBadgeClass"
               >
-                {{ deck.is_public ? 'Public' : 'Private' }}
+                {{ visibilityLabel }}
               </span>
               <span
                 v-else
@@ -128,6 +128,7 @@ import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckRecord } from '@/modules/decks/types';
+import { deckVisibilityBadgeClasses, deckVisibilityLabels } from '@/modules/decks/visibility';
 
 const props = defineProps<{
   deck: DeckRecord;
@@ -141,6 +142,8 @@ const rootProps = computed(() => (isCardLink.value ? { to: props.titleTo } : {})
 const titleTag = computed(() => (isCardLink.value ? 'h3' : props.titleTo ? 'RouterLink' : 'h3'));
 const titleProps = computed(() => (!isCardLink.value && props.titleTo ? { to: props.titleTo } : {}));
 const formatDate = (value: string): string => new Date(value).toLocaleDateString();
+const visibilityLabel = computed(() => deckVisibilityLabels[props.deck.visibility]);
+const visibilityBadgeClass = computed(() => deckVisibilityBadgeClasses[props.deck.visibility]);
 const layoutClass = computed(() => [
   'page-card',
   props.mode === 'browse'
@@ -149,7 +152,7 @@ const layoutClass = computed(() => [
 ]);
 const contentLayoutClass = computed(() =>
   props.mode === 'owned'
-    ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_11rem] xl:items-start'
+    ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-stretch'
     : 'flex flex-col gap-4 xl:flex-row xl:items-start',
 );
 const mainColumnClass = computed(() => 'min-w-0 flex-1');
@@ -158,7 +161,7 @@ const imageFrameClass = computed(() => (props.mode === 'browse' ? 'h-36 w-28' : 
 const curveColumnClass = computed(() => (props.mode === 'browse' ? 'w-full xl:w-[13rem] xl:shrink-0' : 'w-full xl:w-[16.5rem] xl:shrink-0'));
 const actionsColumnClass = computed(() =>
   props.mode === 'owned'
-    ? 'flex flex-wrap gap-2 border-t border-[var(--theme-border)]/70 pt-4 xl:w-[11rem] xl:flex-col xl:items-stretch xl:border-t-0 xl:border-l xl:pl-4 xl:pt-0'
+    ? 'theme-divider flex h-full items-stretch justify-end xl:border-l xl:pl-4'
     : 'flex flex-wrap gap-2 lg:shrink-0',
 );
 </script>

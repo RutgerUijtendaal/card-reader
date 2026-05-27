@@ -1,119 +1,107 @@
 <template>
   <section class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-6 overflow-hidden">
-    <div class="page-card flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <h2 class="theme-section-title text-xl font-semibold">
-          {{ controller.deckId.value ? 'Edit Deck' : 'Build Deck' }}
-        </h2>
-        <p class="theme-section-muted text-sm">
-          {{ controller.deck.isSetupStep.value ? 'Select a hero and enter the deck details to continue.' : `Build a mainboard with at least ${MIN_MAINBOARD_CARD_COUNT} cards, including ${MIN_MAINBOARD_MANA_TYPE_COUNT} Mana cards.` }}
-        </p>
-      </div>
-
-      <div class="flex flex-col gap-4 lg:min-w-0 lg:flex-row lg:items-center">
-        <div
+    <AppPageHeader
+      :icon="SquarePen"
+      :title="controller.deckId.value ? 'Edit Deck' : 'Build Deck'"
+      :subtitle="controller.deck.isSetupStep.value ? 'Select a hero and enter the deck details to continue.' : `Build a mainboard with at least ${MIN_MAINBOARD_CARD_COUNT} cards, including ${MIN_MAINBOARD_MANA_TYPE_COUNT} Mana cards.`"
+      :back-to="controller.backLink.value"
+      :back-label="controller.backLabel.value"
+      title-tag="h2"
+      title-class="text-xl"
+    >
+      <template #actions>
+        <button
           v-if="!controller.deck.isSetupStep.value"
-          class="min-w-0 flex-1"
+          class="btn-primary"
+          type="button"
+          :disabled="controller.saving.value"
+          @click="controller.saveDeck"
         >
-          <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div class="flex items-center gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
-              <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallTotalCards.value }}</span>
-            </div>
-            <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-center gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
-              <span class="theme-section-title text-base font-semibold">
-                {{ controller.deck.totalMainboardCards.value }}<template v-if="controller.deck.totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT"> / {{ MAX_MAINBOARD_CARD_COUNT }}</template>
-              </span>
-            </div>
-            <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-center gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
-              <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardManaTypeCards.value }}</span>
-              <InfoTooltip
-                text="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
-              >
-                <CircleCheckBig
-                  v-if="controller.deck.hasFreeMulliganManaRatio.value"
-                  class="h-4 w-4 text-emerald-400"
-                />
-                <CircleX
-                  v-else
-                  class="h-4 w-4 text-rose-400"
-                />
-              </InfoTooltip>
-            </div>
-            <div class="theme-divider hidden h-4 border-l lg:block" />
+          {{ controller.saving.value ? 'Saving...' : controller.deckId.value ? 'Save Deck' : 'Create Deck' }}
+        </button>
+      </template>
 
-            <div
-              v-if="controller.deck.headerDeckTypeCounts.value.length > 0"
-              class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+      <template
+        v-if="!controller.deck.isSetupStep.value"
+        #bottomRight
+      >
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div class="flex items-center gap-2">
+            <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
+            <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallTotalCards.value }}</span>
+          </div>
+          <div class="theme-divider hidden h-4 border-l lg:block" />
+          <div class="flex items-center gap-2">
+            <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
+            <span class="theme-section-title text-base font-semibold">
+              {{ controller.deck.totalMainboardCards.value }}<template v-if="controller.deck.totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT"> / {{ MAX_MAINBOARD_CARD_COUNT }}</template>
+            </span>
+          </div>
+          <div class="theme-divider hidden h-4 border-l lg:block" />
+          <div class="flex items-center gap-2">
+            <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
+            <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardManaTypeCards.value }}</span>
+            <InfoTooltip
+              text="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
             >
-              <span class="theme-kicker shrink-0 text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
-              <span
-                v-for="row in controller.deck.headerDeckTypeCounts.value"
-                :key="row.type.id"
-                class="theme-section-muted"
-              >
-                <span class="theme-section-title font-medium">{{ row.type.label }}</span>
-                {{ row.count }}
-              </span>
-              <span
-                v-if="controller.deck.remainingDeckTypeCount.value > 0"
-                class="theme-section-muted"
-              >
-                +{{ controller.deck.remainingDeckTypeCount.value }} more
-              </span>
-            </div>
-            <p
-              v-else
-              class="theme-section-muted flex items-center gap-2 text-xs"
-            >
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
-              <span>No type data yet.</span>
-            </p>
+              <CircleCheckBig
+                v-if="controller.deck.hasFreeMulliganManaRatio.value"
+                class="h-4 w-4 text-emerald-400"
+              />
+              <CircleX
+                v-else
+                class="h-4 w-4 text-rose-400"
+              />
+            </InfoTooltip>
+          </div>
+          <div class="theme-divider hidden h-4 border-l lg:block" />
 
-            <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-center gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
-              <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallUniqueCards.value }}</span>
-            </div>
-            <div class="theme-divider hidden h-4 border-l lg:block" />
-            <div class="flex items-center gap-2">
-              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Status</span>
-              <span
-                class="text-base font-semibold"
-                :class="controller.deck.isDeckValid.value ? 'text-emerald-300' : 'theme-section-title'"
-              >
-                {{ controller.deck.deckStatusLabel.value }}
-              </span>
-            </div>
+          <div
+            v-if="controller.deck.headerDeckTypeCounts.value.length > 0"
+            class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+          >
+            <span class="theme-kicker shrink-0 text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
+            <span
+              v-for="row in controller.deck.headerDeckTypeCounts.value"
+              :key="row.type.id"
+              class="theme-section-muted"
+            >
+              <span class="theme-section-title font-medium">{{ row.type.label }}</span>
+              {{ row.count }}
+            </span>
+            <span
+              v-if="controller.deck.remainingDeckTypeCount.value > 0"
+              class="theme-section-muted"
+            >
+              +{{ controller.deck.remainingDeckTypeCount.value }} more
+            </span>
+          </div>
+          <p
+            v-else
+            class="theme-section-muted flex items-center gap-2 text-xs"
+          >
+            <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
+            <span>No type data yet.</span>
+          </p>
+
+          <div class="theme-divider hidden h-4 border-l lg:block" />
+          <div class="flex items-center gap-2">
+            <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
+            <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallUniqueCards.value }}</span>
+          </div>
+          <div class="theme-divider hidden h-4 border-l lg:block" />
+          <div class="flex items-center gap-2">
+            <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Status</span>
+            <span
+              class="text-base font-semibold"
+              :class="controller.deck.isDeckValid.value ? 'text-emerald-300' : 'theme-section-title'"
+            >
+              {{ controller.deck.deckStatusLabel.value }}
+            </span>
           </div>
         </div>
-
-        <div
-          class="theme-divider flex flex-wrap items-center gap-2 pt-1 lg:shrink-0 lg:border-l lg:pl-4 lg:pt-0"
-          :class="!controller.deck.isSetupStep.value ? 'border-t pt-4 lg:border-t-0 lg:pt-0' : ''"
-        >
-          <RouterLink
-            class="btn-secondary"
-            :to="controller.backLink.value"
-          >
-            {{ controller.backLabel.value }}
-          </RouterLink>
-          <button
-            v-if="!controller.deck.isSetupStep.value"
-            class="btn-primary"
-            type="button"
-            :disabled="controller.saving.value"
-            @click="controller.saveDeck"
-          >
-            {{ controller.saving.value ? 'Saving...' : controller.deckId.value ? 'Save Deck' : 'Create Deck' }}
-          </button>
-        </div>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <div
       v-if="controller.loading.value"
@@ -134,7 +122,8 @@
 </template>
 
 <script setup lang="ts">
-import { CircleCheckBig, CircleX } from 'lucide-vue-next';
+import { CircleCheckBig, CircleX, SquarePen } from 'lucide-vue-next';
+import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import InfoTooltip from '@/components/InfoTooltip.vue';
 import DeckBuilderFiltersPanel from '@/modules/decks/components/DeckBuilderFiltersPanel.vue';
 import DeckBuilderGallery from '@/modules/decks/components/DeckBuilderGallery.vue';
