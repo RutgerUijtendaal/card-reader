@@ -41,12 +41,16 @@ def list_cards(
     tag_ids: list[str] | None = None,
     tag_match: str | None = None,
     mana_symbol_ids: list[str] | None = None,
+    mana_symbol_exclude_ids: list[str] | None = None,
     mana_symbol_match: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
     devotion_symbol_ids: list[str] | None = None,
+    devotion_symbol_exclude_ids: list[str] | None = None,
     devotion_symbol_match: str | None = None,
     other_symbol_ids: list[str] | None = None,
+    other_symbol_exclude_ids: list[str] | None = None,
     other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
@@ -74,12 +78,16 @@ def list_cards(
         tag_ids=tag_ids,
         tag_match=tag_match,
         mana_symbol_ids=mana_symbol_ids,
+        mana_symbol_exclude_ids=mana_symbol_exclude_ids,
         mana_symbol_match=mana_symbol_match,
         affinity_symbol_ids=affinity_symbol_ids,
+        affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
         affinity_symbol_match=affinity_symbol_match,
         devotion_symbol_ids=devotion_symbol_ids,
+        devotion_symbol_exclude_ids=devotion_symbol_exclude_ids,
         devotion_symbol_match=devotion_symbol_match,
         other_symbol_ids=other_symbol_ids,
+        other_symbol_exclude_ids=other_symbol_exclude_ids,
         other_symbol_match=other_symbol_match,
         symbol_ids=symbol_ids,
         type_ids=type_ids,
@@ -124,12 +132,16 @@ def list_matching_cards(
     tag_ids: list[str] | None = None,
     tag_match: str | None = None,
     mana_symbol_ids: list[str] | None = None,
+    mana_symbol_exclude_ids: list[str] | None = None,
     mana_symbol_match: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
     devotion_symbol_ids: list[str] | None = None,
+    devotion_symbol_exclude_ids: list[str] | None = None,
     devotion_symbol_match: str | None = None,
     other_symbol_ids: list[str] | None = None,
+    other_symbol_exclude_ids: list[str] | None = None,
     other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
@@ -153,12 +165,16 @@ def list_matching_cards(
         tag_ids=tag_ids,
         tag_match=tag_match,
         mana_symbol_ids=mana_symbol_ids,
+        mana_symbol_exclude_ids=mana_symbol_exclude_ids,
         mana_symbol_match=mana_symbol_match,
         affinity_symbol_ids=affinity_symbol_ids,
+        affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
         affinity_symbol_match=affinity_symbol_match,
         devotion_symbol_ids=devotion_symbol_ids,
+        devotion_symbol_exclude_ids=devotion_symbol_exclude_ids,
         devotion_symbol_match=devotion_symbol_match,
         other_symbol_ids=other_symbol_ids,
+        other_symbol_exclude_ids=other_symbol_exclude_ids,
         other_symbol_match=other_symbol_match,
         symbol_ids=symbol_ids,
         type_ids=type_ids,
@@ -241,12 +257,16 @@ def list_filtered_latest_card_version_reparse_sources(
     tag_ids: list[str] | None = None,
     tag_match: str | None = None,
     mana_symbol_ids: list[str] | None = None,
+    mana_symbol_exclude_ids: list[str] | None = None,
     mana_symbol_match: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
     devotion_symbol_ids: list[str] | None = None,
+    devotion_symbol_exclude_ids: list[str] | None = None,
     devotion_symbol_match: str | None = None,
     other_symbol_ids: list[str] | None = None,
+    other_symbol_exclude_ids: list[str] | None = None,
     other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
@@ -270,12 +290,16 @@ def list_filtered_latest_card_version_reparse_sources(
         tag_ids=tag_ids,
         tag_match=tag_match,
         mana_symbol_ids=mana_symbol_ids,
+        mana_symbol_exclude_ids=mana_symbol_exclude_ids,
         mana_symbol_match=mana_symbol_match,
         affinity_symbol_ids=affinity_symbol_ids,
+        affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
         affinity_symbol_match=affinity_symbol_match,
         devotion_symbol_ids=devotion_symbol_ids,
+        devotion_symbol_exclude_ids=devotion_symbol_exclude_ids,
         devotion_symbol_match=devotion_symbol_match,
         other_symbol_ids=other_symbol_ids,
+        other_symbol_exclude_ids=other_symbol_exclude_ids,
         other_symbol_match=other_symbol_match,
         symbol_ids=symbol_ids,
         type_ids=type_ids,
@@ -364,6 +388,19 @@ def filter_by_links(
     return queryset.filter(id__in=version_ids)
 
 
+def exclude_by_links(
+    queryset: QuerySet[CardVersion],
+    link_model: type[CardVersionKeyword] | type[CardVersionTag] | type[CardVersionSymbol] | type[CardVersionType],
+    link_field: str,
+    values: list[str] | None,
+) -> QuerySet[CardVersion]:
+    if not values:
+        return queryset
+    normalized_values = list(dict.fromkeys(values))
+    version_ids = link_model.objects.filter(**{f"{link_field}__in": normalized_values}).values_list("card_version_id", flat=True)
+    return queryset.exclude(id__in=version_ids)
+
+
 def _build_filtered_versions_queryset(
     *,
     query: str | None,
@@ -374,12 +411,16 @@ def _build_filtered_versions_queryset(
     tag_ids: list[str] | None,
     tag_match: str | None,
     mana_symbol_ids: list[str] | None,
+    mana_symbol_exclude_ids: list[str] | None,
     mana_symbol_match: str | None,
     affinity_symbol_ids: list[str] | None,
+    affinity_symbol_exclude_ids: list[str] | None,
     affinity_symbol_match: str | None,
     devotion_symbol_ids: list[str] | None,
+    devotion_symbol_exclude_ids: list[str] | None,
     devotion_symbol_match: str | None,
     other_symbol_ids: list[str] | None,
+    other_symbol_exclude_ids: list[str] | None,
     other_symbol_match: str | None,
     symbol_ids: list[str] | None,
     type_ids: list[str] | None,
@@ -435,13 +476,17 @@ def _build_filtered_versions_queryset(
     versions = filter_by_links(versions, CardVersionKeyword, "keyword_id", keyword_ids, match_mode=keyword_match)
     versions = filter_by_links(versions, CardVersionTag, "tag_id", tag_ids, match_mode=tag_match)
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", mana_symbol_ids, match_mode=mana_symbol_match)
+    versions = exclude_by_links(versions, CardVersionSymbol, "symbol_id", mana_symbol_exclude_ids)
     versions = filter_by_links(
         versions, CardVersionSymbol, "symbol_id", affinity_symbol_ids, match_mode=affinity_symbol_match
     )
+    versions = exclude_by_links(versions, CardVersionSymbol, "symbol_id", affinity_symbol_exclude_ids)
     versions = filter_by_links(
         versions, CardVersionSymbol, "symbol_id", devotion_symbol_ids, match_mode=devotion_symbol_match
     )
+    versions = exclude_by_links(versions, CardVersionSymbol, "symbol_id", devotion_symbol_exclude_ids)
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", other_symbol_ids, match_mode=other_symbol_match)
+    versions = exclude_by_links(versions, CardVersionSymbol, "symbol_id", other_symbol_exclude_ids)
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
     versions = filter_by_links(versions, CardVersionType, "type_id", type_ids, match_mode=type_match)
     return _apply_card_sort(versions, sort)

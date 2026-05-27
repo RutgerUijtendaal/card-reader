@@ -28,6 +28,7 @@ describe('deckBrowseFilterState', () => {
       card_q: '  Spear ',
       affinity_symbol_match: 'all',
       affinity_symbol_keys: ['water', 'fire'],
+      affinity_symbol_exclude_keys: ['fire'],
     });
 
     expect(parsed).toEqual({
@@ -35,12 +36,14 @@ describe('deckBrowseFilterState', () => {
       cardQuery: 'Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolKeys: ['fire', 'water'],
+      affinitySymbolExcludeKeys: ['fire'],
     });
     expect(buildDeckBrowseFilterRouteQuery(parsed)).toEqual({
       hero_q: 'Aurora',
       card_q: 'Spear',
       affinity_symbol_match: 'all',
       affinity_symbol_keys: ['fire', 'water'],
+      affinity_symbol_exclude_keys: ['fire'],
     });
   });
 
@@ -52,6 +55,7 @@ describe('deckBrowseFilterState', () => {
         cardQuery: 'Spear',
         affinitySymbolMatch: 'all',
         affinitySymbolKeys: ['fire', 'water'],
+        affinitySymbolExcludeKeys: ['fire'],
       },
       catalog,
     );
@@ -61,12 +65,14 @@ describe('deckBrowseFilterState', () => {
       cardQuery: 'Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolIds: ['sym-1', 'sym-2'],
+      affinitySymbolExcludeIds: ['sym-1'],
     });
     expect(buildDeckBrowseFilterStateFromSelection(selection, catalog)).toEqual({
       heroQuery: 'Aurora',
       cardQuery: 'Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolKeys: ['fire', 'water'],
+      affinitySymbolExcludeKeys: ['fire'],
     });
   });
 
@@ -76,12 +82,14 @@ describe('deckBrowseFilterState', () => {
       cardQuery: 'Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolIds: ['sym-1', 'sym-2'],
+      affinitySymbolExcludeIds: ['sym-1'],
     });
 
     expect(params.get('hero_q')).toBe('Aurora');
     expect(params.get('card_q')).toBe('Spear');
     expect(params.get('affinity_symbol_match')).toBe('all');
     expect(params.getAll('affinity_symbol_ids')).toEqual(['sym-1', 'sym-2']);
+    expect(params.getAll('affinity_symbol_exclude_ids')).toEqual(['sym-1']);
   });
 
   test('empty state clears both text filters and affinity selections', () => {
@@ -90,6 +98,7 @@ describe('deckBrowseFilterState', () => {
       cardQuery: '',
       affinitySymbolMatch: 'any',
       affinitySymbolKeys: [],
+      affinitySymbolExcludeKeys: [],
     });
   });
 });

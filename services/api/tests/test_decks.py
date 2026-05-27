@@ -534,6 +534,75 @@ def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_by_affinity_symbol_exclusions() -> None:
+    owner = _create_user("deck-filter-affinity-exclude-owner", "password")
+    hero = _create_card(name="Affinity Exclude Hero", is_hero=True)
+    fire_card = _create_card(name="Exclude Fire Card", is_hero=False)
+    water_card = _create_card(name="Exclude Water Card", is_hero=False)
+    dual_card = _create_card(name="Exclude Dual Card", is_hero=False)
+    _add_card_metadata(fire_card, symbol_specs=[("aff-fire-exclude", "Fire Affinity", "{AF}", "affinity")])
+    _add_card_metadata(water_card, symbol_specs=[("aff-water-exclude", "Water Affinity", "{AW}", "affinity")])
+    _add_card_metadata(
+        dual_card,
+        symbol_specs=[
+            ("aff-fire-exclude", "Fire Affinity", "{AF}", "affinity"),
+            ("aff-water-exclude", "Water Affinity", "{AW}", "affinity"),
+        ],
+    )
+    fire_symbol_id = Symbol.objects.get(key="aff-fire-exclude").id
+    water_symbol_id = Symbol.objects.get(key="aff-water-exclude").id
+
+    fire_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Exclude Fire Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=fire_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Exclude Water Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=water_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Exclude Dual Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=dual_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {
+            "affinity_symbol_ids": [fire_symbol_id, water_symbol_id],
+            "affinity_symbol_match": "any",
+            "affinity_symbol_exclude_ids": [water_symbol_id],
+        },
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [fire_deck.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> None:
     owner = _create_user("deck-filter-visibility-owner", "password")
     target_hero = _create_card(name="Visible Filter Hero", is_hero=True)

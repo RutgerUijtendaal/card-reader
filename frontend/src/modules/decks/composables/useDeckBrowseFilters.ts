@@ -23,6 +23,7 @@ export const useDeckBrowseFilters = () => {
   const heroQuery = ref('');
   const cardQuery = ref('');
   const affinitySymbolIds = ref<string[]>([]);
+  const affinitySymbolExcludeIds = ref<string[]>([]);
   const affinitySymbolMatch = ref<'any' | 'all'>('any');
 
   const selectionState = computed(() =>
@@ -36,6 +37,7 @@ export const useDeckBrowseFilters = () => {
         cardQuery: cardQuery.value,
         affinitySymbolMatch: affinitySymbolMatch.value,
         affinitySymbolIds: affinitySymbolIds.value,
+        affinitySymbolExcludeIds: affinitySymbolExcludeIds.value,
       },
       filterCatalog.value,
     );
@@ -47,6 +49,7 @@ export const useDeckBrowseFilters = () => {
     cardQuery.value = normalized.cardQuery;
     affinitySymbolMatch.value = normalized.affinitySymbolMatch;
     affinitySymbolIds.value = [...normalized.affinitySymbolIds];
+    affinitySymbolExcludeIds.value = [...normalized.affinitySymbolExcludeIds];
   };
 
   const resetFilters = (): void => {
@@ -65,12 +68,17 @@ export const useDeckBrowseFilters = () => {
     affinitySymbolIds.value = value;
   };
 
+  const updateAffinitySymbolExcludeIds = (value: string[]): void => {
+    affinitySymbolExcludeIds.value = value;
+  };
+
   const updateAffinitySymbolMatch = (value: 'any' | 'all'): void => {
     affinitySymbolMatch.value = value;
   };
 
   const resetAffinitySymbols = (): void => {
     affinitySymbolIds.value = [];
+    affinitySymbolExcludeIds.value = [];
     affinitySymbolMatch.value = 'any';
   };
 
@@ -89,6 +97,7 @@ export const useDeckBrowseFilters = () => {
     heroQuery,
     cardQuery,
     affinitySymbolIds,
+    affinitySymbolExcludeIds,
     affinitySymbolMatch,
     selectionState,
     readFilterState,
@@ -97,6 +106,7 @@ export const useDeckBrowseFilters = () => {
     updateHeroQuery,
     updateCardQuery,
     updateAffinitySymbolIds,
+    updateAffinitySymbolExcludeIds,
     updateAffinitySymbolMatch,
     resetAffinitySymbols,
     loadFilters,

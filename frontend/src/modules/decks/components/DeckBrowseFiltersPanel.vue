@@ -27,7 +27,8 @@
     </div>
 
     <SymbolToggleGroup
-      v-model="selectedAffinitySymbolIds"
+      v-model:included-value="selectedAffinitySymbolIds"
+      v-model:excluded-value="excludedAffinitySymbolIds"
       v-model:match-mode="affinitySymbolMatch"
       :default-open="true"
       label="Affinity"
@@ -51,6 +52,10 @@ const props = defineProps<{
 const selectedAffinitySymbolIds = computed({
   get: () => props.controller.affinitySymbolIds.value,
   set: props.controller.updateAffinitySymbolIds,
+});
+const excludedAffinitySymbolIds = computed({
+  get: () => props.controller.affinitySymbolExcludeIds.value,
+  set: props.controller.updateAffinitySymbolExcludeIds,
 });
 
 const affinitySymbolMatch = computed({

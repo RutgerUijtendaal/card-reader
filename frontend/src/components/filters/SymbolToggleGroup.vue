@@ -49,10 +49,16 @@
           <RotateCcw class="h-3.5 w-3.5" />
         </button>
         <span
-          v-if="modelValue.length > 0"
+          v-if="includedValue.length > 0"
           class="theme-pill theme-pill-accent px-2 py-0.5 text-xs font-medium"
         >
-          {{ modelValue.length }}
+          +{{ includedValue.length }}
+        </span>
+        <span
+          v-if="excludedValue.length > 0"
+          class="theme-pill theme-pill-danger px-2 py-0.5 text-xs font-medium"
+        >
+          -{{ excludedValue.length }}
         </span>
         <ChevronDown
           class="h-4 w-4 transition"
@@ -71,13 +77,10 @@
           :key="option.id"
           type="button"
           class="theme-choice-chip h-10 w-10"
-          :class="
-            selectedIds.has(option.id)
-              ? 'theme-choice-chip-active shadow-sm'
-              : ''
-          "
-          :title="option.label"
-          :aria-pressed="selectedIds.has(option.id)"
+          :class="chipClass(option.id)"
+          :title="chipTitle(option.label, option.id)"
+          :aria-pressed="chipState(option.id) !== 'off'"
+          :aria-label="chipTitle(option.label, option.id)"
           @click.stop="toggle(option.id)"
         >
           <SymbolToken
@@ -99,12 +102,14 @@ import { computed, ref } from 'vue';
 import { ChevronDown, RotateCcw } from 'lucide-vue-next';
 import SymbolToken from '@/components/SymbolToken.vue';
 import type { SymbolFilterOption } from '@/modules/card-detail/types';
+import type { SymbolFilterTriState } from '@/modules/card-search/cardFilterSectionsState';
 
 const props = withDefaults(
   defineProps<{
     label: string;
     options: SymbolFilterOption[];
-    modelValue: string[];
+    includedValue: string[];
+    excludedValue: string[];
     matchMode: 'any' | 'all';
     description?: string;
     defaultOpen?: boolean;
@@ -118,21 +123,64 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: string[]): void;
+  (e: 'update:includedValue', value: string[]): void;
+  (e: 'update:excludedValue', value: string[]): void;
   (e: 'update:matchMode', value: 'any' | 'all'): void;
   (e: 'reset'): void;
 }>();
 
-const selectedIds = computed(() => new Set(props.modelValue));
+const includedIds = computed(() => new Set(props.includedValue));
+const excludedIds = computed(() => new Set(props.excludedValue));
 const isOpen = ref(props.defaultOpen);
 
-const toggle = (id: string): void => {
-  const next = new Set(props.modelValue);
-  if (next.has(id)) {
-    next.delete(id);
-  } else {
-    next.add(id);
+const chipState = (id: string): SymbolFilterTriState => {
+  if (includedIds.value.has(id)) {
+    return 'include';
   }
-  emit('update:modelValue', Array.from(next));
+  if (excludedIds.value.has(id)) {
+    return 'exclude';
+  }
+  return 'off';
+};
+
+const chipTitle = (label: string, id: string): string => {
+  const state = chipState(id);
+  if (state === 'include') {
+    return `${label} included. Click to exclude.`;
+  }
+  if (state === 'exclude') {
+    return `${label} excluded. Click to clear.`;
+  }
+  return `${label} not filtered. Click to include.`;
+};
+
+const chipClass = (id: string): string => {
+  const state = chipState(id);
+  if (state === 'include') {
+    return 'theme-choice-chip-include';
+  }
+  if (state === 'exclude') {
+    return 'theme-choice-chip-exclude';
+  }
+  return '';
+};
+
+const toggle = (id: string): void => {
+  const nextIncluded = new Set(props.includedValue);
+  const nextExcluded = new Set(props.excludedValue);
+  const state = chipState(id);
+
+  if (state === 'include') {
+    nextIncluded.delete(id);
+    nextExcluded.add(id);
+  } else if (state === 'exclude') {
+    nextExcluded.delete(id);
+  } else {
+    nextIncluded.add(id);
+    nextExcluded.delete(id);
+  }
+
+  emit('update:includedValue', Array.from(nextIncluded));
+  emit('update:excludedValue', Array.from(nextExcluded));
 };
 </script>

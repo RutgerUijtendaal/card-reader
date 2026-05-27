@@ -1,10 +1,13 @@
 import type { MetadataOption, SymbolFilterOption } from '@/modules/card-detail/types';
 
 export type MatchMode = 'any' | 'all';
+export type SymbolFilterTriState = 'off' | 'include' | 'exclude';
 
 export type CardFilterSectionsState = {
   selectedManaTypeSymbolIds: string[];
   onUpdateSelectedManaTypeSymbolIds: (value: string[]) => void;
+  excludedManaTypeSymbolIds: string[];
+  onUpdateExcludedManaTypeSymbolIds: (value: string[]) => void;
   manaSymbolMatch: MatchMode;
   onUpdateManaSymbolMatch: (value: MatchMode) => void;
   manaTypeOptions: SymbolFilterOption[];
@@ -21,18 +24,24 @@ export type CardFilterSectionsState = {
   resetTypeGroup: () => void;
   selectedAffinitySymbolIds: string[];
   onUpdateSelectedAffinitySymbolIds: (value: string[]) => void;
+  excludedAffinitySymbolIds: string[];
+  onUpdateExcludedAffinitySymbolIds: (value: string[]) => void;
   affinitySymbolMatch: MatchMode;
   onUpdateAffinitySymbolMatch: (value: MatchMode) => void;
   affinityTypeOptions: SymbolFilterOption[];
   resetAffinityGroup: () => void;
   selectedDevotionSymbolIds: string[];
   onUpdateSelectedDevotionSymbolIds: (value: string[]) => void;
+  excludedDevotionSymbolIds: string[];
+  onUpdateExcludedDevotionSymbolIds: (value: string[]) => void;
   devotionSymbolMatch: MatchMode;
   onUpdateDevotionSymbolMatch: (value: MatchMode) => void;
   devotionTypeOptions: SymbolFilterOption[];
   resetDevotionGroup: () => void;
   selectedOtherSymbolIds: string[];
   onUpdateSelectedOtherSymbolIds: (value: string[]) => void;
+  excludedOtherSymbolIds: string[];
+  onUpdateExcludedOtherSymbolIds: (value: string[]) => void;
   otherSymbolMatch: MatchMode;
   onUpdateOtherSymbolMatch: (value: MatchMode) => void;
   otherSymbolOptions: SymbolFilterOption[];

@@ -24,9 +24,13 @@ export type CardFilterState = {
   keywordKeys: string[];
   tagKeys: string[];
   manaSymbolKeys: string[];
+  manaSymbolExcludeKeys: string[];
   affinitySymbolKeys: string[];
+  affinitySymbolExcludeKeys: string[];
   devotionSymbolKeys: string[];
+  devotionSymbolExcludeKeys: string[];
   otherSymbolKeys: string[];
+  otherSymbolExcludeKeys: string[];
   typeKeys: string[];
 };
 
@@ -49,9 +53,13 @@ export type CardFilterSelectionState = {
   keywordIds: string[];
   tagIds: string[];
   manaTypeSymbolIds: string[];
+  manaTypeSymbolExcludeIds: string[];
   affinitySymbolIds: string[];
+  affinitySymbolExcludeIds: string[];
   devotionSymbolIds: string[];
+  devotionSymbolExcludeIds: string[];
   otherSymbolIds: string[];
+  otherSymbolExcludeIds: string[];
   typeIds: string[];
 };
 
@@ -74,12 +82,16 @@ export type CardFilterApiPayload = {
   type_ids?: string[];
   type_match?: 'any' | 'all';
   mana_symbol_ids?: string[];
+  mana_symbol_exclude_ids?: string[];
   mana_symbol_match?: 'any' | 'all';
   affinity_symbol_ids?: string[];
+  affinity_symbol_exclude_ids?: string[];
   affinity_symbol_match?: 'any' | 'all';
   devotion_symbol_ids?: string[];
+  devotion_symbol_exclude_ids?: string[];
   devotion_symbol_match?: 'any' | 'all';
   other_symbol_ids?: string[];
+  other_symbol_exclude_ids?: string[];
   other_symbol_match?: 'any' | 'all';
   template_id?: string;
   mana_cost_min?: string;
@@ -109,9 +121,13 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
   keywordKeys: [],
   tagKeys: [],
   manaSymbolKeys: [],
+  manaSymbolExcludeKeys: [],
   affinitySymbolKeys: [],
+  affinitySymbolExcludeKeys: [],
   devotionSymbolKeys: [],
+  devotionSymbolExcludeKeys: [],
   otherSymbolKeys: [],
+  otherSymbolExcludeKeys: [],
   typeKeys: [],
 });
 
@@ -134,9 +150,13 @@ export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState 
   keywordIds: [],
   tagIds: [],
   manaTypeSymbolIds: [],
+  manaTypeSymbolExcludeIds: [],
   affinitySymbolIds: [],
+  affinitySymbolExcludeIds: [],
   devotionSymbolIds: [],
+  devotionSymbolExcludeIds: [],
   otherSymbolIds: [],
+  otherSymbolExcludeIds: [],
   typeIds: [],
 });
 
@@ -180,9 +200,13 @@ export const normalizeCardFilterState = (state: CardFilterState): CardFilterStat
   keywordKeys: normalizeStringArray(state.keywordKeys),
   tagKeys: normalizeStringArray(state.tagKeys),
   manaSymbolKeys: normalizeStringArray(state.manaSymbolKeys),
+  manaSymbolExcludeKeys: normalizeStringArray(state.manaSymbolExcludeKeys),
   affinitySymbolKeys: normalizeStringArray(state.affinitySymbolKeys),
+  affinitySymbolExcludeKeys: normalizeStringArray(state.affinitySymbolExcludeKeys),
   devotionSymbolKeys: normalizeStringArray(state.devotionSymbolKeys),
+  devotionSymbolExcludeKeys: normalizeStringArray(state.devotionSymbolExcludeKeys),
   otherSymbolKeys: normalizeStringArray(state.otherSymbolKeys),
+  otherSymbolExcludeKeys: normalizeStringArray(state.otherSymbolExcludeKeys),
   typeKeys: normalizeStringArray(state.typeKeys),
 });
 
@@ -207,9 +231,13 @@ export const normalizeCardFilterSelectionState = (
   keywordIds: normalizeStringArray(state.keywordIds),
   tagIds: normalizeStringArray(state.tagIds),
   manaTypeSymbolIds: normalizeStringArray(state.manaTypeSymbolIds),
+  manaTypeSymbolExcludeIds: normalizeStringArray(state.manaTypeSymbolExcludeIds),
   affinitySymbolIds: normalizeStringArray(state.affinitySymbolIds),
+  affinitySymbolExcludeIds: normalizeStringArray(state.affinitySymbolExcludeIds),
   devotionSymbolIds: normalizeStringArray(state.devotionSymbolIds),
+  devotionSymbolExcludeIds: normalizeStringArray(state.devotionSymbolExcludeIds),
   otherSymbolIds: normalizeStringArray(state.otherSymbolIds),
+  otherSymbolExcludeIds: normalizeStringArray(state.otherSymbolExcludeIds),
   typeIds: normalizeStringArray(state.typeIds),
 });
 
@@ -233,9 +261,13 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
     keywordKeys: readQueryValues(query.keyword_keys),
     tagKeys: readQueryValues(query.tag_keys),
     manaSymbolKeys: readQueryValues(query.mana_symbol_keys),
+    manaSymbolExcludeKeys: readQueryValues(query.mana_symbol_exclude_keys),
     affinitySymbolKeys: readQueryValues(query.affinity_symbol_keys),
+    affinitySymbolExcludeKeys: readQueryValues(query.affinity_symbol_exclude_keys),
     devotionSymbolKeys: readQueryValues(query.devotion_symbol_keys),
+    devotionSymbolExcludeKeys: readQueryValues(query.devotion_symbol_exclude_keys),
     otherSymbolKeys: readQueryValues(query.other_symbol_keys),
+    otherSymbolExcludeKeys: readQueryValues(query.other_symbol_exclude_keys),
     typeKeys: readQueryValues(query.type_keys),
   });
 
@@ -261,9 +293,17 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   if (normalized.keywordKeys.length > 0) query.keyword_keys = normalized.keywordKeys;
   if (normalized.tagKeys.length > 0) query.tag_keys = normalized.tagKeys;
   if (normalized.manaSymbolKeys.length > 0) query.mana_symbol_keys = normalized.manaSymbolKeys;
+  if (normalized.manaSymbolExcludeKeys.length > 0) query.mana_symbol_exclude_keys = normalized.manaSymbolExcludeKeys;
   if (normalized.affinitySymbolKeys.length > 0) query.affinity_symbol_keys = normalized.affinitySymbolKeys;
+  if (normalized.affinitySymbolExcludeKeys.length > 0) {
+    query.affinity_symbol_exclude_keys = normalized.affinitySymbolExcludeKeys;
+  }
   if (normalized.devotionSymbolKeys.length > 0) query.devotion_symbol_keys = normalized.devotionSymbolKeys;
+  if (normalized.devotionSymbolExcludeKeys.length > 0) {
+    query.devotion_symbol_exclude_keys = normalized.devotionSymbolExcludeKeys;
+  }
   if (normalized.otherSymbolKeys.length > 0) query.other_symbol_keys = normalized.otherSymbolKeys;
+  if (normalized.otherSymbolExcludeKeys.length > 0) query.other_symbol_exclude_keys = normalized.otherSymbolExcludeKeys;
   if (normalized.typeKeys.length > 0) query.type_keys = normalized.typeKeys;
 
   return query;
@@ -339,9 +379,13 @@ export const buildCardFilterSelectionState = (
     keywordIds: resolveIdsFromKeys(state.keywordKeys, catalog.keywords),
     tagIds: resolveIdsFromKeys(state.tagKeys, catalog.tags),
     manaTypeSymbolIds: resolveIdsFromKeys(state.manaSymbolKeys, catalog.manaSymbols),
+    manaTypeSymbolExcludeIds: resolveIdsFromKeys(state.manaSymbolExcludeKeys, catalog.manaSymbols),
     affinitySymbolIds: resolveIdsFromKeys(state.affinitySymbolKeys, catalog.affinitySymbols),
+    affinitySymbolExcludeIds: resolveIdsFromKeys(state.affinitySymbolExcludeKeys, catalog.affinitySymbols),
     devotionSymbolIds: resolveIdsFromKeys(state.devotionSymbolKeys, catalog.devotionSymbols),
+    devotionSymbolExcludeIds: resolveIdsFromKeys(state.devotionSymbolExcludeKeys, catalog.devotionSymbols),
     otherSymbolIds: resolveIdsFromKeys(state.otherSymbolKeys, catalog.otherSymbols),
+    otherSymbolExcludeIds: resolveIdsFromKeys(state.otherSymbolExcludeKeys, catalog.otherSymbols),
     typeIds: resolveIdsFromKeys(state.typeKeys, catalog.types),
   });
 
@@ -368,9 +412,13 @@ export const buildCardFilterStateFromSelection = (
     keywordKeys: resolveKeysFromIds(state.keywordIds, catalog.keywords),
     tagKeys: resolveKeysFromIds(state.tagIds, catalog.tags),
     manaSymbolKeys: resolveKeysFromIds(state.manaTypeSymbolIds, catalog.manaSymbols),
+    manaSymbolExcludeKeys: resolveKeysFromIds(state.manaTypeSymbolExcludeIds, catalog.manaSymbols),
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.affinitySymbols),
+    affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.affinitySymbols),
     devotionSymbolKeys: resolveKeysFromIds(state.devotionSymbolIds, catalog.devotionSymbols),
+    devotionSymbolExcludeKeys: resolveKeysFromIds(state.devotionSymbolExcludeIds, catalog.devotionSymbols),
     otherSymbolKeys: resolveKeysFromIds(state.otherSymbolIds, catalog.otherSymbols),
+    otherSymbolExcludeKeys: resolveKeysFromIds(state.otherSymbolExcludeIds, catalog.otherSymbols),
     typeKeys: resolveKeysFromIds(state.typeIds, catalog.types),
   });
 
@@ -398,17 +446,29 @@ export const buildCardFilterApiSearchParams = (
     payload.mana_symbol_ids.forEach((id) => params.append('mana_symbol_ids', id));
     params.set('mana_symbol_match', payload.mana_symbol_match ?? normalized.manaSymbolMatch);
   }
+  if (payload.mana_symbol_exclude_ids) {
+    payload.mana_symbol_exclude_ids.forEach((id) => params.append('mana_symbol_exclude_ids', id));
+  }
   if (payload.affinity_symbol_ids) {
     payload.affinity_symbol_ids.forEach((id) => params.append('affinity_symbol_ids', id));
     params.set('affinity_symbol_match', payload.affinity_symbol_match ?? normalized.affinitySymbolMatch);
+  }
+  if (payload.affinity_symbol_exclude_ids) {
+    payload.affinity_symbol_exclude_ids.forEach((id) => params.append('affinity_symbol_exclude_ids', id));
   }
   if (payload.devotion_symbol_ids) {
     payload.devotion_symbol_ids.forEach((id) => params.append('devotion_symbol_ids', id));
     params.set('devotion_symbol_match', payload.devotion_symbol_match ?? normalized.devotionSymbolMatch);
   }
+  if (payload.devotion_symbol_exclude_ids) {
+    payload.devotion_symbol_exclude_ids.forEach((id) => params.append('devotion_symbol_exclude_ids', id));
+  }
   if (payload.other_symbol_ids) {
     payload.other_symbol_ids.forEach((id) => params.append('other_symbol_ids', id));
     params.set('other_symbol_match', payload.other_symbol_match ?? normalized.otherSymbolMatch);
+  }
+  if (payload.other_symbol_exclude_ids) {
+    payload.other_symbol_exclude_ids.forEach((id) => params.append('other_symbol_exclude_ids', id));
   }
   if (payload.template_id) params.set('template_id', payload.template_id);
   if (payload.mana_cost_min) params.set('mana_cost_min', payload.mana_cost_min);
@@ -444,17 +504,29 @@ export const buildCardFilterApiPayload = (
     payload.mana_symbol_ids = normalized.manaTypeSymbolIds;
     payload.mana_symbol_match = normalized.manaSymbolMatch;
   }
+  if (normalized.manaTypeSymbolExcludeIds.length > 0) {
+    payload.mana_symbol_exclude_ids = normalized.manaTypeSymbolExcludeIds;
+  }
   if (normalized.affinitySymbolIds.length > 0) {
     payload.affinity_symbol_ids = normalized.affinitySymbolIds;
     payload.affinity_symbol_match = normalized.affinitySymbolMatch;
+  }
+  if (normalized.affinitySymbolExcludeIds.length > 0) {
+    payload.affinity_symbol_exclude_ids = normalized.affinitySymbolExcludeIds;
   }
   if (normalized.devotionSymbolIds.length > 0) {
     payload.devotion_symbol_ids = normalized.devotionSymbolIds;
     payload.devotion_symbol_match = normalized.devotionSymbolMatch;
   }
+  if (normalized.devotionSymbolExcludeIds.length > 0) {
+    payload.devotion_symbol_exclude_ids = normalized.devotionSymbolExcludeIds;
+  }
   if (normalized.otherSymbolIds.length > 0) {
     payload.other_symbol_ids = normalized.otherSymbolIds;
     payload.other_symbol_match = normalized.otherSymbolMatch;
+  }
+  if (normalized.otherSymbolExcludeIds.length > 0) {
+    payload.other_symbol_exclude_ids = normalized.otherSymbolExcludeIds;
   }
   if (normalized.templateId) payload.template_id = normalized.templateId;
   if (normalized.manaCostMin) payload.mana_cost_min = normalized.manaCostMin;

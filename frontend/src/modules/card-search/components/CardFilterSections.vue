@@ -1,7 +1,8 @@
 <template>
   <div class="space-y-3">
     <SymbolToggleGroup
-      v-model="selectedManaTypeSymbolIds"
+      v-model:included-value="selectedManaTypeSymbolIds"
+      v-model:excluded-value="excludedManaTypeSymbolIds"
       v-model:match-mode="manaSymbolMatch"
       :default-open="true"
       label="Mana"
@@ -42,7 +43,8 @@
     />
 
     <SymbolToggleGroup
-      v-model="selectedAffinitySymbolIds"
+      v-model:included-value="selectedAffinitySymbolIds"
+      v-model:excluded-value="excludedAffinitySymbolIds"
       v-model:match-mode="affinitySymbolMatch"
       label="Affinity"
       :options="state.affinityTypeOptions"
@@ -50,7 +52,8 @@
     />
 
     <SymbolToggleGroup
-      v-model="selectedDevotionSymbolIds"
+      v-model:included-value="selectedDevotionSymbolIds"
+      v-model:excluded-value="excludedDevotionSymbolIds"
       v-model:match-mode="devotionSymbolMatch"
       label="Devotion"
       :options="state.devotionTypeOptions"
@@ -58,7 +61,8 @@
     />
 
     <SymbolToggleGroup
-      v-model="selectedOtherSymbolIds"
+      v-model:included-value="selectedOtherSymbolIds"
+      v-model:excluded-value="excludedOtherSymbolIds"
       v-model:match-mode="otherSymbolMatch"
       label="Generic"
       :options="state.otherSymbolOptions"
@@ -140,6 +144,10 @@ const selectedManaTypeSymbolIds = computed({
   get: () => props.state.selectedManaTypeSymbolIds,
   set: props.state.onUpdateSelectedManaTypeSymbolIds,
 });
+const excludedManaTypeSymbolIds = computed({
+  get: () => props.state.excludedManaTypeSymbolIds,
+  set: props.state.onUpdateExcludedManaTypeSymbolIds,
+});
 const manaSymbolMatch = computed({
   get: () => props.state.manaSymbolMatch,
   set: props.state.onUpdateManaSymbolMatch,
@@ -164,6 +172,10 @@ const selectedAffinitySymbolIds = computed({
   get: () => props.state.selectedAffinitySymbolIds,
   set: props.state.onUpdateSelectedAffinitySymbolIds,
 });
+const excludedAffinitySymbolIds = computed({
+  get: () => props.state.excludedAffinitySymbolIds,
+  set: props.state.onUpdateExcludedAffinitySymbolIds,
+});
 const affinitySymbolMatch = computed({
   get: () => props.state.affinitySymbolMatch,
   set: props.state.onUpdateAffinitySymbolMatch,
@@ -172,6 +184,10 @@ const selectedDevotionSymbolIds = computed({
   get: () => props.state.selectedDevotionSymbolIds,
   set: props.state.onUpdateSelectedDevotionSymbolIds,
 });
+const excludedDevotionSymbolIds = computed({
+  get: () => props.state.excludedDevotionSymbolIds,
+  set: props.state.onUpdateExcludedDevotionSymbolIds,
+});
 const devotionSymbolMatch = computed({
   get: () => props.state.devotionSymbolMatch,
   set: props.state.onUpdateDevotionSymbolMatch,
@@ -179,6 +195,10 @@ const devotionSymbolMatch = computed({
 const selectedOtherSymbolIds = computed({
   get: () => props.state.selectedOtherSymbolIds,
   set: props.state.onUpdateSelectedOtherSymbolIds,
+});
+const excludedOtherSymbolIds = computed({
+  get: () => props.state.excludedOtherSymbolIds,
+  set: props.state.onUpdateExcludedOtherSymbolIds,
 });
 const otherSymbolMatch = computed({
   get: () => props.state.otherSymbolMatch,

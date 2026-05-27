@@ -952,6 +952,65 @@ def test_cards_list_symbol_group_match_modes() -> None:
     assert card_any.id not in affinity_all_ids
 
 
+def test_cards_list_symbol_group_exclude_modes() -> None:
+    mana_symbols = [
+        Symbol.objects.create(
+            key=f"exclude-mana-{index}",
+            label=f"Exclude Mana {index}",
+            symbol_type="mana",
+            detector_type="template",
+            detection_config_json={},
+            text_enrichment_json={},
+            reference_assets_json=[],
+            text_token=f"{{E{index}}}",
+            enabled=True,
+        )
+        for index in range(3)
+    ]
+
+    card_red, version_red = _create_editable_card_version(name="Mana Red")
+    card_blue_white, version_blue_white = _create_editable_card_version(name="Mana Blue White")
+    card_red_green, version_red_green = _create_editable_card_version(name="Mana Red Green")
+    _create_card_image(version_red)
+    _create_card_image(version_blue_white)
+    _create_card_image(version_red_green)
+
+    replace_card_version_symbols(card_version_id=version_red.id, symbol_ids=[mana_symbols[0].id])
+    replace_card_version_symbols(card_version_id=version_blue_white.id, symbol_ids=[mana_symbols[1].id, mana_symbols[2].id])
+    replace_card_version_symbols(card_version_id=version_red_green.id, symbol_ids=[mana_symbols[0].id, mana_symbols[2].id])
+
+    client = Client(HTTP_HOST="localhost")
+
+    exclude_response = client.get(
+        "/cards",
+        {
+            "mana_symbol_exclude_ids": [mana_symbols[2].id],
+        },
+    )
+    include_and_exclude_response = client.get(
+        "/cards",
+        {
+            "mana_symbol_ids": [mana_symbols[0].id, mana_symbols[1].id],
+            "mana_symbol_match": "any",
+            "mana_symbol_exclude_ids": [mana_symbols[2].id],
+        },
+    )
+
+    assert exclude_response.status_code == 200
+    assert include_and_exclude_response.status_code == 200
+
+    exclude_ids = {row["id"] for row in exclude_response.json()["results"]}
+    include_and_exclude_ids = {row["id"] for row in include_and_exclude_response.json()["results"]}
+
+    assert card_red.id in exclude_ids
+    assert card_blue_white.id not in exclude_ids
+    assert card_red_green.id not in exclude_ids
+
+    assert card_red.id in include_and_exclude_ids
+    assert card_blue_white.id not in include_and_exclude_ids
+    assert card_red_green.id not in include_and_exclude_ids
+
+
 def test_cards_list_mana_cost_range_filters() -> None:
     card_low, version_low = _create_editable_card_version(name="Mana Value Low")
     card_mid, version_mid = _create_editable_card_version(name="Mana Value Mid")
