@@ -3,6 +3,9 @@
     :is="rootTag"
     v-bind="rootProps"
     :class="layoutClass"
+    @click="handleCardClick"
+    @keydown.enter="handleCardKeydown"
+    @keydown.space.prevent="handleCardKeydown"
   >
     <div :class="contentLayoutClass">
       <div :class="mainColumnClass">
@@ -116,6 +119,7 @@
       <div
         v-if="$slots.actions"
         :class="actionsColumnClass"
+        data-card-click-ignore="true"
       >
         <slot name="actions" />
       </div>
@@ -125,6 +129,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckRecord } from '@/modules/decks/types';
@@ -136,9 +141,24 @@ const props = defineProps<{
   titleTo?: string;
 }>();
 
+const router = useRouter();
 const isCardLink = computed(() => props.mode === 'browse' && Boolean(props.titleTo));
+const isClickableCard = computed(() => props.mode === 'owned' && Boolean(props.titleTo));
 const rootTag = computed(() => (isCardLink.value ? 'RouterLink' : 'div'));
-const rootProps = computed(() => (isCardLink.value ? { to: props.titleTo } : {}));
+const rootProps = computed(() => {
+  if (isCardLink.value) {
+    return { to: props.titleTo };
+  }
+
+  if (isClickableCard.value) {
+    return {
+      role: 'link',
+      tabindex: 0,
+    };
+  }
+
+  return {};
+});
 const titleTag = computed(() => (isCardLink.value ? 'h3' : props.titleTo ? 'RouterLink' : 'h3'));
 const titleProps = computed(() => (!isCardLink.value && props.titleTo ? { to: props.titleTo } : {}));
 const formatDate = (value: string): string => new Date(value).toLocaleDateString();
@@ -146,8 +166,8 @@ const visibilityLabel = computed(() => deckVisibilityLabels[props.deck.visibilit
 const visibilityBadgeClass = computed(() => deckVisibilityBadgeClasses[props.deck.visibility]);
 const layoutClass = computed(() => [
   'page-card',
-  props.mode === 'browse'
-    ? 'block transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
+  props.titleTo
+    ? 'block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
     : '',
 ]);
 const contentLayoutClass = computed(() =>
@@ -164,4 +184,35 @@ const actionsColumnClass = computed(() =>
     ? 'theme-divider flex h-full items-stretch justify-end xl:border-l xl:pl-4'
     : 'flex flex-wrap gap-2 lg:shrink-0',
 );
+
+const interactiveSelector =
+  'a, button, input, select, textarea, summary, details, [role="button"], [data-card-click-ignore="true"]';
+
+const shouldIgnoreCardNavigation = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return target.closest(interactiveSelector) !== null;
+};
+
+const navigateToCard = (): void => {
+  if (!props.titleTo || isCardLink.value) {
+    return;
+  }
+  void router.push(props.titleTo);
+};
+
+const handleCardClick = (event: MouseEvent): void => {
+  if (!isClickableCard.value || shouldIgnoreCardNavigation(event.target)) {
+    return;
+  }
+  navigateToCard();
+};
+
+const handleCardKeydown = (event: KeyboardEvent): void => {
+  if (!isClickableCard.value || shouldIgnoreCardNavigation(event.target)) {
+    return;
+  }
+  navigateToCard();
+};
 </script>
