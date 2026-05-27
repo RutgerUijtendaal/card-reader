@@ -40,7 +40,7 @@ const buildEntry = (quantity = 3): DeckEntrySummary => ({
     confidence: 1,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
-    image_url: null,
+    image_url: '/card.png',
     keywords: [],
     tags: [],
     symbols: [],
@@ -101,6 +101,16 @@ const mountRow = async ({
   };
 };
 
+const showRowControls = async (container: HTMLElement): Promise<void> => {
+  const row = container.firstElementChild;
+  if (!(row instanceof HTMLElement)) {
+    throw new Error('expected row root');
+  }
+
+  row.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+  await nextTick();
+};
+
 describe('DeckBuilderBoardEntryRow', () => {
   afterEach(() => {
     document.body.innerHTML = '';
@@ -108,6 +118,7 @@ describe('DeckBuilderBoardEntryRow', () => {
 
   test('renders the quantity controls as one grouped cluster', async () => {
     const mounted = await mountRow();
+    await showRowControls(mounted.container);
 
     const decrementButton = mounted.container.querySelector('[aria-label="Remove one copy"]');
     const incrementButton = mounted.container.querySelector('[aria-label="Add one copy"]');
@@ -117,6 +128,16 @@ describe('DeckBuilderBoardEntryRow', () => {
     expect(controlGroup?.contains(incrementButton ?? null)).toBe(true);
     expect(controlGroup?.textContent).toContain('3');
     expect(mounted.container.querySelector('input')).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('renders mana on the left and an art strip when card imagery exists', async () => {
+    const mounted = await mountRow({ entry: buildEntry(7) });
+
+    expect(mounted.container.textContent).toContain('1');
+    expect(mounted.container.textContent).toContain('Card 1');
+    expect(mounted.container.querySelector('img[alt="Card 1"]')).not.toBeNull();
 
     mounted.unmount();
   });
@@ -131,6 +152,7 @@ describe('DeckBuilderBoardEntryRow', () => {
 
   test('shows the move button and lists only other boards', async () => {
     const mounted = await mountRow({ moveDestinations: buildMoveDestinations() });
+    await showRowControls(mounted.container);
     const moveButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card to another board"]');
     if (!(moveButton instanceof HTMLButtonElement)) {
       throw new Error('expected move button');
@@ -152,6 +174,7 @@ describe('DeckBuilderBoardEntryRow', () => {
 
   test('move menu emits the destination board and closes', async () => {
     const mounted = await mountRow({ moveDestinations: buildMoveDestinations() });
+    await showRowControls(mounted.container);
     const moveButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card to another board"]');
     if (!(moveButton instanceof HTMLButtonElement)) {
       throw new Error('expected move button');
@@ -178,6 +201,7 @@ describe('DeckBuilderBoardEntryRow', () => {
 
   test('trash glyph still emits remove', async () => {
     const mounted = await mountRow();
+    await showRowControls(mounted.container);
     const removeButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Remove card from board"]');
     if (!(removeButton instanceof HTMLButtonElement)) {
       throw new Error('expected remove button');
@@ -193,6 +217,7 @@ describe('DeckBuilderBoardEntryRow', () => {
 
   test('nested controls do not trigger row-level actions', async () => {
     const mounted = await mountRow({ moveDestinations: buildMoveDestinations() });
+    await showRowControls(mounted.container);
     const decrementButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Remove one copy"]');
     const incrementButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Add one copy"]');
     const moveButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card to another board"]');
@@ -205,6 +230,20 @@ describe('DeckBuilderBoardEntryRow', () => {
     await nextTick();
 
     expect(mounted.events).toEqual(['decrement:card-1', 'increment:card-1', 'remove:card-1']);
+
+    mounted.unmount();
+  });
+
+  test('hides heavy row controls until hover or focus state reveals them', async () => {
+    const mounted = await mountRow({ moveDestinations: buildMoveDestinations() });
+
+    const countControls = mounted.container.querySelector('[data-testid="row-count-controls"]');
+    const moveButton = mounted.container.querySelector('[aria-label="Move card to another board"]');
+    const removeButton = mounted.container.querySelector('[aria-label="Remove card from board"]');
+
+    expect(countControls).toBeNull();
+    expect(moveButton).toBeNull();
+    expect(removeButton).toBeNull();
 
     mounted.unmount();
   });

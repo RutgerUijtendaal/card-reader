@@ -115,38 +115,112 @@
       </template>
 
       <template v-else>
-        <div class="theme-muted-panel space-y-3 p-3">
-          <div class="flex items-start justify-between gap-3">
-            <h3 class="theme-section-title truncate text-lg font-semibold">
-              {{ controller.deck.form.name || 'Untitled Deck' }}
-            </h3>
-            <button
-              class="btn-secondary px-2 py-1 text-xs"
-              type="button"
-              @click="controller.setBuilderStep('setup')"
+        <section class="theme-card-frame overflow-hidden rounded-2xl">
+          <div class="relative overflow-hidden">
+            <div
+              v-if="controller.deck.selectedHero.value?.image_url"
+              class="absolute inset-0"
             >
-              Change
-            </button>
+              <img
+                :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+                :alt="controller.deck.selectedHero.value.name"
+                class="h-full w-full object-cover object-center opacity-75"
+              >
+            </div>
+            <div
+              v-else
+              class="absolute inset-0 theme-card-frame-muted"
+            />
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/74 to-slate-900/28" />
+
+            <div class="relative flex items-start gap-2 px-4 py-3">
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
+                @click="heroDetailsExpanded = !heroDetailsExpanded"
+              >
+                <div class="min-w-0 space-y-1">
+                  <p class="truncate text-lg font-semibold text-white">
+                    {{ controller.deck.form.name || 'Untitled Deck' }}
+                  </p>
+                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-100/90">
+                    <span class="font-semibold uppercase tracking-[0.18em] text-slate-200/70">{{ activeBoardLabel }}</span>
+                    <span class="font-semibold">{{ activeBoardCount }}/{{ activeBoardLimitLabel }}</span>
+                    <span
+                      v-if="controller.deck.selectedHero.value"
+                      class="truncate"
+                    >
+                      {{ controller.deck.selectedHero.value.name }}
+                    </span>
+                  </div>
+                </div>
+
+                <span
+                  class="theme-card-frame-muted inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/85"
+                  :aria-label="heroDetailsExpanded ? 'Collapse hero details' : 'Expand hero details'"
+                >
+                  {{ heroDetailsExpanded ? '−' : '+' }}
+                </span>
+              </button>
+
+              <button
+                class="btn-secondary shrink-0 px-2 py-1 text-xs"
+                type="button"
+                @click="controller.setBuilderStep('setup')"
+              >
+                Change
+              </button>
+            </div>
           </div>
 
           <div
-            v-if="controller.deck.selectedHero.value"
-            class="space-y-3"
+            v-if="heroDetailsExpanded"
+            class="theme-divider border-t px-4 py-4"
           >
-            <img
-              v-if="controller.deck.selectedHero.value.image_url"
-              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-              :alt="controller.deck.selectedHero.value.name"
-              class="theme-card-frame max-h-[32rem] w-full rounded-2xl object-contain"
-            >
-            <div
-              v-else
-              class="theme-empty-state flex h-52 items-center justify-center rounded-2xl text-sm"
-            >
-              No hero image
+            <div class="space-y-4">
+              <div class="flex items-start gap-3">
+                <div
+                  v-if="controller.deck.selectedHero.value?.image_url"
+                  class="theme-card-frame-muted h-20 w-16 shrink-0 overflow-hidden rounded-xl"
+                >
+                  <img
+                    :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+                    :alt="controller.deck.selectedHero.value.name"
+                    class="h-full w-full object-cover object-top"
+                  >
+                </div>
+                <div
+                  v-else
+                  class="theme-empty-state flex h-20 w-16 shrink-0 items-center justify-center rounded-xl text-[11px]"
+                >
+                  No hero
+                </div>
+
+                <div class="min-w-0 space-y-1">
+                  <p class="theme-section-title text-sm font-semibold">
+                    {{ controller.deck.selectedHero.value?.name ?? 'No hero selected' }}
+                  </p>
+                  <p
+                    v-if="controller.deck.selectedHero.value?.label"
+                    class="theme-section-muted text-xs"
+                  >
+                    {{ controller.deck.selectedHero.value.label }}
+                  </p>
+                  <p class="theme-section-muted text-xs">
+                    {{ controller.deck.deckStatusLabel.value }} · {{ controller.deck.overallUniqueCards.value }} unique cards
+                  </p>
+                </div>
+              </div>
+
+              <DeckManaCurve
+                :entries="controller.deck.detailedMainboardEntries.value"
+                empty-label="Add mainboard cards to see the mana curve."
+                compact
+                title="Mainboard Curve"
+              />
             </div>
           </div>
-        </div>
+        </section>
 
         <div
           v-if="controller.deck.validationMessages.value.length > 0"
@@ -163,11 +237,6 @@
             {{ message }}
           </p>
         </div>
-
-        <DeckManaCurve
-          :entries="controller.deck.detailedMainboardEntries.value"
-          empty-label="Add mainboard cards to see the mana curve."
-        />
 
         <div class="space-y-3">
           <div class="flex items-center justify-between gap-3">
@@ -209,7 +278,7 @@
 
           <div
             v-if="controller.deck.activeSideboard.value"
-            class="theme-muted-panel space-y-3 p-3"
+            class="theme-muted-panel space-y-2 p-3"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -249,6 +318,12 @@
                 @input="controller.deck.renameSideboard(controller.deck.activeSideboard.value?.id ?? '', ($event.target as HTMLInputElement).value)"
               >
             </label>
+            <p
+              v-else
+              class="theme-section-muted text-xs"
+            >
+              Moves keep whole rows intact and merge counts when the destination already contains that card.
+            </p>
           </div>
 
           <div
@@ -308,6 +383,21 @@ const visibilityOptions = deckVisibilityOptions;
 const visibility = computed(() => props.controller.deck.form.visibility);
 const selectedVisibilityDescription = computed(() => deckVisibilityDescriptions[visibility.value] ?? '');
 const renamingSideboard = ref(false);
+const heroDetailsExpanded = ref(false);
+
+const activeBoardLabel = computed(() =>
+  props.controller.deck.activeBoardId.value === 'mainboard'
+    ? 'Mainboard'
+    : (props.controller.deck.activeSideboard.value?.name.trim() || 'Sideboard'),
+);
+const activeBoardCount = computed(() =>
+  props.controller.deck.activeBoardId.value === 'mainboard'
+    ? props.controller.deck.totalMainboardCards.value
+    : (props.controller.deck.activeSideboard.value?.entries.reduce((sum, entry) => sum + entry.quantity, 0) ?? 0),
+);
+const activeBoardLimitLabel = computed(() =>
+  props.controller.deck.activeBoardId.value === 'mainboard' ? '40' : '∞',
+);
 
 const updateDeckVisibility = (value: DeckVisibility): void => {
   props.controller.deck.setDeckVisibility(value);
