@@ -72,14 +72,6 @@
                     Export TTS
                   </button>
 
-                  <RouterLink
-                    class="btn-secondary w-full justify-center"
-                    :to="buildMyDeckEditorLocation(deck.id)"
-                    @click="close()"
-                  >
-                    Edit
-                  </RouterLink>
-
                   <button
                     class="btn-danger-secondary w-full justify-center"
                     type="button"
