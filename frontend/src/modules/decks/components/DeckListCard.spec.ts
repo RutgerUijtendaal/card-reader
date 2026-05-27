@@ -151,7 +151,7 @@ describe('DeckListCard', () => {
     const text = mounted.container.textContent ?? '';
 
     expect(mounted.container.querySelector('.deck-list-card-browse')).not.toBeNull();
-    expect(mounted.container.querySelector('.deck-list-card-browse-description')).not.toBeNull();
+    expect(mounted.container.querySelector('.deck-list-card-description')).not.toBeNull();
     expect(mounted.container.querySelector('button[aria-label="Toggle deck details"]')).toBeNull();
     expect(mounted.container.querySelector('.deck-list-card-browse-details')).toBeNull();
     expect(text).toContain('Azure Tempo');
@@ -170,10 +170,13 @@ describe('DeckListCard', () => {
     const mounted = await mountDeckListCard('owned');
     const text = mounted.container.textContent ?? '';
 
-    expect(mounted.container.querySelector('.deck-list-card-browse')).toBeNull();
-    expect(text).toContain('Hero');
-    expect(text).toContain('Total / Main');
-    expect(text).toContain('Status');
+    expect(mounted.container.querySelector('.deck-list-card-owned')).not.toBeNull();
+    expect(text).toContain('Azure Tempo');
+    expect(text).toContain('Public');
+    expect(text).toContain('Hero: Azure Hero');
+    expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
+    expect(text).toContain('{F}');
+    expect(text).toContain('Updated');
 
     mounted.unmount();
   });
