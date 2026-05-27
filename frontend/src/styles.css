@@ -406,6 +406,148 @@
     background: var(--color-surface-soft);
   }
 
+  .theme-card-loading-shim {
+    @apply relative h-full w-full overflow-hidden rounded-2xl border;
+    aspect-ratio: 63 / 88;
+    border-color: var(--color-border);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--color-surface-strong) 94%, transparent 6%) 0%, color-mix(in srgb, var(--color-surface-soft) 92%, transparent 8%) 100%);
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  html.dark .theme-card-loading-shim {
+    box-shadow:
+      0 1px 2px rgba(2, 6, 23, 0.28),
+      0 14px 24px rgba(2, 6, 23, 0.18);
+  }
+
+  .theme-card-loading-shim::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%);
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+    animation: card-loading-shim-sheen 1.6s ease-in-out infinite;
+  }
+
+  html.dark .theme-card-loading-shim::after {
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
+  }
+
+  .theme-card-loading-shim-frame {
+    @apply absolute inset-[0.42rem] rounded-[0.55rem] border px-[0.55rem] pt-[0.55rem];
+    border-color: color-mix(in srgb, var(--color-border-strong) 62%, transparent 38%);
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent 8%);
+  }
+
+  .theme-card-loading-shim-bar {
+    @apply flex items-center justify-between rounded-[0.2rem] border px-3;
+    position: relative;
+    z-index: 1;
+    border-color: color-mix(in srgb, var(--color-border-strong) 60%, transparent 40%);
+    background: color-mix(in srgb, var(--color-surface-strong) 88%, transparent 12%);
+  }
+
+  .theme-card-loading-shim-header {
+    @apply absolute left-[0.7rem] right-[0.7rem] gap-2;
+    height: 6.0%;
+    min-height: 1.7rem;
+    z-index: 10;
+  }
+
+  .theme-card-loading-shim-middle {
+    @apply absolute left-[0.7rem] right-[0.7rem] gap-2;
+    top: 53.0%;
+    height: 5.7%;
+    z-index: 10;
+    min-height: 1.65rem;
+  }
+
+  .theme-card-loading-shim-art {
+    @apply absolute left-[0.8rem] right-[0.8rem] overflow-hidden rounded-[0.35rem] border;
+    top: 8.5%;
+    height: 43.8%;
+    border-color: color-mix(in srgb, var(--color-border-strong) 56%, transparent 44%);
+    background: color-mix(in srgb, var(--color-surface-soft) 90%, transparent 10%);
+  }
+
+  .theme-card-loading-shim-rules {
+    @apply absolute left-[0.8rem] right-[0.8rem] rounded-[0.55rem] border px-4 pt-5;
+    top: 59.3%;
+    bottom: 1.0rem;
+    border-color: color-mix(in srgb, var(--color-border-strong) 58%, transparent 42%);
+    background: color-mix(in srgb, var(--color-surface-soft) 82%, transparent 18%);
+  }
+
+  .theme-card-loading-shim-rules-row {
+    @apply flex items-center gap-2;
+  }
+
+  .theme-card-loading-shim-line {
+    @apply block rounded-full;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--color-surface-strong) 92%, transparent 8%) 0%, color-mix(in srgb, var(--color-border-strong) 34%, var(--color-surface-strong) 66%) 100%);
+  }
+
+  .theme-card-loading-shim-line-title {
+    width: 68%;
+    height: 0.9rem;
+  }
+
+  .theme-card-loading-shim-line-cost {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  .theme-card-loading-shim-line-middle-strong {
+    width: 32%;
+    height: 0.75rem;
+  }
+
+  .theme-card-loading-shim-line-middle-soft {
+    width: 38%;
+    height: 0.75rem;
+  }
+
+  .theme-card-loading-shim-line-rules-long {
+    width: 74%;
+    height: 0.75rem;
+  }
+
+  .theme-card-loading-shim-line-rules-mid {
+    width: 62%;
+    height: 0.75rem;
+    margin-top: 0.85rem;
+  }
+
+  .theme-card-loading-shim-line-rules-short {
+    width: 45%;
+    height: 0.75rem;
+    margin-top: 0.85rem;
+  }
+
+  .theme-card-loading-shim-line-crest {
+    width: 30%;
+    height: 0.48rem;
+  }
+
+  .theme-card-loading-shim-dot,
+  .theme-card-loading-shim-inline-dot {
+    @apply inline-block shrink-0 rounded-full;
+    background: color-mix(in srgb, var(--color-surface-strong) 90%, var(--color-border) 10%);
+  }
+
+  .theme-card-loading-shim-dot {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .theme-card-loading-shim-inline-dot {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+
   .theme-empty-state {
     @apply rounded-lg border border-dashed px-3 py-4 text-sm;
     border-color: var(--color-border-strong);
@@ -743,6 +885,16 @@
 }
 
 @layer utilities {
+  @keyframes card-loading-shim-sheen {
+    0% {
+      transform: translateX(-120%);
+    }
+
+    100% {
+      transform: translateX(120%);
+    }
+  }
+
   .app-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) transparent;
@@ -766,5 +918,11 @@
 
   .app-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-card-loading-shim::after {
+    animation: none;
   }
 }

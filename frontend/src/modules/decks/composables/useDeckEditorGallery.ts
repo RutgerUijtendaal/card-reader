@@ -44,6 +44,7 @@ export const useDeckEditorGallery = ({
   const cardHeightRem = computed(() => Number(((isSetupStep.value ? 24 : 21) * cardScale.value).toFixed(2)));
   const cardFrameWidthRem = computed(() => Number(((cardHeightRem.value * 63) / 88).toFixed(2)));
   const galleryTileWidthRem = computed(() => Number((cardFrameWidthRem.value + 1.5).toFixed(2)));
+  const loadingShimCount = computed(() => (isSetupStep.value ? 24 : 30));
   const galleryGridStyle = computed(() => ({
     gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(galleryTileWidthRem.value * 16)}px, 1fr))`,
     justifyContent: 'start',
@@ -54,9 +55,13 @@ export const useDeckEditorGallery = ({
     galleryCards: collection.cards,
     nextPage: collection.nextPage,
     isLoadingInitial: collection.isLoadingInitial,
+    isRefreshing: collection.isRefreshing,
     isLoadingPage: collection.isLoadingPage,
+    hasLoadedOnce: collection.hasLoadedOnce,
     cardHeightRem,
+    cardFrameWidthRem,
     galleryTileWidthRem,
+    loadingShimCount,
     galleryGridStyle,
     searchCards: collection.searchCards,
     setLoadMoreSentinel: collection.setLoadMoreSentinel,
