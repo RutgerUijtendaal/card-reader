@@ -165,7 +165,7 @@
       data-testid="row-quantity-badge"
     >
       <span class="theme-section-title text-sm font-semibold">
-        x{{ entry.quantity }}
+        {{ entry.quantity }}
       </span>
     </div>
 

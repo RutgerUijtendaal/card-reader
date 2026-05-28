@@ -149,7 +149,7 @@ describe('DeckBuilderBoardEntryRow', () => {
     expect(controlGroup).not.toBeNull();
     expect(controlGroup?.contains(incrementButton ?? null)).toBe(true);
     expect(controlGroup?.textContent).not.toContain('3');
-    expect(quantityBadge?.textContent).toContain('x3');
+    expect(quantityBadge?.textContent).toContain('3');
     expect(mounted.container.querySelector('input')).toBeNull();
 
     mounted.unmount();
@@ -158,7 +158,7 @@ describe('DeckBuilderBoardEntryRow', () => {
   test('renders a persistent quantity badge, resting mana area, and an art strip when card imagery exists', async () => {
     const mounted = await mountRow({ entry: buildEntry(7) });
 
-    expect(mounted.container.querySelector('[data-testid="row-quantity-badge"]')?.textContent).toContain('x7');
+    expect(mounted.container.querySelector('[data-testid="row-quantity-badge"]')?.textContent).toContain('7');
     expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')?.textContent).toContain('1');
     expect(mounted.container.textContent).toContain('Card 1');
     expect(mounted.container.querySelector('img[alt="Card 1"]')).not.toBeNull();
