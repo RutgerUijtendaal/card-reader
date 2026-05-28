@@ -4,7 +4,7 @@ from pathlib import Path
 
 from card_reader_core.models import CardVersionImage
 from card_reader_core.repositories.cards.images import resolve_image_file_path
-from card_reader_core.settings import settings
+from card_reader_core.config.settings import settings
 from card_reader_core.storage import resolve_storage_path
 from card_reader_core.storage import relativize_image_storage_path
 

@@ -10,9 +10,9 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
 from card_reader_api.templates.serializers import TemplateReparseSerializer, TemplateWriteSerializer, template_payload
-from card_reader_core.repositories.cards_repository import list_latest_card_version_reparse_sources
-from card_reader_core.repositories.import_jobs_repository import ImportJobItemTarget, create_import_job_with_files
-from card_reader_core.settings import settings
+from card_reader_core.repositories.cards import list_latest_card_version_reparse_sources
+from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
+from card_reader_core.config.settings import settings
 from card_reader_core.services.templates import TemplateService
 
 

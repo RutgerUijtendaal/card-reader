@@ -7,7 +7,7 @@ import tarfile
 
 import pytest
 
-from card_reader_core.backups import (
+from card_reader_core.operations.backups import (
     BackupError,
     ComposeConfig,
     RuntimePaths,
@@ -173,7 +173,7 @@ def test_run_compose_supports_two_word_compose_command(
         captured["cwd"] = cwd
         captured["check"] = check
 
-    monkeypatch.setattr("card_reader_core.backups.subprocess.run", fake_run)
+    monkeypatch.setattr("card_reader_core.operations.backups.subprocess.run", fake_run)
 
     compose_config = ComposeConfig(
         command="docker compose",

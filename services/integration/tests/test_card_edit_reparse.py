@@ -9,9 +9,9 @@ CASE_PATH = Path(__file__).resolve().parent / "fixtures" / "parser_db_cases" / "
 
 
 def test_reparse_preserves_manual_fields_and_metadata_groups() -> None:
-    from card_reader_core.repositories.cards_repository import get_latest_card_version, update_latest_card_version
-    from card_reader_core.repositories.import_jobs_repository import create_import_job
-    from card_reader_core.repositories.metadata_repository import get_tags_for_card_version
+    from card_reader_core.repositories.cards import get_latest_card_version, update_latest_card_version
+    from card_reader_core.repositories.import_jobs import create_import_job
+    from card_reader_core.repositories.metadata import get_tags_for_card_version
     from card_reader_core.services.parser_jobs import ImportProcessorService
     from card_reader_parser.parsers.card_parser import CardParser
 
@@ -69,8 +69,8 @@ def test_reparse_preserves_manual_fields_and_metadata_groups() -> None:
 
 def test_targeted_reparse_can_switch_template_without_creating_new_version() -> None:
     from card_reader_core.models import Template
-    from card_reader_core.repositories.cards_repository import get_latest_card_version, update_latest_card_version
-    from card_reader_core.repositories.import_jobs_repository import (
+    from card_reader_core.repositories.cards import get_latest_card_version, update_latest_card_version
+    from card_reader_core.repositories.import_jobs import (
         ImportJobItemTarget,
         create_import_job,
         create_import_job_with_files,

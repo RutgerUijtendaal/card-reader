@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
 from card_reader_core.models import Card, CardVersion, Deck, DeckVisibility
-from card_reader_core.repositories.cards_repository import get_card_image
+from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckService
 

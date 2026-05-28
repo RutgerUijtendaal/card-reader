@@ -22,7 +22,7 @@ from card_reader_core.models import (
     Template,
     Type,
 )
-from card_reader_core.settings import settings
+from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 

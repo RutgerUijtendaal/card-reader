@@ -14,9 +14,9 @@ import django
 django.setup()
 
 # Django-backed modules import models, so they must load after django.setup().
-from card_reader_core.core_logging import configure_logging  # noqa: E402
+from card_reader_core.config.logging import configure_logging  # noqa: E402
 from card_reader_core.database.connection import initialize_database  # noqa: E402
-from card_reader_core.repositories.import_jobs_repository import (  # noqa: E402
+from card_reader_core.repositories.import_jobs import (  # noqa: E402
     get_next_queued_job,
     requeue_running_import_jobs,
 )

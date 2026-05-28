@@ -12,7 +12,7 @@ from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
 from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
 from card_reader_core.services.templates import TemplateService
-from card_reader_core.settings import settings
+from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 

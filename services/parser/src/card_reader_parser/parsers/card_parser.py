@@ -6,7 +6,7 @@ from pathlib import Path
 from ..extractors import KnownMetadataExtractor
 from card_reader_core.models import Keyword, Symbol, Tag, Type
 from card_reader_core.services.templates import TemplateService
-from card_reader_core.settings import settings
+from card_reader_core.config.settings import settings
 from card_reader_core.storage import calculate_checksum
 
 from .ocr_runner import OcrRunner

@@ -19,11 +19,12 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 
 1. Inspect the existing endpoint, serializer, repository, and settings patterns before editing.
 2. Decide whether the change is transport-layer behavior or domain behavior before writing code.
-3. Put shared domain logic in `services/core` when it is not API-specific.
+3. Put shared domain logic in `services/core` when it is not API-specific, using the feature package under `card_reader_core.services`.
 4. Keep API-specific request validation, serialization, auth checks, and response orchestration in `services/api`.
-5. If schema changes are required, implement them through core models and migrations rather than API-local workarounds.
-6. If the change affects auth or public/staff/superuser access, trace the current rules before changing endpoint behavior.
-7. Run lint, typecheck, and relevant tests before finishing.
+5. Put persistence logic in the matching feature package under `card_reader_core.repositories`.
+6. If schema changes are required, implement them through core models and migrations rather than API-local workarounds.
+7. If the change affects auth or public/staff/superuser access, trace the current rules before changing endpoint behavior.
+8. Run lint, typecheck, and relevant tests before finishing.
 
 ## Review Focus
 
@@ -38,8 +39,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 
 - `services/api/src/card_reader_api`
 - `services/core/src/card_reader_core/models`
-- `services/core/src/card_reader_core/repositories`
-- `services/core/src/card_reader_core/services`
+- `services/core/src/card_reader_core/repositories/<feature>`
+- `services/core/src/card_reader_core/services/<feature>`
+- `services/core/src/card_reader_core/config`
+- `services/core/src/card_reader_core/storage`
 
 ## Avoid
 
@@ -47,3 +50,4 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 - API-local schema ownership
 - Quick fixes that bypass repositories or shared services when the domain layer should own the behavior
 - Mixing transport concerns and domain behavior in the same patch without a clear boundary
+- Adding new one-off modules in `card_reader_core` root or recreating legacy `*_repository.py` files

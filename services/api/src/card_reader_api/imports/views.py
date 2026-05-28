@@ -14,7 +14,7 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
 from card_reader_api.imports.serializers import ImportUploadSerializer, import_detail_payload, import_job_payload
-from card_reader_core.repositories.import_jobs_repository import (
+from card_reader_core.repositories.import_jobs import (
     SUPPORTED_IMAGE_SUFFIXES,
     fetch_items_for_job,
     fetch_job,

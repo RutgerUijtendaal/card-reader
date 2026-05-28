@@ -26,7 +26,7 @@ from card_reader_api.cards.serializers import (
     symbol_option,
 )
 from card_reader_api.cards.services import CardActionService, CardReparseError
-from card_reader_core.repositories.cards_repository import (
+from card_reader_core.repositories.cards import (
     CARD_SORT_MANA_ASC,
     CARD_SORT_MANA_DESC,
     CARD_SORT_NAME_ASC,
@@ -38,7 +38,7 @@ from card_reader_core.repositories.cards_repository import (
     list_matching_cards,
     update_latest_card_version,
 )
-from card_reader_core.repositories.metadata_repository import list_types_for_card_sort
+from card_reader_core.repositories.metadata import list_types_for_card_sort
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -51,7 +51,7 @@ from card_reader_core.services.cards import (
 
 if TYPE_CHECKING:
     from card_reader_core.models import Type
-    from card_reader_core.repositories.cards_repository import CardSort
+    from card_reader_core.repositories.cards import CardSort
 
 MANA_TYPE_KEY = "mana"
 

@@ -20,7 +20,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 1. Inspect the current pipeline stage before editing.
 2. Identify whether the change belongs in polling/claiming, OCR adaptation, extraction, symbol detection, or persistence before moving code.
 3. Keep OCR/vendor-specific behavior isolated behind parser adapter boundaries.
-4. Put shared persistence or domain behavior in `services/core` when appropriate.
+4. Put shared persistence or domain behavior in `services/core` when appropriate, using feature packages under `card_reader_core.repositories` and `card_reader_core.services`.
 5. Preserve idempotence and claim/process flow behavior when changing parser execution.
 6. Treat data writes as domain operations; route them through existing repositories/services unless the task explicitly requires a new shared abstraction.
 7. Run lint, typecheck, and relevant tests before finishing.
@@ -37,8 +37,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 ## File Hotspots
 
 - `services/parser/src`
-- `services/core/src/card_reader_core/repositories`
-- `services/core/src/card_reader_core/services`
+- `services/core/src/card_reader_core/repositories/import_jobs`
+- `services/core/src/card_reader_core/repositories/cards`
+- `services/core/src/card_reader_core/repositories/metadata`
+- `services/core/src/card_reader_core/services/parser_jobs`
 - `services/core/src/card_reader_core/django_settings.py`
 
 ## Avoid
@@ -47,3 +49,4 @@ Follow `AGENTS.md` first. Use this skill both when implementing parser changes a
 - Tight coupling between parsing logic and a single OCR implementation
 - Writing domain data outside shared repositories/services
 - Local pipeline fixes that quietly change job-claiming semantics
+- Importing from legacy `*_repository.py` paths or adding core root one-off modules

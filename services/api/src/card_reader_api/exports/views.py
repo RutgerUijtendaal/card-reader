@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_core.services.decks import DeckService
-from card_reader_core.repositories.exports_repository import export_cards_csv
+from card_reader_core.repositories.exports import export_cards_csv
 
 
 class ExportCsvView(APIView):

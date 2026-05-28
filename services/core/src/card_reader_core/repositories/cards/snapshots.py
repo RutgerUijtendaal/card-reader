@@ -5,7 +5,7 @@ import json
 from card_reader_core.models import CardVersion
 
 from ..helpers import to_int_or_none
-from ..metadata_repository import (
+from ..metadata import (
     replace_card_version_keywords,
     replace_card_version_symbols,
     replace_card_version_tags,
