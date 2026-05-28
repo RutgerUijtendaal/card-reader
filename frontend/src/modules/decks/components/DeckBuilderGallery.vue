@@ -39,7 +39,7 @@
                   type="button"
                   :disabled="controller.deck.galleryRemoveActionDisabled(card.id)"
                   aria-label="Remove copy from deck"
-                  @click.stop="removeCopy(card.id)"
+                  @click.stop="removeCopy($event, card.id)"
                 >
                   <Minus class="h-4 w-4" />
                 </button>
@@ -48,7 +48,7 @@
                   type="button"
                   :disabled="controller.deck.galleryActionDisabled(card)"
                   aria-label="Add copy to deck"
-                  @click.stop="addCopy(card)"
+                  @click.stop="addCopy($event, card)"
                 >
                   <Plus class="h-4 w-4" />
                 </button>
@@ -86,6 +86,7 @@ import { createLoadingShimItems, type GalleryDisplayItem } from '@/components/ca
 import type { GalleryItem } from '@/modules/card-detail/types';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
+import { blurAfterFinePointerActivation } from '@/utils/pointerFocus';
 
 const props = defineProps<{
   controller: DeckEditorController;
@@ -108,15 +109,17 @@ const handleActivate = (card: GalleryItem): void => {
 const getEntryQuantity = (cardId: string): number =>
   props.controller.deck.getEntryQuantity(cardId);
 
-const addCopy = (card: GalleryItem): void => {
+const addCopy = (event: MouseEvent, card: GalleryItem): void => {
   if (card.result_type !== 'card') {
     return;
   }
   props.controller.deck.handleGalleryAction(card);
+  blurAfterFinePointerActivation(event);
 };
 
-const removeCopy = (cardId: string): void => {
+const removeCopy = (event: MouseEvent, cardId: string): void => {
   props.controller.deck.handleGalleryRemoveAction(cardId);
+  blurAfterFinePointerActivation(event);
 };
 
 const handleContextMenu = (event: MouseEvent, card: GalleryDisplayItem): void => {

@@ -158,6 +158,7 @@ import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
 import { buildCardDetailLocation, buildGalleryItemLocation } from '@/modules/card-search/galleryNavigation';
 import { DEFAULT_HOVER_MODE, type HoverMode } from '@/modules/card-search/hoverMode';
 import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';
+import { blurAfterFinePointerActivation } from '@/utils/pointerFocus';
 
 const props = withDefaults(
   defineProps<{
@@ -259,12 +260,13 @@ const activationProps = computed(() =>
       },
 );
 
-const handleActivate = (): void => {
+const handleActivate = (event: MouseEvent): void => {
   if (isLoadingShim.value) {
     return;
   }
   if (props.activationMode === 'emit' && !props.activationDisabled) {
     emit('activate', props.card as GalleryItem);
+    blurAfterFinePointerActivation(event);
   }
 };
 

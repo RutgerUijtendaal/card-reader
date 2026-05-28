@@ -83,6 +83,17 @@
                 :entries="activeBoardEntries"
                 :empty-label="activeBoardEmptyLabel"
               />
+
+              <div class="theme-divider mt-4 border-t pt-4">
+                <label class="theme-muted-panel flex items-center gap-3 p-3 text-sm">
+                  <input
+                    v-model="groupByType"
+                    type="checkbox"
+                    class="theme-checkbox h-4 w-4"
+                  >
+                  <span class="theme-section-title font-medium">Group by type</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -153,6 +164,7 @@
 
         <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
           <div
+            v-if="!groupByType"
             class="grid gap-4 px-1 pb-3 pt-2"
             :style="mainboardGridStyle"
           >
@@ -173,6 +185,48 @@
               </template>
             </CardGalleryItem>
           </div>
+          <div
+            v-else
+            class="space-y-6 px-1 pb-3 pt-2"
+          >
+            <section
+              v-for="group in groupedActiveBoardEntries"
+              :key="group.key"
+              class="space-y-3"
+              data-testid="deck-type-group"
+              :data-type-group-key="group.key"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="theme-section-title text-sm font-semibold">
+                  {{ group.label }}
+                </h3>
+                <span class="theme-pill theme-pill-neutral text-xs">
+                  {{ group.entries.reduce((sum, entry) => sum + entry.quantity, 0) }} cards
+                </span>
+              </div>
+              <div
+                class="grid gap-4"
+                :style="mainboardGridStyle"
+              >
+                <CardGalleryItem
+                  v-for="entry in group.entries"
+                  :key="entry.card.id"
+                  class="justify-self-center"
+                  :style="mainboardCardStyle"
+                  :card="toGalleryCard(entry.card)"
+                  :card-height-rem="mainboardCardHeightRem"
+                  :hover-mode="effectiveHoverMode"
+                  :navigation-target="detailLocation(entry.card.id)"
+                >
+                  <template #overlay>
+                    <div class="absolute inset-x-3 bottom-3 flex items-center justify-start gap-3">
+                      <DeckCardCountBadge :quantity="entry.quantity" />
+                    </div>
+                  </template>
+                </CardGalleryItem>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </div>
@@ -188,6 +242,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useLocalStorage } from '@vueuse/core';
 import { BookOpenText, Download } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
@@ -206,6 +261,7 @@ import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import { buildDeckCardDetailLocation, buildDeckDetailEditorLocation } from '@/modules/decks/deckRouteState';
+import { groupDeckEntriesByType } from '@/modules/decks/deckTypeGroups';
 import { buildDeckShareUrl, canShareDeck } from '@/modules/decks/share';
 import type { DeckCardSummary, DeckEntrySummary, DeckRecord, DeckSideboardRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/modules/decks/useDeckExport';
@@ -236,6 +292,9 @@ const {
 } = useHoverModeSurface('deckDetail');
 const { exportTtsDeck } = useDeckExport();
 const activeBoardId = ref('mainboard');
+const groupByType = useLocalStorage('card-reader.deck-detail-group-by-type', true, {
+  writeDefaults: true,
+});
 const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
 const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
@@ -271,6 +330,13 @@ const sortedActiveBoardEntries = computed(() =>
   [...activeBoardEntries.value].sort((left, right) =>
     compareCardSort(left.card, right.card, effectiveSort.value, typeSortLookup.value),
   ),
+);
+const groupedActiveBoardEntries = computed(() =>
+  groupDeckEntriesByType(activeBoardEntries.value, filterOptions.value.types, {
+    compareEntries: effectiveSort.value === 'types_asc'
+      ? undefined
+      : (left, right) => compareCardSort(left.card, right.card, effectiveSort.value, typeSortLookup.value),
+  }),
 );
 const detailLocation = (cardId: string) => buildDeckCardDetailLocation(cardId, String(route.params.id), route.query);
 

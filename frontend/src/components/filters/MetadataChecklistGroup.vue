@@ -93,7 +93,7 @@
             :class="isFavorited(option.key) ? 'theme-filter-favorite-button-active' : ''"
             :aria-label="`${isFavorited(option.key) ? 'Remove favorite' : 'Add favorite'} ${option.label}`"
             :title="`${isFavorited(option.key) ? 'Remove favorite' : 'Add favorite'} ${option.label}`"
-            @click.stop.prevent="emit('toggle-favorite', option.key)"
+            @click.stop.prevent="handleFavoriteClick($event, option.key)"
           >
             <Star
               class="h-4 w-4"
@@ -118,6 +118,7 @@ import { computed, ref, watch } from 'vue';
 import { ChevronDown, RotateCcw, Star } from 'lucide-vue-next';
 import type { MetadataOption } from '@/modules/card-detail/types';
 import type { MetadataFavoriteGroup } from '@/modules/card-filters/useMetadataFilterFavorites';
+import { blurAfterFinePointerActivation } from '@/utils/pointerFocus';
 
 const props = withDefaults(
   defineProps<{
@@ -182,4 +183,9 @@ const toggle = (id: string): void => {
 };
 
 const isFavorited = (key: string): boolean => favoriteKeysSet.value.has(key);
+
+const handleFavoriteClick = (event: MouseEvent, key: string): void => {
+  emit('toggle-favorite', key);
+  blurAfterFinePointerActivation(event);
+};
 </script>
