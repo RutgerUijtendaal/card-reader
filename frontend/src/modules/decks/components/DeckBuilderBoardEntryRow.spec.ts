@@ -83,10 +83,12 @@ const buildSingleMoveDestination = (): DeckBoardMoveDestination[] => [
 const mountRow = async ({
   entry = buildEntry(),
   moveDestinations = [] as DeckBoardMoveDestination[],
+  rowActionDisabled = false,
   rowSecondaryActionDisabled = false,
 }: {
   entry?: DeckEntrySummary;
   moveDestinations?: DeckBoardMoveDestination[];
+  rowActionDisabled?: boolean;
   rowSecondaryActionDisabled?: boolean;
 } = {}) => {
   const container = document.createElement('div');
@@ -97,6 +99,7 @@ const mountRow = async ({
     entry,
     hoverMode: 'details',
     moveDestinations,
+    rowActionDisabled,
     rowSecondaryActionDisabled,
     onRowAction: (cardId: string) => events.push(`row:${cardId}`),
     onRowSecondaryAction: (cardId: string) => events.push(`row-secondary:${cardId}`),
@@ -292,6 +295,39 @@ describe('DeckBuilderBoardEntryRow', () => {
     expect(countControls).toBeNull();
     expect(moveButton).toBeNull();
     expect(removeButton).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('row becomes keyboard focusable so focus can reveal controls', async () => {
+    const mounted = await mountRow({ moveDestinations: buildMoveDestinations() });
+    const row = mounted.container.firstElementChild;
+    if (!(row instanceof HTMLDivElement)) {
+      throw new Error('expected row root');
+    }
+
+    expect(row.tabIndex).toBe(0);
+
+    row.focus();
+    await nextTick();
+
+    expect(mounted.container.querySelector('[data-testid="row-count-controls"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Move card to another board"]')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('enter on the focused row triggers the row action', async () => {
+    const mounted = await mountRow();
+    const row = mounted.container.firstElementChild;
+    if (!(row instanceof HTMLDivElement)) {
+      throw new Error('expected row root');
+    }
+
+    row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await nextTick();
+
+    expect(mounted.events).toEqual(['row:card-1']);
 
     mounted.unmount();
   });

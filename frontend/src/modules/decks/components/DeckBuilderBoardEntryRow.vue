@@ -3,12 +3,15 @@
     ref="triggerRef"
     class="theme-card-frame group relative flex h-[4.25rem] items-stretch overflow-hidden rounded-xl select-none"
     :class="rowClickable ? 'cursor-pointer' : 'cursor-default'"
+    :tabindex="rowClickable ? 0 : undefined"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
     @focusin="focusedWithin = true"
     @focusout="handleFocusOut"
     @click="handleRowClick"
     @contextmenu="handleContextMenu"
+    @keydown.enter.prevent="handleRowKeydown"
+    @keydown.space.prevent="handleRowKeydown"
   >
     <div class="relative z-10 flex min-w-0 flex-1 items-center px-3 py-2">
       <div class="flex min-w-0 flex-1 flex-col justify-between self-stretch select-none pr-2">
@@ -279,6 +282,13 @@ const rowArtTransform = 'scale(1.4)';
 const rowControlsRightOffset = `calc(${rowQuantityWidth} + 0.25rem)`;
 
 const handleRowClick = (): void => {
+  if (props.rowActionDisabled) {
+    return;
+  }
+  emit('row-action', props.entry.card.id);
+};
+
+const handleRowKeydown = (): void => {
   if (props.rowActionDisabled) {
     return;
   }

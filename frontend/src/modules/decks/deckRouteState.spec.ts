@@ -98,6 +98,36 @@ describe('deckRouteState', () => {
     });
   });
 
+  test('keeps gallery return context from card detail routes', () => {
+    expect(
+      buildContextualNewDeckEditorLocation('/cards/card-1', {
+        q: 'angel',
+        affinity_symbol_keys: ['air'],
+      }),
+    ).toEqual({
+      path: '/my/decks/new',
+      query: {
+        q: 'angel',
+        affinity_symbol_keys: ['air'],
+        return_to: 'gallery',
+      },
+    });
+  });
+
+  test('keeps gallery return context from card group detail routes', () => {
+    expect(
+      buildContextualNewDeckEditorLocation('/card-groups/group-1', {
+        q: 'angel',
+      }),
+    ).toEqual({
+      path: '/my/decks/new',
+      query: {
+        q: 'angel',
+        return_to: 'gallery',
+      },
+    });
+  });
+
   test('keeps explicit public deck return context for contextual new deck navigation', () => {
     expect(
       buildContextualNewDeckEditorLocation('/my/decks', {

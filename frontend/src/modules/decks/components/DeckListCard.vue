@@ -3,8 +3,10 @@
     <div
       :class="cardClass"
       :data-navigation-target="titleTo"
+      :role="isClickableCard ? 'link' : undefined"
+      :tabindex="isClickableCard ? 0 : undefined"
       @click="handleCardClick"
-      @keydown.enter="handleCardKeydown"
+      @keydown.enter.prevent="handleCardKeydown"
       @keydown.space.prevent="handleCardKeydown"
     >
       <div class="deck-list-card-art">

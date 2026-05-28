@@ -191,6 +191,26 @@ describe('DeckListCard', () => {
     mounted.unmount();
   });
 
+  test.each([
+    ['browse', '.deck-list-card-browse', '/decks/deck-1'],
+    ['owned', '.deck-list-card-owned', '/my/decks/deck-1'],
+  ] as const)('clickable %s deck cards remain keyboard focusable links', async (mode, selector, target) => {
+    const mounted = await mountDeckListCard(mode);
+    const card = mounted.container.querySelector<HTMLElement>(selector);
+    const pushSpy = vi.spyOn(mounted.router, 'push');
+
+    expect(card?.getAttribute('role')).toBe('link');
+    expect(card?.getAttribute('tabindex')).toBe('0');
+
+    card?.focus();
+    card?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+    await nextTick();
+
+    expect(pushSpy).toHaveBeenCalledWith(target);
+
+    mounted.unmount();
+  });
+
   test('copy share link action writes to clipboard without navigating the card', async () => {
     const mounted = await mountDeckListCard('browse');
     const menuTrigger = mounted.container.querySelector('button[aria-label="Open deck actions"]');

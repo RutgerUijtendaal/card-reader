@@ -8,6 +8,8 @@ const GALLERY_RETURN_TO = 'gallery';
 const MY_DECKS_RETURN_TO = 'my_decks';
 const DECK_RETURN_TO_QUERY_KEY = 'return_to';
 const DECK_ID_QUERY_KEY = 'deck_id';
+const isGalleryContextPath = (path: string): boolean =>
+  path === '/cards' || path.startsWith('/cards/') || path.startsWith('/card-groups/');
 
 export const buildDeckCardDetailLocation = (
   cardId: string,
@@ -77,7 +79,7 @@ export const buildContextualNewDeckEditorLocation = (
     return buildNewDeckEditorLocation(DECKS_RETURN_TO);
   }
 
-  if (path === '/cards') {
+  if (isGalleryContextPath(path)) {
     return {
       path: '/my/decks/new',
       query: addReturnToQuery(query, GALLERY_RETURN_TO),
