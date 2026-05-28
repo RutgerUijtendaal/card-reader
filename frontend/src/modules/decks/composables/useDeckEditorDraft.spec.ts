@@ -135,6 +135,248 @@ describe('useDeckEditorDraft', () => {
     expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
   });
 
+  test('board row action increments one copy on the active board', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 2 }];
+
+    controller.handleBoardRowAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 3 }]);
+  });
+
+  test('board row action respects board-specific quantity limits', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 4 }];
+    controller.handleBoardRowAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 4 }]);
+
+    controller.addSideboard();
+    const sideboardId = controller.activeBoardId.value;
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 100 });
+    controller.handleBoardRowAction('cardA', sideboardId);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 100 }]);
+  });
+
+  test('board row secondary action removes one copy without removing the entry', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 3 }];
+
+    controller.handleBoardRowSecondaryAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
+
+    controller.handleBoardRowSecondaryAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+
+    controller.handleBoardRowSecondaryAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+  });
+
+  test('board row actions target the active sideboard when selected', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 2 }];
+    controller.addSideboard();
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 3 });
+
+    controller.handleBoardRowAction('cardA');
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 4 }]);
+
+    controller.handleBoardRowSecondaryAction('cardA');
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 3 }]);
+  });
+
+  test('moves one copy from mainboard to sideboard', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 3 }];
+    controller.addSideboard();
+    const destinationBoardId = controller.activeBoardId.value;
+
+    expect(controller.moveEntryToBoard('cardA', destinationBoardId, 'mainboard')).toBe(true);
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+  });
+
+  test('moves one copy from sideboard to mainboard', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.addSideboard();
+    const sourceBoardId = controller.activeBoardId.value;
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 2 });
+
+    expect(controller.moveEntryToBoard('cardA', 'mainboard', sourceBoardId)).toBe(true);
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+  });
+
+  test('merges one moved copy into an existing destination row when valid', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 2 }];
+    controller.addSideboard();
+    const destinationBoardId = controller.activeBoardId.value;
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 3 });
+
+    expect(controller.moveEntryToBoard('cardA', destinationBoardId, 'mainboard')).toBe(true);
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 4 }]);
+  });
+
+  test('blocks row moves when destination limits would be exceeded', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 2 }];
+    controller.addSideboard();
+    const destinationBoardId = controller.activeBoardId.value;
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 100 });
+
+    expect(controller.moveEntryToBoard('cardA', destinationBoardId, 'mainboard')).toBe(false);
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 100 }]);
+  });
+
+  test('blocks row moves into mainboard when deck limits would be exceeded', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+      filler: buildCard('filler', 'Filler', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [
+      { card_id: 'cardA', quantity: 4 },
+      { card_id: 'filler', quantity: 36 },
+    ];
+    controller.addSideboard();
+    const sourceBoardId = controller.activeBoardId.value;
+    controller.activeSideboard.value?.entries.push({ card_id: 'cardA', quantity: 1 });
+
+    expect(controller.moveEntryToBoard('cardA', 'mainboard', sourceBoardId)).toBe(false);
+    expect(controller.form.entries).toEqual([
+      { card_id: 'cardA', quantity: 4 },
+      { card_id: 'filler', quantity: 36 },
+    ]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+  });
+
+  test('returns move destinations for other boards only', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 2 }];
+    controller.addSideboard();
+    controller.addSideboard();
+    const firstSideboardId = controller.sideboardTabs.value[0]?.id ?? '';
+    const secondSideboardId = controller.sideboardTabs.value[1]?.id ?? '';
+
+    expect(controller.getBoardMoveDestinations('cardA', 'mainboard').map((item) => item.boardId)).toEqual([
+      firstSideboardId,
+      secondSideboardId,
+    ]);
+    expect(controller.getBoardMoveDestinations('cardA', firstSideboardId).map((item) => item.boardId)).toEqual([
+      'mainboard',
+      secondSideboardId,
+    ]);
+  });
+
   test('tracks mainboard and overall totals separately', () => {
     const builderStep = ref<BuilderStep>('build');
     const cardLookup = ref<Record<string, DeckCardSummary>>({

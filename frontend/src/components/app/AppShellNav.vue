@@ -96,6 +96,12 @@
     <div class="mt-auto w-full space-y-4 pt-6">
       <div class="app-sidebar-divider pt-4">
         <div :class="collapsed ? 'flex justify-center' : ''">
+          <AppHotkeysPanel :compact="collapsed" />
+        </div>
+      </div>
+
+      <div class="app-sidebar-divider pt-4">
+        <div :class="collapsed ? 'flex justify-center' : ''">
           <ThemeModeMenu :compact="collapsed" />
         </div>
       </div>
@@ -135,6 +141,7 @@
 import { computed } from 'vue';
 import { BookOpen, ChevronRight, ClipboardCheck, Folders, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
+import AppHotkeysPanel from '@/components/app/AppHotkeysPanel.vue';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 

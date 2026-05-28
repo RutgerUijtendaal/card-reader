@@ -35,7 +35,7 @@
 
     <div
       v-else
-      class="grid gap-4 xl:grid-cols-2"
+      class="grid gap-4 2xl:grid-cols-2"
     >
       <DeckListCard
         v-for="deck in decks"
@@ -45,10 +45,10 @@
         :title-to="`/my/decks/${deck.id}`"
       >
         <template #actions>
-          <div class="flex h-full min-h-[7.5rem] min-w-[11rem] max-w-[11rem] flex-col justify-between">
+          <div class="flex w-[10.75rem] flex-col items-stretch gap-3">
             <div class="flex items-center gap-2">
               <RouterLink
-                class="btn-secondary flex-1"
+                class="btn-secondary min-w-0 flex-1"
                 :to="buildMyDeckEditorLocation(deck.id)"
               >
                 Edit
@@ -83,16 +83,13 @@
               </ExtraActionsMenu>
             </div>
 
-            <label class="flex flex-col gap-1 text-xs">
-              <span class="theme-section-muted">Visibility</span>
-              <AppSelect
-                wrapper-class="min-w-0"
-                :disabled="savingDeckIds.has(deck.id)"
-                :model-value="deck.visibility"
-                :options="visibilityOptions"
-                @update:model-value="handleVisibilitySelect(deck, $event)"
-              />
-            </label>
+            <AppSelect
+              wrapper-class="min-w-0 w-full"
+              :disabled="savingDeckIds.has(deck.id)"
+              :model-value="deck.visibility"
+              :options="visibilityOptions"
+              @update:model-value="handleVisibilitySelect(deck, $event)"
+            />
           </div>
         </template>
       </DeckListCard>

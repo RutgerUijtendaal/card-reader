@@ -78,15 +78,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useLocalStorage, useMediaQuery } from '@vueuse/core';
 import { Menu } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
-import { RouterLink, useRoute } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AppShellNav from '@/components/app/AppShellNav.vue';
+import { useGlobalNavigationHotkeys, usePrimarySearchHotkeys } from '@/composables/useHotkeys';
 import { provideScrollContainer } from '@/composables/useScrollContainer';
+import { useAuthStore } from '@/modules/auth/authStore';
+import { buildContextualNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
 
 const route = useRoute();
+const router = useRouter();
+const auth = useAuthStore();
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const isDesktop = useMediaQuery('(min-width: 1024px)');
 const mobileNavOpen = ref(false);
@@ -94,8 +99,19 @@ const isSidebarCollapsed = useLocalStorage('card-reader.sidebar-collapsed', fals
   writeDefaults: true,
 });
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
+const globalNavigationHotkeys = computed(() => [
+  {
+    sequence: ['n', 'n'] as const,
+    enabled: auth.authenticated,
+    onTrigger: () => {
+      void router.push(buildContextualNewDeckEditorLocation(route.path, route.query));
+    },
+  },
+]);
 
 provideScrollContainer(scrollContainerRef);
+usePrimarySearchHotkeys();
+useGlobalNavigationHotkeys(globalNavigationHotkeys);
 
 watch(
   () => route.fullPath,

@@ -3,6 +3,7 @@
     :class="containerClass"
   >
     <div
+      v-if="showHeader"
       class="flex items-start justify-between gap-3"
     >
       <div
@@ -92,13 +93,14 @@ const props = withDefaults(
 const curveSummary = computed(() => buildManaCurve(props.entries));
 const hasVisibleCurve = computed(() => curveSummary.value.maxBucketCount > 0);
 const totalCardsLabel = computed(() => (curveSummary.value.totalCards === 1 ? '1 card' : `${curveSummary.value.totalCards} cards`));
+const showHeader = computed(() => !props.compact);
 const emptyStateLabel = computed(() =>
   curveSummary.value.totalCards > 0 && curveSummary.value.uncostedCards === curveSummary.value.totalCards
     ? 'No mana cost data is available for these cards.'
     : props.emptyLabel,
 );
 const containerClass = computed(() =>
-  props.compact ? 'space-y-2' : 'space-y-4',
+  props.compact ? '' : 'space-y-4',
 );
 const chartShellClass = computed(() =>
   props.compact

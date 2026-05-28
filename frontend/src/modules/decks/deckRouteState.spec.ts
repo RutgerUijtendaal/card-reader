@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  buildContextualNewDeckEditorLocation,
   buildDeckCardDetailLocation,
   buildDeckDetailEditorLocation,
   buildDeckEditorReturnLocation,
@@ -72,6 +73,74 @@ describe('deckRouteState', () => {
     });
   });
 
+  test('builds a contextual new deck editor location from public deck browse routes', () => {
+    expect(buildContextualNewDeckEditorLocation('/decks/deck-1', {})).toEqual({
+      path: '/my/decks/new',
+      query: {
+        return_to: 'decks',
+      },
+    });
+  });
+
+  test('builds a contextual new deck editor location from the gallery with filters preserved', () => {
+    expect(
+      buildContextualNewDeckEditorLocation('/cards', {
+        q: 'angel',
+        affinity_symbol_keys: ['air'],
+      }),
+    ).toEqual({
+      path: '/my/decks/new',
+      query: {
+        q: 'angel',
+        affinity_symbol_keys: ['air'],
+        return_to: 'gallery',
+      },
+    });
+  });
+
+  test('keeps gallery return context from card detail routes', () => {
+    expect(
+      buildContextualNewDeckEditorLocation('/cards/card-1', {
+        q: 'angel',
+        affinity_symbol_keys: ['air'],
+      }),
+    ).toEqual({
+      path: '/my/decks/new',
+      query: {
+        q: 'angel',
+        affinity_symbol_keys: ['air'],
+        return_to: 'gallery',
+      },
+    });
+  });
+
+  test('keeps gallery return context from card group detail routes', () => {
+    expect(
+      buildContextualNewDeckEditorLocation('/card-groups/group-1', {
+        q: 'angel',
+      }),
+    ).toEqual({
+      path: '/my/decks/new',
+      query: {
+        q: 'angel',
+        return_to: 'gallery',
+      },
+    });
+  });
+
+  test('keeps explicit public deck return context for contextual new deck navigation', () => {
+    expect(
+      buildContextualNewDeckEditorLocation('/my/decks', {
+        return_to: 'decks',
+      }),
+    ).toEqual({
+      path: '/my/decks/new',
+      query: {
+        return_to: 'decks',
+      },
+    });
+  });
+
   test('builds a deck detail editor location with return context', () => {
     expect(buildDeckDetailEditorLocation('deck-1')).toEqual({
       path: '/my/decks/deck-1/edit',
@@ -124,6 +193,23 @@ describe('deckRouteState', () => {
       path: '/decks',
       query: {
         foo: 'bar',
+      },
+    });
+  });
+
+  test('returns gallery from the editor when gallery context is present', () => {
+    const query = {
+      q: 'angel',
+      return_to: 'gallery',
+      affinity_symbol_keys: ['air'],
+    };
+
+    expect(getDeckEditorReturnLabel(query)).toBe('Gallery');
+    expect(buildDeckEditorReturnLocation(query)).toEqual({
+      path: '/cards',
+      query: {
+        q: 'angel',
+        affinity_symbol_keys: ['air'],
       },
     });
   });

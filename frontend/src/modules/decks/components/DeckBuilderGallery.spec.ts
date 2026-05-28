@@ -154,6 +154,25 @@ describe('DeckBuilderGallery', () => {
     mounted.unmount();
   });
 
+  test('right-click still suppresses the browser context menu when removal is unavailable', async () => {
+    const controller = buildController([buildCard()]);
+    controller.deck.galleryRemoveActionDisabled.mockReturnValue(true);
+    const mounted = await mountGallery(controller);
+    const card = mounted.container.querySelector('[data-testid="gallery-card-card-1"]');
+    if (!(card instanceof HTMLElement)) {
+      throw new Error('expected mounted gallery card');
+    }
+
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    card.dispatchEvent(event);
+    await nextTick();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(controller.deck.handleGalleryRemoveAction).not.toHaveBeenCalled();
+
+    mounted.unmount();
+  });
+
   test('right-click ignores non-card items and leaves the native context menu alone', async () => {
     const controller = buildController([
       {
