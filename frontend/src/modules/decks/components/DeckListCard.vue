@@ -156,7 +156,10 @@ const sideboardSummary = computed(() => {
 });
 const boardSummary = computed(() => `Maindeck ${props.deck.mainboard.total_cards} · ${props.deck.mainboard.unique_cards} unique · ${sideboardSummary.value}`);
 const heroAffinitySymbols = computed(() => props.deck.hero_card.symbols.filter((symbol) => symbol.symbol_type === 'affinity'));
-const titlePillLabel = computed(() => (isOwnedMode.value ? deckVisibilityLabels[props.deck.visibility] : props.deck.owner.username));
+const uppercaseFirstCharacter = (value: string): string =>
+  value.length === 0 ? value : value[0].toLocaleUpperCase() + value.slice(1);
+const ownerDisplayName = computed(() => uppercaseFirstCharacter(props.deck.owner.username));
+const titlePillLabel = computed(() => (isOwnedMode.value ? deckVisibilityLabels[props.deck.visibility] : ownerDisplayName.value));
 const titlePillClass = computed(() => (isOwnedMode.value ? deckVisibilityBadgeClasses[props.deck.visibility] : 'theme-pill-keyword'));
 const cardClass = computed(() => [
   'deck-list-card-surface',

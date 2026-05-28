@@ -156,7 +156,8 @@ describe('DeckListCard', () => {
     expect(mounted.container.querySelector('.deck-list-card-browse-details')).toBeNull();
     expect(text).toContain('Azure Tempo');
     expect(text).toContain('Hero: Azure Hero');
-    expect(text).toContain('maitys');
+    expect(text).toContain('Maitys');
+    expect(text).not.toContain('maitys');
     expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).toContain('{F}');
     expect(text).toContain('Pressure early, then pivot into efficient trades.');
