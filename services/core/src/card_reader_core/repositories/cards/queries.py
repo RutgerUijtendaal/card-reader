@@ -4,6 +4,7 @@ from django.db.models import Case, CharField, Count, Exists, F, IntegerField, Ou
 
 from card_reader_core.models import (
     Card,
+    CardMergeRedirect,
     CardVersion,
     CardVersionImage,
     CardVersionKeyword,
@@ -193,7 +194,11 @@ def list_matching_cards(
 
 
 def get_card(card_id: str) -> Card | None:
-    return Card.objects.filter(id=card_id).first()
+    card = Card.objects.filter(id=card_id).first()
+    if card is not None:
+        return card
+    redirect = CardMergeRedirect.objects.select_related("target_card").filter(old_card_id=card_id).first()
+    return redirect.target_card if redirect is not None else None
 
 
 def get_latest_card_version(card_id: str) -> CardVersion | None:
@@ -335,8 +340,11 @@ def list_filtered_latest_card_version_reparse_sources(
 
 
 def list_card_generations(card_id: str) -> list[CardVersion]:
+    card = get_card(card_id)
+    if card is None:
+        return []
     return list(
-        CardVersion.objects.filter(card_id=card_id)
+        CardVersion.objects.filter(card_id=card.id)
         .select_related("card", "template", "previous_version", "parse_result")
         .order_by("-version_number")
     )

@@ -69,6 +69,41 @@ export type MaintenanceActionResponse = {
   removed_paths: string[];
 };
 
+export type CardMergeCardSummary = {
+  id: string;
+  key: string;
+  label: string;
+  latest_name: string;
+  version_count: number;
+};
+
+export type CardMergeAliasPreview = {
+  key: string;
+  label: string;
+  conflict_card_id: string | null;
+};
+
+export type CardMergePreview = {
+  target: CardMergeCardSummary;
+  sources: CardMergeCardSummary[];
+  aliases: CardMergeAliasPreview[];
+  relations: {
+    deck_entry_collisions: number;
+    sideboard_entry_collisions: number;
+    group_member_collisions: number;
+    hero_references: number;
+    anchored_groups: number;
+  };
+  resulting_version_count: number;
+  blocking_conflicts: string[];
+  can_apply: boolean;
+};
+
+export type CardMergeApplyResponse = {
+  message: string;
+  preview: CardMergePreview;
+};
+
 export type ManagedUserRecord = {
   id: string;
   username: string;

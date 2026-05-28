@@ -37,6 +37,15 @@
             <span>Card groups</span>
           </button>
           <button
+            class="theme-tab"
+            type="button"
+            :class="activeTab === 'card-merges' ? 'theme-tab-active' : ''"
+            @click="setActiveTab('card-merges')"
+          >
+            <GitMerge class="h-4 w-4" />
+            <span>Card merges</span>
+          </button>
+          <button
             v-if="auth.canManageUsers"
             class="theme-tab"
             type="button"
@@ -62,6 +71,7 @@
 
     <MaintenanceAdminView v-if="activeTab === 'maintenance'" />
     <UsersAdminView v-else-if="activeTab === 'users'" />
+    <CardMergesAdminView v-else-if="activeTab === 'card-merges'" />
     <CardGroupsAdminView v-else-if="activeTab === 'card-groups'" />
     <TemplatesAdminView v-else-if="activeTab === 'templates'" />
     <CatalogAdminView v-else />
@@ -70,7 +80,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { Database, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
+import { Database, GitMerge, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
@@ -81,6 +91,7 @@ import { useAdminRouteSync } from '@/modules/admin/composables/useAdminRouteSync
 import MaintenanceAdminView from './views/MaintenanceAdminView.vue';
 import CatalogAdminView from './views/CatalogAdminView.vue';
 import CardGroupsAdminView from './views/CardGroupsAdminView.vue';
+import CardMergesAdminView from './views/CardMergesAdminView.vue';
 import TemplatesAdminView from './views/TemplatesAdminView.vue';
 import UsersAdminView from './views/UsersAdminView.vue';
 

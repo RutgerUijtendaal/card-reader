@@ -2,12 +2,13 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from 'vue-rout
 import type { CatalogKind } from '@/modules/admin/types';
 import { addReturnToQuery, clearLocationQueryKeys, mergeLocationQuery, queryString } from '@/router/routeState';
 
-export type AdminTab = 'catalog' | 'templates' | 'card-groups' | 'users' | 'maintenance';
+export type AdminTab = 'catalog' | 'templates' | 'card-groups' | 'card-merges' | 'users' | 'maintenance';
 
 const ADMIN_RETURN_TO = 'admin';
 const ADMIN_TAB_QUERY_KEY = 'admin_tab';
 const ADMIN_KIND_QUERY_KEY = 'admin_kind';
 const ADMIN_ENTRY_QUERY_KEY = 'admin_entry';
+const ADMIN_MERGE_TARGET_QUERY_KEY = 'admin_merge_target';
 const ADMIN_RETURN_TO_QUERY_KEY = 'return_to';
 
 const CATALOG_KINDS: CatalogKind[] = [
@@ -19,7 +20,7 @@ const CATALOG_KINDS: CatalogKind[] = [
   'suggested-types',
 ];
 
-const ADMIN_TABS: AdminTab[] = ['catalog', 'templates', 'card-groups', 'users', 'maintenance'];
+const ADMIN_TABS: AdminTab[] = ['catalog', 'templates', 'card-groups', 'card-merges', 'users', 'maintenance'];
 
 export const parseAdminTab = (
   query: LocationQuery,
@@ -55,6 +56,7 @@ export const buildAdminQuery = (
     tab?: AdminTab | null;
     kind?: CatalogKind | null;
     entryId?: string | null;
+    mergeTargetId?: string | null;
   },
 ): LocationQueryRaw => {
   const nextUpdates: Record<string, string | null | undefined> = {};
@@ -68,6 +70,9 @@ export const buildAdminQuery = (
   if (updates.entryId !== undefined) {
     nextUpdates[ADMIN_ENTRY_QUERY_KEY] = updates.entryId;
   }
+  if (updates.mergeTargetId !== undefined) {
+    nextUpdates[ADMIN_MERGE_TARGET_QUERY_KEY] = updates.mergeTargetId;
+  }
 
   return mergeLocationQuery(query, nextUpdates);
 };
@@ -78,6 +83,17 @@ export const buildAdminCardDetailLocation = (
 ): RouteLocationRaw => ({
   path: `/cards/${cardId}/edit`,
   query: addReturnToQuery(query, ADMIN_RETURN_TO),
+});
+
+export const parseAdminMergeTargetId = (query: LocationQuery): string | null =>
+  queryString(query[ADMIN_MERGE_TARGET_QUERY_KEY]);
+
+export const buildAdminCardMergeLocation = (
+  cardId: string,
+  query: LocationQuery,
+): RouteLocationRaw => ({
+  path: '/admin',
+  query: buildAdminQuery(query, { tab: 'card-merges', mergeTargetId: cardId }),
 });
 
 export const isAdminReturnQuery = (query: LocationQuery): boolean =>
