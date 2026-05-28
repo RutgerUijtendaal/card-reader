@@ -353,4 +353,25 @@ describe('DeckBuilderBoardEntryRow', () => {
 
     mounted.unmount();
   });
+
+  test('mouse leave clears focused row controls on fine pointer screens', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const mounted = await mountRow();
+    await showRowControls(mounted.container);
+    const incrementButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Add one copy"]');
+    const row = mounted.container.firstElementChild;
+    if (!(incrementButton instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) {
+      throw new Error('expected row and increment button');
+    }
+
+    incrementButton.focus();
+    expect(document.activeElement).toBe(incrementButton);
+
+    row.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    await nextTick();
+
+    expect(document.activeElement).not.toBe(incrementButton);
+
+    mounted.unmount();
+  });
 });

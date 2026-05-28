@@ -12,3 +12,15 @@ export const blurAfterFinePointerActivation = (event: Event): void => {
 
   event.currentTarget.blur();
 };
+
+export const blurFocusedDescendantAfterFinePointerLeave = (container: HTMLElement | null): void => {
+  if (!isFinePointerDevice() || !container || !(document.activeElement instanceof HTMLElement)) {
+    return;
+  }
+
+  if (!container.contains(document.activeElement)) {
+    return;
+  }
+
+  document.activeElement.blur();
+};

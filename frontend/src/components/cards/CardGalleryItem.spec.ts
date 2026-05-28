@@ -126,4 +126,30 @@ describe('CardGalleryItem', () => {
 
     mounted.unmount();
   });
+
+  test('mouse leave clears focused descendants on fine pointer screens', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const mounted = await mountCardGalleryItem(buildCard(), {
+      activationMode: 'emit',
+      activationLabel: 'Add card to deck',
+    });
+    const button = mounted.container.querySelector('button');
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error('expected activation button');
+    }
+
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    const root = mounted.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) {
+      throw new Error('expected card root');
+    }
+    root.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    await nextTick();
+
+    expect(document.activeElement).not.toBe(button);
+
+    mounted.unmount();
+  });
 });

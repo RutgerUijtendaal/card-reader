@@ -5,7 +5,7 @@
     :class="rowClickable ? 'cursor-pointer' : 'cursor-default'"
     :tabindex="rowClickable ? 0 : undefined"
     @mouseenter="hovered = true"
-    @mouseleave="hovered = false"
+    @mouseleave="handleMouseLeave"
     @focusin="focusedWithin = true"
     @focusout="handleFocusOut"
     @click="handleRowClick"
@@ -214,7 +214,7 @@ import { useFloatingPopover } from '@/composables/useFloatingPopover';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
 import type { DeckEntrySummary } from '@/modules/decks/types';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
-import { blurAfterFinePointerActivation } from '@/utils/pointerFocus';
+import { blurAfterFinePointerActivation, blurFocusedDescendantAfterFinePointerLeave } from '@/utils/pointerFocus';
 
 const props = defineProps<{
   entry: DeckEntrySummary;
@@ -341,6 +341,11 @@ const handleFocusOut = (event: FocusEvent): void => {
     return;
   }
   focusedWithin.value = false;
+};
+
+const handleMouseLeave = (): void => {
+  hovered.value = false;
+  blurFocusedDescendantAfterFinePointerLeave(triggerRef.value);
 };
 </script>
 
