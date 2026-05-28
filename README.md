@@ -70,13 +70,6 @@ pnpm test
 pnpm check
 ```
 
-When running ad hoc checks in this repo, prefer the helper below so temporary
-files, UV cache data, and pytest scratch paths stay inside `.tmp/codex/`:
-
-```powershell
-pwsh -ExecutionPolicy Bypass -File scripts/run-in-agent-env.ps1 -TaskName lint uv run --project . ruff check services/core/src
-```
-
 Targeted commands:
 
 ```bash

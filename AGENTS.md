@@ -151,3 +151,12 @@ Targeted commands:
 - Keep README files declarative and current-state focused.
 - Do not store real credentials in the app repo.
 - Do not read or expose private seed user files unless the user explicitly asks.
+- Do not run service/integration tests
+
+## Ad hoc commands
+When running ad hoc checks in this repo, prefer the helper below so temporary
+files, UV cache data, and pytest scratch paths stay inside `.tmp/codex/`:
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File scripts/run-in-agent-env.ps1 -TaskName lint uv run --project . ruff check services/core/src
+```
