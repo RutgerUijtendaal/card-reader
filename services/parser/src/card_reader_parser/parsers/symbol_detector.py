@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 
 from card_reader_core.models import Symbol
-from card_reader_core.settings import settings
+from card_reader_core.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

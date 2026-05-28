@@ -4,7 +4,7 @@ from pathlib import Path
 
 from django.http import FileResponse, Http404
 
-from card_reader_core.settings import settings
+from card_reader_core.config.settings import settings
 
 
 def immutable_card_image_response(relative_path: str) -> FileResponse:

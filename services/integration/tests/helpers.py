@@ -36,7 +36,7 @@ def load_case(case_path: Path) -> dict[str, Any]:
 
 
 def run_case(case_path: Path) -> dict[str, Any]:
-    from card_reader_core.repositories.import_jobs_repository import create_import_job
+    from card_reader_core.repositories.import_jobs import create_import_job
     from card_reader_core.services.parser_jobs import ImportProcessorService
     from card_reader_parser.parsers.card_parser import CardParser
 
@@ -81,7 +81,7 @@ def assert_recursive_exact(expected: Any, actual: Any, path: str = "root") -> No
 
 def load_db_state() -> dict[str, object]:
     from card_reader_core.models import Card, CardVersion, CardVersionMetadataSuggestion, ImportJob, ImportJobItem
-    from card_reader_core.repositories.metadata_repository import (
+    from card_reader_core.repositories.metadata import (
         get_keywords_for_card_version,
         get_symbols_for_card_version,
         get_tags_for_card_version,
@@ -158,7 +158,7 @@ def _job_options(case: dict[str, Any]) -> dict[str, object]:
 
 
 def _load_symbol_types(card_version_id: str) -> dict[str, str]:
-    from card_reader_core.repositories.metadata_repository import get_symbols_for_card_version
+    from card_reader_core.repositories.metadata import get_symbols_for_card_version
 
     return {
         row.key: row.symbol_type

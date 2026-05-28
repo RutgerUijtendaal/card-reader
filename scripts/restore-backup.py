@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from card_reader_core.backups import (
+from card_reader_core.operations.backups import (
     DEFAULT_HEALTHCHECK_URL,
     RuntimePaths,
     default_compose_config,

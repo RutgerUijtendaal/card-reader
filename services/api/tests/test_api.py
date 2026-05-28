@@ -7,9 +7,9 @@ import pytest
 
 from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
-from card_reader_core.repositories.cards_repository import get_latest_card_version, save_parsed_card  # noqa: E402
-from card_reader_core.repositories.import_jobs_repository import create_import_job_with_files  # noqa: E402
-from card_reader_core.repositories.metadata_repository import (  # noqa: E402
+from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
+from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
+from card_reader_core.repositories.metadata import (  # noqa: E402
     get_tags_for_card_version,
     replace_card_version_keywords,
     replace_card_version_symbols,
@@ -18,7 +18,7 @@ from card_reader_core.repositories.metadata_repository import (  # noqa: E402
 )
 from card_reader_core.services.imports import ImportService  # noqa: E402
 from card_reader_core.services.parser_jobs import ImportProcessorService  # noqa: E402
-from card_reader_core.settings import settings  # noqa: E402
+from card_reader_core.config.settings import settings  # noqa: E402
 from card_reader_core.storage import build_storage_relative_path, relativize_image_storage_path, resolve_storage_path  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
 from django.db import connection  # noqa: E402

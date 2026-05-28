@@ -5,11 +5,11 @@ from pathlib import Path
 from django.db import transaction
 
 from card_reader_core.models import Card, CardAlias, CardVersion, ImportJobItem, ImportJobStatus, ParseResult, now_utc
-from card_reader_core.rule_text import render_enriched_rule_text
+from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
 
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
-from ..metadata_repository import (
+from ..metadata import (
     SuggestionCandidate,
     get_symbols_for_card_version,
     replace_card_version_metadata_suggestions,
@@ -18,7 +18,7 @@ from ..metadata_repository import (
     replace_card_version_tags,
     replace_card_version_types,
 )
-from ..templates_repository import get_template_by_key
+from ..templates import get_template_by_key
 from .images import save_image_record
 from .queries import get_card, get_latest_card_version
 from .snapshots import (

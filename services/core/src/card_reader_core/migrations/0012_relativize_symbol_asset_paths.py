@@ -29,7 +29,7 @@ def _relativize_symbol_asset_path(value: str) -> str:
         return normalized
 
     try:
-        from card_reader_core.settings import settings
+        from card_reader_core.config.settings import settings
 
         relative_path = Path(value).relative_to(settings.storage_root_dir).as_posix()
         if relative_path.startswith("symbols/"):

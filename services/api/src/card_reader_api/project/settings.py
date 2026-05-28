@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 
-from card_reader_core import django_settings as core_django_settings
-from card_reader_core.settings import settings as core_settings
+from card_reader_core.config import django as core_django_settings
+from card_reader_core.config.settings import settings as core_settings
 
 for setting_name in dir(core_django_settings):
     if setting_name.isupper():

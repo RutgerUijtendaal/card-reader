@@ -6,13 +6,13 @@ from pathlib import Path
 from django.core.management import call_command
 
 from card_reader_api.cards.serializers import CardFilterParams
-from card_reader_core.repositories.cards_repository import (
+from card_reader_core.repositories.cards import (
     LatestCardVersionReparseSource,
     list_filtered_latest_card_version_reparse_sources,
     list_latest_card_version_reparse_sources,
 )
-from card_reader_core.repositories.import_jobs_repository import ImportJobItemTarget, create_import_job_with_files
-from card_reader_core.settings import settings
+from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
+from card_reader_core.config.settings import settings
 
 
 @dataclass(slots=True)

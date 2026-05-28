@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from card_reader_core.backups import RuntimePaths, create_backup_archive
+from card_reader_core.operations.backups import RuntimePaths, create_backup_archive
 
 
 def main() -> None:

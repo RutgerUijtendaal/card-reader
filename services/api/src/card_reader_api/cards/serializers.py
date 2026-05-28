@@ -5,12 +5,12 @@ from rest_framework import serializers
 
 from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
-from card_reader_core.repositories.cards_repository import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
-from card_reader_core.rule_text import render_enriched_rule_text
+from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
+from card_reader_core.rules import render_enriched_rule_text
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardGroup
-    from card_reader_core.repositories.cards_repository import CardSort
+    from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
 MetadataOption = Keyword | Tag | Type

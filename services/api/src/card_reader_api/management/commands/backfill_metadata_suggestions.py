@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from card_reader_core.metadata_matching import KnownMetadataMatcher
-from card_reader_core.metadata_suggestions import extract_metadata_ids_and_suggestions, split_middle_text
+from card_reader_core.metadata.matching import KnownMetadataMatcher
+from card_reader_core.metadata.suggestions import extract_metadata_ids_and_suggestions, split_middle_text
 from django.core.management.base import BaseCommand
 
 from card_reader_core.models import CardVersion
-from card_reader_core.repositories.metadata_repository import (
+from card_reader_core.repositories.metadata import (
     SuggestionCandidate,
     list_tags,
     list_types,

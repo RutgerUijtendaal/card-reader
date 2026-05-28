@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from card_reader_core.models import Tag, Type
-from card_reader_core.metadata_suggestions import (
+from card_reader_core.metadata.suggestions import (
     extract_metadata_ids_and_suggestions,
     split_middle_text,
 )

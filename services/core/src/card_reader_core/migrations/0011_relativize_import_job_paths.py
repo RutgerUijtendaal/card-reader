@@ -25,7 +25,7 @@ def _relativize_storage_path(value: str, *, roots: tuple[str, ...], default_root
         return _normalize_relative_storage_path(value)
 
     try:
-        from card_reader_core.settings import settings
+        from card_reader_core.config.settings import settings
 
         return Path(value).relative_to(settings.storage_root_dir).as_posix()
     except Exception:

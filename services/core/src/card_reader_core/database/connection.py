@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..settings import settings
+from card_reader_core.config.settings import settings
 
 
 def _resolve_database_path() -> Path:

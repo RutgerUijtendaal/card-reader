@@ -5,7 +5,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_core.settings import settings
+from card_reader_core.config.settings import settings
 
 
 class HealthView(APIView):

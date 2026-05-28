@@ -1,4 +1,4 @@
-from card_reader_core.metadata_matching import KnownMetadataMatch, KnownMetadataMatcher
+from card_reader_core.metadata.matching import KnownMetadataMatch, KnownMetadataMatcher
 
 
 class KnownMetadataExtractor(KnownMetadataMatcher):

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from card_reader_core.models import Symbol
-from card_reader_core.rule_text import build_symbol_placeholder, render_enriched_rule_text
+from card_reader_core.rules import build_symbol_placeholder, render_enriched_rule_text
 
 from ..symbol_detector import DetectedSymbol
 

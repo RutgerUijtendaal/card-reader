@@ -24,8 +24,8 @@ Core stack:
 - `services/core`: shared runtime and domain package.
   - Django models and migrations
   - database connection/adoption helpers
-  - repositories and business services
-  - shared storage/settings/template utilities
+  - feature-scoped repositories and business services
+  - shared config, storage, metadata, rule-text, operations, and template utilities
   - `card_reader_core.django_settings` for non-HTTP Django processes
 - `services/api`: Django/DRF HTTP service.
   - Django project: `card_reader_api.project`
@@ -47,6 +47,25 @@ Core stack:
 - When similar logic exists in multiple places, move toward a shared, well-owned abstraction when the fit is real.
 - Do not generalize prematurely, but treat repeated patterns and near-duplicate solutions as a prompt to consolidate.
 - Before adding a new dependency, custom utility, or bespoke implementation for a common UI/backend pattern, scan the existing package dependencies and local shared utilities first, and prefer using them when the use-case fits cleanly.
+- Backend code follows a layered shape:
+  - API views/controllers handle transport concerns, auth, request validation, and response shaping.
+  - Core services coordinate domain workflows and call repositories.
+  - Core repositories own Django query/write persistence details.
+  - Helper classes/modules own grouped normalization, validation, preview-building, or resource-loading logic when that keeps services/repositories focused.
+- Keep `card_reader_core` package root minimal. Root files should be limited to package/Django entrypoints such as `__init__.py`, `apps.py`, `django_settings.py`, and `py.typed`.
+- Place core runtime/domain helpers in owned packages instead of one-off root modules:
+  - `config`: Pydantic settings, logging setup, neutral Django settings implementation.
+  - `storage`: storage path and checksum helpers.
+  - `metadata`: metadata matching and suggestion extraction utilities.
+  - `rules`: rule-text placeholder/rendering helpers.
+  - `operations`: operational workflows such as backup/restore.
+- Place feature-specific core services under `services/<feature>/`.
+  - Current service packages include `cards`, `card_groups`, `card_merges`, `catalog`, `decks`, `imports`, `parser_jobs`, and `templates`.
+  - Service package `__init__.py` files expose the stable public API for that feature.
+- Place feature-specific core repositories under `repositories/<feature>/`.
+  - Current repository packages include `cards`, `card_groups`, `decks`, `exports`, `import_jobs`, `metadata`, and `templates`.
+  - Shared repository helpers belong in `repositories/helpers.py`; avoid recreating legacy `*_repository.py` modules.
+- Prefer importing from package public APIs, such as `card_reader_core.repositories.cards` or `card_reader_core.services.decks`, rather than deep module paths unless the caller is inside the same package.
 - Keep shared card filtering logic centralized in `frontend/src/modules/card-filters`.
   - Route/query parsing, stable key-based filter state, key/id translation, and API filter param building belong there.
   - Page modules such as gallery/review/pickers should only own page-specific behavior like pagination, navigation context, and scroll restoration.
@@ -90,6 +109,7 @@ Core stack:
 - Parser container waits for the API health check and assumes the schema is ready.
 - Parser container uses `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`.
 - Runtime settings are provided through `CARD_READER_*` environment variables.
+- Runtime storage is the repo-root `storage/` directory in development. The Python source package `card_reader_core/storage` is tracked; keep `.gitignore` scoped to `/storage/` for runtime data.
 
 ## Development Commands
 From repo root:
