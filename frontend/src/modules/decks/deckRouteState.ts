@@ -1,8 +1,10 @@
 import type { LocationQuery, RouteLocationRaw } from 'vue-router';
+import { buildGalleryLocation } from '@/modules/card-search/galleryNavigation';
 import { addReturnToQuery, clearLocationQueryKeys, queryString } from '@/router/routeState';
 
 const DECK_RETURN_TO = 'deck';
 const DECKS_RETURN_TO = 'decks';
+const GALLERY_RETURN_TO = 'gallery';
 const MY_DECKS_RETURN_TO = 'my_decks';
 const DECK_RETURN_TO_QUERY_KEY = 'return_to';
 const DECK_ID_QUERY_KEY = 'deck_id';
@@ -66,6 +68,29 @@ export const buildNewDeckEditorLocation = (
   },
 });
 
+export const buildContextualNewDeckEditorLocation = (
+  path: string,
+  query: LocationQuery,
+): RouteLocationRaw => {
+  const explicitReturnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
+  if (explicitReturnTo === DECKS_RETURN_TO) {
+    return buildNewDeckEditorLocation(DECKS_RETURN_TO);
+  }
+
+  if (path === '/cards') {
+    return {
+      path: '/my/decks/new',
+      query: addReturnToQuery(query, GALLERY_RETURN_TO),
+    };
+  }
+
+  if (path === '/decks' || path.startsWith('/decks/')) {
+    return buildNewDeckEditorLocation(DECKS_RETURN_TO);
+  }
+
+  return buildNewDeckEditorLocation(MY_DECKS_RETURN_TO);
+};
+
 export const buildDeckDetailEditorLocation = (deckId: string): RouteLocationRaw => ({
   path: `/my/decks/${deckId}/edit`,
   query: {
@@ -93,13 +118,17 @@ export const buildDeckEditorReturnLocation = (query: LocationQuery): RouteLocati
     };
   }
 
+  if (returnTo === GALLERY_RETURN_TO) {
+    return buildGalleryLocation(clearedQuery as LocationQuery);
+  }
+
   return {
     path: '/my/decks',
     query: clearedQuery,
   };
 };
 
-export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks' | 'My Decks' => {
+export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks' | 'Gallery' | 'My Decks' => {
   const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
   if (returnTo === DECK_RETURN_TO && deckId) {
@@ -107,6 +136,9 @@ export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks'
   }
   if (returnTo === DECKS_RETURN_TO) {
     return 'Decks';
+  }
+  if (returnTo === GALLERY_RETURN_TO) {
+    return 'Gallery';
   }
   return 'My Decks';
 };

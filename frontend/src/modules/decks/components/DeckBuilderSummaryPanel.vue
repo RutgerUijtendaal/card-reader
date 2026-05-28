@@ -125,7 +125,7 @@
           class="theme-card-frame rounded-t-xl"
         >
           <div
-            class="relative border-b"
+            class="relative"
           >
             <div
               v-if="controller.deck.selectedHero.value?.image_url"
@@ -134,7 +134,12 @@
               <img
                 :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
                 :alt="controller.deck.selectedHero.value.name"
-                class="h-full w-full object-cover object-center opacity-75"
+                class="h-full w-full object-cover"
+                :style="{
+                  objectPosition: heroHeaderObjectPosition,
+                  transform: heroHeaderTransform,
+                  opacity: heroHeaderOpacity,
+                }"
               >
             </div>
             <div
@@ -143,7 +148,7 @@
             />
             <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/74 to-slate-900/28" />
 
-            <div class="relative flex items-start gap-2 px-4 py-3">
+            <div class="relative flex min-h-[5.5rem] items-start gap-2 px-4 py-3">
               <button
                 type="button"
                 class="flex min-w-0 flex-1 items-start gap-3 text-left"
@@ -155,7 +160,7 @@
                   </p>
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-100/90">
                     <span class="font-semibold uppercase tracking-[0.18em] text-slate-200/70">{{ activeBoardLabel }}</span>
-                    <span class="font-semibold">{{ activeBoardCount }}/{{ activeBoardLimitLabel }}</span>
+                    <span class="font-semibold">{{ activeBoardCount }}</span>
                     <span
                       v-if="controller.deck.selectedHero.value"
                       class="truncate"
@@ -336,45 +341,30 @@
           }"
         >
           <div class="space-y-4">
-            <div class="flex items-start gap-3">
-              <div
-                v-if="controller.deck.selectedHero.value?.image_url"
-                class="theme-card-frame-muted h-20 w-16 shrink-0 overflow-hidden rounded-xl"
+            <div
+              v-if="controller.deck.selectedHero.value?.image_url"
+              class="theme-card-frame-muted mx-auto w-full max-w-[22rem] overflow-hidden rounded-2xl"
+            >
+              <img
+                :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+                :alt="controller.deck.selectedHero.value.name"
+                class="h-full w-full object-cover object-top"
               >
-                <img
-                  :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-                  :alt="controller.deck.selectedHero.value.name"
-                  class="h-full w-full object-cover object-top"
-                >
-              </div>
-              <div
-                v-else
-                class="theme-empty-state flex h-20 w-16 shrink-0 items-center justify-center rounded-xl text-[11px]"
-              >
-                No hero
-              </div>
-
-              <div class="min-w-0 space-y-1">
-                <p class="theme-section-title text-sm font-semibold">
-                  {{ controller.deck.selectedHero.value?.name ?? 'No hero selected' }}
-                </p>
-                <p
-                  v-if="controller.deck.selectedHero.value?.label"
-                  class="theme-section-muted text-xs"
-                >
-                  {{ controller.deck.selectedHero.value.label }}
-                </p>
-                <p class="theme-section-muted text-xs">
-                  {{ controller.deck.deckStatusLabel.value }} · {{ controller.deck.overallUniqueCards.value }} unique cards
-                </p>
-              </div>
             </div>
+            <div
+              v-else
+              class="theme-empty-state mx-auto flex h-[31rem] w-full max-w-[22rem] items-center justify-center rounded-2xl text-sm"
+            >
+              No hero
+            </div>
+
+            <div class="theme-divider border-t" />
 
             <DeckManaCurve
               :entries="controller.deck.detailedMainboardEntries.value"
               empty-label="Add mainboard cards to see the mana curve."
               compact
-              title="Mainboard Curve"
+              title=""
             />
           </div>
         </div>
@@ -494,9 +484,9 @@ const activeBoardCount = computed(() =>
     ? props.controller.deck.totalMainboardCards.value
     : (props.controller.deck.activeSideboard.value?.entries.reduce((sum, entry) => sum + entry.quantity, 0) ?? 0),
 );
-const activeBoardLimitLabel = computed(() =>
-  props.controller.deck.activeBoardId.value === 'mainboard' ? '40' : '∞',
-);
+const heroHeaderObjectPosition = '30% 10%';
+const heroHeaderTransform = 'scale(1.28)';
+const heroHeaderOpacity = 0.75;
 
 const updateDeckVisibility = (value: DeckVisibility): void => {
   props.controller.deck.setDeckVisibility(value);

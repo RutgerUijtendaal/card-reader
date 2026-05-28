@@ -467,13 +467,14 @@ export const useDeckEditorDraft = ({
     }
 
     const destinationQuantity = getEntryQuantity(cardId, destinationBoardId);
-    const nextDestinationQuantity = destinationQuantity + sourceQuantity;
+    const moveQuantity = 1;
+    const nextDestinationQuantity = destinationQuantity + moveQuantity;
 
     if (destinationBoardId === MAINBOARD_ID) {
       if (nextDestinationQuantity > MAX_DECK_COPIES) {
         return `Mainboard copy limit is ${MAX_DECK_COPIES}.`;
       }
-      if (totalMainboardCards.value + sourceQuantity > MAX_MAINBOARD_CARD_COUNT) {
+      if (totalMainboardCards.value + moveQuantity > MAX_MAINBOARD_CARD_COUNT) {
         return `Mainboard cannot exceed ${MAX_MAINBOARD_CARD_COUNT} cards.`;
       }
       return null;
@@ -565,23 +566,32 @@ export const useDeckEditorDraft = ({
     if (!sourceEntry) {
       return false;
     }
+    const moveQuantity = 1;
 
     const destinationEntries = getBoardEntries(destinationBoardId);
     const destinationEntry = destinationEntries.find((entry) => entry.card_id === cardId);
 
     updateBoardEntries(
       sourceBoardId,
-      sourceEntries.filter((entry) => entry.card_id !== cardId),
+      sourceEntries.flatMap((entry) => {
+        if (entry.card_id !== cardId) {
+          return [entry];
+        }
+        if (entry.quantity <= moveQuantity) {
+          return [];
+        }
+        return [{ ...entry, quantity: entry.quantity - moveQuantity }];
+      }),
     );
     updateBoardEntries(
       destinationBoardId,
       destinationEntry
         ? destinationEntries.map((entry) =>
             entry.card_id === cardId
-              ? { ...entry, quantity: entry.quantity + sourceEntry.quantity }
+              ? { ...entry, quantity: entry.quantity + moveQuantity }
               : entry,
           )
-        : [...destinationEntries, { card_id: cardId, quantity: sourceEntry.quantity }],
+        : [...destinationEntries, { card_id: cardId, quantity: moveQuantity }],
     );
 
     return true;

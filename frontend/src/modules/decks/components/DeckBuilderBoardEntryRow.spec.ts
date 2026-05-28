@@ -49,6 +49,15 @@ const buildEntry = (quantity = 3): DeckEntrySummary => ({
   quantity,
 });
 
+const buildZeroManaEntry = (quantity = 3): DeckEntrySummary => ({
+  ...buildEntry(quantity),
+  card: {
+    ...buildEntry(quantity).card,
+    mana_cost: '0',
+    mana_value: 0,
+  },
+});
+
 const buildMoveDestinations = (): DeckBoardMoveDestination[] => [
   {
     boardId: 'mainboard',
@@ -60,6 +69,14 @@ const buildMoveDestinations = (): DeckBoardMoveDestination[] => [
     label: 'Flex Board',
     description: 'Sideboard copy limit is 100.',
     disabled: true,
+  },
+];
+
+const buildSingleMoveDestination = (): DeckBoardMoveDestination[] => [
+  {
+    boardId: 'mainboard',
+    label: 'Mainboard',
+    disabled: false,
   },
 ];
 
@@ -116,28 +133,40 @@ describe('DeckBuilderBoardEntryRow', () => {
     document.body.innerHTML = '';
   });
 
-  test('renders the quantity controls as one grouped cluster', async () => {
+  test('renders the hover quantity controls as one grouped cluster', async () => {
     const mounted = await mountRow();
     await showRowControls(mounted.container);
 
     const decrementButton = mounted.container.querySelector('[aria-label="Remove one copy"]');
     const incrementButton = mounted.container.querySelector('[aria-label="Add one copy"]');
     const controlGroup = decrementButton?.closest('.theme-card-frame-muted');
+    const quantityBadge = mounted.container.querySelector('[data-testid="row-quantity-badge"]');
 
     expect(controlGroup).not.toBeNull();
     expect(controlGroup?.contains(incrementButton ?? null)).toBe(true);
-    expect(controlGroup?.textContent).toContain('3');
+    expect(controlGroup?.textContent).not.toContain('3');
+    expect(quantityBadge?.textContent).toContain('x3');
     expect(mounted.container.querySelector('input')).toBeNull();
 
     mounted.unmount();
   });
 
-  test('renders mana on the left and an art strip when card imagery exists', async () => {
+  test('renders a persistent quantity badge, resting mana area, and an art strip when card imagery exists', async () => {
     const mounted = await mountRow({ entry: buildEntry(7) });
 
-    expect(mounted.container.textContent).toContain('1');
+    expect(mounted.container.querySelector('[data-testid="row-quantity-badge"]')?.textContent).toContain('x7');
+    expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')?.textContent).toContain('1');
     expect(mounted.container.textContent).toContain('Card 1');
     expect(mounted.container.querySelector('img[alt="Card 1"]')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('does not render a mana row for zero-cost cards', async () => {
+    const mounted = await mountRow({ entry: buildZeroManaEntry() });
+
+    expect(mounted.container.querySelector('[data-testid="row-mana-symbols"]')).toBeNull();
+    expect(mounted.container.textContent).toContain('Card 1');
 
     mounted.unmount();
   });
@@ -168,6 +197,23 @@ describe('DeckBuilderBoardEntryRow', () => {
     expect(moveMenu).toContain('Mainboard');
     expect(moveMenu).toContain('Flex Board');
     expect(moveMenu).not.toContain('Card 1');
+
+    mounted.unmount();
+  });
+
+  test('uses the move button as a direct swap when only one destination exists', async () => {
+    const mounted = await mountRow({ moveDestinations: buildSingleMoveDestination() });
+    await showRowControls(mounted.container);
+    const moveButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card to another board"]');
+    if (!(moveButton instanceof HTMLButtonElement)) {
+      throw new Error('expected move button');
+    }
+
+    moveButton.click();
+    await nextTick();
+
+    expect(mounted.events).toEqual(['move:card-1:mainboard']);
+    expect(document.body.textContent ?? '').not.toContain('Move To Board');
 
     mounted.unmount();
   });
@@ -238,9 +284,11 @@ describe('DeckBuilderBoardEntryRow', () => {
     const mounted = await mountRow({ moveDestinations: buildMoveDestinations() });
 
     const countControls = mounted.container.querySelector('[data-testid="row-count-controls"]');
+    const manaSymbols = mounted.container.querySelector('[data-testid="row-mana-symbols"]');
     const moveButton = mounted.container.querySelector('[aria-label="Move card to another board"]');
     const removeButton = mounted.container.querySelector('[aria-label="Remove card from board"]');
 
+    expect(manaSymbols).not.toBeNull();
     expect(countControls).toBeNull();
     expect(moveButton).toBeNull();
     expect(removeButton).toBeNull();

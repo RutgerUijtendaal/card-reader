@@ -211,7 +211,7 @@ describe('DeckBuilderSummaryPanel', () => {
     const manaCurve = heroDetails?.querySelector('[data-testid="mana-curve"]');
     expect(manaCurve?.getAttribute('data-compact')).toBe('true');
     expect(heroDetails?.style.position).toBe('fixed');
-    expect(document.body.textContent ?? '').toContain('Mainboard Curve');
+    expect(heroDetails?.textContent ?? '').not.toContain('Aurora Hero');
 
     mounted.unmount();
   });
