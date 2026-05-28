@@ -134,6 +134,7 @@ const showRowControls = async (container: HTMLElement): Promise<void> => {
 describe('DeckBuilderBoardEntryRow', () => {
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.unstubAllGlobals();
   });
 
   test('renders the hover quantity controls as one grouped cluster', async () => {
@@ -328,6 +329,27 @@ describe('DeckBuilderBoardEntryRow', () => {
     await nextTick();
 
     expect(mounted.events).toEqual(['row:card-1']);
+
+    mounted.unmount();
+  });
+
+  test('mouse-activated row controls release focus on fine pointer screens', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const mounted = await mountRow();
+    await showRowControls(mounted.container);
+    const incrementButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Add one copy"]');
+    if (!(incrementButton instanceof HTMLButtonElement)) {
+      throw new Error('expected increment button');
+    }
+
+    incrementButton.focus();
+    expect(document.activeElement).toBe(incrementButton);
+
+    incrementButton.click();
+    await nextTick();
+
+    expect(mounted.events).toEqual(['increment:card-1']);
+    expect(document.activeElement).not.toBe(incrementButton);
 
     mounted.unmount();
   });

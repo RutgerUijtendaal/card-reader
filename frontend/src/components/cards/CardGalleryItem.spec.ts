@@ -1,6 +1,6 @@
 import { createApp, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import type { GalleryDisplayItem } from '@/components/cards/galleryDisplayItems';
 import type { CardListItem } from '@/modules/card-detail/types';
@@ -34,9 +34,13 @@ const buildCard = (): CardListItem => ({
   types: [],
 });
 
-const mountCardGalleryItem = async (card: GalleryDisplayItem) => {
+const mountCardGalleryItem = async (
+  card: GalleryDisplayItem,
+  props: Record<string, unknown> = {},
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
+  const activate = vi.fn();
 
   const router = createRouter({
     history: createMemoryHistory(),
@@ -50,6 +54,8 @@ const mountCardGalleryItem = async (card: GalleryDisplayItem) => {
 
   const app = createApp(CardGalleryItem, {
     card,
+    onActivate: activate,
+    ...props,
   });
   app.use(router);
   app.mount(container);
@@ -57,6 +63,7 @@ const mountCardGalleryItem = async (card: GalleryDisplayItem) => {
 
   return {
     container,
+    activate,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -67,6 +74,7 @@ const mountCardGalleryItem = async (card: GalleryDisplayItem) => {
 describe('CardGalleryItem', () => {
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.unstubAllGlobals();
   });
 
   test('renders the non-interactive loading shim layout regions', async () => {
@@ -92,6 +100,29 @@ describe('CardGalleryItem', () => {
     expect(mounted.container.textContent).toContain('No image');
     expect(mounted.container.querySelector('.theme-card-loading-shim')).not.toBeNull();
     expect(mounted.container.querySelector('a,button')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('mouse-activated emitted cards release focus on fine pointer screens', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const mounted = await mountCardGalleryItem(buildCard(), {
+      activationMode: 'emit',
+      activationLabel: 'Add card to deck',
+    });
+    const button = mounted.container.querySelector('button');
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error('expected activation button');
+    }
+
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    button.click();
+    await nextTick();
+
+    expect(mounted.activate).toHaveBeenCalledWith(expect.objectContaining({ id: 'card-1' }));
+    expect(document.activeElement).not.toBe(button);
 
     mounted.unmount();
   });

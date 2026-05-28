@@ -1,10 +1,10 @@
-type TypeSortMetadata = {
+export type TypeSortMetadata = {
   key: string;
   label: string;
   linked_card_count?: number;
 };
 
-type CardTypeMetadata = {
+export type CardTypeMetadata = {
   key: string;
   label: string;
 };
@@ -81,36 +81,50 @@ type TypeSortLookupEntry = {
 };
 
 export type TypeSortLookup = Record<string, TypeSortLookupEntry>;
+export type TypeSortBucket = {
+  key: string;
+  normalizedKey: string;
+  label: string;
+  linkedCardCount: number;
+  sortLabel: string;
+};
 
 const MANA_TYPE_KEY = 'mana';
 const UNTYPED_TYPE_SORT_BUCKET = 1;
 const MANA_TYPE_SORT_BUCKET = 2;
 
-const normalizeTypeKey = (value: string): string => value.trim().toLocaleLowerCase();
+export const normalizeTypeKey = (value: string): string => value.trim().toLocaleLowerCase();
 
-const isManaTypeKey = (value: string): boolean => normalizeTypeKey(value) === MANA_TYPE_KEY;
+export const isManaTypeKey = (value: string): boolean => normalizeTypeKey(value) === MANA_TYPE_KEY;
 
 const parseTimestamp = (value: string): number => {
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp) ? 0 : timestamp;
 };
 
-export const buildTypeSortLookup = (types: TypeSortMetadata[]): TypeSortLookup => {
-  const sortedTypes = [...types].sort((left, right) => {
+export const buildTypeSortBuckets = (types: TypeSortMetadata[]): TypeSortBucket[] =>
+  [...types].sort((left, right) => {
     const leftIsMana = isManaTypeKey(left.key);
     const rightIsMana = isManaTypeKey(right.key);
     if (leftIsMana !== rightIsMana) return leftIsMana ? 1 : -1;
     const countDiff = (right.linked_card_count ?? 0) - (left.linked_card_count ?? 0);
     if (countDiff !== 0) return countDiff;
     return left.label.localeCompare(right.label) || left.key.localeCompare(right.key);
-  });
+  }).map((type) => ({
+    key: type.key,
+    normalizedKey: normalizeTypeKey(type.key),
+    label: type.label,
+    linkedCardCount: type.linked_card_count ?? 0,
+    sortLabel: type.label.toLocaleLowerCase(),
+  }));
 
+export const buildTypeSortLookup = (types: TypeSortMetadata[]): TypeSortLookup => {
   return Object.fromEntries(
-    sortedTypes.map((type) => [
-      normalizeTypeKey(type.key),
+    buildTypeSortBuckets(types).map((type) => [
+      type.normalizedKey,
       {
-        linkedCardCount: type.linked_card_count ?? 0,
-        label: type.label.toLocaleLowerCase(),
+        linkedCardCount: type.linkedCardCount,
+        label: type.sortLabel,
       },
     ]),
   );

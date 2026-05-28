@@ -91,6 +91,28 @@ describe('MetadataChecklistGroup', () => {
     mounted.unmount();
   });
 
+  test('mouse-activated favourite buttons release focus on fine pointer screens', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const mounted = await mountChecklist();
+
+    const favoriteButtons = mounted.container.querySelectorAll<HTMLButtonElement>('.theme-filter-favorite-button');
+    const button = favoriteButtons[1];
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error('expected favorite button');
+    }
+
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    button.click();
+    await nextTick();
+
+    expect(mounted.toggleFavorite).toHaveBeenCalledWith('beta');
+    expect(document.activeElement).not.toBe(button);
+
+    mounted.unmount();
+  });
+
   test('favourite buttons stay layout-stable and hidden until hover or active state', async () => {
     const mounted = await mountChecklist(['alpha']);
 

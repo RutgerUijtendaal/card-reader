@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildTypeSortLookup, compareCardSort } from '@/modules/card-search/cardSort';
+import { buildTypeSortBuckets, buildTypeSortLookup, compareCardSort } from '@/modules/card-search/cardSort';
 
 const buildCard = (
   id: string,
@@ -17,12 +17,21 @@ const buildCard = (
 
 describe('cardSort type sorting', () => {
   test('builds a stable type lookup with mana last', () => {
-    const lookup = buildTypeSortLookup([
+    const types = [
       { key: 'mana', label: 'Mana', linked_card_count: 99 },
       { key: 'creature', label: 'Creature', linked_card_count: 3 },
       { key: 'spell', label: 'Spell', linked_card_count: 5 },
       { key: 'alpha', label: 'Alpha', linked_card_count: 1 },
       { key: 'zeta', label: 'Zeta', linked_card_count: 1 },
+    ];
+    const lookup = buildTypeSortLookup(types);
+
+    expect(buildTypeSortBuckets(types).map((type) => type.key)).toEqual([
+      'spell',
+      'creature',
+      'alpha',
+      'zeta',
+      'mana',
     ]);
 
     expect(compareCardSort(

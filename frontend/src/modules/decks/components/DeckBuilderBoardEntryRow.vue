@@ -53,7 +53,7 @@
             type="button"
             :disabled="entry.quantity <= 1"
             aria-label="Remove one copy"
-            @click.stop="$emit('decrement', entry.card.id)"
+            @click.stop="handleDecrementClick"
             @contextmenu.stop
           >
             -
@@ -63,7 +63,7 @@
             type="button"
             :disabled="quantityMax !== undefined && entry.quantity >= quantityMax"
             aria-label="Add one copy"
-            @click.stop="$emit('increment', entry.card.id)"
+            @click.stop="handleIncrementClick"
             @contextmenu.stop
           >
             +
@@ -129,7 +129,7 @@
           class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition hover:text-rose-300"
           type="button"
           aria-label="Remove card from board"
-          @click.stop="$emit('remove', entry.card.id)"
+          @click.stop="handleRemoveClick"
           @contextmenu.stop
         >
           <Trash2 class="h-4 w-4" />
@@ -214,6 +214,7 @@ import { useFloatingPopover } from '@/composables/useFloatingPopover';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
 import type { DeckEntrySummary } from '@/modules/decks/types';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
+import { blurAfterFinePointerActivation } from '@/utils/pointerFocus';
 
 const props = defineProps<{
   entry: DeckEntrySummary;
@@ -293,6 +294,21 @@ const handleRowKeydown = (): void => {
     return;
   }
   emit('row-action', props.entry.card.id);
+};
+
+const handleDecrementClick = (event: MouseEvent): void => {
+  emit('decrement', props.entry.card.id);
+  blurAfterFinePointerActivation(event);
+};
+
+const handleIncrementClick = (event: MouseEvent): void => {
+  emit('increment', props.entry.card.id);
+  blurAfterFinePointerActivation(event);
+};
+
+const handleRemoveClick = (event: MouseEvent): void => {
+  emit('remove', props.entry.card.id);
+  blurAfterFinePointerActivation(event);
 };
 
 const handleContextMenu = (event: MouseEvent): void => {
