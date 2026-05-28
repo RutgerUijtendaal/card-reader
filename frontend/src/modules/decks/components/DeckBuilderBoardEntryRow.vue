@@ -21,6 +21,13 @@
         >
           {{ entry.card.name }}
         </p>
+        <p
+          v-if="entry.card.lifecycle_status === 'deprecated'"
+          class="theme-pill theme-pill-warning inline-flex w-fit items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+        >
+          <TriangleAlert class="h-3 w-3" />
+          <span>Deprecated</span>
+        </p>
 
         <div
           v-if="showManaSymbols"
@@ -206,7 +213,7 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
-import { ArrowRightLeft, Trash2 } from 'lucide-vue-next';
+import { ArrowRightLeft, Trash2, TriangleAlert } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolizedText from '@/components/SymbolizedText.vue';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';

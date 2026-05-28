@@ -272,7 +272,7 @@ const canPreview = computed(() => targetCard.value !== null && sourceCards.value
 
 const searchCards = async (query: string): Promise<CardListItem[]> => {
   const response = await api.get<PaginatedCardsResponse<CardListItem>>('/cards', {
-    params: { q: query, page: 1, page_size: 8 },
+    params: { q: query, lifecycle_status: 'all', page: 1, page_size: 8 },
   });
   return response.data.results.filter((item): item is CardListItem => item.result_type === 'card');
 };

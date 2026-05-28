@@ -8,7 +8,7 @@ from card_reader_core.models import Symbol
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC
 from card_reader_core.rules import render_enriched_rule_text
 
-from ..cards import list_cards
+from ..cards import DEFAULT_CARD_LIFECYCLE_FILTER, CardLifecycleFilter, list_cards
 from ..metadata import (
     list_symbols,
 )
@@ -47,6 +47,7 @@ def export_cards_csv(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
     sort: CardSort = CARD_SORT_UPDATED_DESC,
 ) -> str:
     stream = io.StringIO()
@@ -102,6 +103,7 @@ def export_cards_csv(
             attack_max=attack_max,
             health_min=health_min,
             health_max=health_max,
+            lifecycle_status=lifecycle_status,
             sort=sort,
             page=page,
             page_size=page_size,

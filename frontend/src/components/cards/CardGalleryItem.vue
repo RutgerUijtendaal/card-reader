@@ -78,6 +78,12 @@
               @load="cardImageLoaded = true"
               @error="cardImageLoaded = true"
             >
+            <span
+              v-if="cardItem?.lifecycle_status === 'deprecated'"
+              class="theme-pill theme-pill-warning absolute left-3 top-3 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+            >
+              Deprecated
+            </span>
           </div>
         </template>
       </component>

@@ -63,11 +63,21 @@
     </div>
 
     <div
-      v-if="$slots.bottomRight"
-      class="theme-divider theme-subheader-row flex justify-end border-t px-5 py-4"
-      :class="bottomRowClass"
+      v-if="hasBottomRow"
+      class="theme-divider theme-subheader-row flex flex-wrap items-center gap-3 border-t px-5 py-4"
+      :class="[bottomRowClass, bottomRowLayoutClass]"
     >
-      <div class="lg:flex lg:self-stretch lg:items-center lg:justify-end">
+      <div
+        v-if="$slots.bottomLeft"
+        class="flex flex-wrap items-center gap-2"
+      >
+        <slot name="bottomLeft" />
+      </div>
+
+      <div
+        v-if="$slots.bottomRight"
+        class="ml-auto lg:flex lg:self-stretch lg:items-center lg:justify-end"
+      >
         <div class="flex flex-wrap items-center gap-2 lg:justify-end">
           <slot name="bottomRight" />
         </div>
@@ -106,7 +116,18 @@ const props = withDefaults(
 const slots = useSlots();
 const hasBackLink = computed(() => Boolean(props.backTo && props.backLabel));
 const hasHeaderActions = computed(() => hasBackLink.value || Boolean(slots.actions));
-const hasBottomRow = computed(() => Boolean(slots.bottomRight));
+const hasBottomRow = computed(() => Boolean(slots.bottomLeft) || Boolean(slots.bottomRight));
+const bottomRowLayoutClass = computed(() => {
+  if (slots.bottomLeft && slots.bottomRight) {
+    return 'justify-between';
+  }
+
+  if (slots.bottomRight) {
+    return 'justify-end';
+  }
+
+  return 'justify-start';
+});
 const resolvedBackTo = computed<RouteLocationRaw>(() => props.backTo ?? '/');
 const headerStyle = computed(() => ({
   borderColor: 'var(--color-border)',

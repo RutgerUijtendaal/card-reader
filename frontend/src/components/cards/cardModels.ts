@@ -16,11 +16,14 @@ export type CardTooltipSymbol = CardTooltipMetadata & {
   asset_url: string | null;
 };
 
+export type CardLifecycleStatus = 'active' | 'deprecated';
+
 export type CardHoverTooltipModel = {
   id: string;
   key: string;
   label: string;
   is_hero: boolean;
+  lifecycle_status?: CardLifecycleStatus;
   template_id: string;
   version_id: string;
   version_number: number;

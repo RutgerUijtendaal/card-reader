@@ -108,6 +108,7 @@ class CardListView(APIView):
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
             health_max=filters["health_max"],
+            lifecycle_status=filters["lifecycle_status"],
             sort=filters["sort"],
             page=filters["page"],
             page_size=filters["page_size"],
@@ -343,6 +344,9 @@ def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+    lifecycle_status = request.query_params.get("lifecycle_status")
+    if lifecycle_status is not None:
+        data["lifecycle_status"] = lifecycle_status
     sort = request.query_params.get("sort")
     if sort is not None:
         data["sort"] = sort
@@ -401,6 +405,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
         attack_max=filters["attack_max"],
         health_min=filters["health_min"],
         health_max=filters["health_max"],
+        lifecycle_status=filters["lifecycle_status"],
         sort=filters["sort"],
     )
     matching_card_ids = [row.version.card.id for row in matching_rows]

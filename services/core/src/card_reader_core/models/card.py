@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from django.db import models
 
@@ -28,6 +28,15 @@ class Card(TimestampedModel):
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
     is_hero: models.BooleanField[bool, bool] = models.BooleanField(default=False, db_index=True)
+    lifecycle_status: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=[
+            ("active", "Active"),
+            ("deprecated", "Deprecated"),
+        ],
+        default="active",
+        db_index=True,
+    )
     latest_version: models.ForeignKey[CardVersion | None, CardVersion | None] = models.ForeignKey(
         "CardVersion",
         on_delete=models.SET_NULL,
@@ -40,6 +49,9 @@ class Card(TimestampedModel):
 
     class Meta:
         db_table = "card"
+
+
+CardLifecycleStatus = Literal["active", "deprecated"]
 
 
 class CardAlias(TimestampedModel):

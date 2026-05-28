@@ -18,13 +18,19 @@ class DeckValidationService:
         issues: list[str] = []
         total_cards = 0
         mana_type_cards = 0
+        deprecated_card_ids: set[str] = set()
 
         if not deck.hero_card.is_hero:
             issues.append("Hero card must be marked as a hero.")
+        if deck.hero_card.lifecycle_status == "deprecated":
+            issues.append("Hero card is deprecated.")
+            deprecated_card_ids.add(deck.hero_card.id)
 
         for entry in entries:
             quantity = int(entry.quantity)
             total_cards += quantity
+            if entry.card.lifecycle_status == "deprecated":
+                deprecated_card_ids.add(entry.card.id)
             if quantity < 1 or quantity > MAX_DECK_COPIES:
                 issues.append(f"Each mainboard card quantity must be between 1 and {MAX_DECK_COPIES}.")
                 break
@@ -36,6 +42,14 @@ class DeckValidationService:
                 break
             if self._card_has_type(entry.card, "mana"):
                 mana_type_cards += quantity
+
+        for sideboard in deck.sideboards.all():
+            for sideboard_entry in sideboard.entries.all():
+                if sideboard_entry.card.lifecycle_status == "deprecated":
+                    deprecated_card_ids.add(sideboard_entry.card.id)
+
+        if deprecated_card_ids:
+            issues.append("Deck contains deprecated cards.")
 
         if total_cards < MIN_MAINBOARD_CARD_COUNT:
             issues.append(f"Deck must contain at least {MIN_MAINBOARD_CARD_COUNT} mainboard cards.")
@@ -51,6 +65,8 @@ class DeckValidationService:
             total_cards=total_cards,
             unique_cards=len(entries),
             issues=issues,
+            deprecated_card_count=len(deprecated_card_ids),
+            deprecated_card_ids=sorted(deprecated_card_ids),
         )
 
     def get_deck_totals(self, deck: Deck) -> DeckTotals:

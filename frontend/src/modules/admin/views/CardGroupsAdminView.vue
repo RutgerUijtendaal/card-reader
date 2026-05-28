@@ -405,6 +405,7 @@ const searchCards = async (): Promise<void> => {
   const response = await api.get<PaginatedCardsResponse<CardListItem>>('/cards', {
     params: {
       q: query,
+      lifecycle_status: 'all',
       page_size: 10,
     },
   });

@@ -140,6 +140,7 @@ def save_parsed_card(
             symbol_ids=symbol_ids or [],
         )
         save_image_record(version, item.source_file, checksum)
+        sync_import_item_lifecycle_warning(item, card)
         mark_item_completed(item)
 
         card.label = parsed_name
@@ -281,6 +282,11 @@ def update_latest_card_version(
             symbol_links_changed = True
         if "is_hero" in updates:
             card.is_hero = bool(updates["is_hero"])
+        if "lifecycle_status" in updates:
+            lifecycle_status = str(updates["lifecycle_status"])
+            if lifecycle_status not in {"active", "deprecated"}:
+                raise ValueError("Invalid card lifecycle status.")
+            card.lifecycle_status = lifecycle_status
 
         if symbol_links_changed:
             apply_manual_rule_text(version, version.rules_text_enriched)
@@ -294,13 +300,15 @@ def update_latest_card_version(
             ensure_card_alias(card=card, key=card.key, label=card.label)
             card.label = version.name
             card.key = next_key
-        if restored_name or "name" in updates or "is_hero" in updates:
+        if restored_name or "name" in updates or "is_hero" in updates or "lifecycle_status" in updates:
             card.updated_at = now_utc()
             update_fields = ["updated_at"]
             if restored_name or "name" in updates:
                 update_fields = ["label", "key", *update_fields]
             if "is_hero" in updates:
                 update_fields = ["is_hero", *update_fields]
+            if "lifecycle_status" in updates:
+                update_fields = ["lifecycle_status", *update_fields]
             card.save(update_fields=list(dict.fromkeys(update_fields)))
 
         version.mana_value = infer_mana_value(
@@ -408,8 +416,23 @@ def update_existing_version(
             card.key = next_key
             update_fields = ["label", "key", *update_fields]
         card.save(update_fields=list(dict.fromkeys(update_fields)))
+        sync_import_item_lifecycle_warning(item, card)
     mark_item_completed(item)
     return version
+
+
+def sync_import_item_lifecycle_warning(item: ImportJobItem, card: Card) -> None:
+    if card.lifecycle_status != "deprecated":
+        item.warning_code = None
+        item.warning_message = None
+        item.updated_at = now_utc()
+        item.save(update_fields=["warning_code", "warning_message", "updated_at"])
+        return
+
+    item.warning_code = "matched_deprecated_card"
+    item.warning_message = f"Import matched deprecated card '{card.label}'. The card remains deprecated."
+    item.updated_at = now_utc()
+    item.save(update_fields=["warning_code", "warning_message", "updated_at"])
 
 
 def create_new_version(

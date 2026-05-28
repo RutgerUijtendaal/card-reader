@@ -4,7 +4,7 @@ import type { CardFiltersResponse } from '@/modules/card-detail/types';
 import type { CardFilterCatalog } from '@/modules/card-filters/cardFilterState';
 import type { MetadataFavoriteGroup } from '@/modules/card-filters/useMetadataFilterFavorites';
 import type { ReturnTypeUseCardFilterState } from '@/modules/card-filters/useCardFilterState';
-import type { CardFilterSectionsState, MatchMode } from '@/modules/card-search/cardFilterSectionsState';
+import type { CardFilterSectionsState, LifecycleFilterValue, MatchMode } from '@/modules/card-search/cardFilterSectionsState';
 
 const createArrayUpdater =
   (target: { value: string[] }) =>
@@ -21,6 +21,12 @@ const createStringUpdater =
 const createMatchModeUpdater =
   (target: { value: MatchMode }) =>
   (value: MatchMode): void => {
+    target.value = value;
+  };
+
+const createLifecycleUpdater =
+  (target: { value: LifecycleFilterValue }) =>
+  (value: LifecycleFilterValue): void => {
     target.value = value;
   };
 
@@ -77,6 +83,8 @@ export const useCardFilterSectionsState = (
   };
 
   const filterSectionsState = computed<CardFilterSectionsState>(() => ({
+    lifecycleStatus: filterState.lifecycleStatus.value,
+    onUpdateLifecycleStatus: createLifecycleUpdater(filterState.lifecycleStatus),
     selectedManaTypeSymbolIds: filterState.manaTypeSymbolIds.value,
     onUpdateSelectedManaTypeSymbolIds: createArrayUpdater(filterState.manaTypeSymbolIds),
     excludedManaTypeSymbolIds: filterState.manaTypeSymbolExcludeIds.value,

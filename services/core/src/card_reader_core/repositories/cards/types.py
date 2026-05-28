@@ -7,6 +7,7 @@ from typing import Literal, TypedDict
 from card_reader_core.models import CardVersion, CardVersionImage, Keyword, Symbol, Tag, Type
 
 CardSort = Literal["updated_desc", "name_asc", "mana_asc", "mana_desc", "types_asc"]
+CardLifecycleFilter = Literal["active", "deprecated", "all"]
 CARD_SORT_UPDATED_DESC: CardSort = "updated_desc"
 CARD_SORT_NAME_ASC: CardSort = "name_asc"
 CARD_SORT_MANA_ASC: CardSort = "mana_asc"
@@ -20,6 +21,7 @@ CARD_SORT_VALUES: tuple[CardSort, ...] = (
     CARD_SORT_TYPES_ASC,
 )
 DEFAULT_CARD_PAGE_SIZE = 36
+DEFAULT_CARD_LIFECYCLE_FILTER: CardLifecycleFilter = "active"
 
 
 @dataclass(frozen=True)

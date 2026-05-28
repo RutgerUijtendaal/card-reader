@@ -25,9 +25,17 @@
         :class="imageUrl ? 'theme-divider border-l pl-4' : ''"
       >
         <div>
-          <h4 class="theme-section-title text-base font-semibold">
-            {{ card.name || 'Unnamed Card' }}
-          </h4>
+          <div class="flex flex-wrap items-center gap-2">
+            <h4 class="theme-section-title text-base font-semibold">
+              {{ card.name || 'Unnamed Card' }}
+            </h4>
+            <span
+              v-if="card.lifecycle_status === 'deprecated'"
+              class="theme-pill theme-pill-warning px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            >
+              Deprecated
+            </span>
+          </div>
           <p class="theme-section-muted text-xs">
             Version {{ card.version_number }}
             <span v-if="card.is_latest"> · Latest</span>

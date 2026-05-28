@@ -107,6 +107,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     previewLoading.value = true;
     try {
       const params: Record<string, string | number | boolean | undefined> = {
+        lifecycle_status: 'all',
         page_size: 8,
         show_groups: false,
       };

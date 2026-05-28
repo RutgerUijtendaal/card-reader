@@ -52,6 +52,8 @@ export type DeckRecord = {
     is_valid: boolean;
     label: string;
     issues: string[];
+    deprecated_card_count?: number;
+    deprecated_card_ids?: string[];
   };
   created_at: string;
   updated_at: string;

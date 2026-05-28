@@ -55,6 +55,7 @@ class ExportCsvView(APIView):
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
             health_max=filters["health_max"],
+            lifecycle_status=filters["lifecycle_status"],
             sort=filters["sort"],
         )
         response = HttpResponse(content, content_type="text/csv")
@@ -109,6 +110,9 @@ def _query_data(request: Request) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+    lifecycle_status = request.query_params.get("lifecycle_status")
+    if lifecycle_status is not None:
+        data["lifecycle_status"] = lifecycle_status
     sort = request.query_params.get("sort")
     if sort is not None:
         data["sort"] = sort

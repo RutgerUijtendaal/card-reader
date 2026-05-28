@@ -1501,6 +1501,50 @@ def test_import_uses_card_alias_for_renamed_card() -> None:
     assert get_latest_card_version(target_card.id).id == version.id
 
 
+def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> None:
+    target_card, target_version = _create_editable_card_version(name="Deprecated Import Card")
+    target_card.lifecycle_status = "deprecated"
+    target_card.save(update_fields=["lifecycle_status"])
+    source_file = settings.storage_root_dir / "uploads" / "deprecated-import-card.png"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_bytes(b"deprecated-import-card")
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "deprecated-import-card.png"),
+        template_id="mtg-like-v1",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "deprecated-import-card.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="deprecated-import-card-checksum",
+        normalized_fields={
+            "name": "Deprecated Import Card",
+            "type_line": "Base Type",
+            "mana_cost": "1",
+            "rules_text": "Rules",
+            "rules_text_raw": "Rules",
+            "rules_text_enriched": "Rules",
+        },
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=False,
+    )
+
+    target_card.refresh_from_db()
+    item.refresh_from_db()
+    assert version.card_id == target_card.id
+    assert version.version_number == target_version.version_number + 1
+    assert target_card.lifecycle_status == "deprecated"
+    assert item.status == "completed"
+    assert item.warning_code == "matched_deprecated_card"
+    assert item.warning_message is not None
+
+
 def test_targeted_reparse_rolls_back_name_conflict() -> None:
     card, version = _create_editable_card_version(name="Rollback Target")
     _conflicting_card, _conflicting_version = _create_editable_card_version(name="Rollback Conflict")

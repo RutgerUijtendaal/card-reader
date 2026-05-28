@@ -10,10 +10,16 @@
       title-class="text-xl"
     >
       <template
-        v-if="card && card.card_groups.length > 0"
+        v-if="card && (card.lifecycle_status === 'deprecated' || card.card_groups.length > 0)"
         #details
       >
         <div class="flex flex-wrap gap-2">
+          <span
+            v-if="card.lifecycle_status === 'deprecated'"
+            class="theme-pill theme-pill-warning inline-flex px-3 py-1 text-xs font-semibold uppercase tracking-wide"
+          >
+            Deprecated
+          </span>
           <RouterLink
             v-for="group in card.card_groups"
             :key="group.id"
@@ -26,11 +32,8 @@
         </div>
       </template>
 
-      <template #bottomRight>
+      <template #bottomLeft>
         <template v-if="card">
-          <div class="theme-section-muted text-sm font-medium">
-            <span>{{ versions.length }} versions</span>
-          </div>
           <button
             class="btn-secondary inline-flex items-center gap-2"
             type="button"
@@ -40,7 +43,9 @@
             <span>Merge/Rename</span>
           </button>
         </template>
+      </template>
 
+      <template #bottomRight>
         <template v-if="hasGalleryContext">
           <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
             {{ positionLabel }}
@@ -125,6 +130,7 @@
           @update-group-search="setMetadataSearch"
           @update-field="updateField"
           @update-hero="updateHero"
+          @update-lifecycle-status="updateLifecycleStatus"
         />
       </div>
     </div>
@@ -211,6 +217,10 @@ const updateField = (fieldName: ScalarFieldName, value: string): void => {
 
 const updateHero = (value: boolean): void => {
   form.is_hero = value;
+};
+
+const updateLifecycleStatus = (value: 'active' | 'deprecated'): void => {
+  form.lifecycle_status = value;
 };
 
 const updateReparseTemplate = (value: string): void => {

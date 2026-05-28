@@ -66,6 +66,16 @@ class ImportJobItem(TimestampedModel):
         default=None,
         null=True,
     )
+    warning_code: models.TextField[str | None, str | None] = models.TextField(
+        default=None,
+        null=True,
+        blank=True,
+    )
+    warning_message: models.TextField[str | None, str | None] = models.TextField(
+        default=None,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         db_table = "import_job_item"

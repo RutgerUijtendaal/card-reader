@@ -18,7 +18,7 @@ _REGISTERED_MODEL_MODULES = (
 
 if TYPE_CHECKING:
     from .base import now_utc
-    from .card import Card, CardAlias, CardMergeRedirect
+    from .card import Card, CardAlias, CardLifecycleStatus, CardMergeRedirect
     from .card_group import CardGroup, CardGroupMember
     from .card_version import CardVersion, CardVersionImage, ParseResult
     from .deck import Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility
@@ -44,6 +44,7 @@ _EXPORTS = {
     "ImportJobItem": ".import_job",
     "Card": ".card",
     "CardAlias": ".card",
+    "CardLifecycleStatus": ".card",
     "CardMergeRedirect": ".card",
     "CardGroup": ".card_group",
     "CardGroupMember": ".card_group",
@@ -75,6 +76,7 @@ __all__ = [
     "ImportJobItem",
     "Card",
     "CardAlias",
+    "CardLifecycleStatus",
     "CardMergeRedirect",
     "CardGroup",
     "CardGroupMember",

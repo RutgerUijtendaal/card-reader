@@ -46,6 +46,7 @@ export const useCardDetailState = () => {
     health: '',
     rules_text: '',
     is_hero: false,
+    lifecycle_status: 'active',
     keyword_ids: [],
     tag_ids: [],
     type_ids: [],
@@ -140,6 +141,7 @@ export const useCardDetailState = () => {
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
     form.is_hero = version.is_hero;
+    form.lifecycle_status = version.lifecycle_status ?? 'active';
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
@@ -458,6 +460,9 @@ const buildManualUpdatePayload = (
 
   if (form.is_hero !== version.is_hero) {
     updates.is_hero = form.is_hero;
+  }
+  if (form.lifecycle_status !== (version.lifecycle_status ?? 'active')) {
+    updates.lifecycle_status = form.lifecycle_status;
   }
 
   if (!sameIds(form.keyword_ids, version.keyword_ids)) {
