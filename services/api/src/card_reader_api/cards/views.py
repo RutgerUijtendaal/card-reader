@@ -214,14 +214,17 @@ class LatestCardVersionUpdateView(APIView):
         if not serializer.is_valid():
             return _serializer_error(serializer)
 
-        updated = update_latest_card_version(
-            card_id=card_id,
-            updates=serializer.validated_update_payload(),
-            restore_fields=serializer.validated_data["restore_fields"],
-            restore_metadata_groups=serializer.validated_data["restore_metadata_groups"],
-            unlock_fields=serializer.validated_data["unlock_fields"],
-            unlock_metadata_groups=serializer.validated_data["unlock_metadata_groups"],
-        )
+        try:
+            updated = update_latest_card_version(
+                card_id=card_id,
+                updates=serializer.validated_update_payload(),
+                restore_fields=serializer.validated_data["restore_fields"],
+                restore_metadata_groups=serializer.validated_data["restore_metadata_groups"],
+                unlock_fields=serializer.validated_data["unlock_fields"],
+                unlock_metadata_groups=serializer.validated_data["unlock_metadata_groups"],
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if updated is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
 

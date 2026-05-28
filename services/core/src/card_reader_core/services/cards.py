@@ -56,7 +56,7 @@ def get_card_with_image(card_id: str) -> tuple[Card | None, CardVersion | None, 
     card = get_card(card_id)
     if card is None:
         return None, None, None
-    version = get_latest_card_version(card_id)
+    version = get_latest_card_version(card.id)
     if version is None:
         return card, None, None
     image = get_card_image(version.id)

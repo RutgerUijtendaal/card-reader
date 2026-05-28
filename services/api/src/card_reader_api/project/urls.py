@@ -12,6 +12,7 @@ urlpatterns = [
     path("", include("card_reader_api.imports.urls")),
     path("", include("card_reader_api.cards.urls")),
     path("", include("card_reader_api.card_groups.urls")),
+    path("", include("card_reader_api.card_merges.urls")),
     path("", include("card_reader_api.decks.urls")),
     path("", include("card_reader_api.catalog.urls")),
     path("", include("card_reader_api.templates.urls")),

@@ -31,6 +31,14 @@
           <div class="theme-section-muted text-sm font-medium">
             <span>{{ versions.length }} versions</span>
           </div>
+          <button
+            class="btn-secondary inline-flex items-center gap-2"
+            type="button"
+            @click="openCardMerge"
+          >
+            <GitMerge class="h-4 w-4" />
+            <span>Merge/Rename</span>
+          </button>
         </template>
 
         <template v-if="hasGalleryContext">
@@ -132,8 +140,10 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { ChevronLeft, ChevronRight, SquarePen } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, GitMerge, SquarePen } from 'lucide-vue-next';
+import { useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import { buildAdminCardMergeLocation } from '@/modules/admin/adminRouteState';
 import { buildCardReturnLocation } from '@/modules/card-detail/cardReturnState';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
 import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
@@ -193,6 +203,8 @@ const {
   formatDate,
 } = useCardDetailState();
 
+const router = useRouter();
+
 const updateField = (fieldName: ScalarFieldName, value: string): void => {
   form[fieldName] = value;
 };
@@ -203,6 +215,11 @@ const updateHero = (value: boolean): void => {
 
 const updateReparseTemplate = (value: string): void => {
   reparseTemplateId.value = value;
+};
+
+const openCardMerge = (): void => {
+  if (!card.value) return;
+  void router.push(buildAdminCardMergeLocation(card.value.id, route.query));
 };
 
 onMounted(loadCard);

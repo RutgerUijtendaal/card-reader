@@ -18,6 +18,8 @@ class Card(TimestampedModel):
     if TYPE_CHECKING:
         anchored_groups: Manager[CardGroup]
         card_group_memberships: Manager[CardGroupMember]
+        aliases: Manager[CardAlias]
+        merge_redirects: Manager[CardMergeRedirect]
         hero_decks: Manager[Deck]
         deck_entries: Manager[DeckEntry]
         deck_sideboard_entries: Manager[DeckSideboardEntry]
@@ -38,5 +40,34 @@ class Card(TimestampedModel):
 
     class Meta:
         db_table = "card"
+
+
+class CardAlias(TimestampedModel):
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card: models.ForeignKey[Card, Card] = models.ForeignKey(
+        "Card",
+        on_delete=models.CASCADE,
+        related_name="aliases",
+        db_column="card_id",
+    )
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    label: models.TextField[str, str] = models.TextField(default="")
+
+    class Meta:
+        db_table = "card_alias"
+
+
+class CardMergeRedirect(TimestampedModel):
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    old_card_id: models.TextField[str, str] = models.TextField(db_index=True, unique=True)
+    target_card: models.ForeignKey[Card, Card] = models.ForeignKey(
+        "Card",
+        on_delete=models.CASCADE,
+        related_name="merge_redirects",
+        db_column="target_card_id",
+    )
+
+    class Meta:
+        db_table = "card_merge_redirect"
 
 

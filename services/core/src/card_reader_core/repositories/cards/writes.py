@@ -4,8 +4,9 @@ from pathlib import Path
 
 from django.db import transaction
 
-from card_reader_core.models import Card, CardVersion, ImportJobItem, ImportJobStatus, ParseResult, now_utc
+from card_reader_core.models import Card, CardAlias, CardVersion, ImportJobItem, ImportJobStatus, ParseResult, now_utc
 from card_reader_core.rule_text import render_enriched_rule_text
+from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
 
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
 from ..metadata_repository import (
@@ -92,7 +93,7 @@ def save_parsed_card(
                 type_suggestions=type_suggestions or [],
             )
 
-        card = Card.objects.filter(key=card_key).first()
+        card = resolve_card_by_name_key(parsed_name)
         if card is None:
             card = Card.objects.create(key=card_key, label=parsed_name)
 
@@ -179,21 +180,22 @@ def reparse_target_version(
         raise ValueError("Target card version does not belong to the requested card")
 
     reset_manual_state = version.template.key != template_id
-    return update_existing_version(
-        item,
-        version,
-        normalized_fields,
-        confidence,
-        raw_ocr,
-        keyword_ids=keyword_ids,
-        tag_ids=tag_ids,
-        type_ids=type_ids,
-        symbol_ids=symbol_ids,
-        tag_suggestions=tag_suggestions,
-        type_suggestions=type_suggestions,
-        template_id=template_id,
-        reset_manual_state=reset_manual_state,
-    )
+    with transaction.atomic():
+        return update_existing_version(
+            item,
+            version,
+            normalized_fields,
+            confidence,
+            raw_ocr,
+            keyword_ids=keyword_ids,
+            tag_ids=tag_ids,
+            type_ids=type_ids,
+            symbol_ids=symbol_ids,
+            tag_suggestions=tag_suggestions,
+            type_suggestions=type_suggestions,
+            template_id=template_id,
+            reset_manual_state=reset_manual_state,
+        )
 
 
 def update_latest_card_version(
@@ -284,8 +286,14 @@ def update_latest_card_version(
             apply_manual_rule_text(version, version.rules_text_enriched)
 
         if restored_name or "name" in updates:
+            next_key = normalize_slug_key(version.name)
+            conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
+            conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
+            if conflicting_card is not None or conflicting_alias is not None:
+                raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
+            ensure_card_alias(card=card, key=card.key, label=card.label)
             card.label = version.name
-            card.key = normalize_slug_key(version.name)
+            card.key = next_key
         if restored_name or "name" in updates or "is_hero" in updates:
             card.updated_at = now_utc()
             update_fields = ["updated_at"]
@@ -390,8 +398,14 @@ def update_existing_version(
         card.latest_version = version
         card.updated_at = now_utc()
         if version.name != previous_name or reset_manual_state:
+            next_key = normalize_slug_key(version.name)
+            conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
+            conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
+            if conflicting_card is not None or conflicting_alias is not None:
+                raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
+            ensure_card_alias(card=card, key=card.key, label=card.label)
             card.label = version.name
-            card.key = normalize_slug_key(version.name)
+            card.key = next_key
             update_fields = ["label", "key", *update_fields]
         card.save(update_fields=list(dict.fromkeys(update_fields)))
     mark_item_completed(item)
