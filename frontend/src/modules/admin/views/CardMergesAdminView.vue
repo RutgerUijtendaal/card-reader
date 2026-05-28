@@ -124,7 +124,10 @@
               <h4 class="theme-section-title text-sm font-semibold">
                 Selected Sources
               </h4>
-              <div v-if="sourceCards.length" class="mt-3 grid gap-2">
+              <div
+                v-if="sourceCards.length"
+                class="mt-3 grid gap-2"
+              >
                 <div
                   v-for="card in sourceCards"
                   :key="`selected-source-${card.id}`"
@@ -352,6 +355,8 @@ const loadPrefilledTarget = async (): Promise<void> => {
     const response = await api.get<CardListItem>(`/cards/${targetId}`);
     targetCard.value = response.data;
     targetSearch.value = response.data.name;
+    sourceCards.value = sourceCards.value.filter((source) => source.id !== response.data.id);
+    preview.value = null;
   } catch (error) {
     toast.error(extractErrorMessage(error, 'Failed to load preselected merge target.'));
   }

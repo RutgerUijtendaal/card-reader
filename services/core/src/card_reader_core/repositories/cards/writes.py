@@ -180,21 +180,22 @@ def reparse_target_version(
         raise ValueError("Target card version does not belong to the requested card")
 
     reset_manual_state = version.template.key != template_id
-    return update_existing_version(
-        item,
-        version,
-        normalized_fields,
-        confidence,
-        raw_ocr,
-        keyword_ids=keyword_ids,
-        tag_ids=tag_ids,
-        type_ids=type_ids,
-        symbol_ids=symbol_ids,
-        tag_suggestions=tag_suggestions,
-        type_suggestions=type_suggestions,
-        template_id=template_id,
-        reset_manual_state=reset_manual_state,
-    )
+    with transaction.atomic():
+        return update_existing_version(
+            item,
+            version,
+            normalized_fields,
+            confidence,
+            raw_ocr,
+            keyword_ids=keyword_ids,
+            tag_ids=tag_ids,
+            type_ids=type_ids,
+            symbol_ids=symbol_ids,
+            tag_suggestions=tag_suggestions,
+            type_suggestions=type_suggestions,
+            template_id=template_id,
+            reset_manual_state=reset_manual_state,
+        )
 
 
 def update_latest_card_version(

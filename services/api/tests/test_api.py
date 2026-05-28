@@ -3,6 +3,8 @@ from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
 from card_reader_core.repositories.cards_repository import get_latest_card_version, save_parsed_card  # noqa: E402
@@ -1425,6 +1427,42 @@ def test_card_merge_endpoints_require_staff() -> None:
     assert response.status_code == 403
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_merge_retargets_existing_redirect_chains() -> None:
+    first_card, _first_version = _create_editable_card_version(name="Redirect Chain First")
+    middle_card, _middle_version = _create_editable_card_version(name="Redirect Chain Middle")
+    final_card, _final_version = _create_editable_card_version(name="Redirect Chain Final")
+    username = "staff-card-merge-chain-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    first_payload = {"target_card_id": middle_card.id, "source_card_ids": [first_card.id]}
+    first_response = client.post(
+        "/admin/card-merges/apply",
+        data=first_payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert first_response.status_code == 200
+
+    second_payload = {"target_card_id": final_card.id, "source_card_ids": [middle_card.id]}
+    second_response = client.post(
+        "/admin/card-merges/apply",
+        data=second_payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert second_response.status_code == 200
+
+    assert CardMergeRedirect.objects.get(old_card_id=first_card.id).target_card_id == final_card.id
+    assert CardMergeRedirect.objects.get(old_card_id=middle_card.id).target_card_id == final_card.id
+    redirected_response = Client(HTTP_HOST="localhost").get(f"/cards/{first_card.id}")
+    assert redirected_response.status_code == 200
+    assert redirected_response.json()["id"] == final_card.id
+
+
 def test_import_uses_card_alias_for_renamed_card() -> None:
     target_card, target_version = _create_editable_card_version(name="Canonical Import Card")
     CardAlias.objects.create(card=target_card, key="old-import-card", label="Old Import Card")
@@ -1461,6 +1499,49 @@ def test_import_uses_card_alias_for_renamed_card() -> None:
     assert version.card_id == target_card.id
     assert version.version_number == target_version.version_number + 1
     assert get_latest_card_version(target_card.id).id == version.id
+
+
+def test_targeted_reparse_rolls_back_name_conflict() -> None:
+    card, version = _create_editable_card_version(name="Rollback Target")
+    _conflicting_card, _conflicting_version = _create_editable_card_version(name="Rollback Conflict")
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "rollback-target.png"),
+        template_id="mtg-like-v1",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "rollback-target.png"),
+        target_card=card,
+        target_card_version=version,
+    )
+    original_parse_result_count = ParseResult.objects.filter(card_version=version).count()
+
+    with pytest.raises(ValueError, match="Card name conflicts"):
+        save_parsed_card(
+            item=item,
+            template_id="mtg-like-v1",
+            checksum="rollback-conflict-checksum",
+            normalized_fields={
+                "name": "Rollback Conflict",
+                "type_line": "Changed Type",
+                "mana_cost": "9",
+                "rules_text": "Changed rules",
+                "rules_text_raw": "Changed rules",
+                "rules_text_enriched": "Changed rules",
+            },
+            confidence={"overall": 0.1},
+            raw_ocr={"changed": True},
+            reparse_existing=False,
+        )
+
+    version.refresh_from_db()
+    item.refresh_from_db()
+    assert version.name == "Rollback Target"
+    assert version.type_line == "Base Type"
+    assert version.mana_cost == "2"
+    assert item.status == "queued"
+    assert ParseResult.objects.filter(card_version=version).count() == original_parse_result_count
 
 
 def test_seed_users_creates_missing_configured_users(

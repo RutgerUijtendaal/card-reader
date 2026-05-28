@@ -136,6 +136,7 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
             old_card_id=source.id,
             defaults={"target_card": target},
         )
+    CardMergeRedirect.objects.filter(target_card_id__in=source_ids).update(target_card=target, updated_at=now_utc())
     Card.objects.filter(id__in=source_ids).delete()
     target.updated_at = now_utc()
     if target.latest_version is not None:
