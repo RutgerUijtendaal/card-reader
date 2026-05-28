@@ -257,7 +257,9 @@ export const normalizeCardFilterSelectionState = (
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
   normalizeCardFilterState({
     query: typeof query.q === 'string' ? query.q : '',
-    lifecycleStatus: 'active',
+    lifecycleStatus: normalizeLifecycleStatus(
+      typeof query.lifecycle_status === 'string' ? query.lifecycle_status : undefined,
+    ),
     keywordMatch: query.keyword_match === 'all' ? 'all' : 'any',
     tagMatch: query.tag_match === 'all' ? 'all' : 'any',
     typeMatch: query.type_match === 'all' ? 'all' : 'any',
@@ -290,6 +292,7 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   const query: LocationQueryRaw = {};
 
   if (normalized.query) query.q = normalized.query;
+  if (normalized.lifecycleStatus !== 'active') query.lifecycle_status = normalized.lifecycleStatus;
   if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
   if (normalized.tagMatch === 'all') query.tag_match = 'all';
   if (normalized.typeMatch === 'all') query.type_match = 'all';
@@ -446,6 +449,7 @@ export const buildCardFilterApiSearchParams = (
   const params = new URLSearchParams();
 
   if (payload.q) params.set('q', payload.q);
+  if (payload.lifecycle_status) params.set('lifecycle_status', payload.lifecycle_status);
   if (payload.keyword_ids) {
     payload.keyword_ids.forEach((id) => params.append('keyword_ids', id));
     params.set('keyword_match', payload.keyword_match ?? normalized.keywordMatch);
@@ -504,6 +508,7 @@ export const buildCardFilterApiPayload = (
   const payload: CardFilterApiPayload = {};
 
   if (normalized.query) payload.q = normalized.query;
+  if (normalized.lifecycleStatus !== 'active') payload.lifecycle_status = normalized.lifecycleStatus;
   if (normalized.keywordIds.length > 0) {
     payload.keyword_ids = normalized.keywordIds;
     payload.keyword_match = normalized.keywordMatch;

@@ -31,6 +31,10 @@ def list_card_groups_for_cards(card_ids: list[str]) -> list[CardGroup]:
     return list(_group_queryset().filter(members__card_id__in=card_ids).distinct())
 
 
+def card_is_group_anchor(card_id: str) -> bool:
+    return CardGroup.objects.filter(anchor_card_id=card_id).exists()
+
+
 def get_cards(card_ids: list[str]) -> dict[str, Card]:
     if not card_ids:
         return {}

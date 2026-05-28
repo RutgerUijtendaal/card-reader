@@ -10,16 +10,19 @@
       title-class="text-xl"
     >
       <template
-        v-if="card && (card.lifecycle_status === 'deprecated' || card.card_groups.length > 0)"
+        v-if="card?.lifecycle_status === 'deprecated'"
+        #titleMeta
+      >
+        <span class="theme-pill theme-pill-warning inline-flex px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+          Deprecated
+        </span>
+      </template>
+
+      <template
+        v-if="card && card.card_groups.length > 0"
         #details
       >
         <div class="flex flex-wrap gap-2">
-          <span
-            v-if="card.lifecycle_status === 'deprecated'"
-            class="theme-pill theme-pill-warning inline-flex px-3 py-1 text-xs font-semibold uppercase tracking-wide"
-          >
-            Deprecated
-          </span>
           <RouterLink
             v-for="group in card.card_groups"
             :key="group.id"
@@ -149,7 +152,7 @@ import { onMounted } from 'vue';
 import { ChevronLeft, ChevronRight, GitMerge, SquarePen } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
-import { buildAdminCardMergeLocation } from '@/modules/admin/adminRouteState';
+import { buildAdminCardMergeSourceLocation } from '@/modules/admin/adminRouteState';
 import { buildCardReturnLocation } from '@/modules/card-detail/cardReturnState';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
 import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
@@ -229,7 +232,7 @@ const updateReparseTemplate = (value: string): void => {
 
 const openCardMerge = (): void => {
   if (!card.value) return;
-  void router.push(buildAdminCardMergeLocation(card.value.id, route.query));
+  void router.push(buildAdminCardMergeSourceLocation(card.value.id, route.query));
 };
 
 onMounted(loadCard);

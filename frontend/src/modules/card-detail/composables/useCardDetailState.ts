@@ -159,7 +159,12 @@ export const useCardDetailState = () => {
       version.version_id === updated.version_id ? updated : version,
     );
     if (card.value) {
-      card.value = { ...card.value, name: updated.name, label: updated.name };
+      card.value = {
+        ...card.value,
+        name: updated.name,
+        label: updated.name,
+        lifecycle_status: updated.lifecycle_status,
+      };
     }
     selectedVersionId.value = updated.version_id;
     syncFormFromSelectedVersion();

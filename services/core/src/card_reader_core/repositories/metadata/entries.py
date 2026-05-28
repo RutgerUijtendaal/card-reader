@@ -298,6 +298,7 @@ def _list_latest_versions_for_detail(
 ) -> tuple[list[CardVersion], int]:
     versions = (
         CardVersion.objects.filter(is_latest=True, **{relation_filter: entry_id})
+        .filter(card__lifecycle_status="active")
         .select_related("card")
         .prefetch_related("images")
         .order_by("-updated_at")

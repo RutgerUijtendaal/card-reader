@@ -87,6 +87,8 @@ class CardGroupService:
             if fetched_anchor_card is None:
                 raise ValueError("Anchor card not found.")
             anchor_card = fetched_anchor_card
+            if anchor_card.lifecycle_status == "deprecated":
+                raise ValueError("Card group anchors cannot be deprecated.")
             existing_member_ids = [member.card.id for member in existing_group.members.all()]
             if anchor_card.id not in existing_member_ids:
                 raise ValueError("Anchor card must already be a member of the card group.")
@@ -133,6 +135,8 @@ class CardGroupService:
         anchor_card = cards_by_id.get(anchor_card_id)
         if anchor_card is None:
             raise ValueError("Anchor card not found.")
+        if anchor_card.lifecycle_status == "deprecated":
+            raise ValueError("Card group anchors cannot be deprecated.")
 
         ordered_without_anchor = [card_id for card_id in ordered_member_ids if card_id != anchor_card_id]
         normalized_name = self._normalize_name(name, anchor_card)

@@ -134,6 +134,7 @@ describe('cardFilterState adapters', () => {
   test('builds API params with UUID ids only', () => {
     const selection: CardFilterSelectionState = {
       query: '',
+      lifecycleStatus: 'deprecated',
       keywordMatch: 'all',
       tagMatch: 'all',
       typeMatch: 'any',
@@ -163,6 +164,7 @@ describe('cardFilterState adapters', () => {
     const params = buildCardFilterApiSearchParams(selection);
     const payload = buildCardFilterApiPayload(selection);
 
+    expect(params.get('lifecycle_status')).toBe('deprecated');
     expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
     expect(params.get('keyword_match')).toBe('all');
     expect(params.getAll('tag_ids')).toEqual(['tag-1']);
@@ -186,6 +188,7 @@ describe('cardFilterState adapters', () => {
     expect(params.get('mana_cost_max')).toBe('7');
     expect(params.getAll('keyword_keys')).toEqual([]);
     expect(payload).toMatchObject({
+      lifecycle_status: 'deprecated',
       keyword_ids: ['kw-1'],
       keyword_match: 'all',
       tag_ids: ['tag-1'],

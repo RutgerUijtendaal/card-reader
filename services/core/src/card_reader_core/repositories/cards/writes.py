@@ -8,6 +8,7 @@ from card_reader_core.models import Card, CardAlias, CardVersion, ImportJobItem,
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
 
+from ..card_groups import card_is_group_anchor
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
 from ..metadata import (
     SuggestionCandidate,
@@ -286,6 +287,8 @@ def update_latest_card_version(
             lifecycle_status = str(updates["lifecycle_status"])
             if lifecycle_status not in {"active", "deprecated"}:
                 raise ValueError("Invalid card lifecycle status.")
+            if lifecycle_status == "deprecated" and card_is_group_anchor(card.id):
+                raise ValueError("Card group anchors cannot be deprecated.")
             card.lifecycle_status = lifecycle_status
 
         if symbol_links_changed:

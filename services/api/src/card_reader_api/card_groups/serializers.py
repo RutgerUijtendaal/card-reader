@@ -9,12 +9,23 @@ from rest_framework.response import Response
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
 from card_reader_core.models import CardGroup, CardGroupMember
-from card_reader_core.repositories.cards import get_card_image
+from card_reader_core.repositories.cards import DEFAULT_CARD_LIFECYCLE_FILTER, CardLifecycleFilter, get_card_image
 from card_reader_core.services.cards import get_card_version_metadata
 
 
-def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
+def card_group_visible_members(group: CardGroup, lifecycle_status: CardLifecycleFilter) -> list[CardGroupMember]:
     members = list(group.members.all())
+    if lifecycle_status == "all":
+        return members
+    return [member for member in members if member.card.lifecycle_status == lifecycle_status]
+
+
+def card_group_gallery_payload(
+    group: CardGroup,
+    *,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+) -> dict[str, object]:
+    members = card_group_visible_members(group, lifecycle_status)
     anchor_card_id = group.anchor_card.id
     preview_cards = []
     for member in members[:3]:
@@ -44,10 +55,14 @@ def card_group_gallery_payload(group: CardGroup) -> dict[str, object]:
     }
 
 
-def card_group_detail_payload(group: CardGroup) -> dict[str, object]:
+def card_group_detail_payload(
+    group: CardGroup,
+    *,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+) -> dict[str, object]:
     anchor_card_id = group.anchor_card.id
     members_payload = []
-    for member in group.members.all():
+    for member in card_group_visible_members(group, lifecycle_status):
         version = member.card.latest_version
         if version is None:
             continue

@@ -288,6 +288,36 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
+    username = "staff-catalog-deprecated-links-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    _login_and_get_csrf_token(client, username, password)
+
+    keyword = Keyword.objects.create(
+        key="deprecated-only-keyword",
+        label="Deprecated Only Keyword",
+        identifiers_json=[],
+    )
+    deprecated_card, deprecated_version = _create_editable_card_version(name="Deprecated Catalog Link Card")
+    deprecated_card.lifecycle_status = "deprecated"
+    deprecated_card.save(update_fields=["lifecycle_status"])
+    replace_card_version_keywords(card_version_id=deprecated_version.id, keyword_ids=[keyword.id])
+
+    list_response = client.get("/admin/catalog")
+    detail_response = client.get(f"/admin/keywords/{keyword.id}")
+
+    assert list_response.status_code == 200
+    assert detail_response.status_code == 200
+    list_keyword = next(row for row in list_response.json()["known"]["keywords"] if row["id"] == keyword.id)
+    detail_payload = detail_response.json()
+    assert list_keyword["linked_card_count"] == 0
+    assert detail_payload["linked_card_count"] == 0
+    assert detail_payload["linked_cards"] == []
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_create_keyword_identifiers() -> None:
     username = "staff-keyword-alias-user"
     password = "password"
@@ -1106,6 +1136,33 @@ def test_cards_list_can_return_card_groups() -> None:
     assert member_card.id not in {row["id"] for row in card_rows}
 
 
+def test_grouped_gallery_hides_deprecated_linked_cards_by_default() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(name="Lifecycle Group Anchor")
+    deprecated_card, deprecated_version = _create_editable_card_version(name="Lifecycle Group Deprecated")
+    _create_card_image(anchor_version)
+    _create_card_image(deprecated_version)
+    deprecated_card.lifecycle_status = "deprecated"
+    deprecated_card.save(update_fields=["lifecycle_status"])
+    _create_card_group("lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card])
+
+    client = Client(HTTP_HOST="localhost")
+    default_response = client.get("/cards", {"show_groups": "true", "q": "Lifecycle Group", "page_size": 100})
+    all_response = client.get(
+        "/cards",
+        {"show_groups": "true", "q": "Lifecycle Group", "lifecycle_status": "all", "page_size": 100},
+    )
+
+    assert default_response.status_code == 200
+    assert all_response.status_code == 200
+    default_group = next(row for row in default_response.json()["results"] if row["result_type"] == "card_group")
+    all_group = next(row for row in all_response.json()["results"] if row["result_type"] == "card_group")
+    assert default_group["anchor_card_id"] == anchor_card.id
+    assert default_group["member_count"] == 1
+    assert [row["card_id"] for row in default_group["preview_cards"]] == [anchor_card.id]
+    assert all_group["member_count"] == 2
+    assert [row["card_id"] for row in all_group["preview_cards"]] == [anchor_card.id, deprecated_card.id]
+
+
 def test_cards_list_rejects_unknown_sort() -> None:
     response = Client(HTTP_HOST="localhost").get("/cards", {"sort": "unknown"})
 
@@ -1301,6 +1358,111 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     assert group_payload["id"] == group.id
     assert [member["card"]["id"] for member in group_payload["members"]] == [anchor_card.id, member_card.id]
     assert group_payload["members"][0]["is_anchor"] is True
+
+
+def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(name="Detail Lifecycle Anchor")
+    deprecated_card, deprecated_version = _create_editable_card_version(name="Detail Lifecycle Deprecated")
+    _create_card_image(anchor_version)
+    _create_card_image(deprecated_version)
+    deprecated_card.lifecycle_status = "deprecated"
+    deprecated_card.save(update_fields=["lifecycle_status"])
+    group = _create_card_group("detail-lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card])
+
+    client = Client(HTTP_HOST="localhost")
+    default_response = client.get(f"/card-groups/{group.id}")
+    all_response = client.get(f"/card-groups/{group.id}", {"lifecycle_status": "all"})
+
+    assert default_response.status_code == 200
+    assert all_response.status_code == 200
+    assert default_response.json()["member_count"] == 1
+    assert [member["card"]["id"] for member in default_response.json()["members"]] == [anchor_card.id]
+    assert all_response.json()["member_count"] == 2
+    assert [member["card"]["id"] for member in all_response.json()["members"]] == [
+        anchor_card.id,
+        deprecated_card.id,
+    ]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_group_anchor_cannot_be_deprecated() -> None:
+    username = "staff-anchor-lifecycle-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    anchor_card, anchor_version = _create_editable_card_version(name="Lifecycle Anchor Active")
+    member_card, member_version = _create_editable_card_version(name="Lifecycle Anchor Member")
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    _create_card_group("lifecycle-anchor-guard", anchor_card=anchor_card, members=[anchor_card, member_card])
+
+    response = client.patch(
+        f"/cards/{anchor_card.id}/latest-version",
+        data={"lifecycle_status": "deprecated"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Card group anchors cannot be deprecated."
+    anchor_card.refresh_from_db()
+    assert anchor_card.lifecycle_status == "active"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_group_management_rejects_deprecated_anchor_but_allows_deprecated_member() -> None:
+    username = "staff-deprecated-anchor-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    active_anchor, _active_version = _create_editable_card_version(name="Group Active Anchor")
+    active_member, _member_version = _create_editable_card_version(name="Group Active Member")
+    deprecated_card, _deprecated_version = _create_editable_card_version(name="Group Deprecated Candidate")
+    deprecated_card.lifecycle_status = "deprecated"
+    deprecated_card.save(update_fields=["lifecycle_status"])
+
+    deprecated_member_response = client.post(
+        "/admin/card-groups",
+        data={
+            "name": "Deprecated Member Allowed",
+            "anchor_card_id": active_anchor.id,
+            "members": [
+                {"card_id": active_anchor.id, "position": 1},
+                {"card_id": deprecated_card.id, "position": 2},
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    deprecated_anchor_response = client.post(
+        "/admin/card-groups",
+        data={
+            "name": "Deprecated Anchor Rejected",
+            "anchor_card_id": deprecated_card.id,
+            "members": [
+                {"card_id": deprecated_card.id, "position": 1},
+                {"card_id": active_member.id, "position": 2},
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    update_anchor_response = client.patch(
+        f"/admin/card-groups/{deprecated_member_response.json()['id']}",
+        data={"anchor_card_id": deprecated_card.id},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert deprecated_member_response.status_code == 200
+    assert deprecated_anchor_response.status_code == 400
+    assert update_anchor_response.status_code == 400
+    assert deprecated_anchor_response.json()["detail"] == "Card group anchors cannot be deprecated."
+    assert update_anchor_response.json()["detail"] == "Card group anchors cannot be deprecated."
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

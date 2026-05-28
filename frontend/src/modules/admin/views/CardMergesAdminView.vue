@@ -250,7 +250,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { api } from '@/api/client';
-import { parseAdminMergeTargetId } from '@/modules/admin/adminRouteState';
+import { parseAdminMergeSourceId, parseAdminMergeTargetId } from '@/modules/admin/adminRouteState';
 import type { CardMergeApplyResponse, CardMergePreview } from '@/modules/admin/types';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 import { useAdminRouteSync } from '@/modules/admin/composables/useAdminRouteSync';
@@ -362,6 +362,23 @@ const loadPrefilledTarget = async (): Promise<void> => {
   }
 };
 
+const loadPrefilledSource = async (): Promise<void> => {
+  const sourceId = parseAdminMergeSourceId(route.query);
+  if (!sourceId || sourceCards.value.some((source) => source.id === sourceId)) return;
+  try {
+    const response = await api.get<CardListItem>(`/cards/${sourceId}`);
+    addSource(response.data);
+    sourceSearch.value = response.data.name;
+  } catch (error) {
+    toast.error(extractErrorMessage(error, 'Failed to load preselected merge source.'));
+  }
+};
+
+const loadPrefilledCards = async (): Promise<void> => {
+  await loadPrefilledTarget();
+  await loadPrefilledSource();
+};
+
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (typeof error === 'object' && error && 'response' in error) {
     const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
@@ -371,6 +388,6 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-onMounted(loadPrefilledTarget);
-watch(() => route.query, loadPrefilledTarget);
+onMounted(loadPrefilledCards);
+watch(() => route.query, loadPrefilledCards);
 </script>
