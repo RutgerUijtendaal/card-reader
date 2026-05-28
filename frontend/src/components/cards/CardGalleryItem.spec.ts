@@ -94,10 +94,10 @@ describe('CardGalleryItem', () => {
     mounted.unmount();
   });
 
-  test('renders the card skeleton behind the no-image fallback for real cards', async () => {
+  test('renders the card skeleton as the no-image fallback for real cards', async () => {
     const mounted = await mountCardGalleryItem(buildCard());
 
-    expect(mounted.container.textContent).toContain('No image');
+    expect(mounted.container.textContent).not.toContain('No image');
     expect(mounted.container.querySelector('.theme-card-loading-shim')).not.toBeNull();
     expect(mounted.container.querySelector('a,button')).not.toBeNull();
 

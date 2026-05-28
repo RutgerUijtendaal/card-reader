@@ -31,7 +31,7 @@
             />
             <div class="theme-card-image-well relative h-full overflow-hidden rounded-2xl">
               <CardLoadingSkeleton
-                v-if="!groupImageLoaded"
+                v-if="!groupImageLoaded || !stackCards[0]?.image_url"
                 class="absolute inset-0"
               />
               <img
@@ -45,12 +45,6 @@
                 @load="groupImageLoaded = true"
                 @error="groupImageLoaded = true"
               >
-              <div
-                v-else
-                class="theme-section-muted flex h-full items-center justify-center text-sm"
-              >
-                No image
-              </div>
               <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/88 via-slate-950/42 to-transparent p-4">
                 <div class="inline-flex max-w-[85%] flex-col gap-1 rounded-2xl border border-white/14 bg-slate-950/42 px-3 py-2 shadow-lg backdrop-blur-md">
                   <p class="text-sm font-semibold tracking-tight text-white drop-shadow-[0_1px_2px_rgba(15,23,42,0.85)]">
@@ -70,7 +64,7 @@
             :style="{ aspectRatio: DEFAULT_CARD_ASPECT_RATIO }"
           >
             <CardLoadingSkeleton
-              v-if="!cardImageLoaded"
+              v-if="!cardImageLoaded || !cardItem?.image_url"
               class="absolute inset-0"
             />
             <img
@@ -84,12 +78,6 @@
               @load="cardImageLoaded = true"
               @error="cardImageLoaded = true"
             >
-            <div
-              v-else
-              class="theme-empty-state absolute inset-0 flex items-center justify-center rounded-xl text-sm"
-            >
-              No image
-            </div>
           </div>
         </template>
       </component>
