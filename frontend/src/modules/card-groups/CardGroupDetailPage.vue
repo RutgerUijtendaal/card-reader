@@ -91,11 +91,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
+import {
+  DEFAULT_CARD_LIFECYCLE_FILTER,
+  normalizeCardLifecycleFilterValue,
+} from '@/modules/card-filters/cardFilterState';
 import { buildGalleryLocation, useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
 import type { CardFiltersResponse, CardGroupDetail, SymbolLookupMap } from '@/modules/card-detail/types';
 
@@ -104,11 +108,20 @@ const router = useRouter();
 const group = ref<CardGroupDetail | null>(null);
 const symbolByKey = ref<SymbolLookupMap>({});
 const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
+const groupLifecycleStatus = computed(() => normalizeCardLifecycleFilterValue(route.query.lifecycle_status));
+const groupRequestParams = computed(() =>
+  groupLifecycleStatus.value === DEFAULT_CARD_LIFECYCLE_FILTER
+    ? undefined
+    : { lifecycle_status: groupLifecycleStatus.value },
+);
 
 const loadGroup = async (): Promise<void> => {
   const groupId = String(route.params.id);
   const [groupResponse, filtersResponse] = await Promise.all([
-    api.get<CardGroupDetail>(`/card-groups/${groupId}`),
+    api.get<CardGroupDetail>(
+      `/card-groups/${groupId}`,
+      groupRequestParams.value ? { params: groupRequestParams.value } : undefined,
+    ),
     api.get<CardFiltersResponse>('/cards/filters'),
   ]);
   group.value = groupResponse.data;
@@ -129,7 +142,7 @@ const formatDate = (value: string): string => {
   return date.toLocaleDateString();
 };
 
-watch(() => route.params.id, loadGroup);
+watch(() => [route.params.id, route.query.lifecycle_status], loadGroup);
 onMounted(loadGroup);
 
 const {

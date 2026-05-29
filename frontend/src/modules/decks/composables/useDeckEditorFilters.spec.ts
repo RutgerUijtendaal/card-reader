@@ -33,7 +33,17 @@ describe('useDeckEditorFilters', () => {
     const params = controller.buildSearchParams();
 
     expect(params.get('q')).toBe('mage');
+    expect(params.get('lifecycle_status')).toBe('all');
     expect(params.getAll('card_ids')).toEqual(['card-a', 'card-b']);
+  });
+
+  test('does not add lifecycle override when current deck only is inactive', () => {
+    const controller = useDeckEditorFilters({
+      deckCardIds: ref(['card-a']),
+      builderStep: ref<BuilderStep>('build'),
+    });
+
+    expect(controller.buildSearchParams().get('lifecycle_status')).toBeNull();
   });
 
   test('uses an empty-deck sentinel when current deck only is enabled without cards', () => {
@@ -44,6 +54,7 @@ describe('useDeckEditorFilters', () => {
 
     controller.setCurrentDeckOnly(true);
 
+    expect(controller.buildSearchParams().get('lifecycle_status')).toBe('all');
     expect(controller.buildSearchParams().getAll('card_ids')).toEqual(['__deck-builder-empty__']);
   });
 
@@ -71,8 +82,10 @@ describe('useDeckEditorFilters', () => {
 
     controller.setCurrentDeckOnly(true);
     expect(controller.buildSearchParams().getAll('card_ids')).toEqual(['card-a']);
+    expect(controller.buildSearchParams().get('lifecycle_status')).toBe('all');
 
     builderStep.value = 'setup';
+    expect(controller.buildSearchParams().get('lifecycle_status')).toBeNull();
     expect(controller.buildSearchParams().getAll('card_ids')).toEqual([]);
   });
 

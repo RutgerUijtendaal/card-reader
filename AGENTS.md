@@ -136,6 +136,9 @@ Targeted commands:
 - Web: `pnpm --filter @card-reader/web dev`
 - Integration tests: `pnpm --filter @card-reader/integration test`
 
+Local app URL:
+- Use `http://localhost:8888` to reach the running web app in the local desktop environment.
+
 ## Coding Standards
 - Python:
   - dependency/runtime via `uv`

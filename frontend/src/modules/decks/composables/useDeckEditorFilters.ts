@@ -1,6 +1,9 @@
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { computed, ref, type Ref } from 'vue';
-import { buildCardFilterApiSearchParams } from '@/modules/card-filters/cardFilterState';
+import {
+  buildCardFilterApiSearchParams,
+  MANAGEMENT_CARD_LIFECYCLE_FILTER,
+} from '@/modules/card-filters/cardFilterState';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
 import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
 import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
@@ -108,7 +111,11 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
     buildSearchParams: () => appendCardSortSearchParam(
       (() => {
         const params = buildCardFilterApiSearchParams(filterController.selectionState.value);
-        currentDeckCardIds.value.forEach((cardId) => params.append('card_ids', cardId));
+        const cardIds = currentDeckCardIds.value;
+        if (cardIds.length > 0) {
+          params.set('lifecycle_status', MANAGEMENT_CARD_LIFECYCLE_FILTER);
+        }
+        cardIds.forEach((cardId) => params.append('card_ids', cardId));
         return params;
       })(),
       effectiveSort.value,

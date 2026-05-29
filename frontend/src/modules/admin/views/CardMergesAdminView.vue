@@ -5,160 +5,153 @@
         Card Merges
       </h3>
       <p class="theme-section-muted text-sm">
-        Merge renamed duplicate cards into one canonical card while preserving aliases and version history.
+        Merge one duplicate card into one canonical card while preserving aliases and version history.
       </p>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div class="app-scrollbar min-h-0 space-y-4 overflow-y-auto pr-1">
-        <section class="theme-muted-panel p-4">
-          <div class="grid gap-4 lg:grid-cols-2">
-            <div class="space-y-3">
-              <div>
-                <h4 class="theme-section-title text-sm font-semibold">
-                  Target Card
-                </h4>
-                <p class="theme-section-muted text-xs">
-                  The card that keeps the canonical identity and latest version.
-                </p>
-              </div>
-              <label class="field-label">
-                Search target
-                <input
-                  v-model="targetSearch"
-                  class="input-base"
-                  placeholder="Search card name"
-                  @keyup.enter="searchTargets"
-                >
-              </label>
-              <button
-                class="btn-secondary"
-                type="button"
-                :disabled="searchingTargets"
-                @click="searchTargets"
-              >
-                {{ searchingTargets ? 'Searching...' : 'Search Target' }}
-              </button>
-              <div class="grid gap-2">
-                <button
-                  v-for="card in targetResults"
-                  :key="`target-${card.id}`"
-                  class="theme-card-frame-muted rounded-xl px-3 py-2 text-left"
-                  type="button"
-                  @click="selectTarget(card)"
-                >
-                  <span class="theme-section-title block text-sm font-semibold">{{ card.name }}</span>
-                  <span class="theme-section-muted text-xs">{{ card.id }}</span>
-                </button>
-              </div>
-            </div>
+      <div class="app-scrollbar grid min-h-0 gap-4 overflow-y-auto pr-1 xl:grid-cols-[minmax(14rem,1fr)_auto_minmax(14rem,1fr)] xl:items-stretch">
+        <div class="theme-panel-shell flex min-h-[32rem] flex-col space-y-5 p-4 xl:min-h-0">
+          <div class="theme-card-frame-muted rounded-xl p-3">
+            <h4 class="theme-section-title text-lg font-semibold">
+              Source Card
+            </h4>
+            <p class="theme-section-muted mt-1 text-sm">
+              This duplicate card will be folded into the target history.
+            </p>
+          </div>
 
-            <div class="space-y-3">
-              <div>
-                <h4 class="theme-section-title text-sm font-semibold">
-                  Source Cards
-                </h4>
-                <p class="theme-section-muted text-xs">
-                  These duplicate cards will be folded into the target history.
+          <div class="mx-auto w-full max-w-[22rem]">
+            <CardSearchSelect
+              label="Search source"
+              placeholder="Search duplicate card"
+              :disabled-card-ids="targetCard ? [targetCard.id] : []"
+              disabled-action-label="Target"
+              @select="selectSource"
+            />
+          </div>
+
+          <div class="mx-auto w-full max-w-[22rem]">
+            <div class="theme-card-frame relative aspect-[63/88] rounded-2xl">
+              <template v-if="sourceCard">
+                <img
+                  v-if="sourceCard.image_url"
+                  :src="toAbsoluteApiUrl(sourceCard.image_url)"
+                  :alt="sourceCard.name"
+                  class="h-full w-full object-contain"
+                >
+                <CardLoadingSkeleton
+                  v-else
+                  :animated="false"
+                />
+                <span
+                  v-if="sourceCard.lifecycle_status === 'deprecated'"
+                  class="theme-pill theme-pill-warning absolute left-3 top-3 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                >
+                  Deprecated
+                </span>
+              </template>
+              <CardLoadingSkeleton
+                v-else
+                :animated="false"
+              />
+            </div>
+            <div
+              v-if="sourceCard"
+              class="mt-3 flex items-center justify-between gap-3"
+            >
+              <div class="min-w-0">
+                <p class="theme-section-title truncate text-sm font-semibold">
+                  {{ sourceCard.name }}
+                </p>
+                <p class="theme-section-muted truncate text-xs">
+                  {{ sourceCard.label }}
                 </p>
               </div>
-              <label class="field-label">
-                Search source
-                <input
-                  v-model="sourceSearch"
-                  class="input-base"
-                  placeholder="Search old card name"
-                  @keyup.enter="searchSources"
-                >
-              </label>
               <button
-                class="btn-secondary"
+                class="btn-secondary h-8 px-3 text-xs"
                 type="button"
-                :disabled="searchingSources"
-                @click="searchSources"
+                @click="clearSource"
               >
-                {{ searchingSources ? 'Searching...' : 'Search Sources' }}
+                Clear
               </button>
-              <div class="grid gap-2">
-                <button
-                  v-for="card in sourceResults"
-                  :key="`source-${card.id}`"
-                  class="theme-card-frame-muted rounded-xl px-3 py-2 text-left"
-                  type="button"
-                  :disabled="card.id === targetCard?.id || sourceCards.some((source) => source.id === card.id)"
-                  @click="addSource(card)"
-                >
-                  <span class="theme-section-title block text-sm font-semibold">{{ card.name }}</span>
-                  <span class="theme-section-muted text-xs">{{ card.id }}</span>
-                </button>
-              </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section class="theme-muted-panel p-4">
-          <div class="grid gap-4 lg:grid-cols-2">
-            <div>
-              <h4 class="theme-section-title text-sm font-semibold">
-                Selected Target
-              </h4>
-              <div
-                v-if="targetCard"
-                class="theme-card-frame-muted mt-3 rounded-xl px-3 py-2"
-              >
-                <p class="theme-section-title text-sm font-semibold">
+        <div class="flex min-h-24 items-center justify-center xl:min-h-0">
+          <div class="theme-card-frame-muted theme-section-title flex h-14 w-14 items-center justify-center rounded-full">
+            <ArrowRight class="h-6 w-6" />
+          </div>
+        </div>
+
+        <div class="theme-panel-shell flex min-h-[32rem] flex-col space-y-5 p-4 xl:min-h-0">
+          <div class="theme-card-frame-muted rounded-xl p-3">
+            <h4 class="theme-section-title text-lg font-semibold">
+              Target Card
+            </h4>
+            <p class="theme-section-muted mt-1 text-sm">
+              This card keeps the canonical identity and latest version.
+            </p>
+          </div>
+
+          <div class="mx-auto w-full max-w-[22rem]">
+            <CardSearchSelect
+              label="Search target"
+              placeholder="Search canonical card"
+              :disabled-card-ids="sourceCard ? [sourceCard.id] : []"
+              disabled-action-label="Source"
+              @select="selectTarget"
+            />
+          </div>
+
+          <div class="mx-auto w-full max-w-[22rem]">
+            <div class="theme-card-frame relative aspect-[63/88] rounded-2xl">
+              <template v-if="targetCard">
+                <img
+                  v-if="targetCard.image_url"
+                  :src="toAbsoluteApiUrl(targetCard.image_url)"
+                  :alt="targetCard.name"
+                  class="h-full w-full object-contain"
+                >
+                <CardLoadingSkeleton
+                  v-else
+                  :animated="false"
+                />
+                <span
+                  v-if="targetCard.lifecycle_status === 'deprecated'"
+                  class="theme-pill theme-pill-warning absolute left-3 top-3 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                >
+                  Deprecated
+                </span>
+              </template>
+              <CardLoadingSkeleton
+                v-else
+                :animated="false"
+              />
+            </div>
+            <div
+              v-if="targetCard"
+              class="mt-3 flex items-center justify-between gap-3"
+            >
+              <div class="min-w-0">
+                <p class="theme-section-title truncate text-sm font-semibold">
                   {{ targetCard.name }}
                 </p>
-                <p class="theme-section-muted text-xs">
-                  {{ targetCard.id }}
+                <p class="theme-section-muted truncate text-xs">
+                  {{ targetCard.label }}
                 </p>
               </div>
-              <p
-                v-else
-                class="theme-empty-state mt-3"
+              <button
+                class="btn-secondary h-8 px-3 text-xs"
+                type="button"
+                @click="clearTarget"
               >
-                No target selected.
-              </p>
-            </div>
-            <div>
-              <h4 class="theme-section-title text-sm font-semibold">
-                Selected Sources
-              </h4>
-              <div
-                v-if="sourceCards.length"
-                class="mt-3 grid gap-2"
-              >
-                <div
-                  v-for="card in sourceCards"
-                  :key="`selected-source-${card.id}`"
-                  class="theme-card-frame-muted flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-                >
-                  <div>
-                    <p class="theme-section-title text-sm font-semibold">
-                      {{ card.name }}
-                    </p>
-                    <p class="theme-section-muted text-xs">
-                      {{ card.id }}
-                    </p>
-                  </div>
-                  <button
-                    class="btn-secondary h-8"
-                    type="button"
-                    @click="removeSource(card.id)"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-              <p
-                v-if="sourceCards.length === 0"
-                class="theme-empty-state mt-3"
-              >
-                No source cards selected.
-              </p>
+                Clear
+              </button>
             </div>
           </div>
-        </section>
+        </div>
       </div>
 
       <aside class="theme-muted-panel app-scrollbar min-h-0 overflow-y-auto p-4">
@@ -239,7 +232,7 @@
           v-else
           class="theme-section-muted mt-4 text-sm"
         >
-          Select a target and at least one source card, then preview before applying.
+          Select one source card and one target card, then preview before applying.
         </p>
       </aside>
     </div>
@@ -248,79 +241,58 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { ArrowRight } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
-import { api } from '@/api/client';
+import { api, toAbsoluteApiUrl } from '@/api/client';
+import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
+import CardSearchSelect from '@/components/cards/CardSearchSelect.vue';
 import { parseAdminMergeSourceId, parseAdminMergeTargetId } from '@/modules/admin/adminRouteState';
 import type { CardMergeApplyResponse, CardMergePreview } from '@/modules/admin/types';
-import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
+import type { CardListItem } from '@/modules/card-detail/types';
 import { useAdminRouteSync } from '@/modules/admin/composables/useAdminRouteSync';
 
 const { route } = useAdminRouteSync();
-const targetSearch = ref('');
-const sourceSearch = ref('');
-const targetResults = ref<CardListItem[]>([]);
-const sourceResults = ref<CardListItem[]>([]);
 const targetCard = ref<CardListItem | null>(null);
-const sourceCards = ref<CardListItem[]>([]);
+const sourceCard = ref<CardListItem | null>(null);
 const preview = ref<CardMergePreview | null>(null);
-const searchingTargets = ref(false);
-const searchingSources = ref(false);
 const previewing = ref(false);
 const applying = ref(false);
 
-const canPreview = computed(() => targetCard.value !== null && sourceCards.value.length > 0);
-
-const searchCards = async (query: string): Promise<CardListItem[]> => {
-  const response = await api.get<PaginatedCardsResponse<CardListItem>>('/cards', {
-    params: { q: query, lifecycle_status: 'all', page: 1, page_size: 8 },
-  });
-  return response.data.results.filter((item): item is CardListItem => item.result_type === 'card');
-};
-
-const searchTargets = async (): Promise<void> => {
-  searchingTargets.value = true;
-  try {
-    targetResults.value = await searchCards(targetSearch.value);
-  } finally {
-    searchingTargets.value = false;
-  }
-};
-
-const searchSources = async (): Promise<void> => {
-  searchingSources.value = true;
-  try {
-    sourceResults.value = await searchCards(sourceSearch.value);
-  } finally {
-    searchingSources.value = false;
-  }
-};
+const canPreview = computed(() => targetCard.value !== null && sourceCard.value !== null);
 
 const selectTarget = (card: CardListItem): void => {
   targetCard.value = card;
-  sourceCards.value = sourceCards.value.filter((source) => source.id !== card.id);
-  preview.value = null;
-};
-
-const addSource = (card: CardListItem): void => {
-  if (targetCard.value?.id === card.id || sourceCards.value.some((source) => source.id === card.id)) {
-    return;
+  if (sourceCard.value?.id === card.id) {
+    sourceCard.value = null;
   }
-  sourceCards.value = [...sourceCards.value, card];
   preview.value = null;
 };
 
-const removeSource = (cardId: string): void => {
-  sourceCards.value = sourceCards.value.filter((source) => source.id !== cardId);
+const selectSource = (card: CardListItem): void => {
+  sourceCard.value = card;
+  if (targetCard.value?.id === card.id) {
+    targetCard.value = null;
+  }
+  preview.value = null;
+};
+
+const clearTarget = (): void => {
+  targetCard.value = null;
+  preview.value = null;
+};
+
+const clearSource = (): void => {
+  sourceCard.value = null;
   preview.value = null;
 };
 
 const previewMerge = async (): Promise<void> => {
-  if (!targetCard.value || sourceCards.value.length === 0) return;
+  if (!targetCard.value || !sourceCard.value) return;
   previewing.value = true;
   try {
     const response = await api.post<CardMergePreview>('/admin/card-merges/preview', {
       target_card_id: targetCard.value.id,
-      source_card_ids: sourceCards.value.map((card) => card.id),
+      source_card_ids: [sourceCard.value.id],
     });
     preview.value = response.data;
   } catch (error) {
@@ -331,16 +303,16 @@ const previewMerge = async (): Promise<void> => {
 };
 
 const applyMerge = async (): Promise<void> => {
-  if (!targetCard.value || sourceCards.value.length === 0 || !preview.value?.can_apply) return;
+  if (!targetCard.value || !sourceCard.value || !preview.value?.can_apply) return;
   applying.value = true;
   try {
     const response = await api.post<CardMergeApplyResponse>('/admin/card-merges/apply', {
       target_card_id: targetCard.value.id,
-      source_card_ids: sourceCards.value.map((card) => card.id),
+      source_card_ids: [sourceCard.value.id],
     });
     toast.success(response.data.message);
     preview.value = response.data.preview;
-    sourceCards.value = [];
+    sourceCard.value = null;
   } catch (error) {
     toast.error(extractErrorMessage(error, 'Failed to apply card merge.'));
   } finally {
@@ -353,10 +325,7 @@ const loadPrefilledTarget = async (): Promise<void> => {
   if (!targetId || targetCard.value?.id === targetId) return;
   try {
     const response = await api.get<CardListItem>(`/cards/${targetId}`);
-    targetCard.value = response.data;
-    targetSearch.value = response.data.name;
-    sourceCards.value = sourceCards.value.filter((source) => source.id !== response.data.id);
-    preview.value = null;
+    selectTarget(response.data);
   } catch (error) {
     toast.error(extractErrorMessage(error, 'Failed to load preselected merge target.'));
   }
@@ -364,11 +333,10 @@ const loadPrefilledTarget = async (): Promise<void> => {
 
 const loadPrefilledSource = async (): Promise<void> => {
   const sourceId = parseAdminMergeSourceId(route.query);
-  if (!sourceId || sourceCards.value.some((source) => source.id === sourceId)) return;
+  if (!sourceId || sourceCard.value?.id === sourceId) return;
   try {
     const response = await api.get<CardListItem>(`/cards/${sourceId}`);
-    addSource(response.data);
-    sourceSearch.value = response.data.name;
+    selectSource(response.data);
   } catch (error) {
     toast.error(extractErrorMessage(error, 'Failed to load preselected merge source.'));
   }

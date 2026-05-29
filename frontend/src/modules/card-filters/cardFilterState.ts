@@ -107,10 +107,19 @@ export type CardFilterApiPayload = {
 
 export type CardLifecycleStatus = 'active' | 'deprecated';
 export type CardLifecycleFilterValue = CardLifecycleStatus | 'all';
+export const DEFAULT_CARD_LIFECYCLE_FILTER: CardLifecycleFilterValue = 'active';
+export const MANAGEMENT_CARD_LIFECYCLE_FILTER: CardLifecycleFilterValue = 'all';
+
+export const normalizeCardLifecycleFilterValue = (value: unknown): CardLifecycleFilterValue =>
+  value === 'deprecated' || value === 'all' ? value : DEFAULT_CARD_LIFECYCLE_FILTER;
+
+export const managementCardSearchLifecycleParams = (): Pick<CardFilterApiPayload, 'lifecycle_status'> => ({
+  lifecycle_status: MANAGEMENT_CARD_LIFECYCLE_FILTER,
+});
 
 export const createEmptyCardFilterState = (): CardFilterState => ({
   query: '',
-  lifecycleStatus: 'active',
+  lifecycleStatus: DEFAULT_CARD_LIFECYCLE_FILTER,
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
@@ -140,7 +149,7 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
 
 export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState => ({
   query: '',
-  lifecycleStatus: 'active',
+  lifecycleStatus: DEFAULT_CARD_LIFECYCLE_FILTER,
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
@@ -180,9 +189,6 @@ const normalizeStringArray = (values: readonly string[]): string[] =>
     left.localeCompare(right),
   );
 
-const normalizeLifecycleStatus = (value: string | undefined): CardLifecycleFilterValue =>
-  value === 'deprecated' || value === 'all' ? value : 'active';
-
 const readQueryValues = (
   value: LocationQueryValue | LocationQueryValue[] | readonly LocationQueryValue[] | null | undefined,
 ): string[] => {
@@ -194,7 +200,7 @@ const readQueryValues = (
 
 export const normalizeCardFilterState = (state: CardFilterState): CardFilterState => ({
   query: normalizeStringValue(state.query),
-  lifecycleStatus: normalizeLifecycleStatus(state.lifecycleStatus),
+  lifecycleStatus: normalizeCardLifecycleFilterValue(state.lifecycleStatus),
   keywordMatch: state.keywordMatch === 'all' ? 'all' : 'any',
   tagMatch: state.tagMatch === 'all' ? 'all' : 'any',
   typeMatch: state.typeMatch === 'all' ? 'all' : 'any',
@@ -226,7 +232,7 @@ export const normalizeCardFilterSelectionState = (
   state: CardFilterSelectionState,
 ): CardFilterSelectionState => ({
   query: normalizeStringValue(state.query),
-  lifecycleStatus: normalizeLifecycleStatus(state.lifecycleStatus),
+  lifecycleStatus: normalizeCardLifecycleFilterValue(state.lifecycleStatus),
   keywordMatch: state.keywordMatch === 'all' ? 'all' : 'any',
   tagMatch: state.tagMatch === 'all' ? 'all' : 'any',
   typeMatch: state.typeMatch === 'all' ? 'all' : 'any',
@@ -257,7 +263,7 @@ export const normalizeCardFilterSelectionState = (
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
   normalizeCardFilterState({
     query: typeof query.q === 'string' ? query.q : '',
-    lifecycleStatus: normalizeLifecycleStatus(
+    lifecycleStatus: normalizeCardLifecycleFilterValue(
       typeof query.lifecycle_status === 'string' ? query.lifecycle_status : undefined,
     ),
     keywordMatch: query.keyword_match === 'all' ? 'all' : 'any',
@@ -292,7 +298,7 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   const query: LocationQueryRaw = {};
 
   if (normalized.query) query.q = normalized.query;
-  if (normalized.lifecycleStatus !== 'active') query.lifecycle_status = normalized.lifecycleStatus;
+  if (normalized.lifecycleStatus !== DEFAULT_CARD_LIFECYCLE_FILTER) query.lifecycle_status = normalized.lifecycleStatus;
   if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
   if (normalized.tagMatch === 'all') query.tag_match = 'all';
   if (normalized.typeMatch === 'all') query.type_match = 'all';
@@ -508,7 +514,7 @@ export const buildCardFilterApiPayload = (
   const payload: CardFilterApiPayload = {};
 
   if (normalized.query) payload.q = normalized.query;
-  if (normalized.lifecycleStatus !== 'active') payload.lifecycle_status = normalized.lifecycleStatus;
+  if (normalized.lifecycleStatus !== DEFAULT_CARD_LIFECYCLE_FILTER) payload.lifecycle_status = normalized.lifecycleStatus;
   if (normalized.keywordIds.length > 0) {
     payload.keyword_ids = normalized.keywordIds;
     payload.keyword_match = normalized.keywordMatch;
