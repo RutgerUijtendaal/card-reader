@@ -115,6 +115,7 @@
           :rule-text-symbols="rulesTextSymbols"
           :additional-symbol-ids="form.additional_symbol_ids"
           :rule-text-unknown-symbol-keys="ruleTextUnknownSymbolKeys"
+          :deprecated-status-disabled="cardIsGroupAnchor"
           @save="saveEdits"
           @restore-field="restoreField"
           @unlock-field="unlockField"
@@ -143,7 +144,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { ChevronLeft, ChevronRight, GitMerge, SquarePen } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
@@ -212,6 +213,7 @@ const {
 } = useCardDetailState();
 
 const router = useRouter();
+const cardIsGroupAnchor = computed(() => card.value?.card_groups.some((group) => group.is_anchor) ?? false);
 
 const updateField = (fieldName: ScalarFieldName, value: string): void => {
   form[fieldName] = value;
@@ -222,6 +224,7 @@ const updateHero = (value: boolean): void => {
 };
 
 const updateLifecycleStatus = (value: CardLifecycleStatus): void => {
+  if (value === 'deprecated' && cardIsGroupAnchor.value) return;
   form.lifecycle_status = value;
 };
 

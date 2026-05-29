@@ -65,13 +65,21 @@
                 class="theme-pill justify-center px-3 py-2 text-xs font-semibold"
                 :class="form.lifecycle_status === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
                 type="button"
-                :disabled="!version.editable || isBusy"
+                :disabled="lifecycleOptionDisabled(option.value)"
+                :title="lifecycleOptionTitle(option.value)"
+                :data-testid="`lifecycle-option-${option.value}`"
                 @click="$emit('update-lifecycle-status', option.value)"
               >
                 {{ option.label }}
               </button>
             </div>
           </div>
+          <p
+            v-if="deprecatedStatusDisabled"
+            class="theme-section-muted mt-3 text-xs"
+          >
+            Group anchors must stay active. Choose a different anchor before deprecating this card.
+          </p>
         </div>
 
         <div
@@ -498,6 +506,7 @@ const props = defineProps<{
   ruleTextSymbols: SymbolFilterOption[];
   additionalSymbolIds: string[];
   ruleTextUnknownSymbolKeys: string[];
+  deprecatedStatusDisabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -565,6 +574,16 @@ const showSymbolAutocomplete = computed(() => {
   }
   return dismissedTriggerStart.value !== trigger.start;
 });
+
+const lifecycleOptionDisabled = (value: CardLifecycleStatus): boolean =>
+  !props.version.editable ||
+  props.isBusy ||
+  (value === DEPRECATED_CARD_LIFECYCLE_STATUS && props.deprecatedStatusDisabled === true);
+
+const lifecycleOptionTitle = (value: CardLifecycleStatus): string | undefined =>
+  value === DEPRECATED_CARD_LIFECYCLE_STATUS && props.deprecatedStatusDisabled === true
+    ? 'Group anchors must stay active.'
+    : undefined;
 
 watch(
   () => props.form.rules_text,
