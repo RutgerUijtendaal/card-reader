@@ -3,6 +3,8 @@ import { ref } from 'vue';
 import { api } from '@/api/client';
 import { useDeckEditorFilters } from '@/modules/decks/composables/useDeckEditorFilters';
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
+import type { CardFiltersResponse } from '@/modules/card-detail/types';
+import type { DeckCardSummary } from '@/modules/decks/types';
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -11,6 +13,78 @@ vi.mock('@/api/client', () => ({
 }));
 
 const mockedGet = vi.mocked(api.get);
+
+const buildFiltersResponse = (): CardFiltersResponse => ({
+  keywords: [],
+  tags: [],
+  types: [],
+  symbols: [
+    {
+      id: 'arcane-mana-id',
+      key: 'arcane-mana',
+      label: 'Arcane Mana',
+      symbol_type: 'mana',
+      text_token: '{AM}',
+      asset_url: null,
+    },
+    {
+      id: 'martial-mana-id',
+      key: 'martial-mana',
+      label: 'Martial Mana',
+      symbol_type: 'mana',
+      text_token: '{MM}',
+      asset_url: null,
+    },
+    {
+      id: 'martial-affinity-id',
+      key: 'martial-affinity',
+      label: 'Martial Affinity',
+      symbol_type: 'affinity',
+      text_token: '{AFFINITY:MARTIAL}',
+      asset_url: null,
+    },
+  ],
+});
+
+const buildHero = (): DeckCardSummary =>
+  ({
+    id: 'hero-1',
+    result_type: 'card',
+    key: 'hero-1',
+    label: 'Hero',
+    is_hero: true,
+    template_id: '',
+    version_id: 'hero-version',
+    version_number: 1,
+    previous_version_id: null,
+    is_latest: true,
+    name: 'Hero',
+    type_line: 'Hero',
+    mana_cost: '',
+    mana_symbols: [],
+    mana_value: null,
+    attack: null,
+    health: null,
+    rules_text: '',
+    confidence: 1,
+    created_at: '',
+    updated_at: '',
+    image_url: null,
+    keywords: [],
+    tags: [],
+    types: [],
+    symbols: [
+      {
+        id: 'martial-affinity-id',
+        key: 'martial-affinity',
+        label: 'Martial Affinity',
+        linked_card_count: 1,
+        symbol_type: 'affinity',
+        text_token: '{AFFINITY:MARTIAL}',
+        asset_url: null,
+      },
+    ],
+  }) satisfies DeckCardSummary;
 
 describe('useDeckEditorFilters', () => {
   beforeEach(() => {
@@ -103,5 +177,25 @@ describe('useDeckEditorFilters', () => {
     deckCardIds.value = ['card-b', 'card-a', 'card-a'];
 
     expect(controller.currentDeckCardIds.value).toBe(initialValue);
+  });
+
+  test('applies hero affinity mana as included mana and excludes other mana symbols', async () => {
+    mockedGet.mockResolvedValue({ data: buildFiltersResponse() });
+    const controller = useDeckEditorFilters({
+      deckCardIds: ref([]),
+      builderStep: ref<BuilderStep>('build'),
+    });
+
+    await controller.loadFilters();
+    controller.updateQuery('old search');
+    controller.setCurrentDeckOnly(true);
+    controller.applyHeroAffinityManaPreset(buildHero());
+
+    const params = controller.buildSearchParams();
+    expect(controller.query.value).toBe('');
+    expect(controller.currentDeckOnly.value).toBe(false);
+    expect(params.getAll('mana_symbol_ids')).toEqual(['martial-mana-id']);
+    expect(params.getAll('mana_symbol_exclude_ids')).toEqual(['arcane-mana-id']);
+    expect(params.get('mana_symbol_match')).toBe('any');
   });
 });

@@ -96,7 +96,7 @@ export const useDeckEditor = () => {
         await router.replace(buildDeckEditorLocation(record.id, route.query));
       }
       toast.success('Deck saved.');
-      filters.resetFilters();
+      filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
     } finally {
       saving.value = false;
     }
@@ -117,6 +117,9 @@ export const useDeckEditor = () => {
 
   onMounted(async () => {
     await Promise.all([filters.loadFilters(), loadDeck()]);
+    if (builderStep.value === 'build') {
+      filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
+    }
     await gallery.searchCards();
   });
 

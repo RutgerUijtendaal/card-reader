@@ -1,13 +1,15 @@
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { computed, ref, type Ref } from 'vue';
 import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/modules/card-filters/cardLifecycle';
-import { buildCardFilterApiSearchParams } from '@/modules/card-filters/cardFilterState';
+import { buildCardFilterApiSearchParams, createEmptyCardFilterState } from '@/modules/card-filters/cardFilterState';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
 import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
 import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
 import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
 import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
 import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
+import { buildHeroAffinityManaPreset } from '@/modules/decks/affinityMana';
+import type { DeckCardSummary } from '@/modules/decks/types';
 
 type UseDeckEditorFiltersOptions = {
   deckCardIds: Ref<string[]>;
@@ -82,6 +84,20 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
     currentDeckOnly.value = false;
   };
 
+  const applyHeroAffinityManaPreset = (hero: DeckCardSummary | null): void => {
+    resetFilters();
+    const preset = buildHeroAffinityManaPreset(hero, filterController.filterCatalog.value.manaSymbols);
+    if (!preset) {
+      return;
+    }
+
+    filterController.applyRouteFilterState({
+      ...createEmptyCardFilterState(),
+      manaSymbolKeys: preset.includedManaSymbolKeys,
+      manaSymbolExcludeKeys: preset.excludedManaSymbolKeys,
+    });
+  };
+
   return {
     filters: filterController.filters,
     filtersLoaded: filterController.filtersLoaded,
@@ -89,6 +105,7 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
     query: filterController.query,
     selectionState: filterController.selectionState,
     resetFilters,
+    applyHeroAffinityManaPreset,
     updateQuery: filterController.updateQuery,
     currentDeckOnly,
     setCurrentDeckOnly,
