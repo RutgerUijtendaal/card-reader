@@ -4,6 +4,13 @@ import type {
   MetadataOption,
   SymbolFilterOption,
 } from '@/modules/card-detail/types';
+import {
+  buildCardLifecycleApiParams,
+  DEFAULT_CARD_LIFECYCLE_FILTER,
+  normalizeCardLifecycleFilterValue,
+  type CardLifecycleFilterValue,
+} from '@/modules/card-filters/cardLifecycle';
+export type { CardLifecycleFilterValue } from '@/modules/card-filters/cardLifecycle';
 
 export type CardFilterState = {
   query: string;
@@ -104,18 +111,6 @@ export type CardFilterApiPayload = {
   health_min?: string;
   health_max?: string;
 };
-
-export type CardLifecycleStatus = 'active' | 'deprecated';
-export type CardLifecycleFilterValue = CardLifecycleStatus | 'all';
-export const DEFAULT_CARD_LIFECYCLE_FILTER: CardLifecycleFilterValue = 'active';
-export const MANAGEMENT_CARD_LIFECYCLE_FILTER: CardLifecycleFilterValue = 'all';
-
-export const normalizeCardLifecycleFilterValue = (value: unknown): CardLifecycleFilterValue =>
-  value === 'deprecated' || value === 'all' ? value : DEFAULT_CARD_LIFECYCLE_FILTER;
-
-export const managementCardSearchLifecycleParams = (): Pick<CardFilterApiPayload, 'lifecycle_status'> => ({
-  lifecycle_status: MANAGEMENT_CARD_LIFECYCLE_FILTER,
-});
 
 export const createEmptyCardFilterState = (): CardFilterState => ({
   query: '',
@@ -514,7 +509,7 @@ export const buildCardFilterApiPayload = (
   const payload: CardFilterApiPayload = {};
 
   if (normalized.query) payload.q = normalized.query;
-  if (normalized.lifecycleStatus !== DEFAULT_CARD_LIFECYCLE_FILTER) payload.lifecycle_status = normalized.lifecycleStatus;
+  Object.assign(payload, buildCardLifecycleApiParams(normalized.lifecycleStatus));
   if (normalized.keywordIds.length > 0) {
     payload.keyword_ids = normalized.keywordIds;
     payload.keyword_match = normalized.keywordMatch;

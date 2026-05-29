@@ -302,7 +302,7 @@ import { useRouter } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import SmallCardSearchResultRow from '@/components/cards/SmallCardSearchResultRow.vue';
-import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardFilterState';
+import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardLifecycle';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/modules/admin/types';
 

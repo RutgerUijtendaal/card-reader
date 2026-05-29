@@ -61,7 +61,7 @@ import { onClickOutside, useDebounceFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { api } from '@/api/client';
 import SmallCardSearchResultRow from '@/components/cards/SmallCardSearchResultRow.vue';
-import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardFilterState';
+import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardLifecycle';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 
 const props = withDefaults(defineProps<{

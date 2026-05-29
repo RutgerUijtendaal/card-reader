@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from card_reader_core.models import Card, Deck
+from card_reader_core.models import Card, Deck, card_is_deprecated
 
 from .types import (
     MAX_DECK_COPIES,
@@ -22,14 +22,14 @@ class DeckValidationService:
 
         if not deck.hero_card.is_hero:
             issues.append("Hero card must be marked as a hero.")
-        if deck.hero_card.lifecycle_status == "deprecated":
+        if card_is_deprecated(deck.hero_card):
             issues.append("Hero card is deprecated.")
             deprecated_card_ids.add(deck.hero_card.id)
 
         for entry in entries:
             quantity = int(entry.quantity)
             total_cards += quantity
-            if entry.card.lifecycle_status == "deprecated":
+            if card_is_deprecated(entry.card):
                 deprecated_card_ids.add(entry.card.id)
             if quantity < 1 or quantity > MAX_DECK_COPIES:
                 issues.append(f"Each mainboard card quantity must be between 1 and {MAX_DECK_COPIES}.")
@@ -45,7 +45,7 @@ class DeckValidationService:
 
         for sideboard in deck.sideboards.all():
             for sideboard_entry in sideboard.entries.all():
-                if sideboard_entry.card.lifecycle_status == "deprecated":
+                if card_is_deprecated(sideboard_entry.card):
                     deprecated_card_ids.add(sideboard_entry.card.id)
 
         if deprecated_card_ids:

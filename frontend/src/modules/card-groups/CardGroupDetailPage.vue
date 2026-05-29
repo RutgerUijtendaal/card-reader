@@ -97,9 +97,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
 import {
-  DEFAULT_CARD_LIFECYCLE_FILTER,
+  buildCardLifecycleApiParams,
   normalizeCardLifecycleFilterValue,
-} from '@/modules/card-filters/cardFilterState';
+} from '@/modules/card-filters/cardLifecycle';
 import { buildGalleryLocation, useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
 import type { CardFiltersResponse, CardGroupDetail, SymbolLookupMap } from '@/modules/card-detail/types';
 
@@ -109,11 +109,7 @@ const group = ref<CardGroupDetail | null>(null);
 const symbolByKey = ref<SymbolLookupMap>({});
 const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
 const groupLifecycleStatus = computed(() => normalizeCardLifecycleFilterValue(route.query.lifecycle_status));
-const groupRequestParams = computed(() =>
-  groupLifecycleStatus.value === DEFAULT_CARD_LIFECYCLE_FILTER
-    ? undefined
-    : { lifecycle_status: groupLifecycleStatus.value },
-);
+const groupRequestParams = computed(() => buildCardLifecycleApiParams(groupLifecycleStatus.value));
 
 const loadGroup = async (): Promise<void> => {
   const groupId = String(route.params.id);

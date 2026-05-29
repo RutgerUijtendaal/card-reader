@@ -1,9 +1,7 @@
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { computed, ref, type Ref } from 'vue';
-import {
-  buildCardFilterApiSearchParams,
-  MANAGEMENT_CARD_LIFECYCLE_FILTER,
-} from '@/modules/card-filters/cardFilterState';
+import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/modules/card-filters/cardLifecycle';
+import { buildCardFilterApiSearchParams } from '@/modules/card-filters/cardFilterState';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
 import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
 import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';

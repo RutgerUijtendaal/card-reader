@@ -212,4 +212,5 @@ describe('cardFilterState adapters', () => {
 
     expect(catalog.manaSymbols.map((row) => row.key)).toEqual(['mana-fire']);
   });
+
 });

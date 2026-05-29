@@ -1,8 +1,5 @@
-import type {
-  CardLifecycleStatus,
-  CardHoverTooltipModel,
-  CardTooltipSymbolLookup,
-} from '@/components/cards/cardModels';
+import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/components/cards/cardModels';
+import type { CardLifecycleStatus } from '@/modules/card-filters/cardLifecycle';
 
 export type MetadataOption = {
   id: string;

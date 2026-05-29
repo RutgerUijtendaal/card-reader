@@ -3,10 +3,21 @@ from typing import TYPE_CHECKING, TypedDict
 
 from rest_framework import serializers
 
-from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
-from card_reader_core.repositories.cards import DEFAULT_CARD_LIFECYCLE_FILTER, DEFAULT_CARD_PAGE_SIZE
+from card_reader_core.models import (
+    CARD_LIFECYCLE_FILTER_VALUES,
+    CARD_LIFECYCLE_STATUSES,
+    DEFAULT_CARD_LIFECYCLE_FILTER,
+    Card,
+    CardLifecycleFilter,
+    CardVersion,
+    Keyword,
+    Symbol,
+    Tag,
+    Type,
+    normalize_card_lifecycle_filter,
+)
+from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
-from card_reader_core.repositories.cards import CardLifecycleFilter
 from card_reader_core.rules import render_enriched_rule_text
 
 if TYPE_CHECKING:
@@ -242,7 +253,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     health_min = serializers.IntegerField(required=False, allow_null=True)
     health_max = serializers.IntegerField(required=False, allow_null=True)
     lifecycle_status = serializers.ChoiceField(
-        choices=("active", "deprecated", "all"),
+        choices=CARD_LIFECYCLE_FILTER_VALUES,
         required=False,
         default=DEFAULT_CARD_LIFECYCLE_FILTER,
     )
@@ -325,7 +336,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
 
     def _lifecycle_status_value(self, key: str) -> CardLifecycleFilter:
         value = self.validated_data.get(key)
-        return value if value in {"active", "deprecated", "all"} else DEFAULT_CARD_LIFECYCLE_FILTER
+        return normalize_card_lifecycle_filter(value)
 
     def _string_list_or_none(self, key: str) -> list[str] | None:
         value = self.validated_data.get(key)
@@ -344,7 +355,7 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     is_hero = serializers.BooleanField(required=False)
-    lifecycle_status = serializers.ChoiceField(choices=("active", "deprecated"), required=False)
+    lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False)

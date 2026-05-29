@@ -45,7 +45,7 @@
                   :animated="false"
                 />
                 <span
-                  v-if="sourceCard.lifecycle_status === 'deprecated'"
+                  v-if="cardIsDeprecated(sourceCard)"
                   class="theme-pill theme-pill-warning absolute left-3 top-3 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                 >
                   Deprecated
@@ -119,7 +119,7 @@
                   :animated="false"
                 />
                 <span
-                  v-if="targetCard.lifecycle_status === 'deprecated'"
+                  v-if="cardIsDeprecated(targetCard)"
                   class="theme-pill theme-pill-warning absolute left-3 top-3 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                 >
                   Deprecated
@@ -246,6 +246,7 @@ import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
 import CardSearchSelect from '@/components/cards/CardSearchSelect.vue';
+import { cardIsDeprecated } from '@/modules/card-filters/cardLifecycle';
 import { parseAdminMergeSourceId, parseAdminMergeTargetId } from '@/modules/admin/adminRouteState';
 import type { CardMergeApplyResponse, CardMergePreview } from '@/modules/admin/types';
 import type { CardListItem } from '@/modules/card-detail/types';

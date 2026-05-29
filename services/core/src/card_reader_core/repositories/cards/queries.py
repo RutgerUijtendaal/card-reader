@@ -12,6 +12,8 @@ from card_reader_core.models import (
     CardVersionTag,
     CardVersionType,
     Type,
+    active_card_lifecycle_q,
+    filter_queryset_by_card_lifecycle,
 )
 from card_reader_core.search.cards import apply_card_search
 
@@ -231,7 +233,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
     latest_versions = [
         (card.id, card.latest_version)
         for card in Card.objects.exclude(latest_version__isnull=True)
-        .filter(lifecycle_status="active")
+        .filter(active_card_lifecycle_q(field_path="lifecycle_status"))
         .select_related("latest_version__template")
         .prefetch_related("latest_version__images")
         .order_by("id")
@@ -477,8 +479,7 @@ def _build_filtered_versions_queryset(
         )
     )
     versions = apply_card_search(versions, query)
-    if lifecycle_status != "all":
-        versions = versions.filter(card__lifecycle_status=lifecycle_status)
+    versions = filter_queryset_by_card_lifecycle(versions, lifecycle_status)
     if card_ids:
         versions = versions.filter(card_id__in=list(dict.fromkeys(card_ids)))
     versions = apply_card_filters(
@@ -535,9 +536,9 @@ def _apply_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySe
             .annotate(
                 linked_card_count=Count(
                     "card_version_types",
-                    filter=Q(
-                        card_version_types__card_version__is_latest=True,
-                        card_version_types__card_version__card__lifecycle_status="active",
+                    filter=Q(card_version_types__card_version__is_latest=True)
+                    & active_card_lifecycle_q(
+                        field_path="card_version_types__card_version__card__lifecycle_status",
                     ),
                     distinct=True,
                 )

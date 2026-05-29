@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
-from card_reader_core.models import Card, CardGroup
+from card_reader_core.models import Card, CardGroup, card_is_deprecated
 from card_reader_core.repositories.cards import get_card
 from card_reader_core.repositories.card_groups import (
     card_group_key_exists,
@@ -87,7 +87,7 @@ class CardGroupService:
             if fetched_anchor_card is None:
                 raise ValueError("Anchor card not found.")
             anchor_card = fetched_anchor_card
-            if anchor_card.lifecycle_status == "deprecated":
+            if card_is_deprecated(anchor_card):
                 raise ValueError("Card group anchors cannot be deprecated.")
             existing_member_ids = [member.card.id for member in existing_group.members.all()]
             if anchor_card.id not in existing_member_ids:
@@ -135,7 +135,7 @@ class CardGroupService:
         anchor_card = cards_by_id.get(anchor_card_id)
         if anchor_card is None:
             raise ValueError("Anchor card not found.")
-        if anchor_card.lifecycle_status == "deprecated":
+        if card_is_deprecated(anchor_card):
             raise ValueError("Card group anchors cannot be deprecated.")
 
         ordered_without_anchor = [card_id for card_id in ordered_member_ids if card_id != anchor_card_id]

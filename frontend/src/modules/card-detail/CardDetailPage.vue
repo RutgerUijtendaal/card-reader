@@ -1,5 +1,5 @@
 <template>
-  <section class="space-y-5 xl:h-[calc(100vh-13rem)]">
+  <section class="space-y-5 xl:h-[calc(100vh-14rem)]">
     <AppPageHeader
       :icon="SquarePen"
       :title="card?.name || 'Loading card...'"
@@ -10,29 +10,24 @@
       title-class="text-xl"
     >
       <template
-        v-if="card?.lifecycle_status === 'deprecated'"
+        v-if="cardIsDeprecated(card) || (card && card.card_groups.length > 0)"
         #titleMeta
       >
-        <span class="theme-pill theme-pill-warning inline-flex px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+        <span
+          v-if="cardIsDeprecated(card)"
+          class="theme-pill theme-pill-warning inline-flex shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide"
+        >
           Deprecated
         </span>
-      </template>
-
-      <template
-        v-if="card && card.card_groups.length > 0"
-        #details
-      >
-        <div class="flex flex-wrap gap-2">
-          <RouterLink
-            v-for="group in card.card_groups"
-            :key="group.id"
-            :to="`/card-groups/${group.id}`"
-            class="btn-secondary rounded-full px-3 py-1 text-xs font-medium"
-          >
-            <span>{{ group.name }}</span>
-            <span class="theme-kicker">{{ group.member_count }} cards</span>
-          </RouterLink>
-        </div>
+        <RouterLink
+          v-for="group in card?.card_groups ?? []"
+          :key="group.id"
+          :to="`/card-groups/${group.id}`"
+          class="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+        >
+          <span>{{ group.name }}</span>
+          <span class="theme-kicker">{{ group.member_count }} cards</span>
+        </RouterLink>
       </template>
 
       <template #bottomLeft>
@@ -158,6 +153,10 @@ import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionE
 import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
 import { useCardDetailState } from '@/modules/card-detail/composables/useCardDetailState';
+import {
+  cardIsDeprecated,
+  type CardLifecycleStatus,
+} from '@/modules/card-filters/cardLifecycle';
 import type { ScalarFieldName } from '@/modules/card-detail/types';
 
 const {
@@ -222,7 +221,7 @@ const updateHero = (value: boolean): void => {
   form.is_hero = value;
 };
 
-const updateLifecycleStatus = (value: 'active' | 'deprecated'): void => {
+const updateLifecycleStatus = (value: CardLifecycleStatus): void => {
   form.lifecycle_status = value;
 };
 

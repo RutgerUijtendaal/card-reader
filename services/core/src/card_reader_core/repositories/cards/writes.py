@@ -4,7 +4,18 @@ from pathlib import Path
 
 from django.db import transaction
 
-from card_reader_core.models import Card, CardAlias, CardVersion, ImportJobItem, ImportJobStatus, ParseResult, now_utc
+from card_reader_core.models import (
+    DEPRECATED_CARD_LIFECYCLE_STATUS,
+    Card,
+    CardAlias,
+    CardVersion,
+    ImportJobItem,
+    ImportJobStatus,
+    ParseResult,
+    card_is_deprecated,
+    is_card_lifecycle_status,
+    now_utc,
+)
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
 
@@ -285,9 +296,9 @@ def update_latest_card_version(
             card.is_hero = bool(updates["is_hero"])
         if "lifecycle_status" in updates:
             lifecycle_status = str(updates["lifecycle_status"])
-            if lifecycle_status not in {"active", "deprecated"}:
+            if not is_card_lifecycle_status(lifecycle_status):
                 raise ValueError("Invalid card lifecycle status.")
-            if lifecycle_status == "deprecated" and card_is_group_anchor(card.id):
+            if lifecycle_status == DEPRECATED_CARD_LIFECYCLE_STATUS and card_is_group_anchor(card.id):
                 raise ValueError("Card group anchors cannot be deprecated.")
             card.lifecycle_status = lifecycle_status
 
@@ -425,7 +436,7 @@ def update_existing_version(
 
 
 def sync_import_item_lifecycle_warning(item: ImportJobItem, card: Card) -> None:
-    if card.lifecycle_status != "deprecated":
+    if not card_is_deprecated(card):
         item.warning_code = None
         item.warning_message = None
         item.updated_at = now_utc()

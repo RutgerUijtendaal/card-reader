@@ -9,7 +9,7 @@
           {{ card.name }}
         </p>
         <p
-          v-if="card.lifecycle_status === 'deprecated'"
+          v-if="cardIsDeprecated(card)"
           class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
         >
           <TriangleAlert class="h-3 w-3" />
@@ -61,6 +61,7 @@ import { TriangleAlert } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolizedText from '@/components/SymbolizedText.vue';
 import type { CardHoverTooltipModel } from '@/components/cards/cardModels';
+import { cardIsDeprecated } from '@/modules/card-filters/cardLifecycle';
 
 type CardCompactRowCard = Pick<
   CardHoverTooltipModel,

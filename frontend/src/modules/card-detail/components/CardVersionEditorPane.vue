@@ -455,6 +455,11 @@ import { Lock } from 'lucide-vue-next';
 import AppSelect from '@/components/app/AppSelect.vue';
 import SymbolToken from '@/components/SymbolToken.vue';
 import {
+  ACTIVE_CARD_LIFECYCLE_STATUS,
+  DEPRECATED_CARD_LIFECYCLE_STATUS,
+  type CardLifecycleStatus,
+} from '@/modules/card-filters/cardLifecycle';
+import {
   applySymbolAutocomplete,
   findActiveSymbolTrigger,
 } from '@/modules/card-detail/ruleTextSymbols';
@@ -509,7 +514,7 @@ const emit = defineEmits<{
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
   (e: 'update-hero', value: boolean): void;
-  (e: 'update-lifecycle-status', value: 'active' | 'deprecated'): void;
+  (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
 
 const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
@@ -519,8 +524,8 @@ const activeAutocompleteIndex = ref(0);
 const dismissedTriggerStart = ref<number | null>(null);
 const nonSymbolMetadataGroups = metadataGroups.filter((group) => group.name !== 'symbols');
 const lifecycleOptions = [
-  { value: 'active', label: 'Active' },
-  { value: 'deprecated', label: 'Deprecated' },
+  { value: ACTIVE_CARD_LIFECYCLE_STATUS, label: 'Active' },
+  { value: DEPRECATED_CARD_LIFECYCLE_STATUS, label: 'Deprecated' },
 ] as const;
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));

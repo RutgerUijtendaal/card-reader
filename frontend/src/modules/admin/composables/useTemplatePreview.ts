@@ -1,7 +1,7 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
 import { useDebounceFn, useLocalStorage } from '@vueuse/core';
 import { api } from '@/api/client';
-import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardFilterState';
+import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardLifecycle';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 import type {
   TemplateDefinition,

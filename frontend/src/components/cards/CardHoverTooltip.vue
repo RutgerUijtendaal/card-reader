@@ -30,7 +30,7 @@
               {{ card.name || 'Unnamed Card' }}
             </h4>
             <span
-              v-if="card.lifecycle_status === 'deprecated'"
+              v-if="cardIsDeprecated(card)"
               class="theme-pill theme-pill-warning px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
             >
               Deprecated
@@ -188,6 +188,7 @@
 import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolizedText from '@/components/SymbolizedText.vue';
+import { cardIsDeprecated } from '@/modules/card-filters/cardLifecycle';
 import type { CardListItem } from '@/modules/card-detail/types';
 
 const props = defineProps<{
