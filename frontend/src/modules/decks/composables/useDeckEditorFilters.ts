@@ -1,7 +1,12 @@
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { computed, ref, type Ref } from 'vue';
 import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/modules/card-filters/cardLifecycle';
-import { buildCardFilterApiSearchParams, createEmptyCardFilterState } from '@/modules/card-filters/cardFilterState';
+import {
+  buildCardFilterApiSearchParams,
+  createEmptyCardFilterSelectionState,
+  createEmptyCardFilterState,
+  type CardFilterSelectionState,
+} from '@/modules/card-filters/cardFilterState';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
 import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
 import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
@@ -98,6 +103,21 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
     });
   };
 
+  const buildDeckEditorSelectionState = (): CardFilterSelectionState => {
+    const selection = filterController.selectionState.value;
+    if (builderStep.value === 'build') {
+      return selection;
+    }
+
+    return {
+      ...createEmptyCardFilterSelectionState(),
+      query: selection.query,
+      affinitySymbolMatch: selection.affinitySymbolMatch,
+      affinitySymbolIds: selection.affinitySymbolIds,
+      affinitySymbolExcludeIds: selection.affinitySymbolExcludeIds,
+    };
+  };
+
   return {
     filters: filterController.filters,
     filtersLoaded: filterController.filtersLoaded,
@@ -125,7 +145,7 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
     loadFilters: filterController.loadFilters,
     buildSearchParams: () => appendCardSortSearchParam(
       (() => {
-        const params = buildCardFilterApiSearchParams(filterController.selectionState.value);
+        const params = buildCardFilterApiSearchParams(buildDeckEditorSelectionState());
         const cardIds = currentDeckCardIds.value;
         if (cardIds.length > 0) {
           params.set('lifecycle_status', MANAGEMENT_CARD_LIFECYCLE_FILTER);

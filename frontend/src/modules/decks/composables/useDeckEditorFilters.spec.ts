@@ -198,4 +198,22 @@ describe('useDeckEditorFilters', () => {
     expect(params.getAll('mana_symbol_exclude_ids')).toEqual(['arcane-mana-id']);
     expect(params.get('mana_symbol_match')).toBe('any');
   });
+
+  test('ignores hidden mana filters while selecting a hero in setup mode', async () => {
+    mockedGet.mockResolvedValue({ data: buildFiltersResponse() });
+    const builderStep = ref<BuilderStep>('build');
+    const controller = useDeckEditorFilters({
+      deckCardIds: ref([]),
+      builderStep,
+    });
+
+    await controller.loadFilters();
+    controller.applyHeroAffinityManaPreset(buildHero());
+    builderStep.value = 'setup';
+
+    const params = controller.buildSearchParams();
+    expect(params.getAll('mana_symbol_ids')).toEqual([]);
+    expect(params.getAll('mana_symbol_exclude_ids')).toEqual([]);
+    expect(params.get('mana_symbol_match')).toBeNull();
+  });
 });
