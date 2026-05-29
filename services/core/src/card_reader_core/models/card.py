@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Literal, Protocol, TypeVar
 
 from django.db import models
 from django.db.models import Q, QuerySet
@@ -35,6 +35,7 @@ CARD_LIFECYCLE_FILTER_VALUES: tuple[CardLifecycleFilter, ...] = (
     ALL_CARD_LIFECYCLE_FILTER,
 )
 DEFAULT_CARD_LIFECYCLE_FILTER: CardLifecycleFilter = ACTIVE_CARD_LIFECYCLE_STATUS
+_ModelT = TypeVar("_ModelT", bound=models.Model)
 
 
 class Card(TimestampedModel):
@@ -76,7 +77,7 @@ class Card(TimestampedModel):
 
 def normalize_card_lifecycle_filter(value: object) -> CardLifecycleFilter:
     if value in CARD_LIFECYCLE_FILTER_VALUES:
-        return cast(CardLifecycleFilter, value)
+        return value
     return DEFAULT_CARD_LIFECYCLE_FILTER
 
 
@@ -108,11 +109,11 @@ def active_card_lifecycle_q(*, field_path: str = "card__lifecycle_status") -> Q:
 
 
 def filter_queryset_by_card_lifecycle(
-    queryset: QuerySet,
+    queryset: QuerySet[_ModelT],
     lifecycle_filter: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
     *,
     field_path: str = "card__lifecycle_status",
-) -> QuerySet:
+) -> QuerySet[_ModelT]:
     return queryset.filter(card_lifecycle_filter_q(lifecycle_filter, field_path=field_path))
 
 
