@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
-from card_reader_api.card_groups.serializers import card_group_gallery_payload
+from card_reader_api.card_groups.serializers import card_group_gallery_payload, card_group_visible_members
 from card_reader_api.cards.file_views import file_response, immutable_card_image_response, symbol_asset_response
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import (
@@ -108,6 +108,7 @@ class CardListView(APIView):
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
             health_max=filters["health_max"],
+            lifecycle_status=filters["lifecycle_status"],
             sort=filters["sort"],
             page=filters["page"],
             page_size=filters["page_size"],
@@ -343,6 +344,9 @@ def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
         "health_min": request.query_params.get("health_min"),
         "health_max": request.query_params.get("health_max"),
     }
+    lifecycle_status = request.query_params.get("lifecycle_status")
+    if lifecycle_status is not None:
+        data["lifecycle_status"] = lifecycle_status
     sort = request.query_params.get("sort")
     if sort is not None:
         data["sort"] = sort
@@ -401,15 +405,17 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
         attack_max=filters["attack_max"],
         health_min=filters["health_min"],
         health_max=filters["health_max"],
+        lifecycle_status=filters["lifecycle_status"],
         sort=filters["sort"],
     )
     matching_card_ids = [row.version.card.id for row in matching_rows]
     groups = CardGroupService().get_groups_for_cards(matching_card_ids)
+    lifecycle_status = filters["lifecycle_status"]
 
     participant_card_ids = {
         member.card.id
         for group in groups
-        for member in group.members.all()
+        for member in card_group_visible_members(group, lifecycle_status)
     }
 
     grouped_items: list[GroupedGalleryItem] = []
@@ -446,7 +452,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
     anchor_metadata = get_card_versions_metadata([version.id for version in anchor_versions.values()])
     for group in groups:
         anchor_version = anchor_versions.get(group.id)
-        member_ids = {member.card.id for member in group.members.all()}
+        member_ids = {member.card.id for member in card_group_visible_members(group, lifecycle_status)}
         if anchor_version is None or not member_ids.intersection(matching_card_ids):
             continue
         grouped_items.append(
@@ -457,7 +463,7 @@ def _grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]
                 mana_value=anchor_version.mana_value,
                 updated_at=anchor_version.updated_at,
                 types=anchor_metadata.get(anchor_version.id, {"types": []})["types"],
-                payload=card_group_gallery_payload(group),
+                payload=card_group_gallery_payload(group, lifecycle_status=lifecycle_status),
             )
         )
 

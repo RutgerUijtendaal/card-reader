@@ -1,6 +1,7 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
 import { useDebounceFn, useLocalStorage } from '@vueuse/core';
 import { api } from '@/api/client';
+import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardLifecycle';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 import type {
   TemplateDefinition,
@@ -107,6 +108,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     previewLoading.value = true;
     try {
       const params: Record<string, string | number | boolean | undefined> = {
+        ...managementCardSearchLifecycleParams(),
         page_size: 8,
         show_groups: false,
       };

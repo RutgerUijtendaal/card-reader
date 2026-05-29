@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  buildCardFilterRouteQuery,
   createEmptyCardFilterState,
   getCardFilterSignature,
   parseCardFilterRouteQuery,
@@ -26,6 +27,17 @@ describe('cardFilterState route adapters', () => {
       otherSymbolKeys: ['tap'],
       typeKeys: ['creature'],
     });
+  });
+
+  test('round-trips non-default lifecycle status through route query state', () => {
+    const deprecatedState = parseCardFilterRouteQuery({ lifecycle_status: 'deprecated' });
+    const allState = parseCardFilterRouteQuery({ lifecycle_status: 'all' });
+
+    expect(deprecatedState.lifecycleStatus).toBe('deprecated');
+    expect(allState.lifecycleStatus).toBe('all');
+    expect(buildCardFilterRouteQuery(deprecatedState)).toEqual({ lifecycle_status: 'deprecated' });
+    expect(buildCardFilterRouteQuery(allState)).toEqual({ lifecycle_status: 'all' });
+    expect(buildCardFilterRouteQuery(parseCardFilterRouteQuery({ lifecycle_status: 'active' }))).toEqual({});
   });
 
   test('produces a stable signature for equivalent filter selections', () => {

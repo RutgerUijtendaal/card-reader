@@ -2,12 +2,14 @@ import { describe, expect, test } from 'vitest';
 import type { LocationQuery, RouteLocationRaw } from 'vue-router';
 import {
   buildAdminCardMergeLocation,
+  buildAdminCardMergeSourceLocation,
   buildAdminCardDetailLocation,
   buildAdminQuery,
   buildAdminReturnLocation,
   isAdminReturnQuery,
   parseAdminCatalogKind,
   parseAdminEntryId,
+  parseAdminMergeSourceId,
   parseAdminMergeTargetId,
   parseAdminTab,
 } from '@/modules/admin/adminRouteState';
@@ -65,6 +67,21 @@ describe('adminRouteState', () => {
       },
     });
     expect(parseAdminMergeTargetId(((location as Exclude<RouteLocationRaw, string>).query ?? {}) as LocationQuery)).toBe('card-1');
+  });
+
+  test('builds card merge location with a preselected source', () => {
+    const location = buildAdminCardMergeSourceLocation('card-1', {
+      admin_tab: 'catalog',
+    });
+
+    expect(location).toEqual({
+      path: '/admin',
+      query: {
+        admin_tab: 'card-merges',
+        admin_merge_source: 'card-1',
+      },
+    });
+    expect(parseAdminMergeSourceId(((location as Exclude<RouteLocationRaw, string>).query ?? {}) as LocationQuery)).toBe('card-1');
   });
 
   test('builds admin return location by dropping return_to only', () => {

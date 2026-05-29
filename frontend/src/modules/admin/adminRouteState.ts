@@ -9,6 +9,7 @@ const ADMIN_TAB_QUERY_KEY = 'admin_tab';
 const ADMIN_KIND_QUERY_KEY = 'admin_kind';
 const ADMIN_ENTRY_QUERY_KEY = 'admin_entry';
 const ADMIN_MERGE_TARGET_QUERY_KEY = 'admin_merge_target';
+const ADMIN_MERGE_SOURCE_QUERY_KEY = 'admin_merge_source';
 const ADMIN_RETURN_TO_QUERY_KEY = 'return_to';
 
 const CATALOG_KINDS: CatalogKind[] = [
@@ -57,6 +58,7 @@ export const buildAdminQuery = (
     kind?: CatalogKind | null;
     entryId?: string | null;
     mergeTargetId?: string | null;
+    mergeSourceId?: string | null;
   },
 ): LocationQueryRaw => {
   const nextUpdates: Record<string, string | null | undefined> = {};
@@ -73,6 +75,9 @@ export const buildAdminQuery = (
   if (updates.mergeTargetId !== undefined) {
     nextUpdates[ADMIN_MERGE_TARGET_QUERY_KEY] = updates.mergeTargetId;
   }
+  if (updates.mergeSourceId !== undefined) {
+    nextUpdates[ADMIN_MERGE_SOURCE_QUERY_KEY] = updates.mergeSourceId;
+  }
 
   return mergeLocationQuery(query, nextUpdates);
 };
@@ -88,12 +93,23 @@ export const buildAdminCardDetailLocation = (
 export const parseAdminMergeTargetId = (query: LocationQuery): string | null =>
   queryString(query[ADMIN_MERGE_TARGET_QUERY_KEY]);
 
+export const parseAdminMergeSourceId = (query: LocationQuery): string | null =>
+  queryString(query[ADMIN_MERGE_SOURCE_QUERY_KEY]);
+
 export const buildAdminCardMergeLocation = (
   cardId: string,
   query: LocationQuery,
 ): RouteLocationRaw => ({
   path: '/admin',
   query: buildAdminQuery(query, { tab: 'card-merges', mergeTargetId: cardId }),
+});
+
+export const buildAdminCardMergeSourceLocation = (
+  cardId: string,
+  query: LocationQuery,
+): RouteLocationRaw => ({
+  path: '/admin',
+  query: buildAdminQuery(query, { tab: 'card-merges', mergeSourceId: cardId }),
 });
 
 export const isAdminReturnQuery = (query: LocationQuery): boolean =>

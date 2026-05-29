@@ -48,8 +48,10 @@ def mark_job_item_failed(item: ImportJobItem, error_message: str) -> None:
 def mark_job_item_running(item: ImportJobItem) -> None:
     item.status = ImportJobStatus.running
     item.error_message = None
+    item.warning_code = None
+    item.warning_message = None
     item.updated_at = now_utc()
-    item.save(update_fields=["status", "error_message", "updated_at"])
+    item.save(update_fields=["status", "error_message", "warning_code", "warning_message", "updated_at"])
 
 
 def mark_job_item_cancelled(item: ImportJobItem) -> None:

@@ -82,6 +82,12 @@ Core stack:
   - paginated or query-backed card collections should sort in the backend
   - already-loaded embedded card collections may sort client-side for presentation
   - shared sort keys and semantics must stay aligned across both layers
+- Card lifecycle status controls normal visibility:
+  - `active` is the default for play/browsing surfaces such as gallery, grouped gallery, public group detail, catalog linked-card counts/previews, and exports.
+  - `deprecated` cards should stay directly retrievable by id and available in explicit management/query flows such as `lifecycle_status=all` or `lifecycle_status=deprecated`.
+  - Do not automatically remove deprecated cards from decks or groups; instead surface warnings/invalid public listing state where relevant.
+  - Card group anchors must remain active. Deprecated non-anchor group members may remain in admin data, but should be hidden from active public group views.
+  - When adding or consuming endpoints that return cards or card-derived counts, decide intentionally whether deprecated cards should be included and keep list/detail/count behavior consistent.
 
 ## Auth Rules
 - Auth is enabled by default.
@@ -129,6 +135,9 @@ Targeted commands:
 - Core: `pnpm --filter @card-reader/core lint` / `pnpm --filter @card-reader/core typecheck`
 - Web: `pnpm --filter @card-reader/web dev`
 - Integration tests: `pnpm --filter @card-reader/integration test`
+
+Local app URL:
+- Use `http://localhost:8888` to reach the running web app in the local desktop environment.
 
 ## Coding Standards
 - Python:

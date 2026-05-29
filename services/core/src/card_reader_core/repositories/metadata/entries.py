@@ -4,7 +4,7 @@ from typing import Any
 
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 
-from card_reader_core.models import CardVersion, Keyword, Symbol, Tag, Type, now_utc
+from card_reader_core.models import CardVersion, Keyword, Symbol, Tag, Type, active_card_lifecycle_q, now_utc
 
 from .types import MANA_TYPE_KEY, MetadataRow
 
@@ -43,7 +43,10 @@ def list_types_for_card_sort() -> list[Type]:
         Type.objects.annotate(
             linked_card_count=Count(
                 "card_version_types",
-                filter=Q(card_version_types__card_version__is_latest=True),
+                filter=Q(card_version_types__card_version__is_latest=True)
+                & active_card_lifecycle_q(
+                    field_path="card_version_types__card_version__card__lifecycle_status",
+                ),
                 distinct=True,
             ),
             type_sort_is_mana=Case(
@@ -200,7 +203,10 @@ def list_keywords_with_linked_card_counts() -> list[Keyword]:
         Keyword.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_keywords",
-                filter=Q(card_version_keywords__card_version__is_latest=True),
+                filter=Q(card_version_keywords__card_version__is_latest=True)
+                & active_card_lifecycle_q(
+                    field_path="card_version_keywords__card_version__card__lifecycle_status",
+                ),
                 distinct=True,
             ),
         )
@@ -212,7 +218,10 @@ def list_tags_with_linked_card_counts() -> list[Tag]:
         Tag.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_tags",
-                filter=Q(card_version_tags__card_version__is_latest=True),
+                filter=Q(card_version_tags__card_version__is_latest=True)
+                & active_card_lifecycle_q(
+                    field_path="card_version_tags__card_version__card__lifecycle_status",
+                ),
                 distinct=True,
             ),
         )
@@ -224,7 +233,10 @@ def list_types_with_linked_card_counts() -> list[Type]:
         Type.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_types",
-                filter=Q(card_version_types__card_version__is_latest=True),
+                filter=Q(card_version_types__card_version__is_latest=True)
+                & active_card_lifecycle_q(
+                    field_path="card_version_types__card_version__card__lifecycle_status",
+                ),
                 distinct=True,
             ),
         )
@@ -236,7 +248,10 @@ def list_symbols_with_linked_card_counts() -> list[Symbol]:
         Symbol.objects.order_by("label").annotate(
             linked_card_count=Count(
                 "card_version_symbols",
-                filter=Q(card_version_symbols__card_version__is_latest=True),
+                filter=Q(card_version_symbols__card_version__is_latest=True)
+                & active_card_lifecycle_q(
+                    field_path="card_version_symbols__card_version__card__lifecycle_status",
+                ),
                 distinct=True,
             ),
         )
@@ -283,6 +298,7 @@ def _list_latest_versions_for_detail(
 ) -> tuple[list[CardVersion], int]:
     versions = (
         CardVersion.objects.filter(is_latest=True, **{relation_filter: entry_id})
+        .filter(active_card_lifecycle_q())
         .select_related("card")
         .prefetch_related("images")
         .order_by("-updated_at")

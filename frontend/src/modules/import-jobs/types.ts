@@ -10,3 +10,16 @@ export type ImportJob = {
   created_at: string;
   updated_at: string;
 };
+
+export type ImportJobItem = {
+  id: string;
+  source_file: string;
+  status: ImportJobStatus;
+  error_message: string | null;
+  warning_code: string | null;
+  warning_message: string | null;
+};
+
+export type ImportJobDetail = ImportJob & {
+  items: ImportJobItem[];
+};

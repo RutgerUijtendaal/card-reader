@@ -1,5 +1,8 @@
 <template>
-  <div class="theme-card-loading-shim">
+  <div
+    class="theme-card-loading-shim"
+    :class="animated ? '' : 'theme-card-loading-shim-static'"
+  >
     <div class="theme-card-loading-shim-frame">
       <div class="theme-card-loading-shim-bar theme-card-loading-shim-header">
         <span class="theme-card-loading-shim-line theme-card-loading-shim-line-title" />
@@ -27,3 +30,11 @@
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+withDefaults(defineProps<{
+  animated?: boolean;
+}>(), {
+  animated: true,
+});
+</script>

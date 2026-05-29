@@ -12,6 +12,7 @@ from card_reader_api.card_groups.serializers import (
     card_group_detail_payload,
     serializer_error,
 )
+from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.permissions import AuthEnabledOrStaffAllowed
 from card_reader_core.services.card_groups import CardGroupMemberInput, CardGroupService
 
@@ -19,11 +20,15 @@ from card_reader_core.services.card_groups import CardGroupMemberInput, CardGrou
 class PublicCardGroupDetailView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, group_id: str) -> Response:
+    def get(self, request: Request, group_id: str) -> Response:
+        serializer = CardFiltersQuerySerializer(data=_lifecycle_query_data(request))
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        lifecycle_status = serializer.validated_filters()["lifecycle_status"]
         group = CardGroupService().get_group(group_id)
         if group is None:
             return Response({"detail": "Card group not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(card_group_detail_payload(group))
+        return Response(card_group_detail_payload(group, lifecycle_status=lifecycle_status))
 
 
 class StaffCardGroupListCreateView(APIView):
@@ -84,3 +89,10 @@ class StaffCardGroupDetailView(APIView):
         if not deleted:
             return Response({"detail": "Card group not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _lifecycle_query_data(request: Request) -> dict[str, object]:
+    lifecycle_status = request.query_params.get("lifecycle_status")
+    if lifecycle_status is None:
+        return {}
+    return {"lifecycle_status": lifecycle_status}

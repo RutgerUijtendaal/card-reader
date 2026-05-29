@@ -1,7 +1,5 @@
-import type {
-  CardHoverTooltipModel,
-  CardTooltipSymbolLookup,
-} from '@/components/cards/cardModels';
+import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/components/cards/cardModels';
+import type { CardLifecycleStatus } from '@/modules/card-filters/cardLifecycle';
 
 export type MetadataOption = {
   id: string;
@@ -67,6 +65,7 @@ export type CardDetail = {
   id: string;
   label: string;
   name: string;
+  lifecycle_status?: CardLifecycleStatus;
   card_groups: CardGroupSummary[];
 };
 
@@ -145,6 +144,7 @@ export type EditorForm = {
   health: string;
   rules_text: string;
   is_hero: boolean;
+  lifecycle_status: CardLifecycleStatus;
   keyword_ids: string[];
   tag_ids: string[];
   type_ids: string[];

@@ -1,3 +1,5 @@
+import type { CardLifecycleStatus } from '@/modules/card-filters/cardLifecycle';
+
 export type CardTooltipSymbolLookup = {
   asset_url?: string | null;
   text_token?: string;
@@ -21,6 +23,7 @@ export type CardHoverTooltipModel = {
   key: string;
   label: string;
   is_hero: boolean;
+  lifecycle_status?: CardLifecycleStatus;
   template_id: string;
   version_id: string;
   version_number: number;

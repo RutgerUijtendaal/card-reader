@@ -78,6 +78,12 @@
               @load="cardImageLoaded = true"
               @error="cardImageLoaded = true"
             >
+            <span
+              v-if="cardIsDeprecated(cardItem)"
+              class="theme-pill theme-pill-warning absolute left-3 top-3 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+            >
+              Deprecated
+            </span>
           </div>
         </template>
       </component>
@@ -143,6 +149,7 @@ import { fetchHoverPreviewCard } from '@/components/cards/cardHoverPreview';
 import type { GalleryDisplayItem } from '@/components/cards/galleryDisplayItems';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
+import { cardIsDeprecated } from '@/modules/card-filters/cardLifecycle';
 import { buildCardDetailLocation, buildGalleryItemLocation } from '@/modules/card-search/galleryNavigation';
 import { DEFAULT_HOVER_MODE, type HoverMode } from '@/modules/card-search/hoverMode';
 import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';

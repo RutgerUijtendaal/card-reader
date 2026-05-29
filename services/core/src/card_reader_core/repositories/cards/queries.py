@@ -12,6 +12,8 @@ from card_reader_core.models import (
     CardVersionTag,
     CardVersionType,
     Type,
+    active_card_lifecycle_q,
+    filter_queryset_by_card_lifecycle,
 )
 from card_reader_core.search.cards import apply_card_search
 
@@ -23,6 +25,8 @@ from .types import (
     CARD_SORT_TYPES_ASC,
     CARD_SORT_UPDATED_DESC,
     DEFAULT_CARD_PAGE_SIZE,
+    DEFAULT_CARD_LIFECYCLE_FILTER,
+    CardLifecycleFilter,
     CardListRow,
     CardSort,
     LatestCardVersionReparseSource,
@@ -64,6 +68,7 @@ def list_cards(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
     sort: CardSort = CARD_SORT_UPDATED_DESC,
     page: int = 1,
     page_size: int = DEFAULT_CARD_PAGE_SIZE,
@@ -101,6 +106,7 @@ def list_cards(
         attack_max=attack_max,
         health_min=health_min,
         health_max=health_max,
+        lifecycle_status=lifecycle_status,
         sort=sort,
     )
 
@@ -155,6 +161,7 @@ def list_matching_cards(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
     sort: CardSort = CARD_SORT_UPDATED_DESC,
 ) -> list[CardListRow]:
     versions = _build_filtered_versions_queryset(
@@ -188,6 +195,7 @@ def list_matching_cards(
         attack_max=attack_max,
         health_min=health_min,
         health_max=health_max,
+        lifecycle_status=lifecycle_status,
         sort=sort,
     )
     return _build_card_list_rows(list(versions))
@@ -225,6 +233,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
     latest_versions = [
         (card.id, card.latest_version)
         for card in Card.objects.exclude(latest_version__isnull=True)
+        .filter(active_card_lifecycle_q(field_path="lifecycle_status"))
         .select_related("latest_version__template")
         .prefetch_related("latest_version__images")
         .order_by("id")
@@ -284,6 +293,7 @@ def list_filtered_latest_card_version_reparse_sources(
     attack_max: int | None = None,
     health_min: int | None = None,
     health_max: int | None = None,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
     sort: CardSort = CARD_SORT_UPDATED_DESC,
 ) -> list[LatestCardVersionReparseSource]:
     versions = _build_filtered_versions_queryset(
@@ -317,6 +327,7 @@ def list_filtered_latest_card_version_reparse_sources(
         attack_max=attack_max,
         health_min=health_min,
         health_max=health_max,
+        lifecycle_status=lifecycle_status,
         sort=sort,
     )
     out: list[LatestCardVersionReparseSource] = []
@@ -441,6 +452,7 @@ def _build_filtered_versions_queryset(
     attack_max: int | None,
     health_min: int | None,
     health_max: int | None,
+    lifecycle_status: CardLifecycleFilter,
     sort: CardSort,
 ) -> QuerySet[CardVersion]:
     versions = (
@@ -467,6 +479,7 @@ def _build_filtered_versions_queryset(
         )
     )
     versions = apply_card_search(versions, query)
+    versions = filter_queryset_by_card_lifecycle(versions, lifecycle_status)
     if card_ids:
         versions = versions.filter(card_id__in=list(dict.fromkeys(card_ids)))
     versions = apply_card_filters(
@@ -523,7 +536,10 @@ def _apply_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySe
             .annotate(
                 linked_card_count=Count(
                     "card_version_types",
-                    filter=Q(card_version_types__card_version__is_latest=True),
+                    filter=Q(card_version_types__card_version__is_latest=True)
+                    & active_card_lifecycle_q(
+                        field_path="card_version_types__card_version__card__lifecycle_status",
+                    ),
                     distinct=True,
                 )
             )

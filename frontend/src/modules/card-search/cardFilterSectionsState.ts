@@ -1,7 +1,9 @@
 import type { MetadataOption, SymbolFilterOption } from '@/modules/card-detail/types';
+import type { CardLifecycleFilterValue } from '@/modules/card-filters/cardLifecycle';
 import type { MetadataFavoriteGroup } from '@/modules/card-filters/useMetadataFilterFavorites';
 
 export type MatchMode = 'any' | 'all';
+export type LifecycleFilterValue = CardLifecycleFilterValue;
 export type SymbolFilterTriState = 'off' | 'include' | 'exclude';
 export type CardFilterSectionKey =
   | 'mana'
@@ -14,6 +16,8 @@ export type CardFilterSectionKey =
 
 export type CardFilterSectionsState = {
   selectedManaTypeSymbolIds: string[];
+  lifecycleStatus: LifecycleFilterValue;
+  onUpdateLifecycleStatus: (value: LifecycleFilterValue) => void;
   onUpdateSelectedManaTypeSymbolIds: (value: string[]) => void;
   excludedManaTypeSymbolIds: string[];
   onUpdateExcludedManaTypeSymbolIds: (value: string[]) => void;

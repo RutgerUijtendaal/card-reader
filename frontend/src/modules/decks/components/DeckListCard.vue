@@ -40,6 +40,14 @@
               >
                 {{ titlePillLabel }}
               </span>
+              <span
+                v-if="deprecatedCardCount > 0"
+                class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-1 text-xs"
+                title="Deck contains deprecated cards"
+              >
+                <TriangleAlert class="h-3.5 w-3.5" />
+                <span>{{ deprecatedCardCount }}</span>
+              </span>
             </div>
 
             <p class="theme-section-muted text-sm">
@@ -125,6 +133,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { TriangleAlert } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/api/client';
@@ -161,6 +170,7 @@ const uppercaseFirstCharacter = (value: string): string =>
 const ownerDisplayName = computed(() => uppercaseFirstCharacter(props.deck.owner.username));
 const titlePillLabel = computed(() => (isOwnedMode.value ? deckVisibilityLabels[props.deck.visibility] : ownerDisplayName.value));
 const titlePillClass = computed(() => (isOwnedMode.value ? deckVisibilityBadgeClasses[props.deck.visibility] : 'theme-pill-keyword'));
+const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_count ?? 0);
 const cardClass = computed(() => [
   'deck-list-card-surface',
   'page-card',

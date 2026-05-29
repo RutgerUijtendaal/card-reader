@@ -432,6 +432,11 @@
     animation: card-loading-shim-sheen 1.6s ease-in-out infinite;
   }
 
+  .theme-card-loading-shim-static::after {
+    animation: none;
+    display: none;
+  }
+
   html.dark .theme-card-loading-shim::after {
     background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
   }

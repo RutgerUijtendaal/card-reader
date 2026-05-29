@@ -4,6 +4,10 @@ import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import { buildCardReturnLocation, getCardReturnLabel } from '@/modules/card-detail/cardReturnState';
 import { buildEffectiveSymbolIds, getRuleTextSymbolState } from '@/modules/card-detail/ruleTextSymbols';
+import {
+  ACTIVE_CARD_LIFECYCLE_STATUS,
+  normalizeCardLifecycleStatus,
+} from '@/modules/card-filters/cardLifecycle';
 import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
 import type {
   CardDetail,
@@ -46,6 +50,7 @@ export const useCardDetailState = () => {
     health: '',
     rules_text: '',
     is_hero: false,
+    lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
     tag_ids: [],
     type_ids: [],
@@ -140,6 +145,7 @@ export const useCardDetailState = () => {
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
     form.is_hero = version.is_hero;
+    form.lifecycle_status = normalizeCardLifecycleStatus(version.lifecycle_status);
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
     form.type_ids = [...version.type_ids];
@@ -157,7 +163,12 @@ export const useCardDetailState = () => {
       version.version_id === updated.version_id ? updated : version,
     );
     if (card.value) {
-      card.value = { ...card.value, name: updated.name, label: updated.name };
+      card.value = {
+        ...card.value,
+        name: updated.name,
+        label: updated.name,
+        lifecycle_status: updated.lifecycle_status,
+      };
     }
     selectedVersionId.value = updated.version_id;
     syncFormFromSelectedVersion();
@@ -458,6 +469,9 @@ const buildManualUpdatePayload = (
 
   if (form.is_hero !== version.is_hero) {
     updates.is_hero = form.is_hero;
+  }
+  if (form.lifecycle_status !== normalizeCardLifecycleStatus(version.lifecycle_status)) {
+    updates.lifecycle_status = form.lifecycle_status;
   }
 
   if (!sameIds(form.keyword_ids, version.keyword_ids)) {

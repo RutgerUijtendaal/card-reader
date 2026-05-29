@@ -73,13 +73,20 @@ def _login_and_get_csrf_token(client: Client, username: str, password: str) -> s
     return csrf_token
 
 
-def _create_card(*, name: str, is_hero: bool, type_labels: list[str] | None = None) -> Card:
+def _create_card(
+    *,
+    name: str,
+    is_hero: bool,
+    type_labels: list[str] | None = None,
+    lifecycle_status: str = "active",
+) -> Card:
     template = _ensure_template()
     unique_name = f"{name} {next(_CARD_NAME_COUNTER)}"
     card = Card.objects.create(
         key=unique_name.lower().replace(" ", "-"),
         label=unique_name,
         is_hero=is_hero,
+        lifecycle_status=lifecycle_status,
     )
     version = CardVersion.objects.create(
         card=card,
@@ -261,6 +268,47 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
 
     assert response.status_code == 200
     assert deck.id not in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_excludes_decks_with_deprecated_cards_but_owner_can_view_warning() -> None:
+    owner = _create_user("deck-deprecated-card-owner", "password")
+    hero = _create_card(name="Deprecated Warning Hero", is_hero=True)
+    deprecated_card = _create_card(
+        name="Deprecated Mainboard Card",
+        is_hero=False,
+        lifecycle_status="deprecated",
+        type_labels=["Mana"],
+    )
+    filler_cards = _build_mainboard_cards(total_unique=14)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Deprecated Card Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=deprecated_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in filler_cards],
+        ],
+        sideboards=[],
+    )
+    owner_client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    _login_and_get_csrf_token(owner_client, owner.username, "password")
+
+    public_list_response = Client(HTTP_HOST="localhost").get("/decks")
+    public_detail_response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}")
+    owner_detail_response = owner_client.get(f"/my/decks/{deck.id}")
+
+    assert public_list_response.status_code == 200
+    assert deck.id not in [row["id"] for row in public_list_response.json()]
+    assert public_detail_response.status_code == 404
+    assert owner_detail_response.status_code == 200
+    status_payload = owner_detail_response.json()["status"]
+    assert status_payload["is_valid"] is False
+    assert status_payload["deprecated_card_count"] == 1
+    assert status_payload["deprecated_card_ids"] == [deprecated_card.id]
+    assert "Deck contains deprecated cards." in status_payload["issues"]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -1400,6 +1448,35 @@ def test_cards_list_can_filter_by_is_hero() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_cards_list_hides_deprecated_cards_by_default_but_can_include_them() -> None:
+    active_card = _create_card(name="Active Lifecycle Card", is_hero=False)
+    deprecated_card = _create_card(
+        name="Deprecated Lifecycle Card",
+        is_hero=False,
+        lifecycle_status="deprecated",
+    )
+    client = Client(HTTP_HOST="localhost")
+
+    default_response = client.get("/cards")
+    deprecated_response = client.get(
+        "/cards",
+        {"q": "Deprecated Lifecycle Card", "lifecycle_status": "deprecated"},
+    )
+    all_response = client.get("/cards", {"q": "Deprecated Lifecycle Card", "lifecycle_status": "all"})
+    detail_response = client.get(f"/cards/{deprecated_card.id}")
+
+    assert default_response.status_code == 200
+    assert deprecated_response.status_code == 200
+    assert all_response.status_code == 200
+    assert detail_response.status_code == 200
+    assert active_card.id in {row["id"] for row in default_response.json()["results"]}
+    assert deprecated_card.id not in {row["id"] for row in default_response.json()["results"]}
+    assert {row["id"] for row in deprecated_response.json()["results"]} == {deprecated_card.id}
+    assert deprecated_card.id in {row["id"] for row in all_response.json()["results"]}
+    assert detail_response.json()["lifecycle_status"] == "deprecated"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_can_toggle_is_hero() -> None:
     username = "deck-card-hero-toggle-user"
     password = "password"
@@ -1421,3 +1498,23 @@ def test_latest_version_patch_can_toggle_is_hero() -> None:
     assert response.json()["is_hero"] is True
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_version_patch_can_deprecate_card() -> None:
+    username = "deck-card-lifecycle-toggle-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    card = _create_card(name="Toggle Lifecycle Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"lifecycle_status": "deprecated"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    card.refresh_from_db()
+    assert card.lifecycle_status == "deprecated"
+    assert response.json()["lifecycle_status"] == "deprecated"

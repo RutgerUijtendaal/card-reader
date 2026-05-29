@@ -13,28 +13,7 @@
     @keydown.enter.prevent="handleRowKeydown"
     @keydown.space.prevent="handleRowKeydown"
   >
-    <div class="relative z-10 flex min-w-0 flex-1 items-center px-3 py-2">
-      <div class="flex min-w-0 flex-1 flex-col justify-between self-stretch select-none pr-2">
-        <p
-          class="theme-section-title truncate text-sm font-semibold"
-          data-testid="row-card-name"
-        >
-          {{ entry.card.name }}
-        </p>
-
-        <div
-          v-if="showManaSymbols"
-          data-testid="row-mana-symbols"
-          class="row-mana-symbols inline-flex max-w-full items-center overflow-hidden"
-        >
-          <SymbolizedText
-            :tokens="entry.card.mana_symbols"
-            :text="entry.card.mana_cost || '-'"
-            :symbol-by-key="manaSymbolByKey"
-          />
-        </div>
-      </div>
-    </div>
+    <CardCompactRowContent :card="entry.card" />
 
     <div
       v-if="controlsVisible"
@@ -138,29 +117,6 @@
     </div>
 
     <div
-      v-if="entry.card.image_url"
-      class="theme-divider row-art-strip relative z-10 h-full shrink-0 overflow-hidden"
-      :style="{ width: rowArtWidth }"
-    >
-      <img
-        :src="toAbsoluteApiUrl(entry.card.image_url)"
-        :alt="entry.card.name"
-        class="h-full w-full object-cover opacity-95"
-        :style="{ objectPosition: rowArtObjectPosition, transform: rowArtTransform }"
-      >
-      <div
-        class="absolute inset-y-0 left-0 w-[42%]"
-        style="background: linear-gradient(to right, var(--color-surface-strong) 0%, color-mix(in srgb, var(--color-surface-strong) 92%, transparent 8%) 18%, color-mix(in srgb, var(--color-surface-strong) 74%, transparent 26%) 42%, color-mix(in srgb, var(--color-surface-strong) 46%, transparent 54%) 72%, transparent 100%);"
-      />
-      <div class="absolute inset-0 bg-gradient-to-l from-slate-950/70 via-slate-950/30 to-transparent" />
-    </div>
-    <div
-      v-else
-      class="theme-divider row-art-strip relative z-10 h-full shrink-0 border-l bg-gradient-to-l from-slate-800/35 via-slate-700/12 to-transparent"
-      :style="{ width: rowArtWidth }"
-    />
-
-    <div
       class="theme-card-frame-muted theme-divider relative z-10 flex h-full w-9 shrink-0 items-center justify-center border-l"
       data-testid="row-quantity-badge"
     >
@@ -208,8 +164,8 @@ import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
 import { ArrowRightLeft, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
-import SymbolizedText from '@/components/SymbolizedText.vue';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
+import CardCompactRowContent from '@/components/cards/CardCompactRowContent.vue';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
 import type { HoverMode } from '@/modules/card-search/hoverMode';
 import type { DeckEntrySummary } from '@/modules/decks/types';
@@ -269,17 +225,10 @@ const hoverPanelX = computed(() => floating.x.value ?? 0);
 const hoverPanelY = computed(() => floating.y.value ?? 0);
 const rowClickable = computed(() => !props.rowActionDisabled || !props.rowSecondaryActionDisabled);
 const controlsVisible = computed(() => hovered.value || focusedWithin.value || moveMenuOpen.value);
-const manaSymbolByKey = computed(() =>
-  Object.fromEntries(props.entry.card.symbols.map((symbol) => [symbol.key, symbol])),
-);
-const showManaSymbols = computed(() => props.entry.card.mana_value !== 0 && props.entry.card.mana_cost !== '0');
 const singleMoveDestination = computed(() =>
   props.moveDestinations.length === 1 ? props.moveDestinations[0] : null,
 );
 const rowQuantityWidth = '2.25rem';
-const rowArtWidth = '6rem';
-const rowArtObjectPosition = '52% 5%';
-const rowArtTransform = 'scale(1.4)';
 const rowControlsRightOffset = `calc(${rowQuantityWidth} + 0.25rem)`;
 
 const handleRowClick = (): void => {
@@ -348,19 +297,3 @@ const handleMouseLeave = (): void => {
   blurFocusedDescendantAfterFinePointerLeave(triggerRef.value);
 };
 </script>
-
-<style scoped>
-.row-mana-symbols :deep(span.inline-flex) {
-  gap: 0;
-  flex-wrap: nowrap;
-}
-
-.row-mana-symbols :deep(img) {
-  height: 1rem;
-  width: 1rem;
-}
-
-.row-art-strip img {
-  transform-origin: center;
-}
-</style>

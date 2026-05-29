@@ -73,7 +73,7 @@
               Card search
             </h4>
             <p class="theme-section-muted mt-1 text-xs">
-              Find cards to add to the selected group.
+              Find cards to add to the active group editor.
             </p>
           </div>
 
@@ -84,7 +84,8 @@
             <input
               v-model="pickerQuery"
               class="input-base"
-              placeholder="Search cards to add..."
+              :disabled="!editor"
+              :placeholder="editor ? 'Search cards to add...' : 'Select or create a group first'"
               @keydown.enter.prevent
             >
           </label>
@@ -92,31 +93,26 @@
 
         <div class="app-scrollbar mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 xl:h-[calc(100vh-20rem)]">
           <div
-            v-if="pickerResults.length === 0"
+            v-if="!editor"
+            class="theme-empty-state"
+          >
+            Select or create a group before searching for cards.
+          </div>
+          <div
+            v-else-if="pickerResults.length === 0"
             class="theme-empty-state"
           >
             Search for cards to add them here.
           </div>
-          <button
+          <SmallCardSearchResultRow
             v-for="result in pickerResults"
             :key="result.id"
-            type="button"
-            class="theme-selected-surface flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition hover:-translate-y-0.5"
-            :disabled="memberIds.has(result.id)"
-            @click="addMember(result)"
-          >
-            <div>
-              <p class="theme-section-title text-sm font-medium">
-                {{ result.name }}
-              </p>
-              <p class="theme-section-muted text-xs">
-                {{ result.label }}
-              </p>
-            </div>
-            <span class="theme-link text-xs font-semibold">
-              {{ memberIds.has(result.id) ? 'Added' : 'Add' }}
-            </span>
-          </button>
+            :card="result"
+            :disabled="pickerResultDisabled(result)"
+            :action-label="pickerResultActionLabel(result)"
+            :aria-label="`${pickerResultActionLabel(result)} ${result.name}`"
+            @activate="addMember"
+          />
         </div>
       </section>
 
@@ -305,6 +301,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
+import SmallCardSearchResultRow from '@/components/cards/SmallCardSearchResultRow.vue';
+import { managementCardSearchLifecycleParams } from '@/modules/card-filters/cardLifecycle';
 import type { CardListItem, PaginatedCardsResponse } from '@/modules/card-detail/types';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/modules/admin/types';
 
@@ -398,13 +396,14 @@ const resetEditor = (): void => {
 
 const searchCards = async (): Promise<void> => {
   const query = pickerQuery.value.trim();
-  if (!query) {
+  if (!editor.value || !query) {
     pickerResults.value = [];
     return;
   }
   const response = await api.get<PaginatedCardsResponse<CardListItem>>('/cards', {
     params: {
       q: query,
+      ...managementCardSearchLifecycleParams(),
       page_size: 10,
     },
   });
@@ -414,6 +413,18 @@ const searchCards = async (): Promise<void> => {
 const debouncedSearchCards = useDebounceFn(() => {
   void searchCards();
 }, 250);
+
+const pickerResultDisabled = (card: CardListItem): boolean => !editor.value || memberIds.value.has(card.id);
+
+const pickerResultActionLabel = (card: CardListItem): string => {
+  if (!editor.value) {
+    return 'Select group';
+  }
+  if (memberIds.value.has(card.id)) {
+    return 'Added';
+  }
+  return 'Add';
+};
 
 const addMember = (card: CardListItem): void => {
   if (!editor.value || memberIds.value.has(card.id)) {
@@ -579,6 +590,15 @@ watch(
   pickerQuery,
   () => {
     debouncedSearchCards();
+  },
+);
+
+watch(
+  editor,
+  (nextEditor) => {
+    if (!nextEditor) {
+      pickerResults.value = [];
+    }
   },
 );
 

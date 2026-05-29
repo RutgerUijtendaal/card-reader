@@ -30,6 +30,8 @@ def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[st
                 "source_file": item.source_file,
                 "status": item.status,
                 "error_message": item.error_message,
+                "warning_code": item.warning_code,
+                "warning_message": item.warning_message,
             }
             for item in items
         ],

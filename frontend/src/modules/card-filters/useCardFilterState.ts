@@ -2,6 +2,10 @@ import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
 import type { CardFilterCatalog, CardFilterSelectionState } from './cardFilterState';
 import {
+  DEFAULT_CARD_LIFECYCLE_FILTER,
+  type CardLifecycleFilterValue,
+} from './cardLifecycle';
+import {
   buildCardFilterSelectionState,
   buildCardFilterStateFromSelection,
   createEmptyCardFilterSelectionState,
@@ -11,6 +15,7 @@ import {
 
 export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const query = ref('');
+  const lifecycleStatus = ref<CardLifecycleFilterValue>(DEFAULT_CARD_LIFECYCLE_FILTER);
   const keywordMatch = ref<'any' | 'all'>('any');
   const tagMatch = ref<'any' | 'all'>('any');
   const typeMatch = ref<'any' | 'all'>('any');
@@ -40,6 +45,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const selectionState = computed<CardFilterSelectionState>(() =>
     normalizeCardFilterSelectionState({
       query: query.value,
+      lifecycleStatus: lifecycleStatus.value,
       keywordMatch: keywordMatch.value,
       tagMatch: tagMatch.value,
       typeMatch: typeMatch.value,
@@ -71,6 +77,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const applySelectionState = (state: CardFilterSelectionState): void => {
     const normalized = normalizeCardFilterSelectionState(state);
     query.value = normalized.query;
+    lifecycleStatus.value = normalized.lifecycleStatus ?? DEFAULT_CARD_LIFECYCLE_FILTER;
     keywordMatch.value = normalized.keywordMatch;
     tagMatch.value = normalized.tagMatch;
     typeMatch.value = normalized.typeMatch;
@@ -111,6 +118,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
 
   return {
     query,
+    lifecycleStatus,
     keywordMatch,
     tagMatch,
     typeMatch,

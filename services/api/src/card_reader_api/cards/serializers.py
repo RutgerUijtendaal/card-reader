@@ -3,7 +3,19 @@ from typing import TYPE_CHECKING, TypedDict
 
 from rest_framework import serializers
 
-from card_reader_core.models import Card, CardVersion, Keyword, Symbol, Tag, Type
+from card_reader_core.models import (
+    CARD_LIFECYCLE_FILTER_VALUES,
+    CARD_LIFECYCLE_STATUSES,
+    DEFAULT_CARD_LIFECYCLE_FILTER,
+    Card,
+    CardLifecycleFilter,
+    CardVersion,
+    Keyword,
+    Symbol,
+    Tag,
+    Type,
+    normalize_card_lifecycle_filter,
+)
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
 from card_reader_core.rules import render_enriched_rule_text
@@ -49,6 +61,7 @@ class CardFilterParams(TypedDict):
     attack_max: int | None
     health_min: int | None
     health_max: int | None
+    lifecycle_status: CardLifecycleFilter
     sort: CardSort
 
 
@@ -75,6 +88,7 @@ def card_payload(
         "label": card.label,
         "name": version.name,
         "is_hero": card.is_hero,
+        "lifecycle_status": card.lifecycle_status,
         "template_id": version.template.key,
         "version_id": version.id,
         "version_number": version.version_number,
@@ -238,6 +252,11 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     attack_max = serializers.IntegerField(required=False, allow_null=True)
     health_min = serializers.IntegerField(required=False, allow_null=True)
     health_max = serializers.IntegerField(required=False, allow_null=True)
+    lifecycle_status = serializers.ChoiceField(
+        choices=CARD_LIFECYCLE_FILTER_VALUES,
+        required=False,
+        default=DEFAULT_CARD_LIFECYCLE_FILTER,
+    )
     sort = serializers.ChoiceField(choices=CARD_SORT_VALUES, required=False, default=CARD_SORT_UPDATED_DESC)
     page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE)
@@ -275,6 +294,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "attack_max": self._int_or_none("attack_max"),
             "health_min": self._int_or_none("health_min"),
             "health_max": self._int_or_none("health_max"),
+            "lifecycle_status": self._lifecycle_status_value("lifecycle_status"),
             "sort": self._sort_value("sort"),
         }
 
@@ -314,6 +334,10 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         value = self.validated_data.get(key)
         return value if value in CARD_SORT_VALUES else CARD_SORT_UPDATED_DESC
 
+    def _lifecycle_status_value(self, key: str) -> CardLifecycleFilter:
+        value = self.validated_data.get(key)
+        return normalize_card_lifecycle_filter(value)
+
     def _string_list_or_none(self, key: str) -> list[str] | None:
         value = self.validated_data.get(key)
         if not isinstance(value, list):
@@ -331,6 +355,7 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     is_hero = serializers.BooleanField(required=False)
+    lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -361,6 +386,8 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
             updates["rules_text"] = self.validated_data["rules_text_enriched"]
         if "is_hero" in self.validated_data:
             updates["is_hero"] = self.validated_data["is_hero"]
+        if "lifecycle_status" in self.validated_data:
+            updates["lifecycle_status"] = self.validated_data["lifecycle_status"]
         for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):
             if field_name in self.validated_data:
                 updates[field_name] = self.validated_data[field_name]

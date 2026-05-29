@@ -24,8 +24,8 @@
     <div class="min-h-0 flex-1 overflow-y-auto pr-1 pt-5">
       <div class="space-y-4">
         <div class="theme-muted-panel p-3">
-          <div class="flex items-center justify-between gap-4">
-            <div>
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="theme-section-title text-sm font-semibold">
                 Hero Card
               </p>
@@ -34,7 +34,7 @@
               </p>
             </div>
 
-            <label class="theme-section-title flex items-center gap-3 text-sm font-semibold">
+            <label class="theme-section-title flex shrink-0 items-center gap-3 text-sm font-semibold">
               <input
                 :checked="form.is_hero"
                 type="checkbox"
@@ -44,6 +44,33 @@
               >
               <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
             </label>
+          </div>
+        </div>
+
+        <div class="theme-muted-panel p-3">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+              <p class="theme-section-title text-sm font-semibold">
+                Card Status
+              </p>
+              <p class="theme-section-muted text-xs">
+                Deprecated cards stay stored but are hidden from normal play views.
+              </p>
+            </div>
+
+            <div class="grid min-w-52 grid-cols-2 gap-2">
+              <button
+                v-for="option in lifecycleOptions"
+                :key="option.value"
+                class="theme-pill justify-center px-3 py-2 text-xs font-semibold"
+                :class="form.lifecycle_status === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
+                type="button"
+                :disabled="!version.editable || isBusy"
+                @click="$emit('update-lifecycle-status', option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -428,6 +455,11 @@ import { Lock } from 'lucide-vue-next';
 import AppSelect from '@/components/app/AppSelect.vue';
 import SymbolToken from '@/components/SymbolToken.vue';
 import {
+  ACTIVE_CARD_LIFECYCLE_STATUS,
+  DEPRECATED_CARD_LIFECYCLE_STATUS,
+  type CardLifecycleStatus,
+} from '@/modules/card-filters/cardLifecycle';
+import {
   applySymbolAutocomplete,
   findActiveSymbolTrigger,
 } from '@/modules/card-detail/ruleTextSymbols';
@@ -482,6 +514,7 @@ const emit = defineEmits<{
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
   (e: 'update-hero', value: boolean): void;
+  (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
 
 const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
@@ -490,6 +523,10 @@ const rulesTextCaretIndex = ref(0);
 const activeAutocompleteIndex = ref(0);
 const dismissedTriggerStart = ref<number | null>(null);
 const nonSymbolMetadataGroups = metadataGroups.filter((group) => group.name !== 'symbols');
+const lifecycleOptions = [
+  { value: ACTIVE_CARD_LIFECYCLE_STATUS, label: 'Active' },
+  { value: DEPRECATED_CARD_LIFECYCLE_STATUS, label: 'Deprecated' },
+] as const;
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
 const additionalSymbolIds = computed(() => props.additionalSymbolIds);

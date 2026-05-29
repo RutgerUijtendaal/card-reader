@@ -4,9 +4,17 @@ import type {
   MetadataOption,
   SymbolFilterOption,
 } from '@/modules/card-detail/types';
+import {
+  buildCardLifecycleApiParams,
+  DEFAULT_CARD_LIFECYCLE_FILTER,
+  normalizeCardLifecycleFilterValue,
+  type CardLifecycleFilterValue,
+} from '@/modules/card-filters/cardLifecycle';
+export type { CardLifecycleFilterValue } from '@/modules/card-filters/cardLifecycle';
 
 export type CardFilterState = {
   query: string;
+  lifecycleStatus?: CardLifecycleFilterValue;
   keywordMatch: 'any' | 'all';
   tagMatch: 'any' | 'all';
   typeMatch: 'any' | 'all';
@@ -36,6 +44,7 @@ export type CardFilterState = {
 
 export type CardFilterSelectionState = {
   query: string;
+  lifecycleStatus?: CardLifecycleFilterValue;
   keywordMatch: 'any' | 'all';
   tagMatch: 'any' | 'all';
   typeMatch: 'any' | 'all';
@@ -75,6 +84,7 @@ export type CardFilterCatalog = {
 
 export type CardFilterApiPayload = {
   q?: string;
+  lifecycle_status?: CardLifecycleFilterValue;
   keyword_ids?: string[];
   keyword_match?: 'any' | 'all';
   tag_ids?: string[];
@@ -104,6 +114,7 @@ export type CardFilterApiPayload = {
 
 export const createEmptyCardFilterState = (): CardFilterState => ({
   query: '',
+  lifecycleStatus: DEFAULT_CARD_LIFECYCLE_FILTER,
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
@@ -133,6 +144,7 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
 
 export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState => ({
   query: '',
+  lifecycleStatus: DEFAULT_CARD_LIFECYCLE_FILTER,
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
@@ -183,6 +195,7 @@ const readQueryValues = (
 
 export const normalizeCardFilterState = (state: CardFilterState): CardFilterState => ({
   query: normalizeStringValue(state.query),
+  lifecycleStatus: normalizeCardLifecycleFilterValue(state.lifecycleStatus),
   keywordMatch: state.keywordMatch === 'all' ? 'all' : 'any',
   tagMatch: state.tagMatch === 'all' ? 'all' : 'any',
   typeMatch: state.typeMatch === 'all' ? 'all' : 'any',
@@ -214,6 +227,7 @@ export const normalizeCardFilterSelectionState = (
   state: CardFilterSelectionState,
 ): CardFilterSelectionState => ({
   query: normalizeStringValue(state.query),
+  lifecycleStatus: normalizeCardLifecycleFilterValue(state.lifecycleStatus),
   keywordMatch: state.keywordMatch === 'all' ? 'all' : 'any',
   tagMatch: state.tagMatch === 'all' ? 'all' : 'any',
   typeMatch: state.typeMatch === 'all' ? 'all' : 'any',
@@ -244,6 +258,9 @@ export const normalizeCardFilterSelectionState = (
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
   normalizeCardFilterState({
     query: typeof query.q === 'string' ? query.q : '',
+    lifecycleStatus: normalizeCardLifecycleFilterValue(
+      typeof query.lifecycle_status === 'string' ? query.lifecycle_status : undefined,
+    ),
     keywordMatch: query.keyword_match === 'all' ? 'all' : 'any',
     tagMatch: query.tag_match === 'all' ? 'all' : 'any',
     typeMatch: query.type_match === 'all' ? 'all' : 'any',
@@ -276,6 +293,7 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   const query: LocationQueryRaw = {};
 
   if (normalized.query) query.q = normalized.query;
+  if (normalized.lifecycleStatus !== DEFAULT_CARD_LIFECYCLE_FILTER) query.lifecycle_status = normalized.lifecycleStatus;
   if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
   if (normalized.tagMatch === 'all') query.tag_match = 'all';
   if (normalized.typeMatch === 'all') query.type_match = 'all';
@@ -362,6 +380,7 @@ export const buildCardFilterSelectionState = (
 ): CardFilterSelectionState =>
   normalizeCardFilterSelectionState({
     query: state.query,
+    lifecycleStatus: state.lifecycleStatus,
     keywordMatch: state.keywordMatch,
     tagMatch: state.tagMatch,
     typeMatch: state.typeMatch,
@@ -395,6 +414,7 @@ export const buildCardFilterStateFromSelection = (
 ): CardFilterState =>
   normalizeCardFilterState({
     query: state.query,
+    lifecycleStatus: state.lifecycleStatus,
     keywordMatch: state.keywordMatch,
     tagMatch: state.tagMatch,
     typeMatch: state.typeMatch,
@@ -430,6 +450,7 @@ export const buildCardFilterApiSearchParams = (
   const params = new URLSearchParams();
 
   if (payload.q) params.set('q', payload.q);
+  if (payload.lifecycle_status) params.set('lifecycle_status', payload.lifecycle_status);
   if (payload.keyword_ids) {
     payload.keyword_ids.forEach((id) => params.append('keyword_ids', id));
     params.set('keyword_match', payload.keyword_match ?? normalized.keywordMatch);
@@ -488,6 +509,7 @@ export const buildCardFilterApiPayload = (
   const payload: CardFilterApiPayload = {};
 
   if (normalized.query) payload.q = normalized.query;
+  Object.assign(payload, buildCardLifecycleApiParams(normalized.lifecycleStatus));
   if (normalized.keywordIds.length > 0) {
     payload.keyword_ids = normalized.keywordIds;
     payload.keyword_match = normalized.keywordMatch;
