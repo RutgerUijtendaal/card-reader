@@ -18,7 +18,7 @@
             </p>
           </div>
 
-          <div class="mt-4 grid gap-3 md:grid-cols-2">
+          <div class="mt-4 grid gap-3 xl:grid-cols-3">
             <button
               class="btn-secondary justify-center"
               type="button"
