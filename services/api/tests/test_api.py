@@ -218,19 +218,15 @@ def test_auth_enabled_requires_superuser_for_maintenance() -> None:
     staff_client.force_login(staff_user)
     superuser_client.force_login(superuser)
 
-    staff_response = staff_client.post(
+    for path in [
         "/admin/maintenance/queue-latest-reparse",
-        data={},
-        content_type="application/json",
-    )
-    superuser_response = superuser_client.post(
-        "/admin/maintenance/queue-latest-reparse",
-        data={},
-        content_type="application/json",
-    )
+        "/admin/maintenance/convert-card-images-to-webp",
+    ]:
+        staff_response = staff_client.post(path, data={}, content_type="application/json")
+        superuser_response = superuser_client.post(path, data={}, content_type="application/json")
 
-    assert staff_response.status_code == 403
-    assert superuser_response.status_code == 200
+        assert staff_response.status_code == 403
+        assert superuser_response.status_code == 200
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

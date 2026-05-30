@@ -18,7 +18,7 @@
             </p>
           </div>
 
-          <div class="mt-4 grid gap-3 md:grid-cols-2">
+          <div class="mt-4 grid gap-3 xl:grid-cols-3">
             <button
               class="btn-secondary justify-center"
               type="button"
@@ -35,76 +35,103 @@
             >
               {{ runningQueueReparse ? 'Queueing...' : 'Queue Latest Reparses' }}
             </button>
+            <button
+              class="btn-secondary justify-center"
+              type="button"
+              :disabled="runningConvertCardImages"
+              @click="convertCardImagesToWebp"
+            >
+              {{ runningConvertCardImages ? 'Converting...' : 'Convert Card Images To WebP' }}
+            </button>
           </div>
         </section>
 
         <section class="theme-muted-panel p-4">
-          <div class="space-y-1">
-            <h4 class="theme-section-title text-sm font-semibold">
-              Reparse By Filters
-            </h4>
-            <p class="theme-section-muted text-sm">
-              Reuse the current card filter logic to select latest card versions, preview how many match, and queue only that subset for reparse.
-            </p>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="space-y-1">
+              <h4 class="theme-section-title text-sm font-semibold">
+                Filtered Reparse
+              </h4>
+              <p class="theme-section-muted text-sm">
+                Queue reparses for a selected subset of latest card versions.
+              </p>
+            </div>
+
+            <button
+              class="btn-secondary justify-center"
+              type="button"
+              :disabled="!filtersLoaded"
+              @click="filtersExpanded = !filtersExpanded"
+            >
+              {{ filtersExpanded ? 'Hide Filters' : 'Show Filters' }}
+            </button>
           </div>
 
           <div class="mt-4 space-y-4">
-            <label class="field-label">
-              Search
-              <input
-                v-model="filterQuery"
-                class="input-base"
-                placeholder="Name, rules text, or related metadata"
-              >
-            </label>
+            <div class="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+              <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="space-y-1">
+                  <div class="theme-section-title text-sm font-semibold">
+                    {{ activeFilterSummary }}
+                  </div>
+                  <div class="theme-section-muted text-sm">
+                    {{ filteredReparseSummary }}
+                  </div>
+                </div>
 
-            <CardFilterSections
-              v-if="filtersLoaded"
-              :state="filterSectionsState"
-            />
+                <div class="flex flex-col gap-3 sm:flex-row lg:shrink-0">
+                  <button
+                    class="btn-secondary justify-center"
+                    type="button"
+                    :disabled="runningPreviewCount || !hasActiveReparseFilters || !filtersLoaded"
+                    @click="previewFilteredReparseCount"
+                  >
+                    {{ runningPreviewCount ? 'Counting...' : 'Preview Count' }}
+                  </button>
+                  <button
+                    class="btn-primary justify-center"
+                    type="button"
+                    :disabled="runningQueueFilteredReparse || !hasActiveReparseFilters || !filtersLoaded"
+                    @click="queueFilteredReparse"
+                  >
+                    {{ runningQueueFilteredReparse ? 'Queueing...' : 'Queue Selection' }}
+                  </button>
+                  <button
+                    class="btn-secondary justify-center"
+                    type="button"
+                    :disabled="!hasActiveReparseFilters"
+                    @click="resetFilteredReparse"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div
-              v-else
+              v-if="!filtersLoaded"
               class="theme-section-muted text-sm"
             >
               Loading filter options...
             </div>
 
-            <div class="flex flex-col gap-3 rounded-2xl border border-dashed border-[var(--theme-border-strong)] bg-[var(--theme-panel-subtle)]/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div class="space-y-1">
-                <div class="theme-section-title text-sm font-semibold">
-                  Selection preview
-                </div>
-                <div class="theme-section-muted text-sm">
-                  {{ filteredReparseSummary }}
-                </div>
-              </div>
+            <div
+              v-if="filtersExpanded && filtersLoaded"
+              class="space-y-4"
+            >
+              <label class="field-label">
+                Search
+                <input
+                  v-model="filterQuery"
+                  class="input-base"
+                  placeholder="Name, rules text, or related metadata"
+                >
+              </label>
 
-              <div class="flex flex-col gap-3 sm:flex-row">
-                <button
-                  class="btn-secondary justify-center"
-                  type="button"
-                  :disabled="runningPreviewCount || !hasActiveReparseFilters || !filtersLoaded"
-                  @click="previewFilteredReparseCount"
-                >
-                  {{ runningPreviewCount ? 'Counting...' : 'Preview Match Count' }}
-                </button>
-                <button
-                  class="btn-primary justify-center"
-                  type="button"
-                  :disabled="runningQueueFilteredReparse || !hasActiveReparseFilters || !filtersLoaded"
-                  @click="queueFilteredReparse"
-                >
-                  {{ runningQueueFilteredReparse ? 'Queueing...' : 'Queue Reparses For Selection' }}
-                </button>
-                <button
-                  class="btn-secondary justify-center"
-                  type="button"
-                  :disabled="!hasActiveReparseFilters"
-                  @click="resetFilteredReparse"
-                >
-                  Reset Filters
-                </button>
-              </div>
+              <CardFilterSections
+                :state="filterSectionsState"
+                :default-open-sections="[]"
+              />
             </div>
           </div>
         </section>
@@ -123,6 +150,9 @@
           </li>
           <li>
             Backfill metadata suggestions rebuilds suggested tags and types from current latest card versions.
+          </li>
+          <li>
+            WebP conversion updates canonical card image paths while keeping original files available.
           </li>
         </ul>
       </aside>
@@ -145,9 +175,11 @@ import { useCardFilterController } from '@/modules/card-filters/useCardFilterCon
 
 const runningBackfillSuggestions = ref(false);
 const runningQueueReparse = ref(false);
+const runningConvertCardImages = ref(false);
 const runningPreviewCount = ref(false);
 const runningQueueFilteredReparse = ref(false);
 const filteredMatchCount = ref<number | null>(null);
+const filtersExpanded = ref(false);
 const {
   filtersLoaded,
   filterSectionsState,
@@ -170,10 +202,20 @@ const hasActiveReparseFilters = computed(
 const reparseFilterSignature = computed(() =>
   buildCardFilterApiSearchParams(selectionState.value).toString(),
 );
+const activeFilterCount = computed(() => {
+  const payload = buildCardFilterApiPayload(selectionState.value);
+  return Object.keys(payload).filter((key) => !key.endsWith('_match')).length;
+});
+const activeFilterSummary = computed(() => {
+  if (activeFilterCount.value === 0) {
+    return 'No filters selected';
+  }
+  return `${activeFilterCount.value} filter${activeFilterCount.value === 1 ? '' : 's'} selected`;
+});
 
 const filteredReparseSummary = computed(() => {
   if (!hasActiveReparseFilters.value) {
-    return 'Add at least one filter before previewing or queueing a filtered reparse run.';
+    return 'Filtered reparse is idle.';
   }
   if (filteredMatchCount.value === null) {
     return 'Preview the current filter selection to see how many latest card versions will be queued.';
@@ -257,6 +299,22 @@ const backfillMetadataSuggestions = async (): Promise<void> => {
     toast.error(extractErrorMessage(error, 'Failed to backfill metadata suggestions.'));
   } finally {
     runningBackfillSuggestions.value = false;
+  }
+};
+
+const convertCardImagesToWebp = async (): Promise<void> => {
+  if (runningConvertCardImages.value) return;
+  runningConvertCardImages.value = true;
+  try {
+    const response = await api.post<MaintenanceActionResponse>(
+      '/admin/maintenance/convert-card-images-to-webp',
+    );
+    toast.success(response.data.message);
+  } catch (error) {
+    console.error('Convert card images to WebP failed', error);
+    toast.error(extractErrorMessage(error, 'Failed to convert card images to WebP.'));
+  } finally {
+    runningConvertCardImages.value = false;
   }
 };
 

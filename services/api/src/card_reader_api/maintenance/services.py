@@ -13,6 +13,7 @@ from card_reader_core.repositories.cards import (
 )
 from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
 from card_reader_core.config.settings import settings
+from card_reader_core.services.cards import CardImageConversionResult, convert_card_images_to_webp
 
 
 @dataclass(slots=True)
@@ -21,12 +22,27 @@ class MaintenanceResult:
     removed_paths: list[str]
 
 
+@dataclass(slots=True)
+class CardImageConversionMaintenanceResult:
+    message: str
+    removed_paths: list[str]
+    conversion: CardImageConversionResult
+
+
 class MaintenanceService:
     def backfill_metadata_suggestions(self) -> MaintenanceResult:
         call_command("backfill_metadata_suggestions", verbosity=0)
         return MaintenanceResult(
             message="Metadata suggestions backfill completed.",
             removed_paths=[],
+        )
+
+    def convert_card_images_to_webp(self) -> CardImageConversionMaintenanceResult:
+        conversion = convert_card_images_to_webp()
+        return CardImageConversionMaintenanceResult(
+            message=conversion.message,
+            removed_paths=[],
+            conversion=conversion,
         )
 
     def queue_reparse_latest_versions(self) -> MaintenanceResult:
