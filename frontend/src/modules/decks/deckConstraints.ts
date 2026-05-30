@@ -76,6 +76,11 @@ type DeckConstraintViolation = {
   message: string;
 };
 
+type RuleApplicationEntry = {
+  cardId: string;
+  boardId: string;
+};
+
 export const isLegendaryCard = (card: DeckConstraintCard | null | undefined): boolean =>
   Boolean(card?.types.some((type) => type.key.trim().toLowerCase() === 'legendary'));
 
@@ -89,36 +94,33 @@ export const resolveDeckBuildingRules = (
     rules = applyDeckBuildingConfig(rules, context.heroCard.deck_building_config);
   }
 
-  const entryCardIds = new Set<string>();
+  const ruleEntries: RuleApplicationEntry[] = [
+    ...context.mainboardEntries.map((entry) => ({ cardId: entry.card_id, boardId: context.mainboardId })),
+    ...context.sideboards.flatMap((sideboard) =>
+      sideboard.entries.map((entry) => ({ cardId: entry.card_id, boardId: sideboard.id })),
+    ),
+  ];
+  if (
+    candidateCard
+    && candidateBoardId !== undefined
+    && !ruleEntries.some((entry) => entry.cardId === candidateCard.id && entry.boardId === candidateBoardId)
+  ) {
+    ruleEntries.push({ cardId: candidateCard.id, boardId: candidateBoardId });
+  }
+
+  const appliedCardIds = new Set<string>();
   const applyCard = (cardId: string): void => {
-    entryCardIds.add(cardId);
+    appliedCardIds.add(cardId);
     const card = context.cardLookup[cardId];
     if (card) {
       rules = applyDeckBuildingConfig(rules, card.deck_building_config);
     }
   };
-  const candidateBelongsOnBoard = (boardId: string, entries: DeckConstraintEntry[]): boolean =>
-    candidateBoardId === boardId
-    && candidateCard !== undefined
-    && !entries.some((entry) => entry.card_id === candidateCard.id);
 
-  for (const entry of context.mainboardEntries) {
-    applyCard(entry.card_id);
+  for (const entry of sortedRuleEntries(ruleEntries)) {
+    applyCard(entry.cardId);
   }
-  if (candidateCard && candidateBelongsOnBoard(context.mainboardId, context.mainboardEntries)) {
-    rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config);
-    entryCardIds.add(candidateCard.id);
-  }
-  for (const sideboard of context.sideboards) {
-    for (const entry of sideboard.entries) {
-      applyCard(entry.card_id);
-    }
-    if (candidateCard && candidateBelongsOnBoard(sideboard.id, sideboard.entries)) {
-      rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config);
-      entryCardIds.add(candidateCard.id);
-    }
-  }
-  if (candidateCard && candidateBoardId === undefined && !entryCardIds.has(candidateCard.id)) {
+  if (candidateCard && candidateBoardId === undefined && !appliedCardIds.has(candidateCard.id)) {
     rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config);
   }
   return rules;
@@ -336,12 +338,31 @@ const applyRuleOverride = (
   severity: override.severity === 'hard' || override.severity === 'soft' ? override.severity : rule.severity,
   scope: override.scope === 'mainboard' || override.scope === 'whole_deck' ? override.scope : rule.scope,
   blocks_action: typeof override.blocks_action === 'boolean' ? override.blocks_action : rule.blocks_action,
-  min: nonNegativeNumberOrCurrent(override.min ?? override.count ?? override.minimum, rule.min),
-  max: nonNegativeNumberOrCurrent(override.max ?? override.maximum, rule.max),
+  min: nonNegativeNumberOrCurrent(getLastDefinedOverride(override, ['min', 'count', 'minimum']), rule.min),
+  max: nonNegativeNumberOrCurrent(getLastDefinedOverride(override, ['max', 'maximum']), rule.max),
 });
 
 const nonNegativeNumberOrCurrent = (value: unknown, current: number | undefined): number | undefined =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : current;
+
+const getLastDefinedOverride = (
+  override: DeckBuildingRuleOverride,
+  keys: Array<keyof DeckBuildingRuleOverride>,
+): unknown => {
+  let value: unknown;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(override, key)) {
+      value = override[key];
+    }
+  }
+  return value;
+};
+
+const sortedRuleEntries = (entries: RuleApplicationEntry[]): RuleApplicationEntry[] =>
+  [...entries].sort((left, right) => {
+    const cardComparison = left.cardId.localeCompare(right.cardId);
+    return cardComparison !== 0 ? cardComparison : left.boardId.localeCompare(right.boardId);
+  });
 
 const isActionBlockingRule = (rule: DeckBuildingRule): boolean =>
   rule.severity === 'hard' && rule.blocks_action;

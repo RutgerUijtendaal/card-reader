@@ -24,7 +24,13 @@ from card_reader_core.models import (
 )
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path
-from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
+from card_reader_core.services.decks import (
+    DeckConstraintEntry,
+    DeckConstraintEvaluator,
+    DeckEntryInput,
+    DeckService,
+    DeckSideboardInput,
+)
 
 _CARD_NAME_COUNTER = count()
 
@@ -1620,6 +1626,41 @@ def test_hero_override_allows_six_mainboard_copies() -> None:
     assert response.json()["deck_building_rules"]["mainboard_copy_limit"]["max"] == 6
 
 
+def test_card_deck_building_overrides_resolve_independent_of_entry_order() -> None:
+    first_card = _create_card(
+        name="Ordered Override First",
+        is_hero=False,
+        deck_building_config={
+            "overrides": {
+                "mainboard_copy_limit": {
+                    "max": 1,
+                }
+            }
+        },
+    )
+    second_card = _create_card(
+        name="Ordered Override Second",
+        is_hero=False,
+        deck_building_config={
+            "overrides": {
+                "mainboard_copy_limit": {
+                    "max": 6,
+                }
+            }
+        },
+    )
+    evaluator = DeckConstraintEvaluator()
+    entries = [
+        DeckConstraintEntry(card=first_card, quantity=1, board="mainboard"),
+        DeckConstraintEntry(card=second_card, quantity=1, board="mainboard"),
+    ]
+
+    forward_rules = evaluator.resolve_rules(hero_card=None, entries=entries).to_json()
+    reverse_rules = evaluator.resolve_rules(hero_card=None, entries=list(reversed(entries))).to_json()
+
+    assert forward_rules == reverse_rules
+
+
 @override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_whole_deck_mainboard_copy_scope_counts_sideboard_copies() -> None:
     username = "deck-whole-copy-scope-user"
@@ -2077,3 +2118,23 @@ def test_latest_version_patch_rejects_boolean_deck_building_numeric_values() -> 
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Deck-building numeric rule values must be non-negative integers."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_version_patch_rejects_duplicate_deck_building_numeric_aliases() -> None:
+    username = "deck-card-duplicate-rule-alias-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    card = _create_card(name="Duplicate Rule Alias Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"deck_building_config": {"overrides": {"mana_type_count": {"min": 10, "count": 0}}}},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Deck-building numeric aliases cannot be combined for the same rule."

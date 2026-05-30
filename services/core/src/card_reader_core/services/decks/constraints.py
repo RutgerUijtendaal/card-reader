@@ -242,7 +242,7 @@ class DeckConstraintEvaluator:
         rules = DeckConstraintRules.defaults()
         if hero_card is not None:
             rules = rules.apply_config(hero_card.deck_building_config_json)
-        for entry in entries:
+        for entry in _sorted_rule_entries(entries):
             rules = rules.apply_config(entry.card.deck_building_config_json)
         return rules
 
@@ -414,6 +414,7 @@ def normalize_deck_building_config(value: object) -> dict[str, object]:
             raise ValueError(f"Unsupported deck-building rule id: {rule_id}.")
         if not isinstance(override, dict):
             raise ValueError("Deck-building rule overrides must be JSON objects.")
+        _validate_numeric_aliases(override)
         normalized_override: dict[str, object] = {}
         for key, raw_value in override.items():
             if key in {"severity"}:
@@ -486,6 +487,17 @@ def _non_negative_int_or_current(value: object, current: int | None) -> int | No
     if isinstance(value, int) and value >= 0:
         return value
     return current
+
+
+def _validate_numeric_aliases(override: dict[object, object]) -> None:
+    min_aliases = {"min", "count", "minimum"}
+    max_aliases = {"max", "maximum"}
+    if len(min_aliases.intersection(override)) > 1 or len(max_aliases.intersection(override)) > 1:
+        raise ValueError("Deck-building numeric aliases cannot be combined for the same rule.")
+
+
+def _sorted_rule_entries(entries: list[DeckConstraintEntry]) -> list[DeckConstraintEntry]:
+    return sorted(entries, key=lambda entry: (entry.card.id, entry.board))
 
 
 def _scoped_entries(

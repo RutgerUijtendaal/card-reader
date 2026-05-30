@@ -293,7 +293,7 @@ describe('useDeckEditorDraft', () => {
     expect(controller.validationMessages.value).not.toContain('Each mainboard card quantity must be between 1 and 4.');
   });
 
-  test('resolves card overrides for repeated configured entries in board order', () => {
+  test('resolves card overrides in deterministic card id order', () => {
     const repeated = {
       ...buildCard('repeated', 'Repeated Override', 2),
       deck_building_config: {
@@ -327,7 +327,32 @@ describe('useDeckEditorDraft', () => {
       ],
     });
 
-    expect(rules.mainboard_copy_limit.max).toBe(6);
+    expect(rules.mainboard_copy_limit.max).toBe(1);
+  });
+
+  test('uses backend numeric alias precedence for local rule resolution', () => {
+    const hero = {
+      ...buildCard('hero', 'Hero Card', 0),
+      is_hero: true,
+      type_line: 'Hero',
+      deck_building_config: {
+        overrides: {
+          mana_type_count: { min: 10, count: 0 },
+          mainboard_card_count: { max: 50, maximum: 25 },
+        },
+      },
+    };
+
+    const rules = resolveDeckBuildingRules({
+      mainboardId: 'mainboard',
+      heroCard: hero,
+      cardLookup: { hero },
+      mainboardEntries: [],
+      sideboards: [],
+    });
+
+    expect(rules.mana_type_count.min).toBe(0);
+    expect(rules.mainboard_card_count.max).toBe(25);
   });
 
   test('resolves mainboard count limits with the candidate card before adding', () => {
