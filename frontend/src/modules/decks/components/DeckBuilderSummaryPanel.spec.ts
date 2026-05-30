@@ -118,6 +118,7 @@ const buildController = () => {
       removeSideboard: vi.fn(),
       boardRowActionDisabled: vi.fn(() => false),
       boardRowSecondaryActionDisabled: vi.fn(() => false),
+      getCardQuantityLimit: vi.fn(() => 4),
       getBoardMoveDestinations: vi.fn(() => []),
       moveEntryToBoard: vi.fn(),
       changeQuantity: vi.fn(),

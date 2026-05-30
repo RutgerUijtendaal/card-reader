@@ -7,6 +7,12 @@ import {
   MIN_MAINBOARD_CARD_COUNT,
   MIN_MAINBOARD_MANA_TYPE_COUNT,
 } from '@/modules/decks/constants';
+import {
+  getDeckConstraintMessages,
+  getDeckEntryQuantityLimit,
+  getDeckQuantityViolationMessage,
+  type DeckConstraintContext,
+} from '@/modules/decks/deckConstraints';
 import type { DeckCardSummary, DeckMetadataOption, DeckRecord, DeckUpsertRequest, DeckVisibility } from '@/modules/decks/types';
 
 export type DeckFormEntry = {
@@ -105,6 +111,11 @@ export const useDeckEditorDraft = ({
   );
   const activeSideboard = computed(() => form.sideboards.find((sideboard) => sideboard.id === activeBoardId.value) ?? null);
   const activeBoardEntries = computed(() => (activeBoardId.value === MAINBOARD_ID ? form.entries : activeSideboard.value?.entries ?? []));
+  const baseConstraintContext = computed(() => ({
+    mainboardId: MAINBOARD_ID,
+    mainboardEntries: form.entries,
+    sideboards: form.sideboards,
+  }));
 
   const mapDetailedEntries = (entries: DeckFormEntry[]) =>
     entries
@@ -179,8 +190,8 @@ export const useDeckEditorDraft = ({
       messages.push(`Deck must contain at least ${MIN_MAINBOARD_MANA_TYPE_COUNT} mainboard cards with type 'Mana'.`);
     }
     for (const entry of form.entries) {
-      if (entry.quantity < 1 || entry.quantity > MAX_DECK_COPIES) {
-        messages.push(`Each mainboard card quantity must stay between 1 and ${MAX_DECK_COPIES}.`);
+      if (entry.quantity < 1) {
+        messages.push('Each mainboard card quantity must be at least 1.');
         break;
       }
     }
@@ -198,6 +209,7 @@ export const useDeckEditorDraft = ({
         break;
       }
     }
+    messages.push(...getDeckConstraintMessages(cardLookup.value, baseConstraintContext.value));
     return messages;
   });
 
@@ -303,6 +315,56 @@ export const useDeckEditorDraft = ({
   const getEntryQuantity = (cardId: string, boardId = activeBoardId.value): number =>
     getBoardEntries(boardId).find((entry) => entry.card_id === cardId)?.quantity ?? 0;
 
+  const getConstraintContext = (boardId = activeBoardId.value): DeckConstraintContext => ({
+    ...baseConstraintContext.value,
+    boardId,
+  });
+
+  const getMoveConstraintContext = (
+    cardId: string,
+    sourceBoardId: string,
+    destinationBoardId: string,
+  ): DeckConstraintContext => {
+    const removeMovedCopy = (entries: DeckFormEntry[]): DeckFormEntry[] =>
+      entries.flatMap((entry) => {
+        if (entry.card_id !== cardId) {
+          return [entry];
+        }
+        if (entry.quantity <= 1) {
+          return [];
+        }
+        return [{ ...entry, quantity: entry.quantity - 1 }];
+      });
+
+    return {
+      mainboardId: MAINBOARD_ID,
+      boardId: destinationBoardId,
+      mainboardEntries: sourceBoardId === MAINBOARD_ID ? removeMovedCopy(form.entries) : form.entries,
+      sideboards: form.sideboards.map((sideboard) => ({
+        ...sideboard,
+        entries: sourceBoardId === sideboard.id ? removeMovedCopy(sideboard.entries) : sideboard.entries,
+      })),
+    };
+  };
+
+  const getCardQuantityLimit = (cardId: string, boardId = activeBoardId.value): number => {
+    const card = cardLookup.value[cardId];
+    if (!card) {
+      return boardId === MAINBOARD_ID ? MAX_DECK_COPIES : MAX_SIDEBOARD_ENTRY_QUANTITY;
+    }
+    return getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
+  };
+
+  const getCardQuantityLimitMessage = (cardId: string, boardId = activeBoardId.value): string => {
+    const card = cardLookup.value[cardId];
+    if (!card) {
+      return boardId === MAINBOARD_ID
+        ? `Mainboard copy limit is ${MAX_DECK_COPIES}.`
+        : `Sideboard copy limit is ${MAX_SIDEBOARD_ENTRY_QUANTITY}.`;
+    }
+    return getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).message;
+  };
+
   const getBoardLabel = (boardId: string): string => {
     if (boardId === MAINBOARD_ID) {
       return 'Mainboard';
@@ -322,8 +384,9 @@ export const useDeckEditorDraft = ({
     rememberCards([card]);
     const boardId = activeBoardId.value;
     const currentQuantity = getEntryQuantity(card.id, boardId);
+    const quantityLimit = getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
     if (boardId === MAINBOARD_ID) {
-      if (currentQuantity >= MAX_DECK_COPIES || totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) {
+      if (currentQuantity >= quantityLimit || totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) {
         return;
       }
       if (currentQuantity === 0) {
@@ -331,12 +394,15 @@ export const useDeckEditorDraft = ({
         return;
       }
       form.entries = form.entries.map((entry) =>
-        entry.card_id === card.id ? { ...entry, quantity: Math.min(MAX_DECK_COPIES, entry.quantity + 1) } : entry,
+        entry.card_id === card.id ? { ...entry, quantity: Math.min(quantityLimit, entry.quantity + 1) } : entry,
       );
       return;
     }
 
     const boardEntries = getBoardEntries(boardId);
+    if (currentQuantity >= quantityLimit) {
+      return;
+    }
     if (currentQuantity === 0) {
       updateBoardEntries(boardId, [...boardEntries, { card_id: card.id, quantity: 1 }]);
       return;
@@ -345,7 +411,7 @@ export const useDeckEditorDraft = ({
       boardId,
       boardEntries.map((entry) =>
         entry.card_id === card.id
-          ? { ...entry, quantity: Math.min(MAX_SIDEBOARD_ENTRY_QUANTITY, entry.quantity + 1) }
+          ? { ...entry, quantity: Math.min(quantityLimit, entry.quantity + 1) }
           : entry,
       ),
     );
@@ -366,10 +432,9 @@ export const useDeckEditorDraft = ({
         if (entry.card_id !== cardId) {
           return entry;
         }
+        const quantityLimit = getCardQuantityLimit(cardId, boardId);
         const nextQuantity =
-          boardId === MAINBOARD_ID
-            ? Math.max(1, Math.min(MAX_DECK_COPIES, entry.quantity + delta))
-            : Math.max(1, Math.min(MAX_SIDEBOARD_ENTRY_QUANTITY, entry.quantity + delta));
+          Math.max(1, Math.min(quantityLimit, entry.quantity + delta));
         return { ...entry, quantity: nextQuantity };
       }),
     );
@@ -377,11 +442,10 @@ export const useDeckEditorDraft = ({
 
   const setQuantity = (cardId: string, rawValue: string, boardId = activeBoardId.value): void => {
     const parsed = Number.parseInt(rawValue, 10);
+    const quantityLimit = getCardQuantityLimit(cardId, boardId);
     const quantity = Number.isNaN(parsed)
       ? 1
-      : boardId === MAINBOARD_ID
-        ? Math.max(1, Math.min(MAX_DECK_COPIES, parsed))
-        : Math.max(1, Math.min(MAX_SIDEBOARD_ENTRY_QUANTITY, parsed));
+      : Math.max(1, Math.min(quantityLimit, parsed));
     updateBoardEntries(
       boardId,
       getBoardEntries(boardId).map((entry) => (entry.card_id === cardId ? { ...entry, quantity } : entry)),
@@ -395,15 +459,16 @@ export const useDeckEditorDraft = ({
 
     const boardId = activeBoardId.value;
     const quantity = getEntryQuantity(card.id, boardId);
+    const quantityLimit = getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
     if (boardId === MAINBOARD_ID) {
       if (quantity === 0 && totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) return 'Mainboard Full';
       if (quantity === 0) return 'Add To Mainboard';
-      if (quantity >= MAX_DECK_COPIES) return 'At Copy Limit';
+      if (quantity >= quantityLimit) return quantityLimit === 1 ? 'At Legendary Limit' : 'At Copy Limit';
       if (totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT) return `At Mainboard Limit (${quantity})`;
-      return `Add Copy (${quantity}/${MAX_DECK_COPIES})`;
+      return `Add Copy (${quantity}/${quantityLimit})`;
     }
     if (quantity === 0) return 'Add To Sideboard';
-    if (quantity >= MAX_SIDEBOARD_ENTRY_QUANTITY) return 'At Sideboard Limit';
+    if (quantity >= quantityLimit) return quantityLimit === 1 ? 'At Legendary Limit' : 'At Sideboard Limit';
     return `Add Copy (${quantity})`;
   };
 
@@ -415,9 +480,10 @@ export const useDeckEditorDraft = ({
     const boardId = activeBoardId.value;
     const quantity = getEntryQuantity(card.id, boardId);
     if (boardId === MAINBOARD_ID) {
-      return quantity >= MAX_DECK_COPIES || (quantity === 0 && totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT);
+      return quantity >= getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max
+        || (quantity === 0 && totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT);
     }
-    return quantity >= MAX_SIDEBOARD_ENTRY_QUANTITY;
+    return quantity >= getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
   };
 
   const galleryRemoveActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
@@ -437,9 +503,9 @@ export const useDeckEditorDraft = ({
       return true;
     }
     if (boardId === MAINBOARD_ID) {
-      return quantity >= MAX_DECK_COPIES || totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT;
+      return quantity >= getCardQuantityLimit(cardId, boardId) || totalMainboardCards.value >= MAX_MAINBOARD_CARD_COUNT;
     }
-    return quantity >= MAX_SIDEBOARD_ENTRY_QUANTITY;
+    return quantity >= getCardQuantityLimit(cardId, boardId);
   };
 
   const boardRowSecondaryActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
@@ -469,20 +535,25 @@ export const useDeckEditorDraft = ({
     const destinationQuantity = getEntryQuantity(cardId, destinationBoardId);
     const moveQuantity = 1;
     const nextDestinationQuantity = destinationQuantity + moveQuantity;
+    const card = cardLookup.value[cardId];
+    if (card) {
+      const constraintMessage = getDeckQuantityViolationMessage(
+        card,
+        nextDestinationQuantity,
+        getMoveConstraintContext(cardId, sourceBoardId, destinationBoardId),
+      );
+      if (constraintMessage !== null) {
+        return constraintMessage;
+      }
+    }
 
     if (destinationBoardId === MAINBOARD_ID) {
-      if (nextDestinationQuantity > MAX_DECK_COPIES) {
-        return `Mainboard copy limit is ${MAX_DECK_COPIES}.`;
-      }
       if (totalMainboardCards.value + moveQuantity > MAX_MAINBOARD_CARD_COUNT) {
         return `Mainboard cannot exceed ${MAX_MAINBOARD_CARD_COUNT} cards.`;
       }
       return null;
     }
 
-    if (nextDestinationQuantity > MAX_SIDEBOARD_ENTRY_QUANTITY) {
-      return `Sideboard copy limit is ${MAX_SIDEBOARD_ENTRY_QUANTITY}.`;
-    }
     return null;
   };
 
@@ -630,6 +701,8 @@ export const useDeckEditorDraft = ({
     hydrateFromDeck,
     buildPayload,
     getEntryQuantity,
+    getCardQuantityLimit,
+    getCardQuantityLimitMessage,
     changeQuantity,
     setQuantity,
     removeEntry,

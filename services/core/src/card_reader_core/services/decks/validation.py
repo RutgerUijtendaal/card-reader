@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from card_reader_core.models import Card, Deck, card_is_deprecated
 
+from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
 from .types import (
-    MAX_DECK_COPIES,
     MAX_MAINBOARD_CARD_COUNT,
     MIN_MAINBOARD_CARD_COUNT,
     MIN_MAINBOARD_MANA_TYPE_COUNT,
@@ -19,6 +19,7 @@ class DeckValidationService:
         total_cards = 0
         mana_type_cards = 0
         deprecated_card_ids: set[str] = set()
+        constraint_entries: list[DeckConstraintEntry] = []
 
         if not deck.hero_card.is_hero:
             issues.append("Hero card must be marked as a hero.")
@@ -31,9 +32,7 @@ class DeckValidationService:
             total_cards += quantity
             if card_is_deprecated(entry.card):
                 deprecated_card_ids.add(entry.card.id)
-            if quantity < 1 or quantity > MAX_DECK_COPIES:
-                issues.append(f"Each mainboard card quantity must be between 1 and {MAX_DECK_COPIES}.")
-                break
+            constraint_entries.append(DeckConstraintEntry(card=entry.card, quantity=quantity, board="mainboard"))
             if entry.card.is_hero:
                 issues.append("Hero cards cannot appear in mainboard entries.")
                 break
@@ -47,6 +46,17 @@ class DeckValidationService:
             for sideboard_entry in sideboard.entries.all():
                 if card_is_deprecated(sideboard_entry.card):
                     deprecated_card_ids.add(sideboard_entry.card.id)
+                constraint_entries.append(
+                    DeckConstraintEntry(
+                        card=sideboard_entry.card,
+                        quantity=int(sideboard_entry.quantity),
+                        board="sideboard",
+                    )
+                )
+
+        for violation in DeckConstraintEvaluator().validate_entries(constraint_entries):
+            if violation.message not in issues:
+                issues.append(violation.message)
 
         if deprecated_card_ids:
             issues.append("Deck contains deprecated cards.")
