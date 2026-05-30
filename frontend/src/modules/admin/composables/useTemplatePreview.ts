@@ -56,6 +56,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
   const hasInitializedSelection = ref(false);
   const isRestoringSelection = ref(false);
   let restoreRequestId = 0;
+  let searchRequestId = 0;
 
   const storedSelections = useLocalStorage<TemplatePreviewSelectionStorage>(
     TEMPLATE_PREVIEW_STORAGE_KEY,
@@ -126,8 +127,13 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     previewWarning.value = null;
   };
 
-  const selectPreviewCard = (card: TemplatePreviewCardOption): void => {
+  const setSelectedPreviewCard = (card: TemplatePreviewCardOption): void => {
     selectedPreviewCard.value = card;
+  };
+
+  const selectPreviewCard = (card: TemplatePreviewCardOption): void => {
+    restoreRequestId += 1;
+    setSelectedPreviewCard(card);
   };
 
   const setStoredSelection = (selection: TemplatePreviewSelectionState | null): void => {
@@ -141,7 +147,8 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     storedSelections.value = next;
   };
 
-  const searchPreviewCards = async (): Promise<void> => {
+  const searchPreviewCards = async (expectedStorageKey = selectionStorageKey.value): Promise<void> => {
+    const requestId = ++searchRequestId;
     previewLoading.value = true;
     try {
       const params: Record<string, string | number | boolean | undefined> = {
@@ -158,13 +165,19 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
       }
 
       const response = await api.get<PaginatedCardsResponse<CardListItem>>('/cards', { params });
+      if (requestId !== searchRequestId || expectedStorageKey !== selectionStorageKey.value) {
+        return;
+      }
+
       previewCards.value = response.data.results.filter((row) => row.result_type === 'card').map(toPreviewCardOption);
 
       if (!selectedPreviewCard.value && !previewSearchQuery.value.trim() && previewCards.value.length > 0) {
-        selectPreviewCard(previewCards.value[0]);
+        setSelectedPreviewCard(previewCards.value[0]);
       }
     } finally {
-      previewLoading.value = false;
+      if (requestId === searchRequestId) {
+        previewLoading.value = false;
+      }
     }
   };
 
@@ -181,7 +194,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
       previewScope.value = defaultPreviewScope.value;
       selectedPreviewCard.value = null;
       isRestoringSelection.value = false;
-      await searchPreviewCards();
+      await searchPreviewCards(storageKey);
       return;
     }
 
@@ -205,7 +218,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
       setStoredSelection(null);
     }
 
-    await searchPreviewCards();
+    await searchPreviewCards(storageKey);
   };
 
   const restorePreviewCard = async (): Promise<void> => {

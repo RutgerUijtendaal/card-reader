@@ -298,7 +298,7 @@ const form = reactive<TemplateForm>({
 });
 
 const createMode = computed(() => selectedId.value === null);
-const templateKeyForPreview = computed(() => form.key.trim());
+const templateKeyForPreview = computed(() => (createMode.value ? '' : form.key.trim()));
 const reparseSourceOptions = computed(() =>
   templates.value.map((item) => ({
     value: item.key,
