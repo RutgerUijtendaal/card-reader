@@ -74,8 +74,8 @@
       v-if="selectedVersion"
       class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0"
     >
-      <div class="grid min-h-full items-start gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(18rem,30rem)_minmax(20rem,32rem)_minmax(28rem,1fr)] xl:items-stretch xl:overflow-hidden">
-        <div class="app-scrollbar space-y-6 xl:col-span-2 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+      <div class="grid min-h-full items-start gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(30rem,40vw)] xl:items-stretch xl:overflow-hidden">
+        <div class="app-scrollbar min-w-0 space-y-6 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
           <CardVersionOverviewPane
             :version="selectedVersion"
             :symbol-by-key="symbolByKey"
@@ -98,7 +98,7 @@
           />
         </div>
 
-        <aside class="xl:h-full xl:min-h-0 xl:border-l xl:border-[var(--color-border)] xl:pl-6">
+        <aside class="min-w-0 xl:h-full xl:min-h-0 xl:border-l xl:border-[var(--color-border)] xl:pl-6">
           <CardVersionEditorPane
             :version="selectedVersion"
             :form="form"

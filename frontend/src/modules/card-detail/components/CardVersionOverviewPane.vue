@@ -1,11 +1,11 @@
 <template>
-  <div class="grid items-start gap-6 2xl:grid-cols-[minmax(22rem,34rem)_minmax(24rem,1fr)]">
+  <div class="grid items-start gap-6 2xl:grid-cols-[minmax(18rem,30rem)_minmax(24rem,1fr)]">
     <div class="p-4">
       <img
         v-if="version.image_url"
         :src="toAbsoluteApiUrl(version.image_url)"
         alt="Selected card printing image"
-        class="mx-auto block max-h-[50rem] w-full object-contain"
+        class="mx-auto block max-h-[44rem] w-full object-contain"
       >
       <div
         v-else

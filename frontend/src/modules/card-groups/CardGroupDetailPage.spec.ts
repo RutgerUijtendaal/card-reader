@@ -15,9 +15,9 @@ vi.mock('@/api/client', () => ({
   toAbsoluteApiUrl: (url: string) => url,
 }));
 
-vi.mock('@/modules/card-detail/components/CardVersionPreviewPane.vue', () => ({
+vi.mock('@/modules/card-detail/components/CardVersionOverviewPane.vue', () => ({
   default: {
-    name: 'CardVersionPreviewPane',
+    name: 'CardVersionOverviewPane',
     template: '<div />',
   },
 }));

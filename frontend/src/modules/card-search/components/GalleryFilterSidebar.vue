@@ -1,9 +1,9 @@
 <template>
   <aside
-    class="theme-divider flex min-h-0 flex-col border-r pr-5"
+    class="theme-divider flex min-h-0 flex-col border-r pr-3"
     :class="stickyToViewport ? 'xl:sticky xl:top-0 xl:h-[calc(100vh-3rem)]' : 'h-full'"
   >
-    <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
+    <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto">
       <div class="space-y-2">
         <div class="flex justify-between gap-3">
           <div>

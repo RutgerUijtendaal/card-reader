@@ -51,7 +51,7 @@
 
     <div
       v-if="group"
-      class="grid gap-4 xl:grid-cols-2"
+      class="grid gap-6 2xl:grid-cols-2"
     >
       <div
         v-for="member in group.members"
@@ -78,12 +78,10 @@
           </RouterLink>
         </div>
 
-        <CardVersionPreviewPane
+        <CardVersionOverviewPane
           :version="member.card"
           :symbol-by-key="symbolByKey"
           :to-absolute-api-url="toAbsoluteApiUrl"
-          :format-date="formatDate"
-          :show-editable-state="false"
         />
       </div>
     </div>
@@ -95,7 +93,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
-import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
+import CardVersionOverviewPane from '@/modules/card-detail/components/CardVersionOverviewPane.vue';
 import {
   buildCardLifecycleApiParams,
   normalizeCardLifecycleFilterValue,
@@ -128,14 +126,6 @@ const loadGroup = async (): Promise<void> => {
 
 const goBack = (): void => {
   void router.push(buildGalleryLocation(route.query));
-};
-
-const formatDate = (value: string): string => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleDateString();
 };
 
 watch(() => [route.params.id, route.query.lifecycle_status], loadGroup);
