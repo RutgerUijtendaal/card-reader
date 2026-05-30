@@ -183,7 +183,7 @@ describe('useDeckEditorDraft', () => {
     expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 100 }]);
   });
 
-  test('legendary cards are limited to one copy across all boards', () => {
+  test('legendary cards warn without blocking actions by default', () => {
     const builderStep = ref<BuilderStep>('build');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
@@ -199,15 +199,16 @@ describe('useDeckEditorDraft', () => {
     controller.form.hero_card_id = 'hero';
     controller.handleGalleryAction({ ...legendary, result_type: 'card' });
     controller.handleGalleryAction({ ...legendary, result_type: 'card' });
-    expect(controller.form.entries).toEqual([{ card_id: 'legendary', quantity: 1 }]);
+    expect(controller.form.entries).toEqual([{ card_id: 'legendary', quantity: 2 }]);
 
     controller.addSideboard();
     controller.handleGalleryAction({ ...legendary, result_type: 'card' });
-    expect(controller.activeSideboard.value?.entries).toEqual([]);
-    expect(controller.galleryActionDisabled({ ...legendary, result_type: 'card' })).toBe(true);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'legendary', quantity: 1 }]);
+    expect(controller.galleryActionDisabled({ ...legendary, result_type: 'card' })).toBe(false);
+    expect(controller.warningMessages.value).toContain('Legendary cards are limited to 1 copy per deck.');
   });
 
-  test('set quantity clamps legendary cards to one copy', () => {
+  test('set quantity allows legendary cards above soft warning limits', () => {
     const builderStep = ref<BuilderStep>('build');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
@@ -225,10 +226,11 @@ describe('useDeckEditorDraft', () => {
 
     controller.setQuantity('legendary', '4');
 
-    expect(controller.form.entries).toEqual([{ card_id: 'legendary', quantity: 1 }]);
+    expect(controller.form.entries).toEqual([{ card_id: 'legendary', quantity: 4 }]);
+    expect(controller.warningMessages.value).toContain('Legendary cards are limited to 1 copy per deck.');
   });
 
-  test('reports legendary copy limit violations in draft validation messages', () => {
+  test('reports legendary copy limit violations as warning messages by default', () => {
     const builderStep = ref<BuilderStep>('build');
     const legendary = buildLegendaryCard();
     const manaA = { ...buildCard('manaA', 'Mana A', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
@@ -258,7 +260,65 @@ describe('useDeckEditorDraft', () => {
       { card_id: 'filler', quantity: 6 },
     ];
 
-    expect(controller.validationMessages.value).toContain('Legendary cards are limited to 1 copy per deck.');
+    expect(controller.validationMessages.value).not.toContain('Legendary cards are limited to 1 copy per deck.');
+    expect(controller.warningMessages.value).toContain('Legendary cards are limited to 1 copy per deck.');
+  });
+
+  test('uses hero override for mainboard copy limits', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            mainboard_copy_limit: { max: 6 },
+          },
+        },
+      },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 5 }];
+
+    expect(controller.getCardQuantityLimit('cardA')).toBe(6);
+    expect(controller.validationMessages.value).not.toContain('Each mainboard card quantity must be between 1 and 4.');
+  });
+
+  test('uses whole deck scope for hard legendary action limits', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const legendary = buildLegendaryCard();
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            legendary_copy_limit: { severity: 'hard', blocks_action: true, scope: 'whole_deck' },
+          },
+        },
+      },
+      legendary,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'legendary', quantity: 1 }];
+    controller.addSideboard();
+
+    expect(controller.getCardQuantityLimit('legendary')).toBe(0);
   });
 
   test('board row secondary action removes one copy without removing the entry', () => {
@@ -337,7 +397,16 @@ describe('useDeckEditorDraft', () => {
     const builderStep = ref<BuilderStep>('build');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            legendary_copy_limit: { severity: 'hard', blocks_action: true, scope: 'whole_deck' },
+          },
+        },
+      },
       legendary,
     });
     const controller = useDeckEditorDraft({
@@ -428,7 +497,16 @@ describe('useDeckEditorDraft', () => {
     const builderStep = ref<BuilderStep>('build');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
-      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            legendary_copy_limit: { severity: 'hard', blocks_action: true, scope: 'whole_deck' },
+          },
+        },
+      },
       legendary,
     });
     const controller = useDeckEditorDraft({

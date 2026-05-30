@@ -154,6 +154,7 @@ export type EditorForm = {
   health: string;
   rules_text: string;
   is_hero: boolean;
+  deck_building_config: string;
   lifecycle_status: CardLifecycleStatus;
   keyword_ids: string[];
   tag_ids: string[];

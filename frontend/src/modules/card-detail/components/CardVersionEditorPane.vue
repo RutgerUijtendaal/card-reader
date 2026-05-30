@@ -21,8 +21,30 @@
       </span>
     </div>
 
+    <div class="theme-tablist mt-4">
+      <button
+        class="theme-tab"
+        :class="{ 'theme-tab-active': activeEditorTab === 'card' }"
+        type="button"
+        @click="activeEditorTab = 'card'"
+      >
+        Card
+      </button>
+      <button
+        class="theme-tab"
+        :class="{ 'theme-tab-active': activeEditorTab === 'version' }"
+        type="button"
+        @click="activeEditorTab = 'version'"
+      >
+        Card Version
+      </button>
+    </div>
+
     <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1 pt-5">
-      <div class="space-y-4">
+      <div
+        v-if="activeEditorTab === 'card'"
+        class="space-y-4"
+      >
         <div class="theme-muted-panel p-3">
           <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="min-w-0">
@@ -45,6 +67,19 @@
               <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
             </label>
           </div>
+        </div>
+
+        <div class="theme-muted-panel p-3">
+          <JsonEditorField
+            :model-value="form.deck_building_config"
+            label="Deck-Building Config JSON"
+            hint="Override deck-building rule defaults for this card."
+            min-height="14rem"
+            example-title="Deck-building config example"
+            :example-json="deckBuildingConfigExample"
+            :disabled="!version.editable || isBusy"
+            @update:model-value="$emit('update-deck-building-config', $event)"
+          />
         </div>
 
         <div class="theme-muted-panel p-3">
@@ -81,7 +116,12 @@
             Group anchors must stay active. Choose a different anchor before deprecating this card.
           </p>
         </div>
+      </div>
 
+      <div
+        v-else
+        class="space-y-4"
+      >
         <div
           v-for="field in scalarFields"
           :key="field.name"
@@ -403,7 +443,30 @@
       </div>
     </div>
 
-    <div class="theme-divider flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
+    <div
+      v-if="activeEditorTab === 'card'"
+      class="theme-divider flex shrink-0 flex-wrap items-center justify-end gap-3 border-t pt-4"
+    >
+      <p
+        v-if="saveMessage"
+        class="theme-success-text mr-auto text-sm"
+      >
+        {{ saveMessage }}
+      </p>
+      <button
+        class="btn-primary"
+        type="button"
+        :disabled="!version.editable || isBusy"
+        @click="$emit('save-card')"
+      >
+        {{ isSaving ? 'Saving...' : 'Save Card' }}
+      </button>
+    </div>
+
+    <div
+      v-else
+      class="theme-divider flex shrink-0 flex-wrap items-center gap-3 border-t pt-4"
+    >
       <label
         v-if="version.editable"
         class="theme-section-title mr-auto flex min-w-0 items-center gap-3 text-sm font-semibold"
@@ -449,9 +512,9 @@
         class="btn-primary"
         type="button"
         :disabled="!version.editable || isBusy"
-        @click="$emit('save')"
+        @click="$emit('save-version')"
       >
-        {{ isSaving ? 'Saving...' : 'Save Edits' }}
+        {{ isSaving ? 'Saving...' : 'Save Version' }}
       </button>
     </div>
   </div>
@@ -462,6 +525,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { Lock } from 'lucide-vue-next';
 import AppSelect from '@/components/app/AppSelect.vue';
 import SymbolToken from '@/components/SymbolToken.vue';
+import JsonEditorField from '@/modules/admin/components/JsonEditorField.vue';
 import {
   ACTIVE_CARD_LIFECYCLE_STATUS,
   DEPRECATED_CARD_LIFECYCLE_STATUS,
@@ -492,6 +556,7 @@ const props = defineProps<{
   isSaving: boolean;
   isQueuingReparse: boolean;
   saveMessage: string;
+  deckBuildingConfigExample: string;
   fieldSource: (fieldName: ScalarFieldName) => 'auto' | 'manual';
   metadataSource: (groupName: MetadataGroupName) => 'auto' | 'manual';
   fieldSourceLabel: (fieldName: ScalarFieldName) => string;
@@ -510,7 +575,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'save'): void;
+  (e: 'save-card'): void;
+  (e: 'save-version'): void;
   (e: 'restore-field', fieldName: ScalarFieldName): void;
   (e: 'unlock-field', fieldName: ScalarFieldName): void;
   (e: 'restore-group', groupName: MetadataGroupName): void;
@@ -523,9 +589,11 @@ const emit = defineEmits<{
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
   (e: 'update-hero', value: boolean): void;
+  (e: 'update-deck-building-config', value: string): void;
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
 
+const activeEditorTab = ref<'card' | 'version'>('card');
 const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
 const rulesTextValue = ref('');
 const rulesTextCaretIndex = ref(0);

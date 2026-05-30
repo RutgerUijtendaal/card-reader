@@ -294,6 +294,8 @@ def update_latest_card_version(
             symbol_links_changed = True
         if "is_hero" in updates:
             card.is_hero = bool(updates["is_hero"])
+        if "deck_building_config" in updates:
+            card.deck_building_config_json = updates["deck_building_config"]
         if "lifecycle_status" in updates:
             lifecycle_status = str(updates["lifecycle_status"])
             if not is_card_lifecycle_status(lifecycle_status):
@@ -314,13 +316,21 @@ def update_latest_card_version(
             ensure_card_alias(card=card, key=card.key, label=card.label)
             card.label = version.name
             card.key = next_key
-        if restored_name or "name" in updates or "is_hero" in updates or "lifecycle_status" in updates:
+        if (
+            restored_name
+            or "name" in updates
+            or "is_hero" in updates
+            or "deck_building_config" in updates
+            or "lifecycle_status" in updates
+        ):
             card.updated_at = now_utc()
             update_fields = ["updated_at"]
             if restored_name or "name" in updates:
                 update_fields = ["label", "key", *update_fields]
             if "is_hero" in updates:
                 update_fields = ["is_hero", *update_fields]
+            if "deck_building_config" in updates:
+                update_fields = ["deck_building_config_json", *update_fields]
             if "lifecycle_status" in updates:
                 update_fields = ["lifecycle_status", *update_fields]
             card.save(update_fields=list(dict.fromkeys(update_fields)))

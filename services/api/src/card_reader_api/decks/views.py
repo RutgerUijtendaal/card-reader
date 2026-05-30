@@ -14,11 +14,24 @@ from card_reader_api.decks.serializers import (
     deck_payload,
     serializer_error,
 )
-from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput, DeckUpdateInput
+from card_reader_core.services.decks import (
+    DeckEntryInput,
+    DeckService,
+    DeckSideboardInput,
+    DeckUpdateInput,
+    deck_building_rules_metadata_json,
+)
 
 
 def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
+
+
+class DeckRulesMetadataView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, _request: Request) -> Response:
+        return Response(deck_building_rules_metadata_json())
 
 
 class PublicDeckListView(APIView):

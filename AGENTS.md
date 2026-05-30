@@ -88,6 +88,16 @@ Core stack:
   - Do not automatically remove deprecated cards from decks or groups; instead surface warnings/invalid public listing state where relevant.
   - Card group anchors must remain active. Deprecated non-anchor group members may remain in admin data, but should be hidden from active public group views.
   - When adding or consuming endpoints that return cards or card-derived counts, decide intentionally whether deprecated cards should be included and keep list/detail/count behavior consistent.
+- Deck-building constraints are core-owned and exposed to clients through `GET /decks/rules`.
+  - Card-level deck-building overrides live on `Card.deck_building_config_json`; hero cards use the same mechanism as future normal card-triggered constraints.
+  - Supported rule ids are `mainboard_copy_limit`, `mainboard_card_count`, `mana_type_count`, `legendary_copy_limit`, and `sideboard_entry_quantity`.
+  - Rules have `severity` values of `hard` or `soft`; hard violations affect deck validity, while soft violations only warn.
+  - Rules have `scope` values of `mainboard` or `whole_deck`; scope defaults to `mainboard` unless a rule override changes it.
+  - Hard rules can set `blocks_action`; action-blocking hard rules should prevent direct builder actions and API submissions that would exceed the rule.
+  - Frontend code should consume `/decks/rules` for defaults and examples, keeping local fallback defaults only for load/error resilience.
+- The card detail editor separates card-level and version-level edits:
+  - `Card` tab owns Hero Card, Card Status, and Deck-Building Config.
+  - `Card Version` tab owns parsed scalar fields, symbols, metadata groups, template selection, reset, and reparse actions.
 
 ## Auth Rules
 - Auth is enabled by default.
@@ -168,6 +178,7 @@ Local app URL:
 - `GET /cards/{card_id}/versions/{version_id}/image`
 - `GET /symbols/assets/{asset_path}`
 - `GET /exports/csv`
+- `GET /decks/rules`
 - `GET/POST/PATCH/DELETE /settings/*`
 - `POST /auth/login`
 - `POST /auth/logout`

@@ -12,6 +12,9 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Preserve the existing Vue 3 + TypeScript + Vite structure.
 - Check for existing shared utilities, composables, and modules before adding new helpers.
 - Keep shared card filter behavior in `frontend/src/modules/card-filters`.
+- Deck-building rule defaults and example config are backend-owned through `GET /decks/rules`; use the shared deck rules client/fallback instead of duplicating rule constants in feature UI.
+- In the card detail editor, keep card-level controls on the `Card` tab and version-level controls on the `Card Version` tab.
+- Use `JsonEditorField` for deck-building config JSON so formatting, validation affordances, and examples stay consistent with other admin JSON inputs.
 - For full-page application views, prefer inner scrolling within the main content segments instead of making the entire page scroll; match the layout behavior used by the current settings and deck builder pages.
 - Preserve and extend the shared theme/token system in `frontend/src/styles.css` and `frontend/src/composables/useTheme.ts`.
 - Prefer semantic theme primitives and shared classes over ad hoc color styling.
@@ -26,8 +29,9 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 4. Keep page modules focused on page behavior like navigation, pagination, and local interaction flow.
 5. Move reusable state, parsing, or transformation logic into existing shared locations only when reuse is real.
 6. If the change touches filters, inspect `frontend/src/modules/card-filters` first and extend it there instead of cloning the logic into a page.
-7. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
-8. Run lint and typecheck before finishing.
+7. If the change touches deck-building constraints, load defaults/examples from the backend metadata endpoint and keep frontend fallbacks covered by tests.
+8. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
+9. Run lint and typecheck before finishing.
 
 ## Review Focus
 
@@ -38,6 +42,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Theme drift from raw colors, light-only assumptions, or component-local styling systems
 - UI changes verified in one theme only
 - Missing validation for touched frontend behavior
+- Deck-building defaults or example JSON copied into UI code without a backend metadata source or fallback test
 
 ## File Hotspots
 

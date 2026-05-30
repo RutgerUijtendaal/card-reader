@@ -10,6 +10,7 @@
       <button
         class="btn-secondary px-3 py-1.5 text-xs"
         type="button"
+        :disabled="disabled"
         @click="formatValue"
       >
         Format
@@ -25,6 +26,7 @@
         class="json-textarea input-base app-scrollbar w-full px-3 py-3 pr-11 font-mono text-[13px]"
         :class="{ 'min-h-0 flex-1': fillHeight }"
         :style="textareaStyle"
+        :disabled="disabled"
         spellcheck="false"
         @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
       />
@@ -74,6 +76,7 @@
         v-if="exampleJson"
         class="btn-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium"
         type="button"
+        :disabled="disabled"
         @click="showExample = true"
       >
         <CircleHelp class="h-3.5 w-3.5" />
@@ -127,6 +130,7 @@ const props = withDefaults(
     fillHeight?: boolean;
     exampleTitle?: string;
     exampleJson?: string;
+    disabled?: boolean;
   }>(),
   {
     hint: '',
@@ -134,6 +138,7 @@ const props = withDefaults(
     fillHeight: false,
     exampleTitle: '',
     exampleJson: '',
+    disabled: false,
   },
 );
 

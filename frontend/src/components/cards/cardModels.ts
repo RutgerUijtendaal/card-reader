@@ -1,4 +1,5 @@
 import type { CardLifecycleStatus } from '@/modules/card-filters/cardLifecycle';
+import type { DeckBuildingConfig } from '@/modules/decks/deckConstraints';
 
 export type CardTooltipSymbolLookup = {
   asset_url?: string | null;
@@ -23,6 +24,7 @@ export type CardHoverTooltipModel = {
   key: string;
   label: string;
   is_hero: boolean;
+  deck_building_config?: DeckBuildingConfig;
   lifecycle_status?: CardLifecycleStatus;
   template_id: string;
   version_id: string;

@@ -24,6 +24,7 @@ class DeckValidationSummary:
     total_cards: int
     unique_cards: int
     issues: list[str]
+    warnings: list[str]
     deprecated_card_count: int = 0
     deprecated_card_ids: list[str] | None = None
 

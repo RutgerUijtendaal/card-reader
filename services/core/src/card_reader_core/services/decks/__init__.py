@@ -4,6 +4,9 @@ from .constraints import (
     DeckConstraintEntry,
     DeckConstraintEvaluator,
     DeckConstraintViolation,
+    deck_building_rules_metadata_json,
+    effective_deck_building_rules_json,
+    normalize_deck_building_config,
 )
 from .service import DeckService
 from .types import (
@@ -26,4 +29,7 @@ __all__ = [
     "DeckValidationSummary",
     "LEGENDARY_COPY_LIMIT_RULE_ID",
     "MAINBOARD_COPY_LIMIT_RULE_ID",
+    "deck_building_rules_metadata_json",
+    "effective_deck_building_rules_json",
+    "normalize_deck_building_config",
 ]

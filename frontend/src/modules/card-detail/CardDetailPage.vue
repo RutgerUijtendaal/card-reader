@@ -108,6 +108,7 @@
             :is-saving="isSaving"
             :is-queuing-reparse="isQueuingReparse"
             :save-message="saveMessage"
+            :deck-building-config-example="deckBuildingConfigExample"
             :field-source="fieldSource"
             :metadata-source="metadataSource"
             :field-source-label="fieldSourceLabel"
@@ -123,7 +124,8 @@
             :additional-symbol-ids="form.additional_symbol_ids"
             :rule-text-unknown-symbol-keys="ruleTextUnknownSymbolKeys"
             :deprecated-status-disabled="cardIsGroupAnchor"
-            @save="saveEdits"
+            @save-card="saveCardEdits"
+            @save-version="saveVersionEdits"
             @restore-field="restoreField"
             @unlock-field="unlockField"
             @restore-group="restoreMetadataGroup"
@@ -136,6 +138,7 @@
             @update-group-search="setMetadataSearch"
             @update-field="updateField"
             @update-hero="updateHero"
+            @update-deck-building-config="updateDeckBuildingConfig"
             @update-lifecycle-status="updateLifecycleStatus"
           />
         </aside>
@@ -185,6 +188,7 @@ const {
   isQueuingReparse,
   promotingVersionId,
   saveMessage,
+  deckBuildingConfigExample,
   form,
   selectedVersion,
   isBusy,
@@ -196,7 +200,8 @@ const {
   goToNextCard,
   loadCard,
   selectVersion,
-  saveEdits,
+  saveCardEdits,
+  saveVersionEdits,
   restoreField,
   unlockField,
   restoreMetadataGroup,
@@ -231,6 +236,10 @@ const updateField = (fieldName: ScalarFieldName, value: string): void => {
 
 const updateHero = (value: boolean): void => {
   form.is_hero = value;
+};
+
+const updateDeckBuildingConfig = (value: string): void => {
+  form.deck_building_config = value;
 };
 
 const updateLifecycleStatus = (value: CardLifecycleStatus): void => {

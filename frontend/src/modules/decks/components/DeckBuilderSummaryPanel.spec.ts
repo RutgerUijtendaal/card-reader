@@ -90,6 +90,7 @@ const buildController = () => {
       },
       selectedHero,
       validationMessages: ref<string[]>([]),
+      warningMessages: ref<string[]>([]),
       detailedMainboardEntries: ref(mainboardEntries.value),
       detailedActiveBoardEntries: ref(mainboardEntries.value),
       activeBoardId,
