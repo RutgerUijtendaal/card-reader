@@ -1330,6 +1330,151 @@ def test_sideboards_reject_quantities_above_100() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_create_rejects_multiple_legendary_mainboard_copies() -> None:
+    username = "deck-legendary-mainboard-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Legendary Limit Hero", is_hero=True)
+    legendary_card = _create_card(name="Legendary Mainboard Card", is_hero=False, type_labels=["Legendary"])
+    mainboard_cards = _build_mainboard_cards(total_unique=14)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Too Many Legendary Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": legendary_card.id, "quantity": 2},
+                *_valid_entries(mainboard_cards),
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Legendary cards are limited to 1 copy per deck."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_update_rejects_legendary_copies_across_mainboard_and_sideboard() -> None:
+    username = "deck-legendary-sideboard-user"
+    password = "password"
+    owner = _create_user(username, password)
+    hero = _create_card(name="Legendary Sideboard Hero", is_hero=True)
+    legendary_card = _create_card(name="Legendary Sideboard Card", is_hero=False, type_labels=["Legendary"])
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Legendary Sideboard Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "name": "Legendary Sideboard Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": legendary_card.id, "quantity": 1},
+                *_valid_entries(mainboard_cards),
+            ],
+            "sideboards": [
+                {
+                    "name": "Legends",
+                    "entries": [{"card_id": legendary_card.id, "quantity": 1}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Legendary cards are limited to 1 copy per deck."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_create_allows_one_legendary_copy_and_large_non_legendary_sideboard() -> None:
+    username = "deck-legendary-valid-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Valid Legendary Hero", is_hero=True)
+    legendary_card = _create_card(name="Valid Legendary Card", is_hero=False, type_labels=["Legendary"])
+    sideboard_card = _create_card(name="Valid Large Sideboard Card", is_hero=False)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Valid Legendary Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": legendary_card.id, "quantity": 1},
+                *_valid_entries(mainboard_cards),
+            ],
+            "sideboards": [
+                {
+                    "name": "Overflow",
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 100}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 201
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_create_rejects_non_legendary_mainboard_copies_above_four() -> None:
+    username = "deck-mainboard-limit-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Mainboard Limit Hero", is_hero=True)
+    limited_card = _create_card(name="Mainboard Limited Card", is_hero=False)
+    mainboard_cards = _build_mainboard_cards(total_unique=14)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Too Many Copies Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": limited_card.id, "quantity": 5},
+                *_valid_entries(mainboard_cards),
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Each mainboard card quantity must be between 1 and 4."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
     username = "deck-sideboard-duplicate-user"
     password = "password"

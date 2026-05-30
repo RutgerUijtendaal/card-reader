@@ -387,7 +387,7 @@
             :key="entry.card.id"
             :entry="entry"
             :hover-mode="controller.filters.hoverMode.value"
-            :quantity-max="controller.deck.activeBoardId.value === 'mainboard' ? 4 : undefined"
+            :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
             :move-destinations="getMoveDestinations(entry.card.id)"
             :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
             :row-secondary-action-disabled="controller.deck.boardRowSecondaryActionDisabled(entry.card.id)"

@@ -33,6 +33,11 @@ const buildCard = (id: string, name: string, manaValue = 1): DeckCardSummary =>
     types: [],
   }) satisfies DeckCardSummary;
 
+const buildLegendaryCard = (id = 'legendary'): DeckCardSummary => ({
+  ...buildCard(id, 'Legendary Card', 3),
+  types: [{ id: 'legendary', key: 'legendary', label: 'Legendary' }],
+});
+
 describe('useDeckEditorDraft', () => {
   test('builds a payload with named sideboards', () => {
     const builderStep = ref<BuilderStep>('build');
@@ -178,6 +183,84 @@ describe('useDeckEditorDraft', () => {
     expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 100 }]);
   });
 
+  test('legendary cards are limited to one copy across all boards', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const legendary = buildLegendaryCard();
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      legendary,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.handleGalleryAction({ ...legendary, result_type: 'card' });
+    controller.handleGalleryAction({ ...legendary, result_type: 'card' });
+    expect(controller.form.entries).toEqual([{ card_id: 'legendary', quantity: 1 }]);
+
+    controller.addSideboard();
+    controller.handleGalleryAction({ ...legendary, result_type: 'card' });
+    expect(controller.activeSideboard.value?.entries).toEqual([]);
+    expect(controller.galleryActionDisabled({ ...legendary, result_type: 'card' })).toBe(true);
+  });
+
+  test('set quantity clamps legendary cards to one copy', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const legendary = buildLegendaryCard();
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      legendary,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'legendary', quantity: 1 }];
+
+    controller.setQuantity('legendary', '4');
+
+    expect(controller.form.entries).toEqual([{ card_id: 'legendary', quantity: 1 }]);
+  });
+
+  test('reports legendary copy limit violations in draft validation messages', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const legendary = buildLegendaryCard();
+    const manaA = { ...buildCard('manaA', 'Mana A', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
+    const manaB = { ...buildCard('manaB', 'Mana B', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
+    const manaC = { ...buildCard('manaC', 'Mana C', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      legendary,
+      manaA,
+      manaB,
+      manaC,
+      filler: buildCard('filler', 'Filler', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.name = 'Example';
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [
+      { card_id: 'legendary', quantity: 2 },
+      { card_id: 'manaA', quantity: 4 },
+      { card_id: 'manaB', quantity: 4 },
+      { card_id: 'manaC', quantity: 4 },
+      { card_id: 'filler', quantity: 6 },
+    ];
+
+    expect(controller.validationMessages.value).toContain('Legendary cards are limited to 1 copy per deck.');
+  });
+
   test('board row secondary action removes one copy without removing the entry', () => {
     const builderStep = ref<BuilderStep>('build');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
@@ -250,6 +333,29 @@ describe('useDeckEditorDraft', () => {
     expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
   });
 
+  test('allows moving the only legendary copy between boards', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const legendary = buildLegendaryCard();
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      legendary,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'legendary', quantity: 1 }];
+    controller.addSideboard();
+    const destinationBoardId = controller.activeBoardId.value;
+
+    expect(controller.moveEntryToBoard('legendary', destinationBoardId, 'mainboard')).toBe(true);
+    expect(controller.form.entries).toEqual([]);
+    expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'legendary', quantity: 1 }]);
+  });
+
   test('moves one copy from sideboard to mainboard', () => {
     const builderStep = ref<BuilderStep>('build');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
@@ -316,6 +422,31 @@ describe('useDeckEditorDraft', () => {
     expect(controller.moveEntryToBoard('cardA', destinationBoardId, 'mainboard')).toBe(false);
     expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 2 }]);
     expect(controller.activeSideboard.value?.entries).toEqual([{ card_id: 'cardA', quantity: 100 }]);
+  });
+
+  test('blocks moving legendary cards into a board when another copy remains elsewhere', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const legendary = buildLegendaryCard();
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      legendary,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'legendary', quantity: 1 }];
+    controller.addSideboard();
+    const sourceBoardId = controller.activeBoardId.value;
+    controller.activeSideboard.value?.entries.push({ card_id: 'legendary', quantity: 1 });
+
+    expect(controller.moveEntryToBoard('legendary', 'mainboard', sourceBoardId)).toBe(false);
+    expect(controller.getMoveEntryToBoardValidationError('legendary', 'mainboard', sourceBoardId)).toBe(
+      'Legendary cards are limited to 1 copy per deck.',
+    );
   });
 
   test('blocks row moves into mainboard when deck limits would be exceeded', () => {

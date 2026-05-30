@@ -146,7 +146,7 @@ def _deck_card_metadata(version: CardVersion) -> CardMetadata:
 
 class MainboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
     card_id = serializers.CharField()
-    quantity = serializers.IntegerField(min_value=1, max_value=4)
+    quantity = serializers.IntegerField(min_value=1)
 
 
 class SideboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
