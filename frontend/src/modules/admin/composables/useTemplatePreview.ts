@@ -30,6 +30,10 @@ type UseTemplatePreviewOptions = {
   templateKey: ComputedRef<string>;
 };
 
+type TemplatePreviewSelectionStorage = Record<string, TemplatePreviewSelectionState>;
+
+const UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY = '__unsaved-template__';
+
 const toPreviewCardOption = (
   value: CardListItem | TemplatePreviewCardDetail,
 ): TemplatePreviewCardOption => ({
@@ -50,21 +54,39 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
   const lastValidDefinition = ref<TemplateDefinition | null>(null);
   const lastValidRegions = ref<TemplatePreviewRenderRegion[]>([]);
   const hasInitializedSelection = ref(false);
+  const isRestoringSelection = ref(false);
+  let restoreRequestId = 0;
 
-  const storedSelection = useLocalStorage<TemplatePreviewSelectionState | null>(
+  const storedSelections = useLocalStorage<TemplatePreviewSelectionStorage>(
     TEMPLATE_PREVIEW_STORAGE_KEY,
-    null,
+    {},
     {
       serializer: {
         read: (value) => {
-          if (!value) return null;
+          if (!value) return {};
           try {
-            const parsed = JSON.parse(value) as Partial<TemplatePreviewSelectionState>;
-            const normalized = normalizeTemplatePreviewCard(parsed);
-            const scope = parsed.scope === 'all-cards' ? 'all-cards' : 'current-template';
-            return normalized ? { ...normalized, scope } : null;
+            const parsed = JSON.parse(value) as unknown;
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+              return {};
+            }
+
+            const restored: TemplatePreviewSelectionStorage = {};
+            for (const [key, rawSelection] of Object.entries(parsed)) {
+              if (!key.trim() || !rawSelection || typeof rawSelection !== 'object' || Array.isArray(rawSelection)) {
+                continue;
+              }
+
+              const parsedSelection = rawSelection as Partial<TemplatePreviewSelectionState>;
+              const normalized = normalizeTemplatePreviewCard(parsedSelection);
+              const scope = parsedSelection.scope === 'all-cards' ? 'all-cards' : 'current-template';
+              if (normalized) {
+                restored[key] = { ...normalized, scope };
+              }
+            }
+
+            return restored;
           } catch {
-            return null;
+            return {};
           }
         },
         write: (value) => JSON.stringify(value),
@@ -73,6 +95,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
   );
 
   const templateScopedKey = computed(() => templateKey.value.trim());
+  const selectionStorageKey = computed(() => templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY);
   const templateScopeAvailable = computed(() => templateScopedKey.value.length > 0);
   const effectivePreviewScope = computed<TemplatePreviewScope>(() =>
     previewScope.value === 'current-template' && templateScopeAvailable.value ? 'current-template' : 'all-cards',
@@ -102,6 +125,17 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
   const selectPreviewCard = (card: TemplatePreviewCardOption): void => {
     selectedPreviewCard.value = card;
+  };
+
+  const setStoredSelection = (selection: TemplatePreviewSelectionState | null): void => {
+    const key = selectionStorageKey.value;
+    const next = { ...storedSelections.value };
+    if (selection) {
+      next[key] = selection;
+    } else {
+      delete next[key];
+    }
+    storedSelections.value = next;
   };
 
   const searchPreviewCards = async (): Promise<void> => {
@@ -135,32 +169,48 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     void searchPreviewCards();
   }, 250);
 
-  const restorePreviewCard = async (): Promise<void> => {
-    if (hasInitializedSelection.value) {
-      return;
-    }
-
-    hasInitializedSelection.value = true;
-    const stored = storedSelection.value;
+  const restoreStoredPreviewCard = async (): Promise<void> => {
+    const requestId = ++restoreRequestId;
+    const storageKey = selectionStorageKey.value;
+    const stored = storedSelections.value[storageKey] ?? null;
+    isRestoringSelection.value = true;
     if (!stored) {
+      selectedPreviewCard.value = null;
+      isRestoringSelection.value = false;
       await searchPreviewCards();
       return;
     }
 
     previewScope.value = stored.scope;
     selectedPreviewCard.value = normalizeTemplatePreviewCard(stored);
+    isRestoringSelection.value = false;
 
     try {
       const response = await api.get<TemplatePreviewCardDetail>(`/cards/${stored.id}`);
+      if (requestId !== restoreRequestId || storageKey !== selectionStorageKey.value) {
+        return;
+      }
       const restored = toPreviewCardOption(response.data);
       selectedPreviewCard.value = restored;
-      storedSelection.value = { ...restored, scope: previewScope.value };
+      setStoredSelection({ ...restored, scope: previewScope.value });
     } catch {
+      if (requestId !== restoreRequestId || storageKey !== selectionStorageKey.value) {
+        return;
+      }
       selectedPreviewCard.value = null;
-      storedSelection.value = null;
+      setStoredSelection(null);
     }
 
     await searchPreviewCards();
+  };
+
+  const restorePreviewCard = async (): Promise<void> => {
+    if (hasInitializedSelection.value) {
+      return;
+    }
+
+    hasInitializedSelection.value = true;
+    await restoreStoredPreviewCard();
   };
 
   watch(
@@ -188,15 +238,28 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
   watch(
     selectedPreviewCard,
     (value) => {
-      storedSelection.value = value ? { ...value, scope: previewScope.value } : null;
+      if (isRestoringSelection.value) {
+        return;
+      }
+      setStoredSelection(value ? { ...value, scope: previewScope.value } : null);
     },
     { deep: true },
   );
 
   watch(previewScope, (value) => {
-    if (selectedPreviewCard.value) {
-      storedSelection.value = { ...selectedPreviewCard.value, scope: value };
+    if (isRestoringSelection.value) {
+      return;
     }
+    if (selectedPreviewCard.value) {
+      setStoredSelection({ ...selectedPreviewCard.value, scope: value });
+    }
+  });
+
+  watch(templateScopedKey, () => {
+    if (!hasInitializedSelection.value) {
+      return;
+    }
+    void restoreStoredPreviewCard();
   });
 
   return {

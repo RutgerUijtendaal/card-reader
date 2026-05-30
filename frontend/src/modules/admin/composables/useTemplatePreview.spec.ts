@@ -135,12 +135,14 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        id: 'card-1',
-        label: 'Card One',
-        name: 'Card One',
-        template_id: 'mtg-like-v1',
-        image_url: '/cards/card-1/image',
-        scope: 'current-template',
+        'mtg-like-v1': {
+          id: 'card-1',
+          label: 'Card One',
+          name: 'Card One',
+          template_id: 'mtg-like-v1',
+          image_url: '/cards/card-1/image',
+          scope: 'current-template',
+        },
       }),
     );
     mockedGet.mockImplementation(async (url) => {
@@ -185,12 +187,14 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        id: 'missing-card',
-        label: 'Missing Card',
-        name: 'Missing Card',
-        template_id: 'mtg-like-v1',
-        image_url: '/cards/missing-card/image',
-        scope: 'current-template',
+        'mtg-like-v1': {
+          id: 'missing-card',
+          label: 'Missing Card',
+          name: 'Missing Card',
+          template_id: 'mtg-like-v1',
+          image_url: '/cards/missing-card/image',
+          scope: 'current-template',
+        },
       }),
     );
     mockedGet.mockImplementation(async (url) => {
@@ -221,7 +225,87 @@ describe('useTemplatePreview', () => {
     await nextTick();
 
     expect(preview.selectedPreviewCard.value).toBeNull();
-    expect(localStorage.getItem(TEMPLATE_PREVIEW_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(TEMPLATE_PREVIEW_STORAGE_KEY)).toBe('{}');
+  });
+
+  test('restores a separate persisted preview card when switching templates', async () => {
+    localStorage.setItem(
+      TEMPLATE_PREVIEW_STORAGE_KEY,
+      JSON.stringify({
+        'mtg-like-v1': {
+          id: 'card-1',
+          label: 'Card One',
+          name: 'Card One',
+          template_id: 'mtg-like-v1',
+          image_url: '/cards/card-1/image',
+          scope: 'current-template',
+        },
+        'mtg-like-v2': {
+          id: 'card-2',
+          label: 'Card Two',
+          name: 'Card Two',
+          template_id: 'mtg-like-v2',
+          image_url: '/cards/card-2/image',
+          scope: 'all-cards',
+        },
+      }),
+    );
+    mockedGet.mockImplementation(async (url) => {
+      if (url === '/cards/card-1') {
+        return {
+          data: {
+            id: 'card-1',
+            label: 'Card One',
+            name: 'Card One',
+            template_id: 'mtg-like-v1',
+            image_url: '/cards/card-1/image',
+          },
+        };
+      }
+      if (url === '/cards/card-2') {
+        return {
+          data: {
+            id: 'card-2',
+            label: 'Card Two',
+            name: 'Card Two',
+            template_id: 'mtg-like-v2',
+            image_url: '/cards/card-2/image',
+          },
+        };
+      }
+      if (url === '/cards') {
+        return {
+          data: {
+            count: 0,
+            next_page: null,
+            previous_page: null,
+            page: 1,
+            page_size: 8,
+            results: [],
+          },
+        };
+      }
+      throw new Error(`Unhandled request: ${String(url)}`);
+    });
+
+    const templateKey = ref('mtg-like-v1');
+    const preview = useTemplatePreview({
+      definitionJson: ref(relativeDefinitionJson),
+      templateKey: computed(() => templateKey.value),
+    });
+
+    await preview.restorePreviewCard();
+    await nextTick();
+    expect(preview.selectedPreviewCard.value?.id).toBe('card-1');
+    expect(preview.previewScope.value).toBe('current-template');
+
+    templateKey.value = 'mtg-like-v2';
+    await nextTick();
+    await vi.runOnlyPendingTimersAsync();
+    await nextTick();
+
+    expect(preview.selectedPreviewCard.value?.id).toBe('card-2');
+    expect(preview.previewScope.value).toBe('all-cards');
   });
 
   test('search defaults to the current template scope when a template key is available', async () => {
