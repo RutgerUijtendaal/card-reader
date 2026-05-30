@@ -21,10 +21,7 @@
         </button>
       </template>
 
-      <template
-        v-if="!controller.deck.isSetupStep.value"
-        #bottomRight
-      >
+      <template #bottomRight>
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
           <div class="flex items-center gap-2">
             <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
@@ -86,36 +83,90 @@
 
           <div class="theme-divider hidden h-4 border-l lg:block" />
           <div
-            v-if="controller.deck.warningMessages.value.length > 0"
-            class="relative"
+            v-if="hardIssueMessages.length > 0"
+            class="inline-flex"
           >
             <button
+              ref="hardIssueTriggerRef"
+              class="theme-pill theme-pill-danger inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold"
+              type="button"
+              aria-label="Show deck validity issues"
+              :aria-expanded="hardIssuesOpen"
+              @mouseenter="hardIssuesOpen = true"
+              @mouseleave="hardIssuesOpen = false"
+              @focusin="hardIssuesOpen = true"
+              @focusout="hardIssuesOpen = false"
+            >
+              <TriangleAlert class="h-3.5 w-3.5" />
+              {{ hardIssueMessages.length }}
+            </button>
+            <Teleport to="body">
+              <div
+                v-if="hardIssuesOpen"
+                ref="hardIssuePanelRef"
+                class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
+                role="tooltip"
+                :style="{ position: 'fixed', left: `${hardIssueX}px`, top: `${hardIssueY}px` }"
+              >
+                <p class="theme-section-title font-semibold">
+                  Issues
+                </p>
+                <ul class="mt-2 space-y-2">
+                  <li
+                    v-for="message in hardIssueMessages"
+                    :key="message"
+                    class="theme-section-muted"
+                  >
+                    {{ message }}
+                  </li>
+                </ul>
+              </div>
+            </Teleport>
+          </div>
+          <div
+            v-if="hardIssueMessages.length > 0"
+            class="theme-divider hidden h-4 border-l lg:block"
+          />
+          <div
+            v-if="controller.deck.warningMessages.value.length > 0"
+            class="inline-flex"
+          >
+            <button
+              ref="warningTriggerRef"
               class="theme-pill theme-pill-warning inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold"
               type="button"
               aria-label="Show deck warnings"
               :aria-expanded="warningsOpen"
-              @click="warningsOpen = !warningsOpen"
+              @mouseenter="warningsOpen = true"
+              @mouseleave="warningsOpen = false"
+              @focusin="warningsOpen = true"
+              @focusout="warningsOpen = false"
             >
               <TriangleAlert class="h-3.5 w-3.5" />
               {{ controller.deck.warningMessages.value.length }}
             </button>
-            <div
-              v-if="warningsOpen"
-              class="theme-popover absolute right-0 top-full z-30 mt-2 w-72 p-3 text-sm"
-            >
-              <p class="theme-section-title font-semibold">
-                Warnings
-              </p>
-              <ul class="mt-2 space-y-2">
-                <li
-                  v-for="message in controller.deck.warningMessages.value"
-                  :key="message"
-                  class="theme-section-muted"
-                >
-                  {{ message }}
-                </li>
-              </ul>
-            </div>
+            <Teleport to="body">
+              <div
+                v-if="warningsOpen"
+                ref="warningPanelRef"
+                class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
+                role="tooltip"
+                :style="{ position: 'fixed', left: `${warningX}px`, top: `${warningY}px` }"
+              >
+                <p class="theme-section-title font-semibold">
+                  Warnings
+                </p>
+                <ul class="mt-2 space-y-2">
+                  <li
+                    v-for="message in controller.deck.warningMessages.value"
+                    :key="message"
+                    class="theme-section-muted"
+                  >
+                    {{ message }}
+                  </li>
+                </ul>
+              </div>
+            </Teleport>
           </div>
           <div
             v-if="controller.deck.warningMessages.value.length > 0"
@@ -158,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { CircleCheckBig, CircleX, SquarePen, TriangleAlert } from 'lucide-vue-next';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import InfoTooltip from '@/components/InfoTooltip.vue';
@@ -166,12 +217,27 @@ import DeckBuilderFiltersPanel from '@/modules/decks/components/DeckBuilderFilte
 import DeckBuilderGallery from '@/modules/decks/components/DeckBuilderGallery.vue';
 import DeckBuilderSummaryPanel from '@/modules/decks/components/DeckBuilderSummaryPanel.vue';
 import { useDeckEditor } from '@/modules/decks/composables/useDeckEditor';
+import { useFloatingPopover } from '@/composables/useFloatingPopover';
 
 const controller = useDeckEditor();
-const warningsOpen = ref(false);
+const {
+  isOpen: hardIssuesOpen,
+  triggerRef: hardIssueTriggerRef,
+  panelRef: hardIssuePanelRef,
+  x: hardIssueX,
+  y: hardIssueY,
+} = useFloatingPopover({ placement: 'bottom-end' });
+const {
+  isOpen: warningsOpen,
+  triggerRef: warningTriggerRef,
+  panelRef: warningPanelRef,
+  x: warningX,
+  y: warningY,
+} = useFloatingPopover({ placement: 'bottom-end' });
 const mainboardMinCards = computed(() => controller.deckBuildingRules.value.mainboard_card_count.min ?? 0);
 const mainboardMaxCards = computed(() => controller.deckBuildingRules.value.mainboard_card_count.max ?? 0);
 const manaMinCards = computed(() => controller.deckBuildingRules.value.mana_type_count.min ?? 0);
+const hardIssueMessages = computed(() => controller.deck.validationMessages.value);
 const deckEditorSubtitle = computed(() =>
   controller.deck.isSetupStep.value
     ? 'Select a hero and enter the deck details to continue.'

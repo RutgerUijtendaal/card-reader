@@ -292,6 +292,90 @@ describe('useDeckEditorDraft', () => {
     expect(controller.validationMessages.value).not.toContain('Each mainboard card quantity must be between 1 and 4.');
   });
 
+  test('reports action-blocking messages when a selected hero lowers an existing copy limit', () => {
+    const builderStep = ref<BuilderStep>('setup');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      strictHero: {
+        ...buildCard('strictHero', 'Strict Hero', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            mainboard_copy_limit: { max: 4 },
+          },
+        },
+      },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.name = 'Example';
+    controller.form.hero_card_id = 'strictHero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 6 }];
+
+    expect(controller.blockingMessages.value).toContain(
+      'Each mainboard card quantity must be between 1 and 4.',
+    );
+    expect(controller.setupMessages.value).toEqual([]);
+  });
+
+  test('does not treat validity-only deck constraints as setup blockers', () => {
+    const builderStep = ref<BuilderStep>('setup');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.name = 'Example';
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [];
+
+    expect(controller.validationMessages.value).toContain(
+      'Deck must contain at least 20 mainboard cards.',
+    );
+    expect(controller.blockingMessages.value).toEqual([]);
+  });
+
+  test('does not show a setup issue when no hero is selected', () => {
+    const builderStep = ref<BuilderStep>('setup');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({});
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.name = 'Example';
+    controller.form.hero_card_id = '';
+
+    expect(controller.setupMessages.value).toEqual([]);
+  });
+
+  test('does not show a setup issue when deck name is empty', () => {
+    const builderStep = ref<BuilderStep>('setup');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.name = '';
+    controller.form.hero_card_id = 'hero';
+
+    expect(controller.setupMessages.value).toEqual([]);
+  });
+
   test('uses whole deck scope for hard legendary action limits', () => {
     const builderStep = ref<BuilderStep>('build');
     const legendary = buildLegendaryCard();

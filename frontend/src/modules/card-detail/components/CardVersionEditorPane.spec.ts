@@ -205,6 +205,7 @@ describe('CardVersionEditorPane lifecycle status', () => {
 
   test('disables deprecated status when the card is a group anchor', async () => {
     const mounted = await mountPane({ deprecatedStatusDisabled: true });
+    await clickButton(mounted.container, 'Card');
     const deprecatedButton = mounted.container.querySelector('[data-testid="lifecycle-option-deprecated"]');
 
     expect(deprecatedButton).toBeInstanceOf(HTMLButtonElement);
@@ -220,6 +221,7 @@ describe('CardVersionEditorPane lifecycle status', () => {
 
   test('keeps deprecated status selectable for non-anchor cards', async () => {
     const mounted = await mountPane();
+    await clickButton(mounted.container, 'Card');
     const deprecatedButton = mounted.container.querySelector('[data-testid="lifecycle-option-deprecated"]');
 
     expect(deprecatedButton).toBeInstanceOf(HTMLButtonElement);
@@ -238,22 +240,24 @@ describe('CardVersionEditorPane tabs', () => {
     document.body.innerHTML = '';
   });
 
-  test('renders card-level controls only on the Card tab', async () => {
+  test('renders version-level controls by default and card-level controls only on the Card tab', async () => {
     const mounted = await mountPane();
 
-    expect(mounted.container.textContent).toContain('Hero Card');
-    expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
-    expect(mounted.container.textContent).toContain('Card Status');
-    expect(mounted.container.textContent).not.toContain('Mana Cost');
-    expect(mounted.container.textContent).not.toContain('Template');
-
-    await clickButton(mounted.container, 'Card Version');
-
+    expect(mounted.container.textContent).toContain('Card Version Editor');
     expect(mounted.container.textContent).not.toContain('Hero Card');
     expect(mounted.container.textContent).not.toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).not.toContain('Card Status');
     expect(mounted.container.textContent).toContain('Mana Cost');
     expect(mounted.container.textContent).toContain('Template');
+
+    await clickButton(mounted.container, 'Card');
+
+    expect(mounted.container.textContent).toContain('Card Editor');
+    expect(mounted.container.textContent).toContain('Hero Card');
+    expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
+    expect(mounted.container.textContent).toContain('Card Status');
+    expect(mounted.container.textContent).not.toContain('Mana Cost');
+    expect(mounted.container.textContent).not.toContain('Template');
 
     mounted.unmount();
   });
@@ -261,6 +265,7 @@ describe('CardVersionEditorPane tabs', () => {
   test('opens the deck-building config example from the JSON editor', async () => {
     const mounted = await mountPane();
 
+    await clickButton(mounted.container, 'Card');
     await clickButton(mounted.container, 'Example');
 
     expect(document.body.textContent).toContain('Deck-building config example');
@@ -273,13 +278,12 @@ describe('CardVersionEditorPane tabs', () => {
   test('emits separate save events for card and version tabs', async () => {
     const mounted = await mountPane();
 
-    await clickButton(mounted.container, 'Save Card');
-    expect(mounted.saveCard).toHaveBeenCalledTimes(1);
-    expect(mounted.saveVersion).not.toHaveBeenCalled();
-
-    await clickButton(mounted.container, 'Card Version');
     await clickButton(mounted.container, 'Save Version');
+    expect(mounted.saveVersion).toHaveBeenCalledTimes(1);
+    expect(mounted.saveCard).not.toHaveBeenCalled();
 
+    await clickButton(mounted.container, 'Card');
+    await clickButton(mounted.container, 'Save Card');
     expect(mounted.saveCard).toHaveBeenCalledTimes(1);
     expect(mounted.saveVersion).toHaveBeenCalledTimes(1);
 

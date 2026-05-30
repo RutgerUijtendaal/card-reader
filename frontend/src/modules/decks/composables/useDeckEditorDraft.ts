@@ -6,6 +6,7 @@ import {
   MAX_SIDEBOARD_ENTRY_QUANTITY,
 } from '@/modules/decks/constants';
 import {
+  getDeckBlockingMessages,
   getDeckConstraintMessages,
   getDeckEntryQuantityLimit,
   getDeckQuantityViolationMessage,
@@ -183,8 +184,6 @@ export const useDeckEditorDraft = ({
 
   const setupMessages = computed(() => {
     const messages: string[] = [];
-    if (!form.name.trim()) messages.push('Deck name is required.');
-    if (!form.hero_card_id) messages.push('A hero card is required.');
     return messages;
   });
 
@@ -200,6 +199,7 @@ export const useDeckEditorDraft = ({
     return messages;
   });
   const warningMessages = computed(() => getDeckWarningMessages(baseConstraintContext.value));
+  const blockingMessages = computed(() => getDeckBlockingMessages(baseConstraintContext.value));
 
   const isDeckValid = computed(() => validationMessages.value.length === 0);
   const deckStatusLabel = computed(() => (isDeckValid.value ? 'Ready' : 'In Progress'));
@@ -686,6 +686,7 @@ export const useDeckEditorDraft = ({
     setupMessages,
     validationMessages,
     warningMessages,
+    blockingMessages,
     isDeckValid,
     deckStatusLabel,
     setDeckName,

@@ -95,8 +95,18 @@ export const useDeckEditor = () => {
   };
 
   const lockSetup = async (): Promise<void> => {
+    if (!deck.form.hero_card_id) {
+      return;
+    }
+    if (!deck.form.name.trim()) {
+      return;
+    }
     if (deck.setupMessages.value.length > 0) {
       toast.error(deck.setupMessages.value[0]);
+      return;
+    }
+    if (deck.blockingMessages.value.length > 0) {
+      toast.error(deck.blockingMessages.value[0]);
       return;
     }
     saving.value = true;

@@ -11,12 +11,62 @@
           </p>
         </div>
 
+        <section class="space-y-3">
+          <p class="theme-section-title text-sm font-semibold">
+            Selected Hero
+          </p>
+          <div
+            v-if="controller.deck.selectedHero.value"
+            class="space-y-3"
+          >
+            <div
+              v-if="controller.deck.selectedHero.value.image_url"
+              class="mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
+            >
+              <img
+                :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+                :alt="controller.deck.selectedHero.value.name"
+                class="h-full w-full object-contain"
+              >
+            </div>
+            <div
+              v-else
+              class="theme-empty-state flex h-[34rem] items-center justify-center rounded-xl text-sm"
+            >
+              No hero image
+            </div>
+          </div>
+          <p
+            v-else
+            class="theme-card-frame mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
+          >
+            <CardLoadingSkeleton :animated="false" />
+          </p>
+        </section>
+
+        <div
+          v-if="setupBlockingMessages.length > 0"
+          class="theme-muted-panel space-y-2 p-3"
+        >
+          <p class="theme-section-title text-sm font-semibold">
+            Setup Issues
+          </p>
+          <p
+            v-for="message in setupBlockingMessages"
+            :key="message"
+            class="theme-error-text text-sm"
+          >
+            {{ message }}
+          </p>
+        </div>
+
         <label class="field-label">
-          Name
+          <span>Name <span class="theme-error-text">*</span></span>
           <input
             v-model="deckName"
             class="input-base"
             placeholder="Deck name"
+            required
           >
         </label>
 
@@ -49,65 +99,13 @@
             {{ selectedVisibilityDescription }}
           </p>
         </div>
+      </div>
 
-        <div class="theme-muted-panel space-y-3 p-3">
-          <p class="theme-section-title text-sm font-semibold">
-            Selected Hero
-          </p>
-          <div
-            v-if="controller.deck.selectedHero.value"
-            class="space-y-3"
-          >
-            <img
-              v-if="controller.deck.selectedHero.value.image_url"
-              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-              :alt="controller.deck.selectedHero.value.name"
-              class="theme-card-frame max-h-80 w-full rounded-2xl object-contain"
-            >
-            <div
-              v-else
-              class="theme-empty-state flex h-52 items-center justify-center rounded-2xl text-sm"
-            >
-              No hero image
-            </div>
-
-            <div class="space-y-1">
-              <p class="theme-section-title text-sm font-semibold">
-                {{ controller.deck.selectedHero.value.name }}
-              </p>
-              <p class="theme-section-muted text-xs">
-                {{ controller.deck.selectedHero.value.label }}
-              </p>
-            </div>
-          </div>
-          <p
-            v-else
-            class="theme-section-muted text-sm"
-          >
-            No hero selected.
-          </p>
-        </div>
-
-        <div
-          v-if="controller.deck.setupMessages.value.length > 0"
-          class="theme-muted-panel space-y-2 p-3"
-        >
-          <p class="theme-section-title text-sm font-semibold">
-            Missing Setup
-          </p>
-          <p
-            v-for="message in controller.deck.setupMessages.value"
-            :key="message"
-            class="theme-error-text text-sm"
-          >
-            {{ message }}
-          </p>
-        </div>
-
+      <div class="theme-divider shrink-0 border-t p-5">
         <button
           class="btn-primary w-full justify-center"
           type="button"
-          :disabled="controller.deck.setupMessages.value.length > 0"
+          :disabled="!controller.deck.selectedHero.value || !deckName.trim() || setupBlockingMessages.length > 0"
           @click="controller.lockSetup"
         >
           Continue
@@ -419,6 +417,7 @@ import { computed, nextTick, ref } from 'vue';
 import { ChevronDown, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
+import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
@@ -444,6 +443,10 @@ const deckDescription = computed({
 const visibilityOptions = deckVisibilityOptions;
 const visibility = computed(() => props.controller.deck.form.visibility);
 const selectedVisibilityDescription = computed(() => deckVisibilityDescriptions[visibility.value] ?? '');
+const setupBlockingMessages = computed(() => [
+  ...props.controller.deck.setupMessages.value,
+  ...props.controller.deck.blockingMessages.value,
+]);
 const {
   isOpen: heroDetailsExpanded,
   triggerRef: heroDetailsTriggerRef,

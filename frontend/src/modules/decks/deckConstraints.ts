@@ -162,6 +162,16 @@ export const getDeckWarningMessages = (
   context: Omit<DeckConstraintContext, 'boardId'>,
 ): string[] => evaluationMessages(evaluateDeckConstraints(context), 'soft');
 
+export const getDeckBlockingMessages = (
+  context: Omit<DeckConstraintContext, 'boardId'>,
+): string[] => [
+  ...new Set(
+    evaluateDeckConstraints(context)
+      .filter((violation) => violation.severity === 'hard' && violation.blocksAction)
+      .map((violation) => violation.message),
+  ),
+];
+
 const evaluateDeckConstraints = (
   context: Omit<DeckConstraintContext, 'boardId'>,
 ): DeckConstraintViolation[] => {
