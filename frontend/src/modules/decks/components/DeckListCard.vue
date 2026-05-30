@@ -59,13 +59,13 @@
             </p>
 
             <p
-              v-if="deck.description"
+              v-if="deck.description && !isCompact"
               class="deck-list-card-description theme-section-title text-sm"
             >
               {{ deck.description }}
             </p>
             <p
-              v-else
+              v-else-if="!isCompact"
               class="deck-list-card-description theme-section-muted text-sm"
             >
               No description available.
@@ -148,6 +148,7 @@ const props = defineProps<{
   deck: DeckRecord;
   mode: 'browse' | 'owned';
   titleTo?: string;
+  density?: 'default' | 'compact';
 }>();
 
 const router = useRouter();
@@ -155,6 +156,7 @@ const { exportTtsDeck } = useDeckExport();
 
 const isBrowseMode = computed(() => props.mode === 'browse');
 const isOwnedMode = computed(() => props.mode === 'owned');
+const isCompact = computed(() => props.density === 'compact');
 const isClickableCard = computed(() => Boolean(props.titleTo));
 const formatDate = (value: string): string => new Date(value).toLocaleDateString();
 const sideboardSummary = computed(() => {
@@ -175,6 +177,7 @@ const cardClass = computed(() => [
   'deck-list-card-surface',
   'page-card',
   isBrowseMode.value ? 'deck-list-card-browse' : 'deck-list-card-owned',
+  isCompact.value ? 'deck-list-card-compact' : '',
   isClickableCard.value
     ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]'
     : '',
@@ -300,6 +303,24 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.deck-list-card-compact {
+  --deck-card-art-width: min(13rem, 58%);
+  --deck-card-art-position: 28% 12%;
+  --deck-card-art-scale: 1.14;
+  --deck-card-art-hover-scale: 1.2;
+  --deck-card-content-padding-left: clamp(8rem, 34%, 10rem);
+  height: 10.5rem;
+}
+
+.deck-list-card-compact .deck-list-card-content {
+  padding: 0.9rem 1rem 0.85rem var(--deck-card-content-padding-left);
+}
+
+.deck-list-card-compact :deep(.theme-section-title.text-lg) {
+  font-size: 0.98rem;
+  line-height: 1.25rem;
 }
 
 @media (max-width: 767px) {

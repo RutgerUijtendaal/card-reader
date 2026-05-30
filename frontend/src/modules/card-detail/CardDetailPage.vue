@@ -75,14 +75,12 @@
       class="grid items-start gap-5 xl:h-full xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"
     >
       <div class="space-y-4 xl:h-full xl:overflow-y-auto xl:pr-2">
-        <div>
-          <CardVersionPreviewPane
-            :version="selectedVersion"
-            :symbol-by-key="symbolByKey"
-            :to-absolute-api-url="toAbsoluteApiUrl"
-            :format-date="formatDate"
-          />
-        </div>
+        <CardVersionPreviewPane
+          :version="selectedVersion"
+          :symbol-by-key="symbolByKey"
+          :to-absolute-api-url="toAbsoluteApiUrl"
+          :format-date="formatDate"
+        />
         <CardVersionSelectorGrid
           :versions="versions"
           :selected-version-id="selectedVersionId"
@@ -91,6 +89,7 @@
           @select="selectVersion"
         />
       </div>
+
       <div class="xl:h-full xl:min-h-0">
         <CardVersionEditorPane
           :version="selectedVersion"
@@ -138,7 +137,7 @@
       v-else
       class="page-card theme-section-muted text-sm"
     >
-      No versions found.
+      No printings found.
     </div>
   </section>
 </template>

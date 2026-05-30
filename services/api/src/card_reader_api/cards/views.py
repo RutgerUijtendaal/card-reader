@@ -20,11 +20,14 @@ from card_reader_api.cards.serializers import (
     CardFiltersQuerySerializer,
     LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
+    card_deck_reference_payload,
     card_group_summary_payload,
     card_payload,
     metadata_option,
     symbol_option,
 )
+from card_reader_api.common.auth_access import is_authenticated
+from card_reader_api.decks.serializers import deck_payload
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
     CARD_SORT_MANA_ASC,
@@ -48,6 +51,7 @@ from card_reader_core.services.cards import (
     get_filter_metadata,
     resolve_card_image_path,
 )
+from card_reader_core.services.decks import DeckService
 
 if TYPE_CHECKING:
     from card_reader_core.models import Type
@@ -158,7 +162,7 @@ class CardFiltersView(APIView):
 class CardDetailView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str) -> Response:
+    def get(self, request: Request, card_id: str) -> Response:
         card, version, image = get_card_with_image(card_id)
         if card is None or version is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -168,6 +172,14 @@ class CardDetailView(APIView):
             card_group_summary_payload(group, card_id=card.id)
             for group in CardGroupService().get_groups_for_card(card.id)
         ]
+        viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
+        deck_references = [
+            {
+                **deck_payload(deck),
+                "card_reference": card_deck_reference_payload(deck, card_id=card.id),
+            }
+            for deck in DeckService().list_card_decks_for_viewer(card.id, viewer_id=viewer_id)
+        ]
         return Response(
             card_payload(
                 card,
@@ -176,6 +188,7 @@ class CardDetailView(APIView):
                 metadata=metadata,
                 edit_state=edit_state,
                 card_groups=card_groups,
+                deck_references=deck_references,
             )
         )
 

@@ -1356,6 +1356,49 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     assert group_payload["members"][0]["is_anchor"] is True
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_detail_includes_viewer_visible_deck_references() -> None:
+    owner = _create_user("card-deck-reference-owner", "password", is_staff=False)
+    other_owner = _create_user("card-deck-reference-other", "password", is_staff=False)
+    hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Hero")
+    card, version = _create_editable_card_version(name="Deck Reference Included")
+    _create_card_image(version)
+    hero_card.is_hero = True
+    hero_card.save(update_fields=["is_hero"])
+    owner_deck = Deck.objects.create(
+        owner=owner,
+        name="Owner Private Deck",
+        visibility="private",
+        hero_card=hero_card,
+    )
+    DeckEntry.objects.create(deck=owner_deck, card=card, quantity=2)
+    other_deck = Deck.objects.create(
+        owner=other_owner,
+        name="Other Private Deck",
+        visibility="private",
+        hero_card=hero_card,
+    )
+    DeckEntry.objects.create(deck=other_deck, card=card, quantity=3)
+
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    owner_response = client.get(f"/cards/{card.id}")
+    anonymous_response = Client(HTTP_HOST="localhost").get(f"/cards/{card.id}")
+
+    assert owner_response.status_code == 200
+    references = owner_response.json()["deck_references"]
+    assert [reference["id"] for reference in references] == [owner_deck.id]
+    assert references[0]["name"] == "Owner Private Deck"
+    assert references[0]["visibility"] == "private"
+    assert references[0]["owner"]["id"] == str(owner.id)
+    assert references[0]["hero_card"]["id"] == hero_card.id
+    assert references[0]["card_reference"]["is_hero"] is False
+    assert references[0]["card_reference"]["mainboard_quantity"] == 2
+    assert references[0]["card_reference"]["sideboard_quantity"] == 0
+    assert anonymous_response.status_code == 200
+    assert anonymous_response.json()["deck_references"] == []
+
+
 def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Detail Lifecycle Anchor")
     deprecated_card, deprecated_version = _create_editable_card_version(name="Detail Lifecycle Deprecated")

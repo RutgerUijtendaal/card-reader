@@ -1,9 +1,9 @@
 <template>
-  <section class="space-y-5 xl:h-[calc(100vh-13rem)]">
+  <section class="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
     <AppPageHeader
       :icon="Layers3"
       :title="card?.name || 'Loading card...'"
-      subtitle="Browse parsed versions and full card metadata."
+      subtitle="Browse parsed printings and full card metadata."
       :back-to="buildCardReturnLocation(route.query)"
       :back-label="backButtonLabel"
       title-tag="h2"
@@ -67,28 +67,35 @@
 
     <div
       v-if="selectedVersion"
-      class="grid items-start gap-5 xl:h-full xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]"
+      class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1"
     >
-      <div class="space-y-4 xl:h-full xl:overflow-y-auto xl:pr-2">
-        <CardVersionPreviewPane
-          :version="selectedVersion"
-          :symbol-by-key="symbolByKey"
-          :to-absolute-api-url="toAbsoluteApiUrl"
-          :format-date="formatDate"
-          :show-editable-state="false"
-        />
-      </div>
+      <div class="grid min-h-full items-start gap-6 2xl:grid-cols-[minmax(22rem,34rem)_minmax(24rem,36rem)_minmax(36rem,1fr)] 2xl:items-stretch">
+        <div class="space-y-6 2xl:col-span-2">
+          <CardPublicOverviewPane
+            :version="selectedVersion"
+            :symbol-by-key="symbolByKey"
+            :to-absolute-api-url="toAbsoluteApiUrl"
+          />
 
-      <div class="space-y-4 xl:h-full xl:overflow-y-auto">
-        <CardVersionSelectorGrid
-          :versions="versions"
-          :selected-version-id="selectedVersionId"
-          :to-absolute-api-url="toAbsoluteApiUrl"
-          :format-date="formatDate"
-          title="Versions"
-          description="Select a parsed version to inspect."
-          @select="selectVersion"
-        />
+          <CardVersionSelectorGrid
+            :versions="versions"
+            :selected-version-id="selectedVersionId"
+            :to-absolute-api-url="toAbsoluteApiUrl"
+            :format-date="formatDate"
+            class="border-t border-[var(--color-border)] pt-6"
+            surface="plain"
+            title="Printings"
+            description="Select a printing to inspect."
+            @select="selectVersion"
+          />
+        </div>
+
+        <aside class="space-y-5 2xl:h-full 2xl:border-l 2xl:border-[var(--color-border)] 2xl:pl-6">
+          <CardDeckReferencesPanel
+            :deck-references="card?.deck_references ?? []"
+            :current-user-id="auth.user?.id"
+          />
+        </aside>
       </div>
     </div>
 
@@ -96,7 +103,7 @@
       v-else
       class="page-card theme-section-muted text-sm"
     >
-      No versions found.
+      No printings found.
     </div>
   </section>
 </template>
@@ -106,12 +113,15 @@ import { onMounted } from 'vue';
 import { ChevronLeft, ChevronRight, Layers3 } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation } from '@/modules/card-detail/cardReturnState';
-import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
+import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
+import CardPublicOverviewPane from '@/modules/card-detail/components/CardPublicOverviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
 import { useCardPublicDetailState } from '@/modules/card-detail/composables/useCardPublicDetailState';
 
 const route = useRoute();
+const auth = useAuthStore();
 
 const {
   card,

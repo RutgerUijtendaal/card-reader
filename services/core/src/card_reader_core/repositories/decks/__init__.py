@@ -4,6 +4,7 @@ from .queries import (
     get_deck_for_viewer,
     get_owner_deck,
     get_public_deck,
+    list_card_decks_for_viewer,
     list_owner_decks,
     list_public_decks,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "get_deck_for_viewer",
     "get_owner_deck",
     "get_public_deck",
+    "list_card_decks_for_viewer",
     "list_owner_decks",
     "list_public_decks",
     "replace_mainboard_entries",

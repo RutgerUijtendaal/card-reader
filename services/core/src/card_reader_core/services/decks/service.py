@@ -9,6 +9,7 @@ from card_reader_core.repositories.decks import (
     get_deck_for_viewer,
     get_owner_deck,
     get_public_deck,
+    list_card_decks_for_viewer,
     list_owner_decks,
     list_public_decks,
     replace_mainboard_entries,
@@ -53,6 +54,15 @@ class DeckService:
 
     def list_owner_decks(self, owner_id: str) -> list[Deck]:
         return list_owner_decks(owner_id)
+
+    def list_card_decks_for_viewer(self, card_id: str, *, viewer_id: str | None = None) -> list[Deck]:
+        decks = list_card_decks_for_viewer(card_id, viewer_id=viewer_id)
+        return [
+            deck
+            for deck in decks
+            if (viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id)
+            or (deck.visibility == "public" and self.get_deck_validation(deck).is_valid)
+        ]
 
     def get_public_deck(self, deck_id: str) -> Deck | None:
         deck = get_public_deck(deck_id)

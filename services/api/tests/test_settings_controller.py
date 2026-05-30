@@ -44,7 +44,12 @@ def _write_png(path: Path) -> None:
     Image.new("RGB", (8, 8), color=(20, 120, 200)).save(path, format="PNG")
 
 
-def _create_image_record(*, stored_path: str, checksum: str = "image-checksum") -> CardVersionImage:
+def _create_image_record(
+    *,
+    stored_path: str,
+    checksum: str = "image-checksum",
+    source_file: str | None = None,
+) -> CardVersionImage:
     template = Template.objects.create(
         key=f"image-template-{checksum}",
         label="Image Template",
@@ -61,7 +66,7 @@ def _create_image_record(*, stored_path: str, checksum: str = "image-checksum") 
     )
     return CardVersionImage.objects.create(
         card_version=version,
-        source_file=stored_path,
+        source_file=source_file or stored_path,
         stored_path=stored_path,
         checksum=checksum,
     )
@@ -121,6 +126,33 @@ def test_convert_card_images_to_webp_reports_missing_without_updates(
     assert result.missing == 1
     assert result.failed == 0
     assert image.stored_path == "images/missing-image.png"
+
+
+def test_convert_card_images_to_webp_repairs_missing_stored_path_from_source(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    CardVersionImage.objects.all().delete()
+
+    source_path = resolve_storage_path("uploads/source-image.png")
+    _write_png(source_path)
+    image = _create_image_record(
+        source_file="uploads/source-image.png",
+        stored_path="images/missing-source-image.png",
+        checksum="source-image",
+    )
+
+    result = convert_card_images_to_webp()
+
+    image.refresh_from_db()
+    assert result.converted == 1
+    assert result.missing == 0
+    assert result.failed == 0
+    assert image.stored_path == "images/source-image.webp"
+    assert source_path.exists()
+    with Image.open(resolve_storage_path(image.stored_path)) as converted:
+        assert converted.format == "WEBP"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

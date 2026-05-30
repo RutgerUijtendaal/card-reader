@@ -42,7 +42,7 @@ class CardImageConversionResult:
 
 def convert_card_images_to_webp() -> CardImageConversionResult:
     result = CardImageConversionResult()
-    images = CardVersionImage.objects.order_by("id").only("id", "stored_path", "checksum")
+    images = CardVersionImage.objects.order_by("id").only("id", "source_file", "stored_path", "checksum")
     for image in images.iterator():
         _convert_card_image(image, result)
     return result
@@ -62,14 +62,23 @@ def format_byte_count(value: int) -> str:
 
 def _convert_card_image(image: CardVersionImage, result: CardImageConversionResult) -> None:
     stored_path = resolve_storage_path(image.stored_path)
+    readable_path = stored_path
     if not stored_path.exists() or not stored_path.is_file():
-        result.missing += 1
-        return
+        source_path = resolve_storage_path(image.source_file)
+        if not source_path.exists() or not source_path.is_file():
+            result.missing += 1
+            return
+        readable_path = source_path
 
-    original_size = stored_path.stat().st_size
-    if stored_path.suffix.lower() == ".webp":
+    original_size = readable_path.stat().st_size
+    if readable_path.suffix.lower() == ".webp":
         try:
-            _verify_readable_image(stored_path)
+            _verify_readable_image(readable_path)
+            if readable_path != stored_path:
+                CardVersionImage.objects.filter(id=image.id).update(
+                    stored_path=image.source_file,
+                    updated_at=now_utc(),
+                )
             result.already_webp += 1
             result.bytes_before += original_size
             result.bytes_after += original_size
@@ -84,7 +93,7 @@ def _convert_card_image(image: CardVersionImage, result: CardImageConversionResu
         if target_path.exists():
             _verify_readable_image(target_path)
         else:
-            convert_image_to_webp(stored_path, target_path)
+            convert_image_to_webp(readable_path, target_path)
             _verify_readable_image(target_path)
         target_size = target_path.stat().st_size
         CardVersionImage.objects.filter(id=image.id).update(

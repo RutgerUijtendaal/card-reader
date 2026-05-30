@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.db.models import Q
+
 from card_reader_core.models import Deck, DeckVisibility
 
 from .filters import apply_public_deck_filters
@@ -30,6 +32,21 @@ def list_public_decks(
 
 def list_owner_decks(owner_id: str) -> list[Deck]:
     return list(deck_queryset().filter(owner_id=owner_id).order_by("-updated_at", "-created_at"))
+
+
+def list_card_decks_for_viewer(card_id: str, *, viewer_id: str | None = None) -> list[Deck]:
+    visibility_query = Q(visibility="public")
+    if viewer_id:
+        visibility_query |= Q(owner_id=viewer_id)
+    return list(
+        deck_queryset()
+        .filter(
+            visibility_query,
+            Q(hero_card_id=card_id) | Q(entries__card_id=card_id) | Q(sideboards__entries__card_id=card_id),
+        )
+        .distinct()
+        .order_by("-updated_at", "-created_at", "id")
+    )
 
 
 def get_public_deck(deck_id: str) -> Deck | None:

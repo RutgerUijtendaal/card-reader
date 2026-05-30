@@ -97,12 +97,20 @@ def convert_image_to_webp(source_file: Path, target_path: Path) -> None:
     temp_path = target_path.with_name(f".{target_path.name}.tmp")
     try:
         with Image.open(source_file) as image:
-            output = image if image.mode in {"RGB", "L"} else image.convert("RGB")
+            output = _prepare_webp_image(image)
             output.save(temp_path, format="WEBP", quality=WEBP_IMAGE_QUALITY, method=6)
         temp_path.replace(target_path)
     except Exception:
         temp_path.unlink(missing_ok=True)
         raise
+
+
+def _prepare_webp_image(image: Image.Image) -> Image.Image:
+    if image.mode in {"RGB", "L", "RGBA"}:
+        return image
+    if image.mode in {"LA", "PA"} or "transparency" in image.info:
+        return image.convert("RGBA")
+    return image.convert("RGB")
 
 
 def _looks_absolute_path(value: str) -> bool:
