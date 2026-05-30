@@ -6,8 +6,10 @@ const DECK_RETURN_TO = 'deck';
 const DECKS_RETURN_TO = 'decks';
 const GALLERY_RETURN_TO = 'gallery';
 const MY_DECKS_RETURN_TO = 'my_decks';
+const CARD_RETURN_TO = 'card';
 const DECK_RETURN_TO_QUERY_KEY = 'return_to';
 const DECK_ID_QUERY_KEY = 'deck_id';
+const CARD_ID_QUERY_KEY = 'card_id';
 const isGalleryContextPath = (path: string): boolean =>
   path === '/cards' || path.startsWith('/cards/') || path.startsWith('/card-groups/');
 
@@ -15,12 +17,24 @@ export const buildDeckCardDetailLocation = (
   cardId: string,
   deckId: string,
   query: LocationQuery,
-): RouteLocationRaw => ({
-  path: `/cards/${cardId}`,
-  query: addReturnToQuery(query, DECK_RETURN_TO, {
-    [DECK_ID_QUERY_KEY]: deckId,
-  }),
-});
+): RouteLocationRaw => {
+  if (
+    queryString(query[DECK_RETURN_TO_QUERY_KEY]) === CARD_RETURN_TO &&
+    queryString(query[CARD_ID_QUERY_KEY]) !== null
+  ) {
+    return {
+      path: `/cards/${cardId}`,
+      query,
+    };
+  }
+
+  return {
+    path: `/cards/${cardId}`,
+    query: addReturnToQuery(query, DECK_RETURN_TO, {
+      [DECK_ID_QUERY_KEY]: deckId,
+    }),
+  };
+};
 
 export const buildPublicDeckLocation = (deckId: string): RouteLocationRaw => ({
   path: `/decks/${deckId}`,
@@ -104,7 +118,8 @@ export const buildDeckDetailEditorLocation = (deckId: string): RouteLocationRaw 
 export const buildDeckEditorReturnLocation = (query: LocationQuery): RouteLocationRaw => {
   const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
-  const clearedQuery = clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY]);
+  const cardId = queryString(query[CARD_ID_QUERY_KEY]);
+  const clearedQuery = clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY, CARD_ID_QUERY_KEY]);
 
   if (returnTo === DECK_RETURN_TO && deckId) {
     return {
@@ -124,15 +139,23 @@ export const buildDeckEditorReturnLocation = (query: LocationQuery): RouteLocati
     return buildGalleryLocation(clearedQuery as LocationQuery);
   }
 
+  if (returnTo === CARD_RETURN_TO && cardId) {
+    return {
+      path: `/cards/${cardId}`,
+      query: clearedQuery,
+    };
+  }
+
   return {
     path: '/my/decks',
     query: clearedQuery,
   };
 };
 
-export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks' | 'Gallery' | 'My Decks' => {
+export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks' | 'Gallery' | 'Card' | 'My Decks' => {
   const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
+  const cardId = queryString(query[CARD_ID_QUERY_KEY]);
   if (returnTo === DECK_RETURN_TO && deckId) {
     return 'Deck';
   }
@@ -141,6 +164,9 @@ export const getDeckEditorReturnLabel = (query: LocationQuery): 'Deck' | 'Decks'
   }
   if (returnTo === GALLERY_RETURN_TO) {
     return 'Gallery';
+  }
+  if (returnTo === CARD_RETURN_TO && cardId) {
+    return 'Card';
   }
   return 'My Decks';
 };

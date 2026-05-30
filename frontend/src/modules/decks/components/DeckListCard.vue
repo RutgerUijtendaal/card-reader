@@ -2,7 +2,7 @@
   <div class="deck-list-card-shell min-w-0">
     <div
       :class="cardClass"
-      :data-navigation-target="titleTo"
+      :data-navigation-target="navigationTarget"
       :role="isClickableCard ? 'link' : undefined"
       :tabindex="isClickableCard ? 0 : undefined"
       @click="handleCardClick"
@@ -134,7 +134,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { TriangleAlert } from 'lucide-vue-next';
-import { useRouter } from 'vue-router';
+import { useRouter, type RouteLocationRaw } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolToken from '@/components/SymbolToken.vue';
@@ -147,7 +147,7 @@ import { deckVisibilityBadgeClasses, deckVisibilityLabels } from '@/modules/deck
 const props = defineProps<{
   deck: DeckRecord;
   mode: 'browse' | 'owned';
-  titleTo?: string;
+  titleTo?: RouteLocationRaw;
   density?: 'default' | 'compact';
 }>();
 
@@ -158,6 +158,9 @@ const isBrowseMode = computed(() => props.mode === 'browse');
 const isOwnedMode = computed(() => props.mode === 'owned');
 const isCompact = computed(() => props.density === 'compact');
 const isClickableCard = computed(() => Boolean(props.titleTo));
+const navigationTarget = computed(() =>
+  props.titleTo ? router.resolve(props.titleTo).fullPath : undefined,
+);
 const formatDate = (value: string): string => new Date(value).toLocaleDateString();
 const sideboardSummary = computed(() => {
   if (props.deck.sideboards.length === 0) {

@@ -1,6 +1,6 @@
 <template>
-  <div class="grid items-start gap-6 lg:grid-cols-[minmax(22rem,34rem)_minmax(24rem,1fr)]">
-    <div class="theme-muted-panel p-4">
+  <div class="grid items-start gap-6 2xl:grid-cols-[minmax(22rem,34rem)_minmax(24rem,1fr)]">
+    <div class="p-4">
       <img
         v-if="version.image_url"
         :src="toAbsoluteApiUrl(version.image_url)"
@@ -25,7 +25,7 @@
         </p>
       </div>
 
-      <div class="card-public-info-panels space-y-5">
+      <div class="card-version-info-panels space-y-5">
         <div class="theme-card-frame-muted flex gap-4 rounded-lg p-4">
           <Sparkles class="mt-0.5 h-4 w-4 shrink-0 text-[var(--theme-accent)]" />
           <div class="min-w-0">
@@ -185,7 +185,7 @@ defineProps<{
 </script>
 
 <style scoped>
-.card-public-info-panels :deep(.theme-card-frame-muted) {
+.card-version-info-panels :deep(.theme-card-frame-muted) {
   background: transparent;
   box-shadow: none;
 }

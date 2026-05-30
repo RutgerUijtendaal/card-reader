@@ -1,5 +1,5 @@
 <template>
-  <section class="space-y-5 xl:h-[calc(100vh-14rem)]">
+  <section class="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
     <AppPageHeader
       :icon="SquarePen"
       :title="card?.name || 'Loading card...'"
@@ -72,64 +72,73 @@
 
     <div
       v-if="selectedVersion"
-      class="grid items-start gap-5 xl:h-full xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"
+      class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0"
     >
-      <div class="space-y-4 xl:h-full xl:overflow-y-auto xl:pr-2">
-        <CardVersionPreviewPane
-          :version="selectedVersion"
-          :symbol-by-key="symbolByKey"
-          :to-absolute-api-url="toAbsoluteApiUrl"
-          :format-date="formatDate"
-        />
-        <CardVersionSelectorGrid
-          :versions="versions"
-          :selected-version-id="selectedVersionId"
-          :to-absolute-api-url="toAbsoluteApiUrl"
-          :format-date="formatDate"
-          @select="selectVersion"
-        />
-      </div>
+      <div class="grid min-h-full items-start gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(18rem,30rem)_minmax(20rem,32rem)_minmax(28rem,1fr)] xl:items-stretch xl:overflow-hidden">
+        <div class="app-scrollbar space-y-6 xl:col-span-2 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+          <CardVersionOverviewPane
+            :version="selectedVersion"
+            :symbol-by-key="symbolByKey"
+            :to-absolute-api-url="toAbsoluteApiUrl"
+          />
 
-      <div class="xl:h-full xl:min-h-0">
-        <CardVersionEditorPane
-          :version="selectedVersion"
-          :form="form"
-          :reparse-templates="reparseTemplates"
-          :reparse-template-id="reparseTemplateId"
-          :is-busy="isBusy"
-          :is-saving="isSaving"
-          :is-queuing-reparse="isQueuingReparse"
-          :save-message="saveMessage"
-          :field-source="fieldSource"
-          :metadata-source="metadataSource"
-          :field-source-label="fieldSourceLabel"
-          :metadata-source-label="metadataSourceLabel"
-          :field-has-parsed-suggestion="fieldHasParsedSuggestion"
-          :format-parsed-field-value="formatParsedFieldValue"
-          :metadata-has-parsed-suggestion="metadataHasParsedSuggestion"
-          :metadata-search="metadataSearch"
-          :selected-ids="selectedIds"
-          :parsed-metadata-labels="parsedMetadataLabels"
-          :options-for-group="optionsForGroup"
-          :rule-text-symbols="rulesTextSymbols"
-          :additional-symbol-ids="form.additional_symbol_ids"
-          :rule-text-unknown-symbol-keys="ruleTextUnknownSymbolKeys"
-          :deprecated-status-disabled="cardIsGroupAnchor"
-          @save="saveEdits"
-          @restore-field="restoreField"
-          @unlock-field="unlockField"
-          @restore-group="restoreMetadataGroup"
-          @unlock-group="unlockMetadataGroup"
-          @reset-whole-card="resetWholeCardToAuto"
-          @queue-reparse="queueLatestCardReparse"
-          @update-reparse-template="updateReparseTemplate"
-          @toggle-group="toggleMetadataSelection"
-          @toggle-additional-symbol="toggleAdditionalSymbol"
-          @update-group-search="setMetadataSearch"
-          @update-field="updateField"
-          @update-hero="updateHero"
-          @update-lifecycle-status="updateLifecycleStatus"
-        />
+          <CardVersionSelectorGrid
+            :versions="versions"
+            :selected-version-id="selectedVersionId"
+            :to-absolute-api-url="toAbsoluteApiUrl"
+            :format-date="formatDate"
+            class="border-t border-[var(--color-border)] pt-6"
+            surface="plain"
+            title="Printings"
+            description="Select a printing to inspect or edit."
+            allow-promote
+            :promoting-version-id="promotingVersionId"
+            @select="selectVersion"
+            @promote="promoteVersion"
+          />
+        </div>
+
+        <aside class="xl:h-full xl:min-h-0 xl:border-l xl:border-[var(--color-border)] xl:pl-6">
+          <CardVersionEditorPane
+            :version="selectedVersion"
+            :form="form"
+            :reparse-templates="reparseTemplates"
+            :reparse-template-id="reparseTemplateId"
+            :is-busy="isBusy"
+            :is-saving="isSaving"
+            :is-queuing-reparse="isQueuingReparse"
+            :save-message="saveMessage"
+            :field-source="fieldSource"
+            :metadata-source="metadataSource"
+            :field-source-label="fieldSourceLabel"
+            :metadata-source-label="metadataSourceLabel"
+            :field-has-parsed-suggestion="fieldHasParsedSuggestion"
+            :format-parsed-field-value="formatParsedFieldValue"
+            :metadata-has-parsed-suggestion="metadataHasParsedSuggestion"
+            :metadata-search="metadataSearch"
+            :selected-ids="selectedIds"
+            :parsed-metadata-labels="parsedMetadataLabels"
+            :options-for-group="optionsForGroup"
+            :rule-text-symbols="rulesTextSymbols"
+            :additional-symbol-ids="form.additional_symbol_ids"
+            :rule-text-unknown-symbol-keys="ruleTextUnknownSymbolKeys"
+            :deprecated-status-disabled="cardIsGroupAnchor"
+            @save="saveEdits"
+            @restore-field="restoreField"
+            @unlock-field="unlockField"
+            @restore-group="restoreMetadataGroup"
+            @unlock-group="unlockMetadataGroup"
+            @reset-whole-card="resetWholeCardToAuto"
+            @queue-reparse="queueLatestCardReparse"
+            @update-reparse-template="updateReparseTemplate"
+            @toggle-group="toggleMetadataSelection"
+            @toggle-additional-symbol="toggleAdditionalSymbol"
+            @update-group-search="setMetadataSearch"
+            @update-field="updateField"
+            @update-hero="updateHero"
+            @update-lifecycle-status="updateLifecycleStatus"
+          />
+        </aside>
       </div>
     </div>
 
@@ -150,7 +159,7 @@ import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { buildAdminCardMergeSourceLocation } from '@/modules/admin/adminRouteState';
 import { buildCardReturnLocation } from '@/modules/card-detail/cardReturnState';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
-import CardVersionPreviewPane from '@/modules/card-detail/components/CardVersionPreviewPane.vue';
+import CardVersionOverviewPane from '@/modules/card-detail/components/CardVersionOverviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
 import { useCardDetailState } from '@/modules/card-detail/composables/useCardDetailState';
 import {
@@ -174,6 +183,7 @@ const {
   reparseTemplateId,
   isSaving,
   isQueuingReparse,
+  promotingVersionId,
   saveMessage,
   form,
   selectedVersion,
@@ -193,6 +203,7 @@ const {
   unlockMetadataGroup,
   resetWholeCardToAuto,
   queueLatestCardReparse,
+  promoteVersion,
   fieldSource,
   metadataSource,
   fieldSourceLabel,

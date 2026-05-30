@@ -335,6 +335,47 @@ def update_latest_card_version(
         return card, version
 
 
+def promote_card_version(
+    *,
+    card_id: str,
+    version_id: str,
+) -> tuple[Card, CardVersion] | None:
+    card = get_card(card_id)
+    version = (
+        CardVersion.objects.select_related("card", "template", "previous_version", "parse_result")
+        .filter(id=version_id, card_id=card.id if card is not None else card_id)
+        .first()
+    )
+    if card is None or version is None:
+        return None
+
+    if version.is_latest and card.latest_version is not None and card.latest_version.id == version.id:
+        return card, version
+
+    with transaction.atomic():
+        CardVersion.objects.filter(card_id=card.id, is_latest=True).exclude(id=version.id).update(
+            is_latest=False,
+            updated_at=now_utc(),
+        )
+        version.is_latest = True
+        version.updated_at = now_utc()
+        version.save(update_fields=["is_latest", "updated_at"])
+
+        next_key = normalize_slug_key(version.name)
+        conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
+        conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
+        if conflicting_card is not None or conflicting_alias is not None:
+            raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
+
+        ensure_card_alias(card=card, key=card.key, label=card.label)
+        card.latest_version = version
+        card.label = version.name
+        card.key = next_key
+        card.updated_at = now_utc()
+        card.save(update_fields=["latest_version", "label", "key", "updated_at"])
+        return card, version
+
+
 def apply_parsed_fields_to_version(
     version: CardVersion,
     *,

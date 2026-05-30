@@ -39,6 +39,7 @@ from card_reader_core.repositories.cards import (
     list_card_generations,
     list_cards,
     list_matching_cards,
+    promote_card_version,
     update_latest_card_version,
 )
 from card_reader_core.repositories.metadata import list_types_for_card_sort
@@ -251,6 +252,30 @@ class LatestCardVersionUpdateView(APIView):
                 card,
                 version,
                 image_url=card_image_asset_url(image, fallback_url=f"/cards/{card_id}/versions/{version.id}/image"),
+                metadata=metadata,
+                edit_state=edit_state,
+            )
+        )
+
+
+class CardVersionPromoteView(APIView):
+    def post(self, _request: Request, card_id: str, version_id: str) -> Response:
+        try:
+            promoted = promote_card_version(card_id=card_id, version_id=version_id)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if promoted is None:
+            return Response({"detail": "Card version not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        card, version = promoted
+        image = get_card_image(version.id)
+        metadata = get_card_version_metadata(version.id)
+        edit_state = get_card_version_edit_state(version)
+        return Response(
+            card_payload(
+                card,
+                version,
+                image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/versions/{version.id}/image"),
                 metadata=metadata,
                 edit_state=edit_state,
             )

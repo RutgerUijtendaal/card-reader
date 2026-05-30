@@ -67,11 +67,11 @@
 
     <div
       v-if="selectedVersion"
-      class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1"
+      class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0"
     >
-      <div class="grid min-h-full items-start gap-6 2xl:grid-cols-[minmax(22rem,34rem)_minmax(24rem,36rem)_minmax(36rem,1fr)] 2xl:items-stretch">
-        <div class="space-y-6 2xl:col-span-2">
-          <CardPublicOverviewPane
+      <div class="grid min-h-full items-start gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(18rem,30rem)_minmax(20rem,32rem)_minmax(28rem,1fr)] xl:items-stretch xl:overflow-hidden">
+        <div class="app-scrollbar space-y-6 xl:col-span-2 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+          <CardVersionOverviewPane
             :version="selectedVersion"
             :symbol-by-key="symbolByKey"
             :to-absolute-api-url="toAbsoluteApiUrl"
@@ -90,7 +90,7 @@
           />
         </div>
 
-        <aside class="space-y-5 2xl:h-full 2xl:border-l 2xl:border-[var(--color-border)] 2xl:pl-6">
+        <aside class="app-scrollbar space-y-5 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-[var(--color-border)] xl:pl-6 xl:pr-1">
           <CardDeckReferencesPanel
             :deck-references="card?.deck_references ?? []"
             :current-user-id="auth.user?.id"
@@ -116,8 +116,8 @@ import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation } from '@/modules/card-detail/cardReturnState';
 import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
-import CardPublicOverviewPane from '@/modules/card-detail/components/CardPublicOverviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
+import CardVersionOverviewPane from '@/modules/card-detail/components/CardVersionOverviewPane.vue';
 import { useCardPublicDetailState } from '@/modules/card-detail/composables/useCardPublicDetailState';
 
 const route = useRoute();

@@ -40,6 +40,7 @@ export const useCardDetailState = () => {
   const galleryNavigation = useGalleryCardNavigation(route, router, 'edit');
   const isSaving = ref(false);
   const isQueuingReparse = ref(false);
+  const promotingVersionId = ref<string | null>(null);
   const saveMessage = ref('');
 
   const form = reactive<EditorForm>({
@@ -101,7 +102,7 @@ export const useCardDetailState = () => {
       ),
   );
 
-  const isBusy = computed(() => isSaving.value || isQueuingReparse.value);
+  const isBusy = computed(() => isSaving.value || isQueuingReparse.value || promotingVersionId.value !== null);
   const backButtonLabel = computed(() => `Back to ${getCardReturnLabel(route.query)}`);
 
   const goBack = (): void => {
@@ -256,6 +257,37 @@ export const useCardDetailState = () => {
     }
   };
 
+  const promoteVersion = async (versionId: string): Promise<void> => {
+    const targetCard = card.value;
+    const version = versions.value.find((item) => item.version_id === versionId);
+    if (!targetCard || !version || version.is_latest || promotingVersionId.value !== null) {
+      return;
+    }
+
+    promotingVersionId.value = versionId;
+    saveMessage.value = '';
+    try {
+      const response = await api.post<CardVersionDetail>(
+        `/cards/${targetCard.id}/versions/${versionId}/promote`,
+      );
+      const promotedVersion = response.data;
+      versions.value = versions.value.map((item) =>
+        item.version_id === promotedVersion.version_id
+          ? promotedVersion
+          : { ...item, is_latest: false, editable: false },
+      );
+      card.value = {
+        ...targetCard,
+        label: promotedVersion.label,
+        name: promotedVersion.name,
+      };
+      selectedVersionId.value = promotedVersion.version_id;
+      saveMessage.value = 'Promoted printing to latest version.';
+    } finally {
+      promotingVersionId.value = null;
+    }
+  };
+
   const fieldSource = (fieldName: ScalarFieldName): FieldSourceValue =>
     selectedVersion.value?.field_sources.fields[fieldName] ?? 'auto';
 
@@ -376,6 +408,7 @@ export const useCardDetailState = () => {
     reparseTemplateId,
     isSaving,
     isQueuingReparse,
+    promotingVersionId,
     saveMessage,
     form,
     metadataSearch,
@@ -400,6 +433,7 @@ export const useCardDetailState = () => {
     unlockMetadataGroup,
     resetWholeCardToAuto,
     queueLatestCardReparse,
+    promoteVersion,
     fieldSource,
     metadataSource,
     fieldSourceLabel,

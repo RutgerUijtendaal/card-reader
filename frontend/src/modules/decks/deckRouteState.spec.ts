@@ -30,6 +30,23 @@ describe('deckRouteState', () => {
     });
   });
 
+  test('preserves card return context when deck was opened from a card detail page', () => {
+    expect(
+      buildDeckCardDetailLocation('card-2', 'deck-1', {
+        card_id: 'card-1',
+        q: 'angel',
+        return_to: 'card',
+      }),
+    ).toEqual({
+      path: '/cards/card-2',
+      query: {
+        card_id: 'card-1',
+        q: 'angel',
+        return_to: 'card',
+      },
+    });
+  });
+
   test('builds deck return location by dropping deck return keys only', () => {
     const query = {
       foo: 'bar',
@@ -210,6 +227,22 @@ describe('deckRouteState', () => {
       query: {
         q: 'angel',
         affinity_symbol_keys: ['air'],
+      },
+    });
+  });
+
+  test('returns card detail from the editor when card context is present', () => {
+    const query = {
+      q: 'angel',
+      return_to: 'card',
+      card_id: 'card-1',
+    };
+
+    expect(getDeckEditorReturnLabel(query)).toBe('Card');
+    expect(buildDeckEditorReturnLocation(query)).toEqual({
+      path: '/cards/card-1',
+      query: {
+        q: 'angel',
       },
     });
   });

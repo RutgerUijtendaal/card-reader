@@ -1964,6 +1964,59 @@ def test_latest_version_patch_can_restore_and_unlock() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_version_promote_sets_historical_version_as_latest() -> None:
+    username = "staff-card-promote-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    card, historical = _create_editable_card_version(name="Historical Card")
+    latest = CardVersion.objects.create(
+        card_id=card.id,
+        version_number=2,
+        template=historical.template,
+        image_hash="hash-latest-card",
+        name="Current Card",
+        type_line="Current Type",
+        mana_cost="4",
+        mana_symbols_json="[]",
+        mana_value=4,
+        rules_text_raw="Current rules",
+        rules_text_enriched="Current rules",
+        rules_text="Current rules",
+        confidence=0.8,
+        field_sources_json=historical.field_sources_json,
+        parsed_snapshot_json=historical.parsed_snapshot_json,
+        is_latest=True,
+    )
+    historical.is_latest = False
+    historical.save(update_fields=["is_latest"])
+    card.latest_version = latest
+    card.label = latest.name
+    card.save(update_fields=["latest_version", "label"])
+
+    response = client.post(
+        f"/cards/{card.id}/versions/{historical.id}/promote",
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["version_id"] == historical.id
+    assert payload["is_latest"] is True
+    assert payload["editable"] is True
+    historical.refresh_from_db()
+    latest.refresh_from_db()
+    card.refresh_from_db()
+    assert historical.is_latest is True
+    assert latest.is_latest is False
+    assert card.latest_version_id == historical.id
+    assert card.label == "Historical Card"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_symbol_text_token_update_refreshes_rendered_rule_text_for_linked_cards() -> None:
     username = "staff-symbol-refresh-user"
     password = "password"

@@ -91,22 +91,24 @@ const deckReferences: CardDeckReferenceSummary[] = [
   }),
 ];
 
-const mountPanel = async () => {
+const mountPanel = async (references: CardDeckReferenceSummary[] = deckReferences) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
+      { path: '/cards/:id', component: { template: '<div />' } },
       { path: '/decks/:id', component: { template: '<div />' } },
       { path: '/my/decks/:id', component: { template: '<div />' } },
+      { path: '/my/decks/new', component: { template: '<div />' } },
     ],
   });
-  await router.push('/decks/deck-public');
+  await router.push('/cards/card-source?q=dragon');
   await router.isReady();
 
   const app = createApp(CardDeckReferencesPanel, {
-    deckReferences,
+    deckReferences: references,
     currentUserId: 'user-1',
   });
   app.use(router);
@@ -136,8 +138,24 @@ describe('CardDeckReferencesPanel', () => {
     expect(mounted.container.textContent).toContain('Sideboard x1');
     expect(mounted.container.textContent).toContain('Public Aggro');
     expect(mounted.container.textContent).toContain('Includes as hero');
-    expect(mounted.container.querySelector('[data-navigation-target="/my/decks/deck-owned"]')).not.toBeNull();
-    expect(mounted.container.querySelector('[data-navigation-target="/decks/deck-public"]')).not.toBeNull();
+    const navigationTargets = Array.from(mounted.container.querySelectorAll('[data-navigation-target]'))
+      .map((element) => element.getAttribute('data-navigation-target'));
+    expect(navigationTargets).toEqual([
+      '/my/decks/deck-owned?q=dragon&card_id=card-source&return_to=card',
+      '/decks/deck-public?q=dragon&card_id=card-source&return_to=card',
+    ]);
+
+    mounted.unmount();
+  });
+
+  test('shows a static deck placeholder and create action when no decks include the card', async () => {
+    const mounted = await mountPanel([]);
+
+    expect(mounted.container.textContent).toContain('Card is in 0 decks');
+    expect(mounted.container.querySelector('.deck-loading-skeleton')).not.toBeNull();
+    expect(mounted.container.querySelector('.deck-loading-skeleton-static')).not.toBeNull();
+    const createLink = mounted.container.querySelector<HTMLAnchorElement>('a[aria-label="Create deck"]');
+    expect(createLink?.getAttribute('href')).toBe('/my/decks/new?q=dragon&card_id=card-source&return_to=card');
 
     mounted.unmount();
   });

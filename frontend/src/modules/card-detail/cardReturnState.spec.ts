@@ -30,6 +30,22 @@ describe('cardReturnState', () => {
     });
   });
 
+  test('uses card return context when present', () => {
+    const query = {
+      card_id: 'card-1',
+      return_to: 'card',
+      q: 'dragon',
+    };
+
+    expect(getCardReturnLabel(query)).toBe('Card');
+    expect(buildCardReturnLocation(query)).toEqual({
+      path: '/cards/card-1',
+      query: {
+        q: 'dragon',
+      },
+    });
+  });
+
   test('falls back to the gallery when no explicit return context exists', () => {
     expect(getCardReturnLabel({ q: 'dragon' })).toBe('Gallery');
     expect(buildCardReturnLocation({ q: 'dragon' })).toEqual({

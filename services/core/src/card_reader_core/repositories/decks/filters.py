@@ -5,7 +5,7 @@ from django.db.models import Q, QuerySet
 from card_reader_core.models import Deck
 
 
-def apply_public_deck_filters(
+def apply_deck_filters(
     queryset: QuerySet[Deck],
     *,
     hero_query: str | None,

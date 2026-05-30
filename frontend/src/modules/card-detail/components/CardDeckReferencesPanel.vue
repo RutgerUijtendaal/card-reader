@@ -38,22 +38,37 @@
 
     <div
       v-else
-      class="theme-section-muted rounded-lg border px-3 py-3 text-sm"
+      class="relative"
     >
-      This card is not in any visible decks yet.
+      <DeckLoadingSkeleton :animated="false" />
+      <RouterLink
+        class="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-surface)]"
+        style="border-color: color-mix(in srgb, var(--color-border-strong) 62%, transparent 38%); background: color-mix(in srgb, var(--color-surface-strong) 88%, transparent 12%); color: var(--color-text-muted);"
+        aria-label="Create deck"
+        title="Create deck"
+        :to="createDeckLocation"
+      >
+        <Plus class="h-8 w-8" />
+      </RouterLink>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { Plus } from 'lucide-vue-next';
 import { computed } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
 import type { CardDeckReferenceSummary } from '@/modules/card-detail/types';
+import { buildCardReturnContextLocation } from '@/modules/card-detail/cardReturnState';
+import DeckLoadingSkeleton from '@/modules/decks/components/DeckLoadingSkeleton.vue';
 import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
 
 const props = defineProps<{
   deckReferences: CardDeckReferenceSummary[];
   currentUserId?: string | null;
 }>();
+
+const route = useRoute();
 
 const heading = computed(() => {
   const count = props.deckReferences.length;
@@ -65,7 +80,14 @@ const subheading = computed(() =>
     ? 'Decks that include this card as a hero, mainboard card, or sideboard card.'
     : 'No visible deck currently includes this card.',
 );
+const createDeckLocation = computed(() =>
+  buildCardReturnContextLocation('/my/decks/new', route.query, String(route.params.id)),
+);
 
-const deckPath = (deck: CardDeckReferenceSummary): string =>
-  deck.owner.id === props.currentUserId ? `/my/decks/${deck.id}` : `/decks/${deck.id}`;
+const deckPath = (deck: CardDeckReferenceSummary) =>
+  buildCardReturnContextLocation(
+    deck.owner.id === props.currentUserId ? `/my/decks/${deck.id}` : `/decks/${deck.id}`,
+    route.query,
+    String(route.params.id),
+  );
 </script>

@@ -252,6 +252,7 @@ import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
+import { buildCardReturnLocation, isCardReturnQuery } from '@/modules/card-detail/cardReturnState';
 import type { CardFiltersResponse, CardListItem } from '@/modules/card-detail/types';
 import { buildTypeSortLookup, compareCardSort } from '@/modules/card-search/cardSort';
 import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
@@ -299,8 +300,18 @@ const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
 const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
 const canShare = computed(() => (deck.value ? canShareDeck(deck.value) : false));
-const backLink = computed(() => (isOwnedRoute.value ? '/my/decks' : '/decks'));
-const backLabel = computed(() => (isOwnedRoute.value ? 'Back to My Decks' : 'Back to Decks'));
+const backLink = computed(() => {
+  if (isCardReturnQuery(route.query)) {
+    return buildCardReturnLocation(route.query);
+  }
+  return isOwnedRoute.value ? '/my/decks' : '/decks';
+});
+const backLabel = computed(() => {
+  if (isCardReturnQuery(route.query)) {
+    return 'Back to Card';
+  }
+  return isOwnedRoute.value ? 'Back to My Decks' : 'Back to Decks';
+});
 const mainboardCardHeightRem = computed(() => Number((24 * cardScale.value).toFixed(2)));
 const mainboardCardWidthRem = computed(() => Number(((mainboardCardHeightRem.value * 63) / 88).toFixed(2)));
 const mainboardGridStyle = computed(() => ({
