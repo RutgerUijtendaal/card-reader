@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     from card_reader_core.repositories.cards import CardSort
 
 MANA_TYPE_KEY = "mana"
+CARD_DETAIL_DECK_REFERENCE_LIMIT = 3
 
 
 class GroupedGalleryItem(TypedDict):
@@ -179,7 +180,7 @@ class CardDetailView(APIView):
                 **deck_payload(deck),
                 "card_reference": card_deck_reference_payload(deck, card_id=card.id),
             }
-            for deck in DeckService().list_card_decks_for_viewer(card.id, viewer_id=viewer_id)
+            for deck in DeckService().list_card_decks_for_viewer(card.id, viewer_id=viewer_id)[:CARD_DETAIL_DECK_REFERENCE_LIMIT]
         ]
         return Response(
             card_payload(

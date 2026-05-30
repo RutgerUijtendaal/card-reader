@@ -214,14 +214,22 @@ const emptyLabel = computed(() => {
 });
 const currentDeckPath = computed(() => (isOwnedMode.value ? '/my/decks' : '/decks'));
 const newDeckLocation = computed(() => buildNewDeckEditorLocation(isOwnedMode.value ? 'my_decks' : 'decks'));
+let deckLoadRequestId = 0;
 
 const loadDecks = async (): Promise<void> => {
+  const requestId = ++deckLoadRequestId;
+  const requestedPath = currentDeckPath.value;
   loading.value = true;
   try {
     const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
-    decks.value = isOwnedMode.value ? await fetchMyDecks(params) : await fetchPublicDecks(params);
+    const nextDecks = requestedPath === '/my/decks' ? await fetchMyDecks(params) : await fetchPublicDecks(params);
+    if (requestId === deckLoadRequestId && currentDeckPath.value === requestedPath) {
+      decks.value = nextDecks;
+    }
   } finally {
-    loading.value = false;
+    if (requestId === deckLoadRequestId) {
+      loading.value = false;
+    }
   }
 };
 

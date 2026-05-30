@@ -47,7 +47,16 @@
               <ScrollText class="h-4 w-4 shrink-0 text-[var(--theme-accent)]" />
               <span>Type</span>
             </div>
-            <div class="flex flex-wrap gap-1.5">
+            <p
+              v-if="version.type_line"
+              class="theme-section-title text-sm"
+            >
+              {{ version.type_line }}
+            </p>
+            <div
+              v-if="version.types.length > 0"
+              class="mt-3 flex flex-wrap gap-1.5"
+            >
               <span
                 v-for="type in version.types"
                 :key="type.id"
@@ -55,8 +64,12 @@
               >
                 {{ type.label }}
               </span>
+            </div>
+            <div
+              v-else-if="!version.type_line"
+              class="flex flex-wrap gap-1.5"
+            >
               <span
-                v-if="version.types.length === 0"
                 class="theme-kicker text-xs"
               >
                 None

@@ -1399,6 +1399,35 @@ def test_card_detail_includes_viewer_visible_deck_references() -> None:
     assert anonymous_response.json()["deck_references"] == []
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_detail_limits_deck_references_to_three_latest() -> None:
+    owner = _create_user("card-deck-reference-limit-owner", "password", is_staff=False)
+    hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Limit Hero")
+    card, version = _create_editable_card_version(name="Deck Reference Limit Included")
+    _create_card_image(version)
+    hero_card.is_hero = True
+    hero_card.save(update_fields=["is_hero"])
+    decks = []
+    for index in range(4):
+        deck = Deck.objects.create(
+            owner=owner,
+            name=f"Deck Reference Limit {index}",
+            visibility="private",
+            hero_card=hero_card,
+        )
+        DeckEntry.objects.create(deck=deck, card=card, quantity=1)
+        Deck.objects.filter(id=deck.id).update(updated_at=timezone.now() + timedelta(minutes=index))
+        decks.append(deck)
+
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    response = client.get(f"/cards/{card.id}")
+
+    assert response.status_code == 200
+    references = response.json()["deck_references"]
+    assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
+
+
 def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Detail Lifecycle Anchor")
     deprecated_card, deprecated_version = _create_editable_card_version(name="Detail Lifecycle Deprecated")

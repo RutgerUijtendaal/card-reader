@@ -282,6 +282,7 @@ export const useCardDetailState = () => {
         name: promotedVersion.name,
       };
       selectedVersionId.value = promotedVersion.version_id;
+      syncFormFromSelectedVersion();
       saveMessage.value = 'Promoted printing to latest version.';
     } finally {
       promotingVersionId.value = null;

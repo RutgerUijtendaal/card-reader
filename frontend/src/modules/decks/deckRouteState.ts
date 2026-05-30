@@ -20,7 +20,8 @@ export const buildDeckCardDetailLocation = (
 ): RouteLocationRaw => {
   if (
     queryString(query[DECK_RETURN_TO_QUERY_KEY]) === CARD_RETURN_TO &&
-    queryString(query[CARD_ID_QUERY_KEY]) !== null
+    queryString(query[CARD_ID_QUERY_KEY]) !== null &&
+    queryString(query[CARD_ID_QUERY_KEY]) !== cardId
   ) {
     return {
       path: `/cards/${cardId}`,
@@ -30,9 +31,11 @@ export const buildDeckCardDetailLocation = (
 
   return {
     path: `/cards/${cardId}`,
-    query: addReturnToQuery(query, DECK_RETURN_TO, {
+    query: {
+      ...clearLocationQueryKeys(query, [CARD_ID_QUERY_KEY]),
       [DECK_ID_QUERY_KEY]: deckId,
-    }),
+      [DECK_RETURN_TO_QUERY_KEY]: DECK_RETURN_TO,
+    },
   };
 };
 

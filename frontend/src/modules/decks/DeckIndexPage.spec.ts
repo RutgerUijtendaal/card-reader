@@ -204,6 +204,14 @@ const filtersPayload = {
   types: [],
 };
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+  return { promise, resolve };
+};
+
 const flushPage = async (): Promise<void> => {
   await nextTick();
   await Promise.resolve();
@@ -305,6 +313,37 @@ describe('DeckIndexPage', () => {
     expect(mounted.container.querySelector('[data-mode="owned"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/my/decks/deck-1"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Filter your decks');
+
+    mounted.unmount();
+  });
+
+  test('ignores stale deck responses after switching between public and owned modes', async () => {
+    const publicDeferred = createDeferred<Array<typeof deckRecord>>();
+    fetchPublicDecksMock.mockReturnValueOnce(publicDeferred.promise);
+    fetchMyDecksMock.mockResolvedValueOnce([
+      {
+        ...deckRecord,
+        id: 'owned-deck',
+        name: 'Owned Deck',
+      },
+    ]);
+    const mounted = await mountPage('/decks');
+
+    await mounted.router.push('/my/decks');
+    await flushPage();
+
+    publicDeferred.resolve([
+      {
+        ...deckRecord,
+        id: 'public-deck',
+        name: 'Public Deck',
+      },
+    ]);
+    await flushPage();
+
+    expect(mounted.container.textContent).toContain('Owned Deck');
+    expect(mounted.container.textContent).not.toContain('Public Deck');
+    expect(mounted.container.querySelector('[data-mode="owned"]')).not.toBeNull();
 
     mounted.unmount();
   });

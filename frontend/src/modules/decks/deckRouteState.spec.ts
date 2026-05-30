@@ -47,6 +47,23 @@ describe('deckRouteState', () => {
     });
   });
 
+  test('uses deck return context when clicking the same source card from a deck opened from card detail', () => {
+    expect(
+      buildDeckCardDetailLocation('card-1', 'deck-1', {
+        card_id: 'card-1',
+        q: 'angel',
+        return_to: 'card',
+      }),
+    ).toEqual({
+      path: '/cards/card-1',
+      query: {
+        q: 'angel',
+        deck_id: 'deck-1',
+        return_to: 'deck',
+      },
+    });
+  });
+
   test('builds deck return location by dropping deck return keys only', () => {
     const query = {
       foo: 'bar',
