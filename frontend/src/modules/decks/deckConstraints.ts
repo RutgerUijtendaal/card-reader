@@ -66,6 +66,7 @@ export type DeckConstraintContext = {
 export type DeckQuantityLimit = {
   max: number;
   message: string;
+  blocksAction: boolean;
 };
 
 type DeckConstraintViolation = {
@@ -81,33 +82,43 @@ export const isLegendaryCard = (card: DeckConstraintCard | null | undefined): bo
 export const resolveDeckBuildingRules = (
   context: Omit<DeckConstraintContext, 'boardId'>,
   candidateCard?: DeckConstraintCard,
+  candidateBoardId?: string,
 ): DeckBuildingRules => {
   let rules = context.baseRules ?? fallbackDeckBuildingRules();
   if (context.heroCard) {
     rules = applyDeckBuildingConfig(rules, context.heroCard.deck_building_config);
   }
 
-  const seenCardIds = new Set<string>();
+  const entryCardIds = new Set<string>();
   const applyCard = (cardId: string): void => {
-    if (seenCardIds.has(cardId)) {
-      return;
-    }
-    seenCardIds.add(cardId);
+    entryCardIds.add(cardId);
     const card = context.cardLookup[cardId];
     if (card) {
       rules = applyDeckBuildingConfig(rules, card.deck_building_config);
     }
   };
+  const candidateBelongsOnBoard = (boardId: string, entries: DeckConstraintEntry[]): boolean =>
+    candidateBoardId === boardId
+    && candidateCard !== undefined
+    && !entries.some((entry) => entry.card_id === candidateCard.id);
 
   for (const entry of context.mainboardEntries) {
     applyCard(entry.card_id);
+  }
+  if (candidateCard && candidateBelongsOnBoard(context.mainboardId, context.mainboardEntries)) {
+    rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config);
+    entryCardIds.add(candidateCard.id);
   }
   for (const sideboard of context.sideboards) {
     for (const entry of sideboard.entries) {
       applyCard(entry.card_id);
     }
+    if (candidateCard && candidateBelongsOnBoard(sideboard.id, sideboard.entries)) {
+      rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config);
+      entryCardIds.add(candidateCard.id);
+    }
   }
-  if (candidateCard && !seenCardIds.has(candidateCard.id)) {
+  if (candidateCard && candidateBoardId === undefined && !entryCardIds.has(candidateCard.id)) {
     rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config);
   }
   return rules;
@@ -117,17 +128,19 @@ export const getDeckEntryQuantityLimit = (
   card: DeckConstraintCard,
   context: DeckConstraintContext,
 ): DeckQuantityLimit => {
-  const rules = resolveDeckBuildingRules(context, card);
+  const rules = resolveDeckBuildingRules(context, card, context.boardId);
   const boardRule = context.boardId === context.mainboardId
     ? rules.mainboard_copy_limit
     : rules.sideboard_entry_quantity;
-  const boardMax = boardRule.max ?? (context.boardId === context.mainboardId ? MAX_DECK_COPIES : MAX_SIDEBOARD_ENTRY_QUANTITY);
+  const boardBlocksAction = isActionBlockingRule(boardRule) && boardRule.max !== undefined;
+  const boardMax = boardBlocksAction ? boardRule.max as number : Number.POSITIVE_INFINITY;
   const boardMessage = context.boardId === context.mainboardId
-    ? `Mainboard copy limit is ${boardMax}.`
-    : `Sideboard copy limit is ${boardMax}.`;
+    ? `Mainboard copy limit is ${boardRule.max ?? MAX_DECK_COPIES}.`
+    : `Sideboard copy limit is ${boardRule.max ?? MAX_SIDEBOARD_ENTRY_QUANTITY}.`;
 
   if (
     isLegendaryCard(card)
+    && (rules.legendary_copy_limit.scope === 'whole_deck' || context.boardId === context.mainboardId)
     && rules.legendary_copy_limit.severity === 'hard'
     && rules.legendary_copy_limit.blocks_action
     && rules.legendary_copy_limit.max !== undefined
@@ -136,12 +149,14 @@ export const getDeckEntryQuantityLimit = (
     return {
       max: Math.min(boardMax, Math.max(0, rules.legendary_copy_limit.max - otherCopies)),
       message: legendaryCopyLimitMessage(rules.legendary_copy_limit.max),
+      blocksAction: true,
     };
   }
 
   return {
     max: boardMax,
     message: boardMessage,
+    blocksAction: boardBlocksAction,
   };
 };
 
@@ -151,6 +166,9 @@ export const getDeckQuantityViolationMessage = (
   context: DeckConstraintContext,
 ): string | null => {
   const limit = getDeckEntryQuantityLimit(card, context);
+  if (!limit.blocksAction) {
+    return null;
+  }
   return quantity > limit.max ? limit.message : null;
 };
 
@@ -177,8 +195,8 @@ const evaluateDeckConstraints = (
 ): DeckConstraintViolation[] => {
   const rules = resolveDeckBuildingRules(context);
   const violations: DeckConstraintViolation[] = [];
-  const mainboardTotal = context.mainboardEntries.reduce((sum, entry) => sum + entry.quantity, 0);
   const mainboardCardCount = rules.mainboard_card_count;
+  const mainboardTotal = scopedEntries(context, mainboardCardCount.scope).reduce((sum, entry) => sum + entry.quantity, 0);
   if (mainboardCardCount.min !== undefined && mainboardTotal < mainboardCardCount.min) {
     violations.push({
       ruleId: 'mainboard_card_count',
@@ -207,12 +225,17 @@ const validateEntryQuantities = (
   rules: DeckBuildingRules,
   violations: DeckConstraintViolation[],
 ): void => {
-  const mainboardMax = rules.mainboard_copy_limit.max;
-  if (mainboardMax !== undefined && context.mainboardEntries.some((entry) => entry.quantity < 1 || entry.quantity > mainboardMax)) {
+  const mainboardRule = rules.mainboard_copy_limit;
+  const mainboardMax = mainboardRule.max;
+  const mainboardEntries = scopedEntries(context, mainboardRule.scope);
+  const mainboardCopyLimitViolated = mainboardRule.scope === 'whole_deck'
+    ? hasAggregateQuantityViolation(mainboardEntries, mainboardMax)
+    : mainboardEntries.some((entry) => entry.quantity < 1 || (mainboardMax !== undefined && entry.quantity > mainboardMax));
+  if (mainboardMax !== undefined && mainboardCopyLimitViolated) {
     violations.push({
       ruleId: 'mainboard_copy_limit',
-      severity: rules.mainboard_copy_limit.severity,
-      blocksAction: rules.mainboard_copy_limit.blocks_action,
+      severity: mainboardRule.severity,
+      blocksAction: mainboardRule.blocks_action,
       message: `Each mainboard card quantity must be between 1 and ${mainboardMax}.`,
     });
   }
@@ -319,6 +342,23 @@ const applyRuleOverride = (
 
 const nonNegativeNumberOrCurrent = (value: unknown, current: number | undefined): number | undefined =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : current;
+
+const isActionBlockingRule = (rule: DeckBuildingRule): boolean =>
+  rule.severity === 'hard' && rule.blocks_action;
+
+const hasAggregateQuantityViolation = (
+  entries: DeckConstraintEntry[],
+  max: number | undefined,
+): boolean => {
+  const totals = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.quantity < 1) {
+      return true;
+    }
+    totals.set(entry.card_id, (totals.get(entry.card_id) ?? 0) + entry.quantity);
+  }
+  return max !== undefined && [...totals.values()].some((quantity) => quantity > max);
+};
 
 const scopedEntries = (
   context: Omit<DeckConstraintContext, 'boardId'>,

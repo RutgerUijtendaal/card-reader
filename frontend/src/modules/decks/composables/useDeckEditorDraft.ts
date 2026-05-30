@@ -2,7 +2,6 @@ import { computed, reactive, ref, type Ref } from 'vue';
 import type { CardListItem } from '@/modules/card-detail/types';
 import {
   MAX_DECK_COPIES,
-  MAX_MAINBOARD_CARD_COUNT,
   MAX_SIDEBOARD_ENTRY_QUANTITY,
 } from '@/modules/decks/constants';
 import {
@@ -126,7 +125,16 @@ export const useDeckEditorDraft = ({
     sideboards: form.sideboards,
   }));
   const deckBuildingRules = computed(() => resolveDeckBuildingRules(baseConstraintContext.value));
-  const mainboardMaxCards = computed(() => deckBuildingRules.value.mainboard_card_count.max ?? MAX_MAINBOARD_CARD_COUNT);
+  const getActionBlockingMainboardMaxCards = (candidateCard?: DeckCardSummary): number => {
+    const rules = candidateCard
+      ? resolveDeckBuildingRules(baseConstraintContext.value, candidateCard, MAINBOARD_ID)
+      : deckBuildingRules.value;
+    const rule = rules.mainboard_card_count;
+    return rule.severity === 'hard' && rule.blocks_action && rule.max !== undefined
+      ? rule.max
+      : Number.POSITIVE_INFINITY;
+  };
+  const mainboardMaxCards = computed(() => getActionBlockingMainboardMaxCards());
 
   const mapDetailedEntries = (entries: DeckFormEntry[]) =>
     entries
@@ -348,6 +356,8 @@ export const useDeckEditorDraft = ({
     return getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
   };
 
+  const isFiniteLimit = (value: number): boolean => Number.isFinite(value);
+
   const getCardQuantityLimitMessage = (cardId: string, boardId = activeBoardId.value): string => {
     const card = cardLookup.value[cardId];
     if (!card) {
@@ -382,7 +392,8 @@ export const useDeckEditorDraft = ({
     const currentQuantity = getEntryQuantity(card.id, boardId);
     const quantityLimit = getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
     if (boardId === MAINBOARD_ID) {
-      if (currentQuantity >= quantityLimit || totalMainboardCards.value >= mainboardMaxCards.value) {
+      const mainboardMaxForCard = getActionBlockingMainboardMaxCards(card);
+      if (currentQuantity >= quantityLimit || totalMainboardCards.value >= mainboardMaxForCard) {
         return;
       }
       if (currentQuantity === 0) {
@@ -457,11 +468,12 @@ export const useDeckEditorDraft = ({
     const quantity = getEntryQuantity(card.id, boardId);
     const quantityLimit = getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
     if (boardId === MAINBOARD_ID) {
-      if (quantity === 0 && totalMainboardCards.value >= mainboardMaxCards.value) return 'Mainboard Full';
+      const mainboardMaxForCard = getActionBlockingMainboardMaxCards(card);
+      if (quantity === 0 && totalMainboardCards.value >= mainboardMaxForCard) return 'Mainboard Full';
       if (quantity === 0) return 'Add To Mainboard';
       if (quantity >= quantityLimit) return quantityLimit === 1 ? 'At Legendary Limit' : 'At Copy Limit';
-      if (totalMainboardCards.value >= mainboardMaxCards.value) return `At Mainboard Limit (${quantity})`;
-      return `Add Copy (${quantity}/${quantityLimit})`;
+      if (totalMainboardCards.value >= mainboardMaxForCard) return `At Mainboard Limit (${quantity})`;
+      return isFiniteLimit(quantityLimit) ? `Add Copy (${quantity}/${quantityLimit})` : `Add Copy (${quantity})`;
     }
     if (quantity === 0) return 'Add To Sideboard';
     if (quantity >= quantityLimit) return quantityLimit === 1 ? 'At Legendary Limit' : 'At Sideboard Limit';
@@ -476,8 +488,9 @@ export const useDeckEditorDraft = ({
     const boardId = activeBoardId.value;
     const quantity = getEntryQuantity(card.id, boardId);
     if (boardId === MAINBOARD_ID) {
+      const mainboardMaxForCard = getActionBlockingMainboardMaxCards(card);
       return quantity >= getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max
-        || (quantity === 0 && totalMainboardCards.value >= mainboardMaxCards.value);
+        || (quantity === 0 && totalMainboardCards.value >= mainboardMaxForCard);
     }
     return quantity >= getDeckEntryQuantityLimit(card, getConstraintContext(boardId)).max;
   };
@@ -544,8 +557,9 @@ export const useDeckEditorDraft = ({
     }
 
     if (destinationBoardId === MAINBOARD_ID) {
-      if (totalMainboardCards.value + moveQuantity > mainboardMaxCards.value) {
-        return `Mainboard cannot exceed ${mainboardMaxCards.value} cards.`;
+      const mainboardMaxForCard = card ? getActionBlockingMainboardMaxCards(card) : mainboardMaxCards.value;
+      if (totalMainboardCards.value + moveQuantity > mainboardMaxForCard) {
+        return `Mainboard cannot exceed ${mainboardMaxForCard} cards.`;
       }
       return null;
     }

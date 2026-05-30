@@ -253,6 +253,34 @@ class DeckConstraintEvaluator:
     ) -> list[DeckConstraintViolation]:
         if rule.max_count is None:
             return []
+        scoped_entries = _scoped_entries(entries, rule.scope)
+        if rule.scope == "whole_deck":
+            totals_by_card_id: dict[str, int] = {}
+            cards_by_id: dict[str, Card] = {}
+            invalid_entry_cards: set[str] = set()
+            for entry in scoped_entries:
+                card_id = entry.card.id
+                totals_by_card_id[card_id] = totals_by_card_id.get(card_id, 0) + entry.quantity
+                cards_by_id[card_id] = entry.card
+                if entry.quantity < 1:
+                    invalid_entry_cards.add(card_id)
+            invalid_card_ids = {
+                card_id
+                for card_id, quantity in totals_by_card_id.items()
+                if quantity > rule.max_count
+            } | invalid_entry_cards
+            return [
+                DeckConstraintViolation(
+                    rule_id=rule.rule_id,
+                    severity=rule.severity,
+                    scope=rule.scope,
+                    blocks_action=rule.blocks_action,
+                    card_id=card_id,
+                    message=f"Each mainboard card quantity must be between 1 and {rule.max_count}.",
+                )
+                for card_id in sorted(invalid_card_ids)
+                if card_id in cards_by_id
+            ]
         return [
             DeckConstraintViolation(
                 rule_id=rule.rule_id,
@@ -323,7 +351,7 @@ class DeckConstraintEvaluator:
         entries: list[DeckConstraintEntry],
         rule: DeckConstraintRule,
     ) -> list[DeckConstraintViolation]:
-        total = sum(entry.quantity for entry in entries if entry.board == "mainboard")
+        total = sum(entry.quantity for entry in _scoped_entries(entries, rule.scope))
         violations: list[DeckConstraintViolation] = []
         if rule.min_count is not None and total < rule.min_count:
             violations.append(
@@ -377,6 +405,8 @@ def normalize_deck_building_config(value: object) -> dict[str, object]:
         return dict(DEFAULT_DECK_BUILDING_CONFIG)
     if not isinstance(value, dict):
         raise ValueError("Deck-building config must be a JSON object.")
+    if "overrides" in value and not isinstance(value["overrides"], dict):
+        raise ValueError("Deck-building config overrides must be a JSON object.")
     overrides = _extract_rule_overrides(value)
     normalized_overrides: dict[str, object] = {}
     for rule_id, override in overrides.items():
@@ -399,7 +429,7 @@ def normalize_deck_building_config(value: object) -> dict[str, object]:
                     raise ValueError("Deck-building blocks_action must be a boolean.")
                 normalized_override[key] = raw_value
             elif key in {"min", "max", "count", "minimum", "maximum"}:
-                if not isinstance(raw_value, int) or raw_value < 0:
+                if isinstance(raw_value, bool) or not isinstance(raw_value, int) or raw_value < 0:
                     raise ValueError("Deck-building numeric rule values must be non-negative integers.")
                 normalized_override[key] = raw_value
             else:
@@ -451,6 +481,8 @@ def _rule_to_json(rule: DeckConstraintRule) -> dict[str, object]:
 
 
 def _non_negative_int_or_current(value: object, current: int | None) -> int | None:
+    if isinstance(value, bool):
+        return current
     if isinstance(value, int) and value >= 0:
         return value
     return current

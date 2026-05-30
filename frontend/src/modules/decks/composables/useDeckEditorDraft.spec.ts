@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { ref } from 'vue';
 import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
+import { resolveDeckBuildingRules } from '@/modules/decks/deckConstraints';
 import type { DeckCardSummary } from '@/modules/decks/types';
 
 const buildCard = (id: string, name: string, manaValue = 1): DeckCardSummary =>
@@ -292,6 +293,135 @@ describe('useDeckEditorDraft', () => {
     expect(controller.validationMessages.value).not.toContain('Each mainboard card quantity must be between 1 and 4.');
   });
 
+  test('resolves card overrides for repeated configured entries in board order', () => {
+    const repeated = {
+      ...buildCard('repeated', 'Repeated Override', 2),
+      deck_building_config: {
+        overrides: {
+          mainboard_copy_limit: { max: 6 },
+        },
+      },
+    };
+    const strict = {
+      ...buildCard('strict', 'Strict Override', 2),
+      deck_building_config: {
+        overrides: {
+          mainboard_copy_limit: { max: 1 },
+        },
+      },
+    };
+
+    const rules = resolveDeckBuildingRules({
+      mainboardId: 'mainboard',
+      heroCard: null,
+      cardLookup: { repeated, strict },
+      mainboardEntries: [{ card_id: 'repeated', quantity: 1 }],
+      sideboards: [
+        {
+          id: 'sideboard',
+          entries: [
+            { card_id: 'strict', quantity: 1 },
+            { card_id: 'repeated', quantity: 1 },
+          ],
+        },
+      ],
+    });
+
+    expect(rules.mainboard_copy_limit.max).toBe(6);
+  });
+
+  test('resolves mainboard count limits with the candidate card before adding', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const capRaiser = {
+      ...buildCard('capRaiser', 'Cap Raiser', 2),
+      deck_building_config: {
+        overrides: {
+          mainboard_card_count: { max: 101 },
+        },
+      },
+    };
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      filler: buildCard('filler', 'Filler', 2),
+      capRaiser,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'filler', quantity: 100 }];
+
+    expect(controller.galleryActionDisabled({ ...capRaiser, result_type: 'card' })).toBe(false);
+    controller.handleGalleryAction({ ...capRaiser, result_type: 'card' });
+
+    expect(controller.form.entries).toContainEqual({ card_id: 'capRaiser', quantity: 1 });
+  });
+
+  test('uses a candidate card lowering a blocking mainboard count limit before adding', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const capLowerer = {
+      ...buildCard('capLowerer', 'Cap Lowerer', 2),
+      deck_building_config: {
+        overrides: {
+          mainboard_card_count: { max: 50 },
+        },
+      },
+    };
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      filler: buildCard('filler', 'Filler', 2),
+      capLowerer,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'filler', quantity: 99 }];
+
+    expect(controller.galleryActionDisabled({ ...capLowerer, result_type: 'card' })).toBe(true);
+    controller.handleGalleryAction({ ...capLowerer, result_type: 'card' });
+
+    expect(controller.form.entries).not.toContainEqual({ card_id: 'capLowerer', quantity: 1 });
+  });
+
+  test('does not action-block soft mainboard card count limits', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            mainboard_card_count: { severity: 'soft', max: 1 },
+          },
+        },
+      },
+      filler: buildCard('filler', 'Filler', 2),
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'filler', quantity: 100 }];
+
+    expect(controller.galleryActionDisabled({ ...cardLookup.value.cardA, result_type: 'card' })).toBe(false);
+    controller.handleGalleryAction({ ...cardLookup.value.cardA, result_type: 'card' });
+
+    expect(controller.form.entries).toContainEqual({ card_id: 'cardA', quantity: 1 });
+    expect(controller.warningMessages.value).toContain('Deck cannot contain more than 1 mainboard cards.');
+  });
+
   test('reports action-blocking messages when a selected hero lowers an existing copy limit', () => {
     const builderStep = ref<BuilderStep>('setup');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
@@ -403,6 +533,36 @@ describe('useDeckEditorDraft', () => {
     controller.addSideboard();
 
     expect(controller.getCardQuantityLimit('legendary')).toBe(0);
+  });
+
+  test('does not apply mainboard-scoped hard legendary action limits to sideboard edits', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const legendary = buildLegendaryCard();
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            legendary_copy_limit: { severity: 'hard', blocks_action: true },
+          },
+        },
+      },
+      legendary,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'legendary', quantity: 1 }];
+    controller.addSideboard();
+
+    expect(controller.getCardQuantityLimit('legendary')).toBe(100);
+    expect(controller.galleryActionDisabled({ ...legendary, result_type: 'card' })).toBe(false);
   });
 
   test('board row secondary action removes one copy without removing the entry', () => {

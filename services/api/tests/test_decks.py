@@ -1621,6 +1621,99 @@ def test_hero_override_allows_six_mainboard_copies() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_whole_deck_mainboard_copy_scope_counts_sideboard_copies() -> None:
+    username = "deck-whole-copy-scope-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(
+        name="Whole Copy Scope Hero",
+        is_hero=True,
+        deck_building_config={
+            "overrides": {
+                "mainboard_copy_limit": {
+                    "scope": "whole_deck",
+                    "max": 4,
+                }
+            }
+        },
+    )
+    limited_card = _create_card(name="Whole Copy Limited Card", is_hero=False)
+    mainboard_cards = _build_mainboard_cards(total_unique=14)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Whole Copy Scope Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": limited_card.id, "quantity": 4},
+                *_valid_entries(mainboard_cards),
+            ],
+            "sideboards": [
+                {
+                    "name": "Copies",
+                    "entries": [{"card_id": limited_card.id, "quantity": 1}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Each mainboard card quantity must be between 1 and 4."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_whole_deck_mainboard_card_count_scope_counts_sideboard_cards() -> None:
+    username = "deck-whole-count-scope-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(
+        name="Whole Count Scope Hero",
+        is_hero=True,
+        deck_building_config={
+            "overrides": {
+                "mainboard_card_count": {
+                    "scope": "whole_deck",
+                    "max": 100,
+                }
+            }
+        },
+    )
+    mainboard_cards = _build_mainboard_cards(total_unique=20)
+    sideboard_card = _create_card(name="Whole Count Sideboard Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Whole Count Scope Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+            "sideboards": [
+                {
+                    "name": "Overflow",
+                    "entries": [{"card_id": sideboard_card.id, "quantity": 30}],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Deck cannot contain more than 100 mainboard cards."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
     username = "deck-sideboard-duplicate-user"
     password = "password"
@@ -1944,3 +2037,43 @@ def test_latest_version_patch_can_deprecate_card() -> None:
     card.refresh_from_db()
     assert card.lifecycle_status == "deprecated"
     assert response.json()["lifecycle_status"] == "deprecated"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_version_patch_rejects_non_object_deck_building_overrides() -> None:
+    username = "deck-card-invalid-overrides-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    card = _create_card(name="Invalid Overrides Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"deck_building_config": {"overrides": []}},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Deck-building config overrides must be a JSON object."
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_latest_version_patch_rejects_boolean_deck_building_numeric_values() -> None:
+    username = "deck-card-boolean-rule-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    card = _create_card(name="Boolean Rule Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"deck_building_config": {"overrides": {"mainboard_copy_limit": {"max": True}}}},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Deck-building numeric rule values must be non-negative integers."
