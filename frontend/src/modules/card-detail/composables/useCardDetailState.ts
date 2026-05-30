@@ -26,6 +26,12 @@ import type {
 import { metadataGroups, scalarFields } from '@/modules/card-detail/types';
 import { isEditableKeyboardTarget } from '@/utils/keyboard';
 import { fetchTemplates } from '@/modules/admin/api/templates';
+import {
+  fallbackDeckBuildingDefaultConfig,
+  fallbackDeckBuildingConfigExample,
+  fetchDeckRulesMetadata,
+  formatDeckBuildingConfigJson,
+} from '@/modules/decks/deckRules';
 
 export const useCardDetailState = () => {
   const route = useRoute();
@@ -36,6 +42,7 @@ export const useCardDetailState = () => {
   const filterOptions = ref<CardFiltersResponse>({ keywords: [], tags: [], symbols: [], types: [] });
   const symbolByKey = ref<SymbolLookupMap>({});
   const reparseTemplates = ref<ReparseTemplateOption[]>([]);
+  const deckBuildingConfigExample = ref(formatDeckBuildingConfigJson(fallbackDeckBuildingConfigExample));
   const reparseTemplateId = ref('');
   const galleryNavigation = useGalleryCardNavigation(route, router, 'edit');
   const isSaving = ref(false);
@@ -51,6 +58,7 @@ export const useCardDetailState = () => {
     health: '',
     rules_text: '',
     is_hero: false,
+    deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
     tag_ids: [],
@@ -111,11 +119,12 @@ export const useCardDetailState = () => {
 
   const loadCard = async (): Promise<void> => {
     const cardId = String(route.params.id);
-    const [cardResponse, versionsResponse, filtersResponse, templates] = await Promise.all([
+    const [cardResponse, versionsResponse, filtersResponse, templates, deckRulesMetadata] = await Promise.all([
       api.get<CardDetail>(`/cards/${cardId}`),
       api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
       api.get<CardFiltersResponse>('/cards/filters'),
       fetchTemplates(),
+      fetchDeckRulesMetadata().catch(() => null),
     ]);
 
     card.value = cardResponse.data;
@@ -129,6 +138,9 @@ export const useCardDetailState = () => {
       key: row.key,
       label: row.label,
     }));
+    if (deckRulesMetadata) {
+      deckBuildingConfigExample.value = formatDeckBuildingConfigJson(deckRulesMetadata.example_config);
+    }
     selectedVersionId.value =
       versions.value.find((version) => version.is_latest)?.version_id ??
       versions.value[0]?.version_id ??
@@ -146,6 +158,11 @@ export const useCardDetailState = () => {
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
     form.is_hero = version.is_hero;
+    form.deck_building_config = formatDeckBuildingConfigJson(
+      Object.keys(version.deck_building_config ?? {}).length > 0
+        ? version.deck_building_config
+        : fallbackDeckBuildingDefaultConfig,
+    );
     form.lifecycle_status = normalizeCardLifecycleStatus(version.lifecycle_status);
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];
@@ -189,12 +206,12 @@ export const useCardDetailState = () => {
     }
   };
 
-  const saveEdits = async (): Promise<void> => {
+  const saveVersionEdits = async (): Promise<void> => {
     const version = selectedVersion.value;
     if (!version?.editable) return;
     const selectedTemplateId = reparseTemplateId.value;
     const templateChanged = selectedTemplateId !== version.template_id;
-    const updates = buildManualUpdatePayload(form, version, effectiveSymbolIds.value);
+    const updates = buildVersionUpdatePayload(form, version, effectiveSymbolIds.value);
     if (Object.keys(updates).length === 0 && templateChanged) {
       await queueLatestCardReparseForTemplate(selectedTemplateId);
       return;
@@ -210,6 +227,23 @@ export const useCardDetailState = () => {
     if (templateChanged) {
       await queueLatestCardReparseForTemplate(selectedTemplateId);
     }
+  };
+
+  const saveCardEdits = async (): Promise<void> => {
+    const version = selectedVersion.value;
+    if (!version?.editable) return;
+    let updates: Record<string, unknown>;
+    try {
+      updates = buildCardUpdatePayload(form, version);
+    } catch (error) {
+      saveMessage.value = error instanceof Error ? error.message : 'Deck-building config must be valid JSON.';
+      return;
+    }
+    if (Object.keys(updates).length === 0) {
+      saveMessage.value = 'No card changes to save.';
+      return;
+    }
+    await patchLatestVersion(updates, 'Card settings saved.');
   };
 
   const restoreField = async (fieldName: ScalarFieldName): Promise<void> => {
@@ -411,6 +445,7 @@ export const useCardDetailState = () => {
     isQueuingReparse,
     promotingVersionId,
     saveMessage,
+    deckBuildingConfigExample,
     form,
     metadataSearch,
     selectedVersion,
@@ -427,7 +462,8 @@ export const useCardDetailState = () => {
     },
     loadCard,
     selectVersion,
-    saveEdits,
+    saveCardEdits,
+    saveVersionEdits,
     restoreField,
     unlockField,
     restoreMetadataGroup,
@@ -489,7 +525,27 @@ const parsedIds = (groupName: MetadataGroupName, selectedVersion?: CardVersionDe
 
 const sortedIds = (ids: string[]): string[] => [...ids].sort((a, b) => a.localeCompare(b));
 
-const buildManualUpdatePayload = (
+const buildCardUpdatePayload = (
+  form: EditorForm,
+  version: CardVersionDetail,
+): Record<string, unknown> => {
+  const updates: Record<string, unknown> = {};
+
+  if (form.is_hero !== version.is_hero) {
+    updates.is_hero = form.is_hero;
+  }
+  const deckBuildingConfig = parseJsonObject(form.deck_building_config);
+  if (JSON.stringify(deckBuildingConfig) !== JSON.stringify(version.deck_building_config ?? {})) {
+    updates.deck_building_config = deckBuildingConfig;
+  }
+  if (form.lifecycle_status !== normalizeCardLifecycleStatus(version.lifecycle_status)) {
+    updates.lifecycle_status = form.lifecycle_status;
+  }
+
+  return updates;
+};
+
+const buildVersionUpdatePayload = (
   form: EditorForm,
   version: CardVersionDetail,
   effectiveSymbolIds: string[],
@@ -500,13 +556,6 @@ const buildManualUpdatePayload = (
     if (normalizeFormFieldValue(form, fieldName) !== normalizeFieldValue(version, fieldName)) {
       updates[fieldName === 'rules_text' ? 'rules_text_enriched' : fieldName] = form[fieldName];
     }
-  }
-
-  if (form.is_hero !== version.is_hero) {
-    updates.is_hero = form.is_hero;
-  }
-  if (form.lifecycle_status !== normalizeCardLifecycleStatus(version.lifecycle_status)) {
-    updates.lifecycle_status = form.lifecycle_status;
   }
 
   if (!sameIds(form.keyword_ids, version.keyword_ids)) {
@@ -532,6 +581,14 @@ const sameIds = (left: string[], right: string[]): boolean =>
   JSON.stringify(sortedIds(left)) === JSON.stringify(sortedIds(right));
 
 const uniqueIds = (ids: string[]): string[] => Array.from(new Set(ids));
+
+const parseJsonObject = (value: string): Record<string, unknown> => {
+  const parsed = JSON.parse(value.trim() || '{}') as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Deck-building config must be a JSON object.');
+  }
+  return parsed as Record<string, unknown>;
+};
 
 const filterMetadataOptions = <T extends MetadataOption | SymbolFilterOption>(
   options: T[],

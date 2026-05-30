@@ -1,4 +1,5 @@
 import type { CardHoverTooltipModel } from '@/components/cards/cardModels';
+import type { DeckBuildingRules } from '@/modules/decks/deckConstraints';
 
 export type DeckMetadataOption = {
   id: string;
@@ -52,9 +53,11 @@ export type DeckRecord = {
     is_valid: boolean;
     label: string;
     issues: string[];
+    warnings?: string[];
     deprecated_card_count?: number;
     deprecated_card_ids?: string[];
   };
+  deck_building_rules?: DeckBuildingRules;
   created_at: string;
   updated_at: string;
 };

@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-from card_reader_core.models import Card, Deck, card_is_deprecated
+from card_reader_core.models import Deck, card_is_deprecated
 
 from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
-from .types import (
-    MAX_MAINBOARD_CARD_COUNT,
-    MIN_MAINBOARD_CARD_COUNT,
-    MIN_MAINBOARD_MANA_TYPE_COUNT,
-    DeckTotals,
-    DeckValidationSummary,
-)
+from .types import DeckTotals, DeckValidationSummary
 
 
 class DeckValidationService:
     def get_deck_validation(self, deck: Deck) -> DeckValidationSummary:
         entries = list(deck.entries.all())
         issues: list[str] = []
+        warnings: list[str] = []
         total_cards = 0
-        mana_type_cards = 0
         deprecated_card_ids: set[str] = set()
         constraint_entries: list[DeckConstraintEntry] = []
 
@@ -39,8 +33,6 @@ class DeckValidationService:
             if entry.card.id == deck.hero_card.id:
                 issues.append("Hero card cannot also appear in the mainboard.")
                 break
-            if self._card_has_type(entry.card, "mana"):
-                mana_type_cards += quantity
 
         for sideboard in deck.sideboards.all():
             for sideboard_entry in sideboard.entries.all():
@@ -54,19 +46,16 @@ class DeckValidationService:
                     )
                 )
 
-        for violation in DeckConstraintEvaluator().validate_entries(constraint_entries):
+        evaluation = DeckConstraintEvaluator().evaluate(hero_card=deck.hero_card, entries=constraint_entries)
+        for violation in evaluation.hard_violations:
             if violation.message not in issues:
                 issues.append(violation.message)
+        for violation in evaluation.soft_violations:
+            if violation.message not in warnings:
+                warnings.append(violation.message)
 
         if deprecated_card_ids:
             issues.append("Deck contains deprecated cards.")
-
-        if total_cards < MIN_MAINBOARD_CARD_COUNT:
-            issues.append(f"Deck must contain at least {MIN_MAINBOARD_CARD_COUNT} mainboard cards.")
-        if total_cards > MAX_MAINBOARD_CARD_COUNT:
-            issues.append(f"Deck cannot contain more than {MAX_MAINBOARD_CARD_COUNT} mainboard cards.")
-        if mana_type_cards < MIN_MAINBOARD_MANA_TYPE_COUNT:
-            issues.append(f"Deck must contain at least {MIN_MAINBOARD_MANA_TYPE_COUNT} mainboard cards with type 'Mana'.")
 
         is_valid = len(issues) == 0
         return DeckValidationSummary(
@@ -75,6 +64,7 @@ class DeckValidationService:
             total_cards=total_cards,
             unique_cards=len(entries),
             issues=issues,
+            warnings=warnings,
             deprecated_card_count=len(deprecated_card_ids),
             deprecated_card_ids=sorted(deprecated_card_ids),
         )
@@ -102,10 +92,3 @@ class DeckValidationService:
             mainboard_total_cards=mainboard_total_cards,
             mainboard_unique_cards=len(mainboard_entries),
         )
-
-    def _card_has_type(self, card: Card, type_key: str) -> bool:
-        version = card.latest_version
-        if version is None:
-            return False
-        normalized_key = type_key.strip().lower()
-        return any(row.type.key.strip().lower() == normalized_key for row in version.card_version_types.all())

@@ -14,6 +14,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 - Keep Django-owned schema changes in `services/core` migrations.
 - Preserve the current session-auth and CSRF model unless the task explicitly requires a contract change.
 - Keep API compatibility stable unless the requested work requires a deliberate change.
+- Keep deck-building constraint defaults, validation, and metadata in core deck services; expose them through API views without duplicating rule definitions in serializers or frontend code.
 
 ## Implementation Workflow
 
@@ -24,7 +25,8 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 5. Put persistence logic in the matching feature package under `card_reader_core.repositories`.
 6. If schema changes are required, implement them through core models and migrations rather than API-local workarounds.
 7. If the change affects auth or public/staff/superuser access, trace the current rules before changing endpoint behavior.
-8. Run lint, typecheck, and relevant tests before finishing.
+8. If the change affects deck-building constraints, keep `GET /decks/rules` aligned with supported rule ids, defaults, allowed values, and example config.
+9. Run lint, typecheck, and relevant tests before finishing.
 
 ## Review Focus
 
@@ -34,6 +36,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 - Contract drift in request/response shape without an explicit reason
 - Auth regressions around public, staff-only, or superuser-only behavior
 - Missing tests for endpoint behavior or permission boundaries
+- Deck-building rule drift between core validation, API metadata, and frontend fallback assumptions
 
 ## File Hotspots
 

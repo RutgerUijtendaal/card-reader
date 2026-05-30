@@ -1,28 +1,48 @@
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <div class="flex items-start justify-between gap-3">
-      <div>
-        <h3 class="theme-section-title text-lg font-semibold">
-          Version Editor
-        </h3>
-        <p class="theme-section-muted text-sm">
-          {{
-            version.editable
-              ? 'Manual saves lock edited fields and metadata groups against future reparses.'
-              : 'Only the latest version can be edited. Historical versions remain read-only snapshots.'
-          }}
-        </p>
+      <div class="flex min-w-0 items-start gap-3">
+        <div class="min-w-0">
+          <h3 class="theme-section-title text-lg font-semibold">
+            {{ editorTitle }}
+          </h3>
+          <p class="theme-section-muted text-sm">
+            {{ editorSubtitle }}
+          </p>
+        </div>
+        <span
+          class="theme-pill mt-0.5 shrink-0 whitespace-nowrap px-2.5 py-1 text-xs"
+          :class="version.editable ? 'theme-pill-success' : 'theme-pill-neutral'"
+        >
+          {{ version.editable ? 'Latest Version' : 'Historical Version' }}
+        </span>
       </div>
-      <span
-        class="theme-pill whitespace-nowrap px-2.5 py-1 text-xs"
-        :class="version.editable ? 'theme-pill-success' : 'theme-pill-neutral'"
-      >
-        {{ version.editable ? 'Latest Version' : 'Historical Version' }}
-      </span>
+
+      <div class="theme-tablist shrink-0">
+        <button
+          class="theme-tab"
+          :class="{ 'theme-tab-active': activeEditorTab === 'card' }"
+          type="button"
+          @click="activeEditorTab = 'card'"
+        >
+          Card
+        </button>
+        <button
+          class="theme-tab"
+          :class="{ 'theme-tab-active': activeEditorTab === 'version' }"
+          type="button"
+          @click="activeEditorTab = 'version'"
+        >
+          Card Version
+        </button>
+      </div>
     </div>
 
-    <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1 pt-5">
-      <div class="space-y-4">
+    <div class="app-scrollbar my-5 min-h-0 flex-1 overflow-y-auto">
+      <div
+        v-if="activeEditorTab === 'card'"
+        class="space-y-4"
+      >
         <div class="theme-muted-panel p-3">
           <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="min-w-0">
@@ -45,6 +65,19 @@
               <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
             </label>
           </div>
+        </div>
+
+        <div class="theme-muted-panel p-3">
+          <JsonEditorField
+            :model-value="form.deck_building_config"
+            label="Deck-Building Config JSON"
+            hint="Override deck-building rule defaults for this card."
+            min-height="14rem"
+            example-title="Deck-building config example"
+            :example-json="deckBuildingConfigExample"
+            :disabled="!version.editable || isBusy"
+            @update:model-value="$emit('update-deck-building-config', $event)"
+          />
         </div>
 
         <div class="theme-muted-panel p-3">
@@ -81,7 +114,12 @@
             Group anchors must stay active. Choose a different anchor before deprecating this card.
           </p>
         </div>
+      </div>
 
+      <div
+        v-else
+        class="space-y-4"
+      >
         <div
           v-for="field in scalarFields"
           :key="field.name"
@@ -403,7 +441,30 @@
       </div>
     </div>
 
-    <div class="theme-divider flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
+    <div
+      v-if="activeEditorTab === 'card'"
+      class="theme-divider flex shrink-0 flex-wrap items-center justify-end gap-3 border-t pt-4"
+    >
+      <p
+        v-if="saveMessage"
+        class="theme-success-text mr-auto text-sm"
+      >
+        {{ saveMessage }}
+      </p>
+      <button
+        class="btn-primary"
+        type="button"
+        :disabled="!version.editable || isBusy"
+        @click="$emit('save-card')"
+      >
+        {{ isSaving ? 'Saving...' : 'Save Card' }}
+      </button>
+    </div>
+
+    <div
+      v-else
+      class="theme-divider flex shrink-0 flex-wrap items-center gap-3 border-t pt-4"
+    >
       <label
         v-if="version.editable"
         class="theme-section-title mr-auto flex min-w-0 items-center gap-3 text-sm font-semibold"
@@ -449,9 +510,9 @@
         class="btn-primary"
         type="button"
         :disabled="!version.editable || isBusy"
-        @click="$emit('save')"
+        @click="$emit('save-version')"
       >
-        {{ isSaving ? 'Saving...' : 'Save Edits' }}
+        {{ isSaving ? 'Saving...' : 'Save Version' }}
       </button>
     </div>
   </div>
@@ -462,6 +523,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { Lock } from 'lucide-vue-next';
 import AppSelect from '@/components/app/AppSelect.vue';
 import SymbolToken from '@/components/SymbolToken.vue';
+import JsonEditorField from '@/modules/admin/components/JsonEditorField.vue';
 import {
   ACTIVE_CARD_LIFECYCLE_STATUS,
   DEPRECATED_CARD_LIFECYCLE_STATUS,
@@ -492,6 +554,7 @@ const props = defineProps<{
   isSaving: boolean;
   isQueuingReparse: boolean;
   saveMessage: string;
+  deckBuildingConfigExample: string;
   fieldSource: (fieldName: ScalarFieldName) => 'auto' | 'manual';
   metadataSource: (groupName: MetadataGroupName) => 'auto' | 'manual';
   fieldSourceLabel: (fieldName: ScalarFieldName) => string;
@@ -510,7 +573,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'save'): void;
+  (e: 'save-card'): void;
+  (e: 'save-version'): void;
   (e: 'restore-field', fieldName: ScalarFieldName): void;
   (e: 'unlock-field', fieldName: ScalarFieldName): void;
   (e: 'restore-group', groupName: MetadataGroupName): void;
@@ -523,9 +587,11 @@ const emit = defineEmits<{
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
   (e: 'update-hero', value: boolean): void;
+  (e: 'update-deck-building-config', value: string): void;
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
 
+const activeEditorTab = ref<'card' | 'version'>('version');
 const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
 const rulesTextValue = ref('');
 const rulesTextCaretIndex = ref(0);
@@ -539,6 +605,20 @@ const lifecycleOptions = [
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
 const additionalSymbolIds = computed(() => props.additionalSymbolIds);
+const editorTitle = computed(() =>
+  activeEditorTab.value === 'card' ? 'Card Editor' : 'Card Version Editor',
+);
+const editorSubtitle = computed(() => {
+  if (activeEditorTab.value === 'card') {
+    return props.version.editable
+      ? 'Update card-level settings shared by every version of this card.'
+      : 'Card-level settings can only be edited from the latest version.';
+  }
+
+  return props.version.editable
+    ? 'Manual saves lock edited fields and metadata groups against future reparses.'
+    : 'Only the latest version can be edited. Historical versions remain read-only snapshots.';
+});
 const reparseTemplateOptions = computed(() =>
   props.reparseTemplates.map((option) => ({
     value: option.key,

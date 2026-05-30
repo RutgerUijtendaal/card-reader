@@ -16,7 +16,15 @@ class SchemaCheckResult:
 
 
 EXPECTED_TABLE_COLUMNS = {
-    "card": {"id", "key", "label", "latest_version_id", "created_at", "updated_at"},
+    "card": {
+        "id",
+        "key",
+        "label",
+        "latest_version_id",
+        "deck_building_config_json",
+        "created_at",
+        "updated_at",
+    },
     "card_alias": {"id", "card_id", "key", "label", "created_at", "updated_at"},
     "card_merge_redirect": {"id", "old_card_id", "target_card_id", "created_at", "updated_at"},
     "import_job": {

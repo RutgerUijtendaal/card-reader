@@ -19,6 +19,7 @@ from card_reader_core.models import (
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
 from card_reader_core.rules import render_enriched_rule_text
+from card_reader_core.services.decks import normalize_deck_building_config
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardGroup, Deck
@@ -89,6 +90,7 @@ def card_payload(
         "label": card.label,
         "name": version.name,
         "is_hero": card.is_hero,
+        "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
         "lifecycle_status": card.lifecycle_status,
         "template_id": version.template.key,
         "version_id": version.id,
@@ -372,6 +374,7 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     is_hero = serializers.BooleanField(required=False)
+    deck_building_config = serializers.JSONField(required=False)
     lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -394,6 +397,12 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     def validate_unlock_metadata_groups(self, value: list[str]) -> list[str]:
         return _validated_names(value, METADATA_GROUPS, "Invalid metadata group name.")
 
+    def validate_deck_building_config(self, value: object) -> dict[str, object]:
+        try:
+            return normalize_deck_building_config(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
     def validated_update_payload(self) -> dict[str, object]:
         updates: dict[str, object] = {}
         for field_name in SCALAR_FIELDS:
@@ -403,6 +412,8 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
             updates["rules_text"] = self.validated_data["rules_text_enriched"]
         if "is_hero" in self.validated_data:
             updates["is_hero"] = self.validated_data["is_hero"]
+        if "deck_building_config" in self.validated_data:
+            updates["deck_building_config"] = self.validated_data["deck_building_config"]
         if "lifecycle_status" in self.validated_data:
             updates["lifecycle_status"] = self.validated_data["lifecycle_status"]
         for field_name in ("keyword_ids", "tag_ids", "type_ids", "symbol_ids"):

@@ -4,11 +4,7 @@ from card_reader_core.models import Card
 from card_reader_core.repositories.decks import get_cards_by_ids, get_deck_card
 
 from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
-from .types import (
-    MAX_SIDEBOARD_ENTRY_QUANTITY,
-    DeckEntryInput,
-    DeckSideboardInput,
-)
+from .types import DeckEntryInput, DeckSideboardInput
 
 
 class DeckPayloadNormalizer:
@@ -64,11 +60,12 @@ class DeckPayloadNormalizer:
             hero_card=hero_card,
             cards_by_id=cards_by_id,
         )
-        violations = DeckConstraintEvaluator().validate_entries(
-            [*mainboard_constraint_entries, *sideboard_constraint_entries]
+        evaluation = DeckConstraintEvaluator().evaluate(
+            hero_card=hero_card,
+            entries=[*mainboard_constraint_entries, *sideboard_constraint_entries],
         )
-        if violations:
-            raise ValueError(violations[0].message)
+        if evaluation.blocking_violations:
+            raise ValueError(evaluation.blocking_violations[0].message)
         return hero_card, normalized_entries, normalized_sideboards
 
     def normalize_name(self, name: str) -> str:
@@ -156,10 +153,6 @@ class DeckPayloadNormalizer:
         for entry in entries:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
-            if quantity < 1 or quantity > MAX_SIDEBOARD_ENTRY_QUANTITY:
-                raise ValueError(
-                    f"Each sideboard card quantity must be between 1 and {MAX_SIDEBOARD_ENTRY_QUANTITY}."
-                )
             card = cards_by_id[card_id]
             if card.is_hero or card.id == hero_card.id:
                 raise ValueError("Hero cards cannot appear in sideboards.")

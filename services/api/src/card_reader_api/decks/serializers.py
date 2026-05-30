@@ -11,7 +11,7 @@ from card_reader_api.cards.serializers import card_payload
 from card_reader_core.models import Card, CardVersion, Deck, DeckVisibility
 from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
-from card_reader_core.services.decks import DeckService
+from card_reader_core.services.decks import DeckConstraintEntry, DeckService, effective_deck_building_rules_json, normalize_deck_building_config
 
 
 class DeckListFilterParams(TypedDict):
@@ -28,6 +28,15 @@ def deck_payload(deck: Deck) -> dict[str, object]:
     totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
     sideboards = list(deck.sideboards.all())
+    constraint_entries = [
+        DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="mainboard")
+        for entry in entries
+    ]
+    constraint_entries.extend(
+        DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="sideboard")
+        for sideboard in sideboards
+        for entry in sideboard.entries.all()
+    )
     return {
         "id": deck.id,
         "name": deck.name,
@@ -75,9 +84,14 @@ def deck_payload(deck: Deck) -> dict[str, object]:
             "is_valid": validation.is_valid,
             "label": validation.status_label,
             "issues": validation.issues,
+            "warnings": validation.warnings,
             "deprecated_card_count": validation.deprecated_card_count,
             "deprecated_card_ids": validation.deprecated_card_ids or [],
         },
+        "deck_building_rules": effective_deck_building_rules_json(
+            hero_card=deck.hero_card,
+            entries=constraint_entries,
+        ),
         "created_at": deck.created_at.isoformat(),
         "updated_at": deck.updated_at.isoformat(),
     }
@@ -92,6 +106,7 @@ def deck_card_payload(card: Card) -> dict[str, object]:
             "key": card.key,
             "label": card.label,
             "is_hero": card.is_hero,
+            "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
             "lifecycle_status": card.lifecycle_status,
             "template_id": "",
             "version_id": "",
@@ -152,7 +167,7 @@ class MainboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 class SideboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
     card_id = serializers.CharField()
-    quantity = serializers.IntegerField(min_value=1, max_value=100)
+    quantity = serializers.IntegerField(min_value=1)
 
 
 class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):

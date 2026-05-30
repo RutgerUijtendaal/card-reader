@@ -12,6 +12,7 @@ import {
   getDeckEditorReturnLabel,
 } from '@/modules/decks/deckRouteState';
 import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
+import { fallbackDeckBuildingRules, fetchDeckRulesMetadata } from '@/modules/decks/deckRules';
 
 export const useDeckEditor = () => {
   const route = useRoute();
@@ -22,6 +23,7 @@ export const useDeckEditor = () => {
   const loading = ref(false);
   const saving = ref(false);
   const cardLookup = ref<Record<string, DeckCardSummary>>({});
+  const deckBuildingRules = ref(fallbackDeckBuildingRules());
   const backLink = computed(() => buildDeckEditorReturnLocation(route.query));
   const backLabel = computed(() => `Back to ${getDeckEditorReturnLabel(route.query)}`);
 
@@ -38,6 +40,7 @@ export const useDeckEditor = () => {
   const deck = useDeckEditorDraft({
     builderStep,
     cardLookup,
+    deckBuildingRules,
     rememberCards,
   });
   const filters = useDeckEditorFilters({
@@ -75,6 +78,14 @@ export const useDeckEditor = () => {
     }
   };
 
+  const loadDeckRules = async (): Promise<void> => {
+    try {
+      deckBuildingRules.value = (await fetchDeckRulesMetadata()).default_rules;
+    } catch {
+      deckBuildingRules.value = fallbackDeckBuildingRules();
+    }
+  };
+
   const persistDeck = async (): Promise<DeckRecord> => {
     const payload = deck.buildPayload();
     if (deckId.value) {
@@ -84,8 +95,18 @@ export const useDeckEditor = () => {
   };
 
   const lockSetup = async (): Promise<void> => {
+    if (!deck.form.hero_card_id) {
+      return;
+    }
+    if (!deck.form.name.trim()) {
+      return;
+    }
     if (deck.setupMessages.value.length > 0) {
       toast.error(deck.setupMessages.value[0]);
+      return;
+    }
+    if (deck.blockingMessages.value.length > 0) {
+      toast.error(deck.blockingMessages.value[0]);
       return;
     }
     saving.value = true;
@@ -116,7 +137,7 @@ export const useDeckEditor = () => {
   };
 
   onMounted(async () => {
-    await Promise.all([filters.loadFilters(), loadDeck()]);
+    await Promise.all([filters.loadFilters(), loadDeckRules(), loadDeck()]);
     if (builderStep.value === 'build') {
       filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
     }
@@ -130,6 +151,7 @@ export const useDeckEditor = () => {
     builderStep,
     loading,
     saving,
+    deckBuildingRules,
     filters,
     gallery,
     deck,

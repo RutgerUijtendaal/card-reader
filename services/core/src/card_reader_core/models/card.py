@@ -52,6 +52,7 @@ class Card(TimestampedModel):
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
     is_hero: models.BooleanField[bool, bool] = models.BooleanField(default=False, db_index=True)
+    deck_building_config_json = models.JSONField(default=dict)
     lifecycle_status: models.CharField[str, str] = models.CharField(
         max_length=16,
         choices=[

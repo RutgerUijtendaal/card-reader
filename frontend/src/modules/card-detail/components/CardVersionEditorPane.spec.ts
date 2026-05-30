@@ -16,6 +16,7 @@ const buildVersion = (overrides: Partial<CardVersionDetail> = {}): CardVersionDe
   key: 'card-1',
   label: 'Card 1',
   is_hero: false,
+  deck_building_config: { overrides: {} },
   template_id: 'template-1',
   version_id: 'version-1',
   version_number: 1,
@@ -87,6 +88,7 @@ const buildForm = (overrides: Partial<EditorForm> = {}): EditorForm => ({
   health: '',
   rules_text: '',
   is_hero: false,
+  deck_building_config: JSON.stringify({ overrides: {} }, null, 2),
   lifecycle_status: 'active',
   keyword_ids: [],
   tag_ids: [],
@@ -109,6 +111,8 @@ const mountPane = async ({
   const container = document.createElement('div');
   document.body.appendChild(container);
   const updateLifecycleStatus = vi.fn();
+  const saveCard = vi.fn();
+  const saveVersion = vi.fn();
   const form = reactive(buildForm());
   const reparseTemplateId = ref('template-1');
   const reparseTemplates: ReparseTemplateOption[] = [
@@ -127,6 +131,22 @@ const mountPane = async ({
             isSaving: false,
             isQueuingReparse: false,
             saveMessage: '',
+            deckBuildingConfigExample: JSON.stringify(
+              {
+                overrides: {
+                  mainboard_copy_limit: { max: 6 },
+                  mana_type_count: { min: 0 },
+                  legendary_copy_limit: {
+                    severity: 'hard',
+                    scope: 'whole_deck',
+                    blocks_action: true,
+                    max: 1,
+                  },
+                },
+              },
+              null,
+              2,
+            ),
             fieldSource: autoSource,
             metadataSource: autoSource,
             fieldSourceLabel: autoLabel,
@@ -147,6 +167,8 @@ const mountPane = async ({
             additionalSymbolIds: [],
             ruleTextUnknownSymbolKeys: [],
             deprecatedStatusDisabled,
+            onSaveCard: saveCard,
+            onSaveVersion: saveVersion,
             onUpdateLifecycleStatus: updateLifecycleStatus,
           });
       },
@@ -157,12 +179,23 @@ const mountPane = async ({
 
   return {
     container,
+    saveCard,
+    saveVersion,
     updateLifecycleStatus,
     unmount: () => {
       app.unmount();
       container.remove();
     },
   };
+};
+
+const clickButton = async (container: HTMLElement, label: string): Promise<void> => {
+  const button = Array.from(container.querySelectorAll('button')).find(
+    (candidate) => candidate.textContent?.trim() === label,
+  );
+  expect(button).toBeInstanceOf(HTMLButtonElement);
+  (button as HTMLButtonElement).click();
+  await nextTick();
 };
 
 describe('CardVersionEditorPane lifecycle status', () => {
@@ -172,6 +205,7 @@ describe('CardVersionEditorPane lifecycle status', () => {
 
   test('disables deprecated status when the card is a group anchor', async () => {
     const mounted = await mountPane({ deprecatedStatusDisabled: true });
+    await clickButton(mounted.container, 'Card');
     const deprecatedButton = mounted.container.querySelector('[data-testid="lifecycle-option-deprecated"]');
 
     expect(deprecatedButton).toBeInstanceOf(HTMLButtonElement);
@@ -187,6 +221,7 @@ describe('CardVersionEditorPane lifecycle status', () => {
 
   test('keeps deprecated status selectable for non-anchor cards', async () => {
     const mounted = await mountPane();
+    await clickButton(mounted.container, 'Card');
     const deprecatedButton = mounted.container.querySelector('[data-testid="lifecycle-option-deprecated"]');
 
     expect(deprecatedButton).toBeInstanceOf(HTMLButtonElement);
@@ -196,6 +231,62 @@ describe('CardVersionEditorPane lifecycle status', () => {
     await nextTick();
 
     expect(mounted.updateLifecycleStatus).toHaveBeenCalledWith('deprecated');
+    mounted.unmount();
+  });
+});
+
+describe('CardVersionEditorPane tabs', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  test('renders version-level controls by default and card-level controls only on the Card tab', async () => {
+    const mounted = await mountPane();
+
+    expect(mounted.container.textContent).toContain('Card Version Editor');
+    expect(mounted.container.textContent).not.toContain('Hero Card');
+    expect(mounted.container.textContent).not.toContain('Deck-Building Config JSON');
+    expect(mounted.container.textContent).not.toContain('Card Status');
+    expect(mounted.container.textContent).toContain('Mana Cost');
+    expect(mounted.container.textContent).toContain('Template');
+
+    await clickButton(mounted.container, 'Card');
+
+    expect(mounted.container.textContent).toContain('Card Editor');
+    expect(mounted.container.textContent).toContain('Hero Card');
+    expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
+    expect(mounted.container.textContent).toContain('Card Status');
+    expect(mounted.container.textContent).not.toContain('Mana Cost');
+    expect(mounted.container.textContent).not.toContain('Template');
+
+    mounted.unmount();
+  });
+
+  test('opens the deck-building config example from the JSON editor', async () => {
+    const mounted = await mountPane();
+
+    await clickButton(mounted.container, 'Card');
+    await clickButton(mounted.container, 'Example');
+
+    expect(document.body.textContent).toContain('Deck-building config example');
+    expect(document.body.textContent).toContain('mainboard_copy_limit');
+    expect(document.body.textContent).toContain('whole_deck');
+
+    mounted.unmount();
+  });
+
+  test('emits separate save events for card and version tabs', async () => {
+    const mounted = await mountPane();
+
+    await clickButton(mounted.container, 'Save Version');
+    expect(mounted.saveVersion).toHaveBeenCalledTimes(1);
+    expect(mounted.saveCard).not.toHaveBeenCalled();
+
+    await clickButton(mounted.container, 'Card');
+    await clickButton(mounted.container, 'Save Card');
+    expect(mounted.saveCard).toHaveBeenCalledTimes(1);
+    expect(mounted.saveVersion).toHaveBeenCalledTimes(1);
+
     mounted.unmount();
   });
 });
