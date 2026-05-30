@@ -21,6 +21,7 @@ export const useDeckBrowseFilters = () => {
   const filtersLoaded = ref(false);
   const filterCatalog = computed(() => createDeckBrowseFilterCatalog(filters.value));
   const heroQuery = ref('');
+  const authorQuery = ref('');
   const cardQuery = ref('');
   const affinitySymbolIds = ref<string[]>([]);
   const affinitySymbolExcludeIds = ref<string[]>([]);
@@ -34,6 +35,7 @@ export const useDeckBrowseFilters = () => {
     return buildDeckBrowseFilterStateFromSelection(
       {
         heroQuery: heroQuery.value,
+        authorQuery: authorQuery.value,
         cardQuery: cardQuery.value,
         affinitySymbolMatch: affinitySymbolMatch.value,
         affinitySymbolIds: affinitySymbolIds.value,
@@ -46,6 +48,7 @@ export const useDeckBrowseFilters = () => {
   const applyRouteFilterState = (state: DeckBrowseFilterState): void => {
     const normalized = buildDeckBrowseFilterSelectionState(state, filterCatalog.value);
     heroQuery.value = normalized.heroQuery;
+    authorQuery.value = normalized.authorQuery;
     cardQuery.value = normalized.cardQuery;
     affinitySymbolMatch.value = normalized.affinitySymbolMatch;
     affinitySymbolIds.value = [...normalized.affinitySymbolIds];
@@ -58,6 +61,10 @@ export const useDeckBrowseFilters = () => {
 
   const updateHeroQuery = (value: string): void => {
     heroQuery.value = value;
+  };
+
+  const updateAuthorQuery = (value: string): void => {
+    authorQuery.value = value;
   };
 
   const updateCardQuery = (value: string): void => {
@@ -95,6 +102,7 @@ export const useDeckBrowseFilters = () => {
     filtersLoaded,
     filterCatalog,
     heroQuery,
+    authorQuery,
     cardQuery,
     affinitySymbolIds,
     affinitySymbolExcludeIds,
@@ -104,6 +112,7 @@ export const useDeckBrowseFilters = () => {
     applyRouteFilterState,
     resetFilters,
     updateHeroQuery,
+    updateAuthorQuery,
     updateCardQuery,
     updateAffinitySymbolIds,
     updateAffinitySymbolExcludeIds,

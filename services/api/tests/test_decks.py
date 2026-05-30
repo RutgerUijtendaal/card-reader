@@ -365,6 +365,39 @@ def test_public_deck_list_filters_by_hero_name() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_list_filters_by_author_username() -> None:
+    target_owner = _create_user("deck-author-target", "password")
+    other_owner = _create_user("deck-author-other", "password")
+    hero = _create_card(name="Author Filter Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+
+    target_deck = DeckService().create_owner_deck(
+        owner_id=str(target_owner.id),
+        name="Target Author Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    other_deck = DeckService().create_owner_deck(
+        owner_id=str(other_owner.id),
+        name="Other Author Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"author_q": "target"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [target_deck.id]
+    assert other_deck.id not in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_mainboard_card_name() -> None:
     owner = _create_user("deck-filter-mainboard-owner", "password")
     hero = _create_card(name="Mainboard Hero", is_hero=True)

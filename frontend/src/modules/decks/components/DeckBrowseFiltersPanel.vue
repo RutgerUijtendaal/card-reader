@@ -12,6 +12,23 @@
     <div class="theme-muted-panel space-y-2 p-3">
       <div class="space-y-1">
         <h4 class="theme-section-title text-sm font-semibold">
+          Author
+        </h4>
+        <p class="theme-section-muted text-xs">
+          Match decks published by a username.
+        </p>
+      </div>
+      <input
+        :value="controller.authorQuery.value"
+        class="input-base"
+        placeholder="Search authors..."
+        @input="controller.updateAuthorQuery(($event.target as HTMLInputElement).value)"
+      >
+    </div>
+
+    <div class="theme-muted-panel space-y-2 p-3">
+      <div class="space-y-1">
+        <h4 class="theme-section-title text-sm font-semibold">
           Cards In Deck
         </h4>
         <p class="theme-section-muted text-xs">
@@ -51,7 +68,7 @@ const props = defineProps<{
 }>();
 
 const description = computed(
-  () => props.description ?? 'Filter public decks by hero, included cards, and affinity.',
+  () => props.description ?? 'Filter public decks by hero, author, included cards, and affinity.',
 );
 
 const selectedAffinitySymbolIds = computed({

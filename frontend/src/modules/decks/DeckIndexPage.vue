@@ -198,8 +198,8 @@ const activeSubtitle = computed(() =>
 );
 const filterDescription = computed(() =>
   isOwnedMode.value
-    ? 'Filter your decks by hero, included cards, and affinity.'
-    : 'Filter public decks by hero, included cards, and affinity.',
+    ? 'Filter your decks by hero, author, included cards, and affinity.'
+    : 'Filter public decks by hero, author, included cards, and affinity.',
 );
 const loadingSkeletonCount = 10;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));

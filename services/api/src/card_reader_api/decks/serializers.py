@@ -16,6 +16,7 @@ from card_reader_core.services.decks import DeckService
 
 class DeckListFilterParams(TypedDict):
     hero_query: str | None
+    author_query: str | None
     card_query: str | None
     affinity_symbol_ids: list[str] | None
     affinity_symbol_exclude_ids: list[str] | None
@@ -170,6 +171,7 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     hero_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    author_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     card_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     affinity_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
@@ -178,6 +180,7 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     def validated_list_filters(self) -> DeckListFilterParams:
         return {
             "hero_query": self._string_or_none("hero_q"),
+            "author_query": self._string_or_none("author_q"),
             "card_query": self._string_or_none("card_q"),
             "affinity_symbol_ids": self._string_list_or_none("affinity_symbol_ids"),
             "affinity_symbol_exclude_ids": self._string_list_or_none("affinity_symbol_exclude_ids"),
