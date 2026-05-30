@@ -17,6 +17,10 @@ export type DeckRulesMetadata = {
   example_config: { overrides: Record<string, unknown> };
 };
 
+export const fallbackDeckBuildingDefaultConfig = {
+  overrides: {},
+};
+
 export const fallbackDeckBuildingRules = (): DeckBuildingRules => ({
   mainboard_copy_limit: {
     rule_id: 'mainboard_copy_limit',

@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { api } from '@/api/client';
 import {
   fallbackDeckBuildingConfigExample,
+  fallbackDeckBuildingDefaultConfig,
   fallbackDeckBuildingRules,
   fetchDeckRulesMetadata,
   formatDeckBuildingConfigJson,
@@ -24,7 +25,7 @@ const backendMetadataFixture: DeckRulesMetadata = {
   ],
   allowed_severities: ['hard', 'soft'],
   allowed_scopes: ['mainboard', 'whole_deck'],
-  default_config: { overrides: {} },
+  default_config: fallbackDeckBuildingDefaultConfig,
   default_rules: fallbackDeckBuildingRules(),
   example_config: fallbackDeckBuildingConfigExample,
 };
@@ -47,6 +48,7 @@ describe('deckRules', () => {
     expect(fallbackRules.mana_type_count.min).toBe(3);
     expect(fallbackRules.legendary_copy_limit.severity).toBe('soft');
     expect(fallbackRules.legendary_copy_limit.scope).toBe('mainboard');
+    expect(formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig)).toContain('overrides');
     expect(formatDeckBuildingConfigJson(fallbackDeckBuildingConfigExample)).toContain(
       'mainboard_copy_limit',
     );

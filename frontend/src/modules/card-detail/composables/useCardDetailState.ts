@@ -27,6 +27,7 @@ import { metadataGroups, scalarFields } from '@/modules/card-detail/types';
 import { isEditableKeyboardTarget } from '@/utils/keyboard';
 import { fetchTemplates } from '@/modules/admin/api/templates';
 import {
+  fallbackDeckBuildingDefaultConfig,
   fallbackDeckBuildingConfigExample,
   fetchDeckRulesMetadata,
   formatDeckBuildingConfigJson,
@@ -57,7 +58,7 @@ export const useCardDetailState = () => {
     health: '',
     rules_text: '',
     is_hero: false,
-    deck_building_config: '{}',
+    deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
     tag_ids: [],
@@ -157,7 +158,11 @@ export const useCardDetailState = () => {
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
     form.is_hero = version.is_hero;
-    form.deck_building_config = formatDeckBuildingConfigJson(version.deck_building_config ?? {});
+    form.deck_building_config = formatDeckBuildingConfigJson(
+      Object.keys(version.deck_building_config ?? {}).length > 0
+        ? version.deck_building_config
+        : fallbackDeckBuildingDefaultConfig,
+    );
     form.lifecycle_status = normalizeCardLifecycleStatus(version.lifecycle_status);
     form.keyword_ids = [...version.keyword_ids];
     form.tag_ids = [...version.tag_ids];

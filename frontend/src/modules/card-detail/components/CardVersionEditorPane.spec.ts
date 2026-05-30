@@ -88,7 +88,7 @@ const buildForm = (overrides: Partial<EditorForm> = {}): EditorForm => ({
   health: '',
   rules_text: '',
   is_hero: false,
-  deck_building_config: '{}',
+  deck_building_config: JSON.stringify({ overrides: {} }, null, 2),
   lifecycle_status: 'active',
   keyword_ids: [],
   tag_ids: [],
