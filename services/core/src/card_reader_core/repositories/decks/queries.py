@@ -13,6 +13,7 @@ PUBLIC_DECK_VISIBILITIES: tuple[DeckVisibility, DeckVisibility] = ("public", "un
 def list_public_decks(
     *,
     hero_query: str | None = None,
+    author_query: str | None = None,
     card_query: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
@@ -22,6 +23,7 @@ def list_public_decks(
         apply_deck_filters(
             deck_queryset().filter(visibility="public"),
             hero_query=hero_query,
+            author_query=author_query,
             card_query=card_query,
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
@@ -43,6 +45,7 @@ def list_owner_decks(
         apply_deck_filters(
             deck_queryset().filter(owner_id=owner_id),
             hero_query=hero_query,
+            author_query=None,
             card_query=card_query,
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,

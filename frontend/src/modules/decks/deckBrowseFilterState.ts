@@ -3,6 +3,7 @@ import type { CardFiltersResponse, SymbolFilterOption } from '@/modules/card-det
 
 export type DeckBrowseFilterState = {
   heroQuery: string;
+  authorQuery: string;
   cardQuery: string;
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolKeys: string[];
@@ -11,6 +12,7 @@ export type DeckBrowseFilterState = {
 
 export type DeckBrowseFilterSelectionState = {
   heroQuery: string;
+  authorQuery: string;
   cardQuery: string;
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolIds: string[];
@@ -54,6 +56,7 @@ const resolveKeysFromIds = (ids: string[], options: SymbolFilterOption[]): strin
 
 export const createEmptyDeckBrowseFilterState = (): DeckBrowseFilterState => ({
   heroQuery: '',
+  authorQuery: '',
   cardQuery: '',
   affinitySymbolMatch: 'any',
   affinitySymbolKeys: [],
@@ -62,6 +65,7 @@ export const createEmptyDeckBrowseFilterState = (): DeckBrowseFilterState => ({
 
 export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): DeckBrowseFilterState => ({
   heroQuery: normalizeStringValue(state.heroQuery),
+  authorQuery: normalizeStringValue(state.authorQuery),
   cardQuery: normalizeStringValue(state.cardQuery),
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolKeys: normalizeStringArray(state.affinitySymbolKeys),
@@ -72,6 +76,7 @@ export const normalizeDeckBrowseFilterSelectionState = (
   state: DeckBrowseFilterSelectionState,
 ): DeckBrowseFilterSelectionState => ({
   heroQuery: normalizeStringValue(state.heroQuery),
+  authorQuery: normalizeStringValue(state.authorQuery),
   cardQuery: normalizeStringValue(state.cardQuery),
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolIds: normalizeStringArray(state.affinitySymbolIds),
@@ -81,6 +86,7 @@ export const normalizeDeckBrowseFilterSelectionState = (
 export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrowseFilterState =>
   normalizeDeckBrowseFilterState({
     heroQuery: typeof query.hero_q === 'string' ? query.hero_q : '',
+    authorQuery: typeof query.author_q === 'string' ? query.author_q : '',
     cardQuery: typeof query.card_q === 'string' ? query.card_q : '',
     affinitySymbolMatch: query.affinity_symbol_match === 'all' ? 'all' : 'any',
     affinitySymbolKeys: readQueryValues(query.affinity_symbol_keys),
@@ -92,6 +98,7 @@ export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): L
   const query: LocationQueryRaw = {};
 
   if (normalized.heroQuery) query.hero_q = normalized.heroQuery;
+  if (normalized.authorQuery) query.author_q = normalized.authorQuery;
   if (normalized.cardQuery) query.card_q = normalized.cardQuery;
   if (normalized.affinitySymbolMatch === 'all') query.affinity_symbol_match = 'all';
   if (normalized.affinitySymbolKeys.length > 0) query.affinity_symbol_keys = normalized.affinitySymbolKeys;
@@ -135,6 +142,7 @@ export const buildDeckBrowseFilterSelectionState = (
 ): DeckBrowseFilterSelectionState =>
   normalizeDeckBrowseFilterSelectionState({
     heroQuery: state.heroQuery,
+    authorQuery: state.authorQuery,
     cardQuery: state.cardQuery,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolIds: resolveIdsFromKeys(state.affinitySymbolKeys, catalog.affinitySymbols),
@@ -147,6 +155,7 @@ export const buildDeckBrowseFilterStateFromSelection = (
 ): DeckBrowseFilterState =>
   normalizeDeckBrowseFilterState({
     heroQuery: state.heroQuery,
+    authorQuery: state.authorQuery,
     cardQuery: state.cardQuery,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.affinitySymbols),
@@ -160,6 +169,7 @@ export const buildDeckBrowseFilterApiSearchParams = (
   const params = new URLSearchParams();
 
   if (normalized.heroQuery) params.set('hero_q', normalized.heroQuery);
+  if (normalized.authorQuery) params.set('author_q', normalized.authorQuery);
   if (normalized.cardQuery) params.set('card_q', normalized.cardQuery);
   if (normalized.affinitySymbolIds.length > 0) {
     normalized.affinitySymbolIds.forEach((id) => params.append('affinity_symbol_ids', id));

@@ -9,6 +9,7 @@ def apply_deck_filters(
     queryset: QuerySet[Deck],
     *,
     hero_query: str | None,
+    author_query: str | None,
     card_query: str | None,
     affinity_symbol_ids: list[str] | None,
     affinity_symbol_exclude_ids: list[str] | None,
@@ -22,6 +23,10 @@ def apply_deck_filters(
             Q(hero_card__label__icontains=normalized_hero_query)
             | Q(hero_card__latest_version__name__icontains=normalized_hero_query)
         )
+
+    normalized_author_query = (author_query or "").strip()
+    if normalized_author_query:
+        filtered = filtered.filter(owner__username__icontains=normalized_author_query)
 
     normalized_card_query = (card_query or "").strip()
     if normalized_card_query:

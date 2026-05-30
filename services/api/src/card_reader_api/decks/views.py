@@ -28,6 +28,7 @@ class PublicDeckListView(APIView):
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
+                "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
                 "affinity_symbol_exclude_ids": request.query_params.getlist("affinity_symbol_exclude_ids"),
@@ -39,6 +40,7 @@ class PublicDeckListView(APIView):
         filters = serializer.validated_list_filters()
         decks = DeckService().list_public_decks(
             hero_query=filters["hero_query"],
+            author_query=filters["author_query"],
             card_query=filters["card_query"],
             affinity_symbol_ids=filters["affinity_symbol_ids"],
             affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
@@ -65,6 +67,7 @@ class OwnerDeckListCreateView(APIView):
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
+                "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
                 "affinity_symbol_exclude_ids": request.query_params.getlist("affinity_symbol_exclude_ids"),

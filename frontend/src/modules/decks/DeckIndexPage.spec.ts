@@ -110,12 +110,14 @@ vi.mock('@/modules/decks/components/DeckBrowseFiltersPanel.vue', () => ({
     props: {
       controller: { type: Object, required: true },
       description: { type: String, required: true },
+      showAuthor: { type: Boolean, default: true },
       totalCount: { type: Number, required: true },
     },
     setup(props) {
       return () =>
         h('aside', [
           h('p', props.description),
+          props.showAuthor ? h('span', 'Author filter') : null,
           h('span', `Total ${props.totalCount}`),
           h('input', {
             'data-testid': 'card-query',
@@ -313,6 +315,7 @@ describe('DeckIndexPage', () => {
     expect(mounted.container.querySelector('[data-mode="owned"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/my/decks/deck-1"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Filter your decks');
+    expect(mounted.container.textContent).not.toContain('Author filter');
 
     mounted.unmount();
   });
@@ -348,12 +351,15 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('tabs link to public and owned deck routes', async () => {
-    const mounted = await mountPage('/my/decks?card_q=Blade');
+  test('tabs link to public and owned deck routes without carrying author into owned mode', async () => {
+    const mounted = await mountPage('/decks?card_q=Blade&author_q=Frosty');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
 
     expect(
-      links.some((link) => link.textContent?.trim() === 'Public' && link.getAttribute('href') === '/decks?card_q=Blade'),
+      links.some(
+        (link) =>
+          link.textContent?.trim() === 'Public' && link.getAttribute('href') === '/decks?author_q=Frosty&card_q=Blade',
+      ),
     ).toBe(true);
     expect(
       links.some(
@@ -378,12 +384,13 @@ describe('DeckIndexPage', () => {
   });
 
   test.each([
-    ['/decks', fetchPublicDecksMock],
-    ['/my/decks', fetchMyDecksMock],
-  ])('passes route filters to API params for %s', async (path, fetchMock) => {
-    const mounted = await mountPage(`${path}?card_q=Blade`);
+    ['/decks', fetchPublicDecksMock, 'Frosty'],
+    ['/my/decks', fetchMyDecksMock, null],
+  ])('passes route filters to API params for %s', async (path, fetchMock, expectedAuthorQuery) => {
+    const mounted = await mountPage(`${path}?card_q=Blade&author_q=Frosty`);
 
     expect(lastSearchParams(fetchMock).get('card_q')).toBe('Blade');
+    expect(lastSearchParams(fetchMock).get('author_q')).toBe(expectedAuthorQuery);
 
     mounted.unmount();
   });

@@ -13,7 +13,7 @@
             <RouterLink
               class="theme-tab"
               :class="{ 'theme-tab-active': !isOwnedMode }"
-              :to="{ path: '/decks', query: currentFilterRouteQuery }"
+              :to="{ path: '/decks', query: publicFilterRouteQuery }"
             >
               Public
             </RouterLink>
@@ -21,7 +21,7 @@
               v-if="canUseOwnedDecks"
               class="theme-tab"
               :class="{ 'theme-tab-active': isOwnedMode }"
-              :to="{ path: '/my/decks', query: currentFilterRouteQuery }"
+              :to="{ path: '/my/decks', query: ownedFilterRouteQuery }"
             >
               My Decks
             </RouterLink>
@@ -43,6 +43,7 @@
         :controller="filterController"
         :total-count="decks.length"
         :description="filterDescription"
+        :show-author="!isOwnedMode"
       />
 
       <div class="app-scrollbar min-h-0 overflow-y-auto pr-1">
@@ -199,12 +200,22 @@ const activeSubtitle = computed(() =>
 const filterDescription = computed(() =>
   isOwnedMode.value
     ? 'Filter your decks by hero, included cards, and affinity.'
-    : 'Filter public decks by hero, included cards, and affinity.',
+    : 'Filter public decks by hero, author, included cards, and affinity.',
 );
 const loadingSkeletonCount = 10;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
-const currentFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
-const currentRouteSignature = computed(() => getDeckBrowseFilterSignature(currentRouteFilterState.value));
+const effectiveRouteFilterState = computed(() => ({
+  ...currentRouteFilterState.value,
+  authorQuery: isOwnedMode.value ? '' : currentRouteFilterState.value.authorQuery,
+}));
+const publicFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
+const ownedFilterRouteQuery = computed(() =>
+  buildDeckBrowseFilterRouteQuery({
+    ...currentRouteFilterState.value,
+    authorQuery: '',
+  }),
+);
+const currentRouteSignature = computed(() => getDeckBrowseFilterSignature(effectiveRouteFilterState.value));
 const hasActiveFilters = computed(() => currentRouteSignature.value.length > 0);
 const emptyLabel = computed(() => {
   if (hasActiveFilters.value) {
@@ -221,7 +232,10 @@ const loadDecks = async (): Promise<void> => {
   const requestedPath = currentDeckPath.value;
   loading.value = true;
   try {
-    const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
+    const params = buildDeckBrowseFilterApiSearchParams({
+      ...selectionState.value,
+      authorQuery: requestedPath === '/my/decks' ? '' : selectionState.value.authorQuery,
+    });
     const nextDecks = requestedPath === '/my/decks' ? await fetchMyDecks(params) : await fetchPublicDecks(params);
     if (requestId === deckLoadRequestId && currentDeckPath.value === requestedPath) {
       decks.value = nextDecks;
@@ -238,12 +252,16 @@ const debouncedUpdateRoute = useDebounceFn(() => {
     return;
   }
   const nextRouteState = readFilterState();
-  if (sameDeckBrowseFilterState(nextRouteState, currentRouteFilterState.value)) {
+  const effectiveNextRouteState = {
+    ...nextRouteState,
+    authorQuery: isOwnedMode.value ? '' : nextRouteState.authorQuery,
+  };
+  if (sameDeckBrowseFilterState(effectiveNextRouteState, effectiveRouteFilterState.value)) {
     return;
   }
   void router.replace({
     path: currentDeckPath.value,
-    query: buildDeckBrowseFilterRouteQuery(nextRouteState),
+    query: buildDeckBrowseFilterRouteQuery(effectiveNextRouteState),
   });
 }, 250);
 
@@ -261,7 +279,13 @@ watch(
     if (!ready) {
       return;
     }
-    const routeState = currentRouteFilterState.value;
+    if (isOwnedMode.value && currentRouteFilterState.value.authorQuery) {
+      void router.replace({
+        path: currentDeckPath.value,
+        query: ownedFilterRouteQuery.value,
+      });
+    }
+    const routeState = effectiveRouteFilterState.value;
     if (!sameDeckBrowseFilterState(readFilterState(), routeState)) {
       applyRouteFilterState(routeState);
     }
