@@ -193,22 +193,6 @@
         </section>
 
         <div class="space-y-3 px-5">
-          <div
-            v-if="controller.deck.validationMessages.value.length > 0"
-            class="theme-muted-panel space-y-2 p-3"
-          >
-            <p class="theme-section-title text-sm font-semibold">
-              Validation
-            </p>
-            <p
-              v-for="message in controller.deck.validationMessages.value"
-              :key="message"
-              class="theme-error-text text-sm"
-            >
-              {{ message }}
-            </p>
-          </div>
-
           <div class="space-y-3">
             <div class="flex items-center justify-between gap-3">
               <h4 class="theme-section-title text-sm font-semibold">

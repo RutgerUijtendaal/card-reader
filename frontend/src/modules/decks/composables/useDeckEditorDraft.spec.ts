@@ -447,6 +447,71 @@ describe('useDeckEditorDraft', () => {
     expect(controller.warningMessages.value).toContain('Deck cannot contain more than 1 mainboard cards.');
   });
 
+  test('blocks sideboard copies when mainboard copy limit is scoped to the whole deck', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            mainboard_copy_limit: { scope: 'whole_deck', max: 4 },
+          },
+        },
+      },
+      cardA: buildCard('cardA', 'Card A', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 4 }];
+    controller.addSideboard();
+
+    expect(controller.getCardQuantityLimit('cardA')).toBe(0);
+    expect(controller.galleryActionDisabled({ ...cardLookup.value.cardA, result_type: 'card' })).toBe(true);
+    controller.handleGalleryAction({ ...cardLookup.value.cardA, result_type: 'card' });
+    expect(controller.activeSideboard.value?.entries).toEqual([]);
+  });
+
+  test('uses whole-deck mainboard card count scope for mainboard add gates', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: {
+        ...buildCard('hero', 'Hero Card', 0),
+        is_hero: true,
+        type_line: 'Hero',
+        deck_building_config: {
+          overrides: {
+            mainboard_card_count: { scope: 'whole_deck', max: 100 },
+          },
+        },
+      },
+      main: buildCard('main', 'Main Card', 2),
+      side: buildCard('side', 'Side Card', 2),
+      candidate: buildCard('candidate', 'Candidate Card', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'main', quantity: 80 }];
+    controller.addSideboard();
+    controller.activeSideboard.value?.entries.push({ card_id: 'side', quantity: 20 });
+    controller.selectBoard('mainboard');
+
+    expect(controller.galleryActionDisabled({ ...cardLookup.value.candidate, result_type: 'card' })).toBe(true);
+    controller.handleGalleryAction({ ...cardLookup.value.candidate, result_type: 'card' });
+    expect(controller.form.entries).not.toContainEqual({ card_id: 'candidate', quantity: 1 });
+  });
+
   test('reports action-blocking messages when a selected hero lowers an existing copy limit', () => {
     const builderStep = ref<BuilderStep>('setup');
     const cardLookup = ref<Record<string, DeckCardSummary>>({

@@ -139,6 +139,15 @@ export const getDeckEntryQuantityLimit = (
   const boardMessage = context.boardId === context.mainboardId
     ? `Mainboard copy limit is ${boardRule.max ?? MAX_DECK_COPIES}.`
     : `Sideboard copy limit is ${boardRule.max ?? MAX_SIDEBOARD_ENTRY_QUANTITY}.`;
+  const aggregateMainboardCopyLimit = getAggregateMainboardCopyLimit(card.id, context, rules);
+  if (aggregateMainboardCopyLimit !== null) {
+    const remainingCopies = Math.max(0, aggregateMainboardCopyLimit.max - aggregateMainboardCopyLimit.otherCopies);
+    return {
+      max: Math.min(boardMax, remainingCopies),
+      message: `Mainboard copy limit is ${aggregateMainboardCopyLimit.max}.`,
+      blocksAction: true,
+    };
+  }
 
   if (
     isLegendaryCard(card)
@@ -415,6 +424,21 @@ const getCopiesOutsideBoard = (
 
 const getEntryQuantity = (entries: DeckConstraintEntry[], cardId: string): number =>
   entries.find((entry) => entry.card_id === cardId)?.quantity ?? 0;
+
+const getAggregateMainboardCopyLimit = (
+  cardId: string,
+  context: DeckConstraintContext,
+  rules: DeckBuildingRules,
+): { max: number; otherCopies: number } | null => {
+  const rule = rules.mainboard_copy_limit;
+  if (!isActionBlockingRule(rule) || rule.scope !== 'whole_deck' || rule.max === undefined) {
+    return null;
+  }
+  return {
+    max: rule.max,
+    otherCopies: getCopiesOutsideBoard(cardId, context, rule.scope),
+  };
+};
 
 const legendaryCopyLimitMessage = (max: number): string =>
   `Legendary cards are limited to ${max} copy per deck.`;

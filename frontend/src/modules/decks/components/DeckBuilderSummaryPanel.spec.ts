@@ -284,6 +284,20 @@ describe('DeckBuilderSummaryPanel', () => {
     mounted.unmount();
   });
 
+  test('does not duplicate validation messages in the build sidebar', async () => {
+    const mounted = await mountPanel();
+    mounted.controller.deck.validationMessages.value = ['Deck must contain at least 20 mainboard cards.'];
+    mounted.controller.deck.warningMessages.value = ['Legendary cards are limited to 1 copy per deck.'];
+    await nextTick();
+
+    const text = mounted.container.textContent ?? '';
+    expect(text).not.toContain('Validation');
+    expect(text).not.toContain('Deck must contain at least 20 mainboard cards.');
+    expect(text).not.toContain('Legendary cards are limited to 1 copy per deck.');
+
+    mounted.unmount();
+  });
+
   test('expands hero details and compact mana curve on toggle', async () => {
     const mounted = await mountPanel();
     const buttons = mounted.container.querySelectorAll('button');
