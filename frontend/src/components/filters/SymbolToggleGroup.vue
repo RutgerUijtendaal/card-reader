@@ -56,7 +56,7 @@
         </span>
         <span
           v-if="excludedValue.length > 0"
-          class="theme-pill theme-pill-danger px-2 py-0.5 text-xs font-medium"
+          class="theme-pill theme-pill-filter-exclude px-2 py-0.5 text-xs font-medium"
         >
           -{{ excludedValue.length }}
         </span>

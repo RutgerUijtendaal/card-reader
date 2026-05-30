@@ -1,11 +1,11 @@
 <template>
   <aside
-    class="page-card flex min-h-0 flex-col"
+    class="theme-divider flex min-h-0 flex-col border-r pr-5"
     :class="stickyToViewport ? 'xl:sticky xl:top-0 xl:h-[calc(100vh-3rem)]' : 'h-full'"
   >
     <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
       <div class="space-y-2">
-        <div class="flex items-center justify-between gap-3">
+        <div class="flex justify-between gap-3">
           <div>
             <h3 class="theme-section-title text-lg font-semibold">
               {{ title }}

@@ -291,7 +291,7 @@ describe('DeckIndexPage', () => {
     apiGetMock.mockReturnValue(new Promise(() => undefined));
     const mounted = await mountPage('/decks');
 
-    expect(mounted.container.querySelectorAll('.deck-loading-skeleton')).toHaveLength(4);
+    expect(mounted.container.querySelectorAll('.deck-loading-skeleton')).toHaveLength(10);
     expect(mounted.container.textContent).not.toContain('Loading decks');
 
     mounted.unmount();
