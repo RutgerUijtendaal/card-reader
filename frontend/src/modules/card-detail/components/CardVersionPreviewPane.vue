@@ -1,12 +1,12 @@
 <template>
   <div class="page-card">
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
       <div class="theme-muted-panel p-3">
         <img
           v-if="version.image_url"
           :src="toAbsoluteApiUrl(version.image_url)"
           alt="Selected card version image"
-          class="mx-auto block max-h-[38rem] w-full object-contain"
+          class="mx-auto block max-h-[42rem] w-full object-contain"
         >
         <div
           v-else
@@ -23,7 +23,7 @@
               {{ version.name || 'Unnamed Card' }}
             </h3>
             <p class="theme-section-muted text-sm">
-              Version {{ version.version_number }}
+              Printing {{ version.version_number }}
               <span v-if="version.is_latest"> · Latest</span>
             </p>
           </div>

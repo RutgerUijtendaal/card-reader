@@ -11,8 +11,8 @@ export const fetchDeckDetail = async (deckId: string): Promise<DeckRecord> => {
   return response.data;
 };
 
-export const fetchMyDecks = async (): Promise<DeckRecord[]> => {
-  const response = await api.get<DeckRecord[]>('/my/decks');
+export const fetchMyDecks = async (params?: URLSearchParams): Promise<DeckRecord[]> => {
+  const response = await api.get<DeckRecord[]>('/my/decks', { params });
   return response.data;
 };
 

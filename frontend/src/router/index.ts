@@ -7,10 +7,9 @@ import CardSearchPage from '@/modules/card-search/CardSearchPage.vue';
 import CardGroupDetailPage from '@/modules/card-groups/CardGroupDetailPage.vue';
 import CardDetailPage from '@/modules/card-detail/CardDetailPage.vue';
 import CardPublicDetailPage from '@/modules/card-detail/CardPublicDetailPage.vue';
-import DeckBrowsePage from '@/modules/decks/DeckBrowsePage.vue';
 import DeckDetailPage from '@/modules/decks/DeckDetailPage.vue';
 import DeckEditorPage from '@/modules/decks/DeckEditorPage.vue';
-import MyDecksPage from '@/modules/decks/MyDecksPage.vue';
+import DeckIndexPage from '@/modules/decks/DeckIndexPage.vue';
 import ReviewQueuePage from '@/modules/review-queue/ReviewQueuePage.vue';
 import SettingsPage from '@/modules/settings/SettingsPage.vue';
 import AdminPage from '@/modules/admin/AdminPage.vue';
@@ -25,11 +24,11 @@ export const router = createRouter({
     { path: '/cards', component: CardSearchPage, meta: { title: 'Gallery' } },
     { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { title: 'Card' } },
     { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { title: 'Card Group' } },
-    { path: '/decks', component: DeckBrowsePage, meta: { title: 'Decks' } },
+    { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks' } },
     { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck' } },
     { path: '/login', component: LoginPage, meta: { public: true, title: 'Sign In' } },
     { path: '/password-setup', component: PasswordSetupPage, meta: { public: true, title: 'Password Setup' } },
-    { path: '/my/decks', component: MyDecksPage, meta: { requiresAuth: true, title: 'My Decks' } },
+    { path: '/my/decks', component: DeckIndexPage, meta: { requiresAuth: true, title: 'My Decks' } },
     { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true, title: 'My Deck' }, props: true },
     { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true, title: 'New Deck' } },
     { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, title: 'Edit Deck' }, props: true },

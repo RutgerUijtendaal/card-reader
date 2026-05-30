@@ -902,6 +902,103 @@ def test_authenticated_owner_can_crud_decks() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_owner_deck_list_filters_owned_decks_by_card_name_without_leaking_other_users_decks() -> None:
+    owner = _create_user("deck-owner-filter-user", "password")
+    other_owner = _create_user("deck-owner-filter-other-user", "password")
+    hero = _create_card(name="Owner Filter Hero", is_hero=True)
+    featured_card = _create_card(name="Owner Filter Blade", is_hero=False)
+    filler_cards = _build_mainboard_cards(total_unique=14)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    _login_and_get_csrf_token(client, owner.username, "password")
+
+    matching_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Owned Matching Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=featured_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in filler_cards],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Owned Nonmatching Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+    other_user_deck = DeckService().create_owner_deck(
+        owner_id=str(other_owner.id),
+        name="Other User Matching Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=featured_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+
+    response = client.get("/my/decks", {"card_q": "Owner Filter Blade"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [matching_deck.id]
+    assert other_user_deck.id not in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_owner_deck_list_filters_owned_decks_by_affinity_symbol() -> None:
+    owner = _create_user("deck-owner-affinity-filter-user", "password")
+    hero = _create_card(name="Owner Affinity Hero", is_hero=True)
+    fire_card = _create_card(name="Owner Fire Card", is_hero=False)
+    water_card = _create_card(name="Owner Water Card", is_hero=False)
+    _add_card_metadata(fire_card, symbol_specs=[("owner-aff-fire", "Owner Fire Affinity", "{OF}", "affinity")])
+    _add_card_metadata(water_card, symbol_specs=[("owner-aff-water", "Owner Water Affinity", "{OW}", "affinity")])
+    fire_symbol_id = Symbol.objects.get(key="owner-aff-fire").id
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    _login_and_get_csrf_token(client, owner.username, "password")
+
+    fire_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Owned Fire Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=fire_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Owned Water Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=water_card.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards(total_unique=14)],
+        ],
+        sideboards=[],
+    )
+
+    response = client.get(
+        "/my/decks",
+        {"affinity_symbol_ids": [fire_symbol_id], "affinity_symbol_match": "any"},
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == [fire_deck.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_payload_includes_sideboards_and_aggregate_totals() -> None:
     owner = _create_user("deck-sideboard-owner", "password")
     hero = _create_card(name="Sideboard Hero", is_hero=True)

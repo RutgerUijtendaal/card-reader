@@ -1,5 +1,6 @@
 import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/components/cards/cardModels';
 import type { CardLifecycleStatus } from '@/modules/card-filters/cardLifecycle';
+import type { DeckRecord } from '@/modules/decks/types';
 
 export type MetadataOption = {
   id: string;
@@ -61,12 +62,21 @@ export type CardGroupSummary = {
   position: number | null;
 };
 
+export type CardDeckReferenceSummary = DeckRecord & {
+  card_reference: {
+    is_hero: boolean;
+    mainboard_quantity: number;
+    sideboard_quantity: number;
+  };
+};
+
 export type CardDetail = {
   id: string;
   label: string;
   name: string;
   lifecycle_status?: CardLifecycleStatus;
   card_groups: CardGroupSummary[];
+  deck_references: CardDeckReferenceSummary[];
 };
 
 export type CardVersionDetail = CardHoverTooltipModel & {

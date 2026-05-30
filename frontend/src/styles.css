@@ -76,6 +76,10 @@
     --color-danger-hover: rgba(254, 226, 226, 0.98);
     --color-danger-border: rgba(251, 146, 146, 0.7);
     --color-danger-text: #b91c1c;
+    --color-filter-exclude-bg: rgba(255, 241, 242, 0.9);
+    --color-filter-exclude-hover: rgba(255, 228, 230, 0.94);
+    --color-filter-exclude-border: rgba(251, 113, 133, 0.42);
+    --color-filter-exclude-text: #9f1239;
     --color-warning-bg: rgba(255, 251, 235, 0.94);
     --color-warning-border: rgba(252, 211, 77, 0.72);
     --color-warning-text: #b45309;
@@ -157,6 +161,10 @@
     --color-danger-hover: rgba(127, 29, 29, 0.56);
     --color-danger-border: rgba(248, 113, 113, 0.34);
     --color-danger-text: #fecaca;
+    --color-filter-exclude-bg: rgba(94, 45, 63, 0.54);
+    --color-filter-exclude-hover: rgba(113, 55, 74, 0.62);
+    --color-filter-exclude-border: rgba(251, 113, 133, 0.28);
+    --color-filter-exclude-text: #ffe4e6;
     --color-warning-bg: rgba(120, 53, 15, 0.38);
     --color-warning-border: rgba(251, 191, 36, 0.3);
     --color-warning-text: #fde68a;
@@ -666,6 +674,12 @@
     color: var(--color-pill-danger-text);
   }
 
+  .theme-pill-filter-exclude {
+    border-color: var(--color-filter-exclude-border);
+    background: var(--color-filter-exclude-bg);
+    color: var(--color-filter-exclude-text);
+  }
+
   .theme-tablist {
     @apply inline-flex w-full flex-wrap gap-2 rounded-xl border p-1 lg:w-auto lg:flex-nowrap;
     border-color: var(--color-border);
@@ -750,6 +764,7 @@
     border-color: var(--color-border-strong);
     background: var(--color-surface-soft);
     color: var(--color-text);
+    transform: translateY(-1px);
   }
 
   .theme-choice-chip-active {
@@ -768,14 +783,34 @@
       0 1px 2px rgba(15, 23, 42, 0.18);
   }
 
-  .theme-choice-chip-exclude {
-    border-color: var(--color-danger-border);
-    background: var(--color-danger-bg);
-    color: var(--color-danger-text);
+  .theme-choice-chip-include:hover {
+    border-color: var(--color-selected-border);
+    background: var(--color-selected-bg-strong);
+    color: var(--color-selected-text);
     box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--color-danger-border) 68%, transparent 32%),
-      0 0 0 2px color-mix(in srgb, var(--color-danger-border) 24%, transparent 76%),
-      0 1px 2px rgba(15, 23, 42, 0.18);
+      inset 0 0 0 1px color-mix(in srgb, var(--color-selected-border) 78%, transparent 22%),
+      0 0 0 3px color-mix(in srgb, var(--color-selected-border) 36%, transparent 64%),
+      0 3px 8px rgba(15, 23, 42, 0.2);
+  }
+
+  .theme-choice-chip-exclude {
+    border-color: var(--color-filter-exclude-border);
+    background: var(--color-filter-exclude-bg);
+    color: var(--color-filter-exclude-text);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-filter-exclude-border) 58%, transparent 42%),
+      0 0 0 2px color-mix(in srgb, var(--color-filter-exclude-border) 16%, transparent 84%),
+      0 1px 2px rgba(15, 23, 42, 0.12);
+  }
+
+  .theme-choice-chip-exclude:hover {
+    border-color: var(--color-filter-exclude-border);
+    background: var(--color-filter-exclude-hover);
+    color: var(--color-filter-exclude-text);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-filter-exclude-border) 64%, transparent 36%),
+      0 0 0 3px color-mix(in srgb, var(--color-filter-exclude-border) 22%, transparent 78%),
+      0 3px 8px rgba(15, 23, 42, 0.16);
   }
 
   .theme-choice-chip-dashed {
@@ -975,8 +1010,9 @@
   }
 
   .app-scrollbar {
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) transparent;
+    scrollbar-color: color-mix(in srgb, var(--scrollbar-thumb) 55%, transparent) transparent;
   }
 
   .app-scrollbar::-webkit-scrollbar {
@@ -992,7 +1028,7 @@
     border-radius: 9999px;
     border: 2px solid transparent;
     background-clip: padding-box;
-    background-color: var(--scrollbar-thumb);
+    background-color: color-mix(in srgb, var(--scrollbar-thumb) 55%, transparent);
   }
 
   .app-scrollbar::-webkit-scrollbar-thumb:hover {

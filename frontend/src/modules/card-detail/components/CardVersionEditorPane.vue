@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card flex h-full min-h-0 flex-col">
+  <div class="flex h-full min-h-0 flex-col">
     <div class="flex items-start justify-between gap-3">
       <div>
         <h3 class="theme-section-title text-lg font-semibold">
@@ -14,14 +14,14 @@
         </p>
       </div>
       <span
-        class="theme-pill px-2.5 py-1 text-xs"
+        class="theme-pill whitespace-nowrap px-2.5 py-1 text-xs"
         :class="version.editable ? 'theme-pill-success' : 'theme-pill-neutral'"
       >
         {{ version.editable ? 'Latest Version' : 'Historical Version' }}
       </span>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto pr-1 pt-5">
+    <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1 pt-5">
       <div class="space-y-4">
         <div class="theme-muted-panel p-3">
           <div class="flex flex-wrap items-center justify-between gap-4">

@@ -20,11 +20,14 @@ from card_reader_api.cards.serializers import (
     CardFiltersQuerySerializer,
     LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
+    card_deck_reference_payload,
     card_group_summary_payload,
     card_payload,
     metadata_option,
     symbol_option,
 )
+from card_reader_api.common.auth_access import is_authenticated
+from card_reader_api.decks.serializers import deck_payload
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
     CARD_SORT_MANA_ASC,
@@ -36,6 +39,7 @@ from card_reader_core.repositories.cards import (
     list_card_generations,
     list_cards,
     list_matching_cards,
+    promote_card_version,
     update_latest_card_version,
 )
 from card_reader_core.repositories.metadata import list_types_for_card_sort
@@ -48,12 +52,14 @@ from card_reader_core.services.cards import (
     get_filter_metadata,
     resolve_card_image_path,
 )
+from card_reader_core.services.decks import DeckService
 
 if TYPE_CHECKING:
     from card_reader_core.models import Type
     from card_reader_core.repositories.cards import CardSort
 
 MANA_TYPE_KEY = "mana"
+CARD_DETAIL_DECK_REFERENCE_LIMIT = 3
 
 
 class GroupedGalleryItem(TypedDict):
@@ -158,7 +164,7 @@ class CardFiltersView(APIView):
 class CardDetailView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str) -> Response:
+    def get(self, request: Request, card_id: str) -> Response:
         card, version, image = get_card_with_image(card_id)
         if card is None or version is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -168,6 +174,14 @@ class CardDetailView(APIView):
             card_group_summary_payload(group, card_id=card.id)
             for group in CardGroupService().get_groups_for_card(card.id)
         ]
+        viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
+        deck_references = [
+            {
+                **deck_payload(deck),
+                "card_reference": card_deck_reference_payload(deck, card_id=card.id),
+            }
+            for deck in DeckService().list_card_decks_for_viewer(card.id, viewer_id=viewer_id)[:CARD_DETAIL_DECK_REFERENCE_LIMIT]
+        ]
         return Response(
             card_payload(
                 card,
@@ -176,6 +190,7 @@ class CardDetailView(APIView):
                 metadata=metadata,
                 edit_state=edit_state,
                 card_groups=card_groups,
+                deck_references=deck_references,
             )
         )
 
@@ -238,6 +253,30 @@ class LatestCardVersionUpdateView(APIView):
                 card,
                 version,
                 image_url=card_image_asset_url(image, fallback_url=f"/cards/{card_id}/versions/{version.id}/image"),
+                metadata=metadata,
+                edit_state=edit_state,
+            )
+        )
+
+
+class CardVersionPromoteView(APIView):
+    def post(self, _request: Request, card_id: str, version_id: str) -> Response:
+        try:
+            promoted = promote_card_version(card_id=card_id, version_id=version_id)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if promoted is None:
+            return Response({"detail": "Card version not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        card, version = promoted
+        image = get_card_image(version.id)
+        metadata = get_card_version_metadata(version.id)
+        edit_state = get_card_version_edit_state(version)
+        return Response(
+            card_payload(
+                card,
+                version,
+                image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/versions/{version.id}/image"),
                 metadata=metadata,
                 edit_state=edit_state,
             )

@@ -35,7 +35,7 @@ from .types import (
     PaginatedCardList,
     ParsedSnapshotPayload,
 )
-from .writes import apply_parsed_fields_to_version, save_parsed_card, update_latest_card_version
+from .writes import apply_parsed_fields_to_version, promote_card_version, save_parsed_card, update_latest_card_version
 
 __all__ = [
     "CardListRow",
@@ -69,6 +69,7 @@ __all__ = [
     "list_matching_cards",
     "list_filtered_latest_card_version_reparse_sources",
     "list_latest_card_version_reparse_sources",
+    "promote_card_version",
     "resolve_image_file_path",
     "save_parsed_card",
     "update_latest_card_version",

@@ -1,7 +1,7 @@
 <template>
   <GalleryFilterSidebar
     title="Deck Filters"
-    description="Filter public decks by hero, included cards, and affinity."
+    :description="description"
     :query="controller.heroQuery.value"
     :on-update-query="controller.updateHeroQuery"
     search-placeholder="Search hero cards..."
@@ -47,7 +47,12 @@ import type { DeckBrowseFiltersController } from '@/modules/decks/composables/us
 const props = defineProps<{
   controller: DeckBrowseFiltersController;
   totalCount: number;
+  description?: string;
 }>();
+
+const description = computed(
+  () => props.description ?? 'Filter public decks by hero, included cards, and affinity.',
+);
 
 const selectedAffinitySymbolIds = computed({
   get: () => props.controller.affinitySymbolIds.value,

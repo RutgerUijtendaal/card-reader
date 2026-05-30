@@ -62,8 +62,27 @@ class OwnerDeckListCreateView(APIView):
     permission_classes = [AuthEnabledOrAuthenticatedAllowed]
 
     def get(self, request: Request) -> Response:
+        serializer = DeckListQuerySerializer(
+            data={
+                "hero_q": request.query_params.get("hero_q"),
+                "card_q": request.query_params.get("card_q"),
+                "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
+                "affinity_symbol_exclude_ids": request.query_params.getlist("affinity_symbol_exclude_ids"),
+                "affinity_symbol_match": request.query_params.get("affinity_symbol_match"),
+            }
+        )
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        filters = serializer.validated_list_filters()
         owner_id = _user_id(request)
-        decks = DeckService().list_owner_decks(owner_id)
+        decks = DeckService().list_owner_decks(
+            owner_id,
+            hero_query=filters["hero_query"],
+            card_query=filters["card_query"],
+            affinity_symbol_ids=filters["affinity_symbol_ids"],
+            affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
+            affinity_symbol_match=filters["affinity_symbol_match"],
+        )
         return Response([deck_payload(deck) for deck in decks])
 
     def post(self, request: Request) -> Response:

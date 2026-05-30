@@ -9,6 +9,7 @@ from card_reader_core.repositories.decks import (
     get_deck_for_viewer,
     get_owner_deck,
     get_public_deck,
+    list_card_decks_for_viewer,
     list_owner_decks,
     list_public_decks,
     replace_mainboard_entries,
@@ -51,8 +52,33 @@ class DeckService:
             if self.get_deck_validation(deck).is_valid
         ]
 
-    def list_owner_decks(self, owner_id: str) -> list[Deck]:
-        return list_owner_decks(owner_id)
+    def list_owner_decks(
+        self,
+        owner_id: str,
+        *,
+        hero_query: str | None = None,
+        card_query: str | None = None,
+        affinity_symbol_ids: list[str] | None = None,
+        affinity_symbol_exclude_ids: list[str] | None = None,
+        affinity_symbol_match: str | None = None,
+    ) -> list[Deck]:
+        return list_owner_decks(
+            owner_id,
+            hero_query=hero_query,
+            card_query=card_query,
+            affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+            affinity_symbol_match=affinity_symbol_match,
+        )
+
+    def list_card_decks_for_viewer(self, card_id: str, *, viewer_id: str | None = None) -> list[Deck]:
+        decks = list_card_decks_for_viewer(card_id, viewer_id=viewer_id)
+        return [
+            deck
+            for deck in decks
+            if (viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id)
+            or (deck.visibility == "public" and self.get_deck_validation(deck).is_valid)
+        ]
 
     def get_public_deck(self, deck_id: str) -> Deck | None:
         deck = get_public_deck(deck_id)

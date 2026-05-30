@@ -21,7 +21,7 @@ from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SOR
 from card_reader_core.rules import render_enriched_rule_text
 
 if TYPE_CHECKING:
-    from card_reader_core.models import CardGroup
+    from card_reader_core.models import CardGroup, Deck
     from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
@@ -79,6 +79,7 @@ def card_payload(
     metadata: CardMetadata | None = None,
     edit_state: CardEditState | None = None,
     card_groups: list[dict[str, object]] | None = None,
+    deck_references: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     rendered_rule_text = _render_card_rule_text(version, metadata)
     payload: dict[str, object] = {
@@ -119,6 +120,7 @@ def card_payload(
         "symbols": [],
         "types": [],
         "card_groups": card_groups or [],
+        "deck_references": deck_references or [],
     }
     if metadata is not None:
         payload.update(metadata_payload(metadata))
@@ -187,6 +189,21 @@ def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) 
         "card_ids": card_ids,
         "is_anchor": anchor_card_id == card_id,
         "position": position,
+    }
+
+
+def card_deck_reference_payload(deck: Deck, *, card_id: str) -> dict[str, object]:
+    mainboard_quantity = sum(int(entry.quantity) for entry in deck.entries.all() if entry.card.id == card_id)
+    sideboard_quantity = sum(
+        int(entry.quantity)
+        for sideboard in deck.sideboards.all()
+        for entry in sideboard.entries.all()
+        if entry.card.id == card_id
+    )
+    return {
+        "is_hero": deck.hero_card.id == card_id,
+        "mainboard_quantity": mainboard_quantity,
+        "sideboard_quantity": sideboard_quantity,
     }
 
 

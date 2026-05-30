@@ -1356,6 +1356,78 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     assert group_payload["members"][0]["is_anchor"] is True
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_detail_includes_viewer_visible_deck_references() -> None:
+    owner = _create_user("card-deck-reference-owner", "password", is_staff=False)
+    other_owner = _create_user("card-deck-reference-other", "password", is_staff=False)
+    hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Hero")
+    card, version = _create_editable_card_version(name="Deck Reference Included")
+    _create_card_image(version)
+    hero_card.is_hero = True
+    hero_card.save(update_fields=["is_hero"])
+    owner_deck = Deck.objects.create(
+        owner=owner,
+        name="Owner Private Deck",
+        visibility="private",
+        hero_card=hero_card,
+    )
+    DeckEntry.objects.create(deck=owner_deck, card=card, quantity=2)
+    other_deck = Deck.objects.create(
+        owner=other_owner,
+        name="Other Private Deck",
+        visibility="private",
+        hero_card=hero_card,
+    )
+    DeckEntry.objects.create(deck=other_deck, card=card, quantity=3)
+
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    owner_response = client.get(f"/cards/{card.id}")
+    anonymous_response = Client(HTTP_HOST="localhost").get(f"/cards/{card.id}")
+
+    assert owner_response.status_code == 200
+    references = owner_response.json()["deck_references"]
+    assert [reference["id"] for reference in references] == [owner_deck.id]
+    assert references[0]["name"] == "Owner Private Deck"
+    assert references[0]["visibility"] == "private"
+    assert references[0]["owner"]["id"] == str(owner.id)
+    assert references[0]["hero_card"]["id"] == hero_card.id
+    assert references[0]["card_reference"]["is_hero"] is False
+    assert references[0]["card_reference"]["mainboard_quantity"] == 2
+    assert references[0]["card_reference"]["sideboard_quantity"] == 0
+    assert anonymous_response.status_code == 200
+    assert anonymous_response.json()["deck_references"] == []
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_detail_limits_deck_references_to_three_latest() -> None:
+    owner = _create_user("card-deck-reference-limit-owner", "password", is_staff=False)
+    hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Limit Hero")
+    card, version = _create_editable_card_version(name="Deck Reference Limit Included")
+    _create_card_image(version)
+    hero_card.is_hero = True
+    hero_card.save(update_fields=["is_hero"])
+    decks = []
+    for index in range(4):
+        deck = Deck.objects.create(
+            owner=owner,
+            name=f"Deck Reference Limit {index}",
+            visibility="private",
+            hero_card=hero_card,
+        )
+        DeckEntry.objects.create(deck=deck, card=card, quantity=1)
+        Deck.objects.filter(id=deck.id).update(updated_at=timezone.now() + timedelta(minutes=index))
+        decks.append(deck)
+
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    response = client.get(f"/cards/{card.id}")
+
+    assert response.status_code == 200
+    references = response.json()["deck_references"]
+    assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
+
+
 def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Detail Lifecycle Anchor")
     deprecated_card, deprecated_version = _create_editable_card_version(name="Detail Lifecycle Deprecated")
@@ -1918,6 +1990,59 @@ def test_latest_version_patch_can_restore_and_unlock() -> None:
     assert latest.type_line == "Manual Type"
     assert latest.rules_text == "Parsed rules"
     assert [row.id for row in get_tags_for_card_version(latest.id)] == [tag.id]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_version_promote_sets_historical_version_as_latest() -> None:
+    username = "staff-card-promote-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    card, historical = _create_editable_card_version(name="Historical Card")
+    latest = CardVersion.objects.create(
+        card_id=card.id,
+        version_number=2,
+        template=historical.template,
+        image_hash="hash-latest-card",
+        name="Current Card",
+        type_line="Current Type",
+        mana_cost="4",
+        mana_symbols_json="[]",
+        mana_value=4,
+        rules_text_raw="Current rules",
+        rules_text_enriched="Current rules",
+        rules_text="Current rules",
+        confidence=0.8,
+        field_sources_json=historical.field_sources_json,
+        parsed_snapshot_json=historical.parsed_snapshot_json,
+        is_latest=True,
+    )
+    historical.is_latest = False
+    historical.save(update_fields=["is_latest"])
+    card.latest_version = latest
+    card.label = latest.name
+    card.save(update_fields=["latest_version", "label"])
+
+    response = client.post(
+        f"/cards/{card.id}/versions/{historical.id}/promote",
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["version_id"] == historical.id
+    assert payload["is_latest"] is True
+    assert payload["editable"] is True
+    historical.refresh_from_db()
+    latest.refresh_from_db()
+    card.refresh_from_db()
+    assert historical.is_latest is True
+    assert latest.is_latest is False
+    assert card.latest_version_id == historical.id
+    assert card.label == "Historical Card"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

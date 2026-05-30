@@ -10,7 +10,7 @@
       :options="state.manaTypeOptions"
       @reset="state.resetManaGroup"
     >
-      <div class="theme-muted-panel p-3">
+      <div class="theme-divider border-t pt-3">
         <div class="flex items-center gap-3">
           <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
             Cost
@@ -76,7 +76,7 @@
       :options="state.otherSymbolOptions"
       @reset="state.resetGenericGroup"
     >
-      <div class="theme-muted-panel space-y-2 p-3">
+      <div class="theme-divider space-y-2 border-t pt-3">
         <div class="flex items-center gap-3">
           <h4 class="theme-section-title w-16 shrink-0 text-sm font-semibold">
             Attack
