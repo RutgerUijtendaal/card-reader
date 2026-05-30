@@ -5,12 +5,14 @@ from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client
+from django.test import Client, override_settings
+from PIL import Image
 
 from card_reader_api.catalog.views import _store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
 from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
+from card_reader_core.services.cards import convert_card_images_to_webp
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
@@ -37,6 +39,34 @@ def _template_definition(region_id: str) -> dict[str, object]:
     }
 
 
+def _write_png(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), color=(20, 120, 200)).save(path, format="PNG")
+
+
+def _create_image_record(*, stored_path: str, checksum: str = "image-checksum") -> CardVersionImage:
+    template = Template.objects.create(
+        key=f"image-template-{checksum}",
+        label="Image Template",
+        definition_json=_template_definition("top_bar"),
+    )
+    card = Card.objects.create(key=f"image-card-{checksum}", label="Image Card")
+    version = CardVersion.objects.create(
+        card=card,
+        version_number=1,
+        template=template,
+        image_hash=checksum,
+        name="Image Card",
+        is_latest=True,
+    )
+    return CardVersionImage.objects.create(
+        card_version=version,
+        source_file=stored_path,
+        stored_path=stored_path,
+        checksum=checksum,
+    )
+
+
 def test_upload_symbol_asset_stores_under_uploads(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
     upload = SimpleUploadedFile("Fire Mana.PNG", BytesIO(b"symbol-asset").read())
@@ -50,6 +80,83 @@ def test_upload_symbol_asset_stores_under_uploads(tmp_path: Path, monkeypatch) -
 
     assert stored_path.parent == tmp_path / "symbols" / "uploads"
     assert stored_path.read_bytes() == b"symbol-asset"
+
+
+def test_convert_card_images_to_webp_updates_paths_and_keeps_original(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    CardVersionImage.objects.all().delete()
+
+    source_path = resolve_storage_path("images/image-checksum.png")
+    _write_png(source_path)
+    image = _create_image_record(stored_path="images/image-checksum.png")
+
+    result = convert_card_images_to_webp()
+
+    image.refresh_from_db()
+    assert result.converted == 1
+    assert result.already_webp == 0
+    assert result.missing == 0
+    assert result.failed == 0
+    assert image.stored_path == "images/image-checksum.webp"
+    assert source_path.exists()
+    with Image.open(resolve_storage_path(image.stored_path)) as converted:
+        assert converted.format == "WEBP"
+
+
+def test_convert_card_images_to_webp_reports_missing_without_updates(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    CardVersionImage.objects.all().delete()
+    image = _create_image_record(stored_path="images/missing-image.png", checksum="missing-image")
+
+    result = convert_card_images_to_webp()
+
+    image.refresh_from_db()
+    assert result.converted == 0
+    assert result.missing == 1
+    assert result.failed == 0
+    assert image.stored_path == "images/missing-image.png"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_convert_card_images_to_webp_endpoint_returns_summary(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    CardVersionImage.objects.all().delete()
+
+    source_path = resolve_storage_path("images/endpoint-image.png")
+    _write_png(source_path)
+    _create_image_record(stored_path="images/endpoint-image.png", checksum="endpoint-image")
+
+    user = get_user_model().objects.create_user(
+        username="webp-conversion-superuser",
+        password="password",
+        is_staff=True,
+        is_superuser=True,
+    )
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+
+    response = client.post(
+        "/admin/maintenance/convert-card-images-to-webp",
+        data={},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["converted"] == 1
+    assert payload["already_webp"] == 0
+    assert payload["missing"] == 0
+    assert payload["failed"] == 0
+    assert payload["bytes_before"] > payload["bytes_after"]
 def test_queue_reparse_latest_versions_groups_jobs_by_template(
     tmp_path,
     monkeypatch,

@@ -18,6 +18,34 @@ class BackfillMetadataSuggestionsView(APIView):
         return Response({"message": result.message, "removed_paths": result.removed_paths})
 
 
+class ConvertCardImagesToWebpView(APIView):
+    permission_classes = [AuthEnabledOrSuperuserAllowed]
+
+    def post(self, _request: Request) -> Response:
+        result = MaintenanceService().convert_card_images_to_webp()
+        conversion = result.conversion
+        return Response(
+            {
+                "message": result.message,
+                "removed_paths": result.removed_paths,
+                "converted": conversion.converted,
+                "already_webp": conversion.already_webp,
+                "missing": conversion.missing,
+                "failed": conversion.failed,
+                "bytes_before": conversion.bytes_before,
+                "bytes_after": conversion.bytes_after,
+                "failures": [
+                    {
+                        "image_id": failure.image_id,
+                        "path": failure.path,
+                        "detail": failure.detail,
+                    }
+                    for failure in conversion.failures
+                ],
+            }
+        )
+
+
 class QueueLatestReparseView(APIView):
     permission_classes = [AuthEnabledOrSuperuserAllowed]
 

@@ -35,6 +35,14 @@
             >
               {{ runningQueueReparse ? 'Queueing...' : 'Queue Latest Reparses' }}
             </button>
+            <button
+              class="btn-secondary justify-center"
+              type="button"
+              :disabled="runningConvertCardImages"
+              @click="convertCardImagesToWebp"
+            >
+              {{ runningConvertCardImages ? 'Converting...' : 'Convert Card Images To WebP' }}
+            </button>
           </div>
         </section>
 
@@ -124,6 +132,9 @@
           <li>
             Backfill metadata suggestions rebuilds suggested tags and types from current latest card versions.
           </li>
+          <li>
+            WebP conversion updates canonical card image paths while keeping original files available.
+          </li>
         </ul>
       </aside>
     </div>
@@ -145,6 +156,7 @@ import { useCardFilterController } from '@/modules/card-filters/useCardFilterCon
 
 const runningBackfillSuggestions = ref(false);
 const runningQueueReparse = ref(false);
+const runningConvertCardImages = ref(false);
 const runningPreviewCount = ref(false);
 const runningQueueFilteredReparse = ref(false);
 const filteredMatchCount = ref<number | null>(null);
@@ -257,6 +269,22 @@ const backfillMetadataSuggestions = async (): Promise<void> => {
     toast.error(extractErrorMessage(error, 'Failed to backfill metadata suggestions.'));
   } finally {
     runningBackfillSuggestions.value = false;
+  }
+};
+
+const convertCardImagesToWebp = async (): Promise<void> => {
+  if (runningConvertCardImages.value) return;
+  runningConvertCardImages.value = true;
+  try {
+    const response = await api.post<MaintenanceActionResponse>(
+      '/admin/maintenance/convert-card-images-to-webp',
+    );
+    toast.success(response.data.message);
+  } catch (error) {
+    console.error('Convert card images to WebP failed', error);
+    toast.error(extractErrorMessage(error, 'Failed to convert card images to WebP.'));
+  } finally {
+    runningConvertCardImages.value = false;
   }
 };
 

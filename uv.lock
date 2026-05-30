@@ -149,6 +149,7 @@ version = "0.1.10"
 source = { editable = "services/core" }
 dependencies = [
     { name = "django" },
+    { name = "pillow" },
     { name = "pydantic-settings" },
 ]
 
@@ -162,6 +163,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "django", specifier = ">=5.1.0" },
+    { name = "pillow", specifier = ">=10.4.0" },
     { name = "pydantic-settings", specifier = ">=2.5.2" },
 ]
 

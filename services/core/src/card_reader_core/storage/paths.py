@@ -4,9 +4,12 @@ import hashlib
 import shutil
 from pathlib import Path, PurePosixPath
 
+from PIL import Image
+
 from card_reader_core.config.settings import settings
 
 _KNOWN_STORAGE_ROOTS = ("images", "uploads", "symbols", "debug-crops", "maintenance", "logs")
+WEBP_IMAGE_QUALITY = 90
 
 
 def calculate_checksum(file_path: Path) -> str:
@@ -23,7 +26,7 @@ def build_storage_relative_path(*parts: str | Path) -> str:
 
 
 def build_image_storage_path(source_file: Path, checksum: str) -> str:
-    return build_storage_relative_path("images", f"{checksum}{source_file.suffix.lower()}")
+    return build_storage_relative_path("images", f"{checksum}.webp")
 
 
 def resolve_storage_path(storage_path: str | Path) -> Path:
@@ -70,8 +73,25 @@ def store_image(source_file: Path, checksum: str) -> str:
     relative_path = build_image_storage_path(source_file, checksum)
     target_path = resolve_storage_path(relative_path)
     if not target_path.exists():
-        shutil.copy2(source_file, target_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if source_file.suffix.lower() == ".webp":
+            shutil.copy2(source_file, target_path)
+        else:
+            convert_image_to_webp(source_file, target_path)
     return relative_path
+
+
+def convert_image_to_webp(source_file: Path, target_path: Path) -> None:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = target_path.with_name(f".{target_path.name}.tmp")
+    try:
+        with Image.open(source_file) as image:
+            output = image if image.mode in {"RGB", "L"} else image.convert("RGB")
+            output.save(temp_path, format="WEBP", quality=WEBP_IMAGE_QUALITY, method=6)
+        temp_path.replace(target_path)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
 
 
 def _looks_absolute_path(value: str) -> bool:
