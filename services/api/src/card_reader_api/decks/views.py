@@ -81,7 +81,6 @@ class OwnerDeckListCreateView(APIView):
         decks = DeckService().list_owner_decks(
             owner_id,
             hero_query=filters["hero_query"],
-            author_query=filters["author_query"],
             card_query=filters["card_query"],
             affinity_symbol_ids=filters["affinity_symbol_ids"],
             affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],

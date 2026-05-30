@@ -9,7 +9,10 @@
     :on-reset="controller.resetFilters"
     :sticky-to-viewport="false"
   >
-    <div class="theme-muted-panel space-y-2 p-3">
+    <div
+      v-if="showAuthor"
+      class="theme-muted-panel space-y-2 p-3"
+    >
       <div class="space-y-1">
         <h4 class="theme-section-title text-sm font-semibold">
           Author
@@ -65,6 +68,7 @@ const props = defineProps<{
   controller: DeckBrowseFiltersController;
   totalCount: number;
   description?: string;
+  showAuthor?: boolean;
 }>();
 
 const description = computed(
