@@ -308,6 +308,81 @@ describe('useTemplatePreview', () => {
     expect(preview.previewScope.value).toBe('all-cards');
   });
 
+  test('resets to current template scope when switching to a template without a saved preview card', async () => {
+    localStorage.setItem(
+      TEMPLATE_PREVIEW_STORAGE_KEY,
+      JSON.stringify({
+        'mtg-like-v1': {
+          id: 'card-1',
+          label: 'Card One',
+          name: 'Card One',
+          template_id: 'mtg-like-v1',
+          image_url: '/cards/card-1/image',
+          scope: 'all-cards',
+        },
+      }),
+    );
+    mockedGet.mockImplementation(async (url, config) => {
+      if (url === '/cards/card-1') {
+        return {
+          data: {
+            id: 'card-1',
+            label: 'Card One',
+            name: 'Card One',
+            template_id: 'mtg-like-v1',
+            image_url: '/cards/card-1/image',
+          },
+        };
+      }
+      if (url === '/cards') {
+        const params = config && typeof config === 'object' && 'params' in config ? config.params : {};
+        const results =
+          params && typeof params === 'object' && 'template_id' in params && params.template_id === 'mtg-like-v2'
+            ? []
+            : [
+                {
+                  id: 'unrelated-card',
+                  label: 'Unrelated Card',
+                  name: 'Unrelated Card',
+                  template_id: 'other-template',
+                  image_url: '/cards/unrelated-card/image',
+                  result_type: 'card',
+                },
+              ];
+        return {
+          data: {
+            count: results.length,
+            next_page: null,
+            previous_page: null,
+            page: 1,
+            page_size: 8,
+            results,
+          },
+        };
+      }
+      throw new Error(`Unhandled request: ${String(url)}`);
+    });
+
+    const templateKey = ref('mtg-like-v1');
+    const preview = useTemplatePreview({
+      definitionJson: ref(relativeDefinitionJson),
+      templateKey: computed(() => templateKey.value),
+    });
+
+    await preview.restorePreviewCard();
+    await nextTick();
+    expect(preview.previewScope.value).toBe('all-cards');
+
+    templateKey.value = 'mtg-like-v2';
+    await nextTick();
+    await vi.runOnlyPendingTimersAsync();
+    await nextTick();
+
+    expect(preview.previewScope.value).toBe('current-template');
+    expect(preview.selectedPreviewCard.value).toBeNull();
+    expect(localStorage.getItem(TEMPLATE_PREVIEW_STORAGE_KEY)).not.toContain('unrelated-card');
+  });
+
   test('search defaults to the current template scope when a template key is available', async () => {
     const definitionJson = ref(relativeDefinitionJson);
     useTemplatePreview({

@@ -97,6 +97,9 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
   const templateScopedKey = computed(() => templateKey.value.trim());
   const selectionStorageKey = computed(() => templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY);
   const templateScopeAvailable = computed(() => templateScopedKey.value.length > 0);
+  const defaultPreviewScope = computed<TemplatePreviewScope>(() =>
+    templateScopeAvailable.value ? 'current-template' : 'all-cards',
+  );
   const effectivePreviewScope = computed<TemplatePreviewScope>(() =>
     previewScope.value === 'current-template' && templateScopeAvailable.value ? 'current-template' : 'all-cards',
   );
@@ -175,6 +178,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     const stored = storedSelections.value[storageKey] ?? null;
     isRestoringSelection.value = true;
     if (!stored) {
+      previewScope.value = defaultPreviewScope.value;
       selectedPreviewCard.value = null;
       isRestoringSelection.value = false;
       await searchPreviewCards();
