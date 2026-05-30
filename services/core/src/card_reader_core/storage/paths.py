@@ -4,7 +4,7 @@ import hashlib
 import shutil
 from pathlib import Path, PurePosixPath
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from card_reader_core.config.settings import settings
 
@@ -77,8 +77,19 @@ def store_image(source_file: Path, checksum: str) -> str:
         if source_file.suffix.lower() == ".webp":
             shutil.copy2(source_file, target_path)
         else:
-            convert_image_to_webp(source_file, target_path)
+            try:
+                convert_image_to_webp(source_file, target_path)
+            except UnidentifiedImageError:
+                relative_path = _build_original_format_image_storage_path(source_file, checksum)
+                target_path = resolve_storage_path(relative_path)
+                if not target_path.exists():
+                    shutil.copy2(source_file, target_path)
     return relative_path
+
+
+def _build_original_format_image_storage_path(source_file: Path, checksum: str) -> str:
+    suffix = source_file.suffix.lower() or ".img"
+    return build_storage_relative_path("images", f"{checksum}{suffix}")
 
 
 def convert_image_to_webp(source_file: Path, target_path: Path) -> None:
