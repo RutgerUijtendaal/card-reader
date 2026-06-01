@@ -8,6 +8,7 @@ export const AFFINITY_TO_MANA_SYMBOL_KEYS: Readonly<Record<string, readonly stri
   'martial-affinity': ['martial-mana'],
   'occult-affinity': ['occult-mana'],
   'primla-affinity': ['primal-mana'],
+  'primal-affinity': ['primal-mana'],
 };
 
 export type HeroAffinityManaPreset = {
