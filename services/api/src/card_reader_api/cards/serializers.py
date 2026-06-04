@@ -97,6 +97,7 @@ def card_payload(
         "version_number": version.version_number,
         "previous_version_id": version.previous_version.id if version.previous_version is not None else None,
         "is_latest": version.is_latest,
+        "content_version": _content_version_payload(version),
         "type_line": version.type_line,
         "mana_cost": version.mana_cost,
         "mana_symbols": _decode_mana_symbols(version.mana_symbols_json),
@@ -129,6 +130,18 @@ def card_payload(
     if edit_state is not None:
         payload.update(edit_state_payload(edit_state))
     return payload
+
+
+def _content_version_payload(version: CardVersion) -> dict[str, object] | None:
+    content_version = version.content_version
+    if content_version is None:
+        return None
+    return {
+        "id": content_version.id,
+        "version_number": content_version.version_number,
+        "base_version": content_version.base_version,
+        "description": content_version.description,
+    }
 
 
 def metadata_payload(metadata: CardMetadata) -> dict[str, object]:

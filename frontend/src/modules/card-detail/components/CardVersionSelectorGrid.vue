@@ -64,6 +64,12 @@
             >
               {{ formatDate(version.created_at) }}
             </p>
+            <p
+              class="mt-0.5 truncate text-xs"
+              :class="version.version_id === selectedVersionId ? 'theme-section-title' : 'theme-section-muted'"
+            >
+              Version {{ formatCardContentVersion(version) }}
+            </p>
           </div>
         </button>
 
@@ -87,7 +93,7 @@
 
 <script setup lang="ts">
 import { ArrowUpCircle } from 'lucide-vue-next';
-import type { CardVersionDetail } from '@/modules/card-detail/types';
+import { formatCardContentVersion, type CardVersionDetail } from '@/modules/card-detail/types';
 
 withDefaults(
   defineProps<{

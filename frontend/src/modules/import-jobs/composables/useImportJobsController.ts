@@ -2,11 +2,15 @@ import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
 import { fetchTemplates } from '@/modules/admin/api/templates';
 import type { TemplateRecord } from '@/modules/admin/types';
-import { cancelImportJob, createImportJob, fetchImportJobs } from '@/modules/import-jobs/api';
-import type { ImportJob } from '@/modules/import-jobs/types';
+import { cancelImportJob, createImportJob, fetchCurrentContentVersion, fetchImportJobs } from '@/modules/import-jobs/api';
+import type { ContentVersion, ImportJob } from '@/modules/import-jobs/types';
 import {
   canCancelImportJob,
   extractImportJobErrorMessage,
+  getContentVersionBaseError,
+  getContentVersionBasePrefill,
+  getContentVersionDescriptionPrefill,
+  getImportSubmitLabel,
   formatImportJobTimestamp,
   getImportJobProgressClass,
   getImportJobProgressPercent,
@@ -17,6 +21,9 @@ import {
 export const useImportJobsController = () => {
   const pickerTemplateId = ref('mtg-like-v1');
   const pickerMode = ref<'single' | 'directory'>('single');
+  const contentVersionBase = ref('');
+  const contentVersionDescription = ref('');
+  const currentContentVersion = ref<ContentVersion | null>(null);
   const pickedFiles = ref<File[]>([]);
   const errorMessage = ref('');
   const jobs = ref<ImportJob[]>([]);
@@ -34,6 +41,14 @@ export const useImportJobsController = () => {
   const failedCount = computed(() => jobs.value.filter((job) => job.status === 'failed').length);
   const cancelledCount = computed(() => jobs.value.filter((job) => job.status === 'cancelled').length);
   const hasActiveJobs = computed(() => hasActiveImportJobs(jobs.value));
+  const contentVersionBaseError = computed(() => getContentVersionBaseError(contentVersionBase.value));
+  const hasValidVersionInput = computed(
+    () => contentVersionBaseError.value.length === 0 && contentVersionDescription.value.trim().length > 0,
+  );
+  const submitButtonLabel = computed(() => {
+    if (creatingJob.value) return 'Queueing Import...';
+    return getImportSubmitLabel(contentVersionBase.value, currentContentVersion.value);
+  });
 
   const loadJobs = async (): Promise<void> => {
     isRefreshing.value = true;
@@ -57,16 +72,35 @@ export const useImportJobsController = () => {
     }
   };
 
+  const loadCurrentContentVersion = async (): Promise<void> => {
+    currentContentVersion.value = await fetchCurrentContentVersion();
+    contentVersionBase.value = getContentVersionBasePrefill(currentContentVersion.value);
+    contentVersionDescription.value = getContentVersionDescriptionPrefill(currentContentVersion.value);
+  };
+
   const createJobFromPicker = async (): Promise<void> => {
     errorMessage.value = '';
     if (pickedFiles.value.length === 0) {
       errorMessage.value = 'Please select at least one file.';
       return;
     }
+    if (contentVersionBaseError.value.length > 0) {
+      errorMessage.value = contentVersionBaseError.value;
+      return;
+    }
+    if (contentVersionDescription.value.trim().length === 0) {
+      errorMessage.value = 'Please enter a version description.';
+      return;
+    }
 
     creatingJob.value = true;
     try {
-      await createImportJob(pickerTemplateId.value, pickedFiles.value);
+      await createImportJob({
+        templateId: pickerTemplateId.value,
+        contentVersionBase: contentVersionBase.value.trim(),
+        contentVersionDescription: contentVersionDescription.value.trim(),
+        files: pickedFiles.value,
+      });
       pickedFiles.value = [];
     } catch (error) {
       console.error('Create import from upload failed', error);
@@ -77,7 +111,7 @@ export const useImportJobsController = () => {
     }
 
     try {
-      await loadJobs();
+      await Promise.all([loadCurrentContentVersion(), loadJobs()]);
     } catch (error) {
       console.error('Refresh imports after upload create failed', error);
       errorMessage.value = 'Import was created, but refreshing the jobs list failed.';
@@ -143,13 +177,15 @@ export const useImportJobsController = () => {
   );
 
   onMounted(async () => {
-    await loadTemplates();
-    await loadJobs();
+    await Promise.all([loadTemplates(), loadCurrentContentVersion(), loadJobs()]);
   });
 
   return {
     pickerTemplateId,
     pickerMode,
+    contentVersionBase,
+    contentVersionDescription,
+    currentContentVersion,
     pickedFiles,
     errorMessage,
     jobs,
@@ -164,6 +200,9 @@ export const useImportJobsController = () => {
     completedCount,
     failedCount,
     cancelledCount,
+    contentVersionBaseError,
+    hasValidVersionInput,
+    submitButtonLabel,
     loadJobs,
     createJobFromPicker,
     cancelJob,

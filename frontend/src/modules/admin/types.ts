@@ -80,6 +80,16 @@ export type MaintenanceActionResponse = {
   }[];
 };
 
+export type ContentVersionRecord = {
+  id: string;
+  version_number: string;
+  base_version: string;
+  description: string;
+  card_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CardMergeCardSummary = {
   id: string;
   key: string;

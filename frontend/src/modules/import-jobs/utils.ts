@@ -1,4 +1,6 @@
-import type { ImportJob, ImportJobStatus } from '@/modules/import-jobs/types';
+import type { ContentVersion, ImportJob, ImportJobStatus } from '@/modules/import-jobs/types';
+
+const CONTENT_VERSION_BASE_PATTERN = /^\d+\.\d+$/;
 
 export const canCancelImportJob = (job: ImportJob): boolean =>
   job.status === 'queued' || job.status === 'running';
@@ -32,6 +34,30 @@ export const formatImportJobTimestamp = (value: string): string => {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
 };
+
+export const getImportSubmitLabel = (contentVersionBase: string, currentVersion: ContentVersion | null): string => {
+  if (currentVersion && contentVersionBase.trim() === currentVersion.base_version) {
+    return 'Update Version';
+  }
+  return 'Create Version';
+};
+
+export const getContentVersionBaseError = (value: string): string => {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return 'Enter a version.';
+  }
+  if (!CONTENT_VERSION_BASE_PATTERN.test(trimmed)) {
+    return 'Use major.minor format, for example 14.1.';
+  }
+  return '';
+};
+
+export const getContentVersionBasePrefill = (currentVersion: ContentVersion | null): string =>
+  currentVersion?.base_version ?? '';
+
+export const getContentVersionDescriptionPrefill = (currentVersion: ContentVersion | null): string =>
+  currentVersion?.description ?? '';
 
 export const extractImportJobErrorMessage = (error: unknown): string => {
   if (typeof error === 'object' && error && 'response' in error) {

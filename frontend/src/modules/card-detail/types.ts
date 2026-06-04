@@ -196,3 +196,6 @@ export const metadataGroups: MetadataGroupConfig[] = [
 ];
 
 export type SymbolLookupMap = Record<string, CardTooltipSymbolLookup>;
+
+export const formatCardContentVersion = (version: Pick<CardVersionDetail, 'content_version'>): string =>
+  version.content_version?.version_number ?? 'Unversioned';

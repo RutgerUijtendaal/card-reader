@@ -433,6 +433,8 @@ def update_existing_version(
         version.template = template
     if reset_manual_state:
         version.field_sources_json = DEFAULT_FIELD_SOURCES
+    if item.job.content_version is not None:
+        version.content_version = item.job.content_version
     apply_parsed_output_to_version(
         version,
         normalized_fields=normalized_fields,
@@ -546,6 +548,7 @@ def create_new_version(
         parsed_snapshot_json=build_parsed_snapshot(normalized_fields, [], [], [], []),
         is_latest=True,
         previous_version_id=previous_version_id,
+        content_version=item.job.content_version,
     )
 
 

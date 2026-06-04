@@ -21,7 +21,7 @@
           {{ version.name || 'Unnamed Card' }}
         </h3>
         <p class="theme-kicker mt-1 text-xs font-semibold uppercase tracking-[0.16em]">
-          Printing {{ version.version_number }}<span v-if="version.is_latest"> · Latest</span>
+          Printing {{ version.version_number }}<span v-if="version.is_latest"> · Latest</span> · Version {{ formatCardContentVersion(version) }}
         </p>
       </div>
 
@@ -182,7 +182,7 @@
 <script setup lang="ts">
 import { BookOpenText, Hash, HeartPulse, KeyRound, ScrollText, Sparkles, Swords, Tags } from 'lucide-vue-next';
 import SymbolizedText from '@/components/SymbolizedText.vue';
-import type { CardVersionDetail, SymbolLookupMap } from '@/modules/card-detail/types';
+import { formatCardContentVersion, type CardVersionDetail, type SymbolLookupMap } from '@/modules/card-detail/types';
 
 defineProps<{
   version: CardVersionDetail;

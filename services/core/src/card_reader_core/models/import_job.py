@@ -10,6 +10,7 @@ from .base import TimestampedModel, uuid_str
 if TYPE_CHECKING:
     from .card import Card
     from .card_version import CardVersion
+    from .content_version import ContentVersion
 
 
 class ImportJobStatus(StrEnum):
@@ -25,6 +26,15 @@ class ImportJob(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     source_path: models.TextField[str, str] = models.TextField()
     template_id: models.TextField[str, str] = models.TextField()
+    content_version: models.ForeignKey[ContentVersion | None, ContentVersion | None] = models.ForeignKey(
+        "ContentVersion",
+        on_delete=models.SET_NULL,
+        related_name="import_jobs",
+        db_column="content_version_id",
+        default=None,
+        null=True,
+        blank=True,
+    )
     options_json = models.JSONField(default=dict)
     status: models.TextField[str, str] = models.TextField(default=ImportJobStatus.queued)
     total_items: models.IntegerField[int, int] = models.IntegerField(default=0)
