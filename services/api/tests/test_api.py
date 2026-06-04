@@ -1992,9 +1992,11 @@ def test_import_uses_card_alias_for_renamed_card() -> None:
         reparse_existing=False,
     )
 
-    assert version.card_id == target_card.id
+    latest_version = get_latest_card_version(target_card.id)
+    assert latest_version is not None
+    assert version.card == target_card
     assert version.version_number == target_version.version_number + 1
-    assert get_latest_card_version(target_card.id).id == version.id
+    assert latest_version.id == version.id
 
 
 def test_import_assigns_content_version_to_created_card_version() -> None:
@@ -2037,7 +2039,7 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
         reparse_existing=False,
     )
 
-    assert version.content_version_id == content_version.id
+    assert version.content_version == content_version
 
 
 def test_targeted_reparse_preserves_existing_card_version_content_version() -> None:
@@ -2091,7 +2093,7 @@ def test_targeted_reparse_preserves_existing_card_version_content_version() -> N
     )
 
     assert version.id == target_version.id
-    assert version.content_version_id == original_content_version.id
+    assert version.content_version == original_content_version
 
 
 def test_ordinary_import_matching_latest_checksum_creates_new_content_version_snapshot() -> None:
@@ -2149,11 +2151,11 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
     target_version.refresh_from_db()
     card.refresh_from_db()
     assert version.id != target_version.id
-    assert version.card_id == card.id
+    assert version.card == card
     assert version.version_number == target_version.version_number + 1
-    assert version.content_version_id == next_content_version.id
-    assert target_version.content_version_id == original_content_version.id
-    assert card.latest_version_id == version.id
+    assert version.content_version == next_content_version
+    assert target_version.content_version == original_content_version
+    assert card.latest_version == version
 
 
 def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> None:
@@ -2192,7 +2194,7 @@ def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> No
 
     target_card.refresh_from_db()
     item.refresh_from_db()
-    assert version.card_id == target_card.id
+    assert version.card == target_card
     assert version.version_number == target_version.version_number + 1
     assert target_card.lifecycle_status == "deprecated"
     assert item.status == "completed"
