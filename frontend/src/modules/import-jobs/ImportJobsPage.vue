@@ -61,27 +61,42 @@
       </template>
     </AppPageHeader>
 
-    <section class="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[380px_minmax(0,1fr)]">
-      <div class="flex min-h-0 flex-col gap-6">
-        <form
-          id="import-job-form"
-          class="page-card rounded-[1.75rem] p-6 shadow-sm"
-          @submit.prevent="createJobFromPicker"
-        >
-          <div class="mb-5 flex items-center justify-between gap-3">
-            <div class="grid gap-3">
-              <div>
-                <h3 class="theme-section-title text-base font-semibold">
-                  New Import
-                </h3>
-                <p class="theme-section-muted text-sm">
-                  Upload one file or a whole folder into the parser queue.
-                </p>
-              </div>
-            </div>
+    <section class="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[23rem_minmax(0,1fr)]">
+      <form
+        id="import-job-form"
+        class="theme-divider flex min-h-0 flex-col border-b pb-4 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-3"
+        @submit.prevent="createJobFromPicker"
+      >
+        <div class="app-scrollbar flex-1 space-y-5 overflow-y-auto pr-2">
+          <div class="space-y-2">
+            <h3 class="theme-section-title text-lg font-semibold">
+              New Import
+            </h3>
+            <p class="theme-section-muted text-sm">
+              Upload one file or a whole folder into the parser queue.
+            </p>
           </div>
 
-          <div class="grid gap-4">
+          <div class="theme-muted-panel rounded-xl px-4 py-4">
+            <div class="theme-kicker text-xs font-semibold uppercase tracking-[0.18em]">
+              Current Version
+            </div>
+            <div class="theme-section-title mt-2 text-sm">
+              {{ currentContentVersion?.version_number ?? 'No version yet' }}
+            </div>
+            <p
+              v-if="currentContentVersion"
+              class="theme-section-muted mt-1 text-sm leading-5"
+            >
+              {{ currentContentVersion.description }}
+            </p>
+          </div>
+
+          <div class="space-y-4">
+            <h4 class="theme-kicker text-xs font-semibold uppercase tracking-[0.18em]">
+              Import Metadata
+            </h4>
+
             <label class="field-label">
               Template
               <AppSelect
@@ -90,21 +105,6 @@
                 required
               />
             </label>
-
-            <div class="theme-muted-panel rounded-[1.25rem] px-4 py-4">
-              <div class="theme-kicker text-xs font-semibold uppercase tracking-[0.18em]">
-                Current Version
-              </div>
-              <div class="theme-section-title mt-2 text-sm">
-                {{ currentContentVersion?.version_number ?? 'No version yet' }}
-              </div>
-              <p
-                v-if="currentContentVersion"
-                class="theme-section-muted mt-1 text-sm leading-5"
-              >
-                {{ currentContentVersion.description }}
-              </p>
-            </div>
 
             <label class="field-label">
               Version
@@ -138,6 +138,12 @@
                 required
               />
             </label>
+          </div>
+
+          <div class="theme-divider space-y-4 border-t pt-5">
+            <h4 class="theme-kicker text-xs font-semibold uppercase tracking-[0.18em]">
+              Source
+            </h4>
 
             <label class="field-label">
               Pick mode
@@ -175,13 +181,13 @@
               >
             </label>
 
-            <div class="theme-muted-panel rounded-[1.25rem] px-4 py-4">
-              <div class="theme-kicker text-xs font-semibold uppercase tracking-[0.18em]">
+            <div class="theme-card-frame-muted flex items-center justify-between gap-3 rounded-xl px-4 py-3">
+              <span class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
                 Selection
-              </div>
-              <div class="theme-section-title mt-2 text-sm">
-                {{ pickedFiles.length }} file{{ pickedFiles.length === 1 ? '' : 's' }} ready
-              </div>
+              </span>
+              <span class="theme-section-title text-sm font-semibold">
+                {{ pickedFiles.length }} file{{ pickedFiles.length === 1 ? '' : 's' }}
+              </span>
             </div>
 
             <p
@@ -190,26 +196,28 @@
             >
               No templates available. Add one in Admin > Templates first.
             </p>
-
-            <button
-              class="btn-primary w-full justify-center"
-              type="submit"
-              :disabled="pickedFiles.length === 0 || templates.length === 0 || !hasValidVersionInput || creatingJob"
-            >
-              {{ submitButtonLabel }}
-            </button>
           </div>
-        </form>
+        </div>
 
-        <p
-          v-if="errorMessage"
-          class="theme-alert-danger"
-        >
-          {{ errorMessage }}
-        </p>
-      </div>
+        <div class="theme-divider mt-4 space-y-3">
+          <p
+            v-if="errorMessage"
+            class="theme-alert-danger"
+          >
+            {{ errorMessage }}
+          </p>
 
-      <section class="page-card flex min-h-0 flex-col overflow-hidden xl:h-full">
+          <button
+            class="btn-primary w-full justify-center"
+            type="submit"
+            :disabled="pickedFiles.length === 0 || templates.length === 0 || !hasValidVersionInput || creatingJob"
+          >
+            {{ submitButtonLabel }}
+          </button>
+        </div>
+      </form>
+
+      <section class="flex min-h-0 flex-col overflow-hidden">
         <div class="theme-divider flex flex-wrap items-center justify-between gap-3 border-b px-1 pb-4">
           <div class="space-y-1">
             <h3 class="theme-section-title text-base font-semibold">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 from django.db import transaction
 
@@ -91,6 +92,30 @@ def save_parsed_card(
                 .first()
             )
         if existing_version is not None:
+            if should_create_content_version_snapshot(item, existing_version):
+                snapshot_card = cast(Card, existing_version.card)
+                version = create_parsed_card_version(
+                    item=item,
+                    card=snapshot_card,
+                    template_id=template_id,
+                    checksum=checksum,
+                    normalized_fields=normalized_fields,
+                    confidence=confidence,
+                    raw_ocr=raw_ocr,
+                    keyword_ids=keyword_ids or [],
+                    tag_ids=tag_ids or [],
+                    type_ids=type_ids or [],
+                    symbol_ids=symbol_ids or [],
+                    tag_suggestions=tag_suggestions or [],
+                    type_suggestions=type_suggestions or [],
+                )
+                snapshot_card.label = version.name
+                snapshot_card.latest_version = version
+                snapshot_card.updated_at = now_utc()
+                snapshot_card.save(update_fields=["label", "latest_version", "updated_at"])
+                sync_import_item_lifecycle_warning(item, snapshot_card)
+                mark_item_completed(item)
+                return version
             return update_existing_version(
                 item,
                 existing_version,
@@ -111,6 +136,29 @@ def save_parsed_card(
 
         latest = get_latest_card_version(card.id)
         if latest and latest.image_hash == checksum and reparse_existing:
+            if should_create_content_version_snapshot(item, latest):
+                version = create_parsed_card_version(
+                    item=item,
+                    card=card,
+                    template_id=template_id,
+                    checksum=checksum,
+                    normalized_fields=normalized_fields,
+                    confidence=confidence,
+                    raw_ocr=raw_ocr,
+                    keyword_ids=keyword_ids or [],
+                    tag_ids=tag_ids or [],
+                    type_ids=type_ids or [],
+                    symbol_ids=symbol_ids or [],
+                    tag_suggestions=tag_suggestions or [],
+                    type_suggestions=type_suggestions or [],
+                )
+                card.label = version.name
+                card.latest_version = version
+                card.updated_at = now_utc()
+                card.save(update_fields=["label", "latest_version", "updated_at"])
+                sync_import_item_lifecycle_warning(item, card)
+                mark_item_completed(item)
+                return version
             return update_existing_version(
                 item,
                 latest,
@@ -125,33 +173,21 @@ def save_parsed_card(
                 type_suggestions=type_suggestions or [],
             )
 
-        version = create_new_version(item, card, template_id, checksum, normalized_fields, confidence)
-        replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids or [])
-        replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids or [])
-        replace_card_version_types(card_version_id=version.id, type_ids=type_ids or [])
-        replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids or [])
-        parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
-        replace_card_version_metadata_suggestions(
-            card_version_id=version.id,
-            kind="tag",
-            candidates=tag_suggestions or [],
-            parse_result_id=parse_result.id,
-        )
-        replace_card_version_metadata_suggestions(
-            card_version_id=version.id,
-            kind="type",
-            candidates=type_suggestions or [],
-            parse_result_id=parse_result.id,
-        )
-        save_parsed_snapshot(
-            version,
+        version = create_parsed_card_version(
+            item=item,
+            card=card,
+            template_id=template_id,
+            checksum=checksum,
             normalized_fields=normalized_fields,
+            confidence=confidence,
+            raw_ocr=raw_ocr,
             keyword_ids=keyword_ids or [],
             tag_ids=tag_ids or [],
             type_ids=type_ids or [],
             symbol_ids=symbol_ids or [],
+            tag_suggestions=tag_suggestions or [],
+            type_suggestions=type_suggestions or [],
         )
-        save_image_record(version, item.source_file, checksum)
         sync_import_item_lifecycle_warning(item, card)
         mark_item_completed(item)
 
@@ -160,6 +196,57 @@ def save_parsed_card(
         card.updated_at = now_utc()
         card.save(update_fields=["label", "latest_version", "updated_at"])
         return version
+
+
+def should_create_content_version_snapshot(item: ImportJobItem, version: CardVersion) -> bool:
+    job_content_version = item.job.content_version
+    return job_content_version is not None and version.content_version != job_content_version
+
+
+def create_parsed_card_version(
+    *,
+    item: ImportJobItem,
+    card: Card,
+    template_id: str,
+    checksum: str,
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+    raw_ocr: dict[str, object],
+    keyword_ids: list[str],
+    tag_ids: list[str],
+    type_ids: list[str],
+    symbol_ids: list[str],
+    tag_suggestions: list[SuggestionCandidate],
+    type_suggestions: list[SuggestionCandidate],
+) -> CardVersion:
+    version = create_new_version(item, card, template_id, checksum, normalized_fields, confidence)
+    replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids)
+    replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids)
+    replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
+    replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids)
+    parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
+    replace_card_version_metadata_suggestions(
+        card_version_id=version.id,
+        kind="tag",
+        candidates=tag_suggestions,
+        parse_result_id=parse_result.id,
+    )
+    replace_card_version_metadata_suggestions(
+        card_version_id=version.id,
+        kind="type",
+        candidates=type_suggestions,
+        parse_result_id=parse_result.id,
+    )
+    save_parsed_snapshot(
+        version,
+        normalized_fields=normalized_fields,
+        keyword_ids=keyword_ids,
+        tag_ids=tag_ids,
+        type_ids=type_ids,
+        symbol_ids=symbol_ids,
+    )
+    save_image_record(version, item.source_file, checksum)
+    return version
 
 
 def reparse_target_version(
@@ -433,8 +520,6 @@ def update_existing_version(
         version.template = template
     if reset_manual_state:
         version.field_sources_json = DEFAULT_FIELD_SOURCES
-    if item.job.content_version is not None:
-        version.content_version = item.job.content_version
     apply_parsed_output_to_version(
         version,
         normalized_fields=normalized_fields,

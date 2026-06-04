@@ -257,6 +257,22 @@ const updateVersionInList = (updated: ContentVersionRecord): void => {
     .sort((left, right) => right.version_number.localeCompare(left.version_number, undefined, { numeric: true }));
 };
 
+const extractApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const detail = (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+    if (typeof detail === 'string' && detail.trim().length > 0) {
+      return detail;
+    }
+  }
+  if (typeof error === 'object' && error && 'message' in error) {
+    const message = String((error as { message: unknown }).message);
+    if (message.trim().length > 0) {
+      return message;
+    }
+  }
+  return fallback;
+};
+
 const saveVersion = async (): Promise<void> => {
   if (!selectedVersion.value) return;
   saveMessage.value = '';
@@ -284,7 +300,7 @@ const saveVersion = async (): Promise<void> => {
     saveMessage.value = 'Version saved.';
   } catch (error) {
     console.error('Save content version failed', error);
-    formError.value = 'Version could not be saved.';
+    formError.value = extractApiErrorMessage(error, 'Version could not be saved.');
   } finally {
     isSavingVersion.value = false;
   }

@@ -2040,8 +2040,18 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
     assert version.content_version_id == content_version.id
 
 
-def test_import_assigns_content_version_to_updated_card_version() -> None:
+def test_targeted_reparse_preserves_existing_card_version_content_version() -> None:
     _card, target_version = _create_editable_card_version(name="Content Version Reparse")
+    original_content_version = ContentVersion.objects.create(
+        version_number="71.1.0",
+        base_version="71.1",
+        major=71,
+        minor=1,
+        patch=0,
+        description="Original import version.",
+    )
+    target_version.content_version = original_content_version
+    target_version.save(update_fields=["content_version"])
     content_version = ContentVersion.objects.create(
         version_number="71.2.0",
         base_version="71.2",
@@ -2081,7 +2091,69 @@ def test_import_assigns_content_version_to_updated_card_version() -> None:
     )
 
     assert version.id == target_version.id
-    assert version.content_version_id == content_version.id
+    assert version.content_version_id == original_content_version.id
+
+
+def test_ordinary_import_matching_latest_checksum_creates_new_content_version_snapshot() -> None:
+    card, target_version = _create_editable_card_version(name="Content Version Snapshot")
+    original_content_version = ContentVersion.objects.create(
+        version_number="71.3.0",
+        base_version="71.3",
+        major=71,
+        minor=3,
+        patch=0,
+        description="Original import version.",
+    )
+    next_content_version = ContentVersion.objects.create(
+        version_number="71.3.1",
+        base_version="71.3",
+        major=71,
+        minor=3,
+        patch=1,
+        description="Next import version.",
+    )
+    target_version.content_version = original_content_version
+    target_version.image_hash = "content-version-snapshot-checksum"
+    target_version.save(update_fields=["content_version", "image_hash"])
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "content-version-snapshot.png"),
+        template_id="mtg-like-v1",
+        content_version=next_content_version,
+        total_items=1,
+    )
+    source_file = resolve_storage_path(build_storage_relative_path("uploads", "content-version-snapshot.png"))
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    _write_test_png(source_file)
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "content-version-snapshot.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="content-version-snapshot-checksum",
+        normalized_fields={
+            "name": "Content Version Snapshot",
+            "type_line": "Changed Type",
+            "mana_cost": "2",
+            "rules_text": "Changed rules",
+            "rules_text_raw": "Changed rules",
+            "rules_text_enriched": "Changed rules",
+        },
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=True,
+    )
+
+    target_version.refresh_from_db()
+    card.refresh_from_db()
+    assert version.id != target_version.id
+    assert version.card_id == card.id
+    assert version.version_number == target_version.version_number + 1
+    assert version.content_version_id == next_content_version.id
+    assert target_version.content_version_id == original_content_version.id
+    assert card.latest_version_id == version.id
 
 
 def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> None:
