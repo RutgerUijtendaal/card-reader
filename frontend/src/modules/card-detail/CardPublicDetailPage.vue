@@ -75,6 +75,8 @@
             :version="selectedVersion"
             :symbol-by-key="symbolByKey"
             :to-absolute-api-url="toAbsoluteApiUrl"
+            :can-flag="auth.authenticated"
+            @flag-parse-issue="flagModalOpen = true"
           />
 
           <CardVersionSelectorGrid
@@ -107,23 +109,41 @@
     >
       No printings found.
     </div>
+
+    <CardVersionParseFlagModal
+      :open="flagModalOpen"
+      :version="selectedVersion"
+      :submitting="flagSubmitting"
+      :error-message="flagError"
+      @close="closeFlagModal"
+      @submit="submitParseFlag"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { ChevronLeft, ChevronRight, Layers3 } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
+import { toast } from 'vue-sonner';
+import { api } from '@/api/client';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
+import { useReviewSummary } from '@/composables/useReviewSummary';
 import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
+import CardVersionParseFlagModal from '@/modules/card-detail/components/CardVersionParseFlagModal.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
 import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
 import { useCardPublicDetailState } from '@/modules/card-detail/composables/useCardPublicDetailState';
+import type { ParseFlagCreatePayload } from '@/modules/card-detail/types';
 
 const route = useRoute();
 const auth = useAuthStore();
+const flagModalOpen = ref(false);
+const flagSubmitting = ref(false);
+const flagError = ref('');
+const { incrementOpenParseFlagItemCount } = useReviewSummary();
 
 const {
   card,
@@ -147,6 +167,37 @@ const {
   toAbsoluteApiUrl,
   formatDate,
 } = useCardPublicDetailState();
+
+const closeFlagModal = (): void => {
+  if (flagSubmitting.value) return;
+  flagModalOpen.value = false;
+  flagError.value = '';
+};
+
+const submitParseFlag = async (payload: ParseFlagCreatePayload): Promise<void> => {
+  const version = selectedVersion.value;
+  if (!version || payload.items.length === 0) return;
+  flagSubmitting.value = true;
+  flagError.value = '';
+  try {
+    await api.post(`/cards/${version.id}/versions/${version.version_id}/flags`, payload);
+    if (auth.canAccessStaffRoutes) {
+      incrementOpenParseFlagItemCount(payload.items.length);
+    }
+    flagModalOpen.value = false;
+    toast.success('Parse issue submitted.');
+  } catch (error) {
+    flagError.value = extractErrorMessage(error, 'Failed to submit parse issue.');
+  } finally {
+    flagSubmitting.value = false;
+  }
+};
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+  const maybeResponse = error as { response?: { data?: { detail?: unknown } } };
+  const detail = maybeResponse.response?.data?.detail;
+  return typeof detail === 'string' && detail.trim() ? detail : fallback;
+};
 
 onMounted(loadCard);
 </script>

@@ -145,6 +145,18 @@ export type PaginatedCardsResponse<TCard = GalleryItem> = {
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
 export type MetadataSearchState = Record<MetadataGroupName, string>;
+export type ParseFlagPropertyKey = ScalarFieldName | MetadataGroupName | 'other';
+
+export type ParseFlagItemDraft = {
+  property_key: ParseFlagPropertyKey;
+  expected_value: string;
+  note: string;
+};
+
+export type ParseFlagCreatePayload = {
+  note: string;
+  items: ParseFlagItemDraft[];
+};
 
 export type EditorForm = {
   name: string;
@@ -194,6 +206,20 @@ export const metadataGroups: MetadataGroupConfig[] = [
   { name: 'types', label: 'Types' },
   { name: 'symbols', label: 'Symbols' },
 ];
+
+export const parseFlagPropertyLabels: Record<ParseFlagPropertyKey, string> = {
+  name: 'Name',
+  type_line: 'Type Line',
+  mana_cost: 'Mana Cost',
+  attack: 'Attack',
+  health: 'Health',
+  rules_text: 'Rules Text',
+  keywords: 'Keywords',
+  tags: 'Tags',
+  types: 'Types',
+  symbols: 'Symbols',
+  other: 'Other',
+};
 
 export type SymbolLookupMap = Record<string, CardTooltipSymbolLookup>;
 

@@ -90,6 +90,12 @@
           class="h-[1.125rem] w-[1.125rem] shrink-0"
         />
         <span v-if="!collapsed">{{ item.label }}</span>
+        <span
+          v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
+          class="theme-pill theme-pill-warning ml-auto px-2 py-0.5 text-[11px] font-semibold"
+        >
+          {{ item.badgeCount }}
+        </span>
       </RouterLink>
     </nav>
 
@@ -138,11 +144,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { BookOpen, ChevronRight, ClipboardCheck, Folders, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
 import AppHotkeysPanel from '@/components/app/AppHotkeysPanel.vue';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
+import { useReviewSummary } from '@/composables/useReviewSummary';
 import { useAuthStore } from '@/modules/auth/authStore';
 
 type NavItem = {
@@ -151,6 +158,7 @@ type NavItem = {
   icon: typeof Images;
   requiresStaff?: boolean;
   requiresAuth?: boolean;
+  badgeCount?: number;
 };
 
 const props = withDefaults(
@@ -174,19 +182,20 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const router = useRouter();
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
+const { openParseFlagItemCount, loadReviewSummary } = useReviewSummary();
 
-const items: NavItem[] = [
+const items = computed<NavItem[]>(() => [
   { label: 'Gallery', to: '/cards', icon: Images },
   { label: 'Decks', to: '/decks', icon: BookOpen },
   { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
   { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
   { label: 'Import Jobs', to: '/import-jobs', icon: Upload, requiresStaff: true },
-  { label: 'Review Queue', to: '/review', icon: ClipboardCheck, requiresStaff: true },
+  { label: 'Review Queue', to: '/review', icon: ClipboardCheck, requiresStaff: true, badgeCount: openParseFlagItemCount.value },
   { label: 'Admin', to: '/admin', icon: Settings, requiresStaff: true },
-];
+]);
 
 const visibleItems = computed(() =>
-  items.filter((item) => {
+  items.value.filter((item) => {
     if (item.requiresStaff && !auth.canAccessStaffRoutes) {
       return false;
     }
@@ -210,4 +219,15 @@ const signOut = async (): Promise<void> => {
   }
   await router.push('/cards');
 };
+
+watch(
+  () => auth.canAccessStaffRoutes,
+  () => {
+    void loadReviewSummary();
+  },
+);
+
+onMounted(() => {
+  void loadReviewSummary();
+});
 </script>

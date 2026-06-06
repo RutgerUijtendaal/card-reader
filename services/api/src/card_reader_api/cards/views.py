@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.http import FileResponse, Http404
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,6 +13,7 @@ from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import (
     CardFiltersQuerySerializer,
+    CardVersionParseFlagCreateSerializer,
     LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
     card_deck_reference_payload,
@@ -33,6 +34,7 @@ from card_reader_core.repositories.cards import (
     promote_card_version,
     update_latest_card_version,
 )
+from card_reader_core.repositories.parse_flags import ParseFlagItemInput
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -42,6 +44,7 @@ from card_reader_core.services.cards import (
     resolve_card_image_path,
 )
 from card_reader_core.services.decks import DeckService
+from card_reader_core.services.parse_flags import create_parse_flag_for_card_version
 
 CARD_DETAIL_DECK_REFERENCE_LIMIT = 3
 
@@ -254,6 +257,43 @@ class CardVersionPromoteView(APIView):
                 metadata=metadata,
                 edit_state=edit_state,
             )
+        )
+
+
+class CardVersionParseFlagView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, card_id: str, version_id: str) -> Response:
+        serializer = CardVersionParseFlagCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        try:
+            flag = create_parse_flag_for_card_version(
+                card_id=card_id,
+                version_id=version_id,
+                submitted_by_id=str(getattr(request.user, "pk", "")),
+                note=str(serializer.validated_data.get("note") or ""),
+                items=[
+                    ParseFlagItemInput(
+                        property_key=str(item["property_key"]),
+                        expected_value=str(item.get("expected_value") or ""),
+                        note=str(item.get("note") or ""),
+                    )
+                    for item in serializer.validated_data["items"]
+                ],
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if flag is None:
+            return Response({"detail": "Card version not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {
+                "id": flag.id,
+                "card_version_id": flag.card_version.id,
+                "item_count": flag.items.count(),
+                "message": "Parse issue submitted.",
+            },
+            status=status.HTTP_201_CREATED,
         )
 
 

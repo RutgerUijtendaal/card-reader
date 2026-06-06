@@ -32,6 +32,7 @@ import {
   fetchDeckRulesMetadata,
   formatDeckBuildingConfigJson,
 } from '@/composables/decks/deckRules';
+import { queryString } from '@/router/routeState';
 
 export const useCardDetailState = () => {
   const route = useRoute();
@@ -112,6 +113,7 @@ export const useCardDetailState = () => {
 
   const isBusy = computed(() => isSaving.value || isQueuingReparse.value || promotingVersionId.value !== null);
   const backButtonLabel = computed(() => `Back to ${getCardReturnLabel(route.query)}`);
+  const reviewFocusPropertyKey = computed(() => queryString(route.query.property_key));
 
   const goBack = (): void => {
     void router.push(buildCardReturnLocation(route.query));
@@ -141,7 +143,9 @@ export const useCardDetailState = () => {
     if (deckRulesMetadata) {
       deckBuildingConfigExample.value = formatDeckBuildingConfigJson(deckRulesMetadata.example_config);
     }
+    const queryVersionId = queryString(route.query.version_id);
     selectedVersionId.value =
+      versions.value.find((version) => version.version_id === queryVersionId)?.version_id ??
       versions.value.find((version) => version.is_latest)?.version_id ??
       versions.value[0]?.version_id ??
       '';
@@ -455,6 +459,7 @@ export const useCardDetailState = () => {
     additionalSymbols,
     effectiveSymbolIds,
     backButtonLabel,
+    reviewFocusPropertyKey,
     goBack,
     goToPreviousCard: galleryNavigation.goToPreviousCard,
     goToNextCard: () => {
