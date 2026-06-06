@@ -25,6 +25,7 @@
             <p class="theme-section-muted text-sm">
               Printing {{ version.version_number }}
               <span v-if="version.is_latest"> · Latest</span>
+              · Version {{ formatCardContentVersion(version) }}
             </p>
           </div>
           <span
@@ -177,7 +178,7 @@
 
 <script setup lang="ts">
 import SymbolizedText from '@/components/SymbolizedText.vue';
-import type { SymbolLookupMap, CardVersionDetail } from '@/modules/card-detail/types';
+import { formatCardContentVersion, type SymbolLookupMap, type CardVersionDetail } from '@/modules/card-detail/types';
 
 withDefaults(
   defineProps<{

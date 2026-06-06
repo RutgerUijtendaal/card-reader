@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         CardVersionTag,
         CardVersionType,
     )
+    from .content_version import ContentVersion
     from .template import Template
 
 
@@ -70,6 +71,15 @@ class CardVersion(TimestampedModel):
         on_delete=models.SET_NULL,
         related_name="next_versions",
         db_column="previous_version_id",
+        default=None,
+        null=True,
+        blank=True,
+    )
+    content_version: models.ForeignKey[ContentVersion | None, ContentVersion | None] = models.ForeignKey(
+        "ContentVersion",
+        on_delete=models.SET_NULL,
+        related_name="card_versions",
+        db_column="content_version_id",
         default=None,
         null=True,
         blank=True,

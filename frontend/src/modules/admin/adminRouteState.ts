@@ -2,7 +2,7 @@ import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from 'vue-rout
 import type { CatalogKind } from '@/modules/admin/types';
 import { addReturnToQuery, clearLocationQueryKeys, mergeLocationQuery, queryString } from '@/router/routeState';
 
-export type AdminTab = 'catalog' | 'templates' | 'card-groups' | 'card-merges' | 'users' | 'maintenance';
+export type AdminTab = 'catalog' | 'versions' | 'templates' | 'card-groups' | 'card-merges' | 'users' | 'maintenance';
 
 const ADMIN_RETURN_TO = 'admin';
 const ADMIN_TAB_QUERY_KEY = 'admin_tab';
@@ -21,7 +21,7 @@ const CATALOG_KINDS: CatalogKind[] = [
   'suggested-types',
 ];
 
-const ADMIN_TABS: AdminTab[] = ['catalog', 'templates', 'card-groups', 'card-merges', 'users', 'maintenance'];
+const ADMIN_TABS: AdminTab[] = ['catalog', 'versions', 'templates', 'card-groups', 'card-merges', 'users', 'maintenance'];
 
 export const parseAdminTab = (
   query: LocationQuery,

@@ -13,7 +13,13 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
-from card_reader_api.imports.serializers import ImportUploadSerializer, import_detail_payload, import_job_payload
+from card_reader_api.imports.serializers import (
+    ImportUploadSerializer,
+    content_version_payload,
+    import_detail_payload,
+    import_job_payload,
+)
+from card_reader_core.repositories.content_versions import get_current_content_version
 from card_reader_core.repositories.import_jobs import (
     SUPPORTED_IMAGE_SUFFIXES,
     fetch_items_for_job,
@@ -32,11 +38,18 @@ class ImportListView(APIView):
         return Response([import_job_payload(job) for job in jobs])
 
 
+class CurrentContentVersionView(APIView):
+    def get(self, _request: Request) -> Response:
+        return Response(content_version_payload(get_current_content_version()))
+
+
 class ImportUploadView(APIView):
     def post(self, request: Request) -> Response:
         serializer = ImportUploadSerializer(
             data={
                 "template_id": request.data.get("template_id", ""),
+                "content_version_base": request.data.get("content_version_base", ""),
+                "content_version_description": request.data.get("content_version_description", ""),
                 "options_json": request.data.get("options_json", "{}"),
                 "files": request.FILES.getlist("files"),
             }
@@ -53,6 +66,8 @@ class ImportUploadView(APIView):
                 source_path=str(upload_dir),
                 template_id=serializer.validated_data["template_id"],
                 options=serializer.validated_data["options_json"],
+                content_version_base=serializer.validated_data["content_version_base"],
+                content_version_description=serializer.validated_data["content_version_description"],
             )
         except ValueError as exc:
             return _bad_request(str(exc))

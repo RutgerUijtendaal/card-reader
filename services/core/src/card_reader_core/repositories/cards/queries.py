@@ -212,7 +212,7 @@ def get_card(card_id: str) -> Card | None:
 def get_latest_card_version(card_id: str) -> CardVersion | None:
     return (
         CardVersion.objects.filter(card_id=card_id, is_latest=True)
-        .select_related("card", "template", "previous_version", "parse_result")
+        .select_related("card", "template", "previous_version", "parse_result", "content_version")
         .order_by("-version_number")
         .first()
     )
@@ -356,9 +356,37 @@ def list_card_generations(card_id: str) -> list[CardVersion]:
         return []
     return list(
         CardVersion.objects.filter(card_id=card.id)
-        .select_related("card", "template", "previous_version", "parse_result")
+        .select_related("card", "template", "previous_version", "parse_result", "content_version")
         .order_by("-version_number")
     )
+
+
+def list_cards_for_content_version(content_version_id: str) -> list[CardListRow]:
+    versions = (
+        CardVersion.objects.filter(content_version_id=content_version_id)
+        .select_related("card", "template", "previous_version", "content_version")
+        .prefetch_related(
+            "images",
+            Prefetch(
+                "card_version_keywords",
+                queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
+            ),
+            Prefetch(
+                "card_version_tags",
+                queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
+            ),
+            Prefetch(
+                "card_version_symbols",
+                queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
+            ),
+            Prefetch(
+                "card_version_types",
+                queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
+            ),
+        )
+        .order_by("name", "card__label", "card__id", "-version_number")
+    )
+    return _build_card_list_rows(list(versions))
 
 
 def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> QuerySet[CardVersion]:
@@ -457,7 +485,7 @@ def _build_filtered_versions_queryset(
 ) -> QuerySet[CardVersion]:
     versions = (
         CardVersion.objects.filter(is_latest=True)
-        .select_related("card", "template", "previous_version")
+        .select_related("card", "template", "previous_version", "content_version")
         .prefetch_related(
             "images",
             Prefetch(

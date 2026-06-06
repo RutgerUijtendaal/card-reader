@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 _REGISTERED_MODEL_MODULES = (
     import_module(".card", __name__),
     import_module(".card_group", __name__),
+    import_module(".content_version", __name__),
     import_module(".card_version", __name__),
     import_module(".deck", __name__),
     import_module(".import_job", __name__),
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
         normalize_card_lifecycle_filter,
     )
     from .card_group import CardGroup, CardGroupMember
+    from .content_version import ContentVersion
     from .card_version import CardVersion, CardVersionImage, ParseResult
     from .deck import Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility
     from .import_job import ImportJob, ImportJobItem, ImportJobStatus
@@ -83,6 +85,7 @@ _EXPORTS = {
     "normalize_card_lifecycle_filter": ".card",
     "CardGroup": ".card_group",
     "CardGroupMember": ".card_group",
+    "ContentVersion": ".content_version",
     "CardVersion": ".card_version",
     "CardVersionImage": ".card_version",
     "ParseResult": ".card_version",
@@ -130,6 +133,7 @@ __all__ = [
     "normalize_card_lifecycle_filter",
     "CardGroup",
     "CardGroupMember",
+    "ContentVersion",
     "CardVersion",
     "CardVersionImage",
     "ParseResult",

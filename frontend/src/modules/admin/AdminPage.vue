@@ -3,7 +3,7 @@
     <AppPageHeader
       :icon="Settings"
       title="Admin"
-      subtitle="Manage catalog data, templates, card groups, users, and maintenance tools."
+      subtitle="Manage catalog data, versions, templates, card groups, users, and maintenance tools."
       title-tag="h2"
       title-class="text-xl"
     >
@@ -26,6 +26,15 @@
           >
             <LayoutTemplate class="h-4 w-4" />
             <span>Templates</span>
+          </button>
+          <button
+            class="theme-tab"
+            type="button"
+            :class="activeTab === 'versions' ? 'theme-tab-active' : ''"
+            @click="setActiveTab('versions')"
+          >
+            <History class="h-4 w-4" />
+            <span>Versions</span>
           </button>
           <button
             class="theme-tab"
@@ -73,6 +82,7 @@
     <UsersAdminView v-else-if="activeTab === 'users'" />
     <CardMergesAdminView v-else-if="activeTab === 'card-merges'" />
     <CardGroupsAdminView v-else-if="activeTab === 'card-groups'" />
+    <ContentVersionsAdminView v-else-if="activeTab === 'versions'" />
     <TemplatesAdminView v-else-if="activeTab === 'templates'" />
     <CatalogAdminView v-else />
   </section>
@@ -80,7 +90,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { Database, GitMerge, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
+import { Database, GitMerge, History, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
@@ -92,6 +102,7 @@ import MaintenanceAdminView from './views/MaintenanceAdminView.vue';
 import CatalogAdminView from './views/CatalogAdminView.vue';
 import CardGroupsAdminView from './views/CardGroupsAdminView.vue';
 import CardMergesAdminView from './views/CardMergesAdminView.vue';
+import ContentVersionsAdminView from './views/ContentVersionsAdminView.vue';
 import TemplatesAdminView from './views/TemplatesAdminView.vue';
 import UsersAdminView from './views/UsersAdminView.vue';
 

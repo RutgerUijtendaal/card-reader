@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
+from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ContentVersion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
 from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
@@ -63,6 +63,8 @@ def test_create_import_upload_rejects_unknown_template() -> None:
         "/imports/upload",
         data={
             "template_id": "unknown-template",
+            "content_version_base": "14.1",
+            "content_version_description": "Test import version.",
             "options_json": "{}",
             "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
         },
@@ -75,7 +77,12 @@ def test_create_import_upload_rejects_unknown_template() -> None:
 def test_create_import_upload_rejects_unsupported_files() -> None:
     response = Client(HTTP_HOST="localhost").post(
         "/imports/upload",
-        data={"template_id": "mtg-like-v1", "options_json": "{}"},
+        data={
+            "template_id": "mtg-like-v1",
+            "content_version_base": "14.1",
+            "content_version_description": "Test import version.",
+            "options_json": "{}",
+        },
     )
     assert response.status_code == 400
 
@@ -86,6 +93,8 @@ def test_create_import_upload_stores_relative_paths() -> None:
         "/imports/upload",
         data={
             "template_id": "mtg-like-v1",
+            "content_version_base": "14.1",
+            "content_version_description": "Test import version.",
             "options_json": "{}",
             "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
         },
@@ -95,7 +104,94 @@ def test_create_import_upload_stores_relative_paths() -> None:
     job = ImportJob.objects.get(id=response.json()["id"])
     item = ImportJobItem.objects.get(job_id=job.id)
     assert job.source_path.startswith("uploads/")
+    assert job.content_version is not None
+    assert job.content_version.version_number == "14.1.0"
+    assert response.json()["content_version"]["version_number"] == "14.1.0"
     assert item.source_file.startswith(f"{job.source_path}/")
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+@pytest.mark.parametrize("base_version", ["", "14", "14.1.2", "v14.1", "14.a"])
+def test_create_import_upload_rejects_invalid_content_version_base(base_version: str) -> None:
+    existing_count = ContentVersion.objects.count()
+    response = Client(HTTP_HOST="localhost").post(
+        "/imports/upload",
+        data={
+            "template_id": "mtg-like-v1",
+            "content_version_base": base_version,
+            "content_version_description": "Test import version.",
+            "options_json": "{}",
+            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+        },
+    )
+
+    assert response.status_code == 400
+    assert ContentVersion.objects.count() == existing_count
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_create_import_upload_rejects_blank_content_version_description() -> None:
+    existing_count = ContentVersion.objects.count()
+    response = Client(HTTP_HOST="localhost").post(
+        "/imports/upload",
+        data={
+            "template_id": "mtg-like-v1",
+            "content_version_base": "14.1",
+            "content_version_description": "   ",
+            "options_json": "{}",
+            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+        },
+    )
+
+    assert response.status_code == 400
+    assert ContentVersion.objects.count() == existing_count
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_create_import_upload_increments_content_version_patch() -> None:
+    client = Client(HTTP_HOST="localhost")
+    for filename in ["first.png", "second.png"]:
+        response = client.post(
+            "/imports/upload",
+            data={
+                "template_id": "mtg-like-v1",
+                "content_version_base": "98.7",
+                "content_version_description": "Test import version.",
+                "options_json": "{}",
+                "files": SimpleUploadedFile(filename, b"fake-image-content", content_type="image/png"),
+            },
+        )
+        assert response.status_code == 201
+
+    versions = list(
+        ContentVersion.objects.filter(base_version="98.7").order_by("patch").values_list("version_number", flat=True)
+    )
+    assert versions == ["98.7.0", "98.7.1"]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_current_content_version_uses_numeric_semantic_sorting() -> None:
+    ContentVersion.objects.create(
+        version_number="99.9.9",
+        base_version="99.9",
+        major=99,
+        minor=9,
+        patch=9,
+        description="Older version.",
+    )
+    ContentVersion.objects.create(
+        version_number="99.10.0",
+        base_version="99.10",
+        major=99,
+        minor=10,
+        patch=0,
+        description="Current version.",
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/imports/current-version")
+
+    assert response.status_code == 200
+    assert response.json()["version_number"] == "99.10.0"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=False)
@@ -684,6 +780,176 @@ def test_card_payloads_use_immutable_image_urls() -> None:
 
     assert generations_response.status_code == 200
     assert generations_response.json()[0]["image_url"] == expected_image_url
+
+
+def test_card_payloads_include_content_version() -> None:
+    card, version = _create_editable_card_version(name="Versioned Payload Card")
+    content_version = ContentVersion.objects.create(
+        version_number="72.3.0",
+        base_version="72.3",
+        major=72,
+        minor=3,
+        patch=0,
+        description="Versioned payload release.",
+    )
+    version.content_version = content_version
+    version.save(update_fields=["content_version"])
+    client = Client(HTTP_HOST="localhost")
+
+    detail_response = client.get(f"/cards/{card.id}")
+    generations_response = client.get(f"/cards/{card.id}/generations")
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["content_version"]["version_number"] == "72.3.0"
+    assert generations_response.status_code == 200
+    assert generations_response.json()[0]["content_version"]["version_number"] == "72.3.0"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_admin_content_versions_list_counts_linked_cards() -> None:
+    _older_card, older_version = _create_editable_card_version(name="Older Content Version Card")
+    _latest_card, latest_version = _create_editable_card_version(name="Latest Content Version Card")
+    older_content_version = ContentVersion.objects.create(
+        version_number="173.1.0",
+        base_version="173.1",
+        major=173,
+        minor=1,
+        patch=0,
+        description="Older content version.",
+    )
+    latest_content_version = ContentVersion.objects.create(
+        version_number="173.2.0",
+        base_version="173.2",
+        major=173,
+        minor=2,
+        patch=0,
+        description="Latest content version.",
+    )
+    older_version.content_version = older_content_version
+    older_version.save(update_fields=["content_version"])
+    latest_version.content_version = latest_content_version
+    latest_version.save(update_fields=["content_version"])
+
+    response = Client(HTTP_HOST="localhost").get("/admin/content-versions")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["version_number"] for row in payload[:2]] == ["173.2.0", "173.1.0"]
+    latest_row = next(row for row in payload if row["id"] == latest_content_version.id)
+    assert latest_row["card_count"] == 1
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_admin_content_version_cards_returns_cards_for_selected_version() -> None:
+    matching_card, matching_version = _create_editable_card_version(name="Version Gallery Match")
+    _other_card, other_version = _create_editable_card_version(name="Version Gallery Other")
+    content_version = ContentVersion.objects.create(
+        version_number="74.1.0",
+        base_version="74.1",
+        major=74,
+        minor=1,
+        patch=0,
+        description="Version gallery.",
+    )
+    other_content_version = ContentVersion.objects.create(
+        version_number="74.2.0",
+        base_version="74.2",
+        major=74,
+        minor=2,
+        patch=0,
+        description="Other gallery.",
+    )
+    matching_version.content_version = content_version
+    matching_version.save(update_fields=["content_version"])
+    other_version.content_version = other_content_version
+    other_version.save(update_fields=["content_version"])
+
+    response = Client(HTTP_HOST="localhost").get(f"/admin/content-versions/{content_version.id}/cards")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["id"] for row in payload] == [matching_card.id]
+    assert payload[0]["content_version"]["version_number"] == "74.1.0"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_admin_content_version_patch_updates_version_and_description() -> None:
+    content_version = ContentVersion.objects.create(
+        version_number="175.1.0",
+        base_version="175.1",
+        major=175,
+        minor=1,
+        patch=0,
+        description="Old description.",
+    )
+
+    response = Client(HTTP_HOST="localhost").patch(
+        f"/admin/content-versions/{content_version.id}",
+        data={"version_number": "175.2.3", "description": "Updated description."},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    content_version.refresh_from_db()
+    assert content_version.version_number == "175.2.3"
+    assert content_version.base_version == "175.2"
+    assert content_version.major == 175
+    assert content_version.minor == 2
+    assert content_version.patch == 3
+    assert content_version.description == "Updated description."
+    assert response.json()["version_number"] == "175.2.3"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_admin_content_version_patch_rejects_invalid_version_number() -> None:
+    content_version = ContentVersion.objects.create(
+        version_number="176.1.0",
+        base_version="176.1",
+        major=176,
+        minor=1,
+        patch=0,
+        description="Valid description.",
+    )
+
+    response = Client(HTTP_HOST="localhost").patch(
+        f"/admin/content-versions/{content_version.id}",
+        data={"version_number": "176.1"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    content_version.refresh_from_db()
+    assert content_version.version_number == "176.1.0"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=False)
+def test_admin_content_version_patch_rejects_duplicate_version_number() -> None:
+    first = ContentVersion.objects.create(
+        version_number="177.1.0",
+        base_version="177.1",
+        major=177,
+        minor=1,
+        patch=0,
+        description="First.",
+    )
+    second = ContentVersion.objects.create(
+        version_number="177.2.0",
+        base_version="177.2",
+        major=177,
+        minor=2,
+        patch=0,
+        description="Second.",
+    )
+
+    response = Client(HTTP_HOST="localhost").patch(
+        f"/admin/content-versions/{second.id}",
+        data={"version_number": first.version_number},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    second.refresh_from_db()
+    assert second.version_number == "177.2.0"
 
 
 def test_card_group_payloads_use_immutable_preview_image_urls() -> None:
@@ -1726,9 +1992,200 @@ def test_import_uses_card_alias_for_renamed_card() -> None:
         reparse_existing=False,
     )
 
-    assert version.card_id == target_card.id
+    latest_version = get_latest_card_version(target_card.id)
+    assert latest_version is not None
+    assert version.card == target_card
     assert version.version_number == target_version.version_number + 1
-    assert get_latest_card_version(target_card.id).id == version.id
+    assert latest_version.id == version.id
+
+
+def test_import_assigns_content_version_to_created_card_version() -> None:
+    content_version = ContentVersion.objects.create(
+        version_number="71.1.0",
+        base_version="71.1",
+        major=71,
+        minor=1,
+        patch=0,
+        description="Created import version.",
+    )
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "content-version-card.png"),
+        template_id="mtg-like-v1",
+        content_version=content_version,
+        total_items=1,
+    )
+    source_file = resolve_storage_path(build_storage_relative_path("uploads", "content-version-card.png"))
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    _write_test_png(source_file)
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "content-version-card.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="content-version-card-checksum",
+        normalized_fields={
+            "name": "Content Version Card",
+            "type_line": "Base Type",
+            "mana_cost": "1",
+            "rules_text": "Rules",
+            "rules_text_raw": "Rules",
+            "rules_text_enriched": "Rules",
+        },
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=False,
+    )
+
+    assert version.content_version == content_version
+
+
+def test_targeted_reparse_preserves_existing_card_version_content_version() -> None:
+    _card, target_version = _create_editable_card_version(name="Content Version Reparse")
+    original_content_version = ContentVersion.objects.create(
+        version_number="171.1.0",
+        base_version="171.1",
+        major=171,
+        minor=1,
+        patch=0,
+        description="Original import version.",
+    )
+    target_version.content_version = original_content_version
+    target_version.save(update_fields=["content_version"])
+    content_version = ContentVersion.objects.create(
+        version_number="171.2.0",
+        base_version="171.2",
+        major=171,
+        minor=2,
+        patch=0,
+        description="Updated import version.",
+    )
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "content-version-reparse.png"),
+        template_id="mtg-like-v1",
+        content_version=content_version,
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "content-version-reparse.png"),
+        target_card=target_version.card,
+        target_card_version=target_version,
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="content-version-reparse-checksum",
+        normalized_fields={
+            "name": "Content Version Reparse",
+            "type_line": "Changed Type",
+            "mana_cost": "2",
+            "rules_text": "Changed rules",
+            "rules_text_raw": "Changed rules",
+            "rules_text_enriched": "Changed rules",
+        },
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=False,
+    )
+
+    assert version.id == target_version.id
+    assert version.content_version == original_content_version
+
+
+def test_ordinary_import_matching_latest_checksum_creates_new_content_version_snapshot() -> None:
+    card, target_version = _create_editable_card_version(name="Content Version Snapshot Old")
+    manual_tag = Tag.objects.create(key="manual-snapshot-tag", label="Manual Snapshot Tag")
+    ocr_tag = Tag.objects.create(key="ocr-snapshot-tag", label="OCR Snapshot Tag")
+    original_content_version = ContentVersion.objects.create(
+        version_number="171.3.0",
+        base_version="171.3",
+        major=171,
+        minor=3,
+        patch=0,
+        description="Original import version.",
+    )
+    next_content_version = ContentVersion.objects.create(
+        version_number="171.3.1",
+        base_version="171.3",
+        major=171,
+        minor=3,
+        patch=1,
+        description="Next import version.",
+    )
+    target_version.content_version = original_content_version
+    target_version.image_hash = "content-version-snapshot-checksum"
+    target_version.name = "Manually Corrected Snapshot"
+    target_version.field_sources_json = {
+        "fields": {
+            "name": "manual",
+            "type_line": "auto",
+            "mana_cost": "auto",
+            "attack": "auto",
+            "health": "auto",
+            "rules_text": "auto",
+        },
+        "metadata": {
+            "keywords": "auto",
+            "tags": "manual",
+            "types": "auto",
+            "symbols": "auto",
+        },
+    }
+    target_version.save(update_fields=["content_version", "image_hash", "name", "field_sources_json"])
+    replace_card_version_tags(card_version_id=target_version.id, tag_ids=[manual_tag.id])
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "content-version-snapshot.png"),
+        template_id="mtg-like-v1",
+        content_version=next_content_version,
+        total_items=1,
+    )
+    source_file = resolve_storage_path(build_storage_relative_path("uploads", "content-version-snapshot.png"))
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    _write_test_png(source_file)
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "content-version-snapshot.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="content-version-snapshot-checksum",
+        normalized_fields={
+            "name": "Content Version Snapshot New",
+            "type_line": "Changed Type",
+            "mana_cost": "2",
+            "rules_text": "Changed rules",
+            "rules_text_raw": "Changed rules",
+            "rules_text_enriched": "Changed rules",
+        },
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        tag_ids=[ocr_tag.id],
+        reparse_existing=True,
+    )
+
+    target_version.refresh_from_db()
+    card.refresh_from_db()
+    assert version.id != target_version.id
+    assert version.card == card
+    assert version.version_number == target_version.version_number + 1
+    assert version.name == "Manually Corrected Snapshot"
+    assert version.content_version == next_content_version
+    assert target_version.content_version == original_content_version
+    assert card.latest_version == version
+    assert card.key == "manually-corrected-snapshot"
+    assert card.label == "Manually Corrected Snapshot"
+    assert CardAlias.objects.filter(
+        card=card,
+        key="content-version-snapshot-old",
+        label="Content Version Snapshot Old",
+    ).exists()
+    assert [tag.id for tag in get_tags_for_card_version(version.id)] == [manual_tag.id]
 
 
 def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> None:
@@ -1767,7 +2224,7 @@ def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> No
 
     target_card.refresh_from_db()
     item.refresh_from_db()
-    assert version.card_id == target_card.id
+    assert version.card == target_card
     assert version.version_number == target_version.version_number + 1
     assert target_card.lifecycle_status == "deprecated"
     assert item.status == "completed"
@@ -2304,6 +2761,14 @@ def _create_card_image(version: CardVersion) -> CardVersionImage:
         source_file=build_storage_relative_path("images", image_path.name),
         stored_path=build_storage_relative_path("images", image_path.name),
         checksum=f"checksum-{version.id}",
+    )
+
+
+def _write_test_png(path: Path) -> None:
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?"
+        b"\x00\x05\xfe\x02\xfeA\x89\x81\x8b\x00\x00\x00\x00IEND\xaeB`\x82"
     )
 
 

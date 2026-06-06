@@ -19,6 +19,13 @@ export type CardTooltipSymbol = CardTooltipMetadata & {
   asset_url: string | null;
 };
 
+export type CardContentVersionSummary = {
+  id: string;
+  version_number: string;
+  base_version: string;
+  description: string;
+};
+
 export type CardHoverTooltipModel = {
   id: string;
   key: string;
@@ -31,6 +38,7 @@ export type CardHoverTooltipModel = {
   version_number: number;
   previous_version_id: string | null;
   is_latest: boolean;
+  content_version?: CardContentVersionSummary | null;
   name: string;
   type_line: string;
   mana_cost: string;

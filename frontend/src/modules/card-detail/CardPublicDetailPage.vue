@@ -1,5 +1,5 @@
 <template>
-  <section class="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
+  <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="Layers3"
       :title="card?.name || 'Loading card...'"
@@ -67,10 +67,10 @@
 
     <div
       v-if="selectedVersion"
-      class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0"
+      class="w-full"
     >
-      <div class="grid min-h-full items-start gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(30rem,40vw)] xl:items-stretch xl:overflow-hidden">
-        <div class="app-scrollbar min-w-0 space-y-6 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+      <div class="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(28rem,35vw)]">
+        <div class="min-w-0 space-y-6">
           <CardVersionOverviewPane
             :version="selectedVersion"
             :symbol-by-key="symbolByKey"
@@ -90,11 +90,13 @@
           />
         </div>
 
-        <aside class="app-scrollbar min-w-0 space-y-5 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-[var(--color-border)] xl:pl-6 xl:pr-1">
-          <CardDeckReferencesPanel
-            :deck-references="card?.deck_references ?? []"
-            :current-user-id="auth.user?.id"
-          />
+        <aside class="min-w-0 2xl:sticky 2xl:top-0 2xl:h-[calc(100vh-3rem)] 2xl:max-h-[calc(100vh-11rem)] 2xl:border-l 2xl:border-[var(--color-border)] 2xl:pl-6">
+          <div class="space-y-5 2xl:app-scrollbar 2xl:h-full 2xl:overflow-y-auto 2xl:pr-1">
+            <CardDeckReferencesPanel
+              :deck-references="card?.deck_references ?? []"
+              :current-user-id="auth.user?.id"
+            />
+          </div>
         </aside>
       </div>
     </div>
