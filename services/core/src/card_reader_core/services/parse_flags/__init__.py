@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from card_reader_core.models import CardVersion
+from card_reader_core.models import CardVersion, CardVersionParseFlag
 from card_reader_core.repositories.metadata import (
     get_keywords_for_card_version,
     get_symbols_for_card_version,
@@ -20,7 +20,7 @@ def create_parse_flag_for_card_version(
     submitted_by_id: str,
     note: str,
     items: list[ParseFlagItemInput],
-):
+) -> CardVersionParseFlag | None:
     version = CardVersion.objects.filter(id=version_id, card_id=card_id).first()
     if version is None:
         return None

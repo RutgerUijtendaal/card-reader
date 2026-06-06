@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -87,7 +88,11 @@ class CardVersionParseFlagItem(TimestampedModel):
         blank=True,
     )
     review_note: models.TextField[str, str] = models.TextField(default="", blank=True)
-    reviewed_at: models.DateTimeField = models.DateTimeField(default=None, null=True, blank=True)
+    reviewed_at: models.DateTimeField[datetime | None, datetime | None] = models.DateTimeField(
+        default=None,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         db_table = "card_version_parse_flag_item"

@@ -289,7 +289,7 @@ class CardVersionParseFlagView(APIView):
         return Response(
             {
                 "id": flag.id,
-                "card_version_id": flag.card_version_id,
+                "card_version_id": flag.card_version.id,
                 "item_count": flag.items.count(),
                 "message": "Parse issue submitted.",
             },
