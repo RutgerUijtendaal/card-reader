@@ -193,11 +193,11 @@ import { Pencil } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import { fetchContentVersionCards, fetchContentVersions, updateContentVersion } from '@/modules/admin/api/contentVersions';
-import { buildAdminCardDetailLocation } from '@/modules/admin/adminRouteState';
+import { buildAdminCardDetailLocation } from '@/composables/admin/adminRouteState';
 import { useAdminRouteSync } from '@/modules/admin/composables/useAdminRouteSync';
 import type { ContentVersionRecord } from '@/modules/admin/types';
 import type { CardListItem } from '@/modules/card-detail/types';
-import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
+import { useGalleryOptions } from '@/composables/useGalleryOptions';
 
 const versions = ref<ContentVersionRecord[]>([]);
 const cards = ref<CardListItem[]>([]);

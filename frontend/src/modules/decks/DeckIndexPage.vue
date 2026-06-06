@@ -158,8 +158,8 @@ import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { deleteDeck, fetchMyDecks, fetchPublicDecks, updateDeck } from '@/modules/decks/api';
 import DeckBrowseFiltersPanel from '@/modules/decks/components/DeckBrowseFiltersPanel.vue';
-import DeckLoadingSkeleton from '@/modules/decks/components/DeckLoadingSkeleton.vue';
-import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
+import DeckLoadingSkeleton from '@/components/decks/DeckLoadingSkeleton.vue';
+import DeckListCard from '@/components/decks/DeckListCard.vue';
 import { useDeckBrowseFilters } from '@/modules/decks/composables/useDeckBrowseFilters';
 import {
   buildDeckBrowseFilterApiSearchParams,
@@ -167,13 +167,13 @@ import {
   getDeckBrowseFilterSignature,
   parseDeckBrowseFilterRouteQuery,
   sameDeckBrowseFilterState,
-} from '@/modules/decks/deckBrowseFilterState';
-import { buildDeckUpsertRequestFromRecord } from '@/modules/decks/deckPayload';
-import { buildMyDeckEditorLocation, buildNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
-import { buildDeckShareUrl, canShareDeck } from '@/modules/decks/share';
+} from '@/composables/decks/deckBrowseFilterState';
+import { buildDeckUpsertRequestFromRecord } from '@/composables/decks/deckPayload';
+import { buildMyDeckEditorLocation, buildNewDeckEditorLocation } from '@/composables/decks/deckRouteState';
+import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
 import type { DeckRecord, DeckVisibility } from '@/modules/decks/types';
-import { useDeckExport } from '@/modules/decks/useDeckExport';
-import { deckVisibilityLabels, deckVisibilityOptions } from '@/modules/decks/visibility';
+import { useDeckExport } from '@/composables/useDeckExport';
+import { deckVisibilityLabels, deckVisibilityOptions } from '@/composables/decks/visibility';
 
 const route = useRoute();
 const router = useRouter();

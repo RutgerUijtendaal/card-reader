@@ -74,7 +74,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { buildManaCurve, type ManaCurveCardLike, type ManaCurveEntryLike } from '@/modules/decks/manaCurve';
+import { buildManaCurve, type ManaCurveCardLike, type ManaCurveEntryLike } from '@/composables/decks/manaCurve';
 
 const props = withDefaults(
   defineProps<{

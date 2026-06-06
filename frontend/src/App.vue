@@ -87,7 +87,7 @@ import AppShellNav from '@/components/app/AppShellNav.vue';
 import { useGlobalNavigationHotkeys, usePrimarySearchHotkeys } from '@/composables/useHotkeys';
 import { provideScrollContainer } from '@/composables/useScrollContainer';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { buildContextualNewDeckEditorLocation } from '@/modules/decks/deckRouteState';
+import { buildContextualNewDeckEditorLocation } from '@/composables/decks/deckRouteState';
 
 const route = useRoute();
 const router = useRouter();

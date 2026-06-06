@@ -167,7 +167,7 @@ import { toAbsoluteApiUrl } from '@/api/client';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import CardCompactRowContent from '@/components/cards/CardCompactRowContent.vue';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
-import type { HoverMode } from '@/modules/card-search/hoverMode';
+import type { HoverMode } from '@/composables/card-gallery/hoverMode';
 import type { DeckEntrySummary } from '@/modules/decks/types';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
 import { blurAfterFinePointerActivation, blurFocusedDescendantAfterFinePointerLeave } from '@/utils/pointerFocus';

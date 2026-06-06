@@ -116,10 +116,10 @@ import { ChevronLeft, ChevronRight, Layers3 } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { buildCardReturnLocation } from '@/modules/card-detail/cardReturnState';
+import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
-import CardVersionOverviewPane from '@/modules/card-detail/components/CardVersionOverviewPane.vue';
+import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
 import { useCardPublicDetailState } from '@/modules/card-detail/composables/useCardPublicDetailState';
 
 const route = useRoute();

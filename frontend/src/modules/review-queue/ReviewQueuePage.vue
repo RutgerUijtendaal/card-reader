@@ -46,7 +46,7 @@
 import { onMounted, ref } from 'vue';
 import { ClipboardCheck } from 'lucide-vue-next';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
-import { useCardCollection } from '@/modules/card-search/useCardCollection';
+import { useCardCollection } from '@/composables/useCardCollection';
 
 type ReviewCard = { id: string; name: string; confidence: number };
 const filtersLoaded = ref(true);

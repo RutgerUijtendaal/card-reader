@@ -59,9 +59,9 @@ import { Plus } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import type { CardDeckReferenceSummary } from '@/modules/card-detail/types';
-import { buildCardReturnContextLocation } from '@/modules/card-detail/cardReturnState';
-import DeckLoadingSkeleton from '@/modules/decks/components/DeckLoadingSkeleton.vue';
-import DeckListCard from '@/modules/decks/components/DeckListCard.vue';
+import { buildCardReturnContextLocation } from '@/composables/cards/cardReturnState';
+import DeckLoadingSkeleton from '@/components/decks/DeckLoadingSkeleton.vue';
+import DeckListCard from '@/components/decks/DeckListCard.vue';
 
 const props = defineProps<{
   deckReferences: CardDeckReferenceSummary[];

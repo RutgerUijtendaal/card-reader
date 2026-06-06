@@ -16,7 +16,7 @@ import {
   getImportJobProgressPercent,
   getImportJobStatusClass,
   hasActiveImportJobs,
-} from '@/modules/import-jobs/utils';
+} from '@/modules/import-jobs/utils/importJobUtils';
 
 export const useImportJobsController = () => {
   const pickerTemplateId = ref('mtg-like-v1');

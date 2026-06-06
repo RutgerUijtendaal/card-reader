@@ -3,7 +3,7 @@ import type { CardListItem } from '@/modules/card-detail/types';
 import {
   MAX_DECK_COPIES,
   MAX_SIDEBOARD_ENTRY_QUANTITY,
-} from '@/modules/decks/constants';
+} from '@/composables/decks/constants';
 import {
   getDeckBlockingMessages,
   getDeckConstraintMessages,
@@ -14,8 +14,8 @@ import {
   type DeckBuildingRules,
   type DeckConstraintContext,
   type DeckConstraintScope,
-} from '@/modules/decks/deckConstraints';
-import { fallbackDeckBuildingRules } from '@/modules/decks/deckRules';
+} from '@/composables/decks/deckConstraints';
+import { fallbackDeckBuildingRules } from '@/composables/decks/deckRules';
 import type { DeckCardSummary, DeckMetadataOption, DeckRecord, DeckUpsertRequest, DeckVisibility } from '@/modules/decks/types';
 
 export type DeckFormEntry = {

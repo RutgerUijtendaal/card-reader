@@ -70,8 +70,8 @@
 <script setup lang="ts">
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
-import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
-import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
+import CardFilterSections from '@/components/filters/CardFilterSections.vue';
+import GalleryFilterSidebar from '@/components/filters/GalleryFilterSidebar.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 
 defineProps<{

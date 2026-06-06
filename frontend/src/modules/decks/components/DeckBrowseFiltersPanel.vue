@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
-import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
+import GalleryFilterSidebar from '@/components/filters/GalleryFilterSidebar.vue';
 import type { DeckBrowseFiltersController } from '@/modules/decks/composables/useDeckBrowseFilters';
 
 const props = defineProps<{

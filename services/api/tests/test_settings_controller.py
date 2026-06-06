@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, override_settings
 from PIL import Image
 
-from card_reader_api.catalog.views import _store_symbol_asset
+from card_reader_api.catalog.assets import store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
 from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
@@ -76,7 +76,7 @@ def test_upload_symbol_asset_stores_under_uploads(tmp_path: Path, monkeypatch) -
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
     upload = SimpleUploadedFile("Fire Mana.PNG", BytesIO(b"symbol-asset").read())
 
-    stored_path = _store_symbol_asset(upload, "Fire Mana.PNG", ".png")
+    stored_path = store_symbol_asset(upload, "Fire Mana.PNG", ".png")
     relative_path = f"uploads/{stored_path.name}"
 
     assert relative_path.startswith("uploads/fire-mana-")

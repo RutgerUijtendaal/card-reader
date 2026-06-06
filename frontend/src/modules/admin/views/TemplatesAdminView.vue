@@ -170,7 +170,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import AppSelect from '@/components/app/AppSelect.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
-import JsonEditorField from '@/modules/admin/components/JsonEditorField.vue';
+import JsonEditorField from '@/components/forms/JsonEditorField.vue';
 import TemplatePreviewPane from '@/modules/admin/components/TemplatePreviewPane.vue';
 import {
   createTemplate,

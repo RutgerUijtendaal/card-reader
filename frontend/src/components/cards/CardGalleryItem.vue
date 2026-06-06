@@ -149,9 +149,9 @@ import { fetchHoverPreviewCard } from '@/components/cards/cardHoverPreview';
 import type { GalleryDisplayItem } from '@/components/cards/galleryDisplayItems';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
-import { cardIsDeprecated } from '@/modules/card-filters/cardLifecycle';
-import { buildCardDetailLocation, buildGalleryItemLocation } from '@/modules/card-search/galleryNavigation';
-import { DEFAULT_HOVER_MODE, type HoverMode } from '@/modules/card-search/hoverMode';
+import { cardIsDeprecated } from '@/composables/card-filters/cardLifecycle';
+import { buildCardDetailLocation, buildGalleryItemLocation } from '@/composables/card-gallery/galleryNavigation';
+import { DEFAULT_HOVER_MODE, type HoverMode } from '@/composables/card-gallery/hoverMode';
 import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';
 import { blurAfterFinePointerActivation, blurFocusedDescendantAfterFinePointerLeave } from '@/utils/pointerFocus';
 

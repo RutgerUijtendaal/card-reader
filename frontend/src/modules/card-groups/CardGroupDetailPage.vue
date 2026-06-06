@@ -93,12 +93,12 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
-import CardVersionOverviewPane from '@/modules/card-detail/components/CardVersionOverviewPane.vue';
+import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
 import {
   buildCardLifecycleApiParams,
   normalizeCardLifecycleFilterValue,
-} from '@/modules/card-filters/cardLifecycle';
-import { buildGalleryLocation, useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
+} from '@/composables/card-filters/cardLifecycle';
+import { buildGalleryLocation, useGalleryCardNavigation } from '@/composables/card-gallery/galleryNavigation';
 import type { CardFiltersResponse, CardGroupDetail, SymbolLookupMap } from '@/modules/card-detail/types';
 
 const route = useRoute();

@@ -5,7 +5,7 @@ import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckRe
 import type { CardDeckReferenceSummary } from '@/modules/card-detail/types';
 import type { DeckRecord } from '@/modules/decks/types';
 
-vi.mock('@/modules/decks/useDeckExport', () => ({
+vi.mock('@/composables/useDeckExport', () => ({
   useDeckExport: () => ({
     exportTtsDeck: vi.fn(),
   }),

@@ -41,7 +41,7 @@ import { computed } from 'vue';
 import { ArrowUpDown } from 'lucide-vue-next';
 import PopoverOptionList, { type PopoverOptionItem } from '@/components/cards/PopoverOptionList.vue';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
-import { cardSortOptions, getCardSortCompactLabel, getCardSortLabel, type CardSort } from '@/modules/card-search/cardSort';
+import { cardSortOptions, getCardSortCompactLabel, getCardSortLabel, type CardSort } from '@/composables/card-gallery/cardSort';
 
 const props = withDefaults(
   defineProps<{

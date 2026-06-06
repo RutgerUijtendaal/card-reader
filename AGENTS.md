@@ -66,9 +66,18 @@ Core stack:
   - Current repository packages include `cards`, `card_groups`, `decks`, `exports`, `import_jobs`, `metadata`, and `templates`.
   - Shared repository helpers belong in `repositories/helpers.py`; avoid recreating legacy `*_repository.py` modules.
 - Prefer importing from package public APIs, such as `card_reader_core.repositories.cards` or `card_reader_core.services.decks`, rather than deep module paths unless the caller is inside the same package.
-- Keep shared card filtering logic centralized in `frontend/src/modules/card-filters`.
-  - Route/query parsing, stable key-based filter state, key/id translation, and API filter param building belong there.
+- Keep shared frontend logic in `frontend/src/composables`.
+  - Use domain subfolders such as `card-filters`, `card-gallery`, `decks`, `cards`, and `admin` when shared logic belongs to a real domain concept.
+  - Shared card filtering logic belongs in `frontend/src/composables/card-filters`: route/query parsing, stable key-based filter state, key/id translation, API filter param building, lifecycle helpers, and filter controller composables.
+  - Shared gallery/search behavior belongs in `frontend/src/composables/card-gallery` or root composables such as `useCardCollection`, `useGalleryOptions`, and preference composables.
   - Page modules such as gallery/review/pickers should only own page-specific behavior like pagination, navigation context, and scroll restoration.
+- Keep shared Vue components in `frontend/src/components`.
+  - Use domain subfolders such as `app`, `cards`, `decks`, `filters`, `forms`, and `modals`.
+  - If a component is consumed by more than one module, move it to `frontend/src/components` instead of importing across module component folders.
+- Keep frontend module roots focused on module entrypoints and core module files.
+  - Acceptable module-root files are pages/views, `api.ts`, `types.ts`, stores, and other true module entrypoints.
+  - Place module-owned implementation details under `components`, `composables`, `utils`, or `tests`.
+  - Do not import from another module's `components`, `composables`, or `utils` folders; promote genuinely shared code to root `frontend/src/components` or `frontend/src/composables`.
 - Django owns the domain schema through migrations in `services/core`.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:

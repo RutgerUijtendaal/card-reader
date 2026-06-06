@@ -1,8 +1,8 @@
 import { computed, type Ref } from 'vue';
 import type { CardListItem } from '@/modules/card-detail/types';
-import type { CardFilterSelectionState } from '@/modules/card-filters/cardFilterState';
-import type { CardSort } from '@/modules/card-search/cardSort';
-import { useCardCollection } from '@/modules/card-search/useCardCollection';
+import type { CardFilterSelectionState } from '@/composables/card-filters/cardFilterState';
+import type { CardSort } from '@/composables/card-gallery/cardSort';
+import { useCardCollection } from '@/composables/useCardCollection';
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 
 type UseDeckEditorGalleryOptions = {

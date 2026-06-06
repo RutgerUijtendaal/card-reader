@@ -62,7 +62,7 @@ import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
-import { buildAdminCardDetailLocation } from '@/modules/admin/adminRouteState';
+import { buildAdminCardDetailLocation } from '@/composables/admin/adminRouteState';
 import type { LinkedCardPreview } from '@/modules/admin/types';
 
 defineProps<{

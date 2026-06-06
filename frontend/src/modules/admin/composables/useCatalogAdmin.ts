@@ -17,7 +17,7 @@ import type {
 import {
   parseAdminCatalogKind,
   parseAdminEntryId,
-} from '@/modules/admin/adminRouteState';
+} from '@/composables/admin/adminRouteState';
 import { useAdminRouteSync } from '@/modules/admin/composables/useAdminRouteSync';
 import {
   CATALOG_KIND_GROUPS,

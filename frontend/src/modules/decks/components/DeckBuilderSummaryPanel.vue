@@ -408,7 +408,7 @@ import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
 import type { DeckVisibility } from '@/modules/decks/types';
-import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/modules/decks/visibility';
+import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/composables/decks/visibility';
 
 const props = defineProps<{
   controller: DeckEditorController;

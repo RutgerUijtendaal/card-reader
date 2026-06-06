@@ -188,7 +188,7 @@
 import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolizedText from '@/components/SymbolizedText.vue';
-import { cardIsDeprecated } from '@/modules/card-filters/cardLifecycle';
+import { cardIsDeprecated } from '@/composables/card-filters/cardLifecycle';
 import type { CardListItem } from '@/modules/card-detail/types';
 
 const props = defineProps<{

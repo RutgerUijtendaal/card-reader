@@ -7,7 +7,7 @@ import {
   createDeckBrowseFilterCatalog,
   createEmptyDeckBrowseFilterState,
   type DeckBrowseFilterState,
-} from '@/modules/decks/deckBrowseFilterState';
+} from '@/composables/decks/deckBrowseFilterState';
 
 const EMPTY_FILTERS: CardFiltersResponse = {
   keywords: [],

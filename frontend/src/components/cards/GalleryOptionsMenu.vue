@@ -133,8 +133,8 @@ import { SlidersHorizontal } from 'lucide-vue-next';
 import AppSelect from '@/components/app/AppSelect.vue';
 import PopoverOptionList, { type PopoverOptionItem } from '@/components/cards/PopoverOptionList.vue';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
-import { HOVER_MODE_OPTIONS, type HoverMode } from '@/modules/card-search/hoverMode';
-import { CARD_PAGE_SIZE_OPTIONS } from '@/modules/card-search/pageSize';
+import { HOVER_MODE_OPTIONS, type HoverMode } from '@/composables/card-gallery/hoverMode';
+import { CARD_PAGE_SIZE_OPTIONS } from '@/composables/card-gallery/pageSize';
 
 const props = withDefaults(
   defineProps<{
