@@ -1,5 +1,5 @@
-import type { CardLifecycleStatus } from '@/modules/card-filters/cardLifecycle';
-import type { DeckBuildingConfig } from '@/modules/decks/deckConstraints';
+import type { CardLifecycleStatus } from '@/composables/card-filters/cardLifecycle';
+import type { DeckBuildingConfig } from '@/composables/decks/deckConstraints';
 
 export type CardTooltipSymbolLookup = {
   asset_url?: string | null;

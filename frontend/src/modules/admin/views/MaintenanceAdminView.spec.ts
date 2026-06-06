@@ -22,7 +22,7 @@ vi.mock('vue-sonner', () => ({
   },
 }));
 
-vi.mock('@/modules/card-search/components/CardFilterSections.vue', () => ({
+vi.mock('@/components/filters/CardFilterSections.vue', () => ({
   default: {
     template: '<div />',
   },

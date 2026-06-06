@@ -1,5 +1,5 @@
 import { useRoute, useRouter } from 'vue-router';
-import { buildAdminQuery, type AdminTab } from '@/modules/admin/adminRouteState';
+import { buildAdminQuery, type AdminTab } from '@/composables/admin/adminRouteState';
 import type { CatalogKind } from '@/modules/admin/types';
 
 type AdminRouteUpdates = {

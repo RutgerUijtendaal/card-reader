@@ -102,7 +102,7 @@ import { computed, ref } from 'vue';
 import { ChevronDown, RotateCcw } from 'lucide-vue-next';
 import SymbolToken from '@/components/SymbolToken.vue';
 import type { SymbolFilterOption } from '@/modules/card-detail/types';
-import type { SymbolFilterTriState } from '@/modules/card-search/cardFilterSectionsState';
+import type { SymbolFilterTriState } from '@/composables/card-filters/cardFilterSectionsState';
 
 const props = withDefaults(
   defineProps<{

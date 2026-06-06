@@ -132,7 +132,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import JsonEditorField from '@/modules/admin/components/JsonEditorField.vue';
+import JsonEditorField from '@/components/forms/JsonEditorField.vue';
 import type { CatalogFormEntry, CatalogKind } from '@/modules/admin/types';
 import { textEnrichmentExample } from '@/modules/admin/composables/catalogAdminUtils';
 

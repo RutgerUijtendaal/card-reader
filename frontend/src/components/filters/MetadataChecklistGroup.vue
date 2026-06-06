@@ -117,7 +117,7 @@
 import { computed, ref, watch } from 'vue';
 import { ChevronDown, RotateCcw, Star } from 'lucide-vue-next';
 import type { MetadataOption } from '@/modules/card-detail/types';
-import type { MetadataFavoriteGroup } from '@/modules/card-filters/useMetadataFilterFavorites';
+import type { MetadataFavoriteGroup } from '@/composables/card-filters/useMetadataFilterFavorites';
 import { blurAfterFinePointerActivation } from '@/utils/pointerFocus';
 
 const props = withDefaults(

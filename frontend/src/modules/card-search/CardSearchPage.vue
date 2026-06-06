@@ -119,20 +119,20 @@ import {
   getCardFilterSignature,
   parseCardFilterRouteQuery,
   sameCardFilterState,
-} from '@/modules/card-filters/cardFilterState';
-import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
+} from '@/composables/card-filters/cardFilterState';
+import { useCardFilterController } from '@/composables/card-filters/useCardFilterController';
 import {
   getGallerySnapshot,
   saveGallerySnapshot,
   setGalleryNavigationCards,
-} from '@/modules/card-search/galleryNavigation';
-import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
-import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
-import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
-import GalleryFilterSidebar from '@/modules/card-search/components/GalleryFilterSidebar.vue';
-import { useCardCollection } from '@/modules/card-search/useCardCollection';
-import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
-import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
+} from '@/composables/card-gallery/galleryNavigation';
+import { appendCardSortSearchParam } from '@/composables/card-gallery/cardSort';
+import { useCardSortSurface } from '@/composables/useCardSortPreferences';
+import CardFilterSections from '@/components/filters/CardFilterSections.vue';
+import GalleryFilterSidebar from '@/components/filters/GalleryFilterSidebar.vue';
+import { useCardCollection } from '@/composables/useCardCollection';
+import { useGalleryOptions } from '@/composables/useGalleryOptions';
+import { useHoverModeSurface } from '@/composables/useHoverModePreferences';
 
 const route = useRoute();
 const router = useRouter();

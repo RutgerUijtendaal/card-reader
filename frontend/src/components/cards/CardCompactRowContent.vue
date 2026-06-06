@@ -61,7 +61,7 @@ import { TriangleAlert } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolizedText from '@/components/SymbolizedText.vue';
 import type { CardHoverTooltipModel } from '@/components/cards/cardModels';
-import { cardIsDeprecated } from '@/modules/card-filters/cardLifecycle';
+import { cardIsDeprecated } from '@/composables/card-filters/cardLifecycle';
 
 type CardCompactRowCard = Pick<
   CardHoverTooltipModel,

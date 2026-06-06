@@ -7,8 +7,8 @@ import {
   buildCardEditorReturnLocation,
   buildCardReturnLocation,
   getCardReturnLabel,
-} from '@/modules/card-detail/cardReturnState';
-import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
+} from '@/composables/cards/cardReturnState';
+import { useGalleryCardNavigation } from '@/composables/card-gallery/galleryNavigation';
 import type {
   CardDetail,
   CardFiltersResponse,

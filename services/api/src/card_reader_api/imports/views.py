@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
 from uuid import uuid4
 
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
+from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.imports.serializers import (
     ImportUploadSerializer,
     content_version_payload,
@@ -55,11 +53,11 @@ class ImportUploadView(APIView):
             }
         )
         if not serializer.is_valid():
-            return _serializer_error(serializer)
+            return serializer_error(serializer)
 
         upload_dir = _save_supported_uploads(serializer.validated_data["files"])
         if upload_dir is None:
-            return _bad_request("No supported image files found in upload")
+            return bad_request("No supported image files found in upload")
 
         try:
             job = ImportService().create_job(
@@ -70,7 +68,7 @@ class ImportUploadView(APIView):
                 content_version_description=serializer.validated_data["content_version_description"],
             )
         except ValueError as exc:
-            return _bad_request(str(exc))
+            return bad_request(str(exc))
         except Exception:
             logger.exception("Failed to create import job from upload. upload_dir=%s", upload_dir)
             return Response(
@@ -84,7 +82,7 @@ class ImportDetailView(APIView):
     def get(self, _request: Request, job_id: str) -> Response:
         job = fetch_job(job_id)
         if job is None:
-            return Response({"detail": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Job not found")
         return Response(import_detail_payload(job, fetch_items_for_job(job_id)))
 
 
@@ -92,7 +90,7 @@ class ImportCancelView(APIView):
     def post(self, _request: Request, job_id: str) -> Response:
         job = ImportService().cancel_job(job_id=job_id)
         if job is None:
-            return Response({"detail": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Job not found")
         return Response(import_job_payload(job), status=status.HTTP_202_ACCEPTED)
 
 
@@ -114,15 +112,3 @@ def _save_supported_uploads(files: list[UploadedFile]) -> str | None:
         saved_count += 1
 
     return upload_dir if saved_count else None
-
-
-def _bad_request(detail: str) -> Response:
-    return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
-
-
-def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
-    errors = serializer.errors
-    detail = next(iter(cast(Mapping[str, object], errors).values()), "Invalid request.")
-    if isinstance(detail, list):
-        detail = detail[0]
-    return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)

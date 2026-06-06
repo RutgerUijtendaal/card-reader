@@ -2,13 +2,13 @@ import { onKeyStroke } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
-import { buildCardReturnLocation, getCardReturnLabel } from '@/modules/card-detail/cardReturnState';
-import { buildEffectiveSymbolIds, getRuleTextSymbolState } from '@/modules/card-detail/ruleTextSymbols';
+import { buildCardReturnLocation, getCardReturnLabel } from '@/composables/cards/cardReturnState';
+import { buildEffectiveSymbolIds, getRuleTextSymbolState } from '@/composables/cards/ruleTextSymbols';
 import {
   ACTIVE_CARD_LIFECYCLE_STATUS,
   normalizeCardLifecycleStatus,
-} from '@/modules/card-filters/cardLifecycle';
-import { useGalleryCardNavigation } from '@/modules/card-search/galleryNavigation';
+} from '@/composables/card-filters/cardLifecycle';
+import { useGalleryCardNavigation } from '@/composables/card-gallery/galleryNavigation';
 import type {
   CardDetail,
   CardFiltersResponse,
@@ -31,7 +31,7 @@ import {
   fallbackDeckBuildingConfigExample,
   fetchDeckRulesMetadata,
   formatDeckBuildingConfigJson,
-} from '@/modules/decks/deckRules';
+} from '@/composables/decks/deckRules';
 
 export const useCardDetailState = () => {
   const route = useRoute();

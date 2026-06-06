@@ -1,5 +1,5 @@
 import type { CardHoverTooltipModel } from '@/components/cards/cardModels';
-import type { DeckBuildingRules } from '@/modules/decks/deckConstraints';
+import type { DeckBuildingRules } from '@/composables/decks/deckConstraints';
 
 export type DeckMetadataOption = {
   id: string;

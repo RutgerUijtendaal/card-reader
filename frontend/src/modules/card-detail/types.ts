@@ -1,5 +1,5 @@
 import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/components/cards/cardModels';
-import type { CardLifecycleStatus } from '@/modules/card-filters/cardLifecycle';
+import type { CardLifecycleStatus } from '@/composables/card-filters/cardLifecycle';
 import type { DeckRecord } from '@/modules/decks/types';
 
 export type MetadataOption = {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { ref } from 'vue';
 import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
-import { resolveDeckBuildingRules } from '@/modules/decks/deckConstraints';
+import { resolveDeckBuildingRules } from '@/composables/decks/deckConstraints';
 import type { DeckCardSummary } from '@/modules/decks/types';
 
 const buildCard = (id: string, name: string, manaValue = 1): DeckCardSummary =>

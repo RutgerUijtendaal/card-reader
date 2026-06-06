@@ -1,19 +1,19 @@
 import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { computed, ref, type Ref } from 'vue';
-import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/modules/card-filters/cardLifecycle';
+import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/composables/card-filters/cardLifecycle';
 import {
   buildCardFilterApiSearchParams,
   createEmptyCardFilterSelectionState,
   createEmptyCardFilterState,
   type CardFilterSelectionState,
-} from '@/modules/card-filters/cardFilterState';
-import type { HoverMode } from '@/modules/card-search/hoverMode';
-import { appendCardSortSearchParam } from '@/modules/card-search/cardSort';
-import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
-import { useGalleryOptions } from '@/modules/card-search/useGalleryOptions';
-import { useHoverModeSurface } from '@/modules/card-search/useHoverModePreferences';
-import { useCardSortSurface } from '@/modules/card-search/useCardSortPreferences';
-import { buildHeroAffinityManaPreset } from '@/modules/decks/affinityMana';
+} from '@/composables/card-filters/cardFilterState';
+import type { HoverMode } from '@/composables/card-gallery/hoverMode';
+import { appendCardSortSearchParam } from '@/composables/card-gallery/cardSort';
+import { useCardFilterController } from '@/composables/card-filters/useCardFilterController';
+import { useGalleryOptions } from '@/composables/useGalleryOptions';
+import { useHoverModeSurface } from '@/composables/useHoverModePreferences';
+import { useCardSortSurface } from '@/composables/useCardSortPreferences';
+import { buildHeroAffinityManaPreset } from '@/composables/decks/affinityMana';
 import type { DeckCardSummary } from '@/modules/decks/types';
 
 type UseDeckEditorFiltersOptions = {

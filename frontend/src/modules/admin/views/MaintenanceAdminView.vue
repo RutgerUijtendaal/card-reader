@@ -164,14 +164,14 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { api } from '@/api/client';
-import CardFilterSections from '@/modules/card-search/components/CardFilterSections.vue';
+import CardFilterSections from '@/components/filters/CardFilterSections.vue';
 import type { MaintenanceActionResponse } from '@/modules/admin/types';
 import type { PaginatedCardsResponse } from '@/modules/card-detail/types';
 import {
   buildCardFilterApiPayload,
   buildCardFilterApiSearchParams,
-} from '@/modules/card-filters/cardFilterState';
-import { useCardFilterController } from '@/modules/card-filters/useCardFilterController';
+} from '@/composables/card-filters/cardFilterState';
+import { useCardFilterController } from '@/composables/card-filters/useCardFilterController';
 
 const runningBackfillSuggestions = ref(false);
 const runningQueueReparse = ref(false);

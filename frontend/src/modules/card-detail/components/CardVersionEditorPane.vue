@@ -523,16 +523,16 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { Lock } from 'lucide-vue-next';
 import AppSelect from '@/components/app/AppSelect.vue';
 import SymbolToken from '@/components/SymbolToken.vue';
-import JsonEditorField from '@/modules/admin/components/JsonEditorField.vue';
+import JsonEditorField from '@/components/forms/JsonEditorField.vue';
 import {
   ACTIVE_CARD_LIFECYCLE_STATUS,
   DEPRECATED_CARD_LIFECYCLE_STATUS,
   type CardLifecycleStatus,
-} from '@/modules/card-filters/cardLifecycle';
+} from '@/composables/card-filters/cardLifecycle';
 import {
   applySymbolAutocomplete,
   findActiveSymbolTrigger,
-} from '@/modules/card-detail/ruleTextSymbols';
+} from '@/composables/cards/ruleTextSymbols';
 import type {
   CardVersionDetail,
   EditorForm,

@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, cast
-
 from rest_framework import serializers
-from rest_framework.response import Response
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
@@ -132,11 +128,3 @@ class CardGroupWriteSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     anchor_card_id = serializers.CharField(required=False)
     members = CardGroupMemberWriteSerializer(many=True, required=False)
-
-
-def serializer_error(serializer: serializers.BaseSerializer[Any]) -> Response:
-    errors = serializer.errors
-    detail = next(iter(cast(Mapping[str, object], errors).values()), "Invalid request.")
-    if isinstance(detail, list):
-        detail = detail[0]
-    return Response({"detail": str(detail)}, status=400)

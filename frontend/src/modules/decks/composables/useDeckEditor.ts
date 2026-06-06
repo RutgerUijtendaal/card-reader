@@ -10,9 +10,9 @@ import {
   buildDeckEditorLocation,
   buildDeckEditorReturnLocation,
   getDeckEditorReturnLabel,
-} from '@/modules/decks/deckRouteState';
+} from '@/composables/decks/deckRouteState';
 import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
-import { fallbackDeckBuildingRules, fetchDeckRulesMetadata } from '@/modules/decks/deckRules';
+import { fallbackDeckBuildingRules, fetchDeckRulesMetadata } from '@/composables/decks/deckRules';
 
 export const useDeckEditor = () => {
   const route = useRoute();

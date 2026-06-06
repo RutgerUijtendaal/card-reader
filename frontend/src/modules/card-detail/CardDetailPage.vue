@@ -159,16 +159,16 @@ import { computed, onMounted } from 'vue';
 import { ChevronLeft, ChevronRight, GitMerge, SquarePen } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
-import { buildAdminCardMergeSourceLocation } from '@/modules/admin/adminRouteState';
-import { buildCardReturnLocation } from '@/modules/card-detail/cardReturnState';
+import { buildAdminCardMergeSourceLocation } from '@/composables/admin/adminRouteState';
+import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
-import CardVersionOverviewPane from '@/modules/card-detail/components/CardVersionOverviewPane.vue';
+import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
 import { useCardDetailState } from '@/modules/card-detail/composables/useCardDetailState';
 import {
   cardIsDeprecated,
   type CardLifecycleStatus,
-} from '@/modules/card-filters/cardLifecycle';
+} from '@/composables/card-filters/cardLifecycle';
 import type { ScalarFieldName } from '@/modules/card-detail/types';
 
 const {
