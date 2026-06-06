@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
 
 from django.db import transaction
 
@@ -24,7 +23,10 @@ from ..card_groups import card_is_group_anchor
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
 from ..metadata import (
     SuggestionCandidate,
+    get_keywords_for_card_version,
     get_symbols_for_card_version,
+    get_tags_for_card_version,
+    get_types_for_card_version,
     replace_card_version_metadata_suggestions,
     replace_card_version_keywords,
     replace_card_version_symbols,
@@ -93,10 +95,9 @@ def save_parsed_card(
             )
         if existing_version is not None:
             if should_create_content_version_snapshot(item, existing_version):
-                snapshot_card = cast(Card, existing_version.card)
-                version = create_parsed_card_version(
+                version = create_content_version_snapshot_from_existing(
                     item=item,
-                    card=snapshot_card,
+                    source_version=existing_version,
                     template_id=template_id,
                     checksum=checksum,
                     normalized_fields=normalized_fields,
@@ -109,11 +110,8 @@ def save_parsed_card(
                     tag_suggestions=tag_suggestions or [],
                     type_suggestions=type_suggestions or [],
                 )
-                snapshot_card.label = version.name
-                snapshot_card.latest_version = version
-                snapshot_card.updated_at = now_utc()
-                snapshot_card.save(update_fields=["label", "latest_version", "updated_at"])
-                sync_import_item_lifecycle_warning(item, snapshot_card)
+                apply_latest_version_identity(existing_version.card, version)
+                sync_import_item_lifecycle_warning(item, existing_version.card)
                 mark_item_completed(item)
                 return version
             return update_existing_version(
@@ -137,9 +135,9 @@ def save_parsed_card(
         latest = get_latest_card_version(card.id)
         if latest and latest.image_hash == checksum and reparse_existing:
             if should_create_content_version_snapshot(item, latest):
-                version = create_parsed_card_version(
+                version = create_content_version_snapshot_from_existing(
                     item=item,
-                    card=card,
+                    source_version=latest,
                     template_id=template_id,
                     checksum=checksum,
                     normalized_fields=normalized_fields,
@@ -152,10 +150,7 @@ def save_parsed_card(
                     tag_suggestions=tag_suggestions or [],
                     type_suggestions=type_suggestions or [],
                 )
-                card.label = version.name
-                card.latest_version = version
-                card.updated_at = now_utc()
-                card.save(update_fields=["label", "latest_version", "updated_at"])
+                apply_latest_version_identity(card, version)
                 sync_import_item_lifecycle_warning(item, card)
                 mark_item_completed(item)
                 return version
@@ -191,11 +186,27 @@ def save_parsed_card(
         sync_import_item_lifecycle_warning(item, card)
         mark_item_completed(item)
 
-        card.label = parsed_name
-        card.latest_version = version
-        card.updated_at = now_utc()
-        card.save(update_fields=["label", "latest_version", "updated_at"])
+        apply_latest_version_identity(card, version)
         return version
+
+
+def apply_latest_version_identity(card: Card, version: CardVersion) -> None:
+    update_fields = ["latest_version", "updated_at"]
+    card.latest_version = version
+    card.updated_at = now_utc()
+    next_key = normalize_slug_key(version.name)
+    if next_key != card.key or card.label != version.name:
+        previous_key = card.key
+        previous_label = card.label
+        conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
+        conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
+        if conflicting_card is not None or conflicting_alias is not None:
+            raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
+        card.label = version.name
+        card.key = next_key
+        ensure_card_alias(card=card, key=previous_key, label=previous_label)
+        update_fields = ["label", "key", *update_fields]
+    card.save(update_fields=list(dict.fromkeys(update_fields)))
 
 
 def should_create_content_version_snapshot(item: ImportJobItem, version: CardVersion) -> bool:
@@ -246,6 +257,119 @@ def create_parsed_card_version(
         symbol_ids=symbol_ids,
     )
     save_image_record(version, item.source_file, checksum)
+    return version
+
+
+def create_content_version_snapshot_from_existing(
+    *,
+    item: ImportJobItem,
+    source_version: CardVersion,
+    template_id: str,
+    checksum: str,
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+    raw_ocr: dict[str, object],
+    keyword_ids: list[str],
+    tag_ids: list[str],
+    type_ids: list[str],
+    symbol_ids: list[str],
+    tag_suggestions: list[SuggestionCandidate],
+    type_suggestions: list[SuggestionCandidate],
+) -> CardVersion:
+    version = clone_card_version_for_content_version_snapshot(
+        item=item,
+        source_version=source_version,
+        template_id=template_id,
+        checksum=checksum,
+    )
+    apply_parsed_output_to_version(
+        version,
+        normalized_fields=normalized_fields,
+        confidence=confidence,
+        keyword_ids=keyword_ids,
+        tag_ids=tag_ids,
+        type_ids=type_ids,
+        symbol_ids=symbol_ids,
+    )
+    parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
+    replace_card_version_metadata_suggestions(
+        card_version_id=version.id,
+        kind="tag",
+        candidates=tag_suggestions,
+        parse_result_id=parse_result.id,
+    )
+    replace_card_version_metadata_suggestions(
+        card_version_id=version.id,
+        kind="type",
+        candidates=type_suggestions,
+        parse_result_id=parse_result.id,
+    )
+    save_parsed_snapshot(
+        version,
+        normalized_fields=normalized_fields,
+        keyword_ids=keyword_ids,
+        tag_ids=tag_ids,
+        type_ids=type_ids,
+        symbol_ids=symbol_ids,
+    )
+    version.updated_at = now_utc()
+    version.save()
+    save_image_record(version, item.source_file, checksum)
+    return version
+
+
+def clone_card_version_for_content_version_snapshot(
+    *,
+    item: ImportJobItem,
+    source_version: CardVersion,
+    template_id: str,
+    checksum: str,
+) -> CardVersion:
+    template = get_template_by_key(key=template_id)
+    if template is None:
+        raise ValueError(f"Unknown template_id '{template_id}'")
+
+    source_version.is_latest = False
+    source_version.updated_at = now_utc()
+    source_version.save(update_fields=["is_latest", "updated_at"])
+    version = CardVersion.objects.create(
+        card=source_version.card,
+        version_number=source_version.version_number + 1,
+        template=template,
+        image_hash=checksum,
+        name=source_version.name,
+        type_line=source_version.type_line,
+        mana_cost=source_version.mana_cost,
+        mana_symbols_json=source_version.mana_symbols_json,
+        mana_value=source_version.mana_value,
+        attack=source_version.attack,
+        health=source_version.health,
+        rules_text_raw=source_version.rules_text_raw,
+        rules_text_enriched=source_version.rules_text_enriched,
+        rules_text=source_version.rules_text,
+        confidence=source_version.confidence,
+        field_sources_json=source_version.field_sources_json,
+        parsed_snapshot_json=source_version.parsed_snapshot_json,
+        is_latest=True,
+        previous_version=source_version,
+        content_version=item.job.content_version,
+    )
+    replace_card_version_keywords(
+        card_version_id=version.id,
+        keyword_ids=[row.id for row in get_keywords_for_card_version(source_version.id)],
+    )
+    replace_card_version_tags(
+        card_version_id=version.id,
+        tag_ids=[row.id for row in get_tags_for_card_version(source_version.id)],
+    )
+    replace_card_version_types(
+        card_version_id=version.id,
+        type_ids=[row.id for row in get_types_for_card_version(source_version.id)],
+    )
+    replace_card_version_symbols(
+        card_version_id=version.id,
+        symbol_ids=[row.id for row in get_symbols_for_card_version(source_version.id)],
+    )
     return version
 
 
@@ -458,18 +582,7 @@ def promote_card_version(
         version.updated_at = now_utc()
         version.save(update_fields=["is_latest", "updated_at"])
 
-        next_key = normalize_slug_key(version.name)
-        conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
-        conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
-        if conflicting_card is not None or conflicting_alias is not None:
-            raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
-
-        ensure_card_alias(card=card, key=card.key, label=card.label)
-        card.latest_version = version
-        card.label = version.name
-        card.key = next_key
-        card.updated_at = now_utc()
-        card.save(update_fields=["latest_version", "label", "key", "updated_at"])
+        apply_latest_version_identity(card, version)
         return card, version
 
 
@@ -512,7 +625,6 @@ def update_existing_version(
     template_id: str | None = None,
     reset_manual_state: bool = False,
 ) -> CardVersion:
-    previous_name = version.name
     if template_id is not None:
         template = get_template_by_key(key=template_id)
         if template is None:
@@ -554,20 +666,7 @@ def update_existing_version(
     version.save()
     card = Card.objects.filter(id=version.card.id).first()
     if card is not None:
-        update_fields = ["latest_version", "updated_at"]
-        card.latest_version = version
-        card.updated_at = now_utc()
-        if version.name != previous_name or reset_manual_state:
-            next_key = normalize_slug_key(version.name)
-            conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
-            conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
-            if conflicting_card is not None or conflicting_alias is not None:
-                raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
-            ensure_card_alias(card=card, key=card.key, label=card.label)
-            card.label = version.name
-            card.key = next_key
-            update_fields = ["label", "key", *update_fields]
-        card.save(update_fields=list(dict.fromkeys(update_fields)))
+        apply_latest_version_identity(card, version)
         sync_import_item_lifecycle_warning(item, card)
     mark_item_completed(item)
     return version

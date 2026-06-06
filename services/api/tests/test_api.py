@@ -2045,9 +2045,9 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
 def test_targeted_reparse_preserves_existing_card_version_content_version() -> None:
     _card, target_version = _create_editable_card_version(name="Content Version Reparse")
     original_content_version = ContentVersion.objects.create(
-        version_number="71.1.0",
-        base_version="71.1",
-        major=71,
+        version_number="171.1.0",
+        base_version="171.1",
+        major=171,
         minor=1,
         patch=0,
         description="Original import version.",
@@ -2055,9 +2055,9 @@ def test_targeted_reparse_preserves_existing_card_version_content_version() -> N
     target_version.content_version = original_content_version
     target_version.save(update_fields=["content_version"])
     content_version = ContentVersion.objects.create(
-        version_number="71.2.0",
-        base_version="71.2",
-        major=71,
+        version_number="171.2.0",
+        base_version="171.2",
+        major=171,
         minor=2,
         patch=0,
         description="Updated import version.",
@@ -2097,26 +2097,46 @@ def test_targeted_reparse_preserves_existing_card_version_content_version() -> N
 
 
 def test_ordinary_import_matching_latest_checksum_creates_new_content_version_snapshot() -> None:
-    card, target_version = _create_editable_card_version(name="Content Version Snapshot")
+    card, target_version = _create_editable_card_version(name="Content Version Snapshot Old")
+    manual_tag = Tag.objects.create(key="manual-snapshot-tag", label="Manual Snapshot Tag")
+    ocr_tag = Tag.objects.create(key="ocr-snapshot-tag", label="OCR Snapshot Tag")
     original_content_version = ContentVersion.objects.create(
-        version_number="71.3.0",
-        base_version="71.3",
-        major=71,
+        version_number="171.3.0",
+        base_version="171.3",
+        major=171,
         minor=3,
         patch=0,
         description="Original import version.",
     )
     next_content_version = ContentVersion.objects.create(
-        version_number="71.3.1",
-        base_version="71.3",
-        major=71,
+        version_number="171.3.1",
+        base_version="171.3",
+        major=171,
         minor=3,
         patch=1,
         description="Next import version.",
     )
     target_version.content_version = original_content_version
     target_version.image_hash = "content-version-snapshot-checksum"
-    target_version.save(update_fields=["content_version", "image_hash"])
+    target_version.name = "Manually Corrected Snapshot"
+    target_version.field_sources_json = {
+        "fields": {
+            "name": "manual",
+            "type_line": "auto",
+            "mana_cost": "auto",
+            "attack": "auto",
+            "health": "auto",
+            "rules_text": "auto",
+        },
+        "metadata": {
+            "keywords": "auto",
+            "tags": "manual",
+            "types": "auto",
+            "symbols": "auto",
+        },
+    }
+    target_version.save(update_fields=["content_version", "image_hash", "name", "field_sources_json"])
+    replace_card_version_tags(card_version_id=target_version.id, tag_ids=[manual_tag.id])
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "content-version-snapshot.png"),
         template_id="mtg-like-v1",
@@ -2136,7 +2156,7 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
         template_id="mtg-like-v1",
         checksum="content-version-snapshot-checksum",
         normalized_fields={
-            "name": "Content Version Snapshot",
+            "name": "Content Version Snapshot New",
             "type_line": "Changed Type",
             "mana_cost": "2",
             "rules_text": "Changed rules",
@@ -2145,6 +2165,7 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
         },
         confidence={"overall": 0.8},
         raw_ocr={},
+        tag_ids=[ocr_tag.id],
         reparse_existing=True,
     )
 
@@ -2153,9 +2174,18 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
     assert version.id != target_version.id
     assert version.card == card
     assert version.version_number == target_version.version_number + 1
+    assert version.name == "Manually Corrected Snapshot"
     assert version.content_version == next_content_version
     assert target_version.content_version == original_content_version
     assert card.latest_version == version
+    assert card.key == "manually-corrected-snapshot"
+    assert card.label == "Manually Corrected Snapshot"
+    assert CardAlias.objects.filter(
+        card=card,
+        key="content-version-snapshot-old",
+        label="Content Version Snapshot Old",
+    ).exists()
+    assert [tag.id for tag in get_tags_for_card_version(version.id)] == [manual_tag.id]
 
 
 def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> None:
