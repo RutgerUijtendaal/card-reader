@@ -124,6 +124,7 @@
             :additional-symbol-ids="form.additional_symbol_ids"
             :rule-text-unknown-symbol-keys="ruleTextUnknownSymbolKeys"
             :deprecated-status-disabled="cardIsGroupAnchor"
+            :review-focus-property-key="reviewFocusPropertyKey"
             @save-card="saveCardEdits"
             @save-version="saveVersionEdits"
             @restore-field="restoreField"
@@ -195,6 +196,7 @@ const {
   ruleTextUnknownSymbolKeys,
   rulesTextSymbols,
   backButtonLabel,
+  reviewFocusPropertyKey,
   route,
   goToPreviousCard,
   goToNextCard,

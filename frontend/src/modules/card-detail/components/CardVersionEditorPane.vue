@@ -124,6 +124,7 @@
           v-for="field in scalarFields"
           :key="field.name"
           class="theme-muted-panel p-3"
+          :class="focusClass(field.name)"
         >
           <div class="mb-2 flex items-center justify-between gap-3">
             <div>
@@ -278,7 +279,10 @@
         </div>
 
         <div class="theme-muted-panel p-3">
-          <div class="mb-3 flex items-center justify-between gap-3">
+          <div
+            class="mb-3 flex items-center justify-between gap-3"
+            :class="focusClass('symbols')"
+          >
             <div>
               <p class="theme-section-title text-sm font-semibold">
                 Symbols
@@ -365,6 +369,7 @@
           v-for="group in nonSymbolMetadataGroups"
           :key="group.name"
           class="theme-muted-panel p-3"
+          :class="focusClass(group.name)"
         >
           <div class="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -538,6 +543,7 @@ import type {
   EditorForm,
   MetadataGroupName,
   MetadataOption,
+  ParseFlagPropertyKey,
   MetadataSearchState,
   ReparseTemplateOption,
   ScalarFieldName,
@@ -570,6 +576,7 @@ const props = defineProps<{
   additionalSymbolIds: string[];
   ruleTextUnknownSymbolKeys: string[];
   deprecatedStatusDisabled?: boolean;
+  reviewFocusPropertyKey?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -655,6 +662,11 @@ const showSymbolAutocomplete = computed(() => {
   return dismissedTriggerStart.value !== trigger.start;
 });
 
+const focusClass = (propertyKey: ParseFlagPropertyKey): string =>
+  props.reviewFocusPropertyKey === propertyKey
+    ? 'ring-2 ring-[var(--color-accent)] ring-offset-2 ring-offset-[var(--color-surface)]'
+    : '';
+
 const lifecycleOptionDisabled = (value: CardLifecycleStatus): boolean =>
   !props.version.editable ||
   props.isBusy ||
@@ -676,6 +688,16 @@ watch(
 watch(activeSymbolTrigger, () => {
   activeAutocompleteIndex.value = 0;
 });
+
+watch(
+  () => props.reviewFocusPropertyKey,
+  (propertyKey) => {
+    if (propertyKey) {
+      activeEditorTab.value = 'version';
+    }
+  },
+  { immediate: true },
+);
 
 watch(filteredSymbolInsertOptions, (options) => {
   if (options.length === 0) {

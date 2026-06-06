@@ -17,9 +17,21 @@
 
     <section class="space-y-6">
       <div>
-        <h3 class="theme-section-title text-2xl font-semibold">
-          {{ version.name || 'Unnamed Card' }}
-        </h3>
+        <div class="flex min-w-0 items-start justify-between gap-3">
+          <h3 class="theme-section-title min-w-0 text-2xl font-semibold">
+            {{ version.name || 'Unnamed Card' }}
+          </h3>
+          <button
+            v-if="canFlag"
+            class="btn-secondary inline-flex h-9 w-9 shrink-0 items-center justify-center p-0"
+            type="button"
+            title="Flag a parsed property that looks incorrect so staff can review and correct it."
+            aria-label="Flag parse issue"
+            @click="$emit('flag-parse-issue')"
+          >
+            <Flag class="h-4 w-4" />
+          </button>
+        </div>
         <p class="theme-kicker mt-1 text-xs font-semibold uppercase tracking-[0.16em]">
           Printing {{ version.version_number }}<span v-if="version.is_latest"> · Latest</span> · Version {{ formatCardContentVersion(version) }}
         </p>
@@ -180,14 +192,21 @@
 </template>
 
 <script setup lang="ts">
-import { BookOpenText, Hash, HeartPulse, KeyRound, ScrollText, Sparkles, Swords, Tags } from 'lucide-vue-next';
+import { BookOpenText, Flag, Hash, HeartPulse, KeyRound, ScrollText, Sparkles, Swords, Tags } from 'lucide-vue-next';
 import SymbolizedText from '@/components/SymbolizedText.vue';
 import { formatCardContentVersion, type CardVersionDetail, type SymbolLookupMap } from '@/modules/card-detail/types';
 
-defineProps<{
+withDefaults(defineProps<{
   version: CardVersionDetail;
   symbolByKey: SymbolLookupMap;
   toAbsoluteApiUrl: (urlPath: string) => string;
+  canFlag?: boolean;
+}>(), {
+  canFlag: false,
+});
+
+defineEmits<{
+  (e: 'flag-parse-issue'): void;
 }>();
 </script>
 

@@ -439,6 +439,31 @@ class LatestCardReparseSerializer(serializers.Serializer[dict[str, object]]):
     template_id = serializers.CharField(required=False, allow_blank=False)
 
 
+class CardVersionParseFlagItemSerializer(serializers.Serializer[dict[str, object]]):
+    property_key = serializers.ChoiceField(
+        choices=[
+            "name",
+            "type_line",
+            "mana_cost",
+            "attack",
+            "health",
+            "rules_text",
+            "keywords",
+            "tags",
+            "types",
+            "symbols",
+            "other",
+        ]
+    )
+    expected_value = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class CardVersionParseFlagCreateSerializer(serializers.Serializer[dict[str, object]]):
+    note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    items = CardVersionParseFlagItemSerializer(many=True, allow_empty=False)
+
+
 def _validated_names(values: list[str], allowed: set[str], message: str) -> list[str]:
     if not all(value in allowed for value in values):
         raise serializers.ValidationError(message)

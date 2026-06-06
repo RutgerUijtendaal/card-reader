@@ -11,6 +11,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".card_group", __name__),
     import_module(".content_version", __name__),
     import_module(".card_version", __name__),
+    import_module(".parse_flag", __name__),
     import_module(".deck", __name__),
     import_module(".import_job", __name__),
     import_module(".metadata", __name__),
@@ -43,6 +44,15 @@ if TYPE_CHECKING:
     from .card_group import CardGroup, CardGroupMember
     from .content_version import ContentVersion
     from .card_version import CardVersion, CardVersionImage, ParseResult
+    from .parse_flag import (
+        PARSE_FLAG_ITEM_DISMISSED,
+        PARSE_FLAG_ITEM_OPEN,
+        PARSE_FLAG_ITEM_RESOLVED,
+        PARSE_FLAG_ITEM_STATUSES,
+        PARSE_FLAG_PROPERTY_KEYS,
+        CardVersionParseFlag,
+        CardVersionParseFlagItem,
+    )
     from .deck import Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility
     from .import_job import ImportJob, ImportJobItem, ImportJobStatus
     from .metadata import (
@@ -89,6 +99,13 @@ _EXPORTS = {
     "CardVersion": ".card_version",
     "CardVersionImage": ".card_version",
     "ParseResult": ".card_version",
+    "PARSE_FLAG_ITEM_DISMISSED": ".parse_flag",
+    "PARSE_FLAG_ITEM_OPEN": ".parse_flag",
+    "PARSE_FLAG_ITEM_RESOLVED": ".parse_flag",
+    "PARSE_FLAG_ITEM_STATUSES": ".parse_flag",
+    "PARSE_FLAG_PROPERTY_KEYS": ".parse_flag",
+    "CardVersionParseFlag": ".parse_flag",
+    "CardVersionParseFlagItem": ".parse_flag",
     "Deck": ".deck",
     "DeckVisibility": ".deck",
     "DeckEntry": ".deck",
@@ -137,6 +154,13 @@ __all__ = [
     "CardVersion",
     "CardVersionImage",
     "ParseResult",
+    "PARSE_FLAG_ITEM_DISMISSED",
+    "PARSE_FLAG_ITEM_OPEN",
+    "PARSE_FLAG_ITEM_RESOLVED",
+    "PARSE_FLAG_ITEM_STATUSES",
+    "PARSE_FLAG_PROPERTY_KEYS",
+    "CardVersionParseFlag",
+    "CardVersionParseFlagItem",
     "Deck",
     "DeckVisibility",
     "DeckEntry",

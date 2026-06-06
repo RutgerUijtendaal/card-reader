@@ -11,6 +11,7 @@ from .views import (
     CardListView,
     LatestCardReparseView,
     CardVersionImageView,
+    CardVersionParseFlagView,
     CardVersionPromoteView,
     LatestCardVersionUpdateView,
     SymbolAssetView,
@@ -26,6 +27,7 @@ urlpatterns = [
     path("cards/<str:card_id>/reparse", LatestCardReparseView.as_view()),
     path("cards/<str:card_id>/image", CardImageView.as_view()),
     path("cards/<str:card_id>/versions/<str:version_id>/promote", CardVersionPromoteView.as_view()),
+    path("cards/<str:card_id>/versions/<str:version_id>/flags", CardVersionParseFlagView.as_view()),
     path("cards/<str:card_id>/versions/<str:version_id>/image", CardVersionImageView.as_view()),
     re_path(r"^symbols/assets/(?P<asset_path>.*)$", SymbolAssetView.as_view()),
 ]
