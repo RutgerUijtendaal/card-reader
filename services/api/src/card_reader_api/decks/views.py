@@ -8,11 +8,11 @@ from rest_framework.views import APIView
 
 from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.permissions import AuthEnabledOrAuthenticatedAllowed
+from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.decks.serializers import (
     DeckListQuerySerializer,
     DeckWriteSerializer,
     deck_payload,
-    serializer_error,
 )
 from card_reader_core.services.decks import (
     DeckEntryInput,
@@ -69,7 +69,7 @@ class PublicDeckDetailView(APIView):
         viewer_id = _user_id(request) if is_authenticated(request.user) else None
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
-            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Deck not found")
         return Response(deck_payload(deck))
 
 
@@ -122,7 +122,7 @@ class OwnerDeckListCreateView(APIView):
                 ],
             )
         except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return bad_request(str(exc))
         return Response(deck_payload(deck), status=status.HTTP_201_CREATED)
 
 
@@ -132,7 +132,7 @@ class OwnerDeckDetailView(APIView):
     def get(self, request: Request, deck_id: str) -> Response:
         deck = DeckService().get_owner_deck(deck_id, _user_id(request))
         if deck is None:
-            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Deck not found")
         return Response(deck_payload(deck))
 
     def patch(self, request: Request, deck_id: str) -> Response:
@@ -173,13 +173,13 @@ class OwnerDeckDetailView(APIView):
                 ),
             )
         except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return bad_request(str(exc))
         if deck is None:
-            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Deck not found")
         return Response(deck_payload(deck))
 
     def delete(self, request: Request, deck_id: str) -> Response:
         deleted = DeckService().delete_owner_deck(deck_id=deck_id, owner_id=_user_id(request))
         if not deleted:
-            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Deck not found")
         return Response(status=status.HTTP_204_NO_CONTENT)

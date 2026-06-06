@@ -10,10 +10,10 @@ from card_reader_api.card_groups.serializers import (
     CardGroupWriteSerializer,
     card_group_admin_payload,
     card_group_detail_payload,
-    serializer_error,
 )
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.permissions import AuthEnabledOrStaffAllowed
+from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.card_groups import CardGroupMemberInput, CardGroupService
 
 
@@ -27,7 +27,7 @@ class PublicCardGroupDetailView(APIView):
         lifecycle_status = serializer.validated_filters()["lifecycle_status"]
         group = CardGroupService().get_group(group_id)
         if group is None:
-            return Response({"detail": "Card group not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Card group not found")
         return Response(card_group_detail_payload(group, lifecycle_status=lifecycle_status))
 
 
@@ -45,7 +45,7 @@ class StaffCardGroupListCreateView(APIView):
         anchor_card_id = serializer.validated_data.get("anchor_card_id")
         members = serializer.validated_data.get("members")
         if not anchor_card_id or not members:
-            return Response({"detail": "anchor_card_id and members are required."}, status=status.HTTP_400_BAD_REQUEST)
+            return bad_request("anchor_card_id and members are required.")
         try:
             group = CardGroupService().create_group(
                 name=serializer.validated_data.get("name"),
@@ -53,7 +53,7 @@ class StaffCardGroupListCreateView(APIView):
                 members=[CardGroupMemberInput(**member) for member in members],
             )
         except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return bad_request(str(exc))
         return Response(card_group_admin_payload(group))
 
 
@@ -63,7 +63,7 @@ class StaffCardGroupDetailView(APIView):
     def get(self, _request: Request, group_id: str) -> Response:
         group = CardGroupService().get_group(group_id)
         if group is None:
-            return Response({"detail": "Card group not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Card group not found")
         return Response(card_group_admin_payload(group))
 
     def patch(self, request: Request, group_id: str) -> Response:
@@ -79,15 +79,15 @@ class StaffCardGroupDetailView(APIView):
                 members=None if members is None else [CardGroupMemberInput(**member) for member in members],
             )
         except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return bad_request(str(exc))
         if group is None:
-            return Response({"detail": "Card group not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Card group not found")
         return Response(card_group_admin_payload(group))
 
     def delete(self, _request: Request, group_id: str) -> Response:
         deleted = CardGroupService().delete_group(group_id=group_id)
         if not deleted:
-            return Response({"detail": "Card group not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Card group not found")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

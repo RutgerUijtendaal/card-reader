@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from card_reader_api.cards.file_views import file_response, immutable_card_image_response, symbol_asset_response
 from card_reader_api.cards.grouped_gallery import grouped_gallery_payload
 from card_reader_api.cards.public_urls import card_image_asset_url
+from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import (
     CardFiltersQuerySerializer,
     LatestCardReparseSerializer,
@@ -49,7 +50,7 @@ class CardListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        serializer = CardFiltersQuerySerializer(data=_query_data(request, include_paging=True))
+        serializer = CardFiltersQuerySerializer(data=card_filter_query_data(request, include_list_controls=True))
         if not serializer.is_valid():
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
@@ -321,55 +322,3 @@ class SymbolAssetView(APIView):
 
     def get(self, _request: Request, asset_path: str) -> FileResponse:
         return symbol_asset_response(asset_path)
-
-
-def _query_data(request: Request, *, include_paging: bool) -> dict[str, object]:
-    data: dict[str, object] = {
-        "q": request.query_params.get("q"),
-        "card_ids": request.query_params.getlist("card_ids"),
-        "max_confidence": request.query_params.get("max_confidence"),
-        "keyword_ids": request.query_params.getlist("keyword_ids"),
-        "keyword_match": request.query_params.get("keyword_match"),
-        "tag_ids": request.query_params.getlist("tag_ids"),
-        "tag_match": request.query_params.get("tag_match"),
-        "mana_symbol_ids": request.query_params.getlist("mana_symbol_ids"),
-        "mana_symbol_exclude_ids": request.query_params.getlist("mana_symbol_exclude_ids"),
-        "mana_symbol_match": request.query_params.get("mana_symbol_match"),
-        "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
-        "affinity_symbol_exclude_ids": request.query_params.getlist("affinity_symbol_exclude_ids"),
-        "affinity_symbol_match": request.query_params.get("affinity_symbol_match"),
-        "devotion_symbol_ids": request.query_params.getlist("devotion_symbol_ids"),
-        "devotion_symbol_exclude_ids": request.query_params.getlist("devotion_symbol_exclude_ids"),
-        "devotion_symbol_match": request.query_params.get("devotion_symbol_match"),
-        "other_symbol_ids": request.query_params.getlist("other_symbol_ids"),
-        "other_symbol_exclude_ids": request.query_params.getlist("other_symbol_exclude_ids"),
-        "other_symbol_match": request.query_params.get("other_symbol_match"),
-        "symbol_ids": request.query_params.getlist("symbol_ids"),
-        "type_ids": request.query_params.getlist("type_ids"),
-        "type_match": request.query_params.get("type_match"),
-        "mana_cost_min": request.query_params.get("mana_cost_min"),
-        "mana_cost_max": request.query_params.get("mana_cost_max"),
-        "template_id": request.query_params.get("template_id"),
-        "is_hero": request.query_params.get("is_hero"),
-        "attack_min": request.query_params.get("attack_min"),
-        "attack_max": request.query_params.get("attack_max"),
-        "health_min": request.query_params.get("health_min"),
-        "health_max": request.query_params.get("health_max"),
-    }
-    lifecycle_status = request.query_params.get("lifecycle_status")
-    if lifecycle_status is not None:
-        data["lifecycle_status"] = lifecycle_status
-    sort = request.query_params.get("sort")
-    if sort is not None:
-        data["sort"] = sort
-    show_groups = request.query_params.get("show_groups")
-    if show_groups is not None:
-        data["show_groups"] = show_groups
-    if include_paging:
-        page = request.query_params.get("page")
-        page_size = request.query_params.get("page_size")
-        if page is not None:
-            data["page"] = page
-        if page_size is not None:
-            data["page_size"] = page_size
-    return data

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, TypedDict, cast
+from typing import TypedDict, cast
 
 from rest_framework import serializers
-from rest_framework.response import Response
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
@@ -212,11 +210,3 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
             return None
         out = [item for item in value if isinstance(item, str)]
         return out or None
-
-
-def serializer_error(serializer: serializers.BaseSerializer[Any]) -> Response:
-    errors = serializer.errors
-    detail = next(iter(cast(Mapping[str, object], errors).values()), "Invalid request.")
-    if isinstance(detail, list):
-        detail = detail[0]
-    return Response({"detail": str(detail)}, status=400)
