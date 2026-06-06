@@ -165,7 +165,7 @@
         >
           <CardGalleryItem
             v-for="card in cards"
-            :key="card.id"
+            :key="card.version_id"
             :card="card"
             :card-height-rem="cardHeightRem"
             :navigation-target="buildAdminCardDetailLocation(card.id, route.query)"

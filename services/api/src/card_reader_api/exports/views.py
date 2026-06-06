@@ -2,29 +2,27 @@ from __future__ import annotations
 
 import base64
 import json
-from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from django.http import HttpResponse
 from django.utils.text import slugify
 from rest_framework.permissions import AllowAny
-from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
-from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
-from card_reader_core.services.decks import DeckService
+from card_reader_api.common.auth_access import is_authenticated
+from card_reader_api.common.responses import not_found, serializer_error
 from card_reader_core.repositories.exports import export_cards_csv
+from card_reader_core.services.decks import DeckService
 
 
 class ExportCsvView(APIView):
     def get(self, request: Request) -> HttpResponse:
         serializer = CardFiltersQuerySerializer(data=_query_data(request))
         if not serializer.is_valid():
-            return _serializer_error(serializer)
+            return serializer_error(serializer)
         filters = serializer.validated_filters()
         content = export_cards_csv(
             query=filters["query"],
@@ -70,7 +68,7 @@ class DeckTtsExportView(APIView):
         viewer_id = _user_id(request) if is_authenticated(request.user) else None
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
-            return Response({"detail": "Deck not found"}, status=status.HTTP_404_NOT_FOUND)
+            return not_found("Deck not found")
 
         content = _encode_tts_export(_build_tts_export_payload(deck))
         filename = _tts_export_filename(deck.name)
@@ -192,11 +190,3 @@ def _encode_tts_export(payload: dict[str, object]) -> str:
 def _tts_export_filename(deck_name: str) -> str:
     safe_name = slugify(deck_name) or "deck"
     return f"{safe_name}.tts.txt"
-
-
-def _serializer_error(serializer: BaseSerializer[Any]) -> Response:
-    errors = serializer.errors
-    detail = next(iter(cast(Mapping[str, object], errors).values()), "Invalid request.")
-    if isinstance(detail, list):
-        detail = detail[0]
-    return Response({"detail": str(detail)}, status=status.HTTP_400_BAD_REQUEST)

@@ -36,7 +36,8 @@ from .types import (
     PaginatedCardList,
     ParsedSnapshotPayload,
 )
-from .writes import apply_parsed_fields_to_version, promote_card_version, save_parsed_card, update_latest_card_version
+from .edits import promote_card_version, update_latest_card_version
+from .writes import apply_parsed_fields_to_version, save_parsed_card
 
 __all__ = [
     "CardListRow",
