@@ -13,6 +13,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".card_version", __name__),
     import_module(".parse_flag", __name__),
     import_module(".deck", __name__),
+    import_module(".notification", __name__),
     import_module(".import_job", __name__),
     import_module(".metadata", __name__),
     import_module(".template", __name__),
@@ -54,6 +55,15 @@ if TYPE_CHECKING:
         CardVersionParseFlagItem,
     )
     from .deck import Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility
+    from .notification import (
+        NOTIFICATION_EVENT_DECK_CARD_CHANGED,
+        NOTIFICATION_EVENT_PARSE_FLAG_REVIEWED,
+        NOTIFICATION_STATUS_ALL,
+        NOTIFICATION_STATUS_FILTERS,
+        NOTIFICATION_STATUS_READ,
+        NOTIFICATION_STATUS_UNREAD,
+        UserNotification,
+    )
     from .import_job import ImportJob, ImportJobItem, ImportJobStatus
     from .metadata import (
         CardVersionMetadataSuggestion,
@@ -111,6 +121,13 @@ _EXPORTS = {
     "DeckEntry": ".deck",
     "DeckSideboard": ".deck",
     "DeckSideboardEntry": ".deck",
+    "UserNotification": ".notification",
+    "NOTIFICATION_EVENT_DECK_CARD_CHANGED": ".notification",
+    "NOTIFICATION_EVENT_PARSE_FLAG_REVIEWED": ".notification",
+    "NOTIFICATION_STATUS_ALL": ".notification",
+    "NOTIFICATION_STATUS_FILTERS": ".notification",
+    "NOTIFICATION_STATUS_READ": ".notification",
+    "NOTIFICATION_STATUS_UNREAD": ".notification",
     "Tag": ".metadata",
     "Symbol": ".metadata",
     "Keyword": ".metadata",
@@ -166,6 +183,13 @@ __all__ = [
     "DeckEntry",
     "DeckSideboard",
     "DeckSideboardEntry",
+    "UserNotification",
+    "NOTIFICATION_EVENT_DECK_CARD_CHANGED",
+    "NOTIFICATION_EVENT_PARSE_FLAG_REVIEWED",
+    "NOTIFICATION_STATUS_ALL",
+    "NOTIFICATION_STATUS_FILTERS",
+    "NOTIFICATION_STATUS_READ",
+    "NOTIFICATION_STATUS_UNREAD",
     "Tag",
     "Symbol",
     "Keyword",

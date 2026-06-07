@@ -15,8 +15,8 @@ from card_reader_api.review.serializers import (
 from card_reader_core.repositories.parse_flags import (
     count_open_parse_flag_items,
     list_parse_flags,
-    update_parse_flag_item_status,
 )
+from card_reader_core.services.parse_flags import review_parse_flag_item
 
 
 class ReviewSummaryView(APIView):
@@ -52,7 +52,7 @@ class ParseFlagItemDetailView(APIView):
         if not serializer.is_valid():
             return serializer_error(serializer)
         try:
-            item = update_parse_flag_item_status(
+            item = review_parse_flag_item(
                 item_id=item_id,
                 status=serializer.validated_data["status"],
                 reviewed_by_id=str(getattr(request.user, "pk", "")),

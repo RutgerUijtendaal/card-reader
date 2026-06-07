@@ -1,0 +1,3 @@
+display_name: Card Reader Notifications
+short_description: Add and maintain Card Reader notifications.
+default_prompt: Use this skill when adding or changing Card Reader notification types, inbox behavior, or future notification delivery channels.

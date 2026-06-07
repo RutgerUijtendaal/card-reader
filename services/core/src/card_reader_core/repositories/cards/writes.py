@@ -38,6 +38,7 @@ from .snapshots import (
     build_parsed_snapshot,
     decode_field_sources,
 )
+from .types import ParsedCardSaveResult
 
 
 def save_parsed_card(
@@ -56,20 +57,56 @@ def save_parsed_card(
     type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
 ) -> CardVersion:
+    return save_parsed_card_result(
+        item=item,
+        template_id=template_id,
+        checksum=checksum,
+        normalized_fields=normalized_fields,
+        confidence=confidence,
+        raw_ocr=raw_ocr,
+        keyword_ids=keyword_ids,
+        tag_ids=tag_ids,
+        type_ids=type_ids,
+        symbol_ids=symbol_ids,
+        tag_suggestions=tag_suggestions,
+        type_suggestions=type_suggestions,
+        reparse_existing=reparse_existing,
+    ).version
+
+
+def save_parsed_card_result(
+    *,
+    item: ImportJobItem,
+    template_id: str,
+    checksum: str,
+    normalized_fields: dict[str, str],
+    confidence: dict[str, float],
+    raw_ocr: dict[str, object],
+    keyword_ids: list[str] | None = None,
+    tag_ids: list[str] | None = None,
+    type_ids: list[str] | None = None,
+    symbol_ids: list[str] | None = None,
+    tag_suggestions: list[SuggestionCandidate] | None = None,
+    type_suggestions: list[SuggestionCandidate] | None = None,
+    reparse_existing: bool = True,
+) -> ParsedCardSaveResult:
     if item.target_card_version is not None:
-        return reparse_target_version(
-            item=item,
-            template_id=template_id,
-            checksum=checksum,
-            normalized_fields=normalized_fields,
-            confidence=confidence,
-            raw_ocr=raw_ocr,
-            keyword_ids=keyword_ids or [],
-            tag_ids=tag_ids or [],
-            type_ids=type_ids or [],
-            symbol_ids=symbol_ids or [],
-            tag_suggestions=tag_suggestions or [],
-            type_suggestions=type_suggestions or [],
+        return ParsedCardSaveResult(
+            version=reparse_target_version(
+                item=item,
+                template_id=template_id,
+                checksum=checksum,
+                normalized_fields=normalized_fields,
+                confidence=confidence,
+                raw_ocr=raw_ocr,
+                keyword_ids=keyword_ids or [],
+                tag_ids=tag_ids or [],
+                type_ids=type_ids or [],
+                symbol_ids=symbol_ids or [],
+                tag_suggestions=tag_suggestions or [],
+                type_suggestions=type_suggestions or [],
+            ),
+            created_new_version=False,
         )
 
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
@@ -103,19 +140,22 @@ def save_parsed_card(
                 apply_latest_version_identity(existing_version.card, version)
                 sync_import_item_lifecycle_warning(item, existing_version.card)
                 mark_item_completed(item)
-                return version
-            return update_existing_version(
-                item,
-                existing_version,
-                normalized_fields,
-                confidence,
-                raw_ocr,
-                keyword_ids=keyword_ids or [],
-                tag_ids=tag_ids or [],
-                type_ids=type_ids or [],
-                symbol_ids=symbol_ids or [],
-                tag_suggestions=tag_suggestions or [],
-                type_suggestions=type_suggestions or [],
+                return ParsedCardSaveResult(version=version, created_new_version=True)
+            return ParsedCardSaveResult(
+                version=update_existing_version(
+                    item,
+                    existing_version,
+                    normalized_fields,
+                    confidence,
+                    raw_ocr,
+                    keyword_ids=keyword_ids or [],
+                    tag_ids=tag_ids or [],
+                    type_ids=type_ids or [],
+                    symbol_ids=symbol_ids or [],
+                    tag_suggestions=tag_suggestions or [],
+                    type_suggestions=type_suggestions or [],
+                ),
+                created_new_version=False,
             )
 
         card = resolve_card_by_name_key(parsed_name)
@@ -143,19 +183,22 @@ def save_parsed_card(
                 apply_latest_version_identity(card, version)
                 sync_import_item_lifecycle_warning(item, card)
                 mark_item_completed(item)
-                return version
-            return update_existing_version(
-                item,
-                latest,
-                normalized_fields,
-                confidence,
-                raw_ocr,
-                keyword_ids=keyword_ids or [],
-                tag_ids=tag_ids or [],
-                type_ids=type_ids or [],
-                symbol_ids=symbol_ids or [],
-                tag_suggestions=tag_suggestions or [],
-                type_suggestions=type_suggestions or [],
+                return ParsedCardSaveResult(version=version, created_new_version=True)
+            return ParsedCardSaveResult(
+                version=update_existing_version(
+                    item,
+                    latest,
+                    normalized_fields,
+                    confidence,
+                    raw_ocr,
+                    keyword_ids=keyword_ids or [],
+                    tag_ids=tag_ids or [],
+                    type_ids=type_ids or [],
+                    symbol_ids=symbol_ids or [],
+                    tag_suggestions=tag_suggestions or [],
+                    type_suggestions=type_suggestions or [],
+                ),
+                created_new_version=False,
             )
 
         version = create_parsed_card_version(
@@ -177,7 +220,7 @@ def save_parsed_card(
         mark_item_completed(item)
 
         apply_latest_version_identity(card, version)
-        return version
+        return ParsedCardSaveResult(version=version, created_new_version=True)
 
 
 def apply_latest_version_identity(card: Card, version: CardVersion) -> None:

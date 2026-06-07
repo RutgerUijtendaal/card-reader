@@ -10,6 +10,7 @@ import CardPublicDetailPage from '@/modules/card-detail/CardPublicDetailPage.vue
 import DeckDetailPage from '@/modules/decks/DeckDetailPage.vue';
 import DeckEditorPage from '@/modules/decks/DeckEditorPage.vue';
 import DeckIndexPage from '@/modules/decks/DeckIndexPage.vue';
+import NotificationsPage from '@/modules/notifications/NotificationsPage.vue';
 import ReviewQueuePage from '@/modules/review-queue/ReviewQueuePage.vue';
 import SettingsPage from '@/modules/settings/SettingsPage.vue';
 import AdminPage from '@/modules/admin/AdminPage.vue';
@@ -32,6 +33,7 @@ export const router = createRouter({
     { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true, title: 'My Deck' }, props: true },
     { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true, title: 'New Deck' } },
     { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, title: 'Edit Deck' }, props: true },
+    { path: '/notifications', component: NotificationsPage, meta: { requiresAuth: true, title: 'Notifications' } },
     { path: '/settings', component: SettingsPage, meta: { title: 'Settings' } },
     { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Import Jobs' } },
     { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true, title: 'Edit Card' } },

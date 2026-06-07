@@ -59,6 +59,12 @@ class PaginatedCardList:
     results: list[CardListRow]
 
 
+@dataclass(frozen=True)
+class ParsedCardSaveResult:
+    version: CardVersion
+    created_new_version: bool
+
+
 class FieldSourcesPayload(TypedDict):
     fields: dict[str, str]
     metadata: dict[str, str]

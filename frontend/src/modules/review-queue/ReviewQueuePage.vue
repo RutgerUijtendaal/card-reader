@@ -524,7 +524,6 @@ watch(
 
 onMounted(() => {
   void collection.searchCards();
-  void loadReviewSummary();
   if (activeView.value === 'flags') {
     void loadFlagPage(1, 'replace');
   }

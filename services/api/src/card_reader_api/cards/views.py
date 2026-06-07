@@ -31,8 +31,6 @@ from card_reader_core.repositories.cards import (
     get_card_image,
     list_card_generations,
     list_cards,
-    promote_card_version,
-    update_latest_card_version,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
 from card_reader_core.services.card_groups import CardGroupService
@@ -41,7 +39,9 @@ from card_reader_core.services.cards import (
     get_card_version_metadata,
     get_card_with_image,
     get_filter_metadata,
+    promote_card_version_with_notifications,
     resolve_card_image_path,
+    update_latest_card_version_with_notifications,
 )
 from card_reader_core.services.decks import DeckService
 from card_reader_core.services.parse_flags import create_parse_flag_for_card_version
@@ -208,13 +208,14 @@ class LatestCardVersionUpdateView(APIView):
             return serializer_error(serializer)
 
         try:
-            updated = update_latest_card_version(
+            updated = update_latest_card_version_with_notifications(
                 card_id=card_id,
                 updates=serializer.validated_update_payload(),
                 restore_fields=serializer.validated_data["restore_fields"],
                 restore_metadata_groups=serializer.validated_data["restore_metadata_groups"],
                 unlock_fields=serializer.validated_data["unlock_fields"],
                 unlock_metadata_groups=serializer.validated_data["unlock_metadata_groups"],
+                actor_id=str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None,
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -237,9 +238,13 @@ class LatestCardVersionUpdateView(APIView):
 
 
 class CardVersionPromoteView(APIView):
-    def post(self, _request: Request, card_id: str, version_id: str) -> Response:
+    def post(self, request: Request, card_id: str, version_id: str) -> Response:
         try:
-            promoted = promote_card_version(card_id=card_id, version_id=version_id)
+            promoted = promote_card_version_with_notifications(
+                card_id=card_id,
+                version_id=version_id,
+                actor_id=str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None,
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if promoted is None:

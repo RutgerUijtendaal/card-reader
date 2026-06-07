@@ -16,6 +16,7 @@
       .version { fill: #dcfce7; stroke: #15803d; }
       .meta { fill: #fff7ed; stroke: #c2410c; }
       .review { fill: #fce7f3; stroke: #be185d; }
+      .notify { fill: #e0f2fe; stroke: #0369a1; }
       .import { fill: #e2e8f0; stroke: #475569; }
       .external { fill: #f1f5f9; stroke: #64748b; stroke-dasharray: 6 5; }
       .title { font: 700 18px Arial, sans-serif; fill: #0f172a; }
@@ -32,7 +33,7 @@
 
   <rect class="bg" width="2000" height="1250"/>
   <text x="70" y="58" style="font: 800 34px Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
-  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable card identity. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage.</text>
+  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable card identity. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
 
   <rect class="band" x="55" y="130" width="1890" height="190"/>
   <text class="band-title" x="80" y="162">Import lineage / parser output</text>
@@ -49,13 +50,18 @@
   <text class="title" x="900" y="230">ImportJobItem</text>
   <text class="field" x="875" y="256">target card/version</text>
 
-  <rect class="box external" x="1245" y="195" width="185" height="86"/>
-  <text class="title" x="1290" y="230">Auth User</text>
-  <text class="field" x="1270" y="256">Django auth user</text>
+  <rect class="box version" x="1245" y="195" width="205" height="86"/>
+  <text class="title" x="1285" y="230">Template</text>
+  <text class="field" x="1269" y="256">parser definition</text>
 
-  <rect class="box version" x="1540" y="195" width="205" height="86"/>
-  <text class="title" x="1580" y="230">Template</text>
-  <text class="field" x="1564" y="256">parser definition</text>
+  <rect class="box external" x="1540" y="195" width="185" height="86"/>
+  <text class="title" x="1585" y="230">Auth User</text>
+  <text class="field" x="1565" y="256">Django auth user</text>
+
+  <rect class="box notify" x="1765" y="195" width="160" height="86"/>
+  <text class="title-small" x="1781" y="230">UserNotification</text>
+  <text class="field" x="1788" y="256">recipient/actor</text>
+  <text class="field" x="1788" y="276">event, subject, read</text>
 
   <rect class="band" x="55" y="370" width="560" height="880"/>
   <text class="band-title" x="80" y="402">Built from cards</text>
@@ -183,8 +189,8 @@
   <text class="label" x="400" y="224">belongs to</text>
   <path class="line" d="M715 238 L850 238"/>
   <text class="label" x="742" y="224">has items</text>
-  <path class="line" d="M715 205 C940 150, 1280 150, 1540 205"/>
-  <text class="label" x="1065" y="154">ImportJob.template</text>
+  <path class="line" d="M715 205 C875 150, 1080 150, 1245 205"/>
+  <text class="label" x="930" y="154">ImportJob.template</text>
   <path class="line" d="M607 281 C650 350, 760 425, 820 575"/>
   <text class="label" x="642" y="360">job release context</text>
   <path class="line" d="M962 281 C925 360, 880 450, 860 575"/>
@@ -193,8 +199,10 @@
   <text class="label" x="1090" y="350">target_card_version</text>
   <path class="line" d="M268 281 C420 360, 860 410, 1125 515"/>
   <text class="label" x="610" y="378">content release marker</text>
-  <path class="line" d="M1540 255 C1445 320, 1350 390, 1305 455"/>
-  <text class="label" x="1395" y="360">CardVersion.template</text>
+  <path class="line" d="M1245 255 C1210 320, 1210 390, 1245 455"/>
+  <text class="label" x="1125" y="360">CardVersion.template</text>
+  <path class="thin" d="M1725 238 L1765 238"/>
+  <text class="label" x="1652" y="190">notification recipient/actor</text>
 
   <path class="line" d="M305 493 L360 493"/>
   <path class="line" d="M305 638 L360 638"/>
@@ -241,8 +249,8 @@
   <path class="thin" d="M1850 1175 C1955 1150, 1970 1090, 1850 1078"/>
   <text class="label" x="1880" y="1138">accepted tag/type</text>
 
-  <path class="thin" d="M1335 281 C1375 340, 1405 392, 1455 451"/>
-  <text class="label" x="1328" y="350">submitted_by</text>
-  <path class="thin" d="M1355 281 C1490 332, 1615 372, 1700 451"/>
-  <text class="label" x="1605" y="340">reviewed_by</text>
+  <path class="thin" d="M1600 281 C1560 335, 1515 385, 1455 451"/>
+  <text class="label" x="1465" y="350">submitted_by</text>
+  <path class="thin" d="M1650 281 C1710 330, 1745 375, 1810 410"/>
+  <text class="label" x="1710" y="340">reviewed_by</text>
 </svg>

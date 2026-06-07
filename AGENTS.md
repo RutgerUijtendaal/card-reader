@@ -62,9 +62,11 @@ Core stack:
   - `operations`: operational workflows such as backup/restore.
 - Place feature-specific core services under `services/<feature>/`.
   - Current service packages include `cards`, `card_groups`, `card_merges`, `catalog`, `decks`, `imports`, `parser_jobs`, and `templates`.
+  - `notifications` owns durable user notification creation, event builders, coalescing policy, and future channel fanout seams.
   - Service package `__init__.py` files expose the stable public API for that feature.
 - Place feature-specific core repositories under `repositories/<feature>/`.
   - Current repository packages include `cards`, `card_groups`, `decks`, `exports`, `import_jobs`, `metadata`, and `templates`.
+  - `notifications` owns user notification persistence, unread counts, list queries, read-state updates, and coalescing writes.
   - Shared repository helpers belong in `repositories/helpers.py`; avoid recreating legacy `*_repository.py` modules.
 - Prefer importing from package public APIs, such as `card_reader_core.repositories.cards` or `card_reader_core.services.decks`, rather than deep module paths unless the caller is inside the same package.
 - Keep shared frontend logic in `frontend/src/composables`.
@@ -109,6 +111,12 @@ Core stack:
 - The card detail editor separates card-level and version-level edits:
   - `Card` tab owns Hero Card, Card Status, and Deck-Building Config.
   - `Card Version` tab owns parsed scalar fields, symbols, metadata groups, template selection, reset, and reparse actions.
+- User notifications are durable, core-owned in-app records.
+  - `NotificationService` is the only public creation API; API views, frontend code, and feature call sites must not write notification rows directly.
+  - Domain code should emit meaningful events through typed notification helpers; notification code owns recipient selection, copy, target URLs, metadata, dedupe keys, and channel fanout.
+  - Stored in-app notifications are the source of truth. Future email, push, realtime, and digest delivery should dispatch after notification creation instead of branching inside cards, decks, parse flags, or other feature services.
+  - Store rendered title/message snapshots plus structured metadata so old notifications remain readable and future channels can render richer payloads.
+  - Noisy notification types must intentionally use stable dedupe keys or explicitly opt into one notification per event.
 
 ## Auth Rules
 - Auth is enabled by default.
@@ -190,6 +198,10 @@ Local app URL:
 - `GET /symbols/assets/{asset_path}`
 - `GET /exports/csv`
 - `GET /decks/rules`
+- `GET /notifications`
+- `GET /notifications/summary`
+- `PATCH /notifications/{notification_id}`
+- `POST /notifications/mark-all-read`
 - `GET/POST/PATCH/DELETE /settings/*`
 - `POST /auth/login`
 - `POST /auth/logout`
