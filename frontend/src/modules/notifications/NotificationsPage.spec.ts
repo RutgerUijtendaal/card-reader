@@ -133,4 +133,22 @@ describe('NotificationsPage', () => {
     expect(fetchNotifications).toHaveBeenCalledTimes(2);
     mounted.unmount();
   });
+
+  test('shows filter-specific empty states', async () => {
+    fetchNotifications.mockResolvedValue(pagePayload([]));
+
+    const mounted = await mountView();
+
+    expect(mounted.container.textContent).toContain("You're all caught up");
+    expect(mounted.container.textContent).toContain('Card changes and flag review updates will show up here');
+
+    const allButton = Array.from(mounted.container.querySelectorAll('button')).find((entry) => entry.textContent?.trim() === 'All');
+    allButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushPromises();
+    await nextTick();
+
+    expect(mounted.container.textContent).toContain('No notifications yet');
+    expect(mounted.container.textContent).toContain('Updates about your decks and submitted flags will appear here.');
+    mounted.unmount();
+  });
 });

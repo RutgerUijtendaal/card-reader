@@ -92,7 +92,7 @@
         <span v-if="!collapsed">{{ item.label }}</span>
         <span
           v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
-          class="theme-pill theme-pill-warning ml-auto px-2 py-0.5 text-[11px] font-semibold"
+          class="nav-badge theme-pill theme-pill-warning ml-auto text-[11px] font-semibold"
         >
           {{ item.badgeCount }}
         </span>
@@ -228,3 +228,13 @@ const signOut = async (): Promise<void> => {
 };
 
 </script>
+
+<style scoped>
+.nav-badge {
+  height: 1.25rem;
+  min-width: 1.25rem;
+  justify-content: center;
+  padding: 0 0.375rem;
+  line-height: 1;
+}
+</style>

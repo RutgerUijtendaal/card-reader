@@ -88,6 +88,7 @@ describe('AppShellNav', () => {
     expect(mounted.container.textContent).toContain('Notifications');
     expect(mounted.container.textContent).toContain('3');
     expect(mounted.container.querySelector('a[href="/notifications"]')).not.toBeNull();
+    expect(mounted.container.querySelector('a[href="/notifications"] .nav-badge')?.textContent).toContain('3');
     mounted.unmount();
   });
 

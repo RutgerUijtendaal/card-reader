@@ -38,7 +38,7 @@
     </AppPageHeader>
 
     <section class="min-h-0 flex-1 overflow-hidden">
-      <div class="app-scrollbar h-full overflow-y-auto pr-1">
+      <div class="notification-scroll-area app-scrollbar h-full overflow-y-auto">
         <div
           v-if="loading"
           class="grid gap-3"
@@ -62,9 +62,25 @@
 
         <div
           v-else-if="notifications.length === 0"
-          class="page-card theme-section-muted text-sm"
+          class="theme-empty-state notification-empty-state"
         >
-          {{ emptyLabel }}
+          <div
+            class="notification-empty-state-icon"
+            aria-hidden="true"
+          >
+            <component
+              :is="emptyState.icon"
+              class="h-7 w-7"
+            />
+          </div>
+          <div class="space-y-1 text-center">
+            <h3 class="theme-section-title text-sm font-semibold">
+              {{ emptyState.title }}
+            </h3>
+            <p class="mx-auto max-w-md text-sm leading-6">
+              {{ emptyState.message }}
+            </p>
+          </div>
         </div>
 
         <div
@@ -147,7 +163,8 @@
 </template>
 
 <script setup lang="ts">
-import { Bell, CheckCheck } from 'lucide-vue-next';
+import { BadgeCheck, Bell, CheckCheck, Inbox } from 'lucide-vue-next';
+import type { Component } from 'vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { RouterLink } from 'vue-router';
@@ -182,9 +199,20 @@ const errorMessage = ref('');
 const updatingIds = ref(new Set<string>());
 const { unreadNotificationCount, loadNotificationSummary, setUnreadNotificationCount } = useNotificationSummary();
 
-const emptyLabel = computed(() =>
-  statusFilter.value === 'unread' ? 'No unread notifications.' : 'No notifications yet.',
-);
+const emptyState = computed<{ icon: Component; title: string; message: string }>(() => {
+  if (statusFilter.value === 'unread') {
+    return {
+      icon: BadgeCheck,
+      title: "You're all caught up",
+      message: 'Card changes and flag review updates will show up here when they need your attention.',
+    };
+  }
+  return {
+    icon: Inbox,
+    title: 'No notifications yet',
+    message: 'Updates about your decks and submitted flags will appear here.',
+  };
+});
 
 const loadNotifications = async (nextPage = 1): Promise<void> => {
   loading.value = true;
@@ -288,5 +316,31 @@ onMounted(() => {
   flex-shrink: 0;
   border-radius: 999px;
   background: var(--color-warning-text);
+}
+
+.notification-scroll-area {
+  scrollbar-gutter: auto;
+}
+
+.notification-empty-state {
+  display: flex;
+  min-height: 18rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.notification-empty-state-icon {
+  display: flex;
+  height: 4rem;
+  width: 4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 75%, transparent);
+  background: color-mix(in srgb, var(--color-surface-muted) 72%, transparent);
+  color: var(--color-text-muted);
 }
 </style>
