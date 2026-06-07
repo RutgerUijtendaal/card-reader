@@ -351,6 +351,36 @@ def test_card_promotion_notifies_sideboard_deck_owner() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
+    _clear_notifications()
+    owner = _create_user("notification-noop-promotion-owner", "password")
+    actor = _create_user("notification-noop-promotion-editor", "password", is_staff=True)
+    hero = _create_card(name="Notification Noop Promotion Hero", is_hero=True)
+    card = _create_card(name="Notification Noop Promotion Card", is_hero=False)
+    DeckService().create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Notification Noop Promotion Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=1)],
+        sideboards=[],
+    )
+    current_version = card.latest_version
+    assert current_version is not None
+
+    promoted = promote_card_version_with_notifications(
+        card_id=card.id,
+        version_id=current_version.id,
+        actor_id=str(actor.pk),
+    )
+
+    assert promoted is not None
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk)).count() == 0
+    assert UserNotification.objects.filter(recipient_id=str(actor.pk)).count() == 0
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-owner", "password")
