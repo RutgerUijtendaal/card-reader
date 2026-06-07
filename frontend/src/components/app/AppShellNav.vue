@@ -92,7 +92,7 @@
         <span v-if="!collapsed">{{ item.label }}</span>
         <span
           v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
-          class="theme-pill theme-pill-warning ml-auto px-2 py-0.5 text-[11px] font-semibold"
+          class="nav-badge theme-pill theme-pill-warning ml-auto text-[11px] font-semibold"
         >
           {{ item.badgeCount }}
         </span>
@@ -144,11 +144,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
-import { BookOpen, ChevronRight, ClipboardCheck, Folders, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
 import AppHotkeysPanel from '@/components/app/AppHotkeysPanel.vue';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
+import { useNotificationSummary } from '@/composables/useNotificationSummary';
 import { useReviewSummary } from '@/composables/useReviewSummary';
 import { useAuthStore } from '@/modules/auth/authStore';
 
@@ -158,6 +159,7 @@ type NavItem = {
   icon: typeof Images;
   requiresStaff?: boolean;
   requiresAuth?: boolean;
+  requiresAuthenticatedUser?: boolean;
   badgeCount?: number;
 };
 
@@ -182,12 +184,14 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const router = useRouter();
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
-const { openParseFlagItemCount, loadReviewSummary } = useReviewSummary();
+const { openParseFlagItemCount } = useReviewSummary();
+const { unreadNotificationCount } = useNotificationSummary();
 
 const items = computed<NavItem[]>(() => [
   { label: 'Gallery', to: '/cards', icon: Images },
   { label: 'Decks', to: '/decks', icon: BookOpen },
   { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
+  { label: 'Notifications', to: '/notifications', icon: Bell, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },
   { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
   { label: 'Import Jobs', to: '/import-jobs', icon: Upload, requiresStaff: true },
   { label: 'Review Queue', to: '/review', icon: ClipboardCheck, requiresStaff: true, badgeCount: openParseFlagItemCount.value },
@@ -200,6 +204,9 @@ const visibleItems = computed(() =>
       return false;
     }
     if (item.requiresAuth && auth.authEnabled && !auth.authenticated) {
+      return false;
+    }
+    if (item.requiresAuthenticatedUser && (!auth.authEnabled || !auth.authenticated)) {
       return false;
     }
     return true;
@@ -220,14 +227,14 @@ const signOut = async (): Promise<void> => {
   await router.push('/cards');
 };
 
-watch(
-  () => auth.canAccessStaffRoutes,
-  () => {
-    void loadReviewSummary();
-  },
-);
-
-onMounted(() => {
-  void loadReviewSummary();
-});
 </script>
+
+<style scoped>
+.nav-badge {
+  height: 1.25rem;
+  min-width: 1.25rem;
+  justify-content: center;
+  padding: 0 0.375rem;
+  line-height: 1;
+}
+</style>

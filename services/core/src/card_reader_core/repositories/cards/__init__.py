@@ -34,10 +34,11 @@ from .types import (
     FieldSourcesPayload,
     LatestCardVersionReparseSource,
     PaginatedCardList,
+    ParsedCardSaveResult,
     ParsedSnapshotPayload,
 )
 from .edits import promote_card_version, update_latest_card_version
-from .writes import apply_parsed_fields_to_version, save_parsed_card
+from .writes import apply_parsed_fields_to_version, save_parsed_card, save_parsed_card_result
 
 __all__ = [
     "CardListRow",
@@ -50,6 +51,7 @@ __all__ = [
     "LatestCardVersionReparseSource",
     "METADATA_GROUP_NAMES",
     "PaginatedCardList",
+    "ParsedCardSaveResult",
     "ParsedSnapshotPayload",
     "SCALAR_FIELD_NAMES",
     "apply_parsed_fields_to_version",
@@ -75,5 +77,6 @@ __all__ = [
     "promote_card_version",
     "resolve_image_file_path",
     "save_parsed_card",
+    "save_parsed_card_result",
     "update_latest_card_version",
 ]

@@ -17,6 +17,7 @@ urlpatterns = [
     path("", include("card_reader_api.catalog.urls")),
     path("", include("card_reader_api.content_versions.urls")),
     path("", include("card_reader_api.review.urls")),
+    path("", include("card_reader_api.notifications.urls")),
     path("", include("card_reader_api.templates.urls")),
     path("", include("card_reader_api.users.urls")),
     path("", include("card_reader_api.exports.urls")),

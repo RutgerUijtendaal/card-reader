@@ -19,7 +19,7 @@ from card_reader_core.repositories.import_jobs import (
 from card_reader_core.repositories.metadata import (
     SuggestionCandidate,
 )
-from card_reader_core.repositories.cards import save_parsed_card
+from card_reader_core.services.cards import save_parsed_card_with_notifications
 from card_reader_core.storage import resolve_storage_path
 from .resources import ParserJobContextLoader
 from .types import CardParserProtocol, ItemProcessingResult, JobOptions, ParserResources
@@ -124,7 +124,7 @@ class ImportProcessorService:
             known_tags=resources.known_tags,
             known_types=resources.known_types,
         )
-        save_parsed_card(
+        save_parsed_card_with_notifications(
             item=item,
             template_id=template_id,
             checksum=parsed.checksum,
