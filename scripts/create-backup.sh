@@ -18,6 +18,10 @@ if [[ "${CARD_READER_BACKUP_RUNNER:-}" == "docker_compose" ]]; then
         backup_root="$2"
         shift 2
         ;;
+      --backup-root=*)
+        backup_root="${1#--backup-root=}"
+        shift
+        ;;
       --include-logs)
         include_logs=true
         shift
