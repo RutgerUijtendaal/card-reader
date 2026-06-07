@@ -37,6 +37,8 @@ if [[ "${CARD_READER_BACKUP_RUNNER:-}" == "docker_compose" ]]; then
     echo "--backup-root is required" >&2
     exit 2
   fi
+  mkdir -p "$backup_root"
+  backup_root="$(cd "$backup_root" && pwd -P)"
 
   container_backup_root="${CARD_READER_BACKUP_CONTAINER_ROOT:-/backup}"
   compose_file="${CARD_READER_BACKUP_COMPOSE_FILE:-$ROOT_DIR/docker-compose.yml}"
