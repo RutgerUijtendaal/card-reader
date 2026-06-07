@@ -4,7 +4,15 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.test import Client, override_settings
 
-from card_reader_core.models import CardVersion, ImportJob, ImportJobItem, ParseResult, Template, UserNotification
+from card_reader_core.models import (
+    CardVersion,
+    ImportJob,
+    ImportJobItem,
+    ParseResult,
+    Template,
+    UserNotification,
+    now_utc,
+)
 from card_reader_core.services.cards import (
     promote_card_version_with_notifications,
     save_parsed_card_with_notifications,
@@ -166,6 +174,76 @@ def test_notification_coalesce_retry_preserves_outer_transaction(monkeypatch) ->
     updated.refresh_from_db()
     assert updated.event_count == 2
     assert updated.message == "Race update"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_notification_coalesce_retries_when_found_row_becomes_read(monkeypatch) -> None:
+    _clear_notifications()
+    user = _create_user("notification-stale-dedupe-user", "password")
+    data = NotificationInput(
+        recipient_id=str(user.pk),
+        event_type="deck.card_changed",
+        subject_type="deck_card",
+        subject_id="deck-1:card-1",
+        target_url="/my/decks/deck-1",
+        title="Card changed in deck",
+        message="First update",
+        metadata={"version": 1},
+        dedupe_key="deck.card_changed:stale-row",
+    )
+    stale = create_or_coalesce_notification(data)
+
+    from card_reader_core.repositories.notifications import writes
+
+    original_queryset = writes._active_dedupe_queryset
+    original_create = writes._create_notification
+    state = {"returned_stale": False}
+    active_holder: dict[str, UserNotification] = {}
+
+    class StaleDedupeLookup:
+        def order_by(self, *_fields: str) -> StaleDedupeLookup:
+            return self
+
+        def first(self) -> UserNotification:
+            state["returned_stale"] = True
+            stale.read_at = now_utc()
+            stale.save(update_fields=["read_at"])
+            active_holder["notification"] = original_create(
+                NotificationInput(
+                    **{
+                        **data.__dict__,
+                        "message": "Concurrent update",
+                        "metadata": {"version": 2},
+                    }
+                )
+            )
+            return stale
+
+    def race_queryset(input_data: NotificationInput):
+        if not state["returned_stale"]:
+            return StaleDedupeLookup()
+        return original_queryset(input_data)
+
+    monkeypatch.setattr(writes, "_active_dedupe_queryset", race_queryset)
+
+    updated = create_or_coalesce_notification(
+        NotificationInput(
+            **{
+                **data.__dict__,
+                "message": "Race update",
+                "metadata": {"version": 3},
+            }
+        )
+    )
+
+    active = active_holder["notification"]
+    assert updated.id == active.id
+    updated.refresh_from_db()
+    stale.refresh_from_db()
+    assert stale.read_at is not None
+    assert updated.event_count == 2
+    assert updated.message == "Race update"
+    assert UserNotification.objects.filter(recipient_id=str(user.pk), read_at__isnull=True).count() == 1
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

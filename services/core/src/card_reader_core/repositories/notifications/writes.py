@@ -14,14 +14,7 @@ def create_or_coalesce_notification(data: NotificationInput) -> UserNotification
         existing = _active_dedupe_queryset(data).order_by("-last_event_at", "-created_at").first()
         if existing is not None:
             return _coalesce_existing_notification(existing.id, data)
-        try:
-            with transaction.atomic():
-                return _create_notification(data)
-        except IntegrityError:
-            existing = _active_dedupe_queryset(data).order_by("-last_event_at", "-created_at").first()
-            if existing is None:
-                raise
-            return _coalesce_existing_notification(existing.id, data)
+        return _create_or_coalesce_active_notification(data)
 
     return _create_notification(data)
 
@@ -52,6 +45,20 @@ def _create_notification(data: NotificationInput) -> UserNotification:
     )
 
 
+def _create_or_coalesce_active_notification(data: NotificationInput) -> UserNotification:
+    existing = _active_dedupe_queryset(data).order_by("-last_event_at", "-created_at").first()
+    if existing is not None:
+        return _coalesce_existing_notification(existing.id, data)
+    try:
+        with transaction.atomic():
+            return _create_notification(data)
+    except IntegrityError:
+        existing = _active_dedupe_queryset(data).order_by("-last_event_at", "-created_at").first()
+        if existing is None:
+            raise
+        return _coalesce_existing_notification(existing.id, data)
+
+
 def _coalesce_existing_notification(notification_id: str, data: NotificationInput) -> UserNotification:
     now = now_utc()
     updated_count = (
@@ -74,7 +81,7 @@ def _coalesce_existing_notification(notification_id: str, data: NotificationInpu
         )
     )
     if updated_count == 0:
-        return _create_notification(data)
+        return _create_or_coalesce_active_notification(data)
     return UserNotification.objects.select_related("recipient", "actor").get(id=notification_id)
 
 
