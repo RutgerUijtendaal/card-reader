@@ -280,13 +280,13 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
 
     result = MaintenanceService().queue_reparse_latest_versions()
 
-    jobs = list(ImportJob.objects.order_by("template_id"))
+    jobs = list(ImportJob.objects.select_related("template").order_by("template__key"))
     items = list(ImportJobItem.objects.order_by("source_file"))
 
     assert "Queued 2 reparse jobs for 3 latest card images." == result.message
     assert result.removed_paths == []
     assert len(jobs) == 2
-    assert {job.template_id for job in jobs} == {"mtg-like-v1", "sorcery-v1"}
+    assert {job.template.key for job in jobs} == {"mtg-like-v1", "sorcery-v1"}
     assert all(job.total_items >= 1 for job in jobs)
     assert {item.source_file for item in items} == {
         build_storage_relative_path("images", image_a.name),
@@ -407,7 +407,7 @@ def test_queue_reparse_latest_versions_by_filters_targets_only_matching_cards(
 
     assert result.message == "Queued 1 reparse job for 1 latest card image matching the selected filters."
     assert len(jobs) == 1
-    assert jobs[0].template_id == template.key
+    assert jobs[0].template.key == template.key
     assert len(items) == 1
     assert items[0].target_card_id == alpha_card.id
     assert items[0].target_card_version_id == alpha_version.id
@@ -501,7 +501,7 @@ def test_template_reparse_endpoint_queues_matching_latest_versions(
     assert response.status_code == 202
     job = ImportJob.objects.order_by("-created_at").first()
     assert job is not None
-    assert job.template_id == target_template.key
+    assert job.template.key == target_template.key
     items = list(ImportJobItem.objects.filter(job_id=job.id))
     assert len(items) == 1
     assert items[0].target_card_id == card_a.id

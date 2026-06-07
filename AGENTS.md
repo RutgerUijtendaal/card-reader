@@ -6,6 +6,7 @@
 - Update `.gitignore` when adding generated, private, or machine-local files.
 - Write scalable, readable code. Fix underlying issues cleanly instead of layering quick fixes.
 - Never write absolute local filesystem paths into committed repository files or docs; use repo-relative paths instead.
+- Run lint and typecheck before finishing tasks that touch related source, config, generated code, or typed contracts. For docs-only, diagram-only, or skill-only changes, validate the changed artifact directly instead.
 
 ## Purpose
 Card Reader is a Django-backed card parsing platform with a Vue web UI and a
@@ -79,6 +80,7 @@ Core stack:
   - Place module-owned implementation details under `components`, `composables`, `utils`, or `tests`.
   - Do not import from another module's `components`, `composables`, or `utils` folders; promote genuinely shared code to root `frontend/src/components` or `frontend/src/composables`.
 - Django owns the domain schema through migrations in `services/core`.
+- When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.

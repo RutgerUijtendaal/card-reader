@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader DB Diagrams"
+  short_description: "Maintain Card Reader database diagrams"
+  default_prompt: "Update the Card Reader database diagram and keep docs aligned with model changes."

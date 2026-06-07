@@ -24,7 +24,7 @@ def import_job_payload(job: ImportJob) -> dict[str, object]:
     return {
         "id": job.id,
         "source_path": job.source_path,
-        "template_id": job.template_id,
+        "template_id": job.template.key,
         "content_version": content_version_payload(job.content_version),
         "status": job.status,
         "total_items": job.total_items,

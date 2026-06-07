@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from .card import Card
     from .card_version import CardVersion
     from .content_version import ContentVersion
+    from .template import Template
 
 
 class ImportJobStatus(StrEnum):
@@ -25,7 +26,12 @@ class ImportJobStatus(StrEnum):
 class ImportJob(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     source_path: models.TextField[str, str] = models.TextField()
-    template_id: models.TextField[str, str] = models.TextField()
+    template: models.ForeignKey[Template, Template] = models.ForeignKey(
+        "Template",
+        on_delete=models.PROTECT,
+        related_name="import_jobs",
+        db_column="template_id",
+    )
     content_version: models.ForeignKey[ContentVersion | None, ContentVersion | None] = models.ForeignKey(
         "ContentVersion",
         on_delete=models.SET_NULL,

@@ -6,6 +6,7 @@ from typing import Sequence
 from django.db import transaction
 
 from card_reader_core.models import ContentVersion, ImportJob, ImportJobItem, ImportJobStatus
+from card_reader_core.repositories.templates import get_template_by_key
 from card_reader_core.storage import relativize_storage_path
 
 from .files import collect_supported_files
@@ -43,6 +44,9 @@ def create_import_job_with_files(
     normalized_targets = list(item_targets) if item_targets is not None else [None] * len(files)
     if len(normalized_targets) != len(files):
         raise ValueError("item_targets length must match files length")
+    template = get_template_by_key(key=template_id)
+    if template is None:
+        raise ValueError(f"Unknown template_id '{template_id}'")
 
     with transaction.atomic():
         job = ImportJob.objects.create(
@@ -51,7 +55,7 @@ def create_import_job_with_files(
                 default_root="uploads",
                 preserve_unmatched_absolute=True,
             ),
-            template_id=template_id,
+            template=template,
             content_version=content_version,
             options_json=options,
             total_items=len(files),
