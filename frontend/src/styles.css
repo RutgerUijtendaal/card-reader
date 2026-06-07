@@ -5,13 +5,13 @@
 @layer base {
   :root {
     color-scheme: light;
-    --app-bg-from: #f8ecd8;
-    --app-bg-to: #cbd5e1;
+    --app-bg-from: #f7f9fc;
+    --app-bg-to: #dfe7f0;
     --color-text: #0f172a;
     --color-text-muted: #475569;
     --color-text-soft: #64748b;
-    --color-border: rgba(148, 163, 184, 0.32);
-    --color-border-strong: rgba(100, 116, 139, 0.45);
+    --color-border: rgba(100, 116, 139, 0.34);
+    --color-border-strong: rgba(71, 85, 105, 0.48);
     --color-surface: rgba(255, 255, 255, 0.84);
     --color-surface-strong: rgba(255, 255, 255, 0.93);
     --color-surface-muted: rgba(248, 250, 252, 0.78);
