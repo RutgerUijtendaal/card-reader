@@ -168,6 +168,55 @@ def test_notification_coalesce_retry_preserves_outer_transaction(monkeypatch) ->
     assert updated.message == "Race update"
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_marking_read_deduped_notification_unread_conflicts_with_active_unread() -> None:
+    _clear_notifications()
+    user = _create_user("notification-unread-conflict", "password")
+    data = NotificationInput(
+        recipient_id=str(user.pk),
+        event_type="deck.card_changed",
+        subject_type="deck_card",
+        subject_id="deck-1:card-1",
+        target_url="/my/decks/deck-1",
+        title="Card changed in deck",
+        message="First update",
+        metadata={"version": 1},
+        dedupe_key="deck.card_changed:unread-conflict",
+    )
+    first = create_or_coalesce_notification(data)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    read_response = client.patch(
+        f"/notifications/{first.id}",
+        data={"read": True},
+        content_type="application/json",
+    )
+    assert read_response.status_code == 200
+    second = create_or_coalesce_notification(
+        NotificationInput(
+            **{
+                **data.__dict__,
+                "message": "Second update",
+                "metadata": {"version": 2},
+            }
+        )
+    )
+    assert second.id != first.id
+
+    unread_response = client.patch(
+        f"/notifications/{first.id}",
+        data={"read": False},
+        content_type="application/json",
+    )
+
+    assert unread_response.status_code == 409
+    assert unread_response.json()["active_notification"]["id"] == second.id
+    first.refresh_from_db()
+    second.refresh_from_db()
+    assert first.read_at is not None
+    assert second.read_at is None
+
+
 @override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_notifications_are_empty_when_auth_is_disabled() -> None:
     _clear_notifications()

@@ -15,6 +15,7 @@ from card_reader_api.notifications.serializers import (
     notification_payload,
 )
 from card_reader_core.repositories.notifications import (
+    NotificationReadStateConflict,
     count_unread_notifications,
     list_notifications,
     mark_all_notifications_read,
@@ -79,11 +80,20 @@ class NotificationDetailView(APIView):
         serializer = NotificationUpdateSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
-        notification = set_notification_read_state(
-            notification_id=notification_id,
-            recipient_id=user_id,
-            read=bool(serializer.validated_data["read"]),
-        )
+        try:
+            notification = set_notification_read_state(
+                notification_id=notification_id,
+                recipient_id=user_id,
+                read=bool(serializer.validated_data["read"]),
+            )
+        except NotificationReadStateConflict as exc:
+            return Response(
+                {
+                    "detail": "An unread notification already exists for this event.",
+                    "active_notification": notification_payload(exc.active_notification),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         if notification is None:
             return Response({"detail": "Notification not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(notification_payload(notification))

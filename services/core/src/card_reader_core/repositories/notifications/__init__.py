@@ -2,6 +2,7 @@ from .queries import count_unread_notifications, is_notification_status_filter, 
 from .types import (
     NOTIFICATION_ALL_STATUS,
     NotificationInput,
+    NotificationReadStateConflict,
     NotificationStatusFilter,
     PaginatedNotifications,
 )
@@ -10,6 +11,7 @@ from .writes import create_or_coalesce_notification, mark_all_notifications_read
 __all__ = [
     "NOTIFICATION_ALL_STATUS",
     "NotificationInput",
+    "NotificationReadStateConflict",
     "NotificationStatusFilter",
     "PaginatedNotifications",
     "count_unread_notifications",

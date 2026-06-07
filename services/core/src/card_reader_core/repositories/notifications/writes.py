@@ -6,7 +6,7 @@ from django.db.models import F, QuerySet
 from card_reader_core.models import UserNotification, now_utc
 
 from .queries import notification_queryset
-from .types import NotificationInput
+from .types import NotificationInput, NotificationReadStateConflict
 
 
 def create_or_coalesce_notification(data: NotificationInput) -> UserNotification:
@@ -87,6 +87,21 @@ def set_notification_read_state(
     notification = notification_queryset(recipient_id).filter(id=notification_id).first()
     if notification is None:
         return None
+    if not read and notification.dedupe_key:
+        conflicting_notification = (
+            UserNotification.objects.select_related("recipient", "actor")
+            .filter(
+                recipient_id=recipient_id,
+                dedupe_key=notification.dedupe_key,
+                read_at__isnull=True,
+                archived_at__isnull=True,
+            )
+            .exclude(id=notification.id)
+            .order_by("-last_event_at", "-created_at")
+            .first()
+        )
+        if conflicting_notification is not None:
+            raise NotificationReadStateConflict(conflicting_notification)
     notification.read_at = now_utc() if read else None
     notification.updated_at = now_utc()
     notification.save(update_fields=["read_at", "updated_at"])

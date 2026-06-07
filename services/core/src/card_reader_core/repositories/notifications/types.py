@@ -29,3 +29,9 @@ class PaginatedNotifications:
     page: int
     page_size: int
     results: list[UserNotification]
+
+
+class NotificationReadStateConflict(Exception):
+    def __init__(self, active_notification: UserNotification) -> None:
+        self.active_notification = active_notification
+        super().__init__("An active unread notification already exists for this dedupe key.")
