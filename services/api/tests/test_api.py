@@ -198,7 +198,7 @@ def test_current_content_version_uses_numeric_semantic_sorting() -> None:
 def test_cancel_queued_import_job_marks_it_cancelled() -> None:
     job = ImportJob.objects.create(
         source_path="uploads/test-job",
-        template_id="mtg-like-v1",
+        template=Template.objects.get(key="mtg-like-v1"),
         options_json={},
         total_items=2,
         processed_items=0,
@@ -1967,7 +1967,7 @@ def test_import_uses_card_alias_for_renamed_card() -> None:
     source_file.write_bytes(b"old-import-card")
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "old-import-card.png"),
-        template_id="mtg-like-v1",
+        template=Template.objects.get(key="mtg-like-v1"),
         total_items=1,
     )
     item = ImportJobItem.objects.create(
@@ -2010,7 +2010,7 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
     )
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "content-version-card.png"),
-        template_id="mtg-like-v1",
+        template=Template.objects.get(key="mtg-like-v1"),
         content_version=content_version,
         total_items=1,
     )
@@ -2064,7 +2064,7 @@ def test_targeted_reparse_preserves_existing_card_version_content_version() -> N
     )
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "content-version-reparse.png"),
-        template_id="mtg-like-v1",
+        template=Template.objects.get(key="mtg-like-v1"),
         content_version=content_version,
         total_items=1,
     )
@@ -2139,7 +2139,7 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
     replace_card_version_tags(card_version_id=target_version.id, tag_ids=[manual_tag.id])
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "content-version-snapshot.png"),
-        template_id="mtg-like-v1",
+        template=Template.objects.get(key="mtg-like-v1"),
         content_version=next_content_version,
         total_items=1,
     )
@@ -2197,7 +2197,7 @@ def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> No
     source_file.write_bytes(b"deprecated-import-card")
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "deprecated-import-card.png"),
-        template_id="mtg-like-v1",
+        template=Template.objects.get(key="mtg-like-v1"),
         total_items=1,
     )
     item = ImportJobItem.objects.create(
@@ -2237,7 +2237,7 @@ def test_targeted_reparse_rolls_back_name_conflict() -> None:
     _conflicting_card, _conflicting_version = _create_editable_card_version(name="Rollback Conflict")
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "rollback-target.png"),
-        template_id="mtg-like-v1",
+        template=Template.objects.get(key="mtg-like-v1"),
         total_items=1,
     )
     item = ImportJobItem.objects.create(
@@ -2561,7 +2561,7 @@ def test_latest_card_reparse_queues_import_job() -> None:
     assert "Queued reparse job" in payload["message"]
 
     job = ImportJob.objects.get(id=payload["job_id"])
-    assert job.template_id == version.template.key
+    assert job.template.key == version.template.key
     assert job.options_json == {"reparse_existing": True}
     assert job.total_items == 1
 
@@ -2597,7 +2597,7 @@ def test_latest_card_reparse_accepts_template_switch() -> None:
 
     assert response.status_code == 202
     job = ImportJob.objects.get(id=response.json()["job_id"])
-    assert job.template_id == "api-template-switch"
+    assert job.template.key == "api-template-switch"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

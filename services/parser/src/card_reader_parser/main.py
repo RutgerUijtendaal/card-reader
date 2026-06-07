@@ -88,7 +88,7 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
             logger.info(
                 "Queued job claimed for processing. job_id=%s template_id=%s total_items=%s processed_items=%s",
                 job.id,
-                job.template_id,
+                job.template.key,
                 job.total_items,
                 job.processed_items,
             )
@@ -110,7 +110,6 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
 
 if __name__ == "__main__":
     run_parser_loop()
-
 
 
 

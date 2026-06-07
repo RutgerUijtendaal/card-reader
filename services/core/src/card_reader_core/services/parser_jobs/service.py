@@ -115,9 +115,10 @@ class ImportProcessorService:
         options: JobOptions,
         resources: ParserResources,
     ) -> ItemProcessingResult:
+        template_id = job.template.key
         parsed = self._parser.parse(
             resolve_storage_path(item.source_file),
-            job.template_id,
+            template_id,
             symbols=resources.detectable_symbols,
             known_keywords=resources.known_keywords,
             known_tags=resources.known_tags,
@@ -125,7 +126,7 @@ class ImportProcessorService:
         )
         save_parsed_card(
             item=item,
-            template_id=job.template_id,
+            template_id=template_id,
             checksum=parsed.checksum,
             normalized_fields=parsed.normalized_fields,
             confidence=parsed.confidence,
