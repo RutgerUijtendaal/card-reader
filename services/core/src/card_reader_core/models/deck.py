@@ -72,6 +72,7 @@ class DeckEntry(TimestampedModel):
 
     class Meta:
         db_table = "deck_entry"
+        ordering = ["position", "card_id"]
         constraints = [models.UniqueConstraint(fields=("deck", "card"), name="ux_deck_entry_deck_card")]
         indexes = [
             models.Index(fields=["deck", "created_at"], name="ix_deck_entry_deck_created"),
@@ -118,6 +119,7 @@ class DeckSideboardEntry(TimestampedModel):
 
     class Meta:
         db_table = "deck_sideboard_entry"
+        ordering = ["position", "card_id"]
         constraints = [models.UniqueConstraint(fields=("sideboard", "card"), name="ux_deck_sideboard_entry_card")]
         indexes = [
             models.Index(fields=["sideboard", "created_at"], name="ix_deck_sideboard_entry_created"),

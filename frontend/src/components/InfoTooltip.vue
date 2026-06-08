@@ -27,16 +27,18 @@
 </template>
 
 <script setup lang="ts">
-import { autoUpdate, flip, offset, shift, useFloating, type Placement } from '@floating-ui/vue';
+import { autoUpdate, flip, offset, shift, useFloating, type Middleware, type Placement } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
     text: string;
     placement?: Placement;
+    allowFlip?: boolean;
   }>(),
   {
     placement: 'top',
+    allowFlip: true,
   },
 );
 
@@ -44,12 +46,17 @@ const isOpen = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
 const panelRef = ref<HTMLElement | null>(null);
 const tooltipId = `info-tooltip-${Math.random().toString(36).slice(2, 10)}`;
+const middleware = computed<Middleware[]>(() => [
+  offset(10),
+  ...(props.allowFlip ? [flip()] : []),
+  shift({ padding: 8 }),
+]);
 
 const floating = useFloating(triggerRef, panelRef, {
   open: isOpen,
   placement: props.placement,
   strategy: 'fixed',
-  middleware: [offset(10), flip(), shift({ padding: 8 })],
+  middleware,
   whileElementsMounted: autoUpdate,
 });
 
