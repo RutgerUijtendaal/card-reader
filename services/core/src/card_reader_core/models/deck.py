@@ -68,11 +68,15 @@ class DeckEntry(TimestampedModel):
         db_column="card_id",
     )
     quantity: models.IntegerField[int, int] = models.IntegerField(default=1)
+    position: models.IntegerField[int, int] = models.IntegerField(default=0)
 
     class Meta:
         db_table = "deck_entry"
         constraints = [models.UniqueConstraint(fields=("deck", "card"), name="ux_deck_entry_deck_card")]
-        indexes = [models.Index(fields=["deck", "created_at"], name="ix_deck_entry_deck_created")]
+        indexes = [
+            models.Index(fields=["deck", "created_at"], name="ix_deck_entry_deck_created"),
+            models.Index(fields=["deck", "position"], name="ix_deck_entry_deck_pos"),
+        ]
 
 
 class DeckSideboard(TimestampedModel):
@@ -110,8 +114,12 @@ class DeckSideboardEntry(TimestampedModel):
         db_column="card_id",
     )
     quantity: models.IntegerField[int, int] = models.IntegerField(default=1)
+    position: models.IntegerField[int, int] = models.IntegerField(default=0)
 
     class Meta:
         db_table = "deck_sideboard_entry"
         constraints = [models.UniqueConstraint(fields=("sideboard", "card"), name="ux_deck_sideboard_entry_card")]
-        indexes = [models.Index(fields=["sideboard", "created_at"], name="ix_deck_sideboard_entry_created")]
+        indexes = [
+            models.Index(fields=["sideboard", "created_at"], name="ix_deck_sideboard_entry_created"),
+            models.Index(fields=["sideboard", "position"], name="ix_deck_side_entry_pos"),
+        ]

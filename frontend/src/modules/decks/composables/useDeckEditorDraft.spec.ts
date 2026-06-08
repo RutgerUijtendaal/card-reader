@@ -76,6 +76,79 @@ describe('useDeckEditorDraft', () => {
     });
   });
 
+  test('reorders mainboard entries and preserves the payload order', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+      cardB: buildCard('cardB', 'Card B', 3),
+      cardC: buildCard('cardC', 'Card C', 4),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.name = 'Example';
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [
+      { card_id: 'cardA', quantity: 1 },
+      { card_id: 'cardB', quantity: 2 },
+      { card_id: 'cardC', quantity: 3 },
+    ];
+
+    controller.reorderEntries('mainboard', 'cardC', 'cardA');
+
+    expect(controller.form.entries).toEqual([
+      { card_id: 'cardC', quantity: 3 },
+      { card_id: 'cardA', quantity: 1 },
+      { card_id: 'cardB', quantity: 2 },
+    ]);
+    expect(controller.buildPayload().entries).toEqual([
+      { card_id: 'cardC', quantity: 3 },
+      { card_id: 'cardA', quantity: 1 },
+      { card_id: 'cardB', quantity: 2 },
+    ]);
+  });
+
+  test('reorders sideboard entries without changing the mainboard', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      cardA: buildCard('cardA', 'Card A', 2),
+      cardB: buildCard('cardB', 'Card B', 3),
+      cardC: buildCard('cardC', 'Card C', 4),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.name = 'Example';
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'cardA', quantity: 1 }];
+    controller.addSideboard();
+    const sideboardId = controller.activeBoardId.value;
+    controller.activeSideboard.value?.entries.push(
+      { card_id: 'cardB', quantity: 2 },
+      { card_id: 'cardC', quantity: 3 },
+    );
+
+    controller.reorderEntries(sideboardId, 'cardC', 'cardB');
+
+    expect(controller.form.entries).toEqual([{ card_id: 'cardA', quantity: 1 }]);
+    expect(controller.activeSideboard.value?.entries).toEqual([
+      { card_id: 'cardC', quantity: 3 },
+      { card_id: 'cardB', quantity: 2 },
+    ]);
+    expect(controller.buildPayload().sideboards[0]?.entries).toEqual([
+      { card_id: 'cardC', quantity: 3 },
+      { card_id: 'cardB', quantity: 2 },
+    ]);
+  });
+
   test('targets add/remove actions at the active board', () => {
     const builderStep = ref<BuilderStep>('build');
     const cardLookup = ref<Record<string, DeckCardSummary>>({

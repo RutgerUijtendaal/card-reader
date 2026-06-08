@@ -382,7 +382,10 @@
       class="app-scrollbar relative z-10 mt-4 flex-1 min-h-0 overflow-y-auto px-5 pb-5 pr-4"
       data-testid="deck-summary-list"
     >
-      <div class="space-y-3 pb-1">
+      <div
+        ref="boardEntriesSortableRef"
+        class="space-y-3 pb-1"
+      >
         <div
           v-if="controller.deck.detailedActiveBoardEntries.value.length === 0"
           class="theme-empty-state"
@@ -391,14 +394,17 @@
         </div>
 
         <DeckBuilderBoardEntryRow
-          v-for="entry in controller.deck.detailedActiveBoardEntries.value"
+          v-for="(entry, index) in controller.deck.detailedActiveBoardEntries.value"
           :key="entry.card.id"
           :ref="(element) => setBoardEntryRowRef(entry.card.id, element)"
           :entry="entry"
+          :sortable-card-id="entry.card.id"
           :hover-mode="controller.filters.hoverMode.value"
           :class="{ 'deck-board-entry-pop': poppedBoardEntryCardId === entry.card.id }"
           :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
           :move-destinations="getMoveDestinations(entry.card.id)"
+          :can-reorder-up="index > 0"
+          :can-reorder-down="index < controller.deck.detailedActiveBoardEntries.value.length - 1"
           :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
           :row-secondary-action-disabled="
             controller.deck.boardRowSecondaryActionDisabled(entry.card.id)
@@ -409,6 +415,8 @@
           @row-action="controller.deck.handleBoardRowAction"
           @row-secondary-action="controller.deck.handleBoardRowSecondaryAction"
           @move-to-board="handleMoveToBoard"
+          @reorder-up="handleReorderUp"
+          @reorder-down="handleReorderDown"
         />
       </div>
     </div>
@@ -426,7 +434,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { useSortable } from '@vueuse/integrations/useSortable';
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { ChevronDown, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
@@ -437,7 +446,7 @@ import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoar
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
-import type { DeckVisibility } from '@/modules/decks/types';
+import type { DeckEntrySummary, DeckVisibility } from '@/modules/decks/types';
 import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/composables/decks/visibility';
 
 const props = defineProps<{
@@ -493,9 +502,31 @@ const deleteSideboardTarget = ref<{ id: string; name: string } | null>(null);
 const hoveredSideboardId = ref<string | null>(null);
 const focusedSideboardId = ref<string | null>(null);
 const boardListRef = ref<HTMLElement | null>(null);
+const boardEntriesSortableRef = ref<HTMLElement | null>(null);
+const sortableEntries = shallowRef<DeckEntrySummary[]>([]);
 const boardEntryRowRefs = new Map<string, HTMLElement>();
 const poppedBoardEntryCardId = ref<string | null>(null);
 let popResetTimer: number | undefined;
+
+const sortableController = useSortable(boardEntriesSortableRef, sortableEntries, {
+  animation: 160,
+  handle: '.deck-board-entry-drag-handle',
+  ghostClass: 'deck-board-entry-sortable-ghost',
+  chosenClass: 'deck-board-entry-sortable-chosen',
+  dragClass: 'deck-board-entry-sortable-drag',
+  watchElement: true,
+  onUpdate: (event: { item: HTMLElement; newIndex?: number }): void => {
+    const movedCardId = event.item.dataset.cardId;
+    if (!movedCardId || event.newIndex === undefined) {
+      return;
+    }
+    props.controller.deck.moveEntryToIndex(
+      props.controller.deck.activeBoardId.value,
+      movedCardId,
+      event.newIndex,
+    );
+  },
+});
 
 const componentRefElement = (element: unknown): HTMLElement | null => {
   if (element instanceof HTMLElement) {
@@ -587,6 +618,17 @@ watch(
   },
 );
 
+watch(
+  () => props.controller.deck.detailedActiveBoardEntries.value,
+  (entries) => {
+    sortableEntries.value = [...entries];
+    void nextTick(() => {
+      sortableController.option('disabled', entries.length < 2);
+    });
+  },
+  { immediate: true },
+);
+
 onBeforeUnmount(() => {
   if (popResetTimer !== undefined) {
     window.clearTimeout(popResetTimer);
@@ -609,6 +651,14 @@ const getMoveDestinations = (cardId: string): DeckBoardMoveDestination[] =>
 
 const handleMoveToBoard = (cardId: string, destinationBoardId: string): void => {
   props.controller.deck.moveEntryToBoard(cardId, destinationBoardId);
+};
+
+const handleReorderUp = (cardId: string): void => {
+  props.controller.deck.moveEntryWithinBoard(cardId, -1);
+};
+
+const handleReorderDown = (cardId: string): void => {
+  props.controller.deck.moveEntryWithinBoard(cardId, 1);
 };
 
 const setEditingSideboardInputRef = (element: unknown): void => {
@@ -711,6 +761,19 @@ const confirmDeleteSideboard = (): void => {
 <style scoped>
 .deck-board-entry-pop {
   animation: deck-board-entry-pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.deck-board-entry-sortable-ghost {
+  opacity: 0.35;
+}
+
+.deck-board-entry-sortable-chosen {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, transparent);
+}
+
+.deck-board-entry-sortable-drag {
+  opacity: 0.92;
+  box-shadow: 0 18px 36px rgb(15 23 42 / 0.24);
 }
 
 @keyframes deck-board-entry-pop {

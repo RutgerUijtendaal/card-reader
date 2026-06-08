@@ -479,6 +479,69 @@ export const useDeckEditorDraft = ({
     form.sideboards = form.sideboards.map((sideboard) => (sideboard.id === boardId ? { ...sideboard, entries } : sideboard));
   };
 
+  const reorderEntries = (
+    boardId: string,
+    movedCardId: string,
+    targetCardId: string,
+  ): void => {
+    if (movedCardId === targetCardId) {
+      return;
+    }
+    const boardEntries = getBoardEntries(boardId);
+    const movedIndex = boardEntries.findIndex((entry) => entry.card_id === movedCardId);
+    if (movedIndex < 0) {
+      return;
+    }
+    const nextEntries = [...boardEntries];
+    const [movedEntry] = nextEntries.splice(movedIndex, 1);
+    const targetIndex = nextEntries.findIndex((entry) => entry.card_id === targetCardId);
+    if (!movedEntry || targetIndex < 0) {
+      return;
+    }
+    nextEntries.splice(targetIndex, 0, movedEntry);
+    updateBoardEntries(boardId, nextEntries);
+  };
+
+  const moveEntryWithinBoard = (
+    cardId: string,
+    direction: -1 | 1,
+    boardId = activeBoardId.value,
+  ): void => {
+    const boardEntries = getBoardEntries(boardId);
+    const currentIndex = boardEntries.findIndex((entry) => entry.card_id === cardId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= boardEntries.length) {
+      return;
+    }
+    const nextEntries = [...boardEntries];
+    const [movedEntry] = nextEntries.splice(currentIndex, 1);
+    if (!movedEntry) {
+      return;
+    }
+    nextEntries.splice(nextIndex, 0, movedEntry);
+    updateBoardEntries(boardId, nextEntries);
+  };
+
+  const moveEntryToIndex = (
+    boardId: string,
+    movedCardId: string,
+    targetIndex: number,
+  ): void => {
+    const boardEntries = getBoardEntries(boardId);
+    const movedIndex = boardEntries.findIndex((entry) => entry.card_id === movedCardId);
+    if (movedIndex < 0) {
+      return;
+    }
+    const nextEntries = [...boardEntries];
+    const [movedEntry] = nextEntries.splice(movedIndex, 1);
+    if (!movedEntry) {
+      return;
+    }
+    const clampedTargetIndex = Math.max(0, Math.min(targetIndex, nextEntries.length));
+    nextEntries.splice(clampedTargetIndex, 0, movedEntry);
+    updateBoardEntries(boardId, nextEntries);
+  };
+
   const addEntry = (card: CardListItem): void => {
     rememberCards([card]);
     const boardId = activeBoardId.value;
@@ -832,6 +895,9 @@ export const useDeckEditorDraft = ({
     getCardQuantityLimitMessage,
     changeQuantity,
     setQuantity,
+    reorderEntries,
+    moveEntryWithinBoard,
+    moveEntryToIndex,
     removeEntry,
     galleryActionLabel,
     galleryActionDisabled,

@@ -1186,6 +1186,59 @@ def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_create_preserves_submitted_board_entry_order() -> None:
+    username = "deck-create-entry-order-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Create Order Hero", is_hero=True)
+    alpha_card = _create_card(name="Create Order Alpha", is_hero=False, type_labels=["Mana"])
+    beta_card = _create_card(name="Create Order Beta", is_hero=False, type_labels=["Mana"])
+    gamma_card = _create_card(name="Create Order Gamma", is_hero=False, type_labels=["Mana"])
+    filler_cards = _build_mainboard_cards(total_unique=12)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Create Entry Order Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": gamma_card.id, "quantity": 4},
+                {"card_id": alpha_card.id, "quantity": 4},
+                {"card_id": beta_card.id, "quantity": 4},
+                *_valid_entries(filler_cards),
+            ],
+            "sideboards": [
+                {
+                    "name": "Flex",
+                    "entries": [
+                        {"card_id": beta_card.id, "quantity": 2},
+                        {"card_id": alpha_card.id, "quantity": 1},
+                    ],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert [entry["card"]["id"] for entry in payload["mainboard"]["entries"][:3]] == [
+        gamma_card.id,
+        alpha_card.id,
+        beta_card.id,
+    ]
+    assert [entry["card"]["id"] for entry in payload["sideboards"][0]["entries"]] == [
+        beta_card.id,
+        alpha_card.id,
+    ]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_patch_preserves_sideboards_when_omitted() -> None:
     username = "deck-patch-preserve-sideboards-user"
     password = "password"
@@ -1287,6 +1340,86 @@ def test_patch_clears_sideboards_when_explicitly_empty() -> None:
     payload = patch_response.json()
     assert payload["sideboards"] == []
     assert payload["totals"]["overall_total_cards"] == payload["totals"]["mainboard_total_cards"] == 60
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_patch_persists_reordered_board_entries() -> None:
+    username = "deck-patch-entry-order-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Patch Order Hero", is_hero=True)
+    alpha_card = _create_card(name="Patch Order Alpha", is_hero=False, type_labels=["Mana"])
+    beta_card = _create_card(name="Patch Order Beta", is_hero=False, type_labels=["Mana"])
+    gamma_card = _create_card(name="Patch Order Gamma", is_hero=False, type_labels=["Mana"])
+    filler_cards = _build_mainboard_cards(total_unique=12)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Patch Entry Order Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": alpha_card.id, "quantity": 4},
+                {"card_id": beta_card.id, "quantity": 4},
+                {"card_id": gamma_card.id, "quantity": 4},
+                *_valid_entries(filler_cards),
+            ],
+            "sideboards": [
+                {
+                    "name": "Flex",
+                    "entries": [
+                        {"card_id": alpha_card.id, "quantity": 1},
+                        {"card_id": beta_card.id, "quantity": 2},
+                    ],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+
+    patch_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={
+            "entries": [
+                {"card_id": gamma_card.id, "quantity": 4},
+                {"card_id": alpha_card.id, "quantity": 4},
+                {"card_id": beta_card.id, "quantity": 4},
+                *_valid_entries(filler_cards),
+            ],
+            "sideboards": [
+                {
+                    "name": "Flex",
+                    "entries": [
+                        {"card_id": beta_card.id, "quantity": 2},
+                        {"card_id": alpha_card.id, "quantity": 1},
+                    ],
+                }
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    detail_response = client.get(f"/my/decks/{deck_id}")
+
+    assert patch_response.status_code == 200
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert [entry["card"]["id"] for entry in payload["mainboard"]["entries"][:3]] == [
+        gamma_card.id,
+        alpha_card.id,
+        beta_card.id,
+    ]
+    assert [entry["card"]["id"] for entry in payload["sideboards"][0]["entries"]] == [
+        beta_card.id,
+        alpha_card.id,
+    ]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

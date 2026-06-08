@@ -97,16 +97,21 @@ const mountRow = async ({
   const events: string[] = [];
   const app = createApp(DeckBuilderBoardEntryRow, {
     entry,
+    sortableCardId: entry.card.id,
     hoverMode: 'details',
     moveDestinations,
     rowActionDisabled,
     rowSecondaryActionDisabled,
+    canReorderUp: true,
+    canReorderDown: true,
     onRowAction: (cardId: string) => events.push(`row:${cardId}`),
     onRowSecondaryAction: (cardId: string) => events.push(`row-secondary:${cardId}`),
     onIncrement: (cardId: string) => events.push(`increment:${cardId}`),
     onDecrement: (cardId: string) => events.push(`decrement:${cardId}`),
     onRemove: (cardId: string) => events.push(`remove:${cardId}`),
     onMoveToBoard: (cardId: string, destinationBoardId: string) => events.push(`move:${cardId}:${destinationBoardId}`),
+    onReorderUp: (cardId: string) => events.push(`up:${cardId}`),
+    onReorderDown: (cardId: string) => events.push(`down:${cardId}`),
   });
   app.mount(container);
   await nextTick();
@@ -261,6 +266,52 @@ describe('DeckBuilderBoardEntryRow', () => {
     await nextTick();
 
     expect(mounted.events).toEqual(['remove:card-1']);
+
+    mounted.unmount();
+  });
+
+  test('reorder controls emit keyboard-accessible up and down actions', async () => {
+    const mounted = await mountRow();
+    await showRowControls(mounted.container);
+    const moveUpButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card up"]');
+    const moveDownButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card down"]');
+    if (!(moveUpButton instanceof HTMLButtonElement) || !(moveDownButton instanceof HTMLButtonElement)) {
+      throw new Error('expected reorder buttons');
+    }
+
+    moveUpButton.click();
+    moveDownButton.click();
+    await nextTick();
+
+    expect(mounted.events).toEqual(['up:card-1', 'down:card-1']);
+
+    mounted.unmount();
+  });
+
+  test('drag handle is available without triggering row actions', async () => {
+    const mounted = await mountRow();
+    const dragHandle = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Drag to reorder card"]');
+    if (!(dragHandle instanceof HTMLButtonElement)) {
+      throw new Error('expected drag handle');
+    }
+
+    dragHandle.click();
+    await nextTick();
+
+    expect(dragHandle.className).toContain('deck-board-entry-drag-handle');
+    expect(mounted.events).toEqual([]);
+
+    mounted.unmount();
+  });
+
+  test('binds the sortable card id to the row root', async () => {
+    const mounted = await mountRow();
+    const row = mounted.container.firstElementChild;
+    if (!(row instanceof HTMLElement)) {
+      throw new Error('expected row root');
+    }
+
+    expect(row.dataset.cardId).toBe('card-1');
 
     mounted.unmount();
   });
