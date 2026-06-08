@@ -1,15 +1,17 @@
 <template>
   <div
-    class="theme-popover pointer-events-none shadow-2xl"
-    :class="imageUrl ? 'w-[64rem]' : 'w-[35rem]'"
+    class="theme-popover card-hover-tooltip pointer-events-none shadow-2xl"
+    :class="imageUrl ? '' : 'w-[35rem]'"
+    :style="tooltipStyle"
   >
     <div
       class="gap-4"
-      :class="imageUrl ? 'grid grid-cols-[28rem_minmax(0,1fr)] items-start' : 'space-y-4'"
+      :class="imageUrl ? 'grid items-start' : 'space-y-4'"
+      :style="contentStyle"
     >
       <div
         v-if="imageUrl"
-        class="theme-card-frame theme-card-image-well overflow-hidden rounded-xl"
+        class="theme-card-frame theme-card-image-well card-hover-tooltip-card-panel overflow-hidden rounded-xl"
       >
         <div class="aspect-[63/88]">
           <img
@@ -21,8 +23,11 @@
       </div>
 
       <div
-        class="space-y-4"
-        :class="imageUrl ? 'theme-divider border-l pl-4' : ''"
+        class="card-hover-tooltip-details-panel space-y-4"
+        :class="[
+          imageUrl ? 'theme-divider border-l pl-4' : '',
+          detailsRevealed ? 'card-hover-tooltip-details-revealed' : 'card-hover-tooltip-details-hidden',
+        ]"
       >
         <div>
           <div class="flex flex-wrap items-center gap-2">
@@ -189,13 +194,19 @@ import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolizedText from '@/components/SymbolizedText.vue';
 import { cardIsDeprecated } from '@/composables/card-filters/cardLifecycle';
+import { normalizeHoverPreviewScale } from '@/composables/card-gallery/hoverPreviewScale';
 import type { CardListItem } from '@/modules/card-detail/types';
 
 const props = defineProps<{
   card: CardListItem;
   imageUrl?: string | null;
   imageAlt?: string;
+  detailsRevealed?: boolean;
+  hoverPreviewScale?: number;
 }>();
+
+const BASE_HOVER_CARD_WIDTH_REM = 28;
+const BASE_HOVER_TOOLTIP_WIDTH_REM = 64;
 
 const symbolByKey = computed(() =>
   Object.fromEntries(props.card.symbols.map((symbol) => [symbol.key, symbol])),
@@ -215,4 +226,14 @@ const parsedAtLabel = computed(() => {
 
 const imageUrl = computed(() => props.imageUrl ?? null);
 const imageAlt = computed(() => props.imageAlt ?? props.card.name ?? 'Card preview');
+const detailsRevealed = computed(() => props.detailsRevealed ?? true);
+const hoverPreviewScale = computed(() => normalizeHoverPreviewScale(props.hoverPreviewScale));
+const hoverCardWidthRem = computed(() => Number((BASE_HOVER_CARD_WIDTH_REM * hoverPreviewScale.value).toFixed(3)));
+const hoverTooltipWidthRem = computed(() => Number((BASE_HOVER_TOOLTIP_WIDTH_REM * hoverPreviewScale.value).toFixed(3)));
+const tooltipStyle = computed(() => (imageUrl.value ? { width: `${hoverTooltipWidthRem.value}rem` } : {}));
+const contentStyle = computed(() =>
+  imageUrl.value
+    ? { gridTemplateColumns: `${hoverCardWidthRem.value}rem minmax(0, 1fr)` }
+    : {},
+);
 </script>

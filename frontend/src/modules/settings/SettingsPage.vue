@@ -227,6 +227,30 @@
               </span>
             </button>
           </div>
+
+          <div class="theme-divider border-t py-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="theme-section-title text-sm font-semibold">
+                  Hover Card Size
+                </p>
+                <p class="theme-section-muted mt-1 text-sm">
+                  Scale enlarged card previews shown on hover.
+                </p>
+              </div>
+              <span class="theme-section-muted text-sm font-medium">
+                {{ hoverPreviewScaleLabel }}
+              </span>
+            </div>
+            <input
+              v-model.number="hoverPreviewScale"
+              type="range"
+              :min="HOVER_PREVIEW_SCALE_MIN"
+              :max="HOVER_PREVIEW_SCALE_MAX"
+              :step="HOVER_PREVIEW_SCALE_STEP"
+              class="theme-range mt-3 w-full"
+            >
+          </div>
         </section>
       </section>
     </AppPageLayout>
@@ -245,6 +269,7 @@ import type { PopoverOptionItem } from '@/components/cards/PopoverOptionList.vue
 import type { CardSort } from '@/composables/card-gallery/cardSort';
 import type { HoverMode } from '@/composables/card-gallery/hoverMode';
 import { HOVER_MODE_OPTIONS } from '@/composables/card-gallery/hoverMode';
+import { HOVER_PREVIEW_SCALE_MAX, HOVER_PREVIEW_SCALE_MIN, HOVER_PREVIEW_SCALE_STEP } from '@/composables/card-gallery/hoverPreviewScale';
 import { cardSortOptions } from '@/composables/card-gallery/cardSort';
 import { CARD_PAGE_SIZE_OPTIONS } from '@/composables/card-gallery/pageSize';
 import { useGalleryOptions } from '@/composables/useGalleryOptions';
@@ -262,7 +287,7 @@ type SettingsSection = {
 };
 
 const { defaultSort } = useCardSortPreferences();
-const { defaultHoverMode } = useHoverModePreferences();
+const { defaultHoverMode, hoverPreviewScale } = useHoverModePreferences();
 const { cardScale, showCardGroups, pageSize } = useGalleryOptions();
 const activeSection = ref<SettingsSectionId>('display');
 const settingsSections: SettingsSection[] = [
@@ -311,6 +336,7 @@ const cardPageSizeSelectOptions = computed(() =>
   })),
 );
 const percentLabel = computed(() => `${Math.round(cardScale.value * 100)}%`);
+const hoverPreviewScaleLabel = computed(() => `${Math.round(hoverPreviewScale.value * 100)}%`);
 const activeSectionDetails = computed(
   () => settingsSections.find((section) => section.id === activeSection.value) ?? settingsSections[0],
 );

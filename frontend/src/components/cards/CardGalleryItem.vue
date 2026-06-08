@@ -90,20 +90,24 @@
 
       <Teleport to="body">
         <div
-          v-if="showHoverOverlay"
+          v-if="sharedElementHover.isMounted.value"
           ref="hoverPanelRef"
           class="pointer-events-none z-30 hidden md:block"
-          :style="{ position: 'fixed', left: `${hoverPanelX}px`, top: `${hoverPanelY}px` }"
+          :class="sharedElementHover.overlayClass.value"
+          :style="sharedElementHover.overlayStyle.value"
         >
           <CardHoverTooltip
             v-if="showEnlargedPreview && showDetailsPreview && detailsCard"
             :card="detailsCard"
             :image-url="previewImageUrl"
             :image-alt="previewImageAlt"
+            :details-revealed="sharedElementHover.revealDetails.value"
+            :hover-preview-scale="hoverPreviewScale"
           />
           <div
             v-else-if="showEnlargedPreview && previewImageUrl"
-            class="theme-card-frame w-[28rem] overflow-hidden rounded-xl shadow-2xl"
+            class="theme-card-frame overflow-hidden rounded-xl shadow-2xl"
+            :style="enlargedPreviewStyle"
           >
             <div class="theme-card-image-well aspect-[63/88]">
               <img
@@ -116,6 +120,7 @@
           <CardHoverTooltip
             v-else-if="showDetailsPreview && detailsCard"
             :card="detailsCard"
+            :details-revealed="sharedElementHover.revealDetails.value"
           />
         </div>
       </Teleport>
@@ -152,6 +157,9 @@ import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
 import { cardIsDeprecated } from '@/composables/card-filters/cardLifecycle';
 import { buildCardDetailLocation, buildGalleryItemLocation } from '@/composables/card-gallery/galleryNavigation';
 import { DEFAULT_HOVER_MODE, type HoverMode } from '@/composables/card-gallery/hoverMode';
+import { normalizeHoverPreviewScale } from '@/composables/card-gallery/hoverPreviewScale';
+import { useSharedElementHover } from '@/composables/card-gallery/useSharedElementHover';
+import { useHoverModePreferences } from '@/composables/useHoverModePreferences';
 import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';
 import { blurAfterFinePointerActivation, blurFocusedDescendantAfterFinePointerLeave } from '@/utils/pointerFocus';
 
@@ -179,7 +187,9 @@ const emit = defineEmits<{
 }>();
 
 const DEFAULT_CARD_ASPECT_RATIO = '63 / 88';
+const BASE_HOVER_CARD_WIDTH_REM = 28;
 const route = useRoute();
+const { hoverPreviewScale } = useHoverModePreferences();
 const hovered = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
 const hoverPanelRef = ref<HTMLElement | null>(null);
@@ -215,6 +225,16 @@ const floating = useFloating(triggerRef, hoverPanelRef, {
 });
 const hoverPanelX = computed(() => floating.x.value ?? 0);
 const hoverPanelY = computed(() => floating.y.value ?? 0);
+const enlargedPreviewStyle = computed(() => ({
+  width: `${Number((BASE_HOVER_CARD_WIDTH_REM * normalizeHoverPreviewScale(hoverPreviewScale.value)).toFixed(3))}rem`,
+}));
+const sharedElementHover = useSharedElementHover({
+  isOpen: showHoverOverlay,
+  panelRef: hoverPanelRef,
+  triggerRef,
+  x: hoverPanelX,
+  y: hoverPanelY,
+});
 const cardFrameWidthRem = computed(() => Number(((props.cardHeightRem * 63) / 88).toFixed(3)));
 const cardFrameStyle = computed(() =>
   isCardGroup.value

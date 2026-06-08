@@ -198,7 +198,7 @@ export const useDeckEditor = () => {
   };
 
   const confirmDiscardUnsavedChanges = async (): Promise<boolean> => {
-    if (!hasUnsavedChanges.value || saving.value) {
+    if (!hasUnsavedChanges.value) {
       return true;
     }
     if (pendingDiscardConfirmationPromise) {
