@@ -50,21 +50,13 @@ vi.mock('@/modules/decks/components/DeckBuilderBoardEntryRow.vue', () => ({
       entry: { type: Object, required: true },
       sortableCardId: { type: String, required: true },
     },
-    emits: ['reorder-up', 'reorder-down'],
-    setup(props, { emit }) {
+    setup(props) {
       return () => {
         const cardId = (props.entry as { card: { id: string } }).card.id;
-        return h(
-          'div',
-          {
-            'data-testid': `row-${cardId}`,
-            'data-card-id': props.sortableCardId,
-          },
-          [
-            h('button', { 'aria-label': `Move ${cardId} up`, onClick: () => emit('reorder-up', cardId) }, 'Up'),
-            h('button', { 'aria-label': `Move ${cardId} down`, onClick: () => emit('reorder-down', cardId) }, 'Down'),
-          ],
-        );
+        return h('div', {
+          'data-testid': `row-${cardId}`,
+          'data-card-id': props.sortableCardId,
+        });
       };
     },
   }),
@@ -385,7 +377,7 @@ describe('DeckBuilderSummaryPanel', () => {
     mounted.unmount();
   });
 
-  test('commits sortable updates and keyboard reorder actions to the deck draft', async () => {
+  test('commits sortable updates to the deck draft', async () => {
     const mounted = await mountPanel();
     const firstRow = mounted.container.querySelector<HTMLElement>('[data-testid="row-card-1"]');
     if (!firstRow) {
@@ -403,12 +395,6 @@ describe('DeckBuilderSummaryPanel', () => {
       'card-1',
       1,
     );
-
-    const moveDownButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card-1 down"]');
-    moveDownButton?.click();
-    await nextTick();
-
-    expect(mounted.controller.deck.moveEntryWithinBoard).toHaveBeenCalledWith('card-1', 1);
 
     mounted.unmount();
   });

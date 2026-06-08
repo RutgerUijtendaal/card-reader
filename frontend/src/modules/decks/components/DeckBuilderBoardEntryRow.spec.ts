@@ -102,8 +102,6 @@ const mountRow = async ({
     moveDestinations,
     rowActionDisabled,
     rowSecondaryActionDisabled,
-    canReorderUp: true,
-    canReorderDown: true,
     onRowAction: (cardId: string) => events.push(`row:${cardId}`),
     onRowSecondaryAction: (cardId: string) => events.push(`row-secondary:${cardId}`),
     onIncrement: (cardId: string) => events.push(`increment:${cardId}`),
