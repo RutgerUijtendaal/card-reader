@@ -54,6 +54,7 @@ const mountNav = async (props: { collapsed?: boolean } = {}) => {
       { path: '/cards', component: { template: '<div />' } },
       { path: '/decks', component: { template: '<div />' } },
       { path: '/my/decks', component: { template: '<div />' } },
+      { path: '/my/decks/new', component: { template: '<div />' } },
       { path: '/notifications', component: { template: '<div />' } },
       { path: '/settings', component: { template: '<div />' } },
     ],

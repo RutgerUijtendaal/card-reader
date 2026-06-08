@@ -5,15 +5,23 @@ import DeckBuilderSummaryPanel from '@/modules/decks/components/DeckBuilderSumma
 
 const sortableMock = vi.hoisted(() => ({
   latestOptions: null as null | {
+    scroll?: boolean | HTMLElement;
+    forceAutoScrollFallback?: boolean;
+    bubbleScroll?: boolean;
+    scrollSensitivity?: number;
+    scrollSpeed?: number;
+    onStart?: () => void;
+    onEnd?: () => void;
     onUpdate?: (event: { item: HTMLElement; newIndex?: number }) => void;
   },
+  option: vi.fn(),
 }));
 
 vi.mock('@vueuse/integrations/useSortable', () => ({
   useSortable: vi.fn((_element, _list, options) => {
     sortableMock.latestOptions = options;
     return {
-      option: vi.fn(),
+      option: sortableMock.option,
       start: vi.fn(),
       stop: vi.fn(),
     };
@@ -237,6 +245,7 @@ describe('DeckBuilderSummaryPanel', () => {
     document.body.innerHTML = '';
     vi.clearAllMocks();
     sortableMock.latestOptions = null;
+    sortableMock.option.mockClear();
   });
 
   test('renders a compact hero header and keeps details collapsed by default', async () => {
@@ -417,6 +426,29 @@ describe('DeckBuilderSummaryPanel', () => {
     expect(mounted.controller.deck.selectBoard).not.toHaveBeenCalledWith('side-1');
     expect(document.body.textContent ?? '').toContain('Rename');
     expect(document.body.textContent ?? '').toContain('Delete');
+
+    mounted.unmount();
+  });
+
+  test('pins drag autoscroll to the summary list instead of bubbling to the page', async () => {
+    const mounted = await mountPanel();
+    const summaryList = mounted.container.querySelector<HTMLElement>('[data-testid="deck-summary-list"]');
+
+    expect(summaryList).not.toBeNull();
+    expect(summaryList?.classList.contains('overscroll-contain')).toBe(true);
+    expect(sortableMock.latestOptions?.scroll).toBe(true);
+    expect(sortableMock.latestOptions?.forceAutoScrollFallback).toBe(true);
+    expect(sortableMock.latestOptions?.bubbleScroll).toBe(false);
+    expect(sortableMock.latestOptions?.scrollSensitivity).toBe(180);
+    expect(sortableMock.latestOptions?.scrollSpeed).toBe(18);
+    expect(sortableMock.option).toHaveBeenCalledWith('scroll', summaryList);
+    expect(sortableMock.option).toHaveBeenCalledWith('bubbleScroll', false);
+
+    sortableMock.latestOptions?.onStart?.();
+    sortableMock.latestOptions?.onEnd?.();
+
+    expect(sortableMock.option).toHaveBeenCalledWith('scroll', summaryList);
+    expect(sortableMock.option).toHaveBeenCalledWith('bubbleScroll', false);
 
     mounted.unmount();
   });

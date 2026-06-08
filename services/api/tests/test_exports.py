@@ -126,3 +126,45 @@ def test_tts_export_includes_sideboard_entries() -> None:
     ]
     assert payload["deck"]["overall_total_cards"] == 66
 
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_tts_export_preserves_saved_entry_order() -> None:
+    owner = _create_user("tts-export-order-owner", "password")
+    hero = _create_card(name="TTS Export Order Hero", is_hero=True)
+    alpha_card = _create_card(name="Alpha TTS Card", is_hero=False)
+    beta_card = _create_card(name="Beta TTS Card", is_hero=False)
+    filler_cards = _build_mainboard_cards(total_unique=13)
+    sideboard_alpha_card = _create_card(name="Alpha Sideboard TTS Card", is_hero=False)
+    sideboard_beta_card = _create_card(name="Beta Sideboard TTS Card", is_hero=False)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Ordered Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=beta_card.id, quantity=1),
+            DeckEntryInput(card_id=alpha_card.id, quantity=1),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in filler_cards],
+        ],
+        sideboards=[
+            DeckSideboardInput(
+                name="Tech",
+                entries=[
+                    DeckEntryInput(card_id=sideboard_beta_card.id, quantity=1),
+                    DeckEntryInput(card_id=sideboard_alpha_card.id, quantity=1),
+                ],
+            )
+        ],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 200
+    payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
+    assert [card["card_id"] for card in payload["cards"][:2]] == [beta_card.id, alpha_card.id]
+    assert [card["card_id"] for card in payload["sideboards"][0]["cards"]] == [
+        sideboard_beta_card.id,
+        sideboard_alpha_card.id,
+    ]
+

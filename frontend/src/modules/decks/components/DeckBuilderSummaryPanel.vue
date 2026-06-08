@@ -379,7 +379,7 @@
 
     <div
       ref="boardListRef"
-      class="app-scrollbar relative z-10 mt-4 flex-1 min-h-0 overflow-y-auto px-5 pb-5 pr-4"
+      class="app-scrollbar relative z-10 mt-4 flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-5 pr-4"
       data-testid="deck-summary-list"
     >
       <div
@@ -514,7 +514,20 @@ const sortableController = useSortable(boardEntriesSortableRef, sortableEntries,
   ghostClass: 'deck-board-entry-sortable-ghost',
   chosenClass: 'deck-board-entry-sortable-chosen',
   dragClass: 'deck-board-entry-sortable-drag',
+  scroll: true,
+  forceAutoScrollFallback: true,
+  bubbleScroll: false,
+  scrollSensitivity: 180,
+  scrollSpeed: 18,
   watchElement: true,
+  onStart: (): void => {
+    sortableController.option('scroll', boardListRef.value ?? true);
+    sortableController.option('bubbleScroll', false);
+  },
+  onEnd: (): void => {
+    sortableController.option('scroll', boardListRef.value ?? true);
+    sortableController.option('bubbleScroll', false);
+  },
   onUpdate: (event: { item: HTMLElement; newIndex?: number }): void => {
     const movedCardId = event.item.dataset.cardId;
     if (!movedCardId || event.newIndex === undefined) {
@@ -527,6 +540,15 @@ const sortableController = useSortable(boardEntriesSortableRef, sortableEntries,
     );
   },
 });
+
+watch(
+  boardListRef,
+  (listElement) => {
+    sortableController.option('scroll', listElement ?? true);
+    sortableController.option('bubbleScroll', false);
+  },
+  { immediate: true },
+);
 
 const componentRefElement = (element: unknown): HTMLElement | null => {
   if (element instanceof HTMLElement) {
