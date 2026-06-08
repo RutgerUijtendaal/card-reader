@@ -1,5 +1,5 @@
 <template>
-  <section class="flex h-[calc(100vh-3rem)] min-h-0 w-full flex-col gap-6 overflow-hidden">
+  <section class="flex w-full flex-col gap-6">
     <AppPageHeader
       :icon="SlidersHorizontal"
       title="Settings"
@@ -8,51 +8,56 @@
       title-class="text-xl"
     />
 
-    <div class="mx-auto grid min-h-0 w-full max-w-5xl flex-1 gap-5 overflow-hidden lg:grid-cols-[16rem_minmax(0,42rem)]">
-      <aside class="flex min-h-0 flex-col overflow-hidden">
-        <div class="mb-3 px-1">
-          <h3 class="theme-section-title text-sm font-semibold">
-            Card Browsing
-          </h3>
-          <p class="theme-section-muted mt-1 text-xs">
-            Defaults for shared card list preferences.
-          </p>
-        </div>
+    <AppPageLayout
+      columns="one"
+      root-class="app-page-layout-standard"
+    >
+      <template #aside>
+        <AppStickyAside>
+          <div class="mb-3 px-1">
+            <h3 class="theme-section-title text-sm font-semibold">
+              Card Browsing
+            </h3>
+            <p class="theme-section-muted mt-1 text-xs">
+              Defaults for shared card list preferences.
+            </p>
+          </div>
 
-        <nav
-          class="app-scrollbar flex min-h-0 flex-col gap-2 overflow-y-auto pr-1"
-          aria-label="Settings sections"
-        >
-          <button
-            v-for="section in settingsSections"
-            :key="section.id"
-            type="button"
-            class="rounded-lg border px-3 py-3 text-left transition"
-            :class="activeSection === section.id
-              ? 'theme-selected-surface-strong'
-              : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
-            @click="activeSection = section.id"
+          <nav
+            class="flex flex-col gap-2"
+            aria-label="Settings sections"
           >
-            <div class="flex items-start gap-3">
-              <component
-                :is="section.icon"
-                class="mt-0.5 h-4 w-4 shrink-0"
-              />
-              <span class="min-w-0">
-                <span class="block truncate text-sm font-semibold">{{ section.label }}</span>
-                <span
-                  class="mt-1 block truncate text-xs"
-                  :class="activeSection === section.id ? 'theme-section-title' : 'theme-section-muted'"
-                >
-                  {{ section.summary }}
+            <button
+              v-for="section in settingsSections"
+              :key="section.id"
+              type="button"
+              class="rounded-lg border px-3 py-3 text-left transition"
+              :class="activeSection === section.id
+                ? 'theme-selected-surface-strong'
+                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+              @click="activeSection = section.id"
+            >
+              <div class="flex items-start gap-3">
+                <component
+                  :is="section.icon"
+                  class="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span class="min-w-0">
+                  <span class="block truncate text-sm font-semibold">{{ section.label }}</span>
+                  <span
+                    class="mt-1 block truncate text-xs"
+                    :class="activeSection === section.id ? 'theme-section-title' : 'theme-section-muted'"
+                  >
+                    {{ section.summary }}
+                  </span>
                 </span>
-              </span>
-            </div>
-          </button>
-        </nav>
-      </aside>
+              </div>
+            </button>
+          </nav>
+        </AppStickyAside>
+      </template>
 
-      <section class="theme-divider app-scrollbar min-h-0 overflow-y-auto border-t pt-5 lg:border-l lg:border-t-0 lg:py-1 lg:pl-6">
+      <section class="pt-0">
         <div class="mb-5 flex items-start gap-3">
           <div
             class="theme-card-frame-muted theme-section-title flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
@@ -224,7 +229,7 @@
           </div>
         </section>
       </section>
-    </div>
+    </AppPageLayout>
   </section>
 </template>
 
@@ -232,8 +237,10 @@
 import { computed, ref } from 'vue';
 import { ArrowUpDown, Eye, MousePointer2, SlidersHorizontal } from 'lucide-vue-next';
 import type { Component } from 'vue';
+import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import AppSelect from '@/components/app/AppSelect.vue';
+import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import type { PopoverOptionItem } from '@/components/cards/PopoverOptionList.vue';
 import type { CardSort } from '@/composables/card-gallery/cardSort';
 import type { HoverMode } from '@/composables/card-gallery/hoverMode';

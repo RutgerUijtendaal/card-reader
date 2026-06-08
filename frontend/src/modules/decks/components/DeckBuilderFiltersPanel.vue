@@ -7,7 +7,6 @@
     :search-placeholder="controller.deck.isSetupStep.value ? 'Search heroes...' : 'Search cards...'"
     :total-count="controller.gallery.totalCount.value"
     :on-reset="controller.filters.resetFilters"
-    :sticky-to-viewport="false"
   >
     <div
       v-if="controller.deck.isSetupStep.value"

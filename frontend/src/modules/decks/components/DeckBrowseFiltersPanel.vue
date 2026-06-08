@@ -7,8 +7,33 @@
     search-placeholder="Search hero cards..."
     :total-count="totalCount"
     :on-reset="controller.resetFilters"
-    :sticky-to-viewport="false"
   >
+    <div class="theme-divider space-y-3 border-b pb-4">
+      <div class="space-y-1">
+        <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
+          Deck Library
+        </p>
+      </div>
+
+      <div class="theme-tablist w-full">
+        <RouterLink
+          class="theme-tab flex-1"
+          :class="mode === 'public' ? 'theme-tab-active' : ''"
+          :to="publicTo"
+        >
+          Public
+        </RouterLink>
+        <RouterLink
+          v-if="canUseOwnedDecks"
+          class="theme-tab flex-1"
+          :class="mode === 'owned' ? 'theme-tab-active' : ''"
+          :to="ownedTo"
+        >
+          My Decks
+        </RouterLink>
+      </div>
+    </div>
+
     <div
       v-if="showAuthor"
       class="theme-muted-panel space-y-2 p-3"
@@ -60,6 +85,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { RouterLink } from 'vue-router';
+import type { RouteLocationRaw } from 'vue-router';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
 import GalleryFilterSidebar from '@/components/filters/GalleryFilterSidebar.vue';
 import type { DeckBrowseFiltersController } from '@/modules/decks/composables/useDeckBrowseFilters';
@@ -69,6 +96,10 @@ const props = defineProps<{
   totalCount: number;
   description?: string;
   showAuthor?: boolean;
+  mode: 'public' | 'owned';
+  canUseOwnedDecks: boolean;
+  publicTo: RouteLocationRaw;
+  ownedTo: RouteLocationRaw;
 }>();
 
 const description = computed(

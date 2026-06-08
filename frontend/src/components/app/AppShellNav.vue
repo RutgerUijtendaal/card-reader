@@ -75,28 +75,62 @@
     </div>
 
     <nav class="grid w-full gap-2">
-      <RouterLink
-        v-for="item in visibleItems"
+      <template
+        v-for="item in publicItems"
         :key="item.to"
-        class="nav-link"
-        :class="collapsed ? 'justify-center px-0' : ''"
-        :to="item.to"
-        :title="collapsed ? item.label : undefined"
-        :aria-label="collapsed ? item.label : undefined"
-        @click="handleNavClick"
       >
-        <component
-          :is="item.icon"
-          class="h-[1.125rem] w-[1.125rem] shrink-0"
-        />
-        <span v-if="!collapsed">{{ item.label }}</span>
-        <span
-          v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
-          class="nav-badge theme-pill theme-pill-warning ml-auto text-[11px] font-semibold"
+        <RouterLink
+          class="nav-link"
+          :class="collapsed ? 'justify-center px-0' : ''"
+          :to="item.to"
+          :title="collapsed ? item.label : undefined"
+          :aria-label="collapsed ? item.label : undefined"
+          @click="handleNavClick"
         >
-          {{ item.badgeCount }}
-        </span>
-      </RouterLink>
+          <component
+            :is="item.icon"
+            class="h-[1.125rem] w-[1.125rem] shrink-0"
+          />
+          <span v-if="!collapsed">{{ item.label }}</span>
+          <span
+            v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
+            class="nav-badge theme-pill theme-pill-warning ml-auto text-[11px] font-semibold"
+          >
+            {{ item.badgeCount }}
+          </span>
+        </RouterLink>
+      </template>
+
+      <div
+        v-if="staffItems.length > 0"
+        class="app-sidebar-divider my-2"
+      />
+
+      <template
+        v-for="item in staffItems"
+        :key="item.to"
+      >
+        <RouterLink
+          class="nav-link"
+          :class="collapsed ? 'justify-center px-0' : ''"
+          :to="item.to"
+          :title="collapsed ? item.label : undefined"
+          :aria-label="collapsed ? item.label : undefined"
+          @click="handleNavClick"
+        >
+          <component
+            :is="item.icon"
+            class="h-[1.125rem] w-[1.125rem] shrink-0"
+          />
+          <span v-if="!collapsed">{{ item.label }}</span>
+          <span
+            v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
+            class="nav-badge theme-pill theme-pill-warning ml-auto text-[11px] font-semibold"
+          >
+            {{ item.badgeCount }}
+          </span>
+        </RouterLink>
+      </template>
     </nav>
 
     <div class="mt-auto w-full space-y-4 pt-6">
@@ -145,7 +179,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
+import { Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
 import AppHotkeysPanel from '@/components/app/AppHotkeysPanel.vue';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
@@ -191,6 +225,7 @@ const items = computed<NavItem[]>(() => [
   { label: 'Gallery', to: '/cards', icon: Images },
   { label: 'Decks', to: '/decks', icon: BookOpen },
   { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
+  { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: Hammer, requiresAuth: true },
   { label: 'Notifications', to: '/notifications', icon: Bell, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },
   { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
   { label: 'Import Jobs', to: '/import-jobs', icon: Upload, requiresStaff: true },
@@ -198,20 +233,21 @@ const items = computed<NavItem[]>(() => [
   { label: 'Admin', to: '/admin', icon: Settings, requiresStaff: true },
 ]);
 
-const visibleItems = computed(() =>
-  items.value.filter((item) => {
-    if (item.requiresStaff && !auth.canAccessStaffRoutes) {
-      return false;
-    }
-    if (item.requiresAuth && auth.authEnabled && !auth.authenticated) {
-      return false;
-    }
-    if (item.requiresAuthenticatedUser && (!auth.authEnabled || !auth.authenticated)) {
-      return false;
-    }
-    return true;
-  }),
-);
+const canShowItem = (item: NavItem): boolean => {
+  if (item.requiresStaff && !auth.canAccessStaffRoutes) {
+    return false;
+  }
+  if (item.requiresAuth && auth.authEnabled && !auth.authenticated) {
+    return false;
+  }
+  if (item.requiresAuthenticatedUser && (!auth.authEnabled || !auth.authenticated)) {
+    return false;
+  }
+  return true;
+};
+
+const publicItems = computed(() => items.value.filter((item) => !item.requiresStaff && canShowItem(item)));
+const staffItems = computed(() => items.value.filter((item) => item.requiresStaff && canShowItem(item)));
 
 const handleNavClick = (): void => {
   if (props.mobile) {

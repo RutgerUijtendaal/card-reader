@@ -1,5 +1,5 @@
 <template>
-  <section class="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
+  <section class="app-page-content flex h-full min-h-0 flex-col gap-5 overflow-hidden">
     <AppPageHeader
       :icon="SquarePen"
       :title="card?.name || 'Loading card...'"
@@ -30,7 +30,7 @@
         </RouterLink>
       </template>
 
-      <template #bottomLeft>
+      <template #actions>
         <template v-if="card">
           <button
             class="btn-secondary inline-flex items-center gap-2"
@@ -42,32 +42,6 @@
           </button>
         </template>
       </template>
-
-      <template #bottomRight>
-        <template v-if="hasGalleryContext">
-          <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
-            {{ positionLabel }}
-          </span>
-          <button
-            class="btn-secondary inline-flex items-center gap-2"
-            type="button"
-            :disabled="!previousCardId"
-            @click="goToPreviousCard"
-          >
-            <ChevronLeft class="h-4 w-4" />
-            <span>Previous Card</span>
-          </button>
-          <button
-            class="btn-secondary inline-flex items-center gap-2"
-            type="button"
-            :disabled="!nextCardId && !hasMoreResults"
-            @click="goToNextCard"
-          >
-            <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next Card' }}</span>
-            <ChevronRight class="h-4 w-4" />
-          </button>
-        </template>
-      </template>
     </AppPageHeader>
 
     <div
@@ -76,6 +50,17 @@
     >
       <div class="grid min-h-full items-start gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(30rem,40vw)] xl:items-stretch xl:overflow-hidden">
         <div class="app-scrollbar min-w-0 space-y-6 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+          <CardDetailPager
+            :visible="hasGalleryContext"
+            :position-label="positionLabel"
+            :previous-card-id="previousCardId"
+            :next-card-id="nextCardId"
+            :has-more-results="hasMoreResults"
+            :is-loading-more-cards="isLoadingMoreCards"
+            @previous="goToPreviousCard"
+            @next="goToNextCard"
+          />
+
           <CardVersionOverviewPane
             :version="selectedVersion"
             :symbol-by-key="symbolByKey"
@@ -157,11 +142,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { ChevronLeft, ChevronRight, GitMerge, SquarePen } from 'lucide-vue-next';
+import { GitMerge, SquarePen } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { buildAdminCardMergeSourceLocation } from '@/composables/admin/adminRouteState';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
+import CardDetailPager from '@/modules/card-detail/components/CardDetailPager.vue';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
 import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';

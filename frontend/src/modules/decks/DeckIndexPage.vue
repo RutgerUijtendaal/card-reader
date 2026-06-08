@@ -1,5 +1,5 @@
 <template>
-  <section class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-5 overflow-hidden">
+  <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="activeHeaderIcon"
       :title="activeTitle"
@@ -8,128 +8,112 @@
       title-class="text-xl"
     >
       <template #actions>
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <div class="theme-tablist">
-            <RouterLink
-              class="theme-tab"
-              :class="{ 'theme-tab-active': !isOwnedMode }"
-              :to="{ path: '/decks', query: publicFilterRouteQuery }"
-            >
-              Public
-            </RouterLink>
-            <RouterLink
-              v-if="canUseOwnedDecks"
-              class="theme-tab"
-              :class="{ 'theme-tab-active': isOwnedMode }"
-              :to="{ path: '/my/decks', query: ownedFilterRouteQuery }"
-            >
-              My Decks
-            </RouterLink>
-          </div>
-
-          <RouterLink
-            v-if="canUseOwnedDecks"
-            class="btn-primary"
-            :to="newDeckLocation"
-          >
-            New Deck
-          </RouterLink>
-        </div>
+        <RouterLink
+          class="btn-primary inline-flex items-center gap-2"
+          :to="newDeckLocation"
+        >
+          <Hammer class="h-4 w-4" />
+          <span>Build a deck</span>
+        </RouterLink>
       </template>
     </AppPageHeader>
 
-    <section class="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[23rem_minmax(0,1fr)]">
-      <DeckBrowseFiltersPanel
-        :controller="filterController"
-        :total-count="decks.length"
-        :description="filterDescription"
-        :show-author="!isOwnedMode"
-      />
+    <AppPageLayout>
+      <template #aside>
+        <DeckBrowseFiltersPanel
+          :controller="filterController"
+          :total-count="decks.length"
+          :description="filterDescription"
+          :show-author="!isOwnedMode"
+          :mode="isOwnedMode ? 'owned' : 'public'"
+          :can-use-owned-decks="canUseOwnedDecks"
+          :public-to="{ path: '/decks', query: publicFilterRouteQuery }"
+          :owned-to="{ path: '/my/decks', query: ownedFilterRouteQuery }"
+        />
+      </template>
 
-      <div class="app-scrollbar min-h-0 overflow-y-auto pr-1">
-        <div
-          v-if="loading || !filtersLoaded"
-          class="deck-index-grid grid gap-4 px-1 pb-3 pt-2"
-        >
-          <DeckLoadingSkeleton
-            v-for="index in loadingSkeletonCount"
-            :key="`deck-loading-${index}`"
-          />
-        </div>
-
-        <div
-          v-else-if="decks.length === 0"
-          class="page-card theme-section-muted text-sm"
-        >
-          {{ emptyLabel }}
-        </div>
-
-        <div
-          v-else
-          class="deck-index-grid grid gap-4 px-1 pb-3 pt-2"
-        >
-          <DeckListCard
-            v-for="deck in decks"
-            :key="deck.id"
-            :deck="deck"
-            :mode="isOwnedMode ? 'owned' : 'browse'"
-            :title-to="isOwnedMode ? `/my/decks/${deck.id}` : `/decks/${deck.id}`"
-          >
-            <template
-              v-if="isOwnedMode"
-              #actions
-            >
-              <div class="flex w-[10.75rem] flex-col items-stretch gap-3">
-                <div class="flex items-center gap-2">
-                  <RouterLink
-                    class="btn-secondary min-w-0 flex-1"
-                    :to="buildMyDeckEditorLocation(deck.id)"
-                  >
-                    Edit
-                  </RouterLink>
-                  <ExtraActionsMenu button-label="Open deck actions">
-                    <template #default="{ close }">
-                      <button
-                        v-if="canShareDeck(deck)"
-                        class="btn-secondary w-full justify-center"
-                        type="button"
-                        @click="copyShareLink(deck); close()"
-                      >
-                        Copy Share Link
-                      </button>
-
-                      <button
-                        class="btn-secondary w-full justify-center"
-                        type="button"
-                        @click="exportDeck(deck); close()"
-                      >
-                        Export TTS
-                      </button>
-
-                      <button
-                        class="btn-danger-secondary w-full justify-center"
-                        type="button"
-                        @click="promptDelete(deck); close()"
-                      >
-                        Delete
-                      </button>
-                    </template>
-                  </ExtraActionsMenu>
-                </div>
-
-                <AppSelect
-                  wrapper-class="min-w-0 w-full"
-                  :disabled="savingDeckIds.has(deck.id)"
-                  :model-value="deck.visibility"
-                  :options="visibilityOptions"
-                  @update:model-value="handleVisibilitySelect(deck, $event)"
-                />
-              </div>
-            </template>
-          </DeckListCard>
-        </div>
+      <div
+        v-if="loading || !filtersLoaded"
+        class="deck-index-grid grid gap-4"
+      >
+        <DeckLoadingSkeleton
+          v-for="index in loadingSkeletonCount"
+          :key="`deck-loading-${index}`"
+        />
       </div>
-    </section>
+
+      <div
+        v-else-if="decks.length === 0"
+        class="page-card theme-section-muted text-sm"
+      >
+        {{ emptyLabel }}
+      </div>
+
+      <div
+        v-else
+        class="deck-index-grid grid gap-4"
+      >
+        <DeckListCard
+          v-for="deck in decks"
+          :key="deck.id"
+          :deck="deck"
+          :mode="isOwnedMode ? 'owned' : 'browse'"
+          :title-to="isOwnedMode ? `/my/decks/${deck.id}` : `/decks/${deck.id}`"
+        >
+          <template
+            v-if="isOwnedMode"
+            #actions
+          >
+            <div class="flex w-[10.75rem] flex-col items-stretch gap-3">
+              <div class="flex items-center gap-2">
+                <RouterLink
+                  class="btn-secondary min-w-0 flex-1"
+                  :to="buildMyDeckEditorLocation(deck.id)"
+                >
+                  Edit
+                </RouterLink>
+                <ExtraActionsMenu button-label="Open deck actions">
+                  <template #default="{ close }">
+                    <button
+                      v-if="canShareDeck(deck)"
+                      class="btn-secondary w-full justify-center"
+                      type="button"
+                      @click="copyShareLink(deck); close()"
+                    >
+                      Copy Share Link
+                    </button>
+
+                    <button
+                      class="btn-secondary w-full justify-center"
+                      type="button"
+                      @click="exportDeck(deck); close()"
+                    >
+                      Export TTS
+                    </button>
+
+                    <button
+                      class="btn-danger-secondary w-full justify-center"
+                      type="button"
+                      @click="promptDelete(deck); close()"
+                    >
+                      Delete
+                    </button>
+                  </template>
+                </ExtraActionsMenu>
+              </div>
+
+              <AppSelect
+                wrapper-class="min-w-0 w-full"
+                :disabled="savingDeckIds.has(deck.id)"
+                :model-value="deck.visibility"
+                :options="visibilityOptions"
+                @update:model-value="handleVisibilitySelect(deck, $event)"
+              />
+            </div>
+          </template>
+        </DeckListCard>
+      </div>
+    </AppPageLayout>
 
     <ConfirmModal
       :open="deleteTarget !== null"
@@ -147,10 +131,11 @@
 
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
-import { BookOpen, Folders } from 'lucide-vue-next';
+import { BookOpen, Folders, Hammer } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
+import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import AppSelect from '@/components/app/AppSelect.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';

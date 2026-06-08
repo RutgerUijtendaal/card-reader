@@ -1,5 +1,5 @@
 <template>
-  <div class="app-scrollbar min-h-0 overflow-y-auto pr-1">
+  <div>
     <div class="space-y-6">
       <div
         class="grid gap-6 px-1 pb-3 pt-2"

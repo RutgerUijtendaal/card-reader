@@ -1,5 +1,5 @@
 <template>
-  <aside class="page-card flex h-full min-h-0 flex-col overflow-hidden p-0">
+  <aside class="app-sticky-aside app-sticky-aside-right page-card flex min-h-0 flex-col overflow-hidden p-0 xl:border-l-0 xl:pl-0">
     <template v-if="controller.deck.isSetupStep.value">
       <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto p-5 pr-4">
         <div class="space-y-1">

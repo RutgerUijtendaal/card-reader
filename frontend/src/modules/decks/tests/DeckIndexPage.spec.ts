@@ -108,15 +108,33 @@ vi.mock('@/components/app/ExtraActionsMenu.vue', () => ({
 vi.mock('@/modules/decks/components/DeckBrowseFiltersPanel.vue', () => ({
   default: defineComponent({
     props: {
+      canUseOwnedDecks: { type: Boolean, default: false },
       controller: { type: Object, required: true },
       description: { type: String, required: true },
+      mode: { type: String, required: true },
+      ownedTo: { type: Object, required: true },
+      publicTo: { type: Object, required: true },
       showAuthor: { type: Boolean, default: true },
       totalCount: { type: Number, required: true },
     },
     setup(props) {
+      const routeHref = (to: { path?: string; query?: Record<string, unknown> }): string => {
+        const params = new URLSearchParams();
+        Object.entries(to.query ?? {}).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.set(key, String(value));
+          }
+        });
+        const query = params.toString();
+        return `${to.path ?? ''}${query ? `?${query}` : ''}`;
+      };
       return () =>
         h('aside', [
           h('p', props.description),
+          h('a', { href: routeHref(props.publicTo as { path?: string; query?: Record<string, unknown> }) }, 'Public'),
+          props.canUseOwnedDecks
+            ? h('a', { href: routeHref(props.ownedTo as { path?: string; query?: Record<string, unknown> }) }, 'My Decks')
+            : null,
           props.showAuthor ? h('span', 'Author filter') : null,
           h('span', `Total ${props.totalCount}`),
           h('input', {
@@ -354,18 +372,21 @@ describe('DeckIndexPage', () => {
   test('tabs link to public and owned deck routes without carrying author into owned mode', async () => {
     const mounted = await mountPage('/decks?card_q=Blade&author_q=Frosty');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
+    const publicLink = links.find((link) => link.textContent?.trim() === 'Public');
+    const ownedLink = links.find((link) => link.textContent?.trim() === 'My Decks');
 
-    expect(
-      links.some(
-        (link) =>
-          link.textContent?.trim() === 'Public' && link.getAttribute('href') === '/decks?author_q=Frosty&card_q=Blade',
-      ),
-    ).toBe(true);
-    expect(
-      links.some(
-        (link) => link.textContent?.trim() === 'My Decks' && link.getAttribute('href') === '/my/decks?card_q=Blade',
-      ),
-    ).toBe(true);
+    expect(publicLink).toBeDefined();
+    expect(ownedLink).toBeDefined();
+
+    const publicUrl = new URL(publicLink?.getAttribute('href') ?? '', 'http://localhost');
+    expect(publicUrl.pathname).toBe('/decks');
+    expect(publicUrl.searchParams.get('author_q')).toBe('Frosty');
+    expect(publicUrl.searchParams.get('card_q')).toBe('Blade');
+
+    const ownedUrl = new URL(ownedLink?.getAttribute('href') ?? '', 'http://localhost');
+    expect(ownedUrl.pathname).toBe('/my/decks');
+    expect(ownedUrl.searchParams.get('author_q')).toBeNull();
+    expect(ownedUrl.searchParams.get('card_q')).toBe('Blade');
 
     mounted.unmount();
   });

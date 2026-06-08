@@ -27,6 +27,7 @@ export const useImportJobsController = () => {
   const pickedFiles = ref<File[]>([]);
   const errorMessage = ref('');
   const jobs = ref<ImportJob[]>([]);
+  const jobsLoaded = ref(false);
   const isRefreshing = ref(false);
   const creatingJob = ref(false);
   const cancellingJobIds = ref<Set<string>>(new Set());
@@ -56,6 +57,7 @@ export const useImportJobsController = () => {
       jobs.value = await fetchImportJobs();
       lastRefreshedAt.value = new Date().toLocaleTimeString();
     } finally {
+      jobsLoaded.value = true;
       isRefreshing.value = false;
     }
   };
@@ -189,6 +191,7 @@ export const useImportJobsController = () => {
     pickedFiles,
     errorMessage,
     jobs,
+    jobsLoaded,
     isRefreshing,
     creatingJob,
     cancellingJobIds,

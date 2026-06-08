@@ -1,53 +1,44 @@
 <template>
-  <section class="space-y-5">
-    <div class="page-card space-y-4 shadow-none">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+  <section class="app-page-content flex flex-col gap-5">
+    <AppPageHeader
+      :icon="Layers3"
+      :title="group?.name || 'Loading card group...'"
+      :subtitle="group ? `${group.member_count} cards in this group` : 'Browse grouped card variants.'"
+      :back-to="galleryBackLocation"
+      back-label="Back to Gallery"
+      title-tag="h2"
+      title-class="text-2xl"
+    />
+
+    <nav
+      v-if="hasGalleryContext"
+      class="theme-divider flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between"
+      aria-label="Card group result navigation"
+    >
+      <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
+        {{ positionLabel }}
+      </span>
+      <div class="flex flex-wrap gap-2">
         <button
           class="btn-secondary inline-flex items-center gap-2"
           type="button"
-          @click="goBack"
+          :disabled="!previousCardId"
+          @click="goToPreviousCard"
         >
-          <ArrowLeft class="h-4 w-4" />
-          <span>Back to Gallery</span>
+          <ChevronLeft class="h-4 w-4" />
+          <span>Previous</span>
         </button>
-
-        <div
-          v-if="hasGalleryContext"
-          class="flex flex-wrap items-center gap-2 lg:justify-end"
+        <button
+          class="btn-secondary inline-flex items-center gap-2"
+          type="button"
+          :disabled="!nextCardId && !hasMoreResults"
+          @click="goToNextCard"
         >
-          <button
-            class="btn-secondary inline-flex items-center gap-2"
-            type="button"
-            :disabled="!previousCardId"
-            @click="goToPreviousCard"
-          >
-            <ChevronLeft class="h-4 w-4" />
-            <span>Previous</span>
-          </button>
-          <button
-            class="btn-secondary inline-flex items-center gap-2"
-            type="button"
-            :disabled="!nextCardId && !hasMoreResults"
-            @click="goToNextCard"
-          >
-            <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next' }}</span>
-            <ChevronRight class="h-4 w-4" />
-          </button>
-          <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
-            {{ positionLabel }}
-          </span>
-        </div>
+          <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next' }}</span>
+          <ChevronRight class="h-4 w-4" />
+        </button>
       </div>
-
-      <div v-if="group">
-        <h2 class="theme-section-title text-2xl font-semibold">
-          {{ group.name }}
-        </h2>
-        <p class="theme-section-muted text-sm">
-          {{ group.member_count }} cards in this group
-        </p>
-      </div>
-    </div>
+    </nav>
 
     <div
       v-if="group"
@@ -90,9 +81,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, Layers3 } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
+import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
 import {
   buildCardLifecycleApiParams,
@@ -108,6 +100,7 @@ const symbolByKey = ref<SymbolLookupMap>({});
 const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
 const groupLifecycleStatus = computed(() => normalizeCardLifecycleFilterValue(route.query.lifecycle_status));
 const groupRequestParams = computed(() => buildCardLifecycleApiParams(groupLifecycleStatus.value));
+const galleryBackLocation = computed(() => buildGalleryLocation(route.query));
 
 const loadGroup = async (): Promise<void> => {
   const groupId = String(route.params.id);
@@ -122,10 +115,6 @@ const loadGroup = async (): Promise<void> => {
   symbolByKey.value = Object.fromEntries(
     (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
   );
-};
-
-const goBack = (): void => {
-  void router.push(buildGalleryLocation(route.query));
 };
 
 watch(() => [route.params.id, route.query.lifecycle_status], loadGroup);

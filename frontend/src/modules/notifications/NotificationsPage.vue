@@ -1,5 +1,5 @@
 <template>
-  <section class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-5 overflow-hidden">
+  <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="Bell"
       title="Notifications"
@@ -8,53 +8,58 @@
       title-class="text-xl"
     />
 
-    <div class="mx-auto grid min-h-0 w-full max-w-5xl flex-1 gap-5 overflow-hidden lg:grid-cols-[16rem_minmax(0,42rem)]">
-      <aside class="flex min-h-0 flex-col overflow-hidden">
-        <div class="mb-3 px-1">
-          <h3 class="theme-section-title text-sm font-semibold">
-            Inbox
-          </h3>
-          <p class="theme-section-muted mt-1 text-xs">
-            {{ unreadNotificationCount }} unread notification{{ unreadNotificationCount === 1 ? '' : 's' }}.
-          </p>
-        </div>
+    <AppPageLayout
+      columns="one"
+      root-class="app-page-layout-standard"
+    >
+      <template #aside>
+        <AppStickyAside>
+          <div class="mb-3 px-1">
+            <h3 class="theme-section-title text-sm font-semibold">
+              Inbox
+            </h3>
+            <p class="theme-section-muted mt-1 text-xs">
+              {{ unreadNotificationCount }} unread notification{{ unreadNotificationCount === 1 ? '' : 's' }}.
+            </p>
+          </div>
 
-        <nav
-          class="app-scrollbar flex min-h-0 flex-col gap-2 overflow-y-auto pr-1"
-          aria-label="Notification views"
-        >
-          <button
-            v-for="option in statusOptions"
-            :key="option.value"
-            type="button"
-            class="rounded-lg border px-3 py-3 text-left transition"
-            :class="statusFilter === option.value
-              ? 'theme-selected-surface-strong'
-              : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
-            @click="selectStatus(option.value)"
+          <nav
+            class="flex flex-col gap-2"
+            aria-label="Notification views"
           >
-            <div class="flex items-start justify-between gap-3">
-              <span class="min-w-0">
-                <span class="block truncate text-sm font-semibold">{{ option.label }}</span>
-                <span
-                  class="mt-1 block truncate text-xs"
-                  :class="statusFilter === option.value ? 'theme-section-title' : 'theme-section-muted'"
-                >
-                  {{ option.description }}
+            <button
+              v-for="option in statusOptions"
+              :key="option.value"
+              type="button"
+              class="rounded-lg border px-3 py-3 text-left transition"
+              :class="statusFilter === option.value
+                ? 'theme-selected-surface-strong'
+                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+              @click="selectStatus(option.value)"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <span class="min-w-0">
+                  <span class="block truncate text-sm font-semibold">{{ option.label }}</span>
+                  <span
+                    class="mt-1 block truncate text-xs"
+                    :class="statusFilter === option.value ? 'theme-section-title' : 'theme-section-muted'"
+                  >
+                    {{ option.description }}
+                  </span>
                 </span>
-              </span>
-              <span
-                v-if="option.value === 'unread' && unreadNotificationCount > 0"
-                class="theme-pill theme-pill-warning shrink-0 px-2 py-0.5 text-[11px] font-semibold"
-              >
-                {{ unreadNotificationCount }}
-              </span>
-            </div>
-          </button>
-        </nav>
-      </aside>
+                <span
+                  v-if="option.value === 'unread' && unreadNotificationCount > 0"
+                  class="theme-pill theme-pill-warning shrink-0 px-2 py-0.5 text-[11px] font-semibold"
+                >
+                  {{ unreadNotificationCount }}
+                </span>
+              </div>
+            </button>
+          </nav>
+        </AppStickyAside>
+      </template>
 
-      <section class="theme-divider app-scrollbar min-h-0 overflow-y-auto border-t pt-5 lg:border-l lg:border-t-0 lg:py-1 lg:pl-6">
+      <section class="pt-0">
         <div class="theme-divider mb-4 flex flex-wrap items-start justify-between gap-3 border-b pb-4">
           <div class="min-w-0">
             <h3 class="theme-section-title text-base font-semibold">
@@ -77,17 +82,28 @@
         </div>
 
         <div
-          v-if="loading"
-          class="grid gap-3"
+          v-if="!notificationsLoaded"
+          class="theme-divider"
         >
-          <div
+          <article
             v-for="index in 4"
             :key="`notification-loading-${index}`"
-            class="page-card animate-pulse space-y-3"
+            class="notification-row theme-divider py-4"
           >
-            <div class="h-4 w-2/5 rounded bg-[var(--color-surface-muted)]" />
-            <div class="h-3 w-4/5 rounded bg-[var(--color-surface-muted)]" />
-          </div>
+            <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0 flex-1 space-y-3">
+                <div class="flex items-center gap-2">
+                  <span class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[var(--color-surface-muted)]" />
+                  <span class="h-4 w-2/5 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+                  <span class="h-5 w-8 animate-pulse rounded-full bg-[var(--color-surface-muted)]" />
+                </div>
+                <div class="h-4 w-4/5 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+                <div class="h-3 w-32 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+              </div>
+
+              <div class="h-9 w-24 shrink-0 animate-pulse rounded-lg bg-[var(--color-surface-muted)]" />
+            </div>
+          </article>
         </div>
 
         <div
@@ -99,22 +115,13 @@
 
         <div
           v-else-if="notifications.length === 0"
-          class="notification-empty-state theme-section-muted"
+          class="theme-section-muted flex min-h-72 items-center justify-center py-10 text-center text-sm"
         >
-          <div
-            class="notification-empty-state-icon"
-            aria-hidden="true"
-          >
-            <component
-              :is="emptyState.icon"
-              class="h-7 w-7"
-            />
-          </div>
-          <div class="space-y-1 text-center">
+          <div class="space-y-1">
             <h3 class="theme-section-title text-sm font-semibold">
               {{ emptyState.title }}
             </h3>
-            <p class="mx-auto max-w-md text-sm leading-6">
+            <p class="mx-auto max-w-md leading-6">
               {{ emptyState.message }}
             </p>
           </div>
@@ -172,11 +179,11 @@
           </article>
         </div>
       </section>
-    </div>
+    </AppPageLayout>
 
     <footer
       v-if="page.previous_page || page.next_page"
-      class="theme-divider mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 border-t pt-4"
+      class="theme-divider app-page-content app-page-layout-standard flex w-full flex-wrap items-center justify-between gap-3 border-t !py-0 !pt-4"
     >
       <button
         type="button"
@@ -200,12 +207,13 @@
 </template>
 
 <script setup lang="ts">
-import { BadgeCheck, Bell, CheckCheck, Inbox } from 'lucide-vue-next';
-import type { Component } from 'vue';
+import { Bell, CheckCheck } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { RouterLink } from 'vue-router';
+import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import { useNotificationSummary } from '@/composables/useNotificationSummary';
 import {
   buildNotificationSearchParams,
@@ -222,6 +230,7 @@ const statusOptions: Array<{ value: NotificationStatusFilter; label: string; des
 const pageSize = 25;
 const statusFilter = ref<NotificationStatusFilter>('unread');
 const notifications = ref<UserNotification[]>([]);
+const notificationsLoaded = ref(false);
 const page = ref<NotificationPage>({
   count: 0,
   next_page: null,
@@ -239,16 +248,14 @@ const activeStatusOption = computed(
   () => statusOptions.find((option) => option.value === statusFilter.value) ?? statusOptions[0],
 );
 
-const emptyState = computed<{ icon: Component; title: string; message: string }>(() => {
+const emptyState = computed<{ title: string; message: string }>(() => {
   if (statusFilter.value === 'unread') {
     return {
-      icon: BadgeCheck,
       title: "You're all caught up",
       message: 'Card changes and flag review updates will show up here when they need your attention.',
     };
   }
   return {
-    icon: Inbox,
     title: 'No notifications yet',
     message: 'Updates about your decks and submitted flags will appear here.',
   };
@@ -265,6 +272,7 @@ const loadNotifications = async (nextPage = 1): Promise<void> => {
     errorMessage.value = 'Unable to load notifications.';
     notifications.value = [];
   } finally {
+    notificationsLoaded.value = true;
     loading.value = false;
   }
 };
@@ -367,22 +375,4 @@ onMounted(() => {
   scrollbar-gutter: auto;
 }
 
-.notification-empty-state {
-  display: flex;
-  min-height: 18rem;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 2rem;
-}
-
-.notification-empty-state-icon {
-  display: flex;
-  height: 3rem;
-  width: 3rem;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-}
 </style>

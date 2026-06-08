@@ -362,6 +362,103 @@
     background: var(--color-surface-strong);
   }
 
+  .app-page-layout {
+    @apply grid w-full items-start gap-6;
+    --app-page-x-inset: 1rem;
+    --app-page-y-inset: 1rem;
+    padding: var(--app-page-y-inset) var(--app-page-x-inset);
+  }
+
+  .app-page-content {
+    --app-page-x-inset: 1rem;
+    --app-page-y-inset: 1rem;
+    padding: var(--app-page-y-inset) var(--app-page-x-inset);
+  }
+
+  .app-page-layout-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .app-page-layout-three {
+    grid-template-columns: 1fr;
+  }
+
+  .app-page-layout-one {
+    @apply grid-cols-1;
+  }
+
+  .app-page-layout-main {
+    @apply min-w-0;
+  }
+
+  .app-page-layout-standard {
+    @apply mx-auto max-w-6xl;
+  }
+
+  .app-sticky-aside {
+    @apply min-w-0 border-b pb-5;
+    top: var(--app-page-y-inset, 1rem);
+    border-color: var(--color-border);
+  }
+
+  .app-sticky-aside-left {
+    @apply border-r-0 pr-0;
+  }
+
+  .app-sticky-aside-right {
+    @apply border-l-0 pl-0;
+  }
+
+  .app-sticky-aside-scroll {
+    @apply min-h-0 space-y-4;
+  }
+
+  @media (min-width: 640px) {
+    .app-page-layout,
+    .app-page-content {
+      --app-page-x-inset: 1.5rem;
+      --app-page-y-inset: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .app-page-layout-sidebar {
+      grid-template-columns: 23rem minmax(0, 1fr);
+    }
+
+    .app-page-layout-three {
+      grid-template-columns: 23rem minmax(0, 1fr) 24rem;
+    }
+
+    .app-page-layout-standard {
+      grid-template-columns: 18rem minmax(0, 1fr);
+    }
+
+    .app-sticky-aside {
+      position: sticky;
+      display: flex;
+      height: calc(100dvh - var(--app-page-header-height, 0px) - var(--app-page-y-inset) - var(--app-page-y-inset));
+      max-height: calc(100dvh - var(--app-page-header-height, 0px) - var(--app-page-y-inset) - var(--app-page-y-inset));
+      flex-direction: column;
+      border-bottom-width: 0;
+      padding-bottom: 0;
+    }
+
+    .app-sticky-aside-left {
+      border-right-width: 1px;
+      padding-right: 1.5rem;
+    }
+
+    .app-sticky-aside-right {
+      border-left-width: 1px;
+      padding-left: 1.5rem;
+    }
+
+    .app-sticky-aside-scroll {
+      overflow-y: auto;
+    }
+  }
+
   .theme-divider {
     border-color: var(--color-border);
   }
@@ -1010,9 +1107,13 @@
   }
 
   .app-scrollbar {
-    scrollbar-gutter: stable;
+    scrollbar-gutter: auto;
     scrollbar-width: thin;
     scrollbar-color: color-mix(in srgb, var(--scrollbar-thumb) 55%, transparent) transparent;
+  }
+
+  .app-main-scroll {
+    scrollbar-gutter: stable;
   }
 
   .app-scrollbar::-webkit-scrollbar {

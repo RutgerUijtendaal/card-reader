@@ -1,262 +1,392 @@
 <template>
-  <section class="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
+  <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="ClipboardCheck"
       title="Review Queue"
       subtitle="Review low-confidence parses and user-reported parse issues."
       title-tag="h2"
       title-class="text-xl"
+    />
+
+    <AppPageLayout
+      columns="one"
+      root-class="app-page-layout-standard"
     >
-      <template
-        v-if="activeView === 'flags'"
-        #bottomLeft
-      >
-        <div class="theme-tablist">
-          <button
-            v-for="status in flagStatuses"
-            :key="status.value"
-            class="theme-tab"
-            :class="{ 'theme-tab-active': flagStatus === status.value }"
-            type="button"
-            @click="setFlagStatus(status.value)"
-          >
-            {{ status.label }}
-          </button>
-        </div>
-      </template>
-
-      <template #bottomRight>
-        <div class="theme-tablist">
-          <button
-            class="theme-tab"
-            :class="{ 'theme-tab-active': activeView === 'confidence' }"
-            type="button"
-            @click="setActiveView('confidence')"
-          >
-            Low Confidence
-          </button>
-          <button
-            class="theme-tab"
-            :class="{ 'theme-tab-active': activeView === 'flags' }"
-            type="button"
-            @click="setActiveView('flags')"
-          >
-            Flagged Parses
-          </button>
-        </div>
-      </template>
-    </AppPageHeader>
-
-    <div
-      v-if="activeView === 'confidence'"
-      class="page-card app-scrollbar min-h-0 flex-1 overflow-y-auto"
-    >
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="theme-section-muted text-sm font-medium">
-          {{ cards.length }} loaded
-        </p>
-        <button
-          v-if="nextPage !== null"
-          class="btn-secondary"
-          type="button"
-          @click="loadMore"
-        >
-          Load more
-        </button>
-      </div>
-
-      <ul class="grid gap-2">
-        <li
-          v-for="card in cards"
-          :key="card.id"
-          class="theme-card-frame theme-section-title rounded-lg px-3 py-2 text-sm"
-        >
-          <RouterLink
-            class="theme-link font-medium"
-            :to="`/cards/${card.id}/edit`"
-          >
-            {{ card.name }}
-          </RouterLink>
-          - {{ card.confidence }}
-        </li>
-      </ul>
-    </div>
-
-    <div
-      v-else
-      class="page-card app-scrollbar min-h-0 flex-1 overflow-y-auto"
-    >
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p class="theme-section-muted text-sm font-medium">
-          {{ flagGroups.length }} loaded · {{ flagPage?.count ?? 0 }} reports
-        </p>
-      </div>
-
-      <div
-        v-if="loadingFlags"
-        class="theme-empty-state"
-      >
-        Loading flagged parses...
-      </div>
-      <div
-        v-else-if="flagGroups.length === 0"
-        class="theme-empty-state"
-      >
-        No flagged parse reports found.
-      </div>
-      <ul
-        v-else
-        class="grid gap-3"
-      >
-        <li
-          v-for="group in flagGroups"
-          :key="group.flagId"
-          class="theme-card-frame grid gap-4 rounded-lg p-3 sm:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-[17rem_minmax(0,1fr)]"
-        >
-          <RouterLink
-            :to="editorLocation(group.primary, group)"
-            class="mx-auto block w-64 max-w-full overflow-hidden rounded-lg sm:mx-0 sm:w-full"
-          >
-            <img
-              v-if="group.card.image_url"
-              :src="toAbsoluteApiUrl(group.card.image_url)"
-              :alt="group.card.name"
-              class="aspect-[3/4] w-full object-cover"
-            >
-            <div
-              v-else
-              class="theme-empty-state aspect-[3/4]"
-            >
-              No image
-            </div>
-          </RouterLink>
-
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0">
-                <RouterLink
-                  class="theme-link text-base font-semibold"
-                  :to="editorLocation(group.primary, group)"
-                >
-                  {{ group.card.name }}
-                </RouterLink>
-                <p class="theme-section-muted mt-1 text-xs">
-                  {{ versionLabel(group) }} · reported by {{ group.submitted_by.username }} on {{ formatDate(group.created_at) }}
-                </p>
-              </div>
-              <span
-                class="theme-pill px-2.5 py-1 text-xs"
-                :class="groupStatusClass(group)"
-              >
-                {{ groupStatusLabel(group) }}
-              </span>
-            </div>
-
-            <p
-              v-if="group.note"
-              class="theme-section-muted mt-3 whitespace-pre-wrap text-sm"
-            >
-              {{ group.note }}
+      <template #aside>
+        <AppStickyAside>
+          <div class="mb-3 px-1">
+            <h3 class="theme-section-title text-sm font-semibold">
+              Queue Views
+            </h3>
+            <p class="theme-section-muted mt-1 text-xs">
+              Choose the review work to show.
             </p>
+          </div>
 
-            <div class="mt-4 grid gap-3">
-              <div
-                v-for="item in group.items"
-                :key="item.id"
-                class="theme-card-frame-muted rounded-lg px-3 py-3"
+          <nav
+            class="flex flex-col gap-2"
+            aria-label="Review queue views"
+          >
+            <button
+              type="button"
+              class="rounded-lg border px-3 py-3 text-left transition"
+              :class="activeView === 'flags'
+                ? 'theme-selected-surface-strong'
+                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+              @click="setActiveView('flags')"
+            >
+              <span class="block text-sm font-semibold">Flagged Parses</span>
+              <span
+                class="mt-1 block text-xs"
+                :class="activeView === 'flags' ? 'theme-section-title' : 'theme-section-muted'"
               >
-                <div class="flex flex-wrap items-start justify-between gap-2">
-                  <div class="min-w-0">
-                    <p class="theme-section-title text-sm font-semibold">
-                      {{ propertyLabel(item.property_key) }}
-                    </p>
-                    <p
-                      v-if="item.note"
-                      class="theme-section-muted mt-1 whitespace-pre-wrap text-sm"
-                    >
-                      {{ item.note }}
-                    </p>
+                User-submitted parse reports.
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border px-3 py-3 text-left transition"
+              :class="activeView === 'confidence'
+                ? 'theme-selected-surface-strong'
+                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+              @click="setActiveView('confidence')"
+            >
+              <span class="block text-sm font-semibold">Low Confidence</span>
+              <span
+                class="mt-1 block text-xs"
+                :class="activeView === 'confidence' ? 'theme-section-title' : 'theme-section-muted'"
+              >
+                Parser results below the confidence threshold.
+              </span>
+            </button>
+          </nav>
+
+          <div
+            v-if="activeView === 'flags'"
+            class="theme-divider space-y-2 border-t pt-4"
+          >
+            <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
+              Report Status
+            </p>
+            <div class="grid gap-2">
+              <button
+                v-for="status in flagStatuses"
+                :key="status.value"
+                class="rounded-lg border px-3 py-2 text-left text-sm font-semibold transition"
+                :class="flagStatus === status.value
+                  ? 'theme-selected-surface'
+                  : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+                type="button"
+                @click="setFlagStatus(status.value)"
+              >
+                {{ status.label }}
+              </button>
+            </div>
+          </div>
+        </AppStickyAside>
+      </template>
+
+      <section class="pt-0">
+        <div
+          v-if="activeView === 'confidence'"
+          class="space-y-4"
+        >
+          <div class="theme-divider flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+            <div>
+              <h3 class="theme-section-title text-base font-semibold">
+                Low Confidence
+              </h3>
+              <p class="theme-section-muted mt-1 text-sm">
+                {{ cards.length }} loaded
+              </p>
+            </div>
+            <button
+              v-if="nextPage !== null"
+              class="btn-secondary"
+              type="button"
+              @click="loadMore"
+            >
+              Load more
+            </button>
+          </div>
+
+          <ul
+            v-if="isLoadingInitial"
+            class="theme-divider"
+            aria-label="Loading low-confidence cards"
+          >
+            <li
+              v-for="index in 6"
+              :key="`confidence-loading-${index}`"
+              class="review-list-row theme-divider py-3"
+            >
+              <div class="flex items-center gap-3">
+                <div class="h-4 w-48 max-w-[60%] animate-pulse rounded bg-[var(--color-surface-muted)]" />
+                <div class="h-4 w-14 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+              </div>
+            </li>
+          </ul>
+
+          <div
+            v-else-if="cards.length === 0"
+            class="theme-section-muted flex min-h-72 items-center justify-center py-10 text-center text-sm"
+          >
+            <div class="space-y-1">
+              <h3 class="theme-section-title text-sm font-semibold">
+                No low-confidence cards
+              </h3>
+              <p class="mx-auto max-w-md leading-6">
+                Parser confidence is clear for the current queue.
+              </p>
+            </div>
+          </div>
+
+          <ul
+            v-else
+            class="theme-divider"
+          >
+            <li
+              v-for="card in cards"
+              :key="card.id"
+              class="review-list-row theme-divider py-3"
+            >
+              <RouterLink
+                class="theme-link font-medium"
+                :to="`/cards/${card.id}/edit`"
+              >
+                {{ card.name }}
+              </RouterLink>
+              <span class="theme-section-muted"> - {{ card.confidence }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div
+          v-else
+          class="space-y-4"
+        >
+          <div class="theme-divider flex flex-wrap items-start justify-between gap-3 border-b pb-4">
+            <div>
+              <h3 class="theme-section-title text-base font-semibold">
+                Flagged Parses
+              </h3>
+              <p class="theme-section-muted mt-1 text-sm">
+                {{ flagGroups.length }} loaded · {{ flagPage?.count ?? 0 }} reports
+              </p>
+            </div>
+          </div>
+
+          <ul
+            v-if="loadingFlags"
+            class="theme-divider"
+            aria-label="Loading flagged parse reports"
+          >
+            <li
+              v-for="index in 3"
+              :key="`flag-loading-${index}`"
+              class="review-report-row theme-divider grid gap-4 py-5 sm:grid-cols-[10rem_minmax(0,1fr)] lg:grid-cols-[12rem_minmax(0,1fr)]"
+            >
+              <div class="mx-auto block aspect-[3/4] w-44 max-w-full animate-pulse rounded-lg bg-[var(--color-surface-muted)] sm:mx-0 sm:w-full" />
+
+              <div class="min-w-0 space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0 space-y-2">
+                    <div class="h-5 w-48 max-w-full animate-pulse rounded bg-[var(--color-surface-muted)]" />
+                    <div class="h-3 w-72 max-w-full animate-pulse rounded bg-[var(--color-surface-muted)]" />
                   </div>
-                  <span
-                    class="theme-pill px-2 py-0.5 text-xs"
-                    :class="statusClass(item.status)"
-                  >
-                    {{ item.status }}
-                  </span>
+                  <div class="h-6 w-20 animate-pulse rounded-full bg-[var(--color-surface-muted)]" />
                 </div>
 
-                <div class="mt-3 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <p class="theme-kicker text-[11px] font-medium uppercase tracking-wide">
-                      Reported Value
-                    </p>
-                    <p class="theme-section-title mt-1 whitespace-pre-wrap text-sm">
-                      {{ item.captured_current_value || 'Empty' }}
-                    </p>
+                <div class="grid gap-3 sm:grid-cols-3">
+                  <div class="h-16 animate-pulse rounded-lg bg-[var(--color-surface-muted)]" />
+                  <div class="h-16 animate-pulse rounded-lg bg-[var(--color-surface-muted)]" />
+                  <div class="h-16 animate-pulse rounded-lg bg-[var(--color-surface-muted)]" />
+                </div>
+
+                <div class="space-y-2">
+                  <div class="h-4 w-full animate-pulse rounded bg-[var(--color-surface-muted)]" />
+                  <div class="h-4 w-3/4 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+                </div>
+              </div>
+            </li>
+          </ul>
+          <div
+            v-else-if="flagGroups.length === 0"
+            class="theme-section-muted flex min-h-72 items-center justify-center py-10 text-center text-sm"
+          >
+            <div class="space-y-1">
+              <h3 class="theme-section-title text-sm font-semibold">
+                No flagged reports
+              </h3>
+              <p class="mx-auto max-w-md leading-6">
+                There are no user-submitted parse reports in this view.
+              </p>
+            </div>
+          </div>
+          <ul
+            v-else
+            class="theme-divider"
+          >
+            <li
+              v-for="group in flagGroups"
+              :key="group.flagId"
+              class="review-report-row theme-divider grid gap-4 py-5 sm:grid-cols-[10rem_minmax(0,1fr)] lg:grid-cols-[12rem_minmax(0,1fr)]"
+            >
+              <RouterLink
+                :to="editorLocation(group.primary, group)"
+                class="mx-auto block w-44 max-w-full overflow-hidden rounded-lg sm:mx-0 sm:w-full"
+              >
+                <img
+                  v-if="group.card.image_url"
+                  :src="toAbsoluteApiUrl(group.card.image_url)"
+                  :alt="group.card.name"
+                  class="aspect-[3/4] w-full object-cover"
+                >
+                <div
+                  v-else
+                  class="theme-empty-state aspect-[3/4]"
+                >
+                  No image
+                </div>
+              </RouterLink>
+
+              <div class="flex h-full min-w-0 flex-col">
+                <div>
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <RouterLink
+                        class="theme-link text-base font-semibold"
+                        :to="editorLocation(group.primary, group)"
+                      >
+                        {{ group.card.name }}
+                      </RouterLink>
+                      <p class="theme-section-muted mt-1 text-xs">
+                        {{ versionLabel(group) }} · reported by {{ group.submitted_by.username }} on {{ formatDate(group.created_at) }}
+                      </p>
+                    </div>
+                    <span
+                      class="theme-pill px-2.5 py-1 text-xs"
+                      :class="groupStatusClass(group)"
+                    >
+                      {{ groupStatusLabel(group) }}
+                    </span>
                   </div>
-                  <div>
-                    <p class="theme-kicker text-[11px] font-medium uppercase tracking-wide">
-                      Expected Value
-                    </p>
-                    <p class="theme-section-title mt-1 whitespace-pre-wrap text-sm">
-                      {{ item.expected_value || 'Not provided' }}
-                    </p>
+
+                  <p
+                    v-if="group.note"
+                    class="theme-section-muted mt-3 whitespace-pre-wrap text-sm"
+                  >
+                    {{ group.note }}
+                  </p>
+
+                  <div class="mt-4 grid gap-3">
+                    <div
+                      v-for="item in group.items"
+                      :key="item.id"
+                      class="theme-divider border-t pt-3"
+                    >
+                      <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="theme-section-title text-sm font-semibold">
+                            {{ propertyLabel(item.property_key) }}
+                          </p>
+                          <p
+                            v-if="item.note"
+                            class="theme-section-muted mt-1 whitespace-pre-wrap text-sm"
+                          >
+                            {{ item.note }}
+                          </p>
+                        </div>
+                        <span
+                          class="theme-pill px-2 py-0.5 text-xs"
+                          :class="statusClass(item.status)"
+                        >
+                          {{ item.status }}
+                        </span>
+                      </div>
+
+                      <div class="mt-3 grid gap-3 md:grid-cols-2">
+                        <div>
+                          <p class="theme-kicker text-[11px] font-medium uppercase tracking-wide">
+                            Reported Value
+                          </p>
+                          <p class="theme-section-title mt-1 whitespace-pre-wrap text-sm">
+                            {{ item.captured_current_value || 'Empty' }}
+                          </p>
+                        </div>
+                        <div>
+                          <p class="theme-kicker text-[11px] font-medium uppercase tracking-wide">
+                            Expected Value
+                          </p>
+                          <p class="theme-section-title mt-1 whitespace-pre-wrap text-sm">
+                            {{ item.expected_value || 'Not provided' }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p
+                        v-if="item.status !== 'open' && item.review_note"
+                        class="theme-section-muted mt-3 text-xs"
+                      >
+                        Review note: {{ item.review_note }}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 <div
-                  v-if="item.status === 'open'"
-                  class="theme-divider mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3"
+                  v-if="openItems(group).length > 0"
+                  class="theme-divider mt-auto flex flex-wrap items-center justify-end gap-2 border-t pt-3"
                 >
-                  <RouterLink
-                    class="btn-primary"
-                    :to="editorLocation(item, group)"
+                  <template
+                    v-for="item in openItems(group)"
+                    :key="`actions-${item.id}`"
                   >
-                    Open Editor
-                  </RouterLink>
-                  <button
-                    class="btn-secondary"
-                    type="button"
-                    :disabled="updatingItemId === item.id"
-                    @click="updateFlagItem(item.id, 'dismissed')"
-                  >
-                    Dismiss
-                  </button>
-                  <button
-                    class="btn-secondary"
-                    type="button"
-                    :disabled="updatingItemId === item.id"
-                    @click="updateFlagItem(item.id, 'resolved')"
-                  >
-                    Resolve
-                  </button>
+                    <RouterLink
+                      class="btn-primary"
+                      :to="editorLocation(item, group)"
+                    >
+                      Open Editor
+                    </RouterLink>
+                    <button
+                      class="btn-secondary"
+                      type="button"
+                      :disabled="updatingItemId === item.id"
+                      @click="updateFlagItem(item.id, 'dismissed')"
+                    >
+                      Dismiss
+                    </button>
+                    <button
+                      class="btn-secondary"
+                      type="button"
+                      :disabled="updatingItemId === item.id"
+                      @click="updateFlagItem(item.id, 'resolved')"
+                    >
+                      Resolve
+                    </button>
+                  </template>
                 </div>
-                <p
-                  v-else-if="item.review_note"
-                  class="theme-section-muted mt-3 text-xs"
-                >
-                  Review note: {{ item.review_note }}
-                </p>
               </div>
-            </div>
-          </div>
-        </li>
-      </ul>
+            </li>
+          </ul>
 
-      <div
-        v-if="flagPage?.next_page"
-        class="mt-4 flex justify-end"
-      >
-        <button
-          class="btn-secondary"
-          type="button"
-          :disabled="loadingFlags"
-          @click="loadFlagPage(flagPage.next_page, 'append')"
-        >
-          Load more
-        </button>
-      </div>
-    </div>
+          <div
+            v-if="flagPage?.next_page"
+            class="flex justify-end"
+          >
+            <button
+              class="btn-secondary"
+              type="button"
+              :disabled="loadingFlags"
+              @click="loadFlagPage(flagPage.next_page, 'append')"
+            >
+              Load more
+            </button>
+          </div>
+        </div>
+      </section>
+    </AppPageLayout>
   </section>
 </template>
 
@@ -267,7 +397,9 @@ import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import type { LocationQuery, RouteLocationRaw } from 'vue-router';
 import { api, toAbsoluteApiUrl } from '@/api/client';
+import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import { buildReviewCardEditorLocation } from '@/composables/cards/cardReturnState';
 import { useCardCollection } from '@/composables/useCardCollection';
 import { useReviewSummary } from '@/composables/useReviewSummary';
@@ -344,6 +476,7 @@ const collection = useCardCollection<ReviewCard>({
   pageSize: 100,
 });
 const cards = collection.cards;
+const isLoadingInitial = collection.isLoadingInitial;
 const nextPage = collection.nextPage;
 const flagStatuses: Array<{ value: FlagStatus; label: string }> = [
   { value: 'open', label: 'Open' },
@@ -481,6 +614,9 @@ const statusClass = (status: ParseFlagReviewItem['status']): string => {
   return 'theme-pill-neutral';
 };
 
+const openItems = (group: ParseFlagReviewGroup): ParseFlagReviewItem[] =>
+  group.items.filter((item) => item.status === 'open');
+
 const groupStatusLabel = (group: ParseFlagReviewGroup): string => {
   if (group.openCount > 0) return `${group.openCount} open · ${group.items.length} flagged`;
   if (group.resolvedCount === group.items.length) return `${group.items.length} resolved`;
@@ -529,3 +665,10 @@ onMounted(() => {
   }
 });
 </script>
+
+<style scoped>
+.review-list-row + .review-list-row,
+.review-report-row + .review-report-row {
+  border-top-width: 1px;
+}
+</style>

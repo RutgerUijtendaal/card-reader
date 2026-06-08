@@ -1,5 +1,5 @@
 <template>
-  <section class="space-y-6">
+  <section class="app-page-content space-y-6">
     <AppPageHeader
       :icon="Settings"
       title="Admin"

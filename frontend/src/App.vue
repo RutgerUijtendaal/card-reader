@@ -12,7 +12,10 @@
       />
     </aside>
 
-    <div class="min-w-0 flex-1 overflow-hidden">
+    <div
+      class="flex min-w-0 flex-1 flex-col overflow-hidden"
+      :style="{ '--app-page-header-height': pageHeaderHeight }"
+    >
       <div class="theme-panel-shell m-3 flex items-center justify-between rounded-2xl px-4 py-3 lg:hidden">
         <button
           type="button"
@@ -40,9 +43,15 @@
         <div class="h-10 w-10" />
       </div>
 
+      <div
+        id="app-page-header-outlet"
+        ref="pageHeaderOutletRef"
+        class="shrink-0"
+      />
+
       <main
         ref="scrollContainerRef"
-        class="app-scrollbar h-full overflow-y-auto p-4 pt-1 sm:p-6 sm:pt-2 lg:p-6"
+        class="app-main-scroll app-scrollbar min-h-0 flex-1 overflow-y-auto"
       >
         <RouterView />
       </main>
@@ -79,7 +88,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useLocalStorage, useMediaQuery } from '@vueuse/core';
+import { useLocalStorage, useMediaQuery, useResizeObserver } from '@vueuse/core';
 import { Menu } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
@@ -93,6 +102,8 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const scrollContainerRef = ref<HTMLElement | null>(null);
+const pageHeaderOutletRef = ref<HTMLElement | null>(null);
+const pageHeaderHeight = ref('0px');
 const isDesktop = useMediaQuery('(min-width: 1024px)');
 const mobileNavOpen = ref(false);
 const isSidebarCollapsed = useLocalStorage('card-reader.sidebar-collapsed', false, {
@@ -112,6 +123,10 @@ const globalNavigationHotkeys = computed(() => [
 provideScrollContainer(scrollContainerRef);
 usePrimarySearchHotkeys();
 useGlobalNavigationHotkeys(globalNavigationHotkeys);
+
+useResizeObserver(pageHeaderOutletRef, ([entry]) => {
+  pageHeaderHeight.value = `${Math.round(entry.contentRect.height)}px`;
+});
 
 watch(
   () => route.fullPath,
