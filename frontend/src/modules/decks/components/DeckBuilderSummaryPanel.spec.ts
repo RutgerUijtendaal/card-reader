@@ -3,6 +3,23 @@ import { createApp, defineComponent, h, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import DeckBuilderSummaryPanel from '@/modules/decks/components/DeckBuilderSummaryPanel.vue';
 
+const sortableMock = vi.hoisted(() => ({
+  latestOptions: null as null | {
+    onUpdate?: (event: { item: HTMLElement; newIndex?: number }) => void;
+  },
+}));
+
+vi.mock('@vueuse/integrations/useSortable', () => ({
+  useSortable: vi.fn((_element, _list, options) => {
+    sortableMock.latestOptions = options;
+    return {
+      option: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    };
+  }),
+}));
+
 vi.mock('@/api/client', () => ({
   toAbsoluteApiUrl: (url: string) => url,
 }));
@@ -23,9 +40,24 @@ vi.mock('@/modules/decks/components/DeckBuilderBoardEntryRow.vue', () => ({
   default: defineComponent({
     props: {
       entry: { type: Object, required: true },
+      sortableCardId: { type: String, required: true },
     },
-    setup(props) {
-      return () => h('div', { 'data-testid': `row-${(props.entry as { card: { id: string } }).card.id}` }, 'row');
+    emits: ['reorder-up', 'reorder-down'],
+    setup(props, { emit }) {
+      return () => {
+        const cardId = (props.entry as { card: { id: string } }).card.id;
+        return h(
+          'div',
+          {
+            'data-testid': `row-${cardId}`,
+            'data-card-id': props.sortableCardId,
+          },
+          [
+            h('button', { 'aria-label': `Move ${cardId} up`, onClick: () => emit('reorder-up', cardId) }, 'Up'),
+            h('button', { 'aria-label': `Move ${cardId} down`, onClick: () => emit('reorder-down', cardId) }, 'Down'),
+          ],
+        );
+      };
     },
   }),
 }));
@@ -83,7 +115,10 @@ const buildController = () => {
     label: 'Hero',
     image_url: '/hero.png',
   });
-  const mainboardEntries = ref([{ card: { id: 'card-1' }, quantity: 3 }]);
+  const mainboardEntries = ref([
+    { card: { id: 'card-1' }, quantity: 3 },
+    { card: { id: 'card-3' }, quantity: 1 },
+  ]);
   const activeSideboard = () => sideboards.value.find((sideboard) => sideboard.id === activeBoardId.value) ?? null;
 
   const controller = {
@@ -99,6 +134,7 @@ const buildController = () => {
     backLabel: ref('Back'),
     deck: {
       isSetupStep: ref(false),
+      lastBoardEntryChange: ref(null),
       form: {
         name: 'Aurora Tempo',
         description: '',
@@ -139,6 +175,9 @@ const buildController = () => {
       getCardQuantityLimit: vi.fn(() => 4),
       getBoardMoveDestinations: vi.fn(() => []),
       moveEntryToBoard: vi.fn(),
+      reorderEntries: vi.fn(),
+      moveEntryWithinBoard: vi.fn(),
+      moveEntryToIndex: vi.fn(),
       changeQuantity: vi.fn(),
       removeEntry: vi.fn(),
       handleBoardRowAction: vi.fn(),
@@ -197,6 +236,7 @@ describe('DeckBuilderSummaryPanel', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     vi.clearAllMocks();
+    sortableMock.latestOptions = null;
   });
 
   test('renders a compact hero header and keeps details collapsed by default', async () => {
@@ -332,6 +372,34 @@ describe('DeckBuilderSummaryPanel', () => {
 
     expect(mounted.controller.deck.selectBoard).toHaveBeenCalledWith('side-1');
     expect(mounted.container.querySelector('[data-testid="row-card-2"]')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('commits sortable updates and keyboard reorder actions to the deck draft', async () => {
+    const mounted = await mountPanel();
+    const firstRow = mounted.container.querySelector<HTMLElement>('[data-testid="row-card-1"]');
+    if (!firstRow) {
+      throw new Error('expected board rows');
+    }
+
+    sortableMock.latestOptions?.onUpdate?.({
+      item: firstRow,
+      newIndex: 1,
+    });
+    await nextTick();
+
+    expect(mounted.controller.deck.moveEntryToIndex).toHaveBeenCalledWith(
+      'mainboard',
+      'card-1',
+      1,
+    );
+
+    const moveDownButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card-1 down"]');
+    moveDownButton?.click();
+    await nextTick();
+
+    expect(mounted.controller.deck.moveEntryWithinBoard).toHaveBeenCalledWith('card-1', 1);
 
     mounted.unmount();
   });

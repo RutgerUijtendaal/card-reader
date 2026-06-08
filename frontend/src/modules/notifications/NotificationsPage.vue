@@ -37,21 +37,27 @@
                 : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
               @click="selectStatus(option.value)"
             >
-              <div class="flex items-start justify-between gap-3">
-                <span class="min-w-0">
-                  <span class="block truncate text-sm font-semibold">{{ option.label }}</span>
-                  <span
-                    class="mt-1 block truncate text-xs"
-                    :class="statusFilter === option.value ? 'theme-section-title' : 'theme-section-muted'"
-                  >
-                    {{ option.description }}
+              <div class="flex items-start gap-3">
+                <component
+                  :is="option.icon"
+                  class="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span class="flex min-w-0 flex-1 items-start justify-between gap-3">
+                  <span class="min-w-0">
+                    <span class="block truncate text-sm font-semibold">{{ option.label }}</span>
+                    <span
+                      class="mt-1 block truncate text-xs"
+                      :class="statusFilter === option.value ? 'theme-section-title' : 'theme-section-muted'"
+                    >
+                      {{ option.description }}
+                    </span>
                   </span>
-                </span>
-                <span
-                  v-if="option.value === 'unread' && unreadNotificationCount > 0"
-                  class="theme-pill theme-pill-warning shrink-0 px-2 py-0.5 text-[11px] font-semibold"
-                >
-                  {{ unreadNotificationCount }}
+                  <span
+                    v-if="option.value === 'unread' && unreadNotificationCount > 0"
+                    class="theme-pill theme-pill-warning shrink-0 px-2 py-0.5 text-[11px] font-semibold"
+                  >
+                    {{ unreadNotificationCount }}
+                  </span>
                 </span>
               </div>
             </button>
@@ -61,13 +67,24 @@
 
       <section class="pt-0">
         <div class="theme-divider mb-4 flex flex-wrap items-start justify-between gap-3 border-b pb-4">
-          <div class="min-w-0">
-            <h3 class="theme-section-title text-base font-semibold">
-              {{ activeStatusOption.label }}
-            </h3>
-            <p class="theme-section-muted mt-1 text-sm">
-              {{ activeStatusOption.description }}
-            </p>
+          <div class="flex min-w-0 items-start gap-3">
+            <div
+              class="theme-card-frame-muted theme-section-title flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+              aria-hidden="true"
+            >
+              <component
+                :is="activeStatusOption.icon"
+                class="h-5 w-5"
+              />
+            </div>
+            <div class="min-w-0">
+              <h3 class="theme-section-title text-base font-semibold">
+                {{ activeStatusOption.label }}
+              </h3>
+              <p class="theme-section-muted mt-1 text-sm">
+                {{ activeStatusOption.description }}
+              </p>
+            </div>
           </div>
           <button
             v-if="statusFilter === 'unread'"
@@ -207,8 +224,9 @@
 </template>
 
 <script setup lang="ts">
-import { Bell, CheckCheck } from 'lucide-vue-next';
+import { Bell, CheckCheck, Inbox, MailOpen } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
+import type { Component } from 'vue';
 import { toast } from 'vue-sonner';
 import { RouterLink } from 'vue-router';
 import AppPageLayout from '@/components/app/AppPageLayout.vue';
@@ -223,9 +241,9 @@ import {
 } from '@/modules/notifications/api';
 import type { NotificationPage, NotificationStatusFilter, UserNotification } from '@/modules/notifications/types';
 
-const statusOptions: Array<{ value: NotificationStatusFilter; label: string; description: string }> = [
-  { value: 'unread', label: 'Unread', description: 'Updates that still need attention.' },
-  { value: 'all', label: 'All', description: 'Complete notification history.' },
+const statusOptions: Array<{ value: NotificationStatusFilter; label: string; description: string; icon: Component }> = [
+  { value: 'unread', label: 'Unread', description: 'Updates that still need attention.', icon: MailOpen },
+  { value: 'all', label: 'All', description: 'Complete notification history.', icon: Inbox },
 ];
 const pageSize = 25;
 const statusFilter = ref<NotificationStatusFilter>('unread');

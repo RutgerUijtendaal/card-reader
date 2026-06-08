@@ -36,8 +36,8 @@ def replace_mainboard_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> 
     DeckEntry.objects.filter(deck=deck).delete()
     DeckEntry.objects.bulk_create(
         [
-            DeckEntry(deck=deck, card_id=card_id, quantity=quantity)
-            for card_id, quantity in entries
+            DeckEntry(deck=deck, card_id=card_id, quantity=quantity, position=index)
+            for index, (card_id, quantity) in enumerate(entries, start=1)
         ]
     )
 
@@ -59,7 +59,8 @@ def replace_sideboards(*, deck: Deck, sideboards: list[dict[str, object]]) -> No
                     sideboard=created_sideboard,
                     card_id=str(card_id),
                     quantity=int(quantity),
+                    position=index,
                 )
-                for card_id, quantity in entries
+                for index, (card_id, quantity) in enumerate(entries, start=1)
             ]
         )

@@ -30,7 +30,7 @@ def deck_queryset() -> QuerySet[Deck]:
                 "card__latest_version",
                 "card__latest_version__template",
                 "card__latest_version__previous_version",
-            ).prefetch_related(*latest_version_metadata_prefetches("card__latest_version")).order_by("card__label", "created_at"),
+            ).prefetch_related(*latest_version_metadata_prefetches("card__latest_version")).order_by("position", "card_id"),
         ),
         Prefetch(
             "sideboards",
@@ -44,7 +44,7 @@ def deck_queryset() -> QuerySet[Deck]:
                         "card__latest_version__previous_version",
                     )
                     .prefetch_related(*latest_version_metadata_prefetches("card__latest_version"))
-                    .order_by("card__label", "created_at"),
+                    .order_by("position", "card_id"),
                 )
             ).order_by("created_at", "id"),
         ),

@@ -11,7 +11,7 @@
     </div>
     <div
       v-if="$slots.footer"
-      class="theme-divider mt-4 shrink-0 border-t pt-4"
+      class="app-sticky-aside-footer theme-divider mt-4 shrink-0 border-t pt-4"
       :class="footerClass"
     >
       <slot name="footer" />

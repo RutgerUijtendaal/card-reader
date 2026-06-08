@@ -1,6 +1,7 @@
 <template>
   <div
     ref="triggerRef"
+    :data-card-id="sortableCardId"
     class="theme-card-frame group relative flex h-[4.25rem] items-stretch overflow-hidden rounded-xl select-none"
     :class="rowClickable ? 'cursor-pointer' : 'cursor-default'"
     :tabindex="rowClickable ? 0 : undefined"
@@ -13,6 +14,17 @@
     @keydown.enter.prevent="handleRowKeydown"
     @keydown.space.prevent="handleRowKeydown"
   >
+    <button
+      class="deck-board-entry-drag-handle theme-card-frame-muted theme-section-muted theme-divider relative z-20 flex h-full w-8 shrink-0 cursor-grab items-center justify-center border-r opacity-75 transition hover:opacity-100 active:cursor-grabbing"
+      type="button"
+      aria-label="Drag to reorder card"
+      title="Drag to reorder card"
+      @click.stop
+      @contextmenu.stop
+    >
+      <GripVertical class="h-4 w-4" />
+    </button>
+
     <CardCompactRowContent :card="entry.card" />
 
     <div
@@ -46,6 +58,34 @@
             @contextmenu.stop
           >
             +
+          </button>
+        </div>
+
+        <div
+          class="theme-card-frame-muted inline-flex items-center overflow-hidden rounded-lg"
+          data-testid="row-reorder-controls"
+          @click.stop
+          @contextmenu.stop
+        >
+          <button
+            class="inline-flex h-8 w-8 items-center justify-center transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            type="button"
+            :disabled="!canReorderUp"
+            aria-label="Move card up"
+            @click.stop="handleReorderUpClick"
+            @contextmenu.stop
+          >
+            <ArrowUp class="h-4 w-4" />
+          </button>
+          <button
+            class="theme-divider inline-flex h-8 w-8 items-center justify-center border-l transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            type="button"
+            :disabled="!canReorderDown"
+            aria-label="Move card down"
+            @click.stop="handleReorderDownClick"
+            @contextmenu.stop
+          >
+            <ArrowDown class="h-4 w-4" />
           </button>
         </div>
 
@@ -162,7 +202,7 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
-import { ArrowRightLeft, Trash2 } from 'lucide-vue-next';
+import { ArrowDown, ArrowRightLeft, ArrowUp, GripVertical, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import CardCompactRowContent from '@/components/cards/CardCompactRowContent.vue';
@@ -174,11 +214,14 @@ import { blurAfterFinePointerActivation, blurFocusedDescendantAfterFinePointerLe
 
 const props = defineProps<{
   entry: DeckEntrySummary;
+  sortableCardId: string;
   hoverMode: HoverMode;
   quantityMax?: number;
   moveDestinations: DeckBoardMoveDestination[];
   rowActionDisabled?: boolean;
   rowSecondaryActionDisabled?: boolean;
+  canReorderUp?: boolean;
+  canReorderDown?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -188,6 +231,8 @@ const emit = defineEmits<{
   (e: 'row-action', cardId: string): void;
   (e: 'row-secondary-action', cardId: string): void;
   (e: 'move-to-board', cardId: string, destinationBoardId: string): void;
+  (e: 'reorder-up', cardId: string): void;
+  (e: 'reorder-down', cardId: string): void;
 }>();
 
 const hovered = ref(false);
@@ -252,6 +297,16 @@ const handleDecrementClick = (event: MouseEvent): void => {
 
 const handleIncrementClick = (event: MouseEvent): void => {
   emit('increment', props.entry.card.id);
+  blurAfterFinePointerActivation(event);
+};
+
+const handleReorderUpClick = (event: MouseEvent): void => {
+  emit('reorder-up', props.entry.card.id);
+  blurAfterFinePointerActivation(event);
+};
+
+const handleReorderDownClick = (event: MouseEvent): void => {
+  emit('reorder-down', props.entry.card.id);
   blurAfterFinePointerActivation(event);
 };
 

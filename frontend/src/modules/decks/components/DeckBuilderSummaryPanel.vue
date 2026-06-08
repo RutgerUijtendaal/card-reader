@@ -1,413 +1,452 @@
 <template>
-  <aside class="app-sticky-aside app-sticky-aside-right page-card flex min-h-0 flex-col overflow-hidden p-0 xl:border-l-0 xl:pl-0">
-    <template v-if="controller.deck.isSetupStep.value">
-      <div class="app-scrollbar flex-1 space-y-4 overflow-y-auto p-5 pr-4">
-        <div class="space-y-1">
-          <h3 class="theme-section-title text-lg font-semibold">
-            Deck Setup
-          </h3>
-          <p class="theme-section-muted text-sm">
-            Enter the deck details and choose a hero.
-          </p>
-        </div>
+  <AppStickyAside
+    v-if="controller.deck.isSetupStep.value"
+    side="right"
+  >
+    <div class="space-y-4">
+      <div class="space-y-1">
+        <h3 class="theme-section-title text-lg font-semibold">
+          Deck Setup
+        </h3>
+        <p class="theme-section-muted text-sm">
+          Enter the deck details and choose a hero.
+        </p>
+      </div>
 
-        <section class="space-y-3">
-          <p class="theme-section-title text-sm font-semibold">
-            Selected Hero
-          </p>
-          <div
-            v-if="controller.deck.selectedHero.value"
-            class="space-y-3"
-          >
-            <div
-              v-if="controller.deck.selectedHero.value.image_url"
-              class="mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
-            >
-              <img
-                :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-                :alt="controller.deck.selectedHero.value.name"
-                class="h-full w-full object-contain"
-              >
-            </div>
-            <div
-              v-else
-              class="theme-empty-state flex h-[34rem] items-center justify-center rounded-xl text-sm"
-            >
-              No hero image
-            </div>
-          </div>
-          <p
-            v-else
-            class="theme-card-frame mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
-          >
-            <CardLoadingSkeleton :animated="false" />
-          </p>
-        </section>
-
+      <section class="space-y-3">
+        <p class="theme-section-title text-sm font-semibold">
+          Selected Hero
+        </p>
         <div
-          v-if="setupBlockingMessages.length > 0"
-          class="theme-muted-panel space-y-2 p-3"
+          v-if="controller.deck.selectedHero.value"
+          class="space-y-3"
         >
-          <p class="theme-section-title text-sm font-semibold">
-            Setup Issues
-          </p>
-          <p
-            v-for="message in setupBlockingMessages"
-            :key="message"
-            class="theme-error-text text-sm"
+          <div
+            v-if="controller.deck.selectedHero.value.image_url"
+            class="mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
           >
-            {{ message }}
-          </p>
-        </div>
-
-        <label class="field-label">
-          <span>Name <span class="theme-error-text">*</span></span>
-          <input
-            v-model="deckName"
-            class="input-base"
-            placeholder="Deck name"
-            required
-          >
-        </label>
-
-        <label class="field-label">
-          Description
-          <textarea
-            v-model="deckDescription"
-            class="input-base min-h-28"
-            placeholder="Optional description"
-          />
-        </label>
-
-        <div class="space-y-2">
-          <p class="theme-section-title text-sm font-semibold">
-            Visibility
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="option in visibilityOptions"
-              :key="option.value"
-              class="theme-pill text-xs"
-              :class="visibility === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
-              type="button"
-              @click="updateDeckVisibility(option.value)"
+            <img
+              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+              :alt="controller.deck.selectedHero.value.name"
+              class="h-full w-full object-contain"
             >
-              {{ option.label }}
+          </div>
+          <div
+            v-else
+            class="theme-empty-state flex h-[34rem] items-center justify-center rounded-xl text-sm"
+          >
+            No hero image
+          </div>
+        </div>
+        <p
+          v-else
+          class="theme-card-frame mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
+        >
+          <CardLoadingSkeleton :animated="false" />
+        </p>
+      </section>
+
+      <div
+        v-if="setupBlockingMessages.length > 0"
+        class="theme-muted-panel space-y-2 p-3"
+      >
+        <p class="theme-section-title text-sm font-semibold">
+          Setup Issues
+        </p>
+        <p
+          v-for="message in setupBlockingMessages"
+          :key="message"
+          class="theme-error-text text-sm"
+        >
+          {{ message }}
+        </p>
+      </div>
+
+      <label class="field-label">
+        <span>Name <span class="theme-error-text">*</span></span>
+        <input
+          v-model="deckName"
+          class="input-base"
+          placeholder="Deck name"
+          required
+        >
+      </label>
+
+      <label class="field-label">
+        Description
+        <textarea
+          v-model="deckDescription"
+          class="input-base min-h-28"
+          placeholder="Optional description"
+        />
+      </label>
+
+      <div class="space-y-2">
+        <p class="theme-section-title text-sm font-semibold">
+          Visibility
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="option in visibilityOptions"
+            :key="option.value"
+            class="theme-pill text-xs"
+            :class="visibility === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
+            type="button"
+            @click="updateDeckVisibility(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <p class="theme-section-muted text-xs">
+          {{ selectedVisibilityDescription }}
+        </p>
+      </div>
+    </div>
+
+    <template #footer>
+      <button
+        class="btn-primary w-full justify-center"
+        type="button"
+        :disabled="
+          !controller.deck.selectedHero.value ||
+            !deckName.trim() ||
+            setupBlockingMessages.length > 0
+        "
+        @click="controller.lockSetup"
+      >
+        Continue
+      </button>
+    </template>
+  </AppStickyAside>
+
+  <aside
+    v-else
+    class="app-sticky-aside app-sticky-aside-right page-card flex min-h-0 flex-col overflow-hidden p-0"
+  >
+    <div
+      class="z-20 space-y-3"
+      data-testid="deck-summary-top"
+    >
+      <section
+        ref="heroDetailsTriggerRef"
+        class="overflow-hidden"
+      >
+        <div class="relative">
+          <div
+            v-if="controller.deck.selectedHero.value?.image_url"
+            class="absolute inset-0"
+          >
+            <img
+              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+              :alt="controller.deck.selectedHero.value.name"
+              class="h-full w-full object-cover"
+              :style="{
+                objectPosition: heroHeaderObjectPosition,
+                transform: heroHeaderTransform,
+                opacity: heroHeaderOpacity,
+              }"
+            >
+          </div>
+          <div
+            v-else
+            class="absolute inset-0 theme-card-frame-muted"
+          />
+          <div
+            class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/74 to-slate-900/28"
+          />
+
+          <div class="relative flex min-h-[5.5rem] items-start gap-2 px-4 py-3">
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 items-start gap-3 text-left"
+              @click="toggleHeroDetails()"
+            >
+              <div class="min-w-0 space-y-1">
+                <p class="truncate text-lg font-semibold text-white">
+                  {{ controller.deck.form.name || 'Untitled Deck' }}
+                </p>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-100/90">
+                  <span class="font-semibold uppercase tracking-[0.18em] text-slate-200/70">{{
+                    activeBoardLabel
+                  }}</span>
+                  <span class="font-semibold">{{ activeBoardCount }}</span>
+                  <span
+                    v-if="controller.deck.selectedHero.value"
+                    class="truncate"
+                  >
+                    {{ controller.deck.selectedHero.value.name }}
+                  </span>
+                </div>
+              </div>
+            </button>
+
+            <button
+              class="btn-secondary inline-flex h-8 shrink-0 items-center justify-center px-3 py-0 text-xs"
+              type="button"
+              @click="controller.setBuilderStep('setup')"
+            >
+              Change
+            </button>
+
+            <button
+              type="button"
+              class="theme-card-frame-muted theme-section-title inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition"
+              :aria-label="heroDetailsExpanded ? 'Collapse hero details' : 'Expand hero details'"
+              @click="toggleHeroDetails()"
+            >
+              <ChevronDown
+                class="h-4 w-4 transition-transform"
+                :class="heroDetailsExpanded ? 'rotate-180' : ''"
+              />
             </button>
           </div>
-          <p class="theme-section-muted text-xs">
-            {{ selectedVisibilityDescription }}
-          </p>
         </div>
-      </div>
+      </section>
 
-      <div class="theme-divider shrink-0 border-t p-5">
-        <button
-          class="btn-primary w-full justify-center"
-          type="button"
-          :disabled="!controller.deck.selectedHero.value || !deckName.trim() || setupBlockingMessages.length > 0"
-          @click="controller.lockSetup"
-        >
-          Continue
-        </button>
-      </div>
-    </template>
-
-    <template v-else>
-      <div
-        class="z-20 space-y-3"
-        data-testid="deck-summary-top"
-      >
-        <section
-          ref="heroDetailsTriggerRef"
-          class="theme-card-frame rounded-t-xl"
-        >
-          <div
-            class="relative"
-          >
-            <div
-              v-if="controller.deck.selectedHero.value?.image_url"
-              class="absolute inset-0"
+      <div class="space-y-3 px-5">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <h4 class="theme-section-title text-sm font-semibold">
+              Deck Boards
+            </h4>
+            <button
+              class="btn-secondary inline-flex h-8 shrink-0 items-center gap-1.5 px-3 py-0 text-xs"
+              type="button"
+              @click="controller.deck.addSideboard()"
             >
-              <img
-                :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-                :alt="controller.deck.selectedHero.value.name"
-                class="h-full w-full object-cover"
-                :style="{
-                  objectPosition: heroHeaderObjectPosition,
-                  transform: heroHeaderTransform,
-                  opacity: heroHeaderOpacity,
-                }"
-              >
-            </div>
-            <div
-              v-else
-              class="absolute inset-0 theme-card-frame-muted"
-            />
-            <div class="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/74 to-slate-900/28" />
-
-            <div class="relative flex min-h-[5.5rem] items-start gap-2 px-4 py-3">
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-start gap-3 text-left"
-                @click="toggleHeroDetails()"
-              >
-                <div class="min-w-0 space-y-1">
-                  <p class="truncate text-lg font-semibold text-white">
-                    {{ controller.deck.form.name || 'Untitled Deck' }}
-                  </p>
-                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-100/90">
-                    <span class="font-semibold uppercase tracking-[0.18em] text-slate-200/70">{{ activeBoardLabel }}</span>
-                    <span class="font-semibold">{{ activeBoardCount }}</span>
-                    <span
-                      v-if="controller.deck.selectedHero.value"
-                      class="truncate"
-                    >
-                      {{ controller.deck.selectedHero.value.name }}
-                    </span>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                class="btn-secondary inline-flex h-8 shrink-0 items-center justify-center px-3 py-0 text-xs"
-                type="button"
-                @click="controller.setBuilderStep('setup')"
-              >
-                Change
-              </button>
-
-              <button
-                type="button"
-                class="theme-card-frame-muted theme-section-title inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition"
-                :aria-label="heroDetailsExpanded ? 'Collapse hero details' : 'Expand hero details'"
-                @click="toggleHeroDetails()"
-              >
-                <ChevronDown
-                  class="h-4 w-4 transition-transform"
-                  :class="heroDetailsExpanded ? 'rotate-180' : ''"
-                />
-              </button>
-            </div>
+              <Plus class="h-3.5 w-3.5" />
+              Add Sideboard
+            </button>
           </div>
-        </section>
 
-        <div class="space-y-3 px-5">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between gap-3">
-              <h4 class="theme-section-title text-sm font-semibold">
-                Deck Boards
-              </h4>
-              <button
-                class="btn-secondary inline-flex h-8 shrink-0 items-center gap-1.5 px-3 py-0 text-xs"
-                type="button"
-                @click="controller.deck.addSideboard()"
-              >
-                <Plus class="h-3.5 w-3.5" />
-                Add Sideboard
-              </button>
-            </div>
-
+          <div
+            v-if="controller.deck.sideboardTabs.value.length > 0"
+            class="flex min-h-8 flex-wrap items-center gap-2"
+          >
+            <button
+              class="theme-pill text-xs"
+              :class="
+                controller.deck.activeBoardId.value === 'mainboard'
+                  ? 'theme-pill-accent'
+                  : 'theme-pill-neutral'
+              "
+              type="button"
+              @click="controller.deck.selectBoard('mainboard')"
+            >
+              Mainboard ({{ controller.deck.totalMainboardCards.value }})
+            </button>
             <div
-              v-if="controller.deck.sideboardTabs.value.length > 0"
-              class="flex min-h-8 flex-wrap items-center gap-2"
+              v-for="sideboard in controller.deck.sideboardTabs.value"
+              :key="sideboard.id"
+              class="inline-flex items-center"
+              @mouseenter="hoveredSideboardId = sideboard.id"
+              @mouseleave="clearHoveredSideboard(sideboard.id)"
+              @focusin="focusedSideboardId = sideboard.id"
+              @focusout="handleSideboardFocusOut($event, sideboard.id)"
             >
               <button
+                v-if="editingSideboardId !== sideboard.id"
                 class="theme-pill text-xs"
-                :class="controller.deck.activeBoardId.value === 'mainboard' ? 'theme-pill-accent' : 'theme-pill-neutral'"
+                :class="
+                  controller.deck.activeBoardId.value === sideboard.id
+                    ? 'theme-pill-accent'
+                    : 'theme-pill-neutral'
+                "
                 type="button"
-                @click="controller.deck.selectBoard('mainboard')"
+                @click="selectSideboard(sideboard.id)"
               >
-                Mainboard ({{ controller.deck.totalMainboardCards.value }})
+                <span class="truncate"> {{ sideboard.name }} ({{ sideboard.totalCards }}) </span>
               </button>
               <div
-                v-for="sideboard in controller.deck.sideboardTabs.value"
-                :key="sideboard.id"
-                class="inline-flex items-center"
-                @mouseenter="hoveredSideboardId = sideboard.id"
-                @mouseleave="clearHoveredSideboard(sideboard.id)"
-                @focusin="focusedSideboardId = sideboard.id"
-                @focusout="handleSideboardFocusOut($event, sideboard.id)"
+                v-else
+                class="theme-pill theme-pill-accent inline-flex items-center px-2 py-1"
               >
-                <button
-                  v-if="editingSideboardId !== sideboard.id"
-                  class="theme-pill text-xs"
-                  :class="controller.deck.activeBoardId.value === sideboard.id ? 'theme-pill-accent' : 'theme-pill-neutral'"
-                  type="button"
-                  @click="selectSideboard(sideboard.id)"
+                <input
+                  :ref="setEditingSideboardInputRef"
+                  v-model="editingSideboardName"
+                  class="min-w-[7rem] bg-transparent text-xs font-medium outline-none"
+                  :aria-label="`Rename ${sideboard.name}`"
+                  @click.stop
+                  @keydown.enter.prevent="commitRenameSideboard()"
+                  @keydown.esc.prevent="cancelRenameSideboard()"
+                  @blur="commitRenameSideboard()"
                 >
-                  <span class="truncate">
-                    {{ sideboard.name }} ({{ sideboard.totalCards }})
-                  </span>
-                </button>
-                <div
-                  v-else
-                  class="theme-pill theme-pill-accent inline-flex items-center px-2 py-1"
-                >
-                  <input
-                    :ref="setEditingSideboardInputRef"
-                    v-model="editingSideboardName"
-                    class="min-w-[7rem] bg-transparent text-xs font-medium outline-none"
-                    :aria-label="`Rename ${sideboard.name}`"
-                    @click.stop
-                    @keydown.enter.prevent="commitRenameSideboard()"
-                    @keydown.esc.prevent="cancelRenameSideboard()"
-                    @blur="commitRenameSideboard()"
-                  >
-                </div>
-
-                <button
-                  v-if="shouldShowSideboardActions(sideboard.id)"
-                  class="theme-card-frame-muted theme-section-title -ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full"
-                  type="button"
-                  :aria-label="`Open sideboard actions for ${sideboard.name}`"
-                  @click="openSideboardActions($event, sideboard.id)"
-                >
-                  <Ellipsis class="h-3.5 w-3.5" />
-                </button>
               </div>
+
+              <button
+                v-if="shouldShowSideboardActions(sideboard.id)"
+                class="theme-card-frame-muted theme-section-title -ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full"
+                type="button"
+                :aria-label="`Open sideboard actions for ${sideboard.name}`"
+                @click="openSideboardActions($event, sideboard.id)"
+              >
+                <Ellipsis class="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <Teleport to="body">
-        <div
-          v-if="sideboardActionsOpen && sideboardActionsTargetId"
-          ref="sideboardActionsPanelRef"
-          class="theme-popover z-40 w-44 p-2"
-          :style="{
-            position: 'fixed',
-            left: `${sideboardActionsX}px`,
-            top: `${sideboardActionsY}px`,
-          }"
-        >
-          <div class="space-y-1">
-            <button
-              type="button"
-              class="btn-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
-              @click="beginRenameSideboard(
-                sideboardActionsTargetId,
-                controller.deck.sideboardTabs.value.find((sideboard) => sideboard.id === sideboardActionsTargetId)?.name ?? '',
-              )"
-            >
-              <Pencil class="h-3.5 w-3.5" />
-              Rename
-            </button>
-            <button
-              type="button"
-              class="btn-danger-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
-              @click="promptDeleteSideboard(
-                sideboardActionsTargetId,
-                controller.deck.sideboardTabs.value.find((sideboard) => sideboard.id === sideboardActionsTargetId)?.name ?? 'sideboard',
-              )"
-            >
-              <Trash2 class="h-3.5 w-3.5" />
-              Delete
-            </button>
-          </div>
-        </div>
-      </Teleport>
-
-      <Teleport to="body">
-        <div
-          v-if="heroDetailsExpanded"
-          ref="heroDetailsPanelRef"
-          class="theme-popover z-30 p-4 shadow-2xl"
-          data-testid="deck-summary-hero-details"
-          :style="{
-            position: 'fixed',
-            left: `${heroDetailsX}px`,
-            top: `${heroDetailsY}px`,
-            width: `${heroDetailsPanelWidth}px`,
-          }"
-        >
-          <div class="space-y-4">
-            <div
-              v-if="controller.deck.selectedHero.value?.image_url"
-              class="theme-card-frame-muted mx-auto w-full max-w-[22rem] overflow-hidden rounded-2xl"
-            >
-              <img
-                :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-                :alt="controller.deck.selectedHero.value.name"
-                class="h-full w-full object-cover object-top"
-              >
-            </div>
-            <div
-              v-else
-              class="theme-empty-state mx-auto flex h-[31rem] w-full max-w-[22rem] items-center justify-center rounded-2xl text-sm"
-            >
-              No hero
-            </div>
-
-            <div class="theme-divider border-t" />
-
-            <DeckManaCurve
-              :entries="controller.deck.detailedMainboardEntries.value"
-              empty-label="Add mainboard cards to see the mana curve."
-              compact
-              title=""
-            />
-          </div>
-        </div>
-      </Teleport>
-
+    <Teleport to="body">
       <div
-        class="app-scrollbar relative z-10 mt-4 flex-1 min-h-0 overflow-y-auto px-5 pb-5 pr-4"
-        data-testid="deck-summary-list"
+        v-if="sideboardActionsOpen && sideboardActionsTargetId"
+        ref="sideboardActionsPanelRef"
+        class="theme-popover z-40 w-44 p-2"
+        :style="{
+          position: 'fixed',
+          left: `${sideboardActionsX}px`,
+          top: `${sideboardActionsY}px`,
+        }"
       >
-        <div class="space-y-3 pb-1">
-          <div
-            v-if="controller.deck.detailedActiveBoardEntries.value.length === 0"
-            class="theme-empty-state"
+        <div class="space-y-1">
+          <button
+            type="button"
+            class="btn-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
+            @click="
+              beginRenameSideboard(
+                sideboardActionsTargetId,
+                controller.deck.sideboardTabs.value.find(
+                  (sideboard) => sideboard.id === sideboardActionsTargetId,
+                )?.name ?? '',
+              )
+            "
           >
-            No cards added to this board yet.
+            <Pencil class="h-3.5 w-3.5" />
+            Rename
+          </button>
+          <button
+            type="button"
+            class="btn-danger-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
+            @click="
+              promptDeleteSideboard(
+                sideboardActionsTargetId,
+                controller.deck.sideboardTabs.value.find(
+                  (sideboard) => sideboard.id === sideboardActionsTargetId,
+                )?.name ?? 'sideboard',
+              )
+            "
+          >
+            <Trash2 class="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="heroDetailsExpanded"
+        ref="heroDetailsPanelRef"
+        class="theme-popover z-30 p-4 shadow-2xl"
+        data-testid="deck-summary-hero-details"
+        :style="{
+          position: 'fixed',
+          left: `${heroDetailsX}px`,
+          top: `${heroDetailsY}px`,
+          width: `${heroDetailsPanelWidth}px`,
+        }"
+      >
+        <div class="space-y-4">
+          <div
+            v-if="controller.deck.selectedHero.value?.image_url"
+            class="theme-card-frame-muted mx-auto w-full max-w-[22rem] overflow-hidden rounded-2xl"
+          >
+            <img
+              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
+              :alt="controller.deck.selectedHero.value.name"
+              class="h-full w-full object-cover object-top"
+            >
+          </div>
+          <div
+            v-else
+            class="theme-empty-state mx-auto flex h-[31rem] w-full max-w-[22rem] items-center justify-center rounded-2xl text-sm"
+          >
+            No hero
           </div>
 
-          <DeckBuilderBoardEntryRow
-            v-for="entry in controller.deck.detailedActiveBoardEntries.value"
-            :key="entry.card.id"
-            :entry="entry"
-            :hover-mode="controller.filters.hoverMode.value"
-            :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
-            :move-destinations="getMoveDestinations(entry.card.id)"
-            :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
-            :row-secondary-action-disabled="controller.deck.boardRowSecondaryActionDisabled(entry.card.id)"
-            @decrement="controller.deck.changeQuantity($event, -1)"
-            @increment="controller.deck.changeQuantity($event, 1)"
-            @remove="controller.deck.removeEntry"
-            @row-action="controller.deck.handleBoardRowAction"
-            @row-secondary-action="controller.deck.handleBoardRowSecondaryAction"
-            @move-to-board="handleMoveToBoard"
+          <div class="theme-divider border-t" />
+
+          <DeckManaCurve
+            :entries="controller.deck.detailedMainboardEntries.value"
+            empty-label="Add mainboard cards to see the mana curve."
+            compact
+            title=""
           />
         </div>
       </div>
+    </Teleport>
 
-      <ConfirmModal
-        :open="deleteSideboardTarget !== null"
-        title="Delete Sideboard"
-        :message="deleteSideboardTarget ? `Delete sideboard '${deleteSideboardTarget.name}'?` : ''"
-        confirm-label="Delete"
-        cancel-label="Cancel"
-        @cancel="deleteSideboardTarget = null"
-        @confirm="confirmDeleteSideboard"
-      />
-    </template>
+    <div
+      ref="boardListRef"
+      class="app-scrollbar relative z-10 mt-4 flex-1 min-h-0 overflow-y-auto px-5 pb-5 pr-4"
+      data-testid="deck-summary-list"
+    >
+      <div
+        ref="boardEntriesSortableRef"
+        class="space-y-3 pb-1"
+      >
+        <div
+          v-if="controller.deck.detailedActiveBoardEntries.value.length === 0"
+          class="theme-empty-state"
+        >
+          No cards added to this board yet.
+        </div>
+
+        <DeckBuilderBoardEntryRow
+          v-for="(entry, index) in controller.deck.detailedActiveBoardEntries.value"
+          :key="entry.card.id"
+          :ref="(element) => setBoardEntryRowRef(entry.card.id, element)"
+          :entry="entry"
+          :sortable-card-id="entry.card.id"
+          :hover-mode="controller.filters.hoverMode.value"
+          :class="{ 'deck-board-entry-pop': poppedBoardEntryCardId === entry.card.id }"
+          :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
+          :move-destinations="getMoveDestinations(entry.card.id)"
+          :can-reorder-up="index > 0"
+          :can-reorder-down="index < controller.deck.detailedActiveBoardEntries.value.length - 1"
+          :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
+          :row-secondary-action-disabled="
+            controller.deck.boardRowSecondaryActionDisabled(entry.card.id)
+          "
+          @decrement="controller.deck.changeQuantity($event, -1)"
+          @increment="controller.deck.changeQuantity($event, 1)"
+          @remove="controller.deck.removeEntry"
+          @row-action="controller.deck.handleBoardRowAction"
+          @row-secondary-action="controller.deck.handleBoardRowSecondaryAction"
+          @move-to-board="handleMoveToBoard"
+          @reorder-up="handleReorderUp"
+          @reorder-down="handleReorderDown"
+        />
+      </div>
+    </div>
+
+    <ConfirmModal
+      :open="deleteSideboardTarget !== null"
+      title="Delete Sideboard"
+      :message="deleteSideboardTarget ? `Delete sideboard '${deleteSideboardTarget.name}'?` : ''"
+      confirm-label="Delete"
+      cancel-label="Cancel"
+      @cancel="deleteSideboardTarget = null"
+      @confirm="confirmDeleteSideboard"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { useSortable } from '@vueuse/integrations/useSortable';
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { ChevronDown, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
 import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
+import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
-import type { DeckVisibility } from '@/modules/decks/types';
+import type { DeckEntrySummary, DeckVisibility } from '@/modules/decks/types';
 import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/composables/decks/visibility';
 
 const props = defineProps<{
@@ -426,7 +465,9 @@ const deckDescription = computed({
 
 const visibilityOptions = deckVisibilityOptions;
 const visibility = computed(() => props.controller.deck.form.visibility);
-const selectedVisibilityDescription = computed(() => deckVisibilityDescriptions[visibility.value] ?? '');
+const selectedVisibilityDescription = computed(
+  () => deckVisibilityDescriptions[visibility.value] ?? '',
+);
 const setupBlockingMessages = computed(() => [
   ...props.controller.deck.setupMessages.value,
   ...props.controller.deck.blockingMessages.value,
@@ -460,20 +501,139 @@ const editingSideboardInputRef = ref<HTMLInputElement | null>(null);
 const deleteSideboardTarget = ref<{ id: string; name: string } | null>(null);
 const hoveredSideboardId = ref<string | null>(null);
 const focusedSideboardId = ref<string | null>(null);
+const boardListRef = ref<HTMLElement | null>(null);
+const boardEntriesSortableRef = ref<HTMLElement | null>(null);
+const sortableEntries = shallowRef<DeckEntrySummary[]>([]);
+const boardEntryRowRefs = new Map<string, HTMLElement>();
+const poppedBoardEntryCardId = ref<string | null>(null);
+let popResetTimer: number | undefined;
+
+const sortableController = useSortable(boardEntriesSortableRef, sortableEntries, {
+  animation: 160,
+  handle: '.deck-board-entry-drag-handle',
+  ghostClass: 'deck-board-entry-sortable-ghost',
+  chosenClass: 'deck-board-entry-sortable-chosen',
+  dragClass: 'deck-board-entry-sortable-drag',
+  watchElement: true,
+  onUpdate: (event: { item: HTMLElement; newIndex?: number }): void => {
+    const movedCardId = event.item.dataset.cardId;
+    if (!movedCardId || event.newIndex === undefined) {
+      return;
+    }
+    props.controller.deck.moveEntryToIndex(
+      props.controller.deck.activeBoardId.value,
+      movedCardId,
+      event.newIndex,
+    );
+  },
+});
+
+const componentRefElement = (element: unknown): HTMLElement | null => {
+  if (element instanceof HTMLElement) {
+    return element;
+  }
+  if (
+    element !== null &&
+    typeof element === 'object' &&
+    '$el' in element &&
+    element.$el instanceof HTMLElement
+  ) {
+    return element.$el;
+  }
+  return null;
+};
+
+const setBoardEntryRowRef = (cardId: string, element: unknown): void => {
+  const rowElement = componentRefElement(element);
+  if (rowElement) {
+    boardEntryRowRefs.set(cardId, rowElement);
+    return;
+  }
+  boardEntryRowRefs.delete(cardId);
+};
+
+const scrollBoardEntryIntoView = (rowElement: HTMLElement): void => {
+  const listElement = boardListRef.value;
+  if (!listElement) {
+    return;
+  }
+
+  const listRect = listElement.getBoundingClientRect();
+  const rowRect = rowElement.getBoundingClientRect();
+  const isFullyVisible = rowRect.top >= listRect.top && rowRect.bottom <= listRect.bottom;
+  if (isFullyVisible) {
+    return;
+  }
+
+  const nextScrollTop =
+    rowElement.offsetTop - (listElement.clientHeight / 2) + (rowElement.clientHeight / 2);
+  listElement.scrollTo({
+    top: Math.max(0, nextScrollTop),
+    behavior: 'smooth',
+  });
+};
 
 const activeBoardLabel = computed(() =>
   props.controller.deck.activeBoardId.value === 'mainboard'
     ? 'Mainboard'
-    : (props.controller.deck.activeSideboard.value?.name.trim() || 'Sideboard'),
+    : props.controller.deck.activeSideboard.value?.name.trim() || 'Sideboard',
 );
 const activeBoardCount = computed(() =>
   props.controller.deck.activeBoardId.value === 'mainboard'
     ? props.controller.deck.totalMainboardCards.value
-    : (props.controller.deck.activeSideboard.value?.entries.reduce((sum, entry) => sum + entry.quantity, 0) ?? 0),
+    : (props.controller.deck.activeSideboard.value?.entries.reduce(
+        (sum, entry) => sum + entry.quantity,
+        0,
+      ) ?? 0),
 );
 const heroHeaderObjectPosition = '30% 10%';
 const heroHeaderTransform = 'scale(1.28)';
 const heroHeaderOpacity = 0.75;
+
+watch(
+  () => props.controller.deck.lastBoardEntryChange.value?.sequence,
+  async () => {
+    const change = props.controller.deck.lastBoardEntryChange.value;
+    if (!change || change.boardId !== props.controller.deck.activeBoardId.value) {
+      return;
+    }
+
+    await nextTick();
+    const rowElement = boardEntryRowRefs.get(change.cardId);
+    if (!rowElement) {
+      return;
+    }
+
+    scrollBoardEntryIntoView(rowElement);
+    poppedBoardEntryCardId.value = null;
+    await nextTick();
+    poppedBoardEntryCardId.value = change.cardId;
+    if (popResetTimer !== undefined) {
+      window.clearTimeout(popResetTimer);
+    }
+    popResetTimer = window.setTimeout(() => {
+      poppedBoardEntryCardId.value = null;
+      popResetTimer = undefined;
+    }, 320);
+  },
+);
+
+watch(
+  () => props.controller.deck.detailedActiveBoardEntries.value,
+  (entries) => {
+    sortableEntries.value = [...entries];
+    void nextTick(() => {
+      sortableController.option('disabled', entries.length < 2);
+    });
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (popResetTimer !== undefined) {
+    window.clearTimeout(popResetTimer);
+  }
+});
 
 const updateDeckVisibility = (value: DeckVisibility): void => {
   props.controller.deck.setDeckVisibility(value);
@@ -491,6 +651,14 @@ const getMoveDestinations = (cardId: string): DeckBoardMoveDestination[] =>
 
 const handleMoveToBoard = (cardId: string, destinationBoardId: string): void => {
   props.controller.deck.moveEntryToBoard(cardId, destinationBoardId);
+};
+
+const handleReorderUp = (cardId: string): void => {
+  props.controller.deck.moveEntryWithinBoard(cardId, -1);
+};
+
+const handleReorderDown = (cardId: string): void => {
+  props.controller.deck.moveEntryWithinBoard(cardId, 1);
 };
 
 const setEditingSideboardInputRef = (element: unknown): void => {
@@ -589,3 +757,43 @@ const confirmDeleteSideboard = (): void => {
   deleteSideboardTarget.value = null;
 };
 </script>
+
+<style scoped>
+.deck-board-entry-pop {
+  animation: deck-board-entry-pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.deck-board-entry-sortable-ghost {
+  opacity: 0.35;
+}
+
+.deck-board-entry-sortable-chosen {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, transparent);
+}
+
+.deck-board-entry-sortable-drag {
+  opacity: 0.92;
+  box-shadow: 0 18px 36px rgb(15 23 42 / 0.24);
+}
+
+@keyframes deck-board-entry-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  38% {
+    transform: scale(1.035);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, transparent);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-board-entry-pop {
+    animation: none;
+  }
+}
+</style>
