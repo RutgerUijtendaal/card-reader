@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
 import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { resolveDeckBuildingRules } from '@/composables/decks/deckConstraints';
@@ -120,6 +120,45 @@ describe('useDeckEditorDraft', () => {
     controller.handleGalleryRemoveAction('cardA');
     controller.handleGalleryRemoveAction('cardA');
     expect(controller.form.entries).toEqual([]);
+  });
+
+  test('keeps a final removed row visible for the board entry animation window', () => {
+    vi.useFakeTimers();
+    try {
+      const builderStep = ref<BuilderStep>('build');
+      const cardLookup = ref<Record<string, DeckCardSummary>>({
+        hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+        cardA: buildCard('cardA', 'Card A', 2),
+        cardB: buildCard('cardB', 'Card B', 3),
+      });
+      const controller = useDeckEditorDraft({
+        builderStep,
+        cardLookup,
+        rememberCards: () => undefined,
+      });
+
+      controller.form.hero_card_id = 'hero';
+      controller.form.entries = [
+        { card_id: 'cardA', quantity: 1 },
+        { card_id: 'cardB', quantity: 1 },
+      ];
+
+      controller.handleGalleryRemoveAction('cardA');
+
+      expect(controller.form.entries).toEqual([{ card_id: 'cardB', quantity: 1 }]);
+      expect(controller.detailedActiveBoardEntries.value).toEqual([
+        { card: cardLookup.value.cardA, quantity: 1 },
+        { card: cardLookup.value.cardB, quantity: 1 },
+      ]);
+
+      vi.advanceTimersByTime(320);
+
+      expect(controller.detailedActiveBoardEntries.value).toEqual([
+        { card: cardLookup.value.cardB, quantity: 1 },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('does not remove gallery cards during setup mode', () => {
