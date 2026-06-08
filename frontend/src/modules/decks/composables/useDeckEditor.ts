@@ -27,6 +27,7 @@ export const useDeckEditor = () => {
   const cardLookup = ref<Record<string, DeckCardSummary>>({});
   const deckBuildingRules = ref(fallbackDeckBuildingRules());
   const savedPayloadSignature = ref('');
+  const autosyncFailedSignature = ref('');
   const discardChangesModalOpen = ref(false);
   let bypassNextUnsavedPrompt = false;
   let pendingDiscardConfirmation: ((confirmed: boolean) => void) | null = null;
@@ -115,6 +116,9 @@ export const useDeckEditor = () => {
       return autosyncEnabled.value && canAutosync.value ? 'Autosyncing' : 'Saving';
     }
     if (hasUnsavedChanges.value) {
+      if (autosyncFailedSignature.value === payloadSignature.value) {
+        return 'Autosync Paused';
+      }
       return autosyncEnabled.value && canAutosync.value ? 'Queued' : 'Unsaved';
     }
     return 'Saved';
@@ -122,6 +126,7 @@ export const useDeckEditor = () => {
 
   const markSavedPayload = (signature = payloadSignature.value): void => {
     savedPayloadSignature.value = signature;
+    autosyncFailedSignature.value = '';
   };
 
   const lockSetup = async (): Promise<void> => {
@@ -165,6 +170,9 @@ export const useDeckEditor = () => {
   const saveDeck = async (options: { silent?: boolean } = {}): Promise<void> => {
     if (saving.value) {
       return;
+    }
+    if (!options.silent) {
+      autosyncFailedSignature.value = '';
     }
     saving.value = true;
     manualSaving.value = !options.silent;
@@ -211,10 +219,23 @@ export const useDeckEditor = () => {
   };
 
   const autosyncDeck = useDebounceFn(async () => {
-    if (!autosyncEnabled.value || !canAutosync.value || !hasUnsavedChanges.value || saving.value || loading.value) {
+    if (
+      !autosyncEnabled.value
+      || !canAutosync.value
+      || !hasUnsavedChanges.value
+      || saving.value
+      || loading.value
+      || autosyncFailedSignature.value === payloadSignature.value
+    ) {
       return;
     }
-    await saveDeck({ silent: true });
+    const attemptedSignature = payloadSignature.value;
+    try {
+      await saveDeck({ silent: true });
+    } catch {
+      autosyncFailedSignature.value = attemptedSignature;
+      toast.error('Autosync failed. Changes are still unsaved.');
+    }
   }, 900);
 
   onMounted(async () => {
@@ -227,7 +248,7 @@ export const useDeckEditor = () => {
   });
 
   watch(
-    () => [autosyncEnabled.value, canAutosync.value, hasUnsavedChanges.value, saving.value, loading.value] as const,
+    () => [autosyncEnabled.value, canAutosync.value, hasUnsavedChanges.value, saving.value, loading.value, payloadSignature.value] as const,
     ([autosync, canSync, dirty, isSaving, isLoading]) => {
       if (autosync && canSync && dirty && !isSaving && !isLoading) {
         void autosyncDeck();
@@ -243,7 +264,7 @@ export const useDeckEditor = () => {
   });
 
   useEventListener(window, 'beforeunload', (event) => {
-    if (!hasUnsavedChanges.value || saving.value) {
+    if (!hasUnsavedChanges.value) {
       return;
     }
     event.preventDefault();

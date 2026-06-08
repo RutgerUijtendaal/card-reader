@@ -199,6 +199,21 @@ describe('DeckEditorPage', () => {
     mounted.unmount();
   });
 
+  test('renders a builder-shaped loading state while the deck loads', async () => {
+    controller.loading.value = true;
+
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[data-testid="builder-layout"]')).not.toBeNull();
+    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(2);
+    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).not.toBeNull();
+    expect(mounted.container.textContent).not.toContain('Loading deck...');
+    expect(mounted.container.textContent).not.toContain('Filters');
+    expect(mounted.container.textContent).not.toContain('Summary');
+
+    mounted.unmount();
+  });
+
   test('renders unsaved changes confirmation modal from the editor controller', async () => {
     controller.discardChangesModalOpen.value = true;
 

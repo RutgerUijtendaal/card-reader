@@ -17,232 +17,315 @@
           :disabled="controller.manualSaving.value"
           @click="() => controller.saveDeck()"
         >
-          {{ controller.manualSaving.value ? 'Saving...' : controller.deckId.value ? 'Save Deck' : 'Create Deck' }}
+          {{
+            controller.manualSaving.value
+              ? 'Saving...'
+              : controller.deckId.value
+                ? 'Save Deck'
+                : 'Create Deck'
+          }}
         </button>
       </template>
     </AppPageHeader>
 
-    <div
+    <AppPageLayout
       v-if="controller.loading.value"
-      class="page-card theme-section-muted flex-1 text-sm"
+      columns="three"
+      root-class="deck-builder-layout"
+      main-class="deck-builder-main-column"
+      aria-label="Loading deck builder"
     >
-      Loading deck...
-    </div>
+      <template #aside>
+        <aside class="app-sticky-aside app-sticky-aside-left deck-builder-loading-panel">
+          <div class="app-sticky-aside-scroll space-y-6">
+            <div class="space-y-3">
+              <div class="deck-builder-loading-line h-4 w-28" />
+              <div class="deck-builder-loading-line h-10 w-full" />
+              <div class="deck-builder-loading-line h-10 w-5/6" />
+            </div>
+            <div class="space-y-3">
+              <div class="deck-builder-loading-line h-4 w-20" />
+              <div
+                v-for="index in 5"
+                :key="`loading-filter-${index}`"
+                class="deck-builder-loading-line h-8 w-full"
+              />
+            </div>
+          </div>
+        </aside>
+      </template>
 
-    <template v-else>
-      <AppPageLayout
-        columns="three"
-        root-class="deck-builder-layout"
-        main-class="deck-builder-main-column"
-      >
-        <template #aside>
-          <DeckBuilderFiltersPanel :controller="controller" />
-        </template>
-        <div class="flex min-w-0 flex-col gap-4">
-          <section
-            v-if="!controller.deck.isSetupStep.value"
-            class="deck-builder-status-bar mx-px flex flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
-            aria-label="Deck builder status"
-          >
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <div class="flex items-center gap-2">
-                <component
-                  :is="deckChangeStatusIcon"
-                  class="h-4 w-4 shrink-0"
-                  :class="{ 'animate-spin': controller.saving.value }"
+      <div class="flex min-w-0 flex-col gap-4">
+        <section
+          class="deck-builder-status-bar mx-px flex flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
+          aria-hidden="true"
+        >
+          <div class="flex items-center gap-3">
+            <div class="deck-builder-loading-line h-4 w-4 rounded-full" />
+            <div class="deck-builder-loading-line h-4 w-32" />
+            <div class="deck-builder-loading-line h-4 w-24" />
+          </div>
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div
+              v-for="index in 5"
+              :key="`loading-stat-${index}`"
+              class="deck-builder-loading-line h-5 w-20"
+            />
+          </div>
+        </section>
+
+        <DeckBuilderGallery :controller="controller" />
+      </div>
+
+      <template #endAside>
+        <aside class="app-sticky-aside app-sticky-aside-right deck-builder-loading-panel">
+          <div class="app-sticky-aside-scroll space-y-5">
+            <div class="space-y-3">
+              <div class="deck-builder-loading-line h-4 w-36" />
+              <div class="deck-builder-loading-line h-8 w-full" />
+            </div>
+            <div
+              v-for="sectionIndex in 3"
+              :key="`loading-board-${sectionIndex}`"
+              class="space-y-2"
+            >
+              <div class="deck-builder-loading-line h-4 w-24" />
+              <div
+                v-for="rowIndex in 4"
+                :key="`loading-board-${sectionIndex}-${rowIndex}`"
+                class="deck-builder-loading-line h-11 w-full"
+              />
+            </div>
+          </div>
+        </aside>
+      </template>
+    </AppPageLayout>
+
+    <AppPageLayout
+      v-else
+      columns="three"
+      root-class="deck-builder-layout"
+      main-class="deck-builder-main-column"
+    >
+      <template #aside>
+        <DeckBuilderFiltersPanel :controller="controller" />
+      </template>
+      <div class="flex min-w-0 flex-col gap-4">
+        <section
+          v-if="!controller.deck.isSetupStep.value"
+          class="deck-builder-status-bar mx-px flex flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
+          aria-label="Deck builder status"
+        >
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div class="flex items-center gap-2">
+              <component
+                :is="deckChangeStatusIcon"
+                class="h-4 w-4 shrink-0"
+                :class="{ 'animate-spin': controller.saving.value }"
+              />
+              <span class="theme-section-title text-sm font-semibold">{{
+                controller.changeStatusLabel.value
+              }}</span>
+            </div>
+            <label
+              class="theme-section-muted flex items-center gap-2 text-sm font-semibold"
+              :class="{ 'opacity-60': !controller.canAutosync.value }"
+            >
+              <input
+                v-model="controller.autosyncEnabled.value"
+                class="h-4 w-4 rounded accent-emerald-400"
+                type="checkbox"
+                :disabled="!controller.canAutosync.value"
+              >
+              <span>Autosync</span>
+            </label>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-start gap-x-5 gap-y-2 lg:justify-end">
+            <div class="flex items-center gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
+              <span class="theme-section-title text-base font-semibold">{{
+                controller.deck.overallTotalCards.value
+              }}</span>
+            </div>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div class="flex items-center gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
+              <span class="theme-section-title text-base font-semibold">
+                {{ controller.deck.totalMainboardCards.value
+                }}<template v-if="controller.deck.totalMainboardCards.value >= mainboardMaxCards">
+                  / {{ mainboardMaxCards }}</template>
+              </span>
+            </div>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div class="flex items-center gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
+              <span class="theme-section-title text-base font-semibold">{{
+                controller.deck.totalMainboardManaTypeCards.value
+              }}</span>
+              <InfoTooltip
+                text="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
+                placement="bottom"
+                :allow-flip="false"
+              >
+                <CircleCheckBig
+                  v-if="controller.deck.hasFreeMulliganManaRatio.value"
+                  class="h-4 w-4 text-emerald-400"
                 />
-                <span class="theme-section-title text-sm font-semibold">{{ controller.changeStatusLabel.value }}</span>
-              </div>
-              <label
-                class="theme-section-muted flex items-center gap-2 text-sm font-semibold"
-                :class="{ 'opacity-60': !controller.canAutosync.value }"
-              >
-                <input
-                  v-model="controller.autosyncEnabled.value"
-                  class="h-4 w-4 rounded accent-emerald-400"
-                  type="checkbox"
-                  :disabled="!controller.canAutosync.value"
-                >
-                <span>Autosync</span>
-              </label>
+                <CircleX
+                  v-else
+                  class="h-4 w-4 text-rose-400"
+                />
+              </InfoTooltip>
             </div>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
 
-            <div class="flex flex-wrap items-center justify-start gap-x-5 gap-y-2 lg:justify-end">
-              <div class="flex items-center gap-2">
-                <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Total</span>
-                <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallTotalCards.value }}</span>
-              </div>
-              <div class="theme-divider hidden h-4 border-l lg:block" />
-              <div class="flex items-center gap-2">
-                <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Main</span>
-                <span class="theme-section-title text-base font-semibold">
-                  {{ controller.deck.totalMainboardCards.value }}<template v-if="controller.deck.totalMainboardCards.value >= mainboardMaxCards"> / {{ mainboardMaxCards }}</template>
-                </span>
-              </div>
-              <div class="theme-divider hidden h-4 border-l lg:block" />
-              <div class="flex items-center gap-2">
-                <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Mana</span>
-                <span class="theme-section-title text-base font-semibold">{{ controller.deck.totalMainboardManaTypeCards.value }}</span>
-                <InfoTooltip
-                  text="If at least 25% of your deck is Mana cards, you can mulligan anytime you draw a starting hand with 0 mana cards."
-                  placement="bottom"
-                  :allow-flip="false"
-                >
-                  <CircleCheckBig
-                    v-if="controller.deck.hasFreeMulliganManaRatio.value"
-                    class="h-4 w-4 text-emerald-400"
-                  />
-                  <CircleX
-                    v-else
-                    class="h-4 w-4 text-rose-400"
-                  />
-                </InfoTooltip>
-              </div>
-              <div class="theme-divider hidden h-4 border-l lg:block" />
-
-              <div
-                v-if="controller.deck.headerDeckTypeCounts.value.length > 0"
-                class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+            <div
+              v-if="controller.deck.headerDeckTypeCounts.value.length > 0"
+              class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+            >
+              <span class="theme-kicker shrink-0 text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
+              <span
+                v-for="row in controller.deck.headerDeckTypeCounts.value"
+                :key="row.type.id"
+                class="theme-section-muted"
               >
-                <span class="theme-kicker shrink-0 text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
-                <span
-                  v-for="row in controller.deck.headerDeckTypeCounts.value"
-                  :key="row.type.id"
-                  class="theme-section-muted"
-                >
-                  <span class="theme-section-title font-medium">{{ row.type.label }}</span>
-                  {{ row.count }}
-                </span>
-                <span
-                  v-if="controller.deck.remainingDeckTypeCount.value > 0"
-                  class="theme-section-muted"
-                >
-                  +{{ controller.deck.remainingDeckTypeCount.value }} more
-                </span>
-              </div>
-              <p
-                v-else
-                class="theme-section-muted flex items-center gap-2 text-xs"
+                <span class="theme-section-title font-medium">{{ row.type.label }}</span>
+                {{ row.count }}
+              </span>
+              <span
+                v-if="controller.deck.remainingDeckTypeCount.value > 0"
+                class="theme-section-muted"
               >
-                <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
-                <span>No type data yet.</span>
-              </p>
-
-              <div class="theme-divider hidden h-4 border-l lg:block" />
-              <div
-                v-if="hardIssueMessages.length > 0"
-                class="inline-flex"
-              >
-                <button
-                  ref="hardIssueTriggerRef"
-                  class="theme-pill theme-pill-danger inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold"
-                  type="button"
-                  aria-label="Show deck validity issues"
-                  :aria-expanded="hardIssuesOpen"
-                  @mouseenter="hardIssuesOpen = true"
-                  @mouseleave="hardIssuesOpen = false"
-                  @focusin="hardIssuesOpen = true"
-                  @focusout="hardIssuesOpen = false"
-                >
-                  <TriangleAlert class="h-3.5 w-3.5" />
-                  {{ hardIssueMessages.length }}
-                </button>
-                <Teleport to="body">
-                  <div
-                    v-if="hardIssuesOpen"
-                    ref="hardIssuePanelRef"
-                    class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
-                    role="tooltip"
-                    :style="{ position: 'fixed', left: `${hardIssueX}px`, top: `${hardIssueY}px` }"
-                  >
-                    <p class="theme-section-title font-semibold">
-                      Issues
-                    </p>
-                    <ul class="mt-2 space-y-2">
-                      <li
-                        v-for="message in hardIssueMessages"
-                        :key="message"
-                        class="theme-section-muted"
-                      >
-                        {{ message }}
-                      </li>
-                    </ul>
-                  </div>
-                </Teleport>
-              </div>
-              <div
-                v-if="hardIssueMessages.length > 0"
-                class="theme-divider hidden h-4 border-l lg:block"
-              />
-              <div
-                v-if="controller.deck.warningMessages.value.length > 0"
-                class="inline-flex"
-              >
-                <button
-                  ref="warningTriggerRef"
-                  class="theme-pill theme-pill-warning inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold"
-                  type="button"
-                  aria-label="Show deck warnings"
-                  :aria-expanded="warningsOpen"
-                  @mouseenter="warningsOpen = true"
-                  @mouseleave="warningsOpen = false"
-                  @focusin="warningsOpen = true"
-                  @focusout="warningsOpen = false"
-                >
-                  <TriangleAlert class="h-3.5 w-3.5" />
-                  {{ controller.deck.warningMessages.value.length }}
-                </button>
-                <Teleport to="body">
-                  <div
-                    v-if="warningsOpen"
-                    ref="warningPanelRef"
-                    class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
-                    role="tooltip"
-                    :style="{ position: 'fixed', left: `${warningX}px`, top: `${warningY}px` }"
-                  >
-                    <p class="theme-section-title font-semibold">
-                      Warnings
-                    </p>
-                    <ul class="mt-2 space-y-2">
-                      <li
-                        v-for="message in controller.deck.warningMessages.value"
-                        :key="message"
-                        class="theme-section-muted"
-                      >
-                        {{ message }}
-                      </li>
-                    </ul>
-                  </div>
-                </Teleport>
-              </div>
-              <div
-                v-if="controller.deck.warningMessages.value.length > 0"
-                class="theme-divider hidden h-4 border-l lg:block"
-              />
-              <div class="flex items-center gap-2">
-                <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
-                <span class="theme-section-title text-base font-semibold">{{ controller.deck.overallUniqueCards.value }}</span>
-              </div>
-              <div class="theme-divider hidden h-4 border-l lg:block" />
-              <div class="flex items-center gap-2">
-                <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Status</span>
-                <span
-                  class="text-base font-semibold"
-                  :class="controller.deck.isDeckValid.value ? 'text-emerald-300' : 'theme-section-title'"
-                >
-                  {{ controller.deck.deckStatusLabel.value }}
-                </span>
-              </div>
+                +{{ controller.deck.remainingDeckTypeCount.value }} more
+              </span>
             </div>
-          </section>
+            <p
+              v-else
+              class="theme-section-muted flex items-center gap-2 text-xs"
+            >
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Type Mix</span>
+              <span>No type data yet.</span>
+            </p>
 
-          <DeckBuilderGallery :controller="controller" />
-        </div>
-        <template #endAside>
-          <DeckBuilderSummaryPanel :controller="controller" />
-        </template>
-      </AppPageLayout>
-    </template>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div
+              v-if="hardIssueMessages.length > 0"
+              class="inline-flex"
+            >
+              <button
+                ref="hardIssueTriggerRef"
+                class="theme-pill theme-pill-danger inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold"
+                type="button"
+                aria-label="Show deck validity issues"
+                :aria-expanded="hardIssuesOpen"
+                @mouseenter="hardIssuesOpen = true"
+                @mouseleave="hardIssuesOpen = false"
+                @focusin="hardIssuesOpen = true"
+                @focusout="hardIssuesOpen = false"
+              >
+                <TriangleAlert class="h-3.5 w-3.5" />
+                {{ hardIssueMessages.length }}
+              </button>
+              <Teleport to="body">
+                <div
+                  v-if="hardIssuesOpen"
+                  ref="hardIssuePanelRef"
+                  class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
+                  role="tooltip"
+                  :style="{ position: 'fixed', left: `${hardIssueX}px`, top: `${hardIssueY}px` }"
+                >
+                  <p class="theme-section-title font-semibold">
+                    Issues
+                  </p>
+                  <ul class="mt-2 space-y-2">
+                    <li
+                      v-for="message in hardIssueMessages"
+                      :key="message"
+                      class="theme-section-muted"
+                    >
+                      {{ message }}
+                    </li>
+                  </ul>
+                </div>
+              </Teleport>
+            </div>
+            <div
+              v-if="hardIssueMessages.length > 0"
+              class="theme-divider hidden h-4 border-l lg:block"
+            />
+            <div
+              v-if="controller.deck.warningMessages.value.length > 0"
+              class="inline-flex"
+            >
+              <button
+                ref="warningTriggerRef"
+                class="theme-pill theme-pill-warning inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold"
+                type="button"
+                aria-label="Show deck warnings"
+                :aria-expanded="warningsOpen"
+                @mouseenter="warningsOpen = true"
+                @mouseleave="warningsOpen = false"
+                @focusin="warningsOpen = true"
+                @focusout="warningsOpen = false"
+              >
+                <TriangleAlert class="h-3.5 w-3.5" />
+                {{ controller.deck.warningMessages.value.length }}
+              </button>
+              <Teleport to="body">
+                <div
+                  v-if="warningsOpen"
+                  ref="warningPanelRef"
+                  class="theme-popover pointer-events-none z-50 w-72 p-3 text-sm shadow-lg"
+                  role="tooltip"
+                  :style="{ position: 'fixed', left: `${warningX}px`, top: `${warningY}px` }"
+                >
+                  <p class="theme-section-title font-semibold">
+                    Warnings
+                  </p>
+                  <ul class="mt-2 space-y-2">
+                    <li
+                      v-for="message in controller.deck.warningMessages.value"
+                      :key="message"
+                      class="theme-section-muted"
+                    >
+                      {{ message }}
+                    </li>
+                  </ul>
+                </div>
+              </Teleport>
+            </div>
+            <div
+              v-if="controller.deck.warningMessages.value.length > 0"
+              class="theme-divider hidden h-4 border-l lg:block"
+            />
+            <div class="flex items-center gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Unique</span>
+              <span class="theme-section-title text-base font-semibold">{{
+                controller.deck.overallUniqueCards.value
+              }}</span>
+            </div>
+            <div class="theme-divider hidden h-4 border-l lg:block" />
+            <div class="flex items-center gap-2">
+              <span class="theme-kicker text-[11px] font-semibold uppercase tracking-wide">Status</span>
+              <span
+                class="text-base font-semibold"
+                :class="
+                  controller.deck.isDeckValid.value ? 'text-emerald-300' : 'theme-section-title'
+                "
+              >
+                {{ controller.deck.deckStatusLabel.value }}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <DeckBuilderGallery :controller="controller" />
+      </div>
+      <template #endAside>
+        <DeckBuilderSummaryPanel :controller="controller" />
+      </template>
+    </AppPageLayout>
 
     <ConfirmModal
       :open="controller.discardChangesModalOpen.value"
@@ -258,7 +341,15 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { CircleCheckBig, CircleX, Cloud, CloudUpload, Hammer, LoaderCircle, TriangleAlert } from 'lucide-vue-next';
+import {
+  CircleCheckBig,
+  CircleX,
+  Cloud,
+  CloudUpload,
+  Hammer,
+  LoaderCircle,
+  TriangleAlert,
+} from 'lucide-vue-next';
 import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import InfoTooltip from '@/components/InfoTooltip.vue';
@@ -284,8 +375,12 @@ const {
   x: warningX,
   y: warningY,
 } = useFloatingPopover({ placement: 'bottom', allowFlip: false });
-const mainboardMinCards = computed(() => controller.deckBuildingRules.value.mainboard_card_count.min ?? 0);
-const mainboardMaxCards = computed(() => controller.deckBuildingRules.value.mainboard_card_count.max ?? 0);
+const mainboardMinCards = computed(
+  () => controller.deckBuildingRules.value.mainboard_card_count.min ?? 0,
+);
+const mainboardMaxCards = computed(
+  () => controller.deckBuildingRules.value.mainboard_card_count.max ?? 0,
+);
 const manaMinCards = computed(() => controller.deckBuildingRules.value.mana_type_count.min ?? 0);
 const hardIssueMessages = computed(() => controller.deck.validationMessages.value);
 const deckChangeStatusIcon = computed(() => {
@@ -332,5 +427,36 @@ const deckEditorSubtitle = computed(() =>
   height: 1px;
   content: '';
   background: var(--color-border);
+}
+
+.deck-builder-loading-panel {
+  min-height: 20rem;
+}
+
+.deck-builder-loading-line {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.35rem;
+  background: var(--color-surface-muted);
+}
+
+.deck-builder-loading-line::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-surface-strong) 58%, transparent) 48%,
+    transparent 100%
+  );
+  animation: deck-builder-loading-sheen 1.6s ease-in-out infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes deck-builder-loading-sheen {
+  to {
+    transform: translateX(100%);
+  }
 }
 </style>
