@@ -19,7 +19,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Deck-building rule defaults and example config are backend-owned through `GET /decks/rules`; use the shared deck rules client/fallback instead of duplicating rule constants in feature UI.
 - In the card detail editor, keep card-level controls on the `Card` tab and version-level controls on the `Card Version` tab.
 - Use `JsonEditorField` for deck-building config JSON so formatting, validation affordances, and examples stay consistent with other admin JSON inputs.
-- For full-page application views, prefer inner scrolling within the main content segments instead of making the entire page scroll; match the layout behavior used by the current settings and deck builder pages.
+- For routed app pages with filters, local navigation, summaries, or page controls, prefer the shared `AppPageLayout` and `AppStickyAside` structure.
+- Primary page lists and content should use the shell page scroll; avoid max-height primary list containers that trap content.
+- Desktop asides should behave as edge-attached side panels below the lifted shell header, use the shared aside width, keep bounded inner scrolling only inside the aside, and place persistent footer controls in the shared footer slot so they anchor at the bottom.
+- Mobile page layouts should stack aside content above main content in natural page flow.
 - Preserve and extend the shared theme/token system in `frontend/src/styles.css` and `frontend/src/composables/useTheme.ts`.
 - Prefer semantic theme primitives and shared classes over ad hoc color styling.
 - Avoid overusing containers and card shells. Prefer letting controls and content float on the app background when hierarchy remains clear, using dividers, spacing, accent lines, and selected states for visual separation between sections.
@@ -47,7 +50,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - New helpers added when an existing composable or shared utility already fit
 - Page modules taking on shared state or parsing responsibilities
 - Module root files that should be under `components`, `composables`, `utils`, or `tests`
-- Full-page layouts that scroll the entire page instead of keeping page chrome stable and giving the main segments their own scroll areas
+- Page layouts that reintroduce max-height primary list containers instead of using shell page scroll with sticky/bounded asides
 - Theme drift from raw colors, light-only assumptions, or component-local styling systems
 - Unnecessary framed containers where divider-separated, background-floating content would be clearer and more consistent
 - UI changes verified in one theme only
@@ -73,4 +76,4 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Adding card or panel shells for every section when dividers, spacing, and selected states provide enough structure
 - Adding dependencies before checking whether the repo already has a clean fit
 - Introducing a parallel component or styling system for a one-off feature
-- Building new application pages around document-style full-page scrolling when segmented inner scrolling is the established pattern
+- Building routed app pages with bespoke aside widths, ad hoc sticky offsets, or primary list inner scrollers instead of the shared `AppPageLayout` and `AppStickyAside` structure
