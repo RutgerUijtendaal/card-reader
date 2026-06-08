@@ -7,7 +7,7 @@
       :back-to="galleryBackLocation"
       back-label="Back to Gallery"
       title-tag="h2"
-      title-class="text-2xl"
+      title-class="text-xl"
     />
 
     <nav

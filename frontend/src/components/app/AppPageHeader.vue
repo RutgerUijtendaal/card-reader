@@ -4,7 +4,7 @@
     :disabled="!hasShellHeaderOutlet"
   >
     <header
-      class="theme-page-header border-b backdrop-blur-sm"
+      class="theme-page-header border-b"
       :style="headerStyle"
     >
       <div
@@ -70,6 +70,7 @@
         v-if="hasBottomRow"
         class="theme-divider theme-subheader-row flex flex-wrap items-center gap-3 border-t px-5 py-4"
         :class="[bottomRowClass, bottomRowLayoutClass]"
+        :style="bottomRowStyle"
       >
         <div
           v-if="hasBottomLeft"
@@ -111,7 +112,7 @@ const props = withDefaults(
   }>(),
   {
     titleTag: 'h1',
-    titleClass: 'text-2xl',
+    titleClass: 'text-xl',
     subtitleClass: 'text-sm',
     backTo: null,
     backLabel: '',
@@ -145,14 +146,24 @@ const bottomRowLayoutClass = computed(() => {
 });
 const resolvedBackTo = computed<RouteLocationRaw>(() => props.backTo ?? '/');
 const headerStyle = computed(() => ({
-  borderColor: 'var(--color-border)',
-  background: 'var(--color-surface)',
+  borderColor: 'color-mix(in srgb, var(--color-border-strong) 48%, transparent)',
+  background: [
+    'linear-gradient(180deg,',
+    'color-mix(in srgb, var(--color-surface-strong) 72%, transparent) 0%,',
+    'color-mix(in srgb, var(--color-surface) 42%, transparent) 100%)',
+  ].join(' '),
+  backdropFilter: 'blur(24px) saturate(1.45)',
+  WebkitBackdropFilter: 'blur(24px) saturate(1.45)',
   color: 'var(--color-text)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 0 rgba(148,163,184,0.2), 0 14px 38px rgba(15,23,42,0.14)',
 }));
-const topRowClass = computed(() => [
-  'bg-[var(--color-surface)]',
-]);
-const bottomRowClass = computed(() => 'bg-[var(--color-surface)]');
+const bottomRowStyle = computed(() => ({
+  background: 'color-mix(in srgb, var(--color-surface) 34%, transparent)',
+  backdropFilter: 'blur(20px) saturate(1.35)',
+  WebkitBackdropFilter: 'blur(20px) saturate(1.35)',
+}));
+const topRowClass = computed(() => []);
+const bottomRowClass = computed(() => '');
 
 onMounted(() => {
   hasShellHeaderOutlet.value = document.getElementById('app-page-header-outlet') !== null;

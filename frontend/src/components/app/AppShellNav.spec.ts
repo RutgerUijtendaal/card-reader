@@ -45,7 +45,7 @@ vi.mock('@/components/app/ThemeModeMenu.vue', () => ({
   },
 }));
 
-const mountNav = async () => {
+const mountNav = async (props: { collapsed?: boolean } = {}) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const router = createRouter({
@@ -60,7 +60,7 @@ const mountNav = async () => {
   });
   await router.push('/cards');
   await router.isReady();
-  const app = createApp(AppShellNav);
+  const app = createApp(AppShellNav, props);
   app.use(router);
   app.mount(container);
   await nextTick();
@@ -89,6 +89,16 @@ describe('AppShellNav', () => {
     expect(mounted.container.textContent).toContain('3');
     expect(mounted.container.querySelector('a[href="/notifications"]')).not.toBeNull();
     expect(mounted.container.querySelector('a[href="/notifications"] .nav-badge')?.textContent).toContain('3');
+    mounted.unmount();
+  });
+
+  test('shows notification indicator dot when collapsed', async () => {
+    const mounted = await mountNav({ collapsed: true });
+    const notificationLink = mounted.container.querySelector('a[href="/notifications"]');
+
+    expect(notificationLink).not.toBeNull();
+    expect(notificationLink?.querySelector('.nav-badge')).toBeNull();
+    expect(notificationLink?.querySelector('.nav-indicator-dot')).not.toBeNull();
     mounted.unmount();
   });
 
