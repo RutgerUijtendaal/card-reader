@@ -366,6 +366,7 @@
     @apply grid w-full items-start gap-6;
     --app-page-x-inset: 1rem;
     --app-page-y-inset: 1rem;
+    --app-page-main-max-width: none;
     padding: var(--app-page-y-inset) var(--app-page-x-inset);
   }
 
@@ -393,6 +394,7 @@
 
   .app-page-layout-standard {
     @apply mx-auto max-w-6xl;
+    --app-page-main-max-width: 52rem;
   }
 
   .app-page-layout.app-page-layout-standard {
@@ -403,22 +405,30 @@
 
   .app-page-layout.app-page-layout-standard > .app-page-layout-main {
     width: 100%;
-    max-width: 52rem;
+    max-width: var(--app-page-main-max-width);
     justify-self: center;
   }
 
   .app-sticky-aside {
-    @apply min-w-0 border-b pb-5;
+    @apply min-w-0 border-b px-4 py-5;
     top: var(--app-page-y-inset, 1rem);
-    border-color: var(--color-border);
+    border-color: color-mix(in srgb, var(--color-border) 78%, transparent);
+    border-radius: 0;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-surface-strong) 86%, transparent) 0%,
+        color-mix(in srgb, var(--color-surface) 74%, transparent) 100%
+      );
+    box-shadow: none;
   }
 
   .app-sticky-aside-left {
-    @apply border-r-0 pr-0;
+    @apply border-r-0;
   }
 
   .app-sticky-aside-right {
-    @apply border-l-0 pl-0;
+    @apply border-l-0;
   }
 
   .app-sticky-aside-scroll {
@@ -434,6 +444,13 @@
   }
 
   @media (min-width: 1280px) {
+    .app-page-layout {
+      min-height: calc(100dvh - var(--app-page-header-height, 0px));
+      align-items: stretch;
+      gap: 0;
+      padding: 0;
+    }
+
     .app-page-layout-sidebar {
       grid-template-columns: 23rem minmax(0, 1fr);
     }
@@ -443,31 +460,48 @@
     }
 
     .app-page-layout-standard {
-      grid-template-columns: 18rem minmax(0, 1fr);
+      grid-template-columns: 23rem minmax(0, 1fr);
+    }
+
+    .app-page-layout-main {
+      padding: var(--app-page-y-inset) var(--app-page-x-inset);
+    }
+
+    .app-page-layout.app-page-layout-standard > .app-page-layout-main {
+      max-width: calc(var(--app-page-main-max-width) + (var(--app-page-x-inset) * 2));
     }
 
     .app-sticky-aside {
       position: sticky;
       display: flex;
-      height: calc(100dvh - var(--app-page-header-height, 0px) - var(--app-page-y-inset) - var(--app-page-y-inset));
-      max-height: calc(100dvh - var(--app-page-header-height, 0px) - var(--app-page-y-inset) - var(--app-page-y-inset));
+      top: 0;
+      height: calc(100dvh - var(--app-page-header-height, 0px));
+      max-height: calc(100dvh - var(--app-page-header-height, 0px));
       flex-direction: column;
       border-bottom-width: 0;
-      padding-bottom: 0;
+      padding-top: var(--app-page-y-inset);
+      padding-bottom: var(--app-page-y-inset);
     }
 
     .app-sticky-aside-left {
       border-right-width: 1px;
-      padding-right: 1.5rem;
+      padding-right: 1.25rem;
+      box-shadow: 12px 0 24px -28px rgba(15, 23, 42, 0.5);
     }
 
     .app-sticky-aside-right {
       border-left-width: 1px;
-      padding-left: 1.5rem;
+      padding-left: 1.25rem;
+      box-shadow: -12px 0 24px -28px rgba(15, 23, 42, 0.5);
     }
 
     .app-sticky-aside-scroll {
+      flex: 1 1 auto;
       overflow-y: auto;
+    }
+
+    .app-sticky-aside-footer {
+      margin-top: 1rem;
     }
   }
 
