@@ -34,6 +34,11 @@ const buildCard = (): CardListItem => ({
   types: [],
 });
 
+const buildCardWithImage = (): CardListItem => ({
+  ...buildCard(),
+  image_url: '/cards/card-1/image',
+});
+
 const mountCardGalleryItem = async (
   card: GalleryDisplayItem,
   props: Record<string, unknown> = {},
@@ -74,6 +79,7 @@ const mountCardGalleryItem = async (
 describe('CardGalleryItem', () => {
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -149,6 +155,76 @@ describe('CardGalleryItem', () => {
     await nextTick();
 
     expect(document.activeElement).not.toBe(button);
+
+    mounted.unmount();
+  });
+
+  test('does not render a hover overlay when hover previews are disabled', async () => {
+    const mounted = await mountCardGalleryItem(buildCardWithImage(), {
+      hoverMode: 'none',
+    });
+    const root = mounted.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) {
+      throw new Error('expected card root');
+    }
+
+    root.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await nextTick();
+
+    expect(document.body.querySelector('.shared-element-hover-panel')).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('renders enlarged hovers through the shared-element overlay', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      const id = window.setTimeout(() => callback(performance.now()), 16);
+      return Number(id);
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      clearTimeout(id);
+    });
+    const mounted = await mountCardGalleryItem(buildCardWithImage(), {
+      hoverMode: 'enlarged',
+    });
+    const root = mounted.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) {
+      throw new Error('expected card root');
+    }
+
+    root.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await nextTick();
+
+    const panel = document.body.querySelector<HTMLElement>('.shared-element-hover-panel');
+    expect(panel).not.toBeNull();
+    expect(panel?.style.position).toBe('fixed');
+    expect(panel?.style.transformOrigin).toBe('top left');
+
+    await nextTick();
+    await vi.runOnlyPendingTimersAsync();
+    await nextTick();
+
+    expect(document.body.querySelector('.shared-element-hover-panel-open')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('reduced-motion hover overlays skip transform animation', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const mounted = await mountCardGalleryItem(buildCardWithImage(), {
+      hoverMode: 'enlarged',
+    });
+    const root = mounted.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) {
+      throw new Error('expected card root');
+    }
+
+    root.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await nextTick();
+
+    expect(document.body.querySelector('.shared-element-hover-panel-reduced-motion')).not.toBeNull();
 
     mounted.unmount();
   });

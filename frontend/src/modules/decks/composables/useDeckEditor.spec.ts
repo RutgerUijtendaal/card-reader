@@ -88,6 +88,7 @@ const mountController = async () => {
 
   return {
     controller,
+    router,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -204,6 +205,44 @@ describe('useDeckEditor', () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+
+    resolveSave({
+      id: 'deck-1',
+      status: { is_valid: true },
+    });
+    await savePromise;
+    mounted.unmount();
+  });
+
+  test('keeps route-leave protection active when edits change during a pending save', async () => {
+    let resolveSave!: (value: { id: string; status: { is_valid: boolean } }) => void;
+    updateDeckMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    const mounted = await mountController();
+    mounted.controller.deck.form.name = 'Payload being saved';
+    await nextTick();
+
+    const savePromise = mounted.controller.saveDeck();
+    await nextTick();
+
+    mounted.controller.deck.form.name = 'Unsaved after save started';
+    await nextTick();
+
+    const navigationPromise = mounted.router.push('/cards');
+    await nextTick();
+
+    expect(mounted.controller.hasUnsavedChanges.value).toBe(true);
+    expect(mounted.controller.saving.value).toBe(true);
+    expect(mounted.controller.discardChangesModalOpen.value).toBe(true);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/deck-1/edit');
+
+    mounted.controller.cancelDiscardChanges();
+    await navigationPromise;
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/deck-1/edit');
 
     resolveSave({
       id: 'deck-1',

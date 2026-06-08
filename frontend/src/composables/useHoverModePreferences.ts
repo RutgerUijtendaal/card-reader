@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
 import { DEFAULT_HOVER_MODE, isHoverMode, type HoverMode } from '@/composables/card-gallery/hoverMode';
+import { DEFAULT_HOVER_PREVIEW_SCALE, normalizeHoverPreviewScale } from '@/composables/card-gallery/hoverPreviewScale';
 import { GALLERY_OPTIONS_STORAGE_KEY } from '@/composables/useGalleryOptions';
 
 export type HoverModeSurface = 'gallery' | 'deckBuilder' | 'deckDetail';
@@ -39,6 +40,7 @@ const readLegacyDefaultHoverMode = (): HoverMode => {
 
 export const useHoverModePreferences = () => {
   const storedDefaultHoverMode = useLocalStorage<HoverMode | null>('card-reader.default-hover-mode', null);
+  const storedHoverPreviewScale = useLocalStorage<number>('card-reader.hover-preview-scale', DEFAULT_HOVER_PREVIEW_SCALE);
   const storedOverrides = useLocalStorage<HoverModeOverrideState>('card-reader.hover-mode-overrides', DEFAULT_OVERRIDES, {
     mergeDefaults: true,
   });
@@ -69,8 +71,16 @@ export const useHoverModePreferences = () => {
     return computed<HoverMode>(() => overrideHoverMode.value ?? defaultHoverMode.value);
   };
 
+  const hoverPreviewScale = computed({
+    get: () => normalizeHoverPreviewScale(storedHoverPreviewScale.value),
+    set: (value: number) => {
+      storedHoverPreviewScale.value = normalizeHoverPreviewScale(value);
+    },
+  });
+
   return {
     defaultHoverMode,
+    hoverPreviewScale,
     getOverrideHoverMode,
     getEffectiveHoverMode,
   };
@@ -91,6 +101,7 @@ export const useHoverModeSurface = (surface: HoverModeSurface) => {
 
   return {
     defaultHoverMode: preferences.defaultHoverMode,
+    hoverPreviewScale: preferences.hoverPreviewScale,
     overrideHoverMode,
     effectiveHoverMode,
     setOverrideHoverMode,
