@@ -82,7 +82,7 @@
         </div>
 
         <div
-          v-if="!notificationsLoaded"
+          v-if="loading"
           class="theme-divider"
         >
           <article

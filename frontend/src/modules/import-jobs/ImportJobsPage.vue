@@ -231,13 +231,12 @@
             <article
               v-for="index in 4"
               :key="`import-job-loading-${index}`"
-              class="import-job-row theme-divider py-3"
+              class="import-job-row theme-divider py-5"
             >
-              <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-stretch">
-                <div class="min-w-0 space-y-2 pr-2">
+              <div class="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-stretch">
+                <div class="min-w-0 space-y-3 pr-2">
                   <div class="flex items-center gap-2">
                     <span class="h-6 w-24 animate-pulse rounded-full bg-[var(--color-surface-muted)]" />
-                    <span class="h-3 w-48 animate-pulse rounded bg-[var(--color-surface-muted)]" />
                   </div>
                   <div class="space-y-2">
                     <div class="h-4 w-36 animate-pulse rounded bg-[var(--color-surface-muted)]" />
@@ -246,8 +245,8 @@
                   </div>
                 </div>
 
-                <div class="flex h-full flex-col gap-3 md:items-end md:justify-between">
-                  <div class="grid grid-cols-2 gap-x-5 gap-y-1 md:text-right">
+                <div class="flex h-full flex-col gap-4 md:items-end md:justify-between">
+                  <div class="grid grid-cols-2 gap-x-7 gap-y-2 md:text-right">
                     <div class="space-y-2">
                       <div class="h-3 w-16 animate-pulse rounded bg-[var(--color-surface-muted)]" />
                       <div class="h-4 w-24 animate-pulse rounded bg-[var(--color-surface-muted)]" />
@@ -257,7 +256,7 @@
                       <div class="h-4 w-24 animate-pulse rounded bg-[var(--color-surface-muted)]" />
                     </div>
                   </div>
-                  <div class="flex w-full items-center gap-3 md:w-72">
+                  <div class="flex w-full items-center gap-3 md:w-80">
                     <div class="h-4 w-12 shrink-0 animate-pulse rounded bg-[var(--color-surface-muted)]" />
                     <div class="h-2 w-full min-w-40 animate-pulse rounded-full bg-[var(--color-surface-muted)]" />
                   </div>
@@ -280,10 +279,10 @@
             <article
               v-for="job in jobs"
               :key="job.id"
-              class="import-job-row theme-divider py-3"
+              class="import-job-row theme-divider py-5"
             >
-              <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-stretch">
-                <div class="min-w-0 space-y-2 pr-2">
+              <div class="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-stretch">
+                <div class="min-w-0 space-y-3 pr-2">
                   <div class="flex flex-wrap items-center gap-2">
                     <span
                       class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em]"
@@ -291,14 +290,8 @@
                     >
                       {{ job.status }}
                     </span>
-                    <span
-                      class="theme-kicker max-w-full truncate text-xs sm:max-w-[18rem]"
-                      :title="job.id"
-                    >
-                      {{ job.id }}
-                    </span>
                   </div>
-                  <div class="space-y-1">
+                  <div class="space-y-2">
                     <p class="theme-section-title text-sm font-semibold">
                       {{ job.template_id }}
                     </p>
@@ -314,9 +307,9 @@
                   </div>
                 </div>
 
-                <div class="flex h-full flex-col items-start gap-3 md:items-end md:justify-between md:pl-1">
-                  <div class="flex flex-col items-start gap-3 md:items-end">
-                    <dl class="theme-section-muted grid grid-cols-2 gap-x-5 gap-y-1 text-left text-sm md:text-right">
+                <div class="flex h-full flex-col items-start gap-4 md:items-end md:justify-between md:pl-2">
+                  <div class="flex flex-col items-start gap-4 md:items-end">
+                    <dl class="theme-section-muted grid grid-cols-2 gap-x-7 gap-y-2 text-left text-sm md:text-right">
                       <div>
                         <dt class="theme-kicker text-[11px] uppercase tracking-[0.16em]">
                           Created
@@ -346,7 +339,7 @@
                     </button>
                   </div>
 
-                  <div class="flex w-full items-center gap-3 md:w-72">
+                  <div class="flex w-full items-center gap-3 md:w-80">
                     <span class="theme-section-muted shrink-0 text-sm">
                       {{ job.processed_items }}/{{ job.total_items }}
                     </span>
