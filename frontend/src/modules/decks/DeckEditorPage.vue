@@ -1,7 +1,7 @@
 <template>
-  <section class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-6 overflow-hidden">
+  <section class="flex flex-col gap-6">
     <AppPageHeader
-      :icon="SquarePen"
+      :icon="Hammer"
       :title="controller.deckId.value ? 'Edit Deck' : 'Build Deck'"
       :subtitle="deckEditorSubtitle"
       :back-to="controller.backLink.value"
@@ -197,20 +197,25 @@
       Loading deck...
     </div>
 
-    <section
+    <AppPageLayout
       v-else
-      class="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[23rem_minmax(0,1fr)_24rem]"
+      columns="three"
     >
-      <DeckBuilderFiltersPanel :controller="controller" />
+      <template #aside>
+        <DeckBuilderFiltersPanel :controller="controller" />
+      </template>
       <DeckBuilderGallery :controller="controller" />
-      <DeckBuilderSummaryPanel :controller="controller" />
-    </section>
+      <template #endAside>
+        <DeckBuilderSummaryPanel :controller="controller" />
+      </template>
+    </AppPageLayout>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { CircleCheckBig, CircleX, SquarePen, TriangleAlert } from 'lucide-vue-next';
+import { CircleCheckBig, CircleX, Hammer, TriangleAlert } from 'lucide-vue-next';
+import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import InfoTooltip from '@/components/InfoTooltip.vue';
 import DeckBuilderFiltersPanel from '@/modules/decks/components/DeckBuilderFiltersPanel.vue';

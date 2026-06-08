@@ -1,7 +1,7 @@
 <template>
   <section
     v-if="deck"
-    class="flex h-[calc(100vh-3rem)] min-h-0 flex-col gap-5 overflow-hidden"
+    class="flex flex-col gap-5"
   >
     <AppPageHeader
       :icon="BookOpenText"
@@ -48,81 +48,82 @@
       </template>
     </AppPageHeader>
 
-    <div class="grid min-h-0 flex-1 gap-5 overflow-hidden xl:grid-cols-[360px_minmax(0,1fr)]">
-      <div class="page-card flex min-h-0 flex-col">
-        <div class="app-scrollbar flex-1 overflow-y-auto pr-1">
-          <div class="flex min-h-full flex-col">
-            <div class="space-y-4">
-              <h3 class="theme-section-title text-base font-semibold">
-                Hero
-              </h3>
-              <div class="space-y-3">
-                <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
-                  <img
-                    v-if="deck.hero_card.image_url"
-                    :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
-                    :alt="deck.hero_card.name"
-                    class="h-full w-full object-cover"
-                  >
-                  <div
-                    v-else
-                    class="theme-kicker flex h-full items-center justify-center text-xs"
-                  >
-                    No image
-                  </div>
+    <AppPageLayout
+      columns="one"
+      root-class="xl:grid-cols-[22.5rem_minmax(0,1fr)]"
+    >
+      <template #aside>
+        <AppStickyAside scroll-class="space-y-5">
+          <div class="space-y-4">
+            <h3 class="theme-section-title text-base font-semibold">
+              Hero
+            </h3>
+            <div class="space-y-3">
+              <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
+                <img
+                  v-if="deck.hero_card.image_url"
+                  :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
+                  :alt="deck.hero_card.name"
+                  class="h-full w-full object-cover"
+                >
+                <div
+                  v-else
+                  class="theme-kicker flex h-full items-center justify-center text-xs"
+                >
+                  No image
                 </div>
-
-                <p class="theme-section-title text-lg font-semibold">
-                  {{ deck.hero_card.name }}
-                </p>
               </div>
-            </div>
 
-            <div class="mt-auto pt-6">
-              <DeckManaCurve
-                :entries="activeBoardEntries"
-                :empty-label="activeBoardEmptyLabel"
-              />
-
-              <div class="theme-divider mt-4 border-t pt-4">
-                <label class="theme-muted-panel flex items-center gap-3 p-3 text-sm">
-                  <input
-                    v-model="groupByType"
-                    type="checkbox"
-                    class="theme-checkbox h-4 w-4"
-                  >
-                  <span class="theme-section-title font-medium">Group by type</span>
-                </label>
-              </div>
+              <p class="theme-section-title text-lg font-semibold">
+                {{ deck.hero_card.name }}
+              </p>
             </div>
           </div>
-        </div>
 
-        <div class="theme-divider mt-4 flex shrink-0 flex-wrap items-center gap-3 border-t pt-4">
-          <CardSortMenu
-            :sort="effectiveSort"
-            :default-sort="defaultSort"
-            :override-active="deckDetailSortOverride !== null"
-            allow-default-option
-            @update:sort="setDeckDetailSortOverride"
-            @reset="clearDeckDetailSortOverride"
+          <DeckManaCurve
+            :entries="activeBoardEntries"
+            :empty-label="activeBoardEmptyLabel"
           />
-          <GalleryOptionsMenu
-            :hover-mode="effectiveHoverMode"
-            :default-hover-mode="defaultHoverMode"
-            :hover-mode-override-active="deckDetailHoverModeOverride !== null"
-            allow-hover-mode-default-option
-            :card-scale="cardScale"
-            :show-card-groups="false"
-            :show-card-groups-control="false"
-            @update:hover-mode="setDeckDetailHoverModeOverride"
-            @reset:hover-mode="clearDeckDetailHoverModeOverride"
-            @update:card-scale="cardScale = $event"
-          />
-        </div>
-      </div>
 
-      <div class="page-card flex min-h-0 flex-col space-y-4">
+          <div class="theme-divider border-t pt-4">
+            <label class="theme-muted-panel flex items-center gap-3 p-3 text-sm">
+              <input
+                v-model="groupByType"
+                type="checkbox"
+                class="theme-checkbox h-4 w-4"
+              >
+              <span class="theme-section-title font-medium">Group by type</span>
+            </label>
+          </div>
+
+          <template #footer>
+            <div class="flex flex-wrap items-center gap-3">
+              <CardSortMenu
+                :sort="effectiveSort"
+                :default-sort="defaultSort"
+                :override-active="deckDetailSortOverride !== null"
+                allow-default-option
+                @update:sort="setDeckDetailSortOverride"
+                @reset="clearDeckDetailSortOverride"
+              />
+              <GalleryOptionsMenu
+                :hover-mode="effectiveHoverMode"
+                :default-hover-mode="defaultHoverMode"
+                :hover-mode-override-active="deckDetailHoverModeOverride !== null"
+                allow-hover-mode-default-option
+                :card-scale="cardScale"
+                :show-card-groups="false"
+                :show-card-groups-control="false"
+                @update:hover-mode="setDeckDetailHoverModeOverride"
+                @reset:hover-mode="clearDeckDetailHoverModeOverride"
+                @update:card-scale="cardScale = $event"
+              />
+            </div>
+          </template>
+        </AppStickyAside>
+      </template>
+
+      <section class="space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-2">
             <button
@@ -162,74 +163,72 @@
           </h3>
         </div>
 
-        <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-          <div
-            v-if="!groupByType"
-            class="grid gap-4 px-1 pb-3 pt-2"
-            :style="mainboardGridStyle"
+        <div
+          v-if="!groupByType"
+          class="grid gap-4 px-1 pb-3 pt-2"
+          :style="mainboardGridStyle"
+        >
+          <CardGalleryItem
+            v-for="entry in sortedActiveBoardEntries"
+            :key="entry.card.id"
+            class="justify-self-center"
+            :style="mainboardCardStyle"
+            :card="toGalleryCard(entry.card)"
+            :card-height-rem="mainboardCardHeightRem"
+            :hover-mode="effectiveHoverMode"
+            :navigation-target="detailLocation(entry.card.id)"
           >
-            <CardGalleryItem
-              v-for="entry in sortedActiveBoardEntries"
-              :key="entry.card.id"
-              class="justify-self-center"
-              :style="mainboardCardStyle"
-              :card="toGalleryCard(entry.card)"
-              :card-height-rem="mainboardCardHeightRem"
-              :hover-mode="effectiveHoverMode"
-              :navigation-target="detailLocation(entry.card.id)"
-            >
-              <template #overlay>
-                <div class="absolute inset-x-3 bottom-3 flex items-center justify-start gap-3">
-                  <DeckCardCountBadge :quantity="entry.quantity" />
-                </div>
-              </template>
-            </CardGalleryItem>
-          </div>
-          <div
-            v-else
-            class="space-y-6 px-1 pb-3 pt-2"
-          >
-            <section
-              v-for="group in groupedActiveBoardEntries"
-              :key="group.key"
-              class="space-y-3"
-              data-testid="deck-type-group"
-              :data-type-group-key="group.key"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <h3 class="theme-section-title text-sm font-semibold">
-                  {{ group.label }}
-                </h3>
-                <span class="theme-pill theme-pill-neutral text-xs">
-                  {{ group.entries.reduce((sum, entry) => sum + entry.quantity, 0) }} cards
-                </span>
+            <template #overlay>
+              <div class="absolute inset-x-3 bottom-3 flex items-center justify-start gap-3">
+                <DeckCardCountBadge :quantity="entry.quantity" />
               </div>
-              <div
-                class="grid gap-4"
-                :style="mainboardGridStyle"
-              >
-                <CardGalleryItem
-                  v-for="entry in group.entries"
-                  :key="entry.card.id"
-                  class="justify-self-center"
-                  :style="mainboardCardStyle"
-                  :card="toGalleryCard(entry.card)"
-                  :card-height-rem="mainboardCardHeightRem"
-                  :hover-mode="effectiveHoverMode"
-                  :navigation-target="detailLocation(entry.card.id)"
-                >
-                  <template #overlay>
-                    <div class="absolute inset-x-3 bottom-3 flex items-center justify-start gap-3">
-                      <DeckCardCountBadge :quantity="entry.quantity" />
-                    </div>
-                  </template>
-                </CardGalleryItem>
-              </div>
-            </section>
-          </div>
+            </template>
+          </CardGalleryItem>
         </div>
-      </div>
-    </div>
+        <div
+          v-else
+          class="space-y-6 px-1 pb-3 pt-2"
+        >
+          <section
+            v-for="group in groupedActiveBoardEntries"
+            :key="group.key"
+            class="space-y-3"
+            data-testid="deck-type-group"
+            :data-type-group-key="group.key"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="theme-section-title text-sm font-semibold">
+                {{ group.label }}
+              </h3>
+              <span class="theme-pill theme-pill-neutral text-xs">
+                {{ group.entries.reduce((sum, entry) => sum + entry.quantity, 0) }} cards
+              </span>
+            </div>
+            <div
+              class="grid gap-4"
+              :style="mainboardGridStyle"
+            >
+              <CardGalleryItem
+                v-for="entry in group.entries"
+                :key="entry.card.id"
+                class="justify-self-center"
+                :style="mainboardCardStyle"
+                :card="toGalleryCard(entry.card)"
+                :card-height-rem="mainboardCardHeightRem"
+                :hover-mode="effectiveHoverMode"
+                :navigation-target="detailLocation(entry.card.id)"
+              >
+                <template #overlay>
+                  <div class="absolute inset-x-3 bottom-3 flex items-center justify-start gap-3">
+                    <DeckCardCountBadge :quantity="entry.quantity" />
+                  </div>
+                </template>
+              </CardGalleryItem>
+            </div>
+          </section>
+        </div>
+      </section>
+    </AppPageLayout>
   </section>
 
   <div
@@ -247,7 +246,9 @@ import { BookOpenText, Download } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
+import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';

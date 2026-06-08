@@ -1,5 +1,5 @@
 <template>
-  <section class="flex flex-col gap-5">
+  <section class="app-page-content flex flex-col gap-5">
     <AppPageHeader
       :icon="Layers3"
       :title="card?.name || 'Loading card...'"
@@ -36,33 +36,6 @@
           </RouterLink>
         </div>
       </template>
-
-      <template
-        v-if="hasGalleryContext"
-        #bottomRight
-      >
-        <span class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
-          {{ positionLabel }}
-        </span>
-        <button
-          class="btn-secondary inline-flex items-center gap-2"
-          type="button"
-          :disabled="!previousCardId"
-          @click="goToPreviousCard"
-        >
-          <ChevronLeft class="h-4 w-4" />
-          <span>Previous Card</span>
-        </button>
-        <button
-          class="btn-secondary inline-flex items-center gap-2"
-          type="button"
-          :disabled="!nextCardId && !hasMoreResults"
-          @click="goToNextCard"
-        >
-          <span>{{ isLoadingMoreCards ? 'Loading Next...' : 'Next Card' }}</span>
-          <ChevronRight class="h-4 w-4" />
-        </button>
-      </template>
     </AppPageHeader>
 
     <div
@@ -71,6 +44,17 @@
     >
       <div class="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(28rem,35vw)]">
         <div class="min-w-0 space-y-6">
+          <CardDetailPager
+            :visible="hasGalleryContext"
+            :position-label="positionLabel"
+            :previous-card-id="previousCardId"
+            :next-card-id="nextCardId"
+            :has-more-results="hasMoreResults"
+            :is-loading-more-cards="isLoadingMoreCards"
+            @previous="goToPreviousCard"
+            @next="goToNextCard"
+          />
+
           <CardVersionOverviewPane
             :version="selectedVersion"
             :symbol-by-key="symbolByKey"
@@ -123,7 +107,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ChevronLeft, ChevronRight, Layers3 } from 'lucide-vue-next';
+import { Layers3 } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api } from '@/api/client';
@@ -132,6 +116,7 @@ import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import { useReviewSummary } from '@/composables/useReviewSummary';
 import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
+import CardDetailPager from '@/modules/card-detail/components/CardDetailPager.vue';
 import CardVersionParseFlagModal from '@/modules/card-detail/components/CardVersionParseFlagModal.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
 import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';

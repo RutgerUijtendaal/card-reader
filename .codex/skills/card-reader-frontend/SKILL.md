@@ -22,6 +22,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - For full-page application views, prefer inner scrolling within the main content segments instead of making the entire page scroll; match the layout behavior used by the current settings and deck builder pages.
 - Preserve and extend the shared theme/token system in `frontend/src/styles.css` and `frontend/src/composables/useTheme.ts`.
 - Prefer semantic theme primitives and shared classes over ad hoc color styling.
+- Avoid overusing containers and card shells. Prefer letting controls and content float on the app background when hierarchy remains clear, using dividers, spacing, accent lines, and selected states for visual separation between sections.
 - Keep user-facing page and section descriptions focused on the enduring purpose and end result of the screen; avoid copy that calls out specific implementation details, temporary workflow mechanics, or design decisions that may look out of place as the page grows.
 - Verify visible UI in both light and dark modes.
 
@@ -48,6 +49,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Module root files that should be under `components`, `composables`, `utils`, or `tests`
 - Full-page layouts that scroll the entire page instead of keeping page chrome stable and giving the main segments their own scroll areas
 - Theme drift from raw colors, light-only assumptions, or component-local styling systems
+- Unnecessary framed containers where divider-separated, background-floating content would be clearer and more consistent
 - UI changes verified in one theme only
 - Missing validation for touched frontend behavior
 - Deck-building defaults or example JSON copied into UI code without a backend metadata source or fallback test
@@ -68,6 +70,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Importing from another module's `components`, `composables`, or `utils` folders; promote genuinely shared code to root `components` or `composables`
 - Letting feature module roots accumulate helpers, specs, or implementation details that belong in subfolders
 - Scattering raw light-only or dark-only classes through feature components
+- Adding card or panel shells for every section when dividers, spacing, and selected states provide enough structure
 - Adding dependencies before checking whether the repo already has a clean fit
 - Introducing a parallel component or styling system for a one-off feature
 - Building new application pages around document-style full-page scrolling when segmented inner scrolling is the established pattern

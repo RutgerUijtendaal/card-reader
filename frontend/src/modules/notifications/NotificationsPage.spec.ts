@@ -142,7 +142,9 @@ describe('NotificationsPage', () => {
     expect(mounted.container.textContent).toContain("You're all caught up");
     expect(mounted.container.textContent).toContain('Card changes and flag review updates will show up here');
 
-    const allButton = Array.from(mounted.container.querySelectorAll('button')).find((entry) => entry.textContent?.trim() === 'All');
+    const allButton = Array.from(mounted.container.querySelectorAll('button')).find((entry) =>
+      entry.textContent?.includes('Complete notification history'),
+    );
     allButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushPromises();
     await nextTick();

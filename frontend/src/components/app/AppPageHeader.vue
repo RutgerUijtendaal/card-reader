@@ -1,94 +1,99 @@
 <template>
-  <header
-    class="rounded-xl border backdrop-blur-sm"
-    :style="headerStyle"
+  <Teleport
+    to="#app-page-header-outlet"
+    :disabled="!hasShellHeaderOutlet"
   >
-    <div
-      class="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-stretch lg:justify-between"
-      :class="topRowClass"
+    <header
+      class="theme-page-header border-b backdrop-blur-sm"
+      :style="headerStyle"
     >
-      <div class="flex min-w-0 flex-1 items-start gap-3">
-        <div class="theme-card-frame-muted theme-section-title flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
-          <component
-            :is="icon"
-            class="h-5 w-5"
-          />
-        </div>
-
-        <div class="min-w-0">
-          <div class="flex min-w-0 flex-wrap items-center gap-2">
+      <div
+        class="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-stretch lg:justify-between"
+        :class="topRowClass"
+      >
+        <div class="flex min-w-0 flex-1 items-start gap-3">
+          <div class="theme-card-frame-muted theme-section-title flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
             <component
-              :is="titleTag"
-              class="theme-section-title truncate font-semibold"
-              :class="titleClass"
+              :is="icon"
+              class="h-5 w-5"
+            />
+          </div>
+
+          <div class="min-w-0">
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <component
+                :is="titleTag"
+                class="theme-section-title truncate font-semibold"
+                :class="titleClass"
+              >
+                {{ title }}
+              </component>
+
+              <slot name="titleMeta" />
+            </div>
+
+            <p
+              class="theme-section-muted mt-1"
+              :class="subtitleClass"
             >
-              {{ title }}
-            </component>
+              {{ subtitle }}
+            </p>
 
-            <slot name="titleMeta" />
-          </div>
-
-          <p
-            class="theme-section-muted mt-1"
-            :class="subtitleClass"
-          >
-            {{ subtitle }}
-          </p>
-
-          <div
-            v-if="$slots.details"
-            class="mt-3"
-          >
-            <slot name="details" />
+            <div
+              v-if="$slots.details"
+              class="mt-3"
+            >
+              <slot name="details" />
+            </div>
           </div>
         </div>
-      </div>
 
-      <div
-        v-if="hasHeaderActions"
-        class="lg:flex lg:self-stretch lg:items-center lg:justify-end"
-      >
-        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-          <RouterLink
-            v-if="hasBackLink"
-            class="btn-secondary inline-flex items-center gap-2"
-            :to="resolvedBackTo"
-          >
-            <ArrowLeft class="h-4 w-4" />
-            <span>{{ backLabel }}</span>
-          </RouterLink>
-          <slot name="actions" />
+        <div
+          v-if="hasHeaderActions"
+          class="lg:flex lg:self-stretch lg:items-center lg:justify-end"
+        >
+          <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+            <RouterLink
+              v-if="hasBackLink"
+              class="btn-secondary inline-flex items-center gap-2"
+              :to="resolvedBackTo"
+            >
+              <ArrowLeft class="h-4 w-4" />
+              <span>{{ backLabel }}</span>
+            </RouterLink>
+            <slot name="actions" />
+          </div>
         </div>
       </div>
-    </div>
-
-    <div
-      v-if="hasBottomRow"
-      class="theme-divider theme-subheader-row flex flex-wrap items-center gap-3 border-t px-5 py-4"
-      :class="[bottomRowClass, bottomRowLayoutClass]"
-    >
-      <div
-        v-if="$slots.bottomLeft"
-        class="flex flex-wrap items-center gap-2"
-      >
-        <slot name="bottomLeft" />
-      </div>
 
       <div
-        v-if="$slots.bottomRight"
-        class="ml-auto lg:flex lg:self-stretch lg:items-center lg:justify-end"
+        v-if="hasBottomRow"
+        class="theme-divider theme-subheader-row flex flex-wrap items-center gap-3 border-t px-5 py-4"
+        :class="[bottomRowClass, bottomRowLayoutClass]"
       >
-        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-          <slot name="bottomRight" />
+        <div
+          v-if="hasBottomLeft"
+          class="flex flex-wrap items-center gap-2"
+        >
+          <slot name="bottomLeft" />
+        </div>
+
+        <div
+          v-if="hasBottomRight"
+          class="ml-auto lg:flex lg:self-stretch lg:items-center lg:justify-end"
+        >
+          <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+            <slot name="bottomRight" />
+          </div>
         </div>
       </div>
-    </div>
-  </header>
+    </header>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ArrowLeft } from 'lucide-vue-next';
-import { computed, useSlots } from 'vue';
+import { Comment, computed, onMounted, ref, useSlots } from 'vue';
 import { RouterLink } from 'vue-router';
 import type { Component } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
@@ -114,15 +119,25 @@ const props = withDefaults(
 );
 
 const slots = useSlots();
+const hasShellHeaderOutlet = ref(false);
+const hasRenderableSlot = (name: 'actions' | 'bottomLeft' | 'bottomRight' | 'details' | 'titleMeta'): boolean => {
+  const slot = slots[name];
+  if (!slot) {
+    return false;
+  }
+  return slot().some((node) => node.type !== Comment);
+};
 const hasBackLink = computed(() => Boolean(props.backTo && props.backLabel));
-const hasHeaderActions = computed(() => hasBackLink.value || Boolean(slots.actions));
-const hasBottomRow = computed(() => Boolean(slots.bottomLeft) || Boolean(slots.bottomRight));
+const hasHeaderActions = computed(() => hasBackLink.value || hasRenderableSlot('actions'));
+const hasBottomLeft = computed(() => hasRenderableSlot('bottomLeft'));
+const hasBottomRight = computed(() => hasRenderableSlot('bottomRight'));
+const hasBottomRow = computed(() => hasBottomLeft.value || hasBottomRight.value);
 const bottomRowLayoutClass = computed(() => {
-  if (slots.bottomLeft && slots.bottomRight) {
+  if (hasBottomLeft.value && hasBottomRight.value) {
     return 'justify-between';
   }
 
-  if (slots.bottomRight) {
+  if (hasBottomRight.value) {
     return 'justify-end';
   }
 
@@ -136,7 +151,10 @@ const headerStyle = computed(() => ({
 }));
 const topRowClass = computed(() => [
   'bg-[var(--color-surface)]',
-  hasBottomRow.value ? 'rounded-t-xl' : 'rounded-xl',
 ]);
-const bottomRowClass = computed(() => 'bg-[var(--color-surface)] rounded-b-xl');
+const bottomRowClass = computed(() => 'bg-[var(--color-surface)]');
+
+onMounted(() => {
+  hasShellHeaderOutlet.value = document.getElementById('app-page-header-outlet') !== null;
+});
 </script>
