@@ -80,7 +80,7 @@
         :key="item.to"
       >
         <RouterLink
-          class="nav-link"
+          class="nav-link relative"
           :class="collapsed ? 'justify-center px-0' : ''"
           :to="item.to"
           :title="collapsed ? item.label : undefined"
@@ -93,8 +93,13 @@
           />
           <span v-if="!collapsed">{{ item.label }}</span>
           <span
+            v-if="collapsed && item.badgeCount && item.badgeCount > 0"
+            class="nav-indicator-dot"
+            aria-hidden="true"
+          />
+          <span
             v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
-            class="nav-badge theme-pill theme-pill-warning ml-auto text-[11px] font-semibold"
+            class="nav-badge theme-pill theme-pill-success ml-auto text-[11px] font-semibold"
           >
             {{ item.badgeCount }}
           </span>
@@ -111,7 +116,7 @@
         :key="item.to"
       >
         <RouterLink
-          class="nav-link"
+          class="nav-link relative"
           :class="collapsed ? 'justify-center px-0' : ''"
           :to="item.to"
           :title="collapsed ? item.label : undefined"
@@ -124,8 +129,13 @@
           />
           <span v-if="!collapsed">{{ item.label }}</span>
           <span
+            v-if="collapsed && item.badgeCount && item.badgeCount > 0"
+            class="nav-indicator-dot"
+            aria-hidden="true"
+          />
+          <span
             v-if="!collapsed && item.badgeCount && item.badgeCount > 0"
-            class="nav-badge theme-pill theme-pill-warning ml-auto text-[11px] font-semibold"
+            class="nav-badge theme-pill theme-pill-success ml-auto text-[11px] font-semibold"
           >
             {{ item.badgeCount }}
           </span>
@@ -272,5 +282,17 @@ const signOut = async (): Promise<void> => {
   justify-content: center;
   padding: 0 0.375rem;
   line-height: 1;
+}
+
+.nav-indicator-dot {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 2px solid rgba(15, 23, 42, 0.92);
+  border-radius: 9999px;
+  background: var(--color-pill-success-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-pill-success-border) 34%, transparent);
 }
 </style>

@@ -7,7 +7,7 @@
       :back-to="buildCardReturnLocation(route.query)"
       :back-label="backButtonLabel"
       title-tag="h2"
-      title-class="text-2xl"
+      title-class="text-xl"
     >
       <template #actions>
         <button
