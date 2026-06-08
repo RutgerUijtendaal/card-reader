@@ -49,9 +49,9 @@
     --color-pill-symbol-bg: rgba(237, 233, 254, 0.96);
     --color-pill-symbol-border: rgba(196, 181, 253, 0.8);
     --color-pill-symbol-text: #6d28d9;
-    --color-pill-warning-bg: rgba(255, 228, 230, 0.94);
-    --color-pill-warning-border: rgba(251, 113, 133, 0.58);
-    --color-pill-warning-text: #be123c;
+    --color-pill-warning-bg: rgba(254, 249, 195, 0.94);
+    --color-pill-warning-border: rgba(253, 224, 71, 0.72);
+    --color-pill-warning-text: #a16207;
     --color-pill-danger-bg: rgba(254, 226, 226, 0.94);
     --color-pill-danger-border: rgba(252, 165, 165, 0.75);
     --color-pill-danger-text: #b91c1c;
@@ -134,9 +134,9 @@
     --color-pill-symbol-bg: rgba(74, 47, 115, 0.8);
     --color-pill-symbol-border: rgba(167, 139, 250, 0.34);
     --color-pill-symbol-text: #f3e8ff;
-    --color-pill-warning-bg: rgba(94, 45, 63, 0.74);
-    --color-pill-warning-border: rgba(251, 113, 133, 0.32);
-    --color-pill-warning-text: #ffe4e6;
+    --color-pill-warning-bg: rgba(98, 76, 29, 0.72);
+    --color-pill-warning-border: rgba(250, 204, 21, 0.3);
+    --color-pill-warning-text: #fef3c7;
     --color-pill-danger-bg: rgba(102, 45, 45, 0.76);
     --color-pill-danger-border: rgba(248, 113, 113, 0.3);
     --color-pill-danger-text: #fee2e2;
