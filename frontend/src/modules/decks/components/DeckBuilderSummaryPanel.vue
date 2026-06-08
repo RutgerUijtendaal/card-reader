@@ -378,6 +378,7 @@
     </Teleport>
 
     <div
+      ref="boardListRef"
       class="app-scrollbar relative z-10 mt-4 flex-1 min-h-0 overflow-y-auto px-5 pb-5 pr-4"
       data-testid="deck-summary-list"
     >
@@ -392,8 +393,10 @@
         <DeckBuilderBoardEntryRow
           v-for="entry in controller.deck.detailedActiveBoardEntries.value"
           :key="entry.card.id"
+          :ref="(element) => setBoardEntryRowRef(entry.card.id, element)"
           :entry="entry"
           :hover-mode="controller.filters.hoverMode.value"
+          :class="{ 'deck-board-entry-pop': poppedBoardEntryCardId === entry.card.id }"
           :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
           :move-destinations="getMoveDestinations(entry.card.id)"
           :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
@@ -423,7 +426,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { ChevronDown, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
@@ -489,6 +492,55 @@ const editingSideboardInputRef = ref<HTMLInputElement | null>(null);
 const deleteSideboardTarget = ref<{ id: string; name: string } | null>(null);
 const hoveredSideboardId = ref<string | null>(null);
 const focusedSideboardId = ref<string | null>(null);
+const boardListRef = ref<HTMLElement | null>(null);
+const boardEntryRowRefs = new Map<string, HTMLElement>();
+const poppedBoardEntryCardId = ref<string | null>(null);
+let popResetTimer: number | undefined;
+
+const componentRefElement = (element: unknown): HTMLElement | null => {
+  if (element instanceof HTMLElement) {
+    return element;
+  }
+  if (
+    element !== null &&
+    typeof element === 'object' &&
+    '$el' in element &&
+    element.$el instanceof HTMLElement
+  ) {
+    return element.$el;
+  }
+  return null;
+};
+
+const setBoardEntryRowRef = (cardId: string, element: unknown): void => {
+  const rowElement = componentRefElement(element);
+  if (rowElement) {
+    boardEntryRowRefs.set(cardId, rowElement);
+    return;
+  }
+  boardEntryRowRefs.delete(cardId);
+};
+
+const scrollBoardEntryIntoView = (rowElement: HTMLElement): void => {
+  const listElement = boardListRef.value;
+  if (!listElement) {
+    return;
+  }
+
+  const listRect = listElement.getBoundingClientRect();
+  const rowRect = rowElement.getBoundingClientRect();
+  const isFullyVisible = rowRect.top >= listRect.top && rowRect.bottom <= listRect.bottom;
+  if (isFullyVisible) {
+    return;
+  }
+
+  const nextScrollTop =
+    rowElement.offsetTop - (listElement.clientHeight / 2) + (rowElement.clientHeight / 2);
+  listElement.scrollTo({
+    top: Math.max(0, nextScrollTop),
+    behavior: 'smooth',
+  });
+};
 
 const activeBoardLabel = computed(() =>
   props.controller.deck.activeBoardId.value === 'mainboard'
@@ -506,6 +558,40 @@ const activeBoardCount = computed(() =>
 const heroHeaderObjectPosition = '30% 10%';
 const heroHeaderTransform = 'scale(1.28)';
 const heroHeaderOpacity = 0.75;
+
+watch(
+  () => props.controller.deck.lastBoardEntryChange.value?.sequence,
+  async () => {
+    const change = props.controller.deck.lastBoardEntryChange.value;
+    if (!change || change.boardId !== props.controller.deck.activeBoardId.value) {
+      return;
+    }
+
+    await nextTick();
+    const rowElement = boardEntryRowRefs.get(change.cardId);
+    if (!rowElement) {
+      return;
+    }
+
+    scrollBoardEntryIntoView(rowElement);
+    poppedBoardEntryCardId.value = null;
+    await nextTick();
+    poppedBoardEntryCardId.value = change.cardId;
+    if (popResetTimer !== undefined) {
+      window.clearTimeout(popResetTimer);
+    }
+    popResetTimer = window.setTimeout(() => {
+      poppedBoardEntryCardId.value = null;
+      popResetTimer = undefined;
+    }, 320);
+  },
+);
+
+onBeforeUnmount(() => {
+  if (popResetTimer !== undefined) {
+    window.clearTimeout(popResetTimer);
+  }
+});
 
 const updateDeckVisibility = (value: DeckVisibility): void => {
   props.controller.deck.setDeckVisibility(value);
@@ -621,3 +707,30 @@ const confirmDeleteSideboard = (): void => {
   deleteSideboardTarget.value = null;
 };
 </script>
+
+<style scoped>
+.deck-board-entry-pop {
+  animation: deck-board-entry-pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes deck-board-entry-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  38% {
+    transform: scale(1.035);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, transparent);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-board-entry-pop {
+    animation: none;
+  }
+}
+</style>

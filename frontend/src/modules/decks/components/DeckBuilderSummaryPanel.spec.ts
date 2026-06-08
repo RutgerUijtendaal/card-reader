@@ -99,6 +99,7 @@ const buildController = () => {
     backLabel: ref('Back'),
     deck: {
       isSetupStep: ref(false),
+      lastBoardEntryChange: ref(null),
       form: {
         name: 'Aurora Tempo',
         description: '',

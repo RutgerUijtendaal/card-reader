@@ -45,6 +45,13 @@ export type DeckBoardMoveDestination = {
   description?: string;
   disabled: boolean;
 };
+export type DeckBoardEntryChangeKind = 'add' | 'remove';
+export type DeckBoardEntryChange = {
+  cardId: string;
+  boardId: string;
+  kind: DeckBoardEntryChangeKind;
+  sequence: number;
+};
 
 type UseDeckEditorDraftOptions = {
   builderStep: Ref<BuilderStep>;
@@ -78,6 +85,22 @@ export const useDeckEditorDraft = ({
     sideboards: [],
   });
   const activeBoardId = ref<string>(MAINBOARD_ID);
+  const lastBoardEntryChange = ref<DeckBoardEntryChange | null>(null);
+  let boardEntryChangeSequence = 0;
+
+  const notifyBoardEntryChange = (
+    cardId: string,
+    boardId: string,
+    kind: DeckBoardEntryChangeKind,
+  ): void => {
+    boardEntryChangeSequence += 1;
+    lastBoardEntryChange.value = {
+      cardId,
+      boardId,
+      kind,
+      sequence: boardEntryChangeSequence,
+    };
+  };
 
   const isSetupStep = computed(() => builderStep.value === 'setup');
   const selectedHero = computed(() => (form.hero_card_id ? cardLookup.value[form.hero_card_id] ?? null : null));
@@ -407,11 +430,13 @@ export const useDeckEditorDraft = ({
       }
       if (currentQuantity === 0) {
         form.entries = [...form.entries, { card_id: card.id, quantity: 1 }];
+        notifyBoardEntryChange(card.id, boardId, 'add');
         return;
       }
       form.entries = form.entries.map((entry) =>
         entry.card_id === card.id ? { ...entry, quantity: Math.min(quantityLimit, entry.quantity + 1) } : entry,
       );
+      notifyBoardEntryChange(card.id, boardId, 'add');
       return;
     }
 
@@ -421,6 +446,7 @@ export const useDeckEditorDraft = ({
     }
     if (currentQuantity === 0) {
       updateBoardEntries(boardId, [...boardEntries, { card_id: card.id, quantity: 1 }]);
+      notifyBoardEntryChange(card.id, boardId, 'add');
       return;
     }
     updateBoardEntries(
@@ -428,20 +454,27 @@ export const useDeckEditorDraft = ({
       boardEntries.map((entry) =>
         entry.card_id === card.id
           ? { ...entry, quantity: Math.min(quantityLimit, entry.quantity + 1) }
-          : entry,
+        : entry,
       ),
     );
+    notifyBoardEntryChange(card.id, boardId, 'add');
   };
 
   const removeEntry = (cardId: string, boardId = activeBoardId.value): void => {
+    const currentQuantity = getEntryQuantity(cardId, boardId);
+    if (currentQuantity <= 0) {
+      return;
+    }
     updateBoardEntries(
       boardId,
       getBoardEntries(boardId).filter((entry) => entry.card_id !== cardId),
     );
+    notifyBoardEntryChange(cardId, boardId, 'remove');
   };
 
   const changeQuantity = (cardId: string, delta: number, boardId = activeBoardId.value): void => {
     const boardEntries = getBoardEntries(boardId);
+    const currentQuantity = getEntryQuantity(cardId, boardId);
     updateBoardEntries(
       boardId,
       boardEntries.map((entry) => {
@@ -454,6 +487,9 @@ export const useDeckEditorDraft = ({
         return { ...entry, quantity: nextQuantity };
       }),
     );
+    if (currentQuantity > 0 && delta !== 0) {
+      notifyBoardEntryChange(cardId, boardId, delta > 0 ? 'add' : 'remove');
+    }
   };
 
   const setQuantity = (cardId: string, rawValue: string, boardId = activeBoardId.value): void => {
@@ -694,6 +730,7 @@ export const useDeckEditorDraft = ({
     form,
     isSetupStep,
     activeBoardId,
+    lastBoardEntryChange,
     totalMainboardCards,
     totalSideboardCards,
     overallTotalCards,
