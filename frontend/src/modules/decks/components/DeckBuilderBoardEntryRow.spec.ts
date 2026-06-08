@@ -110,8 +110,6 @@ const mountRow = async ({
     onDecrement: (cardId: string) => events.push(`decrement:${cardId}`),
     onRemove: (cardId: string) => events.push(`remove:${cardId}`),
     onMoveToBoard: (cardId: string, destinationBoardId: string) => events.push(`move:${cardId}:${destinationBoardId}`),
-    onReorderUp: (cardId: string) => events.push(`up:${cardId}`),
-    onReorderDown: (cardId: string) => events.push(`down:${cardId}`),
   });
   app.mount(container);
   await nextTick();
@@ -270,20 +268,14 @@ describe('DeckBuilderBoardEntryRow', () => {
     mounted.unmount();
   });
 
-  test('reorder controls emit keyboard-accessible up and down actions', async () => {
+  test('does not render up and down reorder controls on hover', async () => {
     const mounted = await mountRow();
     await showRowControls(mounted.container);
     const moveUpButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card up"]');
     const moveDownButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Move card down"]');
-    if (!(moveUpButton instanceof HTMLButtonElement) || !(moveDownButton instanceof HTMLButtonElement)) {
-      throw new Error('expected reorder buttons');
-    }
 
-    moveUpButton.click();
-    moveDownButton.click();
-    await nextTick();
-
-    expect(mounted.events).toEqual(['up:card-1', 'down:card-1']);
+    expect(moveUpButton).toBeNull();
+    expect(moveDownButton).toBeNull();
 
     mounted.unmount();
   });

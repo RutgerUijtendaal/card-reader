@@ -394,7 +394,7 @@
         </div>
 
         <DeckBuilderBoardEntryRow
-          v-for="(entry, index) in controller.deck.detailedActiveBoardEntries.value"
+          v-for="entry in controller.deck.detailedActiveBoardEntries.value"
           :key="entry.card.id"
           :ref="(element) => setBoardEntryRowRef(entry.card.id, element)"
           :entry="entry"
@@ -403,8 +403,6 @@
           :class="{ 'deck-board-entry-pop': poppedBoardEntryCardId === entry.card.id }"
           :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
           :move-destinations="getMoveDestinations(entry.card.id)"
-          :can-reorder-up="index > 0"
-          :can-reorder-down="index < controller.deck.detailedActiveBoardEntries.value.length - 1"
           :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
           :row-secondary-action-disabled="
             controller.deck.boardRowSecondaryActionDisabled(entry.card.id)
@@ -415,8 +413,6 @@
           @row-action="controller.deck.handleBoardRowAction"
           @row-secondary-action="controller.deck.handleBoardRowSecondaryAction"
           @move-to-board="handleMoveToBoard"
-          @reorder-up="handleReorderUp"
-          @reorder-down="handleReorderDown"
         />
       </div>
     </div>
@@ -673,14 +669,6 @@ const getMoveDestinations = (cardId: string): DeckBoardMoveDestination[] =>
 
 const handleMoveToBoard = (cardId: string, destinationBoardId: string): void => {
   props.controller.deck.moveEntryToBoard(cardId, destinationBoardId);
-};
-
-const handleReorderUp = (cardId: string): void => {
-  props.controller.deck.moveEntryWithinBoard(cardId, -1);
-};
-
-const handleReorderDown = (cardId: string): void => {
-  props.controller.deck.moveEntryWithinBoard(cardId, 1);
 };
 
 const setEditingSideboardInputRef = (element: unknown): void => {

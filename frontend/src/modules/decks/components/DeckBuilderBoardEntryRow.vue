@@ -62,34 +62,6 @@
         </div>
 
         <div
-          class="theme-card-frame-muted inline-flex items-center overflow-hidden rounded-lg"
-          data-testid="row-reorder-controls"
-          @click.stop
-          @contextmenu.stop
-        >
-          <button
-            class="inline-flex h-8 w-8 items-center justify-center transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
-            type="button"
-            :disabled="!canReorderUp"
-            aria-label="Move card up"
-            @click.stop="handleReorderUpClick"
-            @contextmenu.stop
-          >
-            <ArrowUp class="h-4 w-4" />
-          </button>
-          <button
-            class="theme-divider inline-flex h-8 w-8 items-center justify-center border-l transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
-            type="button"
-            :disabled="!canReorderDown"
-            aria-label="Move card down"
-            @click.stop="handleReorderDownClick"
-            @contextmenu.stop
-          >
-            <ArrowDown class="h-4 w-4" />
-          </button>
-        </div>
-
-        <div
           v-if="moveDestinations.length > 0"
           class="relative"
           @click.stop
@@ -207,7 +179,7 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
-import { ArrowDown, ArrowRightLeft, ArrowUp, GripVertical, Trash2 } from 'lucide-vue-next';
+import { ArrowRightLeft, GripVertical, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import CardHoverTooltip from '@/components/cards/CardHoverTooltip.vue';
 import CardCompactRowContent from '@/components/cards/CardCompactRowContent.vue';
@@ -228,8 +200,6 @@ const props = defineProps<{
   moveDestinations: DeckBoardMoveDestination[];
   rowActionDisabled?: boolean;
   rowSecondaryActionDisabled?: boolean;
-  canReorderUp?: boolean;
-  canReorderDown?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -239,8 +209,6 @@ const emit = defineEmits<{
   (e: 'row-action', cardId: string): void;
   (e: 'row-secondary-action', cardId: string): void;
   (e: 'move-to-board', cardId: string, destinationBoardId: string): void;
-  (e: 'reorder-up', cardId: string): void;
-  (e: 'reorder-down', cardId: string): void;
 }>();
 
 const hovered = ref(false);
@@ -317,16 +285,6 @@ const handleDecrementClick = (event: MouseEvent): void => {
 
 const handleIncrementClick = (event: MouseEvent): void => {
   emit('increment', props.entry.card.id);
-  blurAfterFinePointerActivation(event);
-};
-
-const handleReorderUpClick = (event: MouseEvent): void => {
-  emit('reorder-up', props.entry.card.id);
-  blurAfterFinePointerActivation(event);
-};
-
-const handleReorderDownClick = (event: MouseEvent): void => {
-  emit('reorder-down', props.entry.card.id);
   blurAfterFinePointerActivation(event);
 };
 
