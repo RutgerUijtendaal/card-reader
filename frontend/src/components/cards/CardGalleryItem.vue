@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group flex w-full justify-center"
+    class="group relative z-0 flex w-full justify-center hover:z-20 focus-within:z-20"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
@@ -20,24 +20,72 @@
           <CardLoadingSkeleton />
         </template>
         <template v-else-if="isCardGroup">
-          <div class="relative h-full w-full rounded-2xl">
+          <div class="card-group-stack-root relative h-full w-full rounded-2xl">
             <div
-              class="theme-card-frame-muted absolute inset-2 rounded-2xl"
-              :style="{ transform: 'translate(0.3rem, -0.0rem) rotate(5deg)' }"
-            />
+              class="card-group-resting-layers pointer-events-none absolute inset-0 transition duration-200"
+              aria-hidden="true"
+            >
+              <div
+                v-for="backCard in restingBackCards"
+                :key="`resting-${backCard.card_id}`"
+                class="theme-card-frame theme-card-image-well absolute inset-2 overflow-hidden rounded-2xl shadow-xl"
+                :class="backCard.side === 'left' ? 'card-group-resting-layer-left' : 'card-group-resting-layer-right'"
+                :data-card-group-resting-card-id="backCard.card_id"
+              >
+                <CardLoadingSkeleton
+                  v-if="!backCard.card.image_url"
+                  class="absolute inset-0"
+                />
+                <img
+                  v-if="backCard.card.image_url"
+                  :src="toAbsoluteApiUrl(backCard.card.image_url)"
+                  :alt="backCard.card.name"
+                  class="h-full w-full object-contain"
+                  loading="lazy"
+                  decoding="async"
+                >
+              </div>
+            </div>
+
             <div
-              class="theme-card-frame-muted absolute inset-2 rounded-2xl"
-              :style="{ transform: 'translate(0.1rem, 0.0rem) rotate(2deg)' }"
-            />
-            <div class="theme-card-image-well relative h-full overflow-hidden rounded-2xl">
+              class="card-group-unfolded-stack pointer-events-none absolute inset-0 opacity-0 transition duration-200"
+              aria-hidden="true"
+            >
+              <div
+                v-for="stackCard in stackCards"
+                :key="`unfolded-${stackCard.card_id}`"
+                class="theme-card-frame theme-card-image-well card-group-unfolded-card absolute inset-0 overflow-hidden rounded-2xl shadow-2xl"
+                :style="getUnfoldedCardStyle(stackCard.card_id)"
+                :data-card-group-stack-card-id="stackCard.card_id"
+                @mouseenter="setHoveredGroupPreviewCard(stackCard.card_id)"
+              >
+                <CardLoadingSkeleton
+                  v-if="!stackCard.image_url"
+                  class="absolute inset-0"
+                />
+                <img
+                  v-if="stackCard.image_url"
+                  :src="toAbsoluteApiUrl(stackCard.image_url)"
+                  :alt="stackCard.name"
+                  class="h-full w-full object-contain"
+                  loading="lazy"
+                  decoding="async"
+                >
+              </div>
+            </div>
+
+            <div
+              class="card-group-anchor-card theme-card-image-well relative h-full overflow-hidden rounded-2xl transition duration-200"
+              @mouseenter="setHoveredGroupPreviewCard(anchorPreviewCard?.card_id ?? null)"
+            >
               <CardLoadingSkeleton
-                v-if="!groupImageLoaded || !stackCards[0]?.image_url"
+                v-if="!groupImageLoaded || !anchorPreviewCard?.image_url"
                 class="absolute inset-0"
               />
               <img
-                v-if="stackCards[0]?.image_url"
-                :src="toAbsoluteApiUrl(stackCards[0].image_url)"
-                :alt="stackCards[0].name"
+                v-if="anchorPreviewCard?.image_url"
+                :src="toAbsoluteApiUrl(anchorPreviewCard.image_url)"
+                :alt="anchorPreviewCard.name"
                 class="block h-full w-full object-contain transition duration-300"
                 :class="groupImageLoaded ? 'opacity-100' : 'opacity-0'"
                 loading="lazy"
@@ -201,9 +249,27 @@ const isCard = computed((): boolean => props.card.result_type === 'card');
 const isCardGroup = computed((): boolean => props.card.result_type === 'card_group');
 const cardItem = computed<CardListItem | null>(() => (isCard.value ? props.card as CardListItem : null));
 const groupItem = computed<CardGroupGalleryItem | null>(() => (isCardGroup.value ? props.card as CardGroupGalleryItem : null));
-const stackCards = computed(() => groupItem.value?.preview_cards.slice(0, 3) ?? []);
+const stackCards = computed(() => groupItem.value?.preview_cards ?? []);
+const anchorPreviewCard = computed(() =>
+  stackCards.value.find((card) => card.card_id === groupItem.value?.anchor_card_id) ?? stackCards.value[0] ?? null,
+);
+const restingBackCards = computed(() =>
+  stackCards.value
+    .filter((card) => card.card_id !== anchorPreviewCard.value?.card_id)
+    .slice(0, 2)
+    .map((card, index) => ({
+      card,
+      card_id: card.card_id,
+      side: index === 0 ? 'left' : 'right',
+    })),
+);
+const hoveredGroupPreviewCardId = ref<string | null>(null);
+const activeGroupPreviewCard = computed(() =>
+  stackCards.value.find((card) => card.card_id === hoveredGroupPreviewCardId.value)
+  ?? anchorPreviewCard.value,
+);
 const detailsCard = computed<CardListItem | null>(() => cardItem.value ?? groupHoverCard.value);
-const previewCard = computed(() => stackCards.value[0] ?? null);
+const previewCard = computed(() => activeGroupPreviewCard.value);
 const previewImageUrl = computed(() => cardItem.value?.image_url ?? previewCard.value?.image_url ?? null);
 const previewImageAlt = computed(() => cardItem.value?.name ?? previewCard.value?.name ?? groupItem.value?.anchor_card_name ?? 'Card preview');
 const showEnlargedPreview = computed(() => props.hoverMode === 'enlarged' || props.hoverMode === 'enlarged-details');
@@ -294,7 +360,22 @@ const handleMouseEnter = (): void => {
 
 const handleMouseLeave = (): void => {
   hovered.value = false;
+  hoveredGroupPreviewCardId.value = null;
   blurFocusedDescendantAfterFinePointerLeave(triggerRef.value);
+};
+
+const setHoveredGroupPreviewCard = (cardId: string | null): void => {
+  hoveredGroupPreviewCardId.value = cardId;
+};
+
+const getUnfoldedCardStyle = (cardId: string) => {
+  const cardIndex = stackCards.value.findIndex((card) => card.card_id === cardId);
+  const safeIndex = cardIndex < 0 ? 0 : cardIndex;
+  return {
+    '--card-group-stack-index': safeIndex,
+    '--card-group-stack-depth': stackCards.value.length - safeIndex - 1,
+    zIndex: stackCards.value.length - safeIndex,
+  };
 };
 
 watch(
@@ -306,7 +387,7 @@ watch(
 );
 
 watch(
-  () => stackCards.value[0]?.image_url ?? null,
+  () => anchorPreviewCard.value?.image_url ?? null,
   () => {
     groupImageLoaded.value = false;
   },
@@ -317,23 +398,24 @@ watch(
   () => groupItem.value?.anchor_card_id ?? null,
   () => {
     groupHoverCard.value = null;
+    hoveredGroupPreviewCardId.value = null;
   },
 );
 
 watch(
-  [hovered, showDetailsPreview, groupItem],
-  async ([isHovered, shouldShowDetails, currentGroup]) => {
-    if (!isHovered || !shouldShowDetails || !currentGroup) {
+  [hovered, showDetailsPreview, groupItem, activeGroupPreviewCard],
+  async ([isHovered, shouldShowDetails, currentGroup, currentPreviewCard]) => {
+    if (!isHovered || !shouldShowDetails || !currentGroup || !currentPreviewCard) {
       return;
     }
 
-    if (groupHoverCard.value?.id === currentGroup.anchor_card_id) {
+    if (groupHoverCard.value?.id === currentPreviewCard.card_id) {
       return;
     }
 
-    const expectedAnchorId = currentGroup.anchor_card_id;
-    const loadedCard = await fetchHoverPreviewCard(expectedAnchorId);
-    if (groupItem.value?.anchor_card_id !== expectedAnchorId) {
+    const expectedCardId = currentPreviewCard.card_id;
+    const loadedCard = await fetchHoverPreviewCard(expectedCardId);
+    if (activeGroupPreviewCard.value?.card_id !== expectedCardId) {
       return;
     }
     groupHoverCard.value = loadedCard;
@@ -342,3 +424,39 @@ watch(
 );
 
 </script>
+
+<style scoped>
+.card-group-resting-layer-left {
+  transform: translate(-0.62rem, -0.16rem) rotate(-6deg);
+}
+
+.card-group-resting-layer-right {
+  transform: translate(0.62rem, -0.18rem) rotate(6deg);
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+  .card-group-stack-root:hover .card-group-resting-layers,
+  .card-group-stack-root:hover .card-group-anchor-card {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .card-group-stack-root:hover .card-group-unfolded-stack {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .card-group-unfolded-card {
+    transform: translateY(calc(var(--card-group-stack-depth) * 2.05rem));
+    transition:
+      transform 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .card-group-unfolded-card:hover {
+    box-shadow:
+      0 22px 45px rgba(15, 23, 42, 0.26),
+      0 0 0 2px rgba(255, 255, 255, 0.22);
+  }
+}
+</style>
