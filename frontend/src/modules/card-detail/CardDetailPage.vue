@@ -158,7 +158,7 @@ import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { buildAdminCardMergeSourceLocation } from '@/composables/admin/adminRouteState';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import CardDetailLoadingSkeleton from '@/modules/card-detail/components/CardDetailLoadingSkeleton.vue';
-import CardDetailPager from '@/modules/card-detail/components/CardDetailPager.vue';
+import CardDetailPager from '@/components/cards/CardResultPager.vue';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
 import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';

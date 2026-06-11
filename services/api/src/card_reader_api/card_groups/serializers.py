@@ -77,6 +77,7 @@ def card_group_detail_payload(
     group: CardGroup,
     *,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+    anchor_deck_references: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     anchor_card_id = group.anchor_card.id
     members_payload = []
@@ -103,6 +104,7 @@ def card_group_detail_payload(
         "key": group.key,
         "name": group.name,
         "anchor_card_id": anchor_card_id,
+        "anchor_deck_references": anchor_deck_references or [],
         "member_count": len(members_payload),
         "members": members_payload,
     }

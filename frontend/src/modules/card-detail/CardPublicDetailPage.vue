@@ -19,23 +19,6 @@
           Edit Card
         </button>
       </template>
-
-      <template
-        v-if="card && card.card_groups.length > 0"
-        #details
-      >
-        <div class="flex flex-wrap gap-2">
-          <RouterLink
-            v-for="group in card.card_groups"
-            :key="group.id"
-            :to="`/card-groups/${group.id}`"
-            class="btn-secondary rounded-full px-3 py-1 text-xs font-medium"
-          >
-            <span>{{ group.name }}</span>
-            <span class="theme-kicker">{{ group.member_count }} cards</span>
-          </RouterLink>
-        </div>
-      </template>
     </AppPageHeader>
 
     <div
@@ -70,6 +53,7 @@
             :symbol-by-key="symbolByKey"
             :to-absolute-api-url="toAbsoluteApiUrl"
             :can-flag="auth.authenticated"
+            :card-groups="card?.card_groups ?? []"
             @flag-parse-issue="flagModalOpen = true"
           />
 
@@ -86,7 +70,7 @@
           />
         </div>
 
-        <aside class="min-w-0 2xl:sticky 2xl:top-0 2xl:h-[calc(100vh-3rem)] 2xl:max-h-[calc(100vh-11rem)] 2xl:border-l 2xl:border-[var(--color-border)] 2xl:pl-6">
+        <aside class="min-w-0 2xl:sticky 2xl:top-6 2xl:h-[calc(100vh-3rem)] 2xl:max-h-[calc(100vh-11rem)] 2xl:border-l 2xl:border-[var(--color-border)] 2xl:pl-6">
           <div class="space-y-5 2xl:app-scrollbar 2xl:h-full 2xl:overflow-y-auto 2xl:pr-1">
             <CardDeckReferencesPanel
               :deck-references="card?.deck_references ?? []"
@@ -125,9 +109,9 @@ import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import { useReviewSummary } from '@/composables/useReviewSummary';
-import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
+import CardDeckReferencesPanel from '@/components/cards/CardDeckReferencesPanel.vue';
 import CardDetailLoadingSkeleton from '@/modules/card-detail/components/CardDetailLoadingSkeleton.vue';
-import CardDetailPager from '@/modules/card-detail/components/CardDetailPager.vue';
+import CardDetailPager from '@/components/cards/CardResultPager.vue';
 import CardVersionParseFlagModal from '@/modules/card-detail/components/CardVersionParseFlagModal.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
 import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';

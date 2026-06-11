@@ -101,7 +101,7 @@
       class="min-w-0"
       :class="mode === 'editor'
         ? 'xl:h-full xl:min-h-0 xl:border-l xl:border-[var(--color-border)] xl:pl-6'
-        : '2xl:sticky 2xl:top-0 2xl:h-[calc(100vh-3rem)] 2xl:max-h-[calc(100vh-11rem)] 2xl:border-l 2xl:border-[var(--color-border)] 2xl:pl-6'"
+        : '2xl:sticky 2xl:top-6 2xl:h-[calc(100vh-3rem)] 2xl:max-h-[calc(100vh-11rem)] 2xl:border-l 2xl:border-[var(--color-border)] 2xl:pl-6'"
       aria-hidden="true"
     >
       <div

@@ -177,7 +177,7 @@ vi.mock('@/components/app/AppPageHeader.vue', () => ({
   }),
 }));
 
-vi.mock('@/modules/card-detail/components/CardDetailPager.vue', () => ({
+vi.mock('@/components/cards/CardResultPager.vue', () => ({
   default: defineComponent({
     setup() {
       return () => h('nav', { 'data-testid': 'card-detail-pager' }, 'Pager');
@@ -209,7 +209,7 @@ vi.mock('@/modules/card-detail/components/CardVersionEditorPane.vue', () => ({
   }),
 }));
 
-vi.mock('@/modules/card-detail/components/CardDeckReferencesPanel.vue', () => ({
+vi.mock('@/components/cards/CardDeckReferencesPanel.vue', () => ({
   default: defineComponent({
     setup() {
       return () => h('aside', { 'data-testid': 'card-deck-references' }, 'Deck references');
