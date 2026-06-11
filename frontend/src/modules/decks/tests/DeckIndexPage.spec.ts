@@ -396,7 +396,7 @@ describe('DeckIndexPage', () => {
     const text = mounted.container.textContent ?? '';
 
     expect(text).toContain('Copy Share Link');
-    expect(text).toContain('Export TTS');
+    expect(text).toContain('Copy TTS');
     expect(text).toContain('Delete');
     expect(text.match(/\bEdit\b/g) ?? []).toHaveLength(1);
     expect(mounted.container.querySelector('select')).not.toBeNull();

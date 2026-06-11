@@ -100,7 +100,7 @@
                   type="button"
                   @click="exportDeck(close)"
                 >
-                  Export TTS
+                  Copy TTS
                 </button>
               </template>
             </ExtraActionsMenu>
@@ -213,7 +213,7 @@ const copyShareLink = async (close: () => void): Promise<void> => {
 };
 
 const exportDeck = async (close: () => void): Promise<void> => {
-  await exportTtsDeck(props.deck.id, props.deck.name);
+  await exportTtsDeck(props.deck.id);
   close();
 };
 

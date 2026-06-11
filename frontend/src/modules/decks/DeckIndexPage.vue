@@ -88,7 +88,7 @@
                       type="button"
                       @click="exportDeck(deck); close()"
                     >
-                      Export TTS
+                      Copy TTS
                     </button>
 
                     <button
@@ -319,7 +319,7 @@ const copyShareLink = async (deck: DeckRecord): Promise<void> => {
 };
 
 const exportDeck = async (deck: DeckRecord): Promise<void> => {
-  await exportTtsDeck(deck.id, deck.name);
+  await exportTtsDeck(deck.id);
 };
 
 const confirmDelete = async (): Promise<void> => {

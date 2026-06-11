@@ -244,14 +244,14 @@ describe('DeckListCard', () => {
     menuTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await nextTick();
 
-    const exportButton = Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent?.includes('Export TTS'));
+    const exportButton = Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent?.includes('Copy TTS'));
 
     expect(exportButton).not.toBeNull();
 
     exportButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await nextTick();
 
-    expect(exportTtsDeckMock).toHaveBeenCalledWith('deck-1', 'Azure Tempo');
+    expect(exportTtsDeckMock).toHaveBeenCalledWith('deck-1');
     expect(mounted.router.currentRoute.value.fullPath).toBe('/decks');
 
     mounted.unmount();

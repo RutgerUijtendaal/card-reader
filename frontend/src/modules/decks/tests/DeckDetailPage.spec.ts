@@ -334,7 +334,7 @@ describe('DeckDetailPage type grouping', () => {
   test('exports the active board to TTS with matching button copy', async () => {
     const mounted = await mountPage();
     const mainboardExportButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Export Mainboard TTS'),
+      button.textContent?.includes('Copy Mainboard TTS'),
     );
     if (!(mainboardExportButton instanceof HTMLButtonElement)) {
       throw new Error('expected mainboard export button');
@@ -343,8 +343,8 @@ describe('DeckDetailPage type grouping', () => {
     mainboardExportButton.click();
     await nextTick();
 
-    expect(exportTtsDeckMock).toHaveBeenLastCalledWith('deck-1', 'Grouped Deck', {
-      successMessage: 'TTS mainboard exported',
+    expect(exportTtsDeckMock).toHaveBeenLastCalledWith('deck-1', {
+      successMessage: 'TTS mainboard copied to clipboard',
     });
 
     const sideboardButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
@@ -358,7 +358,7 @@ describe('DeckDetailPage type grouping', () => {
     await nextTick();
 
     const sideboardExportButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Export Sideboard TTS'),
+      button.textContent?.includes('Copy Sideboard TTS'),
     );
     if (!(sideboardExportButton instanceof HTMLButtonElement)) {
       throw new Error('expected sideboard export button');
@@ -367,10 +367,9 @@ describe('DeckDetailPage type grouping', () => {
     sideboardExportButton.click();
     await nextTick();
 
-    expect(exportTtsDeckMock).toHaveBeenLastCalledWith('deck-1', 'Grouped Deck', {
+    expect(exportTtsDeckMock).toHaveBeenLastCalledWith('deck-1', {
       sideboardId: 'side-1',
-      exportName: 'Grouped Deck - Sideboard',
-      successMessage: 'TTS sideboard exported',
+      successMessage: 'TTS sideboard copied to clipboard',
     });
 
     mounted.unmount();

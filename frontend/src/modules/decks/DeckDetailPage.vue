@@ -44,7 +44,7 @@
           type="button"
           @click="handleTtsExport"
         >
-          <Download class="h-4 w-4" />
+          <Clipboard class="h-4 w-4" />
           <span>{{ ttsExportButtonLabel }}</span>
         </button>
         <RouterLink
@@ -251,7 +251,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
-import { BookOpenText, Download } from 'lucide-vue-next';
+import { BookOpenText, Clipboard } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
@@ -346,7 +346,7 @@ const activeBoardTitle = computed(() =>
   activeBoardId.value === 'mainboard' ? 'Mainboard' : (activeSideboard.value?.name ?? 'Sideboard'),
 );
 const ttsExportButtonLabel = computed(() =>
-  activeBoardId.value === 'mainboard' ? 'Export Mainboard TTS' : 'Export Sideboard TTS',
+  activeBoardId.value === 'mainboard' ? 'Copy Mainboard TTS' : 'Copy Sideboard TTS',
 );
 const activeBoardEmptyLabel = computed(() =>
   activeBoardId.value === 'mainboard' ? 'This deck does not have any mainboard cards yet.' : 'This sideboard does not have any cards yet.',
@@ -402,15 +402,14 @@ const handleTtsExport = async (): Promise<void> => {
     return;
   }
   if (activeSideboard.value) {
-    await exportTtsDeck(deck.value.id, deck.value.name, {
+    await exportTtsDeck(deck.value.id, {
       sideboardId: activeSideboard.value.id,
-      exportName: `${deck.value.name} - ${activeSideboard.value.name}`,
-      successMessage: 'TTS sideboard exported',
+      successMessage: 'TTS sideboard copied to clipboard',
     });
     return;
   }
-  await exportTtsDeck(deck.value.id, deck.value.name, {
-    successMessage: 'TTS mainboard exported',
+  await exportTtsDeck(deck.value.id, {
+    successMessage: 'TTS mainboard copied to clipboard',
   });
 };
 
