@@ -1,7 +1,7 @@
 import { createApp, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
+import CardDeckReferencesPanel from '@/components/cards/CardDeckReferencesPanel.vue';
 import type { CardDeckReferenceSummary } from '@/modules/card-detail/types';
 import type { DeckRecord } from '@/modules/decks/types';
 
@@ -91,7 +91,10 @@ const deckReferences: CardDeckReferenceSummary[] = [
   }),
 ];
 
-const mountPanel = async (references: CardDeckReferenceSummary[] = deckReferences) => {
+const mountPanel = async (
+  references: CardDeckReferenceSummary[] = deckReferences,
+  sourceCardId: string | null = null,
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
@@ -99,6 +102,7 @@ const mountPanel = async (references: CardDeckReferenceSummary[] = deckReference
     history: createMemoryHistory(),
     routes: [
       { path: '/cards/:id', component: { template: '<div />' } },
+      { path: '/card-groups/:id', component: { template: '<div />' } },
       { path: '/decks/:id', component: { template: '<div />' } },
       { path: '/my/decks/:id', component: { template: '<div />' } },
       { path: '/my/decks/new', component: { template: '<div />' } },
@@ -110,6 +114,7 @@ const mountPanel = async (references: CardDeckReferenceSummary[] = deckReference
   const app = createApp(CardDeckReferencesPanel, {
     deckReferences: references,
     currentUserId: 'user-1',
+    sourceCardId,
   });
   app.use(router);
   app.mount(container);
@@ -143,6 +148,19 @@ describe('CardDeckReferencesPanel', () => {
     expect(navigationTargets).toEqual([
       '/my/decks/deck-owned?q=dragon&card_id=card-source&return_to=card',
       '/decks/deck-public?q=dragon&card_id=card-source&return_to=card',
+    ]);
+
+    mounted.unmount();
+  });
+
+  test('uses an explicit source card id for group detail contexts', async () => {
+    const mounted = await mountPanel(deckReferences, 'anchor-card');
+
+    const navigationTargets = Array.from(mounted.container.querySelectorAll('[data-navigation-target]'))
+      .map((element) => element.getAttribute('data-navigation-target'));
+    expect(navigationTargets).toEqual([
+      '/my/decks/deck-owned?q=dragon&card_id=anchor-card&return_to=card',
+      '/decks/deck-public?q=dragon&card_id=anchor-card&return_to=card',
     ]);
 
     mounted.unmount();

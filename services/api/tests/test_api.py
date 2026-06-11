@@ -1720,6 +1720,77 @@ def test_card_detail_limits_deck_references_to_three_latest() -> None:
     assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
 
 
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> None:
+    owner = _create_user("group-deck-reference-owner", "password", is_staff=False)
+    other_owner = _create_user("group-deck-reference-other", "password", is_staff=False)
+    anchor_card, anchor_version = _create_editable_card_version(name="Group Deck Reference Anchor")
+    member_card, member_version = _create_editable_card_version(name="Group Deck Reference Member")
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    anchor_card.is_hero = True
+    anchor_card.save(update_fields=["is_hero"])
+    group = _create_card_group("group-deck-reference", anchor_card=anchor_card, members=[anchor_card, member_card])
+    owner_deck = Deck.objects.create(
+        owner=owner,
+        name="Owner Private Group Deck",
+        visibility="private",
+        hero_card=anchor_card,
+    )
+    other_deck = Deck.objects.create(
+        owner=other_owner,
+        name="Other Private Group Deck",
+        visibility="private",
+        hero_card=anchor_card,
+    )
+    DeckEntry.objects.create(deck=other_deck, card=member_card, quantity=3)
+
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    owner_response = client.get(f"/card-groups/{group.id}")
+    anonymous_response = Client(HTTP_HOST="localhost").get(f"/card-groups/{group.id}")
+
+    assert owner_response.status_code == 200
+    references = owner_response.json()["anchor_deck_references"]
+    assert [reference["id"] for reference in references] == [owner_deck.id]
+    assert references[0]["name"] == "Owner Private Group Deck"
+    assert references[0]["card_reference"]["is_hero"] is True
+    assert references[0]["card_reference"]["mainboard_quantity"] == 0
+    assert references[0]["card_reference"]["sideboard_quantity"] == 0
+    assert anonymous_response.status_code == 200
+    assert anonymous_response.json()["anchor_deck_references"] == []
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_card_group_detail_limits_anchor_deck_references_to_three_latest() -> None:
+    owner = _create_user("group-deck-reference-limit-owner", "password", is_staff=False)
+    anchor_card, anchor_version = _create_editable_card_version(name="Group Deck Reference Limit Anchor")
+    member_card, member_version = _create_editable_card_version(name="Group Deck Reference Limit Member")
+    _create_card_image(anchor_version)
+    _create_card_image(member_version)
+    anchor_card.is_hero = True
+    anchor_card.save(update_fields=["is_hero"])
+    group = _create_card_group("group-deck-reference-limit", anchor_card=anchor_card, members=[anchor_card, member_card])
+    decks = []
+    for index in range(4):
+        deck = Deck.objects.create(
+            owner=owner,
+            name=f"Group Deck Reference Limit {index}",
+            visibility="private",
+            hero_card=anchor_card,
+        )
+        Deck.objects.filter(id=deck.id).update(updated_at=timezone.now() + timedelta(minutes=index))
+        decks.append(deck)
+
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    response = client.get(f"/card-groups/{group.id}")
+
+    assert response.status_code == 200
+    references = response.json()["anchor_deck_references"]
+    assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
+
+
 def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Detail Lifecycle Anchor")
     deprecated_card, deprecated_version = _create_editable_card_version(name="Detail Lifecycle Deprecated")

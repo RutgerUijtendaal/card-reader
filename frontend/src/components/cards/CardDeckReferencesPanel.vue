@@ -66,10 +66,12 @@ import DeckListCard from '@/components/decks/DeckListCard.vue';
 const props = defineProps<{
   deckReferences: CardDeckReferenceSummary[];
   currentUserId?: string | null;
+  sourceCardId?: string | null;
 }>();
 
 const route = useRoute();
 
+const cardId = computed(() => props.sourceCardId ?? String(route.params.id));
 const heading = computed(() => {
   const count = props.deckReferences.length;
   return `Card is in ${count} ${count === 1 ? 'deck' : 'decks'}`;
@@ -81,13 +83,13 @@ const subheading = computed(() =>
     : 'No visible deck currently includes this card.',
 );
 const createDeckLocation = computed(() =>
-  buildCardReturnContextLocation('/my/decks/new', route.query, String(route.params.id)),
+  buildCardReturnContextLocation('/my/decks/new', route.query, cardId.value),
 );
 
 const deckPath = (deck: CardDeckReferenceSummary) =>
   buildCardReturnContextLocation(
     deck.owner.id === props.currentUserId ? `/my/decks/${deck.id}` : `/decks/${deck.id}`,
     route.query,
-    String(route.params.id),
+    cardId.value,
   );
 </script>

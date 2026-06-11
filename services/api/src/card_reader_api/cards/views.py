@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from card_reader_api.cards.file_views import file_response, immutable_card_image_response, symbol_asset_response
 from card_reader_api.cards.grouped_gallery import grouped_gallery_payload
+from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import (
@@ -16,7 +17,6 @@ from card_reader_api.cards.serializers import (
     CardVersionParseFlagCreateSerializer,
     LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
-    card_deck_reference_payload,
     card_group_summary_payload,
     card_payload,
     metadata_option,
@@ -24,7 +24,6 @@ from card_reader_api.cards.serializers import (
 )
 from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.responses import serializer_error
-from card_reader_api.decks.serializers import deck_payload
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
     get_card,
@@ -43,10 +42,7 @@ from card_reader_core.services.cards import (
     resolve_card_image_path,
     update_latest_card_version_with_notifications,
 )
-from card_reader_core.services.decks import DeckService
 from card_reader_core.services.parse_flags import create_parse_flag_for_card_version
-
-CARD_DETAIL_DECK_REFERENCE_LIMIT = 3
 
 
 class CardListView(APIView):
@@ -152,13 +148,7 @@ class CardDetailView(APIView):
             for group in CardGroupService().get_groups_for_card(card.id)
         ]
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
-        deck_references = [
-            {
-                **deck_payload(deck),
-                "card_reference": card_deck_reference_payload(deck, card_id=card.id),
-            }
-            for deck in DeckService().list_card_decks_for_viewer(card.id, viewer_id=viewer_id)[:CARD_DETAIL_DECK_REFERENCE_LIMIT]
-        ]
+        deck_references = card_deck_references_payload(card.id, viewer_id=viewer_id)
         return Response(
             card_payload(
                 card,

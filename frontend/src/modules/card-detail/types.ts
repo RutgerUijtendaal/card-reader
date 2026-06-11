@@ -129,6 +129,7 @@ export type CardGroupDetail = {
   key: string;
   name: string;
   anchor_card_id: string;
+  anchor_deck_references: CardDeckReferenceSummary[];
   member_count: number;
   members: CardGroupMemberDetail[];
 };

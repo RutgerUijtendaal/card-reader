@@ -21,16 +21,27 @@
           <h3 class="theme-section-title min-w-0 text-2xl font-semibold">
             {{ version.name || 'Unnamed Card' }}
           </h3>
-          <button
-            v-if="canFlag"
-            class="btn-secondary inline-flex h-9 w-9 shrink-0 items-center justify-center p-0"
-            type="button"
-            title="Flag a parsed property that looks incorrect so staff can review and correct it."
-            aria-label="Flag parse issue"
-            @click="$emit('flag-parse-issue')"
-          >
-            <Flag class="h-4 w-4" />
-          </button>
+          <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <RouterLink
+              v-for="group in cardGroups"
+              :key="group.id"
+              :to="`/card-groups/${group.id}`"
+              class="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+            >
+              <span>{{ group.name }}</span>
+              <span class="theme-kicker">{{ group.member_count }} cards</span>
+            </RouterLink>
+            <button
+              v-if="canFlag"
+              class="btn-secondary inline-flex h-9 w-9 shrink-0 items-center justify-center p-0"
+              type="button"
+              title="Flag a parsed property that looks incorrect so staff can review and correct it."
+              aria-label="Flag parse issue"
+              @click="$emit('flag-parse-issue')"
+            >
+              <Flag class="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <p class="theme-kicker mt-1 text-xs font-semibold uppercase tracking-[0.16em]">
           Printing {{ version.version_number }}<span v-if="version.is_latest"> · Latest</span> · Version {{ formatCardContentVersion(version) }}
@@ -194,15 +205,17 @@
 <script setup lang="ts">
 import { BookOpenText, Flag, Hash, HeartPulse, KeyRound, ScrollText, Sparkles, Swords, Tags } from 'lucide-vue-next';
 import SymbolizedText from '@/components/SymbolizedText.vue';
-import { formatCardContentVersion, type CardVersionDetail, type SymbolLookupMap } from '@/modules/card-detail/types';
+import { formatCardContentVersion, type CardGroupSummary, type CardVersionDetail, type SymbolLookupMap } from '@/modules/card-detail/types';
 
 withDefaults(defineProps<{
   version: CardVersionDetail;
   symbolByKey: SymbolLookupMap;
   toAbsoluteApiUrl: (urlPath: string) => string;
   canFlag?: boolean;
+  cardGroups?: CardGroupSummary[];
 }>(), {
   canFlag: false,
+  cardGroups: () => [],
 });
 
 defineEmits<{

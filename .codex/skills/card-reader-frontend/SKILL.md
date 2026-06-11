@@ -20,6 +20,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - In the card detail editor, keep card-level controls on the `Card` tab and version-level controls on the `Card Version` tab.
 - Use `JsonEditorField` for deck-building config JSON so formatting, validation affordances, and examples stay consistent with other admin JSON inputs.
 - For routed app pages with filters, local navigation, summaries, or page controls, prefer the shared `AppPageLayout` and `AppStickyAside` structure.
+- Routed pages that fetch initial page data should expose a full, layout-shaped skeleton loading state instead of falling through to empty states or text-only loading labels.
 - Primary page lists and content should use the shell page scroll; avoid max-height primary list containers that trap content.
 - Desktop asides should behave as edge-attached side panels below the lifted shell header, use the shared aside width, keep bounded inner scrolling only inside the aside, and place persistent footer controls in the shared footer slot so they anchor at the bottom.
 - Mobile page layouts should stack aside content above main content in natural page flow.
@@ -39,8 +40,9 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 6. If a component becomes cross-module, move it to `frontend/src/components` before wiring the second module to it.
 7. If the change touches filters, inspect `frontend/src/composables/card-filters` first and extend it there instead of cloning the logic into a page.
 8. If the change touches deck-building constraints, load defaults/examples from the backend metadata endpoint and keep frontend fallbacks covered by tests.
-9. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
-10. Run lint and typecheck before finishing.
+9. If the change touches a routed page with initial data fetching, preserve or add a page-shaped skeleton that matches the loaded layout.
+10. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
+11. Run lint and typecheck before finishing.
 
 ## Review Focus
 
@@ -51,6 +53,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Page modules taking on shared state or parsing responsibilities
 - Module root files that should be under `components`, `composables`, `utils`, or `tests`
 - Page layouts that reintroduce max-height primary list containers instead of using shell page scroll with sticky/bounded asides
+- Routed pages that show empty states, partial controls, or text-only loading while initial page data is still loading
 - Theme drift from raw colors, light-only assumptions, or component-local styling systems
 - Unnecessary framed containers where divider-separated, background-floating content would be clearer and more consistent
 - UI changes verified in one theme only

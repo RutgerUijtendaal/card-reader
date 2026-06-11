@@ -11,7 +11,9 @@ from card_reader_api.card_groups.serializers import (
     card_group_admin_payload,
     card_group_detail_payload,
 )
+from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
+from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.permissions import AuthEnabledOrStaffAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.card_groups import CardGroupMemberInput, CardGroupService
@@ -28,7 +30,14 @@ class PublicCardGroupDetailView(APIView):
         group = CardGroupService().get_group(group_id)
         if group is None:
             return not_found("Card group not found")
-        return Response(card_group_detail_payload(group, lifecycle_status=lifecycle_status))
+        viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
+        return Response(
+            card_group_detail_payload(
+                group,
+                lifecycle_status=lifecycle_status,
+                anchor_deck_references=card_deck_references_payload(group.anchor_card.id, viewer_id=viewer_id),
+            )
+        )
 
 
 class StaffCardGroupListCreateView(APIView):

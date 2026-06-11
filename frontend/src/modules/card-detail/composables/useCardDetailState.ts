@@ -46,10 +46,12 @@ export const useCardDetailState = () => {
   const deckBuildingConfigExample = ref(formatDeckBuildingConfigJson(fallbackDeckBuildingConfigExample));
   const reparseTemplateId = ref('');
   const galleryNavigation = useGalleryCardNavigation(route, router, 'edit');
+  const isLoadingInitial = ref(true);
   const isSaving = ref(false);
   const isQueuingReparse = ref(false);
   const promotingVersionId = ref<string | null>(null);
   const saveMessage = ref('');
+  let loadRequestId = 0;
 
   const form = reactive<EditorForm>({
     name: '',
@@ -120,36 +122,48 @@ export const useCardDetailState = () => {
   };
 
   const loadCard = async (): Promise<void> => {
+    const requestId = ++loadRequestId;
     const cardId = String(route.params.id);
-    const [cardResponse, versionsResponse, filtersResponse, templates, deckRulesMetadata] = await Promise.all([
-      api.get<CardDetail>(`/cards/${cardId}`),
-      api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
-      api.get<CardFiltersResponse>('/cards/filters'),
-      fetchTemplates(),
-      fetchDeckRulesMetadata().catch(() => null),
-    ]);
+    isLoadingInitial.value = true;
+    try {
+      const [cardResponse, versionsResponse, filtersResponse, templates, deckRulesMetadata] = await Promise.all([
+        api.get<CardDetail>(`/cards/${cardId}`),
+        api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
+        api.get<CardFiltersResponse>('/cards/filters'),
+        fetchTemplates(),
+        fetchDeckRulesMetadata().catch(() => null),
+      ]);
 
-    card.value = cardResponse.data;
-    versions.value = versionsResponse.data;
-    filterOptions.value = filtersResponse.data;
-    symbolByKey.value = Object.fromEntries(
-      (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
-    );
-    reparseTemplates.value = templates.map((row) => ({
-      id: row.id,
-      key: row.key,
-      label: row.label,
-    }));
-    if (deckRulesMetadata) {
-      deckBuildingConfigExample.value = formatDeckBuildingConfigJson(deckRulesMetadata.example_config);
+      if (requestId !== loadRequestId) {
+        return;
+      }
+
+      card.value = cardResponse.data;
+      versions.value = versionsResponse.data;
+      filterOptions.value = filtersResponse.data;
+      symbolByKey.value = Object.fromEntries(
+        (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
+      );
+      reparseTemplates.value = templates.map((row) => ({
+        id: row.id,
+        key: row.key,
+        label: row.label,
+      }));
+      if (deckRulesMetadata) {
+        deckBuildingConfigExample.value = formatDeckBuildingConfigJson(deckRulesMetadata.example_config);
+      }
+      const queryVersionId = queryString(route.query.version_id);
+      selectedVersionId.value =
+        versions.value.find((version) => version.version_id === queryVersionId)?.version_id ??
+        versions.value.find((version) => version.is_latest)?.version_id ??
+        versions.value[0]?.version_id ??
+        '';
+      saveMessage.value = '';
+    } finally {
+      if (requestId === loadRequestId) {
+        isLoadingInitial.value = false;
+      }
     }
-    const queryVersionId = queryString(route.query.version_id);
-    selectedVersionId.value =
-      versions.value.find((version) => version.version_id === queryVersionId)?.version_id ??
-      versions.value.find((version) => version.is_latest)?.version_id ??
-      versions.value[0]?.version_id ??
-      '';
-    saveMessage.value = '';
   };
 
   const syncFormFromSelectedVersion = (): void => {
@@ -446,6 +460,7 @@ export const useCardDetailState = () => {
     reparseTemplates,
     reparseTemplateId,
     isSaving,
+    isLoadingInitial,
     isQueuingReparse,
     promotingVersionId,
     saveMessage,
