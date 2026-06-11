@@ -518,7 +518,7 @@ function findNearestSpawnedObject()
     local nearest_distance = nil
 
     for _, object in ipairs(getAllObjects()) do
-        if object ~= nil and not object.isDestroyed() then
+        if isImportDeckTargetCandidate(object) then
             local position = object.getPosition()
             local distance = horizontalDistance(position, CONFIG.spawn_position)
 
@@ -531,6 +531,14 @@ function findNearestSpawnedObject()
     end
 
     return nearest
+end
+
+function isImportDeckTargetCandidate(object)
+    if object == nil or object.isDestroyed() then
+        return false
+    end
+
+    return object.tag == "Card" or object.tag == "Deck"
 end
 
 function horizontalDistance(left, right)

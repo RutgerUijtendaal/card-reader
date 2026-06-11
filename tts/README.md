@@ -55,7 +55,8 @@ Current importer behavior:
   `y` offset, creating a vertical stack at `CONFIG.spawn_position`.
 - After all spawn callbacks finish, the importer waits briefly for TTS to
   settle the stack, then names and describes the live stack or deck near
-  `CONFIG.spawn_position`.
+  `CONFIG.spawn_position`. Fallback target lookup only considers card/deck
+  objects so scenery near the spawn point is not renamed.
 - Large imports are processed in small frame-scheduled batches so TTS can keep
   updating the UI between chunks.
 - Missing cards are logged to the TTS console and do not stop the rest of the

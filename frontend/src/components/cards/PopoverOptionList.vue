@@ -41,10 +41,18 @@
               {{ defaultOption.description }}
             </p>
           </div>
-          <Check
-            v-if="!selectionActive"
-            class="h-4 w-4 shrink-0"
-          />
+          <div class="flex shrink-0 items-center gap-2">
+            <kbd
+              v-if="defaultOption.hotkey"
+              class="theme-card-frame-muted theme-section-muted rounded px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none"
+            >
+              {{ defaultOption.hotkey }}
+            </kbd>
+            <Check
+              v-if="!selectionActive"
+              class="h-4 w-4"
+            />
+          </div>
         </div>
       </button>
 
@@ -71,10 +79,18 @@
                 {{ option.description }}
               </p>
             </div>
-            <Check
-              v-if="selectionActive && selectedValue === option.value"
-              class="h-4 w-4 shrink-0"
-            />
+            <div class="flex shrink-0 items-center gap-2">
+              <kbd
+                v-if="option.hotkey"
+                class="theme-card-frame-muted theme-section-muted rounded px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none"
+              >
+                {{ option.hotkey }}
+              </kbd>
+              <Check
+                v-if="selectionActive && selectedValue === option.value"
+                class="h-4 w-4"
+              />
+            </div>
           </div>
         </button>
       </div>
@@ -100,10 +116,18 @@
               {{ defaultOption.description }}
             </p>
           </div>
-          <Check
-            v-if="!selectionActive"
-            class="h-4 w-4 shrink-0"
-          />
+          <div class="flex shrink-0 items-center gap-2">
+            <kbd
+              v-if="defaultOption.hotkey"
+              class="theme-card-frame-muted theme-section-muted rounded px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none"
+            >
+              {{ defaultOption.hotkey }}
+            </kbd>
+            <Check
+              v-if="!selectionActive"
+              class="h-4 w-4"
+            />
+          </div>
         </div>
       </button>
 
@@ -127,10 +151,18 @@
               {{ option.description }}
             </p>
           </div>
-          <Check
-            v-if="selectionActive && selectedValue === option.value"
-            class="h-4 w-4 shrink-0"
-          />
+          <div class="flex shrink-0 items-center gap-2">
+            <kbd
+              v-if="option.hotkey"
+              class="theme-card-frame-muted theme-section-muted rounded px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none"
+            >
+              {{ option.hotkey }}
+            </kbd>
+            <Check
+              v-if="selectionActive && selectedValue === option.value"
+              class="h-4 w-4"
+            />
+          </div>
         </div>
       </button>
     </template>
@@ -144,6 +176,7 @@ export type PopoverOptionItem = {
   value: string;
   label: string;
   description?: string;
+  hotkey?: string;
 };
 
 defineProps<{
@@ -156,6 +189,7 @@ defineProps<{
   defaultOption?: {
     label: string;
     description?: string;
+    hotkey?: string;
   } | null;
 }>();
 
