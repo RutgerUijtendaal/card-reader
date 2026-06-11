@@ -46,7 +46,7 @@ export const useCardDetailState = () => {
   const deckBuildingConfigExample = ref(formatDeckBuildingConfigJson(fallbackDeckBuildingConfigExample));
   const reparseTemplateId = ref('');
   const galleryNavigation = useGalleryCardNavigation(route, router, 'edit');
-  const isLoadingInitial = ref(false);
+  const isLoadingInitial = ref(true);
   const isSaving = ref(false);
   const isQueuingReparse = ref(false);
   const promotingVersionId = ref<string | null>(null);

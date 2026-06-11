@@ -27,7 +27,7 @@ export const useCardPublicDetailState = () => {
   const selectedVersionId = ref<string>('');
   const symbolByKey = ref<SymbolLookupMap>({});
   const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
-  const isLoadingInitial = ref(false);
+  const isLoadingInitial = ref(true);
   let loadRequestId = 0;
 
   const selectedVersion = computed<CardVersionDetail | null>(
