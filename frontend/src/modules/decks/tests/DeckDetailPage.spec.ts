@@ -189,6 +189,14 @@ const filtersPayload = {
   ],
 };
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+  return { promise, resolve };
+};
+
 const mountPage = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -246,6 +254,46 @@ describe('DeckDetailPage type grouping', () => {
     expect(readTypeGroupKeys(mounted.container)).toEqual(['spell', 'creature', 'untyped', 'mana']);
     expect(mounted.container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
     expect(mounted.container.querySelectorAll('[data-testid^="deck-card-"]')).toHaveLength(4);
+
+    mounted.unmount();
+  });
+
+  test('renders a deck-detail-shaped skeleton while loading initial data', async () => {
+    const deferredDeck = createDeferred<typeof deckRecord>();
+    fetchDeckDetailMock.mockReturnValueOnce(deferredDeck.promise);
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[aria-label="Loading deck detail"]')).not.toBeNull();
+    expect(mounted.container.querySelector('.page-card')).toBeNull();
+    expect(mounted.container.textContent).not.toContain('Grouped Deck');
+    expect(mounted.container.querySelectorAll('[data-testid="deck-loading-type-group"]')).toHaveLength(2);
+
+    deferredDeck.resolve(deckRecord);
+    await deferredDeck.promise;
+    await Promise.resolve();
+    await Promise.resolve();
+    await nextTick();
+
+    expect(mounted.container.querySelector('[aria-label="Loading deck detail"]')).toBeNull();
+    expect(mounted.container.textContent).toContain('Grouped Deck');
+
+    mounted.unmount();
+  });
+
+  test('renders a flat card-grid skeleton while loading when grouping is disabled', async () => {
+    localStorage.setItem('card-reader.deck-detail-group-by-type', 'false');
+    const deferredDeck = createDeferred<typeof deckRecord>();
+    fetchDeckDetailMock.mockReturnValueOnce(deferredDeck.promise);
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[aria-label="Loading deck detail"]')).not.toBeNull();
+    expect(mounted.container.querySelectorAll('[data-testid="deck-loading-type-group"]')).toHaveLength(0);
+
+    deferredDeck.resolve(deckRecord);
+    await deferredDeck.promise;
+    await Promise.resolve();
+    await Promise.resolve();
+    await nextTick();
 
     mounted.unmount();
   });

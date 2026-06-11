@@ -1,6 +1,15 @@
 <template>
+  <DeckDetailLoadingSkeleton
+    v-if="loadingInitial"
+    :back-to="backLink"
+    :back-label="backLabel"
+    :grid-style="mainboardGridStyle"
+    :card-style="mainboardCardStyle"
+    :group-by-type="groupByType"
+  />
+
   <section
-    v-if="deck"
+    v-else-if="deck"
     class="flex flex-col gap-5"
   >
     <AppPageHeader
@@ -235,7 +244,7 @@
     v-else
     class="page-card theme-section-muted text-sm"
   >
-    Loading deck...
+    Deck not found.
   </div>
 </template>
 
@@ -261,6 +270,7 @@ import { useGalleryOptions } from '@/composables/useGalleryOptions';
 import { useHoverModeSurface } from '@/composables/useHoverModePreferences';
 import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
+import DeckDetailLoadingSkeleton from '@/modules/decks/components/DeckDetailLoadingSkeleton.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import { buildDeckCardDetailLocation, buildDeckDetailEditorLocation } from '@/composables/decks/deckRouteState';
 import { groupDeckEntriesByType } from '@/composables/decks/deckTypeGroups';
@@ -271,6 +281,7 @@ import { useDeckExport } from '@/composables/useDeckExport';
 const route = useRoute();
 const auth = useAuthStore();
 const deck = ref<DeckRecord | null>(null);
+const loadingInitial = ref(true);
 const filterOptions = ref<CardFiltersResponse>({
   keywords: [],
   tags: [],
@@ -399,6 +410,10 @@ const copyShareLink = async (): Promise<void> => {
 };
 
 onMounted(async () => {
-  await Promise.all([loadDeck(), loadFilterOptions()]);
+  try {
+    await Promise.all([loadDeck(), loadFilterOptions()]);
+  } finally {
+    loadingInitial.value = false;
+  }
 });
 </script>
