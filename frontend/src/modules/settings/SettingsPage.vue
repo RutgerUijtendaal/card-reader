@@ -133,9 +133,9 @@
             <input
               v-model="cardScale"
               type="range"
-              min="0.8"
-              max="1.2"
-              step="0.05"
+              :min="GALLERY_CARD_SCALE_MIN"
+              :max="GALLERY_CARD_SCALE_MAX"
+              :step="GALLERY_CARD_SCALE_STEP"
               class="theme-range mt-3 w-full"
             >
           </div>
@@ -272,7 +272,12 @@ import { HOVER_MODE_OPTIONS } from '@/composables/card-gallery/hoverMode';
 import { HOVER_PREVIEW_SCALE_MAX, HOVER_PREVIEW_SCALE_MIN, HOVER_PREVIEW_SCALE_STEP } from '@/composables/card-gallery/hoverPreviewScale';
 import { cardSortOptions } from '@/composables/card-gallery/cardSort';
 import { CARD_PAGE_SIZE_OPTIONS } from '@/composables/card-gallery/pageSize';
-import { useGalleryOptions } from '@/composables/useGalleryOptions';
+import {
+  GALLERY_CARD_SCALE_MAX,
+  GALLERY_CARD_SCALE_MIN,
+  GALLERY_CARD_SCALE_STEP,
+  useGalleryOptions,
+} from '@/composables/useGalleryOptions';
 import { useHoverModePreferences } from '@/composables/useHoverModePreferences';
 import { useCardSortPreferences } from '@/composables/useCardSortPreferences';
 

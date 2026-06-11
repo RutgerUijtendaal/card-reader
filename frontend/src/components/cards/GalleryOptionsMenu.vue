@@ -112,9 +112,9 @@
                 <input
                   :value="cardScale"
                   type="range"
-                  min="0.8"
-                  max="1.2"
-                  step="0.05"
+                  :min="GALLERY_CARD_SCALE_MIN"
+                  :max="GALLERY_CARD_SCALE_MAX"
+                  :step="GALLERY_CARD_SCALE_STEP"
                   class="theme-range mt-3 w-full"
                   @input="emit('update:cardScale', Number(($event.target as HTMLInputElement).value))"
                 >
@@ -135,6 +135,7 @@ import PopoverOptionList, { type PopoverOptionItem } from '@/components/cards/Po
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
 import { HOVER_MODE_OPTIONS, type HoverMode } from '@/composables/card-gallery/hoverMode';
 import { CARD_PAGE_SIZE_OPTIONS } from '@/composables/card-gallery/pageSize';
+import { GALLERY_CARD_SCALE_MAX, GALLERY_CARD_SCALE_MIN, GALLERY_CARD_SCALE_STEP } from '@/composables/useGalleryOptions';
 
 const props = withDefaults(
   defineProps<{

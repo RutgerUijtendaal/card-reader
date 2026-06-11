@@ -30,4 +30,20 @@ describe('useGalleryOptions', () => {
     expect(stored.tooltipEnabled).toBe(false);
     expect(useHoverModePreferences().defaultHoverMode.value).toBe('none');
   });
+
+  test('clamps card scale to the supported gallery range', async () => {
+    const { cardScale } = useGalleryOptions();
+
+    cardScale.value = 1.4;
+    await nextTick();
+    expect(cardScale.value).toBe(1.4);
+
+    cardScale.value = 2;
+    await nextTick();
+    expect(cardScale.value).toBe(1.4);
+
+    cardScale.value = 0.2;
+    await nextTick();
+    expect(cardScale.value).toBe(0.6);
+  });
 });
