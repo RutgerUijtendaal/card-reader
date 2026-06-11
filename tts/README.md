@@ -83,20 +83,16 @@ avoid doing all clone/index/spawn work in a single blocking frame.
 
 ## How The Lua Importer Matches Cards
 
-The importer searches cards in the configured source containers and matches in this order:
+The importer searches cards in the configured source containers by card name.
+It first tries an exact normalized name match. If that fails, it falls back to
+one-character fuzzy name matching, which allows one missing or different
+character. Fuzzy matching only succeeds when exactly one source card matches;
+ambiguous fuzzy matches are treated as missing cards.
 
-1. `card_id`
-2. `card_key`
-3. `name`
+Supported name sources:
 
-Best results come from storing Card Reader identifiers in TTS card metadata.
-
-Supported metadata sources:
-
-- `GMNotes` JSON such as `{"card_id":"...","card_key":"...","name":"..."}`
-- tagged lines like `card_reader_id: ...`
-- tagged lines like `card_reader_key: ...`
-- exact card name fallback
+- `GMNotes` JSON such as `{"name":"Hero Name"}`
+- exact TTS card nickname/name fallback
 
 ## Example TTS Setup
 
@@ -163,4 +159,4 @@ inspectCardReaderLibrary()
 - The importer clones from card object data already present in the TTS save.
 - It does not create custom cards from image URLs.
 - If your cards are loose on the table instead of inside bags/decks, the importer will need to be adapted.
-- Name-only matching is fragile. Prefer `card_id` or `card_key`.
+- Name-only matching depends on the exported Card Reader names matching the TTS card names closely.

@@ -6,7 +6,7 @@ local CONFIG = {
     column_spacing = 0.6,
     row_spacing = 1.2,
     cards_per_row = 8,
-    match_priority = { "card_id", "card_key", "name" },
+    fuzzy_name_distance = 1,
     index_batch_size = 50,
     spawn_batch_size = 5,
     wait_timeout_seconds = 15,
@@ -29,7 +29,7 @@ function inspectCardReaderLibrary()
     local rows = {}
 
     for _, entry in ipairs(search_index.entries) do
-        table.insert(rows, string.format("%s | %s | %s", entry.card_id or "-", entry.card_key or "-", entry.name or "-"))
+        table.insert(rows, entry.name or "-")
     end
 
     print(table.concat(rows, "\n"))
@@ -93,8 +93,6 @@ end
 function createSearchIndex()
     return {
         entries = {},
-        by_card_id = {},
-        by_card_key = {},
         by_name = {},
     }
 end
@@ -103,19 +101,11 @@ function addSearchIndexEntry(search_index, contained)
     local metadata = readSourceMetadata(contained)
     local row = {
         data = contained,
-        card_id = metadata.card_id,
-        card_key = metadata.card_key,
         name = metadata.name,
     }
 
     table.insert(search_index.entries, row)
 
-    if row.card_id ~= nil then
-        search_index.by_card_id[normalizeLookupValue(row.card_id)] = row
-    end
-    if row.card_key ~= nil then
-        search_index.by_card_key[normalizeLookupValue(row.card_key)] = row
-    end
     if row.name ~= nil then
         search_index.by_name[normalizeLookupValue(row.name)] = row
     end
@@ -251,42 +241,99 @@ function readSourceMetadata(card_data)
     local description = card_data.Description or ""
     local nickname = trim(card_data.Nickname or card_data.Name or "")
     local metadata = {
-        card_id = nil,
-        card_key = nil,
         name = nickname,
     }
 
     local parsed = decodeEmbeddedJson(gm_notes) or decodeEmbeddedJson(description)
     if parsed ~= nil then
-        metadata.card_id = parsed.card_id or parsed.id
-        metadata.card_key = parsed.card_key or parsed.key
         metadata.name = parsed.name or metadata.name
     end
-
-    metadata.card_id = metadata.card_id or readTaggedLine(gm_notes, "card_reader_id") or readTaggedLine(description, "card_reader_id")
-    metadata.card_key = metadata.card_key or readTaggedLine(gm_notes, "card_reader_key") or readTaggedLine(description, "card_reader_key")
 
     return metadata
 end
 
 function findSourceCard(request, search_index)
-    for _, key in ipairs(CONFIG.match_priority) do
-        local value = request[key]
-        if value ~= nil and value ~= "" then
-            local normalized = normalizeLookupValue(value)
-            if key == "card_id" and search_index.by_card_id[normalized] ~= nil then
-                return search_index.by_card_id[normalized]
-            end
-            if key == "card_key" and search_index.by_card_key[normalized] ~= nil then
-                return search_index.by_card_key[normalized]
-            end
-            if key == "name" and search_index.by_name[normalized] ~= nil then
-                return search_index.by_name[normalized]
+    if request.name == nil or request.name == "" then
+        return nil
+    end
+
+    local normalized = normalizeLookupValue(request.name)
+    if search_index.by_name[normalized] ~= nil then
+        return search_index.by_name[normalized]
+    end
+
+    return findFuzzyNameSource(normalized, search_index)
+end
+
+function findFuzzyNameSource(normalized_name, search_index)
+    local match = nil
+    local match_count = 0
+
+    for _, entry in ipairs(search_index.entries) do
+        if entry.name ~= nil and namesAreWithinDistance(normalized_name, normalizeLookupValue(entry.name), CONFIG.fuzzy_name_distance) then
+            match = entry
+            match_count = match_count + 1
+            if match_count > 1 then
+                return nil
             end
         end
     end
 
-    return nil
+    return match
+end
+
+function namesAreWithinDistance(left, right, max_distance)
+    local left_length = #left
+    local right_length = #right
+    local length_delta = math.abs(left_length - right_length)
+
+    if length_delta > max_distance then
+        return false
+    end
+
+    if left_length == right_length then
+        local differences = 0
+        for index = 1, left_length do
+            if string.sub(left, index, index) ~= string.sub(right, index, index) then
+                differences = differences + 1
+                if differences > max_distance then
+                    return false
+                end
+            end
+        end
+        return true
+    end
+
+    return namesMatchWithOneInsertionOrDeletion(left, right)
+end
+
+function namesMatchWithOneInsertionOrDeletion(left, right)
+    local shorter = left
+    local longer = right
+
+    if #left > #right then
+        shorter = right
+        longer = left
+    end
+
+    local shorter_index = 1
+    local longer_index = 1
+    local skipped = 0
+
+    while shorter_index <= #shorter and longer_index <= #longer do
+        if string.sub(shorter, shorter_index, shorter_index) == string.sub(longer, longer_index, longer_index) then
+            shorter_index = shorter_index + 1
+            longer_index = longer_index + 1
+        else
+            skipped = skipped + 1
+            if skipped > 1 then
+                return false
+            end
+            longer_index = longer_index + 1
+        end
+    end
+
+    return true
 end
 
 function buildSpawnPosition(index)
@@ -348,11 +395,9 @@ function logMissingCards(missing)
     local rows = {}
     for index, request in ipairs(missing) do
         table.insert(rows, string.format(
-            "%d. %s | id=%s | key=%s | role=%s",
+            "%d. %s | role=%s",
             index,
             tostring(request.name or "-"),
-            tostring(request.card_id or "-"),
-            tostring(request.card_key or "-"),
             tostring(request.role or "-")
         ))
     end
@@ -379,26 +424,31 @@ function decodeEmbeddedJson(text)
     return nil
 end
 
-function readTaggedLine(text, key)
-    if type(text) ~= "string" or text == "" then
-        return nil
-    end
-
-    local pattern = key .. "%s*:%s*([^\r\n]+)"
-    local value = string.match(text, pattern)
-    if value == nil then
-        return nil
-    end
-
-    return trim(value)
-end
-
 function normalizeLookupValue(value)
     return string.lower(trim(tostring(value)))
 end
 
 function trim(value)
-    return (string.gsub(value, "^%s*(.-)%s*$", "%1"))
+    if type(value) ~= "string" or value == "" then
+        return ""
+    end
+
+    local first = 1
+    local last = #value
+
+    while first <= last and isWhitespace(string.sub(value, first, first)) do
+        first = first + 1
+    end
+
+    while last >= first and isWhitespace(string.sub(value, last, last)) do
+        last = last - 1
+    end
+
+    return string.sub(value, first, last)
+end
+
+function isWhitespace(character)
+    return character == " " or character == "\t" or character == "\r" or character == "\n"
 end
 
 function deepCopy(value)
@@ -415,7 +465,7 @@ end
 
 function base64Decode(input)
     local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    local clean = string.gsub(input, "[^" .. alphabet .. "=]", "")
+    local clean = cleanBase64Input(input, alphabet)
     local bits = {}
 
     for index = 1, #clean do
@@ -445,4 +495,17 @@ function base64Decode(input)
     end
 
     return table.concat(output)
+end
+
+function cleanBase64Input(input, alphabet)
+    local clean = {}
+
+    for index = 1, #input do
+        local character = string.sub(input, index, index)
+        if character == "=" or string.find(alphabet, character, 1, true) ~= nil then
+            table.insert(clean, character)
+        end
+    end
+
+    return table.concat(clean)
 end
