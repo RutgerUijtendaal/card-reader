@@ -72,6 +72,14 @@ The exported payload is a base64-encoded JSON object with this shape:
 Current importer behavior:
 - `cards` is the mainboard import list.
 - `sideboards` is exported for future use and is currently ignored by `tts/importer.lua`.
+- Large imports are processed in small frame-scheduled batches so TTS can keep
+  updating the UI between chunks.
+- Missing cards are logged to the TTS console and do not stop the rest of the
+  import.
+
+TTS Lua does not expose a general-purpose worker thread API for scripts. The
+importer uses `Wait.frames` batching instead, which is the practical way to
+avoid doing all clone/index/spawn work in a single blocking frame.
 
 ## How The Lua Importer Matches Cards
 

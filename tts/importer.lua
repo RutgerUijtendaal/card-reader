@@ -7,6 +7,9 @@ local CONFIG = {
     row_spacing = 1.2,
     cards_per_row = 8,
     match_priority = { "card_id", "card_key", "name" },
+    index_batch_size = 50,
+    spawn_batch_size = 5,
+    wait_timeout_seconds = 15,
 }
 
 function importCardReaderDeck(encoded)
@@ -18,42 +21,7 @@ function importCardReaderDeck(encoded)
     local payload = JSON.decode(json_text)
     validatePayload(payload)
 
-    local search_index = buildSearchIndex(CONFIG.source_container_guids)
-    local requests = expandRequests(payload)
-    local spawned = {}
-
-    for index, request in ipairs(requests) do
-        local source = findSourceCard(request, search_index)
-        if source == nil then
-            error("No source card found for '" .. tostring(request.name) .. "'.")
-        end
-
-        local spawn_position = buildSpawnPosition(index)
-        local object_data = deepCopy(source.data)
-        object_data.GUID = nil
-
-        spawnObjectData({
-            data = object_data,
-            position = spawn_position,
-            callback_function = function(spawned_object)
-                applySpawnMetadata(spawned_object, request)
-                table.insert(spawned, spawned_object)
-            end,
-        })
-    end
-
-    Wait.condition(
-        function()
-            finalizeImportedDeck(payload, spawned)
-        end,
-        function()
-            return #spawned == #requests and allObjectsResting(spawned)
-        end,
-        15,
-        function()
-            print("Timed out while waiting for imported cards to finish spawning.")
-        end
-    )
+    startImportJob(payload, expandRequests(payload))
 end
 
 function inspectCardReaderLibrary()
@@ -105,10 +73,7 @@ function expandRequests(payload)
 end
 
 function buildSearchIndex(container_guids)
-    local entries = {}
-    local by_card_id = {}
-    local by_card_key = {}
-    local by_name = {}
+    local search_index = createSearchIndex()
 
     for _, guid in ipairs(container_guids) do
         local container = getObjectFromGUID(guid)
@@ -117,35 +82,168 @@ function buildSearchIndex(container_guids)
             local contained_objects = data.ContainedObjects or {}
 
             for _, contained in ipairs(contained_objects) do
-                local metadata = readSourceMetadata(contained)
-                local row = {
-                    data = contained,
-                    card_id = metadata.card_id,
-                    card_key = metadata.card_key,
-                    name = metadata.name,
-                }
-
-                table.insert(entries, row)
-
-                if row.card_id ~= nil then
-                    by_card_id[normalizeLookupValue(row.card_id)] = row
-                end
-                if row.card_key ~= nil then
-                    by_card_key[normalizeLookupValue(row.card_key)] = row
-                end
-                if row.name ~= nil then
-                    by_name[normalizeLookupValue(row.name)] = row
-                end
+                addSearchIndexEntry(search_index, contained)
             end
         end
     end
 
+    return search_index
+end
+
+function createSearchIndex()
     return {
-        entries = entries,
-        by_card_id = by_card_id,
-        by_card_key = by_card_key,
-        by_name = by_name,
+        entries = {},
+        by_card_id = {},
+        by_card_key = {},
+        by_name = {},
     }
+end
+
+function addSearchIndexEntry(search_index, contained)
+    local metadata = readSourceMetadata(contained)
+    local row = {
+        data = contained,
+        card_id = metadata.card_id,
+        card_key = metadata.card_key,
+        name = metadata.name,
+    }
+
+    table.insert(search_index.entries, row)
+
+    if row.card_id ~= nil then
+        search_index.by_card_id[normalizeLookupValue(row.card_id)] = row
+    end
+    if row.card_key ~= nil then
+        search_index.by_card_key[normalizeLookupValue(row.card_key)] = row
+    end
+    if row.name ~= nil then
+        search_index.by_name[normalizeLookupValue(row.name)] = row
+    end
+end
+
+function startImportJob(payload, requests)
+    local job = {
+        payload = payload,
+        requests = requests,
+        search_index = createSearchIndex(),
+        source_container_guids = CONFIG.source_container_guids,
+        container_index = 1,
+        contained_objects = nil,
+        contained_index = 1,
+        request_index = 1,
+        spawn_index = 1,
+        expected_spawns = 0,
+        spawned = {},
+        missing = {},
+    }
+
+    print(string.format("Importing '%s' with %d requested cards.", payload.deck.name, #requests))
+    buildSearchIndexForImport(job)
+end
+
+function buildSearchIndexForImport(job)
+    local processed = 0
+
+    while processed < CONFIG.index_batch_size do
+        if job.contained_objects == nil then
+            local guid = job.source_container_guids[job.container_index]
+            if guid == nil then
+                print(string.format("Indexed %d source cards.", #job.search_index.entries))
+                spawnImportBatch(job)
+                return
+            end
+
+            local container = getObjectFromGUID(guid)
+            if container == nil then
+                print("Source container not found: " .. tostring(guid))
+                job.container_index = job.container_index + 1
+            else
+                local data = container.getData()
+                job.contained_objects = data.ContainedObjects or {}
+                job.contained_index = 1
+            end
+        else
+            local contained = job.contained_objects[job.contained_index]
+            if contained == nil then
+                job.contained_objects = nil
+                job.container_index = job.container_index + 1
+            else
+                addSearchIndexEntry(job.search_index, contained)
+                job.contained_index = job.contained_index + 1
+                processed = processed + 1
+            end
+        end
+    end
+
+    Wait.frames(function()
+        buildSearchIndexForImport(job)
+    end, 1)
+end
+
+function spawnImportBatch(job)
+    local processed = 0
+
+    while processed < CONFIG.spawn_batch_size do
+        local request = job.requests[job.request_index]
+        if request == nil then
+            waitForImportSpawns(job)
+            return
+        end
+
+        local source = findSourceCard(request, job.search_index)
+        if source == nil then
+            table.insert(job.missing, request)
+        else
+            local spawn_position = buildSpawnPosition(job.spawn_index)
+            local object_data = deepCopy(source.data)
+            object_data.GUID = nil
+            job.expected_spawns = job.expected_spawns + 1
+            job.spawn_index = job.spawn_index + 1
+
+            spawnObjectData({
+                data = object_data,
+                position = spawn_position,
+                callback_function = function(spawned_object)
+                    applySpawnMetadata(spawned_object, request)
+                    table.insert(job.spawned, spawned_object)
+                end,
+            })
+        end
+
+        job.request_index = job.request_index + 1
+        processed = processed + 1
+    end
+
+    Wait.frames(function()
+        spawnImportBatch(job)
+    end, 1)
+end
+
+function waitForImportSpawns(job)
+    logMissingCards(job.missing)
+
+    if job.expected_spawns == 0 then
+        finalizeImportedDeck(job.payload, job.spawned, job.missing)
+        return
+    end
+
+    Wait.condition(
+        function()
+            finalizeImportedDeck(job.payload, job.spawned, job.missing)
+        end,
+        function()
+            return #job.spawned == job.expected_spawns and allObjectsResting(job.spawned)
+        end,
+        CONFIG.wait_timeout_seconds,
+        function()
+            print(string.format(
+                "Timed out while waiting for imported cards to finish spawning. Spawned %d of %d found cards.",
+                #job.spawned,
+                job.expected_spawns
+            ))
+            logMissingCards(job.missing)
+        end
+    )
 end
 
 function readSourceMetadata(card_data)
@@ -213,7 +311,7 @@ function allObjectsResting(objects)
     return true
 end
 
-function finalizeImportedDeck(payload, objects)
+function finalizeImportedDeck(payload, objects, missing)
     if #objects == 0 then
         print("No cards were spawned.")
         return
@@ -229,7 +327,37 @@ function finalizeImportedDeck(payload, objects)
         end
     end
 
-    print(string.format("Imported '%s' with %d spawned cards.", payload.deck.name, #objects))
+    local missing_count = #(missing or {})
+    if missing_count > 0 then
+        print(string.format(
+            "Imported '%s' with %d spawned cards and %d missing cards.",
+            payload.deck.name,
+            #objects,
+            missing_count
+        ))
+    else
+        print(string.format("Imported '%s' with %d spawned cards.", payload.deck.name, #objects))
+    end
+end
+
+function logMissingCards(missing)
+    if missing == nil or #missing == 0 then
+        return
+    end
+
+    local rows = {}
+    for index, request in ipairs(missing) do
+        table.insert(rows, string.format(
+            "%d. %s | id=%s | key=%s | role=%s",
+            index,
+            tostring(request.name or "-"),
+            tostring(request.card_id or "-"),
+            tostring(request.card_key or "-"),
+            tostring(request.role or "-")
+        ))
+    end
+
+    print("Missing Card Reader cards:\n" .. table.concat(rows, "\n"))
 end
 
 function applySpawnMetadata(object, request)
