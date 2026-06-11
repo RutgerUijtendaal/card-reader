@@ -1,5 +1,5 @@
 local CONFIG = {
-    source_container_guids = {
+    source_region_guids = {
         -- "abc123",
     },
     spawn_position = { x = -45, y = 3, z = 50 },
@@ -25,7 +25,7 @@ function importCardReaderDeck(encoded)
 end
 
 function inspectCardReaderLibrary()
-    local search_index = buildSearchIndex(CONFIG.source_container_guids)
+    local search_index = buildSearchIndex(CONFIG.source_region_guids)
     local rows = {}
 
     for _, entry in ipairs(search_index.entries) do
@@ -105,17 +105,14 @@ function countRequestedCards(requests)
     return total
 end
 
-function buildSearchIndex(container_guids)
+function buildSearchIndex(region_guids)
     local search_index = createSearchIndex()
 
-    for _, guid in ipairs(container_guids) do
-        local container = getObjectFromGUID(guid)
-        if container ~= nil then
-            local data = container.getData()
-            local contained_objects = data.ContainedObjects or {}
-
-            for _, contained in ipairs(contained_objects) do
-                addSearchIndexEntry(search_index, contained)
+    for _, guid in ipairs(region_guids) do
+        local region = getObjectFromGUID(guid)
+        if isScriptingRegion(region) then
+            for _, object in ipairs(region.getObjects()) do
+                addObjectToSearchIndex(search_index, object)
             end
         end
     end
@@ -144,13 +141,33 @@ function addSearchIndexEntry(search_index, contained)
     end
 end
 
+function addObjectToSearchIndex(search_index, object)
+    if object == nil or object.isDestroyed() then
+        return
+    end
+
+    local data = object.getData()
+    local contained_objects = data.ContainedObjects or {}
+
+    if #contained_objects > 0 then
+        for _, contained in ipairs(contained_objects) do
+            addSearchIndexEntry(search_index, contained)
+        end
+        return
+    end
+
+    addSearchIndexEntry(search_index, data)
+end
+
 function startImportJob(payload, requests)
     local job = {
         payload = payload,
         requests = requests,
         search_index = createSearchIndex(),
-        source_container_guids = CONFIG.source_container_guids,
-        container_index = 1,
+        source_region_guids = CONFIG.source_region_guids,
+        region_index = 1,
+        region_objects = nil,
+        region_object_index = 1,
         contained_objects = nil,
         contained_index = 1,
         request_index = 1,
@@ -173,32 +190,53 @@ function buildSearchIndexForImport(job)
     local processed = 0
 
     while processed < CONFIG.index_batch_size do
-        if job.contained_objects == nil then
-            local guid = job.source_container_guids[job.container_index]
+        if job.contained_objects ~= nil then
+            local contained = job.contained_objects[job.contained_index]
+            if contained == nil then
+                job.contained_objects = nil
+                job.region_object_index = job.region_object_index + 1
+            else
+                addSearchIndexEntry(job.search_index, contained)
+                job.contained_index = job.contained_index + 1
+                processed = processed + 1
+            end
+        elseif job.region_objects == nil then
+            local guid = job.source_region_guids[job.region_index]
             if guid == nil then
                 print(string.format("Indexed %d source cards.", #job.search_index.entries))
                 spawnImportBatch(job)
                 return
             end
 
-            local container = getObjectFromGUID(guid)
-            if container == nil then
-                print("Source container not found: " .. tostring(guid))
-                job.container_index = job.container_index + 1
+            local region = getObjectFromGUID(guid)
+            if region == nil then
+                print("Source scripting region not found: " .. tostring(guid))
+                job.region_index = job.region_index + 1
+            elseif not isScriptingRegion(region) then
+                print("Source GUID is not a scripting region: " .. tostring(guid))
+                job.region_index = job.region_index + 1
             else
-                local data = container.getData()
-                job.contained_objects = data.ContainedObjects or {}
-                job.contained_index = 1
+                job.region_objects = region.getObjects()
+                job.region_object_index = 1
             end
         else
-            local contained = job.contained_objects[job.contained_index]
-            if contained == nil then
-                job.contained_objects = nil
-                job.container_index = job.container_index + 1
+            local object = job.region_objects[job.region_object_index]
+            if object == nil then
+                job.region_objects = nil
+                job.region_index = job.region_index + 1
+            elseif object.isDestroyed() then
+                job.region_object_index = job.region_object_index + 1
             else
-                addSearchIndexEntry(job.search_index, contained)
-                job.contained_index = job.contained_index + 1
-                processed = processed + 1
+                local data = object.getData()
+                local contained_objects = data.ContainedObjects or {}
+                if #contained_objects > 0 then
+                    job.contained_objects = contained_objects
+                    job.contained_index = 1
+                else
+                    addSearchIndexEntry(job.search_index, data)
+                    job.region_object_index = job.region_object_index + 1
+                    processed = processed + 1
+                end
             end
         end
     end
@@ -206,6 +244,10 @@ function buildSearchIndexForImport(job)
     Wait.frames(function()
         buildSearchIndexForImport(job)
     end, 1)
+end
+
+function isScriptingRegion(object)
+    return object ~= nil and type(object.getObjects) == "function"
 end
 
 function spawnImportBatch(job)

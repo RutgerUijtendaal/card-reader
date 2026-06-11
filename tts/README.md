@@ -9,7 +9,7 @@ This directory contains the TTS-side importer for deck exports produced by the C
 3. Save the downloaded `.tts.txt` file or copy its base64 contents.
 4. Open Tabletop Simulator.
 5. Paste `tts/importer.lua` into the Global script or another script object.
-6. Configure the source card containers in `CONFIG.source_container_guids`.
+6. Configure the source scripting regions in `CONFIG.source_region_guids`.
 7. Run `importCardReaderDeck("...base64...")` inside TTS.
 
 ## Access Rules
@@ -67,7 +67,9 @@ avoid doing all clone/index/spawn work in a single blocking frame.
 
 ## How The Lua Importer Matches Cards
 
-The importer searches cards in the configured source containers by card name.
+The importer searches cards in the configured source scripting regions by card
+name. Put loose source cards, decks, or bags inside those regions before
+running the import.
 It first tries an exact normalized name match. If that fails, it falls back to
 one-character fuzzy name matching, which allows one missing or different
 character. Fuzzy matching only succeeds when exactly one source card matches;
@@ -80,11 +82,11 @@ Supported name sources:
 
 ## Example TTS Setup
 
-Set the source containers first:
+Set the source scripting regions first:
 
 ```lua
 local CONFIG = {
-    source_container_guids = {
+    source_region_guids = {
         "abc123",
         "def456",
     },
@@ -143,5 +145,6 @@ inspectCardReaderLibrary()
 
 - The importer clones from card object data already present in the TTS save.
 - It does not create custom cards from image URLs.
-- If your cards are loose on the table instead of inside bags/decks, the importer will need to be adapted.
+- Source cards must be inside a configured scripting region. Loose cards,
+  decks, and bags inside the region are supported.
 - Name-only matching depends on the exported Card Reader names matching the TTS card names closely.
