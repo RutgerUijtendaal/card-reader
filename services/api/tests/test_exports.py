@@ -30,11 +30,26 @@ def test_public_deck_tts_export_returns_base64_payload() -> None:
     assert response["Content-Type"].startswith("text/plain")
     assert "tts-export-deck.tts.txt" in response["Content-Disposition"]
     payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
-    assert payload["schema"] == "card-reader.tts-deck.v1"
-    assert payload["deck"]["id"] == deck.id
-    assert payload["deck"]["name"] == "TTS Export Deck"
-    assert payload["hero"]["card_id"] == hero.id
-    assert payload["hero"]["role"] == "hero"
+    assert payload == {
+        "schema": "card-reader.tts-deck.v1",
+        "deck": {
+            "name": "TTS Export Deck",
+            "description": "Export me",
+        },
+        "hero": {
+            "role": "hero",
+            "quantity": 1,
+            "name": hero.latest_version.name,
+        },
+        "cards": [
+            {
+                "role": "mainboard",
+                "quantity": 4,
+                "name": card.latest_version.name,
+            }
+            for card in mainboard_cards
+        ],
+    }
     assert len(payload["cards"]) == len(mainboard_cards)
     assert payload["cards"][0]["role"] == "mainboard"
 
@@ -85,7 +100,7 @@ def test_unlisted_deck_tts_export_is_visible_to_non_owner_by_link() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_tts_export_includes_sideboard_entries() -> None:
+def test_tts_export_omits_sideboard_entries_ignored_by_importer() -> None:
     owner = _create_user("tts-export-sideboard-owner", "password")
     hero = _create_card(name="TTS Export Sideboard Hero", is_hero=True)
     mainboard_cards = _build_mainboard_cards()
@@ -110,21 +125,8 @@ def test_tts_export_includes_sideboard_entries() -> None:
     assert response.status_code == 200
     payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
     assert len(payload["cards"]) == len(mainboard_cards)
-    assert payload["sideboards"] == [
-        {
-            "name": "Tech",
-            "cards": [
-                {
-                    "role": "sideboard",
-                    "quantity": 6,
-                    "card_id": sideboard_card.id,
-                    "card_key": sideboard_card.key,
-                    "name": sideboard_card.latest_version.name,
-                }
-            ],
-        }
-    ]
-    assert payload["deck"]["overall_total_cards"] == 66
+    assert "sideboards" not in payload
+    assert "overall_total_cards" not in payload["deck"]
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -162,9 +164,9 @@ def test_tts_export_preserves_saved_entry_order() -> None:
 
     assert response.status_code == 200
     payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
-    assert [card["card_id"] for card in payload["cards"][:2]] == [beta_card.id, alpha_card.id]
-    assert [card["card_id"] for card in payload["sideboards"][0]["cards"]] == [
-        sideboard_beta_card.id,
-        sideboard_alpha_card.id,
+    assert [card["name"] for card in payload["cards"][:2]] == [
+        beta_card.latest_version.name,
+        alpha_card.latest_version.name,
     ]
+    assert "sideboards" not in payload
 

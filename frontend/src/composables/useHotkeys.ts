@@ -1,5 +1,6 @@
 import { useEventListener } from '@vueuse/core';
 import { toValue, watchEffect, type MaybeRefOrGetter, type Ref } from 'vue';
+import type { HoverMode } from '@/composables/card-gallery/hoverMode';
 import { isEditableKeyboardTarget } from '@/utils/keyboard';
 
 type SearchTargetResolver = () => HTMLInputElement | null;
@@ -8,6 +9,11 @@ type GlobalNavigationHotkey = {
   sequence: readonly [prefix: string, key: string];
   enabled: boolean;
   onTrigger: () => void;
+};
+
+type HoverModeHotkeyActions = {
+  setHoverMode: (mode: HoverMode) => void;
+  clearHoverMode: () => void;
 };
 
 const primarySearchTargetResolvers: SearchTargetResolver[] = [];
@@ -155,6 +161,43 @@ export const handleGlobalNavigationHotkey = (
   return false;
 };
 
+export const handleHoverModeHotkey = (
+  event: KeyboardEvent,
+  actions: HoverModeHotkeyActions | null,
+): boolean => {
+  if (!actions || isEditableKeyboardTarget(event)) {
+    return false;
+  }
+
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return false;
+  }
+
+  const normalizedKey = event.key.toLowerCase();
+  if (normalizedKey === '1') {
+    event.preventDefault();
+    actions.setHoverMode('none');
+    return true;
+  }
+  if (normalizedKey === '2') {
+    event.preventDefault();
+    actions.clearHoverMode();
+    return true;
+  }
+  if (normalizedKey === '3') {
+    event.preventDefault();
+    actions.setHoverMode('enlarged');
+    return true;
+  }
+  if (normalizedKey === '4') {
+    event.preventDefault();
+    actions.setHoverMode('enlarged-details');
+    return true;
+  }
+
+  return false;
+};
+
 export const usePrimarySearchTarget = (
   target: Ref<HTMLInputElement | null>,
   enabled: MaybeRefOrGetter<boolean> = true,
@@ -188,5 +231,17 @@ export const useGlobalNavigationHotkeys = (
 
   useEventListener(window, 'keydown', (event) => {
     handleGlobalNavigationHotkey(event, toValue(hotkeys));
+  });
+};
+
+export const useHoverModeHotkeys = (
+  actions: MaybeRefOrGetter<HoverModeHotkeyActions | null>,
+): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  useEventListener(window, 'keydown', (event) => {
+    handleHoverModeHotkey(event, toValue(actions));
   });
 };

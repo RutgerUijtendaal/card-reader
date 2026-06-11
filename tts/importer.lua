@@ -3,9 +3,7 @@ local CONFIG = {
         -- "abc123",
     },
     spawn_position = { x = 0, y = 3, z = 0 },
-    column_spacing = 0.6,
-    row_spacing = 1.2,
-    cards_per_row = 8,
+    stack_y_spacing = 0.08,
     fuzzy_name_distance = 1,
     index_batch_size = 50,
     spawn_batch_size = 5,
@@ -21,7 +19,7 @@ function importCardReaderDeck(encoded)
     local payload = JSON.decode(json_text)
     validatePayload(payload)
 
-    startImportJob(payload, expandRequests(payload))
+    startImportJob(payload, buildImportRequests(payload))
 end
 
 function inspectCardReaderLibrary()
@@ -53,23 +51,56 @@ function validatePayload(payload)
     end
 end
 
-function expandRequests(payload)
+function buildImportRequests(payload)
     local requests = {}
 
     if type(payload.hero) == "table" and tonumber(payload.hero.quantity or 0) > 0 then
-        for _ = 1, payload.hero.quantity do
-            table.insert(requests, payload.hero)
-        end
+        addImportRequest(requests, payload.hero, "hero")
     end
 
     for _, entry in ipairs(payload.cards) do
-        local quantity = tonumber(entry.quantity or 0) or 0
-        for _ = 1, quantity do
-            table.insert(requests, entry)
-        end
+        addImportRequest(requests, entry, "mainboard")
     end
 
     return requests
+end
+
+function addImportRequest(requests, entry, fallback_role)
+    local quantity = math.floor(tonumber(entry.quantity or 0) or 0)
+    local name = trim(entry.name or "")
+    if quantity <= 0 or name == "" then
+        return
+    end
+
+    local role = tostring(entry.role or fallback_role)
+    local key = role .. "\n" .. normalizeLookupValue(name)
+    local existing = requests.by_key ~= nil and requests.by_key[key] or nil
+    if existing ~= nil then
+        existing.quantity = existing.quantity + quantity
+        existing.remaining = existing.remaining + quantity
+        return
+    end
+
+    local request = {
+        role = role,
+        quantity = quantity,
+        remaining = quantity,
+        name = name,
+        source_resolved = false,
+        source = nil,
+    }
+    table.insert(requests, request)
+
+    requests.by_key = requests.by_key or {}
+    requests.by_key[key] = request
+end
+
+function countRequestedCards(requests)
+    local total = 0
+    for _, request in ipairs(requests) do
+        total = total + request.quantity
+    end
+    return total
 end
 
 function buildSearchIndex(container_guids)
@@ -127,7 +158,12 @@ function startImportJob(payload, requests)
         missing = {},
     }
 
-    print(string.format("Importing '%s' with %d requested cards.", payload.deck.name, #requests))
+    print(string.format(
+        "Importing '%s' with %d card types and %d requested cards.",
+        payload.deck.name,
+        #requests,
+        countRequestedCards(requests)
+    ))
     buildSearchIndexForImport(job)
 end
 
@@ -180,33 +216,57 @@ function spawnImportBatch(job)
             return
         end
 
-        local source = findSourceCard(request, job.search_index)
-        if source == nil then
-            table.insert(job.missing, request)
+        if request.remaining <= 0 then
+            job.request_index = job.request_index + 1
         else
-            local spawn_position = buildSpawnPosition(job.spawn_index)
-            local object_data = deepCopy(source.data)
-            object_data.GUID = nil
-            job.expected_spawns = job.expected_spawns + 1
-            job.spawn_index = job.spawn_index + 1
+            if not request.source_resolved then
+                request.source = findSourceCard(request, job.search_index)
+                request.source_resolved = true
+            end
 
-            spawnObjectData({
-                data = object_data,
-                position = spawn_position,
-                callback_function = function(spawned_object)
-                    applySpawnMetadata(spawned_object, request)
-                    table.insert(job.spawned, spawned_object)
-                end,
-            })
+            if request.source == nil then
+                table.insert(job.missing, request)
+                job.request_index = job.request_index + 1
+                processed = processed + 1
+            else
+                spawnImportCard(job, request)
+                request.remaining = request.remaining - 1
+                processed = processed + 1
+                if request.remaining <= 0 then
+                    job.request_index = job.request_index + 1
+                end
+            end
         end
-
-        job.request_index = job.request_index + 1
-        processed = processed + 1
     end
 
     Wait.frames(function()
         spawnImportBatch(job)
     end, 1)
+end
+
+function spawnImportCard(job, request)
+    local spawn_position = buildSpawnPosition(job.spawn_index)
+    local object_data = deepCopy(request.source.data)
+    object_data.GUID = nil
+    job.expected_spawns = job.expected_spawns + 1
+    job.spawn_index = job.spawn_index + 1
+
+    spawnObjectData({
+        data = object_data,
+        position = spawn_position,
+        callback_function = function(spawned_object)
+            applySpawnMetadata(spawned_object, request)
+            table.insert(job.spawned, spawned_object)
+        end,
+    })
+end
+
+function countMissingCards(missing)
+    local total = 0
+    for _, request in ipairs(missing or {}) do
+        total = total + (tonumber(request.quantity or 0) or 0)
+    end
+    return total
 end
 
 function waitForImportSpawns(job)
@@ -338,13 +398,11 @@ end
 
 function buildSpawnPosition(index)
     local zero_based = index - 1
-    local column = zero_based % CONFIG.cards_per_row
-    local row = math.floor(zero_based / CONFIG.cards_per_row)
 
     return {
-        x = CONFIG.spawn_position.x + (column * CONFIG.column_spacing),
-        y = CONFIG.spawn_position.y,
-        z = CONFIG.spawn_position.z + (row * CONFIG.row_spacing),
+        x = CONFIG.spawn_position.x,
+        y = CONFIG.spawn_position.y + (zero_based * CONFIG.stack_y_spacing),
+        z = CONFIG.spawn_position.z,
     }
 end
 
@@ -374,7 +432,7 @@ function finalizeImportedDeck(payload, objects, missing)
         end
     end
 
-    local missing_count = #(missing or {})
+    local missing_count = countMissingCards(missing)
     if missing_count > 0 then
         print(string.format(
             "Imported '%s' with %d spawned cards and %d missing cards.",
@@ -395,9 +453,10 @@ function logMissingCards(missing)
     local rows = {}
     for index, request in ipairs(missing) do
         table.insert(rows, string.format(
-            "%d. %s | role=%s",
+            "%d. %s x%d | role=%s",
             index,
             tostring(request.name or "-"),
+            tonumber(request.quantity or 0) or 0,
             tostring(request.role or "-")
         ))
     end

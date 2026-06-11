@@ -27,43 +27,19 @@ The exported payload is a base64-encoded JSON object with this shape:
 {
   "schema": "card-reader.tts-deck.v1",
   "deck": {
-    "id": "deck-id",
     "name": "Deck Name",
-    "description": "Optional description",
-    "total_cards": 60,
-    "unique_cards": 15
-  },
-  "lookup": {
-    "preferred_keys": ["card_id", "card_key", "name"]
+    "description": "Optional description"
   },
   "hero": {
     "role": "hero",
     "quantity": 1,
-    "card_id": "hero-id",
-    "card_key": "hero-key",
     "name": "Hero Name"
   },
   "cards": [
     {
       "role": "mainboard",
       "quantity": 4,
-      "card_id": "card-id",
-      "card_key": "card-key",
       "name": "Card Name"
-    }
-  ],
-  "sideboards": [
-    {
-      "name": "Tech",
-      "cards": [
-        {
-          "role": "sideboard",
-          "quantity": 2,
-          "card_id": "sideboard-card-id",
-          "card_key": "sideboard-card-key",
-          "name": "Sideboard Card Name"
-        }
-      ]
     }
   ]
 }
@@ -71,7 +47,12 @@ The exported payload is a base64-encoded JSON object with this shape:
 
 Current importer behavior:
 - `cards` is the mainboard import list.
-- `sideboards` is exported for future use and is currently ignored by `tts/importer.lua`.
+- Sideboard entries are not exported because `tts/importer.lua` imports only the hero and mainboard cards.
+- Export quantities are kept as counted import requests. The importer resolves
+  each unique card name once, then spawns the requested number of copies from
+  the cached source data.
+- Spawned cards use the same `x`/`z` coordinates and a small increasing
+  `y` offset, creating a vertical stack at `CONFIG.spawn_position`.
 - Large imports are processed in small frame-scheduled batches so TTS can keep
   updating the UI between chunks.
 - Missing cards are logged to the TTS console and do not stop the rest of the

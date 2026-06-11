@@ -7,6 +7,8 @@
       <Keyboard class="h-4 w-4" />
       <span class="text-[11px] font-semibold uppercase tracking-[0.18em]">Hotkeys</span>
       <span class="text-[11px]">/</span>
+      <span class="text-[11px]">Alt 1-4</span>
+      <span class="text-[11px]">Alt Wheel</span>
       <span
         v-if="auth.authenticated"
         class="text-[11px]"
@@ -34,6 +36,14 @@
         <div class="flex items-center justify-between gap-3">
           <span class="opacity-80">Search</span>
           <span class="theme-hotkey-chip">/</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Hover Mode</span>
+          <span class="theme-hotkey-chip">Alt+1/2/3/4</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Hover Size</span>
+          <span class="theme-hotkey-chip">Alt+Wheel</span>
         </div>
         <div
           v-if="auth.authenticated"

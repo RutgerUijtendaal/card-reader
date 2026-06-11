@@ -1,7 +1,11 @@
-import { computed } from 'vue';
+import { computed, type ComputedRef, type WritableComputedRef } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
 import { DEFAULT_HOVER_MODE, isHoverMode, type HoverMode } from '@/composables/card-gallery/hoverMode';
-import { DEFAULT_HOVER_PREVIEW_SCALE, normalizeHoverPreviewScale } from '@/composables/card-gallery/hoverPreviewScale';
+import {
+  DEFAULT_HOVER_PREVIEW_SCALE,
+  HOVER_PREVIEW_SCALE_STEP,
+  normalizeHoverPreviewScale,
+} from '@/composables/card-gallery/hoverPreviewScale';
 import { GALLERY_OPTIONS_STORAGE_KEY } from '@/composables/useGalleryOptions';
 
 export type HoverModeSurface = 'gallery' | 'deckBuilder' | 'deckDetail';
@@ -13,13 +17,59 @@ type LegacyGalleryOptionsState = {
   tooltipEnabled?: boolean;
 };
 
+type HoverModePreferencesState = {
+  defaultHoverMode: WritableComputedRef<HoverMode>;
+  hoverPreviewScale: WritableComputedRef<number>;
+  getOverrideHoverMode: (surface: HoverModeSurface) => WritableComputedRef<HoverMode | null>;
+  getEffectiveHoverMode: (surface: HoverModeSurface) => ComputedRef<HoverMode>;
+};
+
 const DEFAULT_OVERRIDES: HoverModeOverrideState = {
   gallery: null,
   deckBuilder: null,
   deckDetail: null,
 };
+const HOVER_MODE_OVERRIDES_STORAGE_KEY = 'card-reader.hover-mode-overrides';
+let hoverModePreferencesState: HoverModePreferencesState | null = null;
 
 const normalizeHoverMode = (value: unknown): HoverMode => (isHoverMode(value) ? value : DEFAULT_HOVER_MODE);
+
+export const resolveHoverModeSurfacePath = (path: string): HoverModeSurface | null => {
+  if (path === '/cards') {
+    return 'gallery';
+  }
+  if (path === '/my/decks/new' || /^\/my\/decks\/[^/]+\/edit$/.test(path)) {
+    return 'deckBuilder';
+  }
+  if (/^\/decks\/[^/]+$/.test(path) || /^\/my\/decks\/[^/]+$/.test(path)) {
+    return 'deckDetail';
+  }
+  return null;
+};
+
+export const getHoverPreviewScaleForWheelDelta = (currentScale: number, deltaY: number): number => {
+  if (deltaY === 0) {
+    return normalizeHoverPreviewScale(currentScale);
+  }
+
+  const direction = deltaY < 0 ? 1 : -1;
+  const nextScale = normalizeHoverPreviewScale(currentScale) + direction * HOVER_PREVIEW_SCALE_STEP;
+  return normalizeHoverPreviewScale(Number(nextScale.toFixed(2)));
+};
+
+export const handleHoverPreviewScaleWheel = (
+  event: Pick<WheelEvent, 'altKey' | 'deltaY' | 'preventDefault'>,
+  currentScale: number,
+  setScale: (scale: number) => void,
+): boolean => {
+  if (!event.altKey) {
+    return false;
+  }
+
+  event.preventDefault();
+  setScale(getHoverPreviewScaleForWheelDelta(currentScale, event.deltaY));
+  return true;
+};
 
 const readLegacyDefaultHoverMode = (): HoverMode => {
   const stored = localStorage.getItem(GALLERY_OPTIONS_STORAGE_KEY);
@@ -38,10 +88,10 @@ const readLegacyDefaultHoverMode = (): HoverMode => {
   }
 };
 
-export const useHoverModePreferences = () => {
+const createHoverModePreferencesState = (): HoverModePreferencesState => {
   const storedDefaultHoverMode = useLocalStorage<HoverMode | null>('card-reader.default-hover-mode', null);
   const storedHoverPreviewScale = useLocalStorage<number>('card-reader.hover-preview-scale', DEFAULT_HOVER_PREVIEW_SCALE);
-  const storedOverrides = useLocalStorage<HoverModeOverrideState>('card-reader.hover-mode-overrides', DEFAULT_OVERRIDES, {
+  const storedOverrides = useLocalStorage<HoverModeOverrideState>(HOVER_MODE_OVERRIDES_STORAGE_KEY, DEFAULT_OVERRIDES, {
     mergeDefaults: true,
   });
 
@@ -86,10 +136,19 @@ export const useHoverModePreferences = () => {
   };
 };
 
+export const useHoverModePreferences = (): HoverModePreferencesState => {
+  hoverModePreferencesState ??= createHoverModePreferencesState();
+  return hoverModePreferencesState;
+};
+
+export const __resetHoverModePreferencesForTests = (): void => {
+  hoverModePreferencesState = null;
+};
+
 export const useHoverModeSurface = (surface: HoverModeSurface) => {
   const preferences = useHoverModePreferences();
   const overrideHoverMode = preferences.getOverrideHoverMode(surface);
-  const effectiveHoverMode = preferences.getEffectiveHoverMode(surface);
+  const effectiveHoverMode = computed<HoverMode>(() => overrideHoverMode.value ?? preferences.defaultHoverMode.value);
 
   const setOverrideHoverMode = (value: HoverMode): void => {
     overrideHoverMode.value = value;

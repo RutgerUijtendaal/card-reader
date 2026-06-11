@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   getModifierKeyLabel,
   handleGlobalNavigationHotkey,
+  handleHoverModeHotkey,
   handlePrimarySearchHotkey,
   registerPrimarySearchTarget,
   resetHotkeyStateForTests,
@@ -137,6 +138,65 @@ describe('useHotkeys', () => {
       ]),
     ).toBe(false);
     expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  test('hover mode hotkeys trigger the mapped actions', () => {
+    const setHoverMode = vi.fn();
+    const clearHoverMode = vi.fn();
+    const actions = { setHoverMode, clearHoverMode };
+
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '1', altKey: true, cancelable: true }), actions))
+      .toBe(true);
+    expect(setHoverMode).toHaveBeenLastCalledWith('none');
+
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '2', altKey: true, cancelable: true }), actions))
+      .toBe(true);
+    expect(clearHoverMode).toHaveBeenCalledOnce();
+
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '3', altKey: true, cancelable: true }), actions))
+      .toBe(true);
+    expect(setHoverMode).toHaveBeenLastCalledWith('enlarged');
+
+    const cardDetailsEvent = new KeyboardEvent('keydown', { key: '4', altKey: true, cancelable: true });
+    expect(handleHoverModeHotkey(cardDetailsEvent, actions)).toBe(true);
+    expect(setHoverMode).toHaveBeenLastCalledWith('enlarged-details');
+    expect(cardDetailsEvent.defaultPrevented).toBe(true);
+  });
+
+  test('hover mode hotkeys do nothing from editable fields', () => {
+    const setHoverMode = vi.fn();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const event = new KeyboardEvent('keydown', {
+      key: '1',
+      altKey: true,
+      cancelable: true,
+    });
+    Object.defineProperty(event, 'target', {
+      configurable: true,
+      value: input,
+    });
+
+    expect(handleHoverModeHotkey(event, { setHoverMode, clearHoverMode: vi.fn() })).toBe(false);
+    expect(setHoverMode).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  test('hover mode hotkeys ignore unrelated modifiers and keys', () => {
+    const setHoverMode = vi.fn();
+    const clearHoverMode = vi.fn();
+    const actions = { setHoverMode, clearHoverMode };
+
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '1', cancelable: true }), actions)).toBe(false);
+    expect(
+      handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '1', altKey: true, shiftKey: true, cancelable: true }), actions),
+    ).toBe(false);
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '5', altKey: true, cancelable: true }), actions))
+      .toBe(false);
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '1', altKey: true, cancelable: true }), null))
+      .toBe(false);
+    expect(setHoverMode).not.toHaveBeenCalled();
+    expect(clearHoverMode).not.toHaveBeenCalled();
   });
 
   test('modifier labels resolve by platform', () => {

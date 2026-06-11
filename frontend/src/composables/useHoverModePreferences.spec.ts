@@ -1,12 +1,20 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { DEFAULT_HOVER_MODE } from '@/composables/card-gallery/hoverMode';
 import { DEFAULT_HOVER_PREVIEW_SCALE } from '@/composables/card-gallery/hoverPreviewScale';
 import { GALLERY_OPTIONS_STORAGE_KEY } from '@/composables/useGalleryOptions';
-import { useHoverModePreferences, useHoverModeSurface } from '@/composables/useHoverModePreferences';
+import {
+  __resetHoverModePreferencesForTests,
+  getHoverPreviewScaleForWheelDelta,
+  handleHoverPreviewScaleWheel,
+  resolveHoverModeSurfacePath,
+  useHoverModePreferences,
+  useHoverModeSurface,
+} from '@/composables/useHoverModePreferences';
 
 describe('useHoverModePreferences', () => {
   beforeEach(() => {
+    __resetHoverModePreferencesForTests();
     localStorage.clear();
   });
 
@@ -103,5 +111,95 @@ describe('useHoverModePreferences', () => {
 
     expect(deckBuilder.overrideHoverMode.value).toBeNull();
     expect(deckBuilder.effectiveHoverMode.value).toBe('details');
+  });
+
+  test('surface override changes stay scoped to the selected surface', async () => {
+    const preferences = useHoverModePreferences();
+    const galleryOverride = preferences.getOverrideHoverMode('gallery');
+    const deckDetailOverride = preferences.getOverrideHoverMode('deckDetail');
+    const galleryEffective = preferences.getEffectiveHoverMode('gallery');
+    const deckDetailEffective = preferences.getEffectiveHoverMode('deckDetail');
+
+    preferences.defaultHoverMode.value = 'details';
+    galleryOverride.value = 'none';
+    deckDetailOverride.value = 'enlarged';
+    await nextTick();
+
+    expect(galleryEffective.value).toBe('none');
+    expect(deckDetailEffective.value).toBe('enlarged');
+
+    galleryOverride.value = 'enlarged-details';
+    await nextTick();
+
+    expect(galleryEffective.value).toBe('enlarged-details');
+    expect(deckDetailEffective.value).toBe('enlarged');
+
+    galleryOverride.value = null;
+    await nextTick();
+
+    expect(galleryOverride.value).toBeNull();
+    expect(galleryEffective.value).toBe('details');
+    expect(deckDetailEffective.value).toBe('enlarged');
+  });
+
+  test('surface override writes preserve newer changes from other preference instances', async () => {
+    const firstPreferences = useHoverModePreferences();
+    const secondPreferences = useHoverModePreferences();
+    const firstGalleryOverride = firstPreferences.getOverrideHoverMode('gallery');
+    const secondDeckBuilderOverride = secondPreferences.getOverrideHoverMode('deckBuilder');
+
+    secondDeckBuilderOverride.value = 'enlarged';
+    await nextTick();
+
+    firstGalleryOverride.value = 'none';
+    await nextTick();
+
+    const stored = JSON.parse(localStorage.getItem('card-reader.hover-mode-overrides') ?? '{}') as Record<string, unknown>;
+    expect(stored).toMatchObject({
+      gallery: 'none',
+      deckBuilder: 'enlarged',
+    });
+  });
+
+  test('resolves route paths to hover mode surfaces', () => {
+    expect(resolveHoverModeSurfacePath('/cards')).toBe('gallery');
+    expect(resolveHoverModeSurfacePath('/decks/deck-1')).toBe('deckDetail');
+    expect(resolveHoverModeSurfacePath('/my/decks/deck-1')).toBe('deckDetail');
+    expect(resolveHoverModeSurfacePath('/my/decks/new')).toBe('deckBuilder');
+    expect(resolveHoverModeSurfacePath('/my/decks/deck-1/edit')).toBe('deckBuilder');
+    expect(resolveHoverModeSurfacePath('/cards/card-1')).toBeNull();
+    expect(resolveHoverModeSurfacePath('/settings')).toBeNull();
+  });
+
+  test('wheel delta adjusts hover preview scale by one bounded step', () => {
+    expect(getHoverPreviewScaleForWheelDelta(1, -100)).toBe(1.05);
+    expect(getHoverPreviewScaleForWheelDelta(1, 100)).toBe(0.95);
+    expect(getHoverPreviewScaleForWheelDelta(1.2, -100)).toBe(1.2);
+    expect(getHoverPreviewScaleForWheelDelta(0.8, 100)).toBe(0.8);
+    expect(getHoverPreviewScaleForWheelDelta(1.05, 0)).toBe(1.05);
+  });
+
+  test('alt wheel prevents default and updates hover preview scale', () => {
+    let scale = 1;
+    const preventDefault = vi.fn();
+
+    expect(handleHoverPreviewScaleWheel({ altKey: true, deltaY: -100, preventDefault }, scale, (value) => {
+      scale = value;
+    })).toBe(true);
+
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(scale).toBe(1.05);
+  });
+
+  test('normal wheel does not prevent default or update hover preview scale', () => {
+    let scale = 1;
+    const preventDefault = vi.fn();
+
+    expect(handleHoverPreviewScaleWheel({ altKey: false, deltaY: -100, preventDefault }, scale, (value) => {
+      scale = value;
+    })).toBe(false);
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(scale).toBe(1);
   });
 });

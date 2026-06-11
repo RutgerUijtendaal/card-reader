@@ -88,19 +88,27 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useLocalStorage, useMediaQuery, useResizeObserver } from '@vueuse/core';
+import { useEventListener, useLocalStorage, useMediaQuery, useResizeObserver } from '@vueuse/core';
 import { Menu } from 'lucide-vue-next';
 import { Toaster } from 'vue-sonner';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AppShellNav from '@/components/app/AppShellNav.vue';
-import { useGlobalNavigationHotkeys, usePrimarySearchHotkeys } from '@/composables/useHotkeys';
+import { useGlobalNavigationHotkeys, useHoverModeHotkeys, usePrimarySearchHotkeys } from '@/composables/useHotkeys';
 import { provideScrollContainer } from '@/composables/useScrollContainer';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildContextualNewDeckEditorLocation } from '@/composables/decks/deckRouteState';
+import type { HoverMode } from '@/composables/card-gallery/hoverMode';
+import {
+  handleHoverPreviewScaleWheel,
+  resolveHoverModeSurfacePath,
+  useHoverModePreferences,
+  type HoverModeSurface,
+} from '@/composables/useHoverModePreferences';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const hoverModePreferences = useHoverModePreferences();
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const pageHeaderOutletRef = ref<HTMLElement | null>(null);
 const pageHeaderHeight = ref('0px');
@@ -119,10 +127,50 @@ const globalNavigationHotkeys = computed(() => [
     },
   },
 ]);
+const hoverModeOverrides = {
+  gallery: hoverModePreferences.getOverrideHoverMode('gallery'),
+  deckBuilder: hoverModePreferences.getOverrideHoverMode('deckBuilder'),
+  deckDetail: hoverModePreferences.getOverrideHoverMode('deckDetail'),
+} satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
+const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
+const hoverModeHotkeyActions = computed(() => {
+  const surface = activeHoverModeSurface.value;
+  if (surface === null) {
+    return null;
+  }
+
+  const hoverModeOverride = hoverModeOverrides[surface];
+  return {
+    setHoverMode: (mode: HoverMode) => {
+      hoverModeOverride.value = mode;
+    },
+    clearHoverMode: () => {
+      hoverModeOverride.value = null;
+    },
+  };
+});
 
 provideScrollContainer(scrollContainerRef);
 usePrimarySearchHotkeys();
 useGlobalNavigationHotkeys(globalNavigationHotkeys);
+useHoverModeHotkeys(hoverModeHotkeyActions);
+
+if (typeof window !== 'undefined') {
+  useEventListener(
+    window,
+    'wheel',
+    (event) => {
+      handleHoverPreviewScaleWheel(
+        event,
+        hoverModePreferences.hoverPreviewScale.value,
+        (scale) => {
+          hoverModePreferences.hoverPreviewScale.value = scale;
+        },
+      );
+    },
+    { passive: false },
+  );
+}
 
 useResizeObserver(pageHeaderOutletRef, ([entry]) => {
   pageHeaderHeight.value = `${Math.round(entry.contentRect.height)}px`;
