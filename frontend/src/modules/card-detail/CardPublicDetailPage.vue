@@ -39,7 +39,17 @@
     </AppPageHeader>
 
     <div
-      v-if="selectedVersion"
+      v-if="isLoadingInitial"
+      class="w-full"
+    >
+      <CardDetailLoadingSkeleton
+        mode="public"
+        :show-pager="hasGalleryContext"
+      />
+    </div>
+
+    <div
+      v-else-if="selectedVersion"
       class="w-full"
     >
       <div class="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(28rem,35vw)]">
@@ -116,6 +126,7 @@ import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import { useReviewSummary } from '@/composables/useReviewSummary';
 import CardDeckReferencesPanel from '@/modules/card-detail/components/CardDeckReferencesPanel.vue';
+import CardDetailLoadingSkeleton from '@/modules/card-detail/components/CardDetailLoadingSkeleton.vue';
 import CardDetailPager from '@/modules/card-detail/components/CardDetailPager.vue';
 import CardVersionParseFlagModal from '@/modules/card-detail/components/CardVersionParseFlagModal.vue';
 import CardVersionSelectorGrid from '@/modules/card-detail/components/CardVersionSelectorGrid.vue';
@@ -136,6 +147,7 @@ const {
   selectedVersionId,
   selectedVersion,
   symbolByKey,
+  isLoadingInitial,
   canEdit,
   backButtonLabel,
   hasGalleryContext,

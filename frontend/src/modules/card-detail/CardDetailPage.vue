@@ -45,7 +45,17 @@
     </AppPageHeader>
 
     <div
-      v-if="selectedVersion"
+      v-if="isLoadingInitial"
+      class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0"
+    >
+      <CardDetailLoadingSkeleton
+        mode="editor"
+        :show-pager="hasGalleryContext"
+      />
+    </div>
+
+    <div
+      v-else-if="selectedVersion"
       class="app-scrollbar min-h-0 w-full flex-1 overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0"
     >
       <div class="grid min-h-full items-start gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(30rem,40vw)] xl:items-stretch xl:overflow-hidden">
@@ -147,6 +157,7 @@ import { useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { buildAdminCardMergeSourceLocation } from '@/composables/admin/adminRouteState';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
+import CardDetailLoadingSkeleton from '@/modules/card-detail/components/CardDetailLoadingSkeleton.vue';
 import CardDetailPager from '@/modules/card-detail/components/CardDetailPager.vue';
 import CardVersionEditorPane from '@/modules/card-detail/components/CardVersionEditorPane.vue';
 import CardVersionOverviewPane from '@/components/cards/CardVersionOverviewPane.vue';
@@ -172,6 +183,7 @@ const {
   reparseTemplates,
   reparseTemplateId,
   isSaving,
+  isLoadingInitial,
   isQueuingReparse,
   promotingVersionId,
   saveMessage,

@@ -27,6 +27,8 @@ export const useCardPublicDetailState = () => {
   const selectedVersionId = ref<string>('');
   const symbolByKey = ref<SymbolLookupMap>({});
   const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
+  const isLoadingInitial = ref(false);
+  let loadRequestId = 0;
 
   const selectedVersion = computed<CardVersionDetail | null>(
     () => versions.value.find((version) => version.version_id === selectedVersionId.value) ?? null,
@@ -36,22 +38,34 @@ export const useCardPublicDetailState = () => {
   const backButtonLabel = computed(() => `Back to ${getCardReturnLabel(route.query)}`);
 
   const loadCard = async (): Promise<void> => {
+    const requestId = ++loadRequestId;
     const cardId = String(route.params.id);
-    const [cardResponse, versionsResponse, filtersResponse] = await Promise.all([
-      api.get<CardDetail>(`/cards/${cardId}`),
-      api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
-      api.get<CardFiltersResponse>('/cards/filters'),
-    ]);
+    isLoadingInitial.value = true;
+    try {
+      const [cardResponse, versionsResponse, filtersResponse] = await Promise.all([
+        api.get<CardDetail>(`/cards/${cardId}`),
+        api.get<CardVersionDetail[]>(`/cards/${cardId}/generations`),
+        api.get<CardFiltersResponse>('/cards/filters'),
+      ]);
 
-    card.value = cardResponse.data;
-    versions.value = versionsResponse.data;
-    symbolByKey.value = Object.fromEntries(
-      (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
-    );
-    selectedVersionId.value =
-      versions.value.find((version) => version.is_latest)?.version_id ??
-      versions.value[0]?.version_id ??
-      '';
+      if (requestId !== loadRequestId) {
+        return;
+      }
+
+      card.value = cardResponse.data;
+      versions.value = versionsResponse.data;
+      symbolByKey.value = Object.fromEntries(
+        (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
+      );
+      selectedVersionId.value =
+        versions.value.find((version) => version.is_latest)?.version_id ??
+        versions.value[0]?.version_id ??
+        '';
+    } finally {
+      if (requestId === loadRequestId) {
+        isLoadingInitial.value = false;
+      }
+    }
   };
 
   const goBack = (): void => {
@@ -99,6 +113,7 @@ export const useCardPublicDetailState = () => {
     selectedVersionId,
     selectedVersion,
     symbolByKey,
+    isLoadingInitial,
     canEdit,
     backButtonLabel,
     hasGalleryContext: galleryNavigation.hasGalleryContext,
