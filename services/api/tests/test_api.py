@@ -1378,11 +1378,13 @@ def test_cards_list_query_count_does_not_scale_linearly() -> None:
 def test_cards_list_can_return_card_groups() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Grouped Anchor")
     member_card, member_version = _create_editable_card_version(name="Grouped Member")
+    extra_card, extra_version = _create_editable_card_version(name="Grouped Extra")
     standalone_card, standalone_version = _create_editable_card_version(name="Grouped Standalone")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
+    _create_card_image(extra_version)
     _create_card_image(standalone_version)
-    _create_card_group("transform-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+    _create_card_group("transform-group", anchor_card=anchor_card, members=[anchor_card, member_card, extra_card])
 
     response = Client(HTTP_HOST="localhost").get("/cards", {"show_groups": "true"})
 
@@ -1392,10 +1394,34 @@ def test_cards_list_can_return_card_groups() -> None:
     card_rows = [row for row in payload["results"] if row["result_type"] == "card"]
     assert len(group_rows) == 1
     assert group_rows[0]["anchor_card_id"] == anchor_card.id
-    assert group_rows[0]["member_count"] == 2
+    assert group_rows[0]["member_count"] == 3
+    assert [row["card_id"] for row in group_rows[0]["preview_cards"]] == [
+        anchor_card.id,
+        member_card.id,
+        extra_card.id,
+    ]
     assert standalone_card.id in {row["id"] for row in card_rows}
     assert anchor_card.id not in {row["id"] for row in card_rows}
     assert member_card.id not in {row["id"] for row in card_rows}
+    assert extra_card.id not in {row["id"] for row in card_rows}
+
+
+def test_grouped_gallery_preview_images_do_not_query_per_member() -> None:
+    cards = []
+    for index in range(7):
+        card, version = _create_editable_card_version(name=f"Grouped Query Member {index}")
+        _create_card_image(version)
+        cards.append(card)
+    _create_card_group("grouped-query-members", anchor_card=cards[0], members=cards)
+
+    client = Client(HTTP_HOST="localhost")
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get("/cards", {"show_groups": "true", "q": "Grouped Query Member", "page_size": 100})
+
+    assert response.status_code == 200
+    group = next(row for row in response.json()["results"] if row["result_type"] == "card_group")
+    assert len(group["preview_cards"]) == len(cards)
+    assert len(queries) <= 22
 
 
 def test_grouped_gallery_hides_deprecated_linked_cards_by_default() -> None:

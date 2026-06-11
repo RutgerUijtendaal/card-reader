@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db import transaction
 from django.db.models import Prefetch, QuerySet
 
-from card_reader_core.models import Card, CardGroup, CardGroupMember
+from card_reader_core.models import Card, CardGroup, CardGroupMember, CardVersionImage
 
 
 def card_group_key_exists(*, key: str, exclude_id: str | None = None) -> bool:
@@ -92,6 +92,13 @@ def _group_queryset() -> QuerySet[CardGroup]:
                 "card__latest_version",
                 "card__latest_version__template",
                 "card__latest_version__previous_version",
-            ).order_by("position", "created_at"),
+            )
+            .prefetch_related(
+                Prefetch(
+                    "card__latest_version__images",
+                    queryset=CardVersionImage.objects.order_by("-created_at"),
+                )
+            )
+            .order_by("position", "created_at"),
         )
     )

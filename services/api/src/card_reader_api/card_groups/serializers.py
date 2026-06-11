@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
@@ -9,15 +11,31 @@ from card_reader_core.models import (
     CardGroup,
     CardGroupMember,
     CardLifecycleFilter,
+    CardVersion,
+    CardVersionImage,
     card_is_visible_for_lifecycle,
 )
-from card_reader_core.repositories.cards import get_card_image
+from card_reader_core.repositories.cards import get_card_image, resolve_image_file_path
 from card_reader_core.services.cards import get_card_version_metadata
 
 
 def card_group_visible_members(group: CardGroup, lifecycle_status: CardLifecycleFilter) -> list[CardGroupMember]:
-    members = list(group.members.all())
+    members = sorted(group.members.all(), key=lambda member: (member.position, member.id))
     return [member for member in members if card_is_visible_for_lifecycle(member.card, lifecycle_status)]
+
+
+def _get_card_version_image(version: CardVersion) -> CardVersionImage | None:
+    prefetched = cast(list[CardVersionImage] | None, getattr(version, "_prefetched_objects_cache", {}).get("images"))
+    if prefetched is None:
+        return get_card_image(version.id)
+
+    first_image = None
+    for image in prefetched:
+        if first_image is None:
+            first_image = image
+        if resolve_image_file_path(image) is not None:
+            return image
+    return first_image
 
 
 def card_group_gallery_payload(
@@ -28,11 +46,11 @@ def card_group_gallery_payload(
     members = card_group_visible_members(group, lifecycle_status)
     anchor_card_id = group.anchor_card.id
     preview_cards = []
-    for member in members[:3]:
+    for member in members:
         version = member.card.latest_version
         if version is None:
             continue
-        image = get_card_image(version.id)
+        image = _get_card_version_image(version)
         preview_cards.append(
             {
                 "card_id": member.card.id,
@@ -66,7 +84,7 @@ def card_group_detail_payload(
         version = member.card.latest_version
         if version is None:
             continue
-        image = get_card_image(version.id)
+        image = _get_card_version_image(version)
         members_payload.append(
             {
                 "position": member.position,
@@ -107,7 +125,7 @@ def card_group_admin_payload(group: CardGroup) -> dict[str, object]:
 
 def card_group_member_admin_payload(member: CardGroupMember, anchor_card_id: str) -> dict[str, object]:
     version = member.card.latest_version
-    image = None if version is None else get_card_image(version.id)
+    image = None if version is None else _get_card_version_image(version)
     card_id = member.card.id
     return {
         "card_id": card_id,

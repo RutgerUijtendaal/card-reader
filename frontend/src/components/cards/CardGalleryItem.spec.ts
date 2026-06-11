@@ -3,7 +3,14 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import type { GalleryDisplayItem } from '@/components/cards/galleryDisplayItems';
-import type { CardListItem } from '@/modules/card-detail/types';
+import { fetchHoverPreviewCard } from '@/components/cards/cardHoverPreview';
+import type { CardGroupGalleryItem, CardListItem } from '@/modules/card-detail/types';
+
+vi.mock('@/components/cards/cardHoverPreview', () => ({
+  fetchHoverPreviewCard: vi.fn(),
+}));
+
+const fetchHoverPreviewCardMock = vi.mocked(fetchHoverPreviewCard);
 
 const buildCard = (): CardListItem => ({
   id: 'card-1',
@@ -39,6 +46,37 @@ const buildCardWithImage = (): CardListItem => ({
   image_url: '/cards/card-1/image',
 });
 
+const buildCardGroup = (): CardGroupGalleryItem => ({
+  id: 'group-1',
+  result_type: 'card_group',
+  group_id: 'group-1',
+  group_key: 'group-1',
+  group_name: 'Group 1',
+  anchor_card_id: 'card-1',
+  anchor_card_name: 'Card 1',
+  member_count: 3,
+  preview_cards: [
+    {
+      card_id: 'card-1',
+      position: 1,
+      name: 'Card 1',
+      image_url: '/cards/card-1/image',
+    },
+    {
+      card_id: 'card-2',
+      position: 2,
+      name: 'Card 2',
+      image_url: '/cards/card-2/image',
+    },
+    {
+      card_id: 'card-3',
+      position: 3,
+      name: 'Card 3',
+      image_url: '/cards/card-3/image',
+    },
+  ],
+});
+
 const mountCardGalleryItem = async (
   card: GalleryDisplayItem,
   props: Record<string, unknown> = {},
@@ -52,6 +90,7 @@ const mountCardGalleryItem = async (
     routes: [
       { path: '/cards', component: { template: '<div />' } },
       { path: '/cards/:id', component: { template: '<div />' } },
+      { path: '/card-groups/:id', component: { template: '<div />' } },
     ],
   });
   await router.push('/cards');
@@ -81,6 +120,7 @@ describe('CardGalleryItem', () => {
     document.body.innerHTML = '';
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    fetchHoverPreviewCardMock.mockReset();
   });
 
   test('renders the non-interactive loading shim layout regions', async () => {
@@ -225,6 +265,64 @@ describe('CardGalleryItem', () => {
     await nextTick();
 
     expect(document.body.querySelector('.shared-element-hover-panel-reduced-motion')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('renders real group member cards behind the anchor card', async () => {
+    const mounted = await mountCardGalleryItem(buildCardGroup());
+
+    const restingCards = mounted.container.querySelectorAll('[data-card-group-resting-card-id]');
+    expect(restingCards).toHaveLength(2);
+    expect(restingCards[0]?.getAttribute('data-card-group-resting-card-id')).toBe('card-2');
+    expect(restingCards[1]?.getAttribute('data-card-group-resting-card-id')).toBe('card-3');
+    expect(restingCards[0]?.querySelector('img')?.getAttribute('src')).toContain('/cards/card-2/image');
+    expect(restingCards[1]?.querySelector('img')?.getAttribute('src')).toContain('/cards/card-3/image');
+
+    mounted.unmount();
+  });
+
+  test('renders unfolded group member cards for every preview card', async () => {
+    const mounted = await mountCardGalleryItem(buildCardGroup());
+
+    const stackCards = mounted.container.querySelectorAll('[data-card-group-stack-card-id]');
+    expect(stackCards).toHaveLength(3);
+    expect(Array.from(stackCards).map((element) => element.querySelector('img')?.getAttribute('alt'))).toEqual([
+      'Card 1',
+      'Card 2',
+      'Card 3',
+    ]);
+
+    mounted.unmount();
+  });
+
+  test('fetches hover tooltip details for the actively hovered group stack member', async () => {
+    fetchHoverPreviewCardMock.mockResolvedValue({
+      ...buildCard(),
+      id: 'card-2',
+      key: 'card-2',
+      name: 'Card 2',
+      label: 'Card 2',
+      image_url: '/cards/card-2/image',
+    });
+    const mounted = await mountCardGalleryItem(buildCardGroup(), {
+      hoverMode: 'details',
+    });
+    const root = mounted.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) {
+      throw new Error('expected card root');
+    }
+    const stackMember = mounted.container.querySelector('[data-card-group-stack-card-id="card-2"]');
+    if (!(stackMember instanceof HTMLElement)) {
+      throw new Error('expected group stack member');
+    }
+
+    root.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    stackMember.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await nextTick();
+    await nextTick();
+
+    expect(fetchHoverPreviewCardMock).toHaveBeenLastCalledWith('card-2');
 
     mounted.unmount();
   });
