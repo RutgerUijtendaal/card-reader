@@ -35,7 +35,8 @@ export const deleteDeck = async (deckId: string): Promise<void> => {
   await api.delete(`/my/decks/${deckId}`);
 };
 
-export const exportDeckTts = async (deckId: string): Promise<Blob> => {
-  const response = await api.get<Blob>(`/decks/${deckId}/exports/tts`, { responseType: 'blob' });
+export const exportDeckTts = async (deckId: string, sideboardId?: string): Promise<Blob> => {
+  const params = sideboardId ? { sideboard_id: sideboardId } : undefined;
+  const response = await api.get<Blob>(`/decks/${deckId}/exports/tts`, { params, responseType: 'blob' });
   return response.data;
 };

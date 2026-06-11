@@ -4,10 +4,11 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import DeckDetailPage from '@/modules/decks/DeckDetailPage.vue';
 
-const { fetchDeckDetailMock, fetchMyDeckMock, apiGetMock } = vi.hoisted(() => ({
+const { fetchDeckDetailMock, fetchMyDeckMock, apiGetMock, exportTtsDeckMock } = vi.hoisted(() => ({
   fetchDeckDetailMock: vi.fn(),
   fetchMyDeckMock: vi.fn(),
   apiGetMock: vi.fn(),
+  exportTtsDeckMock: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/api/client', () => ({
@@ -30,7 +31,7 @@ vi.mock('@/modules/decks/api', () => ({
 
 vi.mock('@/composables/useDeckExport', () => ({
   useDeckExport: () => ({
-    exportTtsDeck: vi.fn(),
+    exportTtsDeck: exportTtsDeckMock,
   }),
 }));
 
@@ -241,6 +242,7 @@ describe('DeckDetailPage type grouping', () => {
     fetchDeckDetailMock.mockResolvedValue(deckRecord);
     fetchMyDeckMock.mockResolvedValue(deckRecord);
     apiGetMock.mockResolvedValue({ data: filtersPayload });
+    exportTtsDeckMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -325,6 +327,51 @@ describe('DeckDetailPage type grouping', () => {
     expect(readTypeGroupKeys(mounted.container)).toEqual(['attachment']);
     expect(mounted.container.textContent).toContain('Attachment Card');
     expect(mounted.container.textContent).not.toContain('Spell Card');
+
+    mounted.unmount();
+  });
+
+  test('exports the active board to TTS with matching button copy', async () => {
+    const mounted = await mountPage();
+    const mainboardExportButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Export Mainboard TTS'),
+    );
+    if (!(mainboardExportButton instanceof HTMLButtonElement)) {
+      throw new Error('expected mainboard export button');
+    }
+
+    mainboardExportButton.click();
+    await nextTick();
+
+    expect(exportTtsDeckMock).toHaveBeenLastCalledWith('deck-1', 'Grouped Deck', {
+      successMessage: 'TTS mainboard exported',
+    });
+
+    const sideboardButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Sideboard'),
+    );
+    if (!(sideboardButton instanceof HTMLButtonElement)) {
+      throw new Error('expected sideboard tab');
+    }
+
+    sideboardButton.click();
+    await nextTick();
+
+    const sideboardExportButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Export Sideboard TTS'),
+    );
+    if (!(sideboardExportButton instanceof HTMLButtonElement)) {
+      throw new Error('expected sideboard export button');
+    }
+
+    sideboardExportButton.click();
+    await nextTick();
+
+    expect(exportTtsDeckMock).toHaveBeenLastCalledWith('deck-1', 'Grouped Deck', {
+      sideboardId: 'side-1',
+      exportName: 'Grouped Deck - Sideboard',
+      successMessage: 'TTS sideboard exported',
+    });
 
     mounted.unmount();
   });

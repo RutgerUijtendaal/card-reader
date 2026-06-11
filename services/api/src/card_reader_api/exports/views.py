@@ -10,7 +10,7 @@ from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.responses import not_found, serializer_error
-from card_reader_api.exports.tts import encode_tts_deck_export, tts_export_filename
+from card_reader_api.exports.tts import encode_tts_deck_export, get_tts_export_sideboard, tts_export_filename
 from card_reader_core.repositories.exports import export_cards_csv
 from card_reader_core.services.decks import DeckService
 
@@ -67,8 +67,13 @@ class DeckTtsExportView(APIView):
         if deck is None:
             return not_found("Deck not found")
 
-        content = encode_tts_deck_export(deck)
-        filename = tts_export_filename(deck.name)
+        sideboard_id = request.query_params.get("sideboard_id")
+        sideboard = get_tts_export_sideboard(deck, sideboard_id)
+        if sideboard_id is not None and sideboard is None:
+            return not_found("Sideboard not found")
+
+        content = encode_tts_deck_export(deck, sideboard_id=sideboard_id)
+        filename = tts_export_filename(deck.name, sideboard_name=sideboard.name if sideboard is not None else None)
         response = HttpResponse(content, content_type="text/plain; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response

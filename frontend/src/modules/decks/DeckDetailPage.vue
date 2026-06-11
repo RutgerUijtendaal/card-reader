@@ -45,7 +45,7 @@
           @click="handleTtsExport"
         >
           <Download class="h-4 w-4" />
-          <span>Export TTS</span>
+          <span>{{ ttsExportButtonLabel }}</span>
         </button>
         <RouterLink
           v-if="canEdit"
@@ -345,6 +345,9 @@ const activeBoardEntries = computed<DeckEntrySummary[]>(() => {
 const activeBoardTitle = computed(() =>
   activeBoardId.value === 'mainboard' ? 'Mainboard' : (activeSideboard.value?.name ?? 'Sideboard'),
 );
+const ttsExportButtonLabel = computed(() =>
+  activeBoardId.value === 'mainboard' ? 'Export Mainboard TTS' : 'Export Sideboard TTS',
+);
 const activeBoardEmptyLabel = computed(() =>
   activeBoardId.value === 'mainboard' ? 'This deck does not have any mainboard cards yet.' : 'This sideboard does not have any cards yet.',
 );
@@ -398,7 +401,17 @@ const handleTtsExport = async (): Promise<void> => {
   if (!deck.value) {
     return;
   }
-  await exportTtsDeck(deck.value.id, deck.value.name);
+  if (activeSideboard.value) {
+    await exportTtsDeck(deck.value.id, deck.value.name, {
+      sideboardId: activeSideboard.value.id,
+      exportName: `${deck.value.name} - ${activeSideboard.value.name}`,
+      successMessage: 'TTS sideboard exported',
+    });
+    return;
+  }
+  await exportTtsDeck(deck.value.id, deck.value.name, {
+    successMessage: 'TTS mainboard exported',
+  });
 };
 
 const copyShareLink = async (): Promise<void> => {

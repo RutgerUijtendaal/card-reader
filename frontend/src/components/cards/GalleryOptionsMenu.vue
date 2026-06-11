@@ -34,7 +34,7 @@
             :options="hoverModeMenuOptions"
             :selected-value="hoverMode"
             :selection-active="hoverModeOverrideActive"
-            :default-option="allowHoverModeDefaultOption ? { label: 'Use Global Default', description: defaultHoverModeLabel, hotkey: 'Alt+2' } : null"
+            :default-option="allowHoverModeDefaultOption ? { label: 'Use Global Default', description: defaultHoverModeLabel, hotkey: 'Alt+5' } : null"
             @select="handleHoverModeSelect"
             @reset="handleHoverModeReset"
           />
@@ -174,7 +174,8 @@ const { isOpen, triggerRef, panelRef, x, y, toggle, close } = useFloatingPopover
 const hoverModeOptions = HOVER_MODE_OPTIONS;
 const hoverModeHotkeys: Partial<Record<HoverMode, string>> = {
   none: 'Alt+1',
-  enlarged: 'Alt+3',
+  enlarged: 'Alt+2',
+  details: 'Alt+3',
   'enlarged-details': 'Alt+4',
 };
 const hoverModeMenuOptions = computed<PopoverOptionItem[]>(() =>

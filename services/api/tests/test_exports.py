@@ -130,6 +130,76 @@ def test_tts_export_omits_sideboard_entries_ignored_by_importer() -> None:
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_tts_export_can_target_one_sideboard() -> None:
+    owner = _create_user("tts-export-target-sideboard-owner", "password")
+    hero = _create_card(name="TTS Export Target Sideboard Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    sideboard_card = _create_card(name="TTS Target Sideboard Card", is_hero=False)
+    other_sideboard_card = _create_card(name="TTS Other Sideboard Card", is_hero=False)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Targeted Deck",
+        description="Sideboard export",
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[
+            DeckSideboardInput(
+                name="Tech",
+                entries=[DeckEntryInput(card_id=sideboard_card.id, quantity=6)],
+            ),
+            DeckSideboardInput(
+                name="Practice",
+                entries=[DeckEntryInput(card_id=other_sideboard_card.id, quantity=2)],
+            ),
+        ],
+    )
+    sideboard = next(sideboard for sideboard in deck.sideboards.all() if sideboard.name == "Tech")
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts?sideboard_id={sideboard.id}")
+
+    assert response.status_code == 200
+    assert "tts-export-targeted-deck-tech.tts.txt" in response["Content-Disposition"]
+    payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
+    assert payload == {
+        "schema": "card-reader.tts-deck.v1",
+        "deck": {
+            "name": "TTS Export Targeted Deck - Tech",
+            "description": "Sideboard export",
+        },
+        "cards": [
+            {
+                "role": "sideboard",
+                "quantity": 6,
+                "name": sideboard_card.latest_version.name,
+            }
+        ],
+    }
+    assert "hero" not in payload
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_tts_export_rejects_unknown_sideboard_id() -> None:
+    owner = _create_user("tts-export-missing-sideboard-owner", "password")
+    hero = _create_card(name="TTS Export Missing Sideboard Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Missing Sideboard Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts?sideboard_id=missing")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Sideboard not found"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_tts_export_preserves_saved_entry_order() -> None:
     owner = _create_user("tts-export-order-owner", "password")
     hero = _create_card(name="TTS Export Order Hero", is_hero=True)

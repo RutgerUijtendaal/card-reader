@@ -8,7 +8,7 @@ local CONFIG = {
     index_batch_size = 50,
     spawn_batch_size = 5,
     wait_timeout_seconds = 15,
-    finalize_wait_frames = 10,
+    finalize_wait_frames = 210,
     finalize_search_radius = 3,
 }
 

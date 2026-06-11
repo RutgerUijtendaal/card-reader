@@ -151,16 +151,20 @@ describe('useHotkeys', () => {
 
     expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '2', altKey: true, cancelable: true }), actions))
       .toBe(true);
-    expect(clearHoverMode).toHaveBeenCalledOnce();
+    expect(setHoverMode).toHaveBeenLastCalledWith('enlarged');
 
     expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '3', altKey: true, cancelable: true }), actions))
       .toBe(true);
-    expect(setHoverMode).toHaveBeenLastCalledWith('enlarged');
+    expect(setHoverMode).toHaveBeenLastCalledWith('details');
 
     const cardDetailsEvent = new KeyboardEvent('keydown', { key: '4', altKey: true, cancelable: true });
     expect(handleHoverModeHotkey(cardDetailsEvent, actions)).toBe(true);
     expect(setHoverMode).toHaveBeenLastCalledWith('enlarged-details');
     expect(cardDetailsEvent.defaultPrevented).toBe(true);
+
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '5', altKey: true, cancelable: true }), actions))
+      .toBe(true);
+    expect(clearHoverMode).toHaveBeenCalledOnce();
   });
 
   test('hover mode hotkeys do nothing from editable fields', () => {
@@ -191,7 +195,7 @@ describe('useHotkeys', () => {
     expect(
       handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '1', altKey: true, shiftKey: true, cancelable: true }), actions),
     ).toBe(false);
-    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '5', altKey: true, cancelable: true }), actions))
+    expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '6', altKey: true, cancelable: true }), actions))
       .toBe(false);
     expect(handleHoverModeHotkey(new KeyboardEvent('keydown', { key: '1', altKey: true, cancelable: true }), null))
       .toBe(false);

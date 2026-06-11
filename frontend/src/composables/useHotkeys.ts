@@ -181,17 +181,22 @@ export const handleHoverModeHotkey = (
   }
   if (normalizedKey === '2') {
     event.preventDefault();
-    actions.clearHoverMode();
+    actions.setHoverMode('enlarged');
     return true;
   }
   if (normalizedKey === '3') {
     event.preventDefault();
-    actions.setHoverMode('enlarged');
+    actions.setHoverMode('details');
     return true;
   }
   if (normalizedKey === '4') {
     event.preventDefault();
     actions.setHoverMode('enlarged-details');
+    return true;
+  }
+  if (normalizedKey === '5') {
+    event.preventDefault();
+    actions.clearHoverMode();
     return true;
   }
 
