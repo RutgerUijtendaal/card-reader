@@ -2,12 +2,14 @@ local CONFIG = {
     source_container_guids = {
         -- "abc123",
     },
-    spawn_position = { x = 0, y = 3, z = 0 },
+    spawn_position = { x = -45, y = 3, z = 50 },
     stack_y_spacing = 0.08,
     fuzzy_name_distance = 1,
     index_batch_size = 50,
     spawn_batch_size = 5,
     wait_timeout_seconds = 15,
+    finalize_wait_frames = 10,
+    finalize_search_radius = 3,
 }
 
 function importCardReaderDeck(encoded)
@@ -279,10 +281,10 @@ function waitForImportSpawns(job)
 
     Wait.condition(
         function()
-            finalizeImportedDeck(job.payload, job.spawned, job.missing)
+            scheduleFinalizeImportedDeck(job)
         end,
         function()
-            return #job.spawned == job.expected_spawns and allObjectsResting(job.spawned)
+            return #job.spawned == job.expected_spawns
         end,
         CONFIG.wait_timeout_seconds,
         function()
@@ -292,6 +294,7 @@ function waitForImportSpawns(job)
                 job.expected_spawns
             ))
             logMissingCards(job.missing)
+            scheduleFinalizeImportedDeck(job)
         end
     )
 end
@@ -406,30 +409,27 @@ function buildSpawnPosition(index)
     }
 end
 
-function allObjectsResting(objects)
-    for _, object in ipairs(objects) do
-        if object == nil or object.isDestroyed() or not object.resting then
-            return false
-        end
-    end
-
-    return true
+function scheduleFinalizeImportedDeck(job)
+    Wait.frames(function()
+        finalizeImportedDeck(job.payload, job.spawned, job.missing)
+    end, CONFIG.finalize_wait_frames)
 end
 
 function finalizeImportedDeck(payload, objects, missing)
-    if #objects == 0 then
+    local primary = findImportedDeckTarget(objects)
+
+    if primary == nil and #objects == 0 then
         print("No cards were spawned.")
         return
     end
-
-    local grouped = group(objects)
-    local primary = grouped[1] or objects[1]
 
     if primary ~= nil and not primary.isDestroyed() then
         primary.setName(payload.deck.name)
         if payload.deck.description ~= nil then
             primary.setDescription(payload.deck.description)
         end
+    else
+        print("Imported deck target could not be found for naming.")
     end
 
     local missing_count = countMissingCards(missing)
@@ -443,6 +443,59 @@ function finalizeImportedDeck(payload, objects, missing)
     else
         print(string.format("Imported '%s' with %d spawned cards.", payload.deck.name, #objects))
     end
+end
+
+function findImportedDeckTarget(objects)
+    local live_objects = collectLiveObjects(objects)
+    if #live_objects > 1 then
+        local grouped = group(live_objects) or {}
+        return grouped[1] or live_objects[1]
+    end
+
+    if #live_objects == 1 then
+        return live_objects[1]
+    end
+
+    return findNearestSpawnedObject()
+end
+
+function collectLiveObjects(objects)
+    local live_objects = {}
+
+    for _, object in ipairs(objects or {}) do
+        if object ~= nil and not object.isDestroyed() then
+            table.insert(live_objects, object)
+        end
+    end
+
+    return live_objects
+end
+
+function findNearestSpawnedObject()
+    local nearest = nil
+    local nearest_distance = nil
+
+    for _, object in ipairs(getAllObjects()) do
+        if object ~= nil and not object.isDestroyed() then
+            local position = object.getPosition()
+            local distance = horizontalDistance(position, CONFIG.spawn_position)
+
+            if distance <= CONFIG.finalize_search_radius
+                and (nearest_distance == nil or distance < nearest_distance) then
+                nearest = object
+                nearest_distance = distance
+            end
+        end
+    end
+
+    return nearest
+end
+
+function horizontalDistance(left, right)
+    local dx = left.x - right.x
+    local dz = left.z - right.z
+
+    return math.sqrt((dx * dx) + (dz * dz))
 end
 
 function logMissingCards(missing)
