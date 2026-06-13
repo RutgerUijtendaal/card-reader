@@ -36,6 +36,15 @@ describe('adminRouteState', () => {
     ).toBe('catalog');
   });
 
+  test('parses card backs admin tab', () => {
+    expect(
+      parseAdminTab(
+        { admin_tab: 'card-backs' },
+        { allowUsers: true, allowMaintenance: true },
+      ),
+    ).toBe('card-backs');
+  });
+
   test('builds card detail location that preserves admin context', () => {
     const location = buildAdminCardDetailLocation('card-1', {
       admin_tab: 'catalog',

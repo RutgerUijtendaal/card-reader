@@ -144,6 +144,10 @@
   <text class="title" x="1483" y="582">CardVersionImage</text>
   <text class="field" x="1482" y="606">stored image data</text>
 
+  <rect class="box version" x="1700" y="545" width="220" height="82"/>
+  <text class="title" x="1762" y="582">CardBack</text>
+  <text class="field" x="1728" y="606">global back history</text>
+
   <rect class="box version" x="1455" y="660" width="215" height="82"/>
   <text class="title" x="1500" y="697">ParseResult</text>
   <text class="field" x="1482" y="721">OCR/raw fields</text>

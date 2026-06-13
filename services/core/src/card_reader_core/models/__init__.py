@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 # not sufficient for ORM relation resolution across modules.
 _REGISTERED_MODEL_MODULES = (
     import_module(".card", __name__),
+    import_module(".card_back", __name__),
     import_module(".card_group", __name__),
     import_module(".content_version", __name__),
     import_module(".card_version", __name__),
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
         is_card_lifecycle_status,
         normalize_card_lifecycle_filter,
     )
+    from .card_back import CardBack
     from .card_group import CardGroup, CardGroupMember
     from .content_version import ContentVersion
     from .card_version import CardVersion, CardVersionImage, ParseResult
@@ -85,6 +87,7 @@ _EXPORTS = {
     "ImportJob": ".import_job",
     "ImportJobItem": ".import_job",
     "Card": ".card",
+    "CardBack": ".card_back",
     "CardAlias": ".card",
     "ACTIVE_CARD_LIFECYCLE_STATUS": ".card",
     "ALL_CARD_LIFECYCLE_FILTER": ".card",
@@ -147,6 +150,7 @@ __all__ = [
     "ImportJob",
     "ImportJobItem",
     "Card",
+    "CardBack",
     "CardAlias",
     "ACTIVE_CARD_LIFECYCLE_STATUS",
     "ALL_CARD_LIFECYCLE_FILTER",
