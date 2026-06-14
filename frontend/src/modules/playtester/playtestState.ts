@@ -1,5 +1,6 @@
 import type { DeckEntrySummary, DeckRecord } from '@/modules/decks/types';
 import type {
+  PlaytestCardFace,
   PlaytestCardInstance,
   PlaytestOpeningSetup,
   PlaytestSetupSnapshot,
@@ -11,7 +12,7 @@ import type {
 
 export const DEFAULT_PLAYTEST_HAND_SIZE = 7;
 export const PLAYTEST_ZONES: PlaytestZoneId[] = ['hero', 'library', 'hand', 'play', 'discard', 'banish', 'other'];
-export const PLAYTEST_DRAFT_VERSION = 1;
+export const PLAYTEST_DRAFT_VERSION = 2;
 export const DEFAULT_PLAYTEST_STACK_FACES: Partial<Record<PlaytestZoneId, PlaytestStackFace>> = {
   library: 'back',
   discard: 'front',
@@ -26,9 +27,21 @@ export const EMPTY_OPENING_SETUP: PlaytestOpeningSetup = {
 };
 
 type OpeningSelectionKey = 'selectedManaInstanceIds' | 'selectedSetupInstanceIds';
+type ClonePlacement =
+  | { type: 'after-source' }
+  | { type: 'board'; anchorX: number; anchorY: number };
+
+type LegacyPlaytestCardInstance = Omit<PlaytestCardInstance, 'face'> & {
+  face?: PlaytestCardFace;
+};
 
 const cloneInstances = (instances: PlaytestCardInstance[]): PlaytestCardInstance[] =>
   normalizePileGroups(instances.map((instance) => ({ ...instance })));
+
+const normalizeInstanceFields = (instance: LegacyPlaytestCardInstance): PlaytestCardInstance => ({
+  ...instance,
+  face: instance.face ?? 'front',
+});
 
 const orderedZoneInstances = (
   instances: PlaytestCardInstance[],
@@ -160,6 +173,7 @@ const buildMainboardInstances = (entries: DeckEntrySummary[]): PlaytestCardInsta
       zoneId: 'library' as const,
       order: 0,
       tapped: false,
+      face: 'front' as const,
       setupOrigin: false,
       boardX: null,
       boardY: null,
@@ -205,6 +219,7 @@ export const createInitialPlaytestState = (
       zoneId: 'hero',
       order: 0,
       tapped: false,
+      face: 'front',
       setupOrigin: true,
       boardX: null,
       boardY: null,
@@ -408,6 +423,147 @@ export const toggleTapped = (state: PlaytestState, instanceId: string): Playtest
   ),
 });
 
+export const toggleCardFace = (state: PlaytestState, instanceId: string): PlaytestState => ({
+  ...state,
+  instances: state.instances.map((instance) =>
+    instance.instanceId === instanceId
+      ? { ...instance, face: instance.face === 'front' ? 'back' : 'front' }
+      : instance,
+  ),
+});
+
+export const toggleCardsFace = (state: PlaytestState, instanceIds: string[]): PlaytestState =>
+  instanceIds.reduce((nextState, instanceId) => toggleCardFace(nextState, instanceId), state);
+
+export const deleteCardInstances = (state: PlaytestState, instanceIds: string[]): PlaytestState => {
+  const ids = new Set(instanceIds);
+  if (ids.size === 0) {
+    return state;
+  }
+  const remaining = state.instances.filter((instance) => !ids.has(instance.instanceId));
+  if (remaining.length === state.instances.length) {
+    return state;
+  }
+  return syncOpeningSelections({
+    ...state,
+    instances: normalizePileGroups(renumberAllZones(remaining)),
+  });
+};
+
+const nextCloneInstanceId = (state: PlaytestState, sourceInstanceId: string): string => {
+  const ids = new Set(state.instances.map((instance) => instance.instanceId));
+  let copyNumber = 1;
+  let candidate = `${sourceInstanceId}:copy:${copyNumber}`;
+  while (ids.has(candidate)) {
+    copyNumber += 1;
+    candidate = `${sourceInstanceId}:copy:${copyNumber}`;
+  }
+  return candidate;
+};
+
+const insertNewInstanceIntoZone = (
+  state: PlaytestState,
+  instance: PlaytestCardInstance,
+  zoneId: PlaytestZoneId,
+  targetIndex?: number,
+): PlaytestState => {
+  const destination = orderedZoneInstances(state.instances, zoneId);
+  const insertionIndex = Math.max(0, Math.min(targetIndex ?? destination.length, destination.length));
+  destination.splice(insertionIndex, 0, instance);
+  const orderedDestination = destination.map((entry, index) => ({ ...entry, order: index }));
+  const destinationIds = new Set(orderedDestination.map((entry) => entry.instanceId));
+  return {
+    ...state,
+    instances: normalizePileGroups(renumberAllZones([
+      ...state.instances.filter((entry) => !destinationIds.has(entry.instanceId)),
+      ...orderedDestination,
+    ])),
+  };
+};
+
+const cloneSourceInstance = (
+  state: PlaytestState,
+  source: PlaytestCardInstance,
+  zoneId: PlaytestZoneId,
+  boardX: number | null,
+  boardY: number | null,
+): PlaytestCardInstance => ({
+  ...source,
+  instanceId: nextCloneInstanceId(state, source.instanceId),
+  zoneId,
+  order: 0,
+  tapped: zoneId === 'play' ? source.tapped : false,
+  setupOrigin: false,
+  boardX: zoneId === 'play' ? boardX : null,
+  boardY: zoneId === 'play' ? boardY : null,
+  pileGroupId: null,
+  pileOrder: null,
+});
+
+export const cloneCardInstance = (
+  state: PlaytestState,
+  instanceId: string,
+  placement: ClonePlacement = { type: 'after-source' },
+): PlaytestState => {
+  const source = state.instances.find((instance) => instance.instanceId === instanceId);
+  if (!source) {
+    return state;
+  }
+
+  if (placement.type === 'board') {
+    const clone = cloneSourceInstance(
+      state,
+      source,
+      'play',
+      Math.max(0, Math.min(100, placement.anchorX)),
+      Math.max(0, Math.min(100, placement.anchorY)),
+    );
+    return insertNewInstanceIntoZone(state, clone, 'play');
+  }
+
+  if (source.zoneId === 'play') {
+    const clone = cloneSourceInstance(
+      state,
+      source,
+      'play',
+      Math.max(0, Math.min(100, (source.boardX ?? 16) + 4)),
+      Math.max(0, Math.min(100, (source.boardY ?? 22) + 4)),
+    );
+    return insertNewInstanceIntoZone(state, clone, 'play');
+  }
+
+  const sourceIndex = getZoneInstances(state, source.zoneId)
+    .findIndex((instance) => instance.instanceId === source.instanceId);
+  const clone = cloneSourceInstance(state, source, source.zoneId, null, null);
+  return insertNewInstanceIntoZone(state, clone, source.zoneId, sourceIndex < 0 ? undefined : sourceIndex + 1);
+};
+
+export const cloneCardInstances = (
+  state: PlaytestState,
+  instanceIds: string[],
+  placement: ClonePlacement = { type: 'after-source' },
+): PlaytestState => {
+  if (placement.type === 'after-source') {
+    return instanceIds.reduce((nextState, instanceId) => cloneCardInstance(nextState, instanceId), state);
+  }
+
+  const sources = instanceIds.flatMap((instanceId) => {
+    const source = state.instances.find((instance) => instance.instanceId === instanceId);
+    return source ? [source] : [];
+  });
+  const baseX = sources[0]?.boardX ?? placement.anchorX;
+  const baseY = sources[0]?.boardY ?? placement.anchorY;
+  return sources.reduce((nextState, source, index) => {
+    const offsetX = source.zoneId === 'play' ? (source.boardX ?? baseX) - baseX : index * 4;
+    const offsetY = source.zoneId === 'play' ? (source.boardY ?? baseY) - baseY : index * 4;
+    return cloneCardInstance(nextState, source.instanceId, {
+      type: 'board',
+      anchorX: placement.anchorX + offsetX,
+      anchorY: placement.anchorY + offsetY,
+    });
+  }, state);
+};
+
 export const untapAllBoardCards = (state: PlaytestState): PlaytestState => ({
   ...state,
   instances: state.instances.map((instance) =>
@@ -431,6 +587,19 @@ export const drawCards = (state: PlaytestState, count: number): PlaytestState =>
 
 export const startNextTurn = (state: PlaytestState): PlaytestState =>
   drawCards(untapAllBoardCards(state), 1);
+
+export const shuffleZone = (
+  state: PlaytestState,
+  zoneId: PlaytestZoneId,
+  random: () => number = Math.random,
+): PlaytestState => {
+  const shuffled = shuffleInstances(getZoneInstances(state, zoneId), random);
+  const shuffledById = new Map(shuffled.map((instance) => [instance.instanceId, instance]));
+  return {
+    ...state,
+    instances: state.instances.map((instance) => shuffledById.get(instance.instanceId) ?? instance),
+  };
+};
 
 const trimOpeningHandToSize = (state: PlaytestState): PlaytestState => {
   let nextState = syncOpeningSelections(state);
@@ -651,6 +820,55 @@ export const serializePlaytestDraft = (state: PlaytestState): StoredPlaytestDraf
   },
   savedAt: new Date().toISOString(),
 });
+
+type LegacyPlaytestState = Omit<PlaytestState, 'instances' | 'setupSnapshot'> & {
+  instances: LegacyPlaytestCardInstance[];
+  setupSnapshot: null | { instances: LegacyPlaytestCardInstance[] };
+};
+
+type LegacyStoredPlaytestDraft = Omit<StoredPlaytestDraft, 'version' | 'state'> & {
+  version: 1 | 2;
+  state: LegacyPlaytestState;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object';
+
+const migratePlaytestState = (state: LegacyPlaytestState): PlaytestState => ({
+  ...state,
+  openingSetup: {
+    ...EMPTY_OPENING_SETUP,
+    ...state.openingSetup,
+  },
+  instances: normalizePileGroups(renumberAllZones(state.instances.map(normalizeInstanceFields))),
+  setupSnapshot: state.setupSnapshot
+    ? { instances: normalizePileGroups(renumberAllZones(state.setupSnapshot.instances.map(normalizeInstanceFields))) }
+    : null,
+});
+
+export const migrateStoredPlaytestDraft = (value: unknown): StoredPlaytestDraft | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (value.version !== 1 && value.version !== PLAYTEST_DRAFT_VERSION) {
+    return null;
+  }
+  if (typeof value.deckId !== 'string' || !isRecord(value.state)) {
+    return null;
+  }
+  if (!Array.isArray(value.state.instances)) {
+    return null;
+  }
+
+  const legacyDraft = value as unknown as LegacyStoredPlaytestDraft;
+  return {
+    ...legacyDraft,
+    version: PLAYTEST_DRAFT_VERSION,
+    deckUpdatedAt: typeof legacyDraft.deckUpdatedAt === 'string' ? legacyDraft.deckUpdatedAt : '',
+    savedAt: typeof legacyDraft.savedAt === 'string' ? legacyDraft.savedAt : new Date(0).toISOString(),
+    state: migratePlaytestState(legacyDraft.state),
+  };
+};
 
 export const isStoredDraftStale = (draft: StoredPlaytestDraft, deck: DeckRecord): boolean =>
   draft.deckUpdatedAt !== deck.updated_at;

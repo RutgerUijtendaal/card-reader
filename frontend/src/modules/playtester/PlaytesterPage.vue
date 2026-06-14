@@ -88,14 +88,17 @@
       <template v-else-if="!staleDraft">
         <div class="playtester-topbar">
           <div class="flex flex-wrap items-center gap-2">
-            <span
-              class="theme-pill theme-pill-success text-xs"
-            >
-              Play
-            </span>
-            <span class="theme-pill theme-pill-neutral text-xs">Library {{ zoneCount('library') }}</span>
-            <span class="theme-pill theme-pill-neutral text-xs">Hand {{ zoneCount('hand') }}</span>
-            <span class="theme-pill theme-pill-neutral text-xs">Board {{ zoneCount('play') }}</span>
+            <label class="playtester-scale-control theme-section-muted">
+              Scale
+              <input
+                v-model.number="cardScale"
+                class="playtester-scale"
+                type="range"
+                min="0.5"
+                max="1.6"
+                step="0.05"
+              >
+            </label>
           </div>
 
           <div class="flex flex-wrap items-center justify-end gap-2">
@@ -130,6 +133,8 @@
           data-testid="playtest-board-zone"
           data-playtest-drop-zone="board"
           @pointerdown="startBoardSelection"
+          @pointermove="rememberBoardPointer"
+          @wheel="handleBoardWheel"
         >
           <div class="playtester-board-label">
             <span>Board</span>
@@ -153,6 +158,7 @@
               :instances="pile.instances"
               :dragged-instance-ids="activeDraggedInstanceIds"
               :selected-instance-ids="selectedBoardInstanceIds"
+              :card-back-url="currentCardBackUrl"
               @activate="activateCard"
               @pointer-card="startCardPointer"
               @context-menu="openCardContextMenu"
@@ -171,6 +177,7 @@
               :instance="instance"
               :dragging="isInstanceDragging(instance.instanceId)"
               :selected="selectedBoardInstanceIds.includes(instance.instanceId)"
+              :card-back-url="currentCardBackUrl"
               @activate="activateCard"
               @pointer-card="startCardPointer"
               @context-menu="openCardContextMenu"
@@ -209,6 +216,7 @@
                 <PlaytestCard
                   :instance="instance"
                   :dragging="isInstanceDragging(instance.instanceId)"
+                  :card-back-url="currentCardBackUrl"
                   @activate="activateCard"
                   @pointer-card="startCardPointer"
                   @context-menu="openCardContextMenu"
@@ -230,6 +238,7 @@
               :collapsed="zone.collapsed"
               :default-action="zone.defaultAction"
               :dragging-top="activeDrag?.instanceId === stackTopInstance(zone.id)?.instanceId"
+              :shuffling="shufflingStackZone === zone.id"
               @open="openStack"
               @draw="drawFromStack"
               @pointer-top="startStackPointer"
@@ -265,6 +274,7 @@
                 :instance="instance"
                 :activatable="false"
                 :dragging="isInstanceDragging(instance.instanceId)"
+                :card-back-url="currentCardBackUrl"
                 @pointer-card="startCardPointer"
                 @context-menu="openCardContextMenu"
                 @hover="setHoverTarget"
@@ -272,65 +282,6 @@
             </div>
           </section>
         </div>
-
-        <footer class="playtester-footer">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="theme-pill theme-pill-neutral text-xs">Discard {{ zoneCount('discard') }}</span>
-            <span class="theme-pill theme-pill-neutral text-xs">Banish {{ zoneCount('banish') }}</span>
-            <span class="theme-pill theme-pill-neutral text-xs">Hero {{ zoneCount('hero') }}</span>
-            <span
-              v-if="deck.sideboards.length > 0"
-              class="theme-pill theme-pill-neutral text-xs"
-            >
-              Sideboards {{ deck.sideboards.length }}
-            </span>
-          </div>
-
-          <label class="theme-section-muted flex items-center gap-2 text-sm font-semibold">
-            Card size
-            <input
-              v-model.number="cardScale"
-              class="playtester-scale"
-              type="range"
-              min="0.75"
-              max="1.35"
-              step="0.05"
-            >
-          </label>
-        </footer>
-
-        <section
-          v-if="deck.sideboards.length > 0"
-          class="playtester-sideboards"
-        >
-          <details>
-            <summary>Sideboard reference</summary>
-            <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <div
-                v-for="sideboard in deck.sideboards"
-                :key="sideboard.id"
-                class="theme-card-frame rounded-lg p-3"
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <p class="theme-section-title text-sm font-semibold">
-                    {{ sideboard.name }}
-                  </p>
-                  <span class="theme-pill theme-pill-neutral text-xs">{{ sideboard.total_cards }}</span>
-                </div>
-                <div class="mt-2 space-y-1">
-                  <p
-                    v-for="entry in sideboard.entries"
-                    :key="entry.card.id"
-                    class="theme-section-muted flex justify-between gap-2 text-xs"
-                  >
-                    <span class="truncate">{{ entry.card.name }}</span>
-                    <span>x{{ entry.quantity }}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </details>
-        </section>
       </template>
     </section>
 
@@ -349,6 +300,7 @@
       :key="overlay.instance.instanceId"
       :drag="overlay.drag"
       :instance="overlay.instance"
+      :card-back-url="currentCardBackUrl"
     />
 
     <PlaytestContextMenu
@@ -363,7 +315,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useEventListener, useResizeObserver } from '@vueuse/core';
 import { Gamepad2 } from 'lucide-vue-next';
 import { RouterLink, useRoute } from 'vue-router';
@@ -384,8 +336,11 @@ import { createLocalPlaytestStorage } from '@/modules/playtester/localPlaytestSt
 import {
   acceptOpeningSetup,
   addInstanceToVisualPile,
+  cloneCardInstance,
+  cloneCardInstances,
   countZone,
   createInitialPlaytestState,
+  deleteCardInstances,
   drawCards,
   getOpeningManaInstances,
   getOpeningSetupInstances,
@@ -399,7 +354,10 @@ import {
   resetToSetup,
   serializePlaytestDraft,
   setOpeningHandSize,
+  shuffleZone,
   startNextTurn,
+  toggleCardFace,
+  toggleCardsFace,
   toggleTapped,
   toggleOpeningManaSelection,
   toggleOpeningSetupSelection,
@@ -423,6 +381,7 @@ import {
   getPlaytestStackFace,
   PLAYTEST_STACK_DEFINITIONS,
 } from '@/modules/playtester/utils/stacks';
+import { isEditableKeyboardTarget } from '@/utils/keyboard';
 
 type PointerDragStart = {
   instanceId: string;
@@ -462,6 +421,10 @@ type DraggedCardOverlay = {
   instance: PlaytestCardInstance;
 };
 
+type CopiedPlaytestCard = {
+  instanceId: string;
+};
+
 const route = useRoute();
 const auth = useAuthStore();
 const storage = createLocalPlaytestStorage();
@@ -478,15 +441,23 @@ const hoverTarget = ref<PlaytestHoverTarget | null>(null);
 const suppressClickUntil = ref(0);
 const restartConfirmOpen = ref(false);
 const saveSuspended = ref(false);
-const cardScale = ref(1);
+const cardScale = ref(0.75);
 const currentCardBackUrl = ref<string | null>(null);
 const openStackZone = ref<PlaytestZoneId | null>(null);
+const copiedCards = ref<CopiedPlaytestCard[]>([]);
+const lastBoardPointer = ref<{ x: number; y: number } | null>(null);
+const shufflingStackZone = ref<PlaytestZoneId | null>(null);
 const boardRef = ref<HTMLElement | null>(null);
 const lowerBarRef = ref<HTMLElement | null>(null);
 const lowerBarWidth = ref(0);
 const DRAG_START_THRESHOLD_PX = 2;
 const SELECTION_START_THRESHOLD_PX = 4;
 const CLICK_SUPPRESSION_MS = 180;
+const PLAYTEST_CARD_SCALE_MIN = 0.5;
+const PLAYTEST_CARD_SCALE_MAX = 1.6;
+const PLAYTEST_CARD_SCALE_STEP = 0.05;
+const STACK_SHUFFLE_ANIMATION_MS = 650;
+let shuffleAnimationTimer: number | null = null;
 
 const deckId = computed(() => String(route.params.deckId ?? ''));
 const cardScaleStyle = computed(() => ({
@@ -628,6 +599,14 @@ const applyState = (nextState: PlaytestState): void => {
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
 
+const setCardScale = (value: number): void => {
+  cardScale.value = clamp(
+    Math.round(value / PLAYTEST_CARD_SCALE_STEP) * PLAYTEST_CARD_SCALE_STEP,
+    PLAYTEST_CARD_SCALE_MIN,
+    PLAYTEST_CARD_SCALE_MAX,
+  );
+};
+
 const isInstanceDragging = (instanceId: string): boolean =>
   activeDrag.value?.instanceId === instanceId
   || activeDrag.value?.groupInstanceIds?.includes(instanceId) === true;
@@ -644,6 +623,24 @@ const boardRelativePoint = (event: PointerEvent): { x: number; y: number } | nul
   return {
     x: clamp(event.clientX - bounds.left, 0, bounds.width),
     y: clamp(event.clientY - bounds.top, 0, bounds.height),
+  };
+};
+
+const boardRelativeMousePoint = (event: MouseEvent | WheelEvent): { x: number; y: number } | null => {
+  const board = boardRef.value;
+  if (!board) {
+    return null;
+  }
+  const bounds = board.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return null;
+  }
+  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
+    return null;
+  }
+  return {
+    x: ((event.clientX - bounds.left) / bounds.width) * 100,
+    y: ((event.clientY - bounds.top) / bounds.height) * 100,
   };
 };
 
@@ -1075,6 +1072,207 @@ const abortPointerDrag = (event: PointerEvent): void => {
 
 useEventListener(window, 'pointercancel', abortPointerDrag);
 
+const isPlayHotkeyEnabled = (): boolean =>
+  playtest.value?.phase === 'play'
+  && staleDraft.value === null
+  && !activeDrag.value
+  && !pendingDrag.value
+  && !boardSelection.value;
+
+const rememberBoardPointer = (event: MouseEvent): void => {
+  const point = boardRelativeMousePoint(event);
+  if (point) {
+    lastBoardPointer.value = point;
+  }
+};
+
+const handleBoardWheel = (event: WheelEvent): void => {
+  rememberBoardPointer(event);
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !isPlayHotkeyEnabled()) {
+    return;
+  }
+  setCardScale(cardScale.value + (event.deltaY < 0 ? PLAYTEST_CARD_SCALE_STEP : -PLAYTEST_CARD_SCALE_STEP));
+  event.preventDefault();
+};
+
+const hoveredCard = (): PlaytestCardInstance | null => {
+  const target = hoverTarget.value;
+  if (target?.type !== 'card') {
+    return null;
+  }
+  return playtest.value?.instances.find((instance) => instance.instanceId === target.instanceId) ?? null;
+};
+
+const selectedBoardIds = (): string[] =>
+  selectedBoardInstanceIds.value.filter((instanceId) =>
+    playtest.value?.instances.some((instance) => instance.instanceId === instanceId && instance.zoneId === 'play') === true,
+  );
+
+const hotkeyCardIds = (options: { boardOnly: boolean }): string[] => {
+  const hovered = hoveredCard();
+  if (hovered && (!options.boardOnly || hovered.zoneId === 'play')) {
+    return [hovered.instanceId];
+  }
+  return selectedBoardIds();
+};
+
+const cloneCard = (instanceId: string): void => {
+  if (!playtest.value) {
+    return;
+  }
+  applyState(cloneCardInstance(playtest.value, instanceId));
+};
+
+const toggleCardFaceAction = (instanceId: string): void => {
+  if (!playtest.value) {
+    return;
+  }
+  applyState(toggleCardFace(playtest.value, instanceId));
+};
+
+const toggleTappedCards = (instanceIds: string[]): void => {
+  if (!playtest.value || instanceIds.length === 0) {
+    return;
+  }
+  applyState(instanceIds.reduce((nextState, instanceId) => toggleTapped(nextState, instanceId), playtest.value));
+};
+
+const deletableCardIds = (instanceIds: string[]): string[] => {
+  if (!playtest.value) {
+    return [];
+  }
+  const ids = new Set(instanceIds);
+  return playtest.value.instances
+    .filter((instance) => ids.has(instance.instanceId) && instance.zoneId !== 'hero')
+    .map((instance) => instance.instanceId);
+};
+
+const deleteCards = (instanceIds: string[]): boolean => {
+  if (!playtest.value) {
+    return false;
+  }
+  const ids = deletableCardIds(instanceIds);
+  if (ids.length === 0) {
+    return false;
+  }
+  applyState(deleteCardInstances(playtest.value, ids));
+  copiedCards.value = copiedCards.value.filter((copy) => !ids.includes(copy.instanceId));
+  return true;
+};
+
+const copyCurrentCards = (): boolean => {
+  if (!playtest.value || !isPlayHotkeyEnabled()) {
+    return false;
+  }
+  const ids = selectedBoardIds();
+  const hovered = hoveredCard();
+  const copyIds = ids.length > 0 ? ids : hovered ? [hovered.instanceId] : [];
+  copiedCards.value = copyIds.map((instanceId) => ({ instanceId }));
+  return copyIds.length > 0;
+};
+
+const pasteCopiedCards = (): boolean => {
+  if (!playtest.value || !isPlayHotkeyEnabled() || copiedCards.value.length === 0) {
+    return false;
+  }
+  const existingIds = new Set(playtest.value.instances.map((instance) => instance.instanceId));
+  const instanceIds = copiedCards.value
+    .map((copy) => copy.instanceId)
+    .filter((instanceId) => existingIds.has(instanceId));
+  if (instanceIds.length === 0) {
+    copiedCards.value = [];
+    return false;
+  }
+  const anchor = lastBoardPointer.value ?? { x: 50, y: 50 };
+  applyState(cloneCardInstances(playtest.value, instanceIds, {
+    type: 'board',
+    anchorX: anchor.x,
+    anchorY: anchor.y,
+  }));
+  return true;
+};
+
+const shuffleLibrary = (): void => {
+  if (!playtest.value) {
+    return;
+  }
+  applyState(shuffleZone(playtest.value, 'library'));
+  shufflingStackZone.value = 'library';
+  if (shuffleAnimationTimer) {
+    window.clearTimeout(shuffleAnimationTimer);
+  }
+  shuffleAnimationTimer = window.setTimeout(() => {
+    shufflingStackZone.value = null;
+    shuffleAnimationTimer = null;
+  }, STACK_SHUFFLE_ANIMATION_MS);
+  if (openStackZone.value === 'library') {
+    closeStack();
+  }
+};
+
+const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
+  if (isEditableKeyboardTarget(event) || !isPlayHotkeyEnabled()) {
+    return;
+  }
+
+  const copyPressed = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c';
+  if (copyPressed && copyCurrentCards()) {
+    event.preventDefault();
+    return;
+  }
+
+  const pastePressed = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v';
+  if (pastePressed && pasteCopiedCards()) {
+    event.preventDefault();
+    return;
+  }
+
+  const deletePressed =
+    !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey
+    && !event.shiftKey
+    && (event.key === 'Delete' || event.key === 'Backspace');
+  if (deletePressed && deleteCards(hotkeyCardIds({ boardOnly: false }))) {
+    event.preventDefault();
+    return;
+  }
+
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.key.length !== 1) {
+    return;
+  }
+
+  const normalizedKey = event.key.toLowerCase();
+  if (normalizedKey === 't') {
+    const ids = hotkeyCardIds({ boardOnly: true });
+    if (ids.length > 0) {
+      toggleTappedCards(ids);
+      event.preventDefault();
+    }
+    return;
+  }
+  if (normalizedKey === 'f') {
+    const ids = hotkeyCardIds({ boardOnly: false });
+    if (ids.length > 0 && playtest.value) {
+      applyState(toggleCardsFace(playtest.value, ids));
+      event.preventDefault();
+    }
+    return;
+  }
+  if (normalizedKey === 'r') {
+    shuffleLibrary();
+    event.preventDefault();
+  }
+};
+
+useEventListener(window, 'keydown', handlePlaytesterHotkey);
+
+onBeforeUnmount(() => {
+  if (shuffleAnimationTimer) {
+    window.clearTimeout(shuffleAnimationTimer);
+  }
+});
+
 const updateOpeningHandSize = (handSize: number): void => {
   if (!playtest.value) {
     return;
@@ -1143,20 +1341,29 @@ const cardActions = (instanceId: string): PlaytestEntityAction[] => {
     return [];
   }
   const zoneActions: PlaytestEntityAction[] = [
-    { id: 'move-hand', label: 'Move to Hand', disabled: instance.zoneId === 'hand', run: () => moveCardToZone(instanceId, 'hand') },
-    { id: 'move-play', label: 'Move to Board', disabled: instance.zoneId === 'play', run: () => moveCardToZone(instanceId, 'play') },
-    { id: 'move-discard', label: 'Move to Discard', disabled: instance.zoneId === 'discard', run: () => moveCardToZone(instanceId, 'discard') },
-    { id: 'move-banish', label: 'Move to Banish', disabled: instance.zoneId === 'banish', run: () => moveCardToZone(instanceId, 'banish') },
-    { id: 'move-library', label: 'Move to Library', disabled: instance.zoneId === 'library', run: () => moveCardToZone(instanceId, 'library') },
-    { id: 'move-hero', label: 'Move to Hero', disabled: instance.zoneId === 'hero', run: () => moveCardToZone(instanceId, 'hero') },
+    { id: 'move-hand', label: 'To Hand', dividerBefore: true, disabled: instance.zoneId === 'hand', run: () => moveCardToZone(instanceId, 'hand') },
+    { id: 'move-play', label: 'To Board', disabled: instance.zoneId === 'play', run: () => moveCardToZone(instanceId, 'play') },
+    { id: 'move-discard', label: 'To Discard', disabled: instance.zoneId === 'discard', run: () => moveCardToZone(instanceId, 'discard') },
+    { id: 'move-banish', label: 'To Banish', disabled: instance.zoneId === 'banish', run: () => moveCardToZone(instanceId, 'banish') },
+    { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveCardToZone(instanceId, 'library') },
   ];
   return [
+    { id: 'copy-card', label: 'Copy', hotkey: 'Ctrl+C', run: () => cloneCard(instanceId) },
+    { id: 'flip-card', label: instance.face === 'front' ? 'Flip Down' : 'Flip Up', hotkey: 'F', run: () => toggleCardFaceAction(instanceId) },
     ...(instance.zoneId === 'play'
-      ? [{ id: 'tap', label: instance.tapped ? 'Untap' : 'Tap', run: () => applyState(toggleTapped(playtest.value as PlaytestState, instanceId)) }]
+      ? [{ id: 'tap', label: instance.tapped ? 'Untap' : 'Tap', hotkey: 'T', run: () => applyState(toggleTapped(playtest.value as PlaytestState, instanceId)) }]
       : []),
     ...(instance.pileGroupId
-      ? [{ id: 'remove-pile', label: 'Remove from Pile', run: () => playtest.value && applyState(removeInstanceFromVisualPile(playtest.value, instanceId)) }]
+      ? [{ id: 'remove-pile', label: 'Unpile', run: () => playtest.value && applyState(removeInstanceFromVisualPile(playtest.value, instanceId)) }]
       : []),
+    {
+      id: 'delete-card',
+      label: 'Delete',
+      hotkey: 'Del',
+      variant: 'danger',
+      disabled: instance.zoneId === 'hero',
+      run: () => deleteCards([instanceId]),
+    },
     ...zoneActions,
   ];
 };
@@ -1169,7 +1376,7 @@ const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
       ? [
           {
             id: 'stack-default',
-            label: 'Draw Top Card',
+            label: 'Draw',
             disabled: !hasCards,
             run: () => drawFromStack(zoneId),
           },
@@ -1178,11 +1385,14 @@ const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
 
   return [
     ...defaultActions,
-    { id: 'stack-open', label: 'Open Stack', disabled: !hasCards, run: () => openStack(zoneId) },
-    { id: 'top-hand', label: 'Move Top to Hand', disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'hand') },
-    { id: 'top-play', label: 'Move Top to Board', disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'play') },
-    { id: 'top-discard', label: 'Move Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },
-    { id: 'top-banish', label: 'Move Top to Banish', disabled: !hasCards || zoneId === 'banish', run: () => moveTopStackCard(zoneId, 'banish') },
+    ...(zoneId === 'library'
+      ? [{ id: 'stack-shuffle', label: 'Shuffle', hotkey: 'R', disabled: !hasCards, run: shuffleLibrary }]
+      : []),
+    { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
+    { id: 'top-hand', label: 'Top to Hand', dividerBefore: true, disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'hand') },
+    { id: 'top-play', label: 'Top to Board', disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'play') },
+    { id: 'top-discard', label: 'Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },
+    { id: 'top-banish', label: 'Top to Banish', disabled: !hasCards || zoneId === 'banish', run: () => moveTopStackCard(zoneId, 'banish') },
   ];
 };
 
@@ -1411,9 +1621,7 @@ onMounted(() => {
 }
 
 .playtester-stale,
-.playtester-topbar,
-.playtester-footer,
-.playtester-sideboards {
+.playtester-topbar {
   position: relative;
   z-index: 30;
 }
@@ -1437,6 +1645,15 @@ onMounted(() => {
   border-bottom: 1px solid var(--playtest-border);
   background: var(--playtest-panel);
   backdrop-filter: blur(12px);
+}
+
+.playtester-scale-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .playtester-board {
@@ -1547,7 +1764,7 @@ onMounted(() => {
 .playtester-hand {
   flex: 1 1 34rem;
   min-width: 0;
-  min-height: calc((var(--playtest-card-width, 9.75rem) * 1.42) + 3.4rem);
+  min-height: calc((var(--playtest-card-width, 9.75rem) * 1.42) + 4rem);
   overflow: hidden;
   border-right: 1px solid var(--playtest-border);
 }
@@ -1564,6 +1781,8 @@ onMounted(() => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  box-sizing: border-box;
+  height: calc((var(--playtest-card-width, 9.75rem) * 1.42) + 2rem);
   min-width: max-content;
   padding: 1.25rem 1.5rem 0.75rem;
 }
@@ -1629,31 +1848,9 @@ onMounted(() => {
   padding: 1rem;
 }
 
-.playtester-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 0.75rem;
-  border-top: 1px solid var(--playtest-border);
-  background: var(--playtest-panel);
-  backdrop-filter: blur(12px);
-}
-
 .playtester-scale {
   width: 8rem;
   accent-color: var(--color-accent);
-}
-
-.playtester-sideboards {
-  padding: 0 0.75rem 0.75rem;
-}
-
-.playtester-sideboards summary {
-  cursor: pointer;
-  color: var(--playtest-text-muted);
-  font-size: 0.85rem;
-  font-weight: 700;
 }
 
 @media (max-width: 1279px) {
@@ -1664,7 +1861,6 @@ onMounted(() => {
 
 @media (max-width: 767px) {
   .playtester-topbar,
-  .playtester-footer,
   .playtester-stale {
     align-items: stretch;
     flex-direction: column;

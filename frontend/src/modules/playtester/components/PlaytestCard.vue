@@ -28,20 +28,35 @@
     @mouseenter="setHoveredCard"
     @mouseleave="clearHoveredCard"
   >
-    <div class="theme-card-image-well aspect-[63/88] overflow-hidden rounded-xl">
+    <div
+      class="playtest-card-image-frame theme-card-image-well aspect-[63/88] overflow-hidden rounded-xl"
+      :class="faceAnimationActive ? 'playtest-card-face-animating' : ''"
+    >
       <img
-        v-if="instance.card.image_url"
+        v-if="instance.face === 'front' && instance.card.image_url"
         :src="toAbsoluteApiUrl(instance.card.image_url)"
         :alt="instance.card.name"
         class="h-full w-full object-contain"
         draggable="false"
       >
       <div
-        v-else
+        v-else-if="instance.face === 'front'"
         class="theme-empty-state flex h-full items-center justify-center text-xs"
       >
         No image
       </div>
+      <img
+        v-else-if="cardBackUrl"
+        :src="cardBackUrl"
+        :alt="`${instance.card.name} face down`"
+        class="h-full w-full object-contain"
+        draggable="false"
+      >
+      <span
+        v-else
+        class="playtest-card-back"
+        aria-hidden="true"
+      />
     </div>
 
     <div
@@ -67,18 +82,30 @@
       >
         <div class="theme-card-image-well aspect-[63/88] overflow-hidden rounded-xl">
           <img
-            v-if="instance.card.image_url"
+            v-if="instance.face === 'front' && instance.card.image_url"
             :src="toAbsoluteApiUrl(instance.card.image_url)"
             :alt="instance.card.name"
             class="h-full w-full object-contain"
             draggable="false"
           >
           <div
-            v-else
+            v-else-if="instance.face === 'front'"
             class="theme-empty-state flex h-full items-center justify-center text-xs"
           >
             No image
           </div>
+          <img
+            v-else-if="cardBackUrl"
+            :src="cardBackUrl"
+            :alt="`${instance.card.name} face down`"
+            class="h-full w-full object-contain"
+            draggable="false"
+          >
+          <span
+            v-else
+            class="playtest-card-back"
+            aria-hidden="true"
+          />
         </div>
       </div>
     </div>
@@ -86,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import type {
   PlaytestCardInstance,
@@ -105,6 +132,7 @@ const props = withDefaults(
     pileMember?: boolean;
     selected?: boolean;
     showName?: boolean;
+    cardBackUrl?: string | null;
   }>(),
   {
     compact: false,
@@ -114,6 +142,7 @@ const props = withDefaults(
     pileMember: false,
     selected: false,
     showName: false,
+    cardBackUrl: null,
   },
 );
 
@@ -126,7 +155,9 @@ const emit = defineEmits<{
 
 const middleZoomActive = ref(false);
 const middleZoomStyle = ref<Record<string, string>>({});
+const faceAnimationActive = ref(false);
 const canActivate = computed(() => props.interactive && props.activatable);
+let faceAnimationTimer: number | null = null;
 
 const endMiddleZoom = (): void => {
   middleZoomActive.value = false;
@@ -182,6 +213,29 @@ const handlePointerDown = (event: PointerEvent): void => {
   }
   emit('pointer-card', props.instance.instanceId, { type: 'card', zoneId: props.instance.zoneId }, event);
 };
+
+watch(
+  () => props.instance.face,
+  (face, previousFace) => {
+    if (face === previousFace) {
+      return;
+    }
+    faceAnimationActive.value = true;
+    if (faceAnimationTimer) {
+      window.clearTimeout(faceAnimationTimer);
+    }
+    faceAnimationTimer = window.setTimeout(() => {
+      faceAnimationActive.value = false;
+      faceAnimationTimer = null;
+    }, 180);
+  },
+);
+
+onBeforeUnmount(() => {
+  if (faceAnimationTimer) {
+    window.clearTimeout(faceAnimationTimer);
+  }
+});
 </script>
 
 <style scoped>
@@ -210,6 +264,25 @@ const handlePointerDown = (event: PointerEvent): void => {
 .playtest-card:hover {
   transform: translateY(-0.18rem);
   filter: drop-shadow(0 1.25rem 1.35rem rgba(0, 0, 0, 0.34));
+}
+
+.playtest-card-image-frame {
+  transform-origin: center center;
+}
+
+.playtest-card-face-animating {
+  animation: playtest-card-face-flip 180ms ease-out;
+}
+
+.playtest-card-back {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(245, 158, 11, 0.75), transparent 18%),
+    radial-gradient(circle at 34% 35%, rgba(59, 130, 246, 0.7), transparent 12%),
+    radial-gradient(circle at 65% 60%, rgba(239, 68, 68, 0.62), transparent 14%),
+    linear-gradient(145deg, #5c3516, #92622d 46%, #3d2412);
 }
 
 .playtest-card-middle-zoom {
@@ -288,5 +361,17 @@ const handlePointerDown = (event: PointerEvent): void => {
   height: var(--playtest-zoom-source-height);
   transform: translate(-50%, -50%) rotate(90deg);
   transform-origin: center center;
+}
+
+@keyframes playtest-card-face-flip {
+  0% {
+    opacity: 0.86;
+    transform: rotateY(84deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: rotateY(0deg);
+  }
 }
 </style>

@@ -2,8 +2,11 @@ import { describe, expect, test } from 'vitest';
 import {
   addInstanceToVisualPile,
   acceptOpeningSetup,
+  cloneCardInstance,
+  cloneCardInstances,
   countZone,
   createInitialPlaytestState,
+  deleteCardInstances,
   drawCards,
   getOpeningManaInstances,
   getOpeningSetupInstances,
@@ -19,7 +22,10 @@ import {
   resetToSetup,
   serializePlaytestDraft,
   setOpeningHandSize,
+  shuffleZone,
   startNextTurn,
+  toggleCardFace,
+  toggleCardsFace,
   toggleTapped,
   toggleOpeningManaSelection,
   toggleOpeningSetupSelection,
@@ -106,6 +112,7 @@ describe('playtestState', () => {
     expect(new Set(state.instances.map((instance) => instance.instanceId)).size).toBe(13);
     expect(getZoneInstances(state, 'hero')[0]?.card.name).toBe('Hero');
     expect(state.instances.every((instance) => instance.pileGroupId === null && instance.pileOrder === null)).toBe(true);
+    expect(state.instances.every((instance) => instance.face === 'front')).toBe(true);
   });
 
   test('draws, moves, taps, and resets without duplicating card instances', () => {
@@ -291,9 +298,88 @@ describe('playtestState', () => {
     const deck = buildDeck();
     const draft = serializePlaytestDraft(createInitialPlaytestState(deck, noShuffle));
 
-    expect(draft.version).toBe(1);
+    expect(draft.version).toBe(2);
     expect(isStoredDraftStale(draft, deck)).toBe(false);
     expect(isStoredDraftStale(draft, { ...deck, updated_at: '2026-02-01T00:00:00Z' })).toBe(true);
+  });
+
+  test('flips one or multiple cards', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const [first, second] = getZoneInstances(initial, 'hand');
+    if (!first || !second) {
+      throw new Error('expected hand cards');
+    }
+
+    const flippedOne = toggleCardFace(initial, first.instanceId);
+    const flippedBoth = toggleCardsFace(flippedOne, [first.instanceId, second.instanceId]);
+
+    expect(flippedOne.instances.find((instance) => instance.instanceId === first.instanceId)?.face).toBe('back');
+    expect(flippedBoth.instances.find((instance) => instance.instanceId === first.instanceId)?.face).toBe('front');
+    expect(flippedBoth.instances.find((instance) => instance.instanceId === second.instanceId)?.face).toBe('back');
+  });
+
+  test('clones cards with new ids and preserves face state', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const [first, second] = getZoneInstances(initial, 'hand');
+    if (!first || !second) {
+      throw new Error('expected hand cards');
+    }
+    const flipped = toggleCardFace(initial, first.instanceId);
+
+    const clonedHand = cloneCardInstance(flipped, first.instanceId);
+    const handCopies = getZoneInstances(clonedHand, 'hand').filter((instance) => instance.cardId === first.cardId);
+    const copiedHandCard = handCopies.find((instance) => instance.instanceId.includes(':copy:'));
+
+    expect(copiedHandCard?.instanceId).not.toBe(first.instanceId);
+    expect(copiedHandCard?.face).toBe('back');
+    expect(copiedHandCard?.setupOrigin).toBe(false);
+
+    const clonedBoard = cloneCardInstances(clonedHand, [first.instanceId, second.instanceId], {
+      type: 'board',
+      anchorX: 40,
+      anchorY: 45,
+    });
+    const boardCopies = getZoneInstances(clonedBoard, 'play').filter((instance) => instance.instanceId.includes(':copy:'));
+
+    expect(boardCopies).toHaveLength(2);
+    expect(boardCopies.map((instance) => [instance.boardX, instance.boardY])).toEqual([[40, 45], [44, 49]]);
+  });
+
+  test('deletes card instances and normalizes remaining pile groups', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const [first, second] = getZoneInstances(initial, 'hand');
+    if (!first || !second) {
+      throw new Error('expected hand cards');
+    }
+    const playing = acceptOpeningSetup(initial);
+    const placed = placeInstanceOnBoard(
+      placeInstanceOnBoard(playing, first.instanceId, 20, 30),
+      second.instanceId,
+      24,
+      30,
+    );
+    const piled = addInstanceToVisualPile(placed, second.instanceId, first.instanceId);
+
+    const deleted = deleteCardInstances(piled, [second.instanceId]);
+    const remaining = deleted.instances.find((instance) => instance.instanceId === first.instanceId);
+
+    expect(deleted.instances.some((instance) => instance.instanceId === second.instanceId)).toBe(false);
+    expect(remaining?.pileGroupId).toBeNull();
+    expect(remaining?.pileOrder).toBeNull();
+    expect(countZone(deleted, 'play')).toBe(1);
+  });
+
+  test('shuffles a zone without moving cards between zones', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const libraryBefore = getZoneInstances(initial, 'library').map((instance) => instance.instanceId);
+
+    const shuffled = shuffleZone(initial, 'library', noShuffle);
+    const libraryAfter = getZoneInstances(shuffled, 'library').map((instance) => instance.instanceId);
+
+    expect(libraryAfter).not.toEqual(libraryBefore);
+    expect([...libraryAfter].sort()).toEqual([...libraryBefore].sort());
+    expect(countZone(shuffled, 'hand')).toBe(countZone(initial, 'hand'));
+    expect(countZone(shuffled, 'library')).toBe(countZone(initial, 'library'));
   });
 
   test('creates and extends visual piles from card-level fields', () => {

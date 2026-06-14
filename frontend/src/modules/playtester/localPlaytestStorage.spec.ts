@@ -41,7 +41,7 @@ describe('localPlaytestStorage', () => {
   test('loads current-version drafts', () => {
     const storage = createLocalPlaytestStorage();
     const draft: StoredPlaytestDraft = {
-      version: 1,
+      version: 2,
       deckId: 'deck-1',
       deckUpdatedAt: '2026-01-01T00:00:00Z',
       savedAt: '2026-01-01T00:00:00Z',
@@ -54,6 +54,8 @@ describe('localPlaytestStorage', () => {
         openingSetup: {
           selectedManaInstanceIds: [],
           selectedSetupInstanceIds: [],
+          reservedOrigins: {},
+          reservedOriginOrders: {},
         },
         setupSnapshot: {
           instances: [
@@ -64,6 +66,7 @@ describe('localPlaytestStorage', () => {
               zoneId: 'library',
               order: 0,
               tapped: false,
+              face: 'front',
               setupOrigin: false,
               boardX: null,
               boardY: null,
@@ -80,6 +83,7 @@ describe('localPlaytestStorage', () => {
             zoneId: 'library',
             order: 0,
             tapped: false,
+            face: 'front',
             setupOrigin: false,
             boardX: null,
             boardY: null,
@@ -97,11 +101,53 @@ describe('localPlaytestStorage', () => {
   test('ignores unsupported draft versions', () => {
     const storage = createLocalPlaytestStorage();
     localStorage.setItem('card-reader.playtester.deck-1', JSON.stringify({
-      version: 2,
+      version: 99,
       deckId: 'deck-1',
       state: {},
     }));
 
     expect(storage.load('deck-1')).toBeNull();
+  });
+
+  test('migrates version 1 drafts with missing card faces', () => {
+    const storage = createLocalPlaytestStorage();
+    localStorage.setItem('card-reader.playtester.deck-1', JSON.stringify({
+      version: 1,
+      deckId: 'deck-1',
+      deckUpdatedAt: '2026-01-01T00:00:00Z',
+      savedAt: '2026-01-01T00:00:00Z',
+      state: {
+        deckId: 'deck-1',
+        deckUpdatedAt: '2026-01-01T00:00:00Z',
+        phase: 'play',
+        handSize: 7,
+        stackFaces: { library: 'back' },
+        openingSetup: {
+          selectedManaInstanceIds: [],
+          selectedSetupInstanceIds: [],
+        },
+        setupSnapshot: null,
+        instances: [
+          {
+            instanceId: 'card-1:main:1',
+            cardId: 'card-1',
+            card,
+            zoneId: 'library',
+            order: 0,
+            tapped: false,
+            setupOrigin: false,
+            boardX: null,
+            boardY: null,
+            pileGroupId: null,
+            pileOrder: null,
+          },
+        ],
+      },
+    }));
+
+    const migrated = storage.load('deck-1');
+
+    expect(migrated?.version).toBe(2);
+    expect(migrated?.state.instances[0]?.face).toBe('front');
   });
 });

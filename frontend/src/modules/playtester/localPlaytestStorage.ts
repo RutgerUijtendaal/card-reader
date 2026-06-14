@@ -1,23 +1,9 @@
 import type {
   PlaytestStorageAdapter,
-  StoredPlaytestDraft,
 } from '@/modules/playtester/types';
-import { PLAYTEST_DRAFT_VERSION } from '@/modules/playtester/playtestState';
+import { migrateStoredPlaytestDraft } from '@/modules/playtester/playtestState';
 
 const STORAGE_PREFIX = 'card-reader.playtester.';
-
-const isStoredDraft = (value: unknown): value is StoredPlaytestDraft => {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  return 'version' in value
-    && value.version === PLAYTEST_DRAFT_VERSION
-    && 'deckId' in value
-    && typeof value.deckId === 'string'
-    && 'state' in value
-    && value.state !== null
-    && typeof value.state === 'object';
-};
 
 const storageKey = (deckId: string): string => `${STORAGE_PREFIX}${deckId}`;
 
@@ -32,7 +18,7 @@ export const createLocalPlaytestStorage = (): PlaytestStorageAdapter => ({
     }
     try {
       const parsed: unknown = JSON.parse(raw);
-      return isStoredDraft(parsed) ? parsed : null;
+      return migrateStoredPlaytestDraft(parsed);
     } catch {
       return null;
     }
