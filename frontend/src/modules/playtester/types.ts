@@ -71,6 +71,8 @@ export type PlaytestSetupSnapshot = {
 export type PlaytestOpeningSetup = {
   selectedManaInstanceIds: string[];
   selectedSetupInstanceIds: string[];
+  reservedOrigins?: Partial<Record<string, PlaytestZoneId>>;
+  reservedOriginOrders?: Partial<Record<string, number>>;
 };
 
 export type PlaytestState = {

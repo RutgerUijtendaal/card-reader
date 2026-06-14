@@ -21,7 +21,11 @@ export const DEFAULT_PLAYTEST_STACK_FACES: Partial<Record<PlaytestZoneId, Playte
 export const EMPTY_OPENING_SETUP: PlaytestOpeningSetup = {
   selectedManaInstanceIds: [],
   selectedSetupInstanceIds: [],
+  reservedOrigins: {},
+  reservedOriginOrders: {},
 };
+
+type OpeningSelectionKey = 'selectedManaInstanceIds' | 'selectedSetupInstanceIds';
 
 const cloneInstances = (instances: PlaytestCardInstance[]): PlaytestCardInstance[] =>
   normalizePileGroups(instances.map((instance) => ({ ...instance })));
@@ -63,7 +67,7 @@ const selectedOpeningIds = (state: PlaytestState): Set<string> =>
 
 const openingSetupWith = (
   setup: PlaytestOpeningSetup,
-  key: keyof PlaytestOpeningSetup,
+  key: OpeningSelectionKey,
   instanceId: string,
   selected: boolean,
 ): PlaytestOpeningSetup => ({
@@ -73,13 +77,30 @@ const openingSetupWith = (
     : setup[key].filter((id) => id !== instanceId),
 });
 
+const selectedOpeningIdsFromSetup = (setup: PlaytestOpeningSetup): Set<string> =>
+  new Set([
+    ...setup.selectedManaInstanceIds,
+    ...setup.selectedSetupInstanceIds,
+  ]);
+
 const syncOpeningSelections = (state: PlaytestState): PlaytestState => {
   const ids = new Set(state.instances.map((instance) => instance.instanceId));
+  const selectedIds = selectedOpeningIdsFromSetup(state.openingSetup);
+  const reservedOrigins = Object.fromEntries(
+    Object.entries(state.openingSetup.reservedOrigins ?? {})
+      .filter(([id]) => ids.has(id) && selectedIds.has(id)),
+  );
+  const reservedOriginOrders = Object.fromEntries(
+    Object.entries(state.openingSetup.reservedOriginOrders ?? {})
+      .filter(([id]) => ids.has(id) && selectedIds.has(id)),
+  );
   return {
     ...state,
     openingSetup: {
       selectedManaInstanceIds: state.openingSetup.selectedManaInstanceIds.filter((id) => ids.has(id)),
       selectedSetupInstanceIds: state.openingSetup.selectedSetupInstanceIds.filter((id) => ids.has(id)),
+      reservedOrigins,
+      reservedOriginOrders,
     },
   };
 };
@@ -458,19 +479,52 @@ export const getOpeningSetupInstances = (state: PlaytestState): PlaytestCardInst
 const setOpeningReservation = (
   state: PlaytestState,
   instanceId: string,
-  key: keyof PlaytestOpeningSetup,
+  key: OpeningSelectionKey,
   selected: boolean,
 ): PlaytestState => {
   const instance = state.instances.find((entry) => entry.instanceId === instanceId);
   if (!instance || instance.zoneId === 'hero') {
     return state;
   }
-  const openingSetup = openingSetupWith(state.openingSetup, key, instanceId, selected);
-  const nextSelectedIds = selectedOpeningIds({ ...state, openingSetup });
-  const movedState = selected || nextSelectedIds.has(instanceId)
-    ? moveInstanceToZone({ ...state, openingSetup }, instanceId, 'other')
-    : moveInstanceToZone({ ...state, openingSetup }, instanceId, 'library');
-  return drawUpToOpeningHandSize(movedState);
+  const currentOrigins = state.openingSetup.reservedOrigins ?? {};
+  const currentOriginOrders = state.openingSetup.reservedOriginOrders ?? {};
+  const nextSetupWithoutOrigins = openingSetupWith(state.openingSetup, key, instanceId, selected);
+  const nextSelectedIds = selectedOpeningIdsFromSetup(nextSetupWithoutOrigins);
+  const nextOrigins: Partial<Record<string, PlaytestZoneId>> = {
+    ...currentOrigins,
+    ...(selected ? { [instanceId]: currentOrigins[instanceId] ?? instance.zoneId } : {}),
+  };
+  const nextOriginOrders: Partial<Record<string, number>> = {
+    ...currentOriginOrders,
+    ...(selected ? { [instanceId]: currentOriginOrders[instanceId] ?? instance.order } : {}),
+  };
+  if (!nextSelectedIds.has(instanceId)) {
+    delete nextOrigins[instanceId];
+    delete nextOriginOrders[instanceId];
+  }
+  const openingSetup: PlaytestOpeningSetup = {
+    ...nextSetupWithoutOrigins,
+    reservedOrigins: nextOrigins,
+    reservedOriginOrders: nextOriginOrders,
+  };
+  if (selected || nextSelectedIds.has(instanceId)) {
+    return drawUpToOpeningHandSize(moveInstanceToZone({ ...state, openingSetup }, instanceId, 'other'));
+  }
+
+  const origin = currentOrigins[instanceId] ?? 'library';
+  let nextState = { ...state, openingSetup };
+  if (origin === 'hand' && state.handSize > 0) {
+    const reservedIds = selectedOpeningIds(nextState);
+    const replacement = [...getZoneInstances(nextState, 'hand')]
+      .reverse()
+      .find((entry) => !reservedIds.has(entry.instanceId));
+    if (replacement && countZone(nextState, 'hand') >= state.handSize) {
+      nextState = moveInstanceToZone(nextState, replacement.instanceId, 'library', 0);
+    }
+    return drawUpToOpeningHandSize(moveInstanceToZone(nextState, instanceId, 'hand', currentOriginOrders[instanceId]));
+  }
+
+  return drawUpToOpeningHandSize(moveInstanceToZone(nextState, instanceId, 'library'));
 };
 
 export const toggleOpeningManaSelection = (
@@ -493,6 +547,16 @@ export const mulliganOpeningHand = (
 ): PlaytestState => {
   const syncedState = syncOpeningSelections(state);
   const selectedIds = selectedOpeningIds(syncedState);
+  const reservedOrigins: Partial<Record<string, PlaytestZoneId>> = {
+    ...(syncedState.openingSetup.reservedOrigins ?? {}),
+  };
+  const reservedOriginOrders: Partial<Record<string, number>> = {
+    ...(syncedState.openingSetup.reservedOriginOrders ?? {}),
+  };
+  selectedIds.forEach((instanceId) => {
+    reservedOrigins[instanceId] = 'library';
+    delete reservedOriginOrders[instanceId];
+  });
   const returnedHand = syncedState.instances.map((instance) =>
     instance.zoneId === 'hand' && !selectedIds.has(instance.instanceId)
       ? {
@@ -516,6 +580,11 @@ export const mulliganOpeningHand = (
   return drawUpToOpeningHandSize({
     ...syncedState,
     phase: 'opening',
+    openingSetup: {
+      ...syncedState.openingSetup,
+      reservedOrigins,
+      reservedOriginOrders,
+    },
     instances: renumberAllZones(nextInstances),
   });
 };

@@ -326,6 +326,16 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-opening-mana')
       .querySelector('.playtest-card-static')).not.toBeNull();
 
+    const handSizeInput = testZone(mounted.container, 'playtest-opening-setup')
+      .querySelector<HTMLInputElement>('input[type="number"]');
+    if (!handSizeInput) {
+      throw new Error('expected hand size input');
+    }
+    handSizeInput.value = '';
+    handSizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
+
     const manaChoice = testZone(mounted.container, 'playtest-opening-mana')
       .querySelector<HTMLButtonElement>('.playtest-opening-card-choice');
     manaChoice?.click();

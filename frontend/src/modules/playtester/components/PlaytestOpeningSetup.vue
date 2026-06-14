@@ -169,7 +169,15 @@ const selectedManaSet = computed(() => new Set(props.selectedManaIds));
 const selectedSetupSet = computed(() => new Set(props.selectedSetupIds));
 
 const emitHandSize = (event: Event): void => {
-  emit('update-hand-size', Number((event.target as HTMLInputElement).value));
+  const value = (event.target as HTMLInputElement).value;
+  if (value.trim() === '') {
+    return;
+  }
+  const handSize = Number(value);
+  if (!Number.isFinite(handSize)) {
+    return;
+  }
+  emit('update-hand-size', handSize);
 };
 
 const scrollSelectionWheel = (event: WheelEvent): void => {

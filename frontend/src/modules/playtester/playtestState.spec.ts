@@ -171,6 +171,7 @@ describe('playtestState', () => {
 
   test('selecting opening mana reserves the exact instance and refills hand', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const initialHandIds = getZoneInstances(initial, 'hand').map((instance) => instance.instanceId);
     const handMana = getZoneInstances(initial, 'hand').find(isManaCardInstance);
     if (!handMana) {
       throw new Error('expected hand mana card');
@@ -182,6 +183,12 @@ describe('playtestState', () => {
     expect(selected.instances.find((instance) => instance.instanceId === handMana.instanceId)?.zoneId).toBe('other');
     expect(getZoneInstances(selected, 'hand').some((instance) => instance.instanceId === handMana.instanceId)).toBe(false);
     expect(countZone(selected, 'hand')).toBe(7);
+
+    const deselected = toggleOpeningManaSelection(selected, handMana.instanceId, false);
+
+    expect(deselected.openingSetup.selectedManaInstanceIds).toEqual([]);
+    expect(getZoneInstances(deselected, 'hand').map((instance) => instance.instanceId)).toEqual(initialHandIds);
+    expect(deselected.instances.find((instance) => instance.instanceId === handMana.instanceId)?.zoneId).toBe('hand');
   });
 
   test('opening mulligan preserves reserved mana and Setup selections', () => {
@@ -207,6 +214,23 @@ describe('playtestState', () => {
     expect(getZoneInstances(afterMulligan, 'hand').some((instance) =>
       instance.instanceId === mana.instanceId || instance.instanceId === setup.instanceId,
     )).toBe(false);
+  });
+
+  test('deselecting a reserved card after mulligan returns it to library instead of the new hand', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const handMana = getZoneInstances(initial, 'hand').find(isManaCardInstance);
+    if (!handMana) {
+      throw new Error('expected hand mana card');
+    }
+    const reserved = toggleOpeningManaSelection(initial, handMana.instanceId, true);
+    const afterMulligan = mulliganOpeningHand(reserved, noShuffle);
+
+    const deselected = toggleOpeningManaSelection(afterMulligan, handMana.instanceId, false);
+
+    expect(deselected.openingSetup.selectedManaInstanceIds).toEqual([]);
+    expect(deselected.instances.find((instance) => instance.instanceId === handMana.instanceId)?.zoneId).toBe('library');
+    expect(getZoneInstances(deselected, 'hand').some((instance) => instance.instanceId === handMana.instanceId)).toBe(false);
+    expect(getZoneInstances(deselected, 'hand')).toHaveLength(7);
   });
 
   test('opening hand size changes trim or refill the current hand', () => {
