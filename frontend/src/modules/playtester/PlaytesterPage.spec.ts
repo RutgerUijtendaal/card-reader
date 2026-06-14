@@ -586,6 +586,53 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('ignores selected board group drops outside board and drop targets', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const board = testZone(mounted.container, 'playtest-board-zone');
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 500, 400));
+
+    const firstHandCard = testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]');
+    firstHandCard?.click();
+    await flushPage();
+    const secondHandCard = testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]');
+    secondHandCard?.click();
+    await flushPage();
+
+    const boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+    expect(boardCards).toHaveLength(2);
+    vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
+    vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
+
+    board.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 11, clientX: 40, clientY: 40 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 11, clientX: 340, clientY: 240 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 11, clientX: 340, clientY: 240 }));
+    await flushPage();
+
+    const boardWrappersBefore = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-board-card"]')];
+    const positionsBefore = boardWrappersBefore.map((element) => [element.style.left, element.style.top]);
+    const originalElementsFromPoint = document.elementsFromPoint;
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: () => [],
+    });
+
+    boardCards[0]?.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 12, clientX: 100, clientY: 100 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 12, clientX: 650, clientY: 100 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 12, clientX: 650, clientY: 100 }));
+    await flushPage();
+
+    const boardWrappersAfter = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-board-card"]')];
+    expect(boardWrappersAfter.map((element) => [element.style.left, element.style.top])).toEqual(positionsBefore);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: originalElementsFromPoint,
+    });
+    mounted.unmount();
+  });
+
   test('dropping a pulled stack card back on the same stack preserves stack order', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);

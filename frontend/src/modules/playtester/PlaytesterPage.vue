@@ -850,6 +850,14 @@ const completeDraggedGroupDrop = (drag: PlaytestDraggedCard, pending: PointerDra
   if (bounds.width <= 0 || bounds.height <= 0) {
     return;
   }
+  if (
+    drag.pointerX < bounds.left
+    || drag.pointerX > bounds.right
+    || drag.pointerY < bounds.top
+    || drag.pointerY > bounds.bottom
+  ) {
+    return;
+  }
   const deltaX = ((drag.pointerX - pending.startX) / bounds.width) * 100;
   const deltaY = ((drag.pointerY - pending.startY) / bounds.height) * 100;
   applyState(moveBoardInstancesByDelta(playtest.value, drag.groupInstanceIds, deltaX, deltaY));
