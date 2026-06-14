@@ -411,8 +411,23 @@ export const drawCards = (state: PlaytestState, count: number): PlaytestState =>
 export const startNextTurn = (state: PlaytestState): PlaytestState =>
   drawCards(untapAllBoardCards(state), 1);
 
-export const drawUpToOpeningHandSize = (state: PlaytestState): PlaytestState => {
+const trimOpeningHandToSize = (state: PlaytestState): PlaytestState => {
   let nextState = syncOpeningSelections(state);
+  const reservedIds = selectedOpeningIds(nextState);
+  while (countZone(nextState, 'hand') > nextState.handSize) {
+    const excessCard = [...getZoneInstances(nextState, 'hand')]
+      .reverse()
+      .find((instance) => !reservedIds.has(instance.instanceId));
+    if (!excessCard) {
+      break;
+    }
+    nextState = moveInstanceToZone(nextState, excessCard.instanceId, 'library');
+  }
+  return nextState;
+};
+
+export const drawUpToOpeningHandSize = (state: PlaytestState): PlaytestState => {
+  let nextState = trimOpeningHandToSize(state);
   const reservedIds = selectedOpeningIds(nextState);
   while (countZone(nextState, 'hand') < nextState.handSize) {
     const topCard = getZoneInstances(nextState, 'library').find((instance) => !reservedIds.has(instance.instanceId));

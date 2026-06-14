@@ -18,6 +18,7 @@ import {
   removeInstanceFromVisualPile,
   resetToSetup,
   serializePlaytestDraft,
+  setOpeningHandSize,
   startNextTurn,
   toggleTapped,
   toggleOpeningManaSelection,
@@ -206,6 +207,22 @@ describe('playtestState', () => {
     expect(getZoneInstances(afterMulligan, 'hand').some((instance) =>
       instance.instanceId === mana.instanceId || instance.instanceId === setup.instanceId,
     )).toBe(false);
+  });
+
+  test('opening hand size changes trim or refill the current hand', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+
+    const smallerHand = setOpeningHandSize(initial, 5);
+
+    expect(smallerHand.handSize).toBe(5);
+    expect(getZoneInstances(smallerHand, 'hand')).toHaveLength(5);
+    expect(countZone(smallerHand, 'library')).toBe(7);
+
+    const largerHand = setOpeningHandSize(smallerHand, 8);
+
+    expect(largerHand.handSize).toBe(8);
+    expect(getZoneInstances(largerHand, 'hand')).toHaveLength(8);
+    expect(countZone(largerHand, 'library')).toBe(4);
   });
 
   test('keep moves selected opening cards to board and saves setup snapshot', () => {

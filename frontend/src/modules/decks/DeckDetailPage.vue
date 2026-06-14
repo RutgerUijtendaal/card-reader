@@ -39,12 +39,6 @@
         >
           Copy Share Link
         </button>
-        <RouterLink
-          class="btn-primary"
-          :to="`/playtester/${deck.id}`"
-        >
-          Playtest
-        </RouterLink>
         <button
           class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
           type="button"
@@ -53,6 +47,12 @@
           <Clipboard class="h-4 w-4" />
           <span>{{ ttsExportButtonLabel }}</span>
         </button>
+        <RouterLink
+          class="btn-primary"
+          :to="`/playtester/${deck.id}`"
+        >
+          Playtest
+        </RouterLink>
         <RouterLink
           v-if="canEdit"
           class="btn-secondary"

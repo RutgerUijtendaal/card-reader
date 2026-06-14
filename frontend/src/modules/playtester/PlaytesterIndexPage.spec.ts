@@ -240,4 +240,23 @@ describe('PlaytesterIndexPage', () => {
 
     mounted.unmount();
   });
+
+  test('does not duplicate owned decks that are hidden past the visible owned limit', async () => {
+    const ownedDecks = Array.from({ length: 7 }, (_, index) =>
+      buildDeck(`owned-${index + 1}`, `Owned ${index + 1}`, `Owned Hero ${index + 1}`, 'me'),
+    );
+    fetchMyDecksMock.mockResolvedValue(ownedDecks);
+    fetchPublicDecksMock.mockResolvedValue([
+      ownedDecks[6],
+      buildDeck('public-extra', 'Public Extra', 'Public Hero', 'other'),
+    ]);
+
+    const mounted = await mountPage();
+
+    expect(mounted.container.textContent).toContain('Owned 1');
+    expect(mounted.container.textContent).not.toContain('Owned 7');
+    expect(mounted.container.textContent).toContain('Public Extra');
+
+    mounted.unmount();
+  });
 });

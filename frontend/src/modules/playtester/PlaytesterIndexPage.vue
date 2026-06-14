@@ -157,7 +157,11 @@ const ownedSuggestions = computed(() =>
   filteredSuggestions.value.filter((suggestion) => suggestion.source === 'owned').slice(0, 6),
 );
 const publicSuggestions = computed(() => {
-  const ownedDeckIds = new Set(ownedSuggestions.value.map((suggestion) => suggestion.deck.id));
+  const ownedDeckIds = new Set(
+    filteredSuggestions.value
+      .filter((suggestion) => suggestion.source === 'owned')
+      .map((suggestion) => suggestion.deck.id),
+  );
   return filteredSuggestions.value
     .filter((suggestion) => suggestion.source === 'public' && !ownedDeckIds.has(suggestion.deck.id))
     .slice(0, 8);

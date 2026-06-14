@@ -8,24 +8,25 @@
       pileMember ? 'playtest-card-pile-member' : '',
       selected ? 'playtest-card-selected' : '',
       middleZoomActive ? 'playtest-card-middle-zoom' : '',
+      interactive ? 'playtest-card-interactive' : 'playtest-card-static',
     ]"
     :data-instance-id="instance.instanceId"
     :data-playtest-zone-id="instance.zoneId"
     :data-playtest-pile-group-id="instance.pileGroupId ?? undefined"
     :data-playtest-selected="selected ? 'true' : undefined"
-    role="button"
-    tabindex="0"
-    @click="emit('activate', instance.instanceId)"
-    @keydown.enter.prevent="emit('activate', instance.instanceId)"
-    @keydown.space.prevent="emit('activate', instance.instanceId)"
+    :role="interactive ? 'button' : undefined"
+    :tabindex="interactive ? 0 : undefined"
+    @click="activateCard"
+    @keydown.enter.prevent="activateCard"
+    @keydown.space.prevent="activateCard"
     @pointerdown="handlePointerDown"
     @pointerup="endMiddleZoom"
     @pointercancel="endMiddleZoom"
     @pointerleave="endMiddleZoom"
     @auxclick.prevent
-    @contextmenu.prevent="emit('context-menu', instance.instanceId, $event)"
-    @mouseenter="emit('hover', { type: 'card', instanceId: instance.instanceId })"
-    @mouseleave="emit('hover', null)"
+    @contextmenu="openContextMenu"
+    @mouseenter="setHoveredCard"
+    @mouseleave="clearHoveredCard"
   >
     <div class="theme-card-image-well aspect-[63/88] overflow-hidden rounded-xl">
       <img
@@ -99,6 +100,7 @@ const props = withDefaults(
     instance: PlaytestCardInstance;
     compact?: boolean;
     dragging?: boolean;
+    interactive?: boolean;
     pileMember?: boolean;
     selected?: boolean;
     showName?: boolean;
@@ -106,6 +108,7 @@ const props = withDefaults(
   {
     compact: false,
     dragging: false,
+    interactive: true,
     pileMember: false,
     selected: false,
     showName: false,
@@ -127,6 +130,35 @@ const endMiddleZoom = (): void => {
   middleZoomStyle.value = {};
 };
 
+const activateCard = (): void => {
+  if (!props.interactive) {
+    return;
+  }
+  emit('activate', props.instance.instanceId);
+};
+
+const openContextMenu = (event: MouseEvent): void => {
+  if (!props.interactive) {
+    return;
+  }
+  event.preventDefault();
+  emit('context-menu', props.instance.instanceId, event);
+};
+
+const setHoveredCard = (): void => {
+  if (!props.interactive) {
+    return;
+  }
+  emit('hover', { type: 'card', instanceId: props.instance.instanceId });
+};
+
+const clearHoveredCard = (): void => {
+  if (!props.interactive) {
+    return;
+  }
+  emit('hover', null);
+};
+
 const handlePointerDown = (event: PointerEvent): void => {
   if (event.button === 1) {
     event.preventDefault();
@@ -140,6 +172,9 @@ const handlePointerDown = (event: PointerEvent): void => {
     return;
   }
   if (event.button !== 0) {
+    return;
+  }
+  if (!props.interactive) {
     return;
   }
   emit('pointer-card', props.instance.instanceId, { type: 'card', zoneId: props.instance.zoneId }, event);
@@ -162,6 +197,10 @@ const handlePointerDown = (event: PointerEvent): void => {
 
 .playtest-card:active {
   cursor: grabbing;
+}
+
+.playtest-card-static {
+  cursor: default;
 }
 
 .playtest-card:hover {

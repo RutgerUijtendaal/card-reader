@@ -71,7 +71,7 @@
       </div>
 
       <PlaytestOpeningSetup
-        v-if="playtest.phase === 'opening'"
+        v-if="!staleDraft && playtest.phase === 'opening'"
         :hand-instances="handInstances"
         :mana-instances="openingManaInstances"
         :setup-instances="openingSetupInstances"
@@ -85,7 +85,7 @@
         @toggle-setup="toggleOpeningSetup"
       />
 
-      <template v-else>
+      <template v-else-if="!staleDraft">
         <div class="playtester-topbar">
           <div class="flex flex-wrap items-center gap-2">
             <span
@@ -893,6 +893,9 @@ const completeDraggedCardDrop = (drag: PlaytestDraggedCard): void => {
     applyState(removeInstanceFromVisualPile(placeInstanceOnBoard(playtest.value, drag.instanceId, position.x, position.y), drag.instanceId));
     return;
   }
+  if (drag.source.zoneId === dropTarget.zoneId) {
+    return;
+  }
   applyState(moveInstanceToZone(playtest.value, drag.instanceId, dropTarget.zoneId));
 };
 
@@ -1028,7 +1031,22 @@ const finishPointerDrag = (event: PointerEvent): void => {
 
 useEventListener(window, 'pointermove', updatePointerDrag);
 useEventListener(window, 'pointerup', finishPointerDrag);
-useEventListener(window, 'pointercancel', finishPointerDrag);
+
+const abortPointerDrag = (event: PointerEvent): void => {
+  if (boardSelection.value?.pointerId === event.pointerId) {
+    boardSelection.value = null;
+    event.preventDefault();
+    return;
+  }
+  const activePointerId = activeDrag.value?.pointerId ?? pendingDrag.value?.pointerId;
+  if (activePointerId !== event.pointerId) {
+    return;
+  }
+  endActiveDrag();
+  event.preventDefault();
+};
+
+useEventListener(window, 'pointercancel', abortPointerDrag);
 
 const updateOpeningHandSize = (handSize: number): void => {
   if (!playtest.value) {
@@ -1245,11 +1263,32 @@ useResizeObserver(lowerBarRef, ([entry]) => {
   lowerBarWidth.value = entry?.contentRect.width ?? 0;
 });
 
-onMounted(async () => {
+let loadRequestId = 0;
+
+const resetTransientPlaytestUi = (): void => {
+  pendingDrag.value = null;
+  activeDrag.value = null;
+  selectedBoardInstanceIds.value = [];
+  boardSelection.value = null;
+  contextMenu.value = null;
+  hoverTarget.value = null;
+  openStackZone.value = null;
+  restartConfirmOpen.value = false;
+};
+
+const loadPlaytestDeck = async (): Promise<void> => {
+  const requestId = ++loadRequestId;
   loading.value = true;
-  void loadCurrentCardBack();
+  deck.value = null;
+  playtest.value = null;
+  staleDraft.value = null;
+  saveSuspended.value = false;
+  resetTransientPlaytestUi();
   try {
     const loadedDeck = await fetchVisibleDeck();
+    if (requestId !== loadRequestId) {
+      return;
+    }
     deck.value = loadedDeck;
     const draft = storage.load(loadedDeck.id);
     if (draft && !isStoredDraftStale(draft, loadedDeck)) {
@@ -1262,8 +1301,22 @@ onMounted(async () => {
     }
     playtest.value = createInitialPlaytestState(loadedDeck);
   } finally {
-    loading.value = false;
+    if (requestId === loadRequestId) {
+      loading.value = false;
+    }
   }
+};
+
+watch(
+  deckId,
+  () => {
+    void loadPlaytestDeck();
+  },
+  { immediate: true },
+);
+
+onMounted(() => {
+  void loadCurrentCardBack();
 });
 </script>
 

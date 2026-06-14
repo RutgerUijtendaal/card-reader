@@ -3,6 +3,11 @@ import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import PlaytesterPage from '@/modules/playtester/PlaytesterPage.vue';
+import {
+  createInitialPlaytestState,
+  getZoneInstances,
+  serializePlaytestDraft,
+} from '@/modules/playtester/playtestState';
 
 const {
   authState,
@@ -144,7 +149,7 @@ const flushPage = async (): Promise<void> => {
   await nextTick();
 };
 
-const mountPage = async (): Promise<{ container: HTMLElement; unmount: () => void }> => {
+const mountPage = async (): Promise<{ container: HTMLElement; router: ReturnType<typeof createRouter>; unmount: () => void }> => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const router = createRouter({
@@ -163,6 +168,7 @@ const mountPage = async (): Promise<{ container: HTMLElement; unmount: () => voi
   await flushPage();
   return {
     container,
+    router,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -257,6 +263,53 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('reloads deck data when navigating between playtester deck routes', async () => {
+    fetchDeckDetailMock.mockImplementation((deckId: string) =>
+      Promise.resolve({
+        ...deckRecord,
+        id: deckId,
+        name: deckId === 'deck-2' ? 'Second Playtest Deck' : 'Playtest Deck',
+      }),
+    );
+    const mounted = await mountPage();
+
+    expect(mounted.container.textContent).toContain('Playtest Deck');
+
+    await mounted.router.push('/playtester/deck-2');
+    await flushPage();
+
+    expect(fetchDeckDetailMock).toHaveBeenCalledWith('deck-2');
+    expect(mounted.container.textContent).toContain('Second Playtest Deck');
+    expect(localStorage.getItem('card-reader.playtester.deck-2')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('requires stale draft choice before current deck controls are interactive', async () => {
+    const staleState = {
+      ...createInitialPlaytestState(deckRecord),
+      deckUpdatedAt: '2025-01-01T00:00:00Z',
+    };
+    localStorage.setItem('card-reader.playtester.deck-1', JSON.stringify(serializePlaytestDraft(staleState)));
+
+    const mounted = await mountPage();
+
+    expect(mounted.container.textContent).toContain('Saved playtest is from an older deck version.');
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-setup"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="playtest-board-zone"]')).toBeNull();
+
+    const restartButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Restart');
+    restartButton?.click();
+    await flushPage();
+
+    expect(mounted.container.textContent).not.toContain('Saved playtest is from an older deck version.');
+    expect(testZone(mounted.container, 'playtest-opening-setup')).not.toBeNull();
+    expect(localStorage.getItem('card-reader.playtester.deck-1')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
   test('opening setup shows physical mana and Setup selections before the board', async () => {
     const mounted = await mountPage();
 
@@ -266,6 +319,10 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-opening-hand').querySelector('.theme-section-title')).toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-mana').querySelector('.theme-section-title')).toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-setup-cards').querySelector('.theme-section-title')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-setup')
+      .querySelectorAll('[data-instance-id][role="button"]')).toHaveLength(0);
+    expect(testZone(mounted.container, 'playtest-opening-setup')
+      .querySelectorAll('[data-instance-id][tabindex]')).toHaveLength(0);
 
     const manaChoice = testZone(mounted.container, 'playtest-opening-mana')
       .querySelector<HTMLButtonElement>('.playtest-opening-card-choice');
@@ -408,6 +465,35 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('pointercancel aborts active drags without moving cards', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const board = testZone(mounted.container, 'playtest-board-zone');
+    const handZone = testZone(mounted.container, 'playtest-hand-zone');
+    const handCard = handZone.querySelector<HTMLElement>('[data-instance-id]');
+    if (!handCard) {
+      throw new Error('expected hand card');
+    }
+    vi.spyOn(handCard, 'getBoundingClientRect').mockReturnValue(rect(90, 90, 100, 140));
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 500, 400));
+
+    handCard.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 9, clientX: 100, clientY: 100 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 9, clientX: 130, clientY: 130 }));
+    await flushPage();
+
+    expect(document.body.querySelector('[data-testid="playtest-dragged-card"]')).not.toBeNull();
+
+    window.dispatchEvent(playtestPointerEvent('pointercancel', { pointerId: 9, clientX: 250, clientY: 180 }));
+    await flushPage();
+
+    expect(document.body.querySelector('[data-testid="playtest-dragged-card"]')).toBeNull();
+    expect(handZone.querySelectorAll('[data-instance-id]')).toHaveLength(7);
+    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(0);
+
+    mounted.unmount();
+  });
+
   test('drops short drags through the source card onto the board underneath', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);
@@ -497,6 +583,41 @@ describe('PlaytesterPage', () => {
     expect(boardWrappers.map((element) => element.style.left)).toEqual(['26%', '42%']);
     expect(boardWrappers.map((element) => element.style.top)).toEqual(['22%', '22%']);
 
+    mounted.unmount();
+  });
+
+  test('dropping a pulled stack card back on the same stack preserves stack order', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const libraryZone = testZone(mounted.container, 'playtest-library-zone');
+    const stackCard = libraryZone.querySelector<HTMLElement>('.playtest-stack-card');
+    if (!stackCard) {
+      throw new Error('expected library stack card');
+    }
+    vi.spyOn(libraryZone, 'getBoundingClientRect').mockReturnValue(rect(300, 300, 120, 180));
+    vi.spyOn(stackCard, 'getBoundingClientRect').mockReturnValue(rect(310, 330, 100, 140));
+    const originalElementsFromPoint = document.elementsFromPoint;
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: () => [libraryZone],
+    });
+    const draftBefore = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    const libraryBefore = getZoneInstances(draftBefore.state, 'library').map((instance) => instance.instanceId);
+
+    libraryZone.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 10, clientX: 320, clientY: 340 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 10, clientX: 340, clientY: 360 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 10, clientX: 340, clientY: 360 }));
+    await flushPage();
+
+    const draftAfter = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    const libraryAfter = getZoneInstances(draftAfter.state, 'library').map((instance) => instance.instanceId);
+    expect(libraryAfter).toEqual(libraryBefore);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: originalElementsFromPoint,
+    });
     mounted.unmount();
   });
 

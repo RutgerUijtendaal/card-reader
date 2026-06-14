@@ -48,6 +48,7 @@
       >
         <PlaytestCard
           :instance="instance"
+          :interactive="false"
         />
       </div>
       <div
@@ -86,6 +87,7 @@
             <PlaytestCard
               :instance="instance"
               compact
+              :interactive="false"
               :selected="selectedManaSet.has(instance.instanceId)"
             />
           </button>
@@ -125,6 +127,7 @@
             <PlaytestCard
               :instance="instance"
               compact
+              :interactive="false"
               :selected="selectedSetupSet.has(instance.instanceId)"
             />
           </button>
