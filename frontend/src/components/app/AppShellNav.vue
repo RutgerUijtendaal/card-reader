@@ -189,7 +189,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
+import { Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Gamepad2, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
 import AppHotkeysPanel from '@/components/app/AppHotkeysPanel.vue';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
@@ -234,6 +234,7 @@ const { unreadNotificationCount } = useNotificationSummary();
 const items = computed<NavItem[]>(() => [
   { label: 'Gallery', to: '/cards', icon: Images },
   { label: 'Decks', to: '/decks', icon: BookOpen },
+  { label: 'Playtester', to: '/playtester', icon: Gamepad2 },
   { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
   { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: Hammer, requiresAuth: true },
   { label: 'Notifications', to: '/notifications', icon: Bell, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },

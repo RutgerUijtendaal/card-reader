@@ -1,4 +1,4 @@
-import { createApp, nextTick } from 'vue';
+import { createApp, h, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import DeckListCard from '@/components/decks/DeckListCard.vue';
@@ -96,7 +96,7 @@ const buildDeck = (): DeckRecord => ({
   updated_at: '2025-01-01T00:00:00Z',
 });
 
-const mountDeckListCard = async (mode: 'browse' | 'owned') => {
+const mountDeckListCard = async (mode: 'browse' | 'owned', options: { customActions?: boolean } = {}) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
@@ -111,10 +111,20 @@ const mountDeckListCard = async (mode: 'browse' | 'owned') => {
   await router.push('/decks');
   await router.isReady();
 
-  const app = createApp(DeckListCard, {
-    deck: buildDeck(),
-    mode,
-    titleTo: mode === 'browse' ? '/decks/deck-1' : '/my/decks/deck-1',
+  const app = createApp({
+    render: () => h(
+      DeckListCard,
+      {
+        deck: buildDeck(),
+        mode,
+        titleTo: mode === 'browse' ? '/decks/deck-1' : '/my/decks/deck-1',
+      },
+      options.customActions
+        ? {
+            actions: () => h('button', { class: 'custom-action', type: 'button' }, 'Custom Action'),
+          }
+        : undefined,
+    ),
   });
   app.use(router);
   app.mount(container);
@@ -188,6 +198,15 @@ describe('DeckListCard', () => {
 
     expect(card).not.toBeNull();
     expect(card?.getAttribute('data-navigation-target')).toBe('/decks/deck-1');
+
+    mounted.unmount();
+  });
+
+  test('renders custom actions in browse mode instead of the fallback actions menu', async () => {
+    const mounted = await mountDeckListCard('browse', { customActions: true });
+
+    expect(mounted.container.textContent).toContain('Custom Action');
+    expect(mounted.container.querySelector('button[aria-label="Open deck actions"]')).toBeNull();
 
     mounted.unmount();
   });

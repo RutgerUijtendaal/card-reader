@@ -39,6 +39,12 @@
         >
           Copy Share Link
         </button>
+        <RouterLink
+          class="btn-primary"
+          :to="`/playtester/${deck.id}`"
+        >
+          Playtest
+        </RouterLink>
         <button
           class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
           type="button"
@@ -49,7 +55,7 @@
         </button>
         <RouterLink
           v-if="canEdit"
-          class="btn-primary"
+          class="btn-secondary"
           :to="buildDeckDetailEditorLocation(deck.id)"
         >
           Edit Deck
