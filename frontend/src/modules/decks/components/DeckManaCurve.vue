@@ -36,7 +36,10 @@
       v-if="hasVisibleCurve"
       :class="chartShellClass"
     >
-      <div :class="chartGridClass">
+      <div
+        :class="chartGridClass"
+        :style="chartGridStyle"
+      >
         <div
           v-for="bucket in curveSummary.buckets"
           :key="bucket.label"
@@ -95,7 +98,9 @@ const hasVisibleCurve = computed(() => curveSummary.value.maxBucketCount > 0);
 const totalCardsLabel = computed(() => (curveSummary.value.totalCards === 1 ? '1 card' : `${curveSummary.value.totalCards} cards`));
 const showHeader = computed(() => !props.compact);
 const emptyStateLabel = computed(() =>
-  curveSummary.value.totalCards > 0 && curveSummary.value.uncostedCards === curveSummary.value.totalCards
+  curveSummary.value.totalCards === 0 && curveSummary.value.excludedManaCards > 0
+    ? 'No non-mana cards to chart.'
+    : curveSummary.value.totalCards > 0 && curveSummary.value.uncostedCards === curveSummary.value.totalCards
     ? 'No mana cost data is available for these cards.'
     : props.emptyLabel,
 );
@@ -107,7 +112,10 @@ const chartShellClass = computed(() =>
     ? 'deck-mana-curve-shell-compact rounded-lg px-2 py-1.5'
     : 'deck-mana-curve-shell rounded-xl px-3 py-3',
 );
-const chartGridClass = computed(() => (props.compact ? 'grid grid-cols-8 gap-1.5' : 'grid grid-cols-8 gap-3'));
+const chartGridClass = computed(() => (props.compact ? 'grid gap-1.5' : 'grid gap-3'));
+const chartGridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${curveSummary.value.buckets.length}, minmax(0, 1fr))`,
+}));
 const bucketColumnClass = computed(() => (props.compact ? 'space-y-1' : 'space-y-2'));
 const countClass = computed(() => (props.compact ? 'theme-section-title text-[10px]' : 'theme-section-title text-sm'));
 const zeroCountClass = computed(() => (props.compact ? 'theme-kicker text-[10px]' : 'theme-kicker text-sm'));

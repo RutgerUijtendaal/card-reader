@@ -1,5 +1,12 @@
+import { isManaTypeKey } from '@/composables/card-gallery/cardSort';
+
+type ManaCurveCardTypeLike = {
+  key: string;
+};
+
 export type ManaCurveCardLike = {
   mana_value: number | null;
+  types?: ManaCurveCardTypeLike[];
 };
 
 export type ManaCurveEntryLike<TCard extends ManaCurveCardLike = ManaCurveCardLike> = {
@@ -19,6 +26,7 @@ export type ManaCurveSummary = {
   totalCards: number;
   maxBucketCount: number;
   uncostedCards: number;
+  excludedManaCards: number;
 };
 
 export type BuildManaCurveOptions = {
@@ -34,28 +42,62 @@ const normalizeManaValue = (value: number | null, overflowCost: number): number 
   return Math.min(value, overflowCost);
 };
 
+const hasManaType = (card: ManaCurveCardLike): boolean =>
+  (card.types ?? []).some((type) => isManaTypeKey(type.key));
+
+const buildBucketCosts = (overflowCost: number, hasZeroCostCards: boolean): number[] => {
+  const startCost = hasZeroCostCards ? 0 : 1;
+  const costs: number[] = [];
+  for (let cost = startCost; cost <= overflowCost; cost += 1) {
+    costs.push(cost);
+  }
+  return costs;
+};
+
 export const buildManaCurve = <TCard extends ManaCurveCardLike>(
   entries: ManaCurveEntryLike<TCard>[],
   options: BuildManaCurveOptions = {},
 ): ManaCurveSummary => {
   const overflowCost = options.overflowCost ?? DEFAULT_OVERFLOW_COST;
-  const bucketCounts = new Map<number, number>();
+  const normalizedEntries: Array<{ quantity: number; manaValue: number | null }> = [];
   let totalCards = 0;
   let uncostedCards = 0;
-
-  for (let cost = 0; cost <= overflowCost; cost += 1) {
-    bucketCounts.set(cost, 0);
-  }
+  let excludedManaCards = 0;
+  let hasZeroCostCards = false;
 
   for (const entry of entries) {
+    if (hasManaType(entry.card)) {
+      excludedManaCards += entry.quantity;
+      continue;
+    }
+
     totalCards += entry.quantity;
     const normalizedManaValue = normalizeManaValue(entry.card.mana_value, overflowCost);
+    normalizedEntries.push({
+      quantity: entry.quantity,
+      manaValue: normalizedManaValue,
+    });
 
     if (normalizedManaValue === null) {
       uncostedCards += entry.quantity;
       continue;
     }
 
+    if (normalizedManaValue === 0) {
+      hasZeroCostCards = true;
+    }
+  }
+
+  const bucketCounts = new Map<number, number>();
+  for (const cost of buildBucketCosts(overflowCost, hasZeroCostCards)) {
+    bucketCounts.set(cost, 0);
+  }
+
+  for (const entry of normalizedEntries) {
+    const normalizedManaValue = entry.manaValue;
+    if (normalizedManaValue === null) {
+      continue;
+    }
     bucketCounts.set(normalizedManaValue, (bucketCounts.get(normalizedManaValue) ?? 0) + entry.quantity);
   }
 
@@ -72,5 +114,6 @@ export const buildManaCurve = <TCard extends ManaCurveCardLike>(
     totalCards,
     maxBucketCount,
     uncostedCards,
+    excludedManaCards,
   };
 };
