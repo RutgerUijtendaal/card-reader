@@ -323,6 +323,8 @@ describe('PlaytesterPage', () => {
       .querySelectorAll('[data-instance-id][role="button"]')).toHaveLength(0);
     expect(testZone(mounted.container, 'playtest-opening-setup')
       .querySelectorAll('[data-instance-id][tabindex]')).toHaveLength(0);
+    expect(testZone(mounted.container, 'playtest-opening-mana')
+      .querySelector('.playtest-card-static')).not.toBeNull();
 
     const manaChoice = testZone(mounted.container, 'playtest-opening-mana')
       .querySelector<HTMLButtonElement>('.playtest-opening-card-choice');
@@ -462,6 +464,39 @@ describe('PlaytesterPage', () => {
 
     expect(document.body.querySelector('[data-testid="playtest-dragged-card"]')).toBeNull();
 
+    mounted.unmount();
+  });
+
+  test('reorders same-zone hand drops against the target after removing the source', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const handZone = testZone(mounted.container, 'playtest-hand-zone');
+    const handCards = [...handZone.querySelectorAll<HTMLElement>('[data-instance-id]')];
+    expect(handCards.length).toBeGreaterThanOrEqual(3);
+    vi.spyOn(handCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(50, 450, 100, 140));
+    vi.spyOn(handCards[2] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(250, 450, 100, 140));
+
+    const orderBefore = handCards.map((element) => element.dataset.instanceId);
+    const originalElementsFromPoint = document.elementsFromPoint;
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: () => [handCards[2]],
+    });
+
+    handCards[0]?.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 13, clientX: 70, clientY: 470 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 13, clientX: 270, clientY: 470 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 13, clientX: 270, clientY: 470 }));
+    await flushPage();
+
+    const orderAfter = [...handZone.querySelectorAll<HTMLElement>('[data-instance-id]')]
+      .map((element) => element.dataset.instanceId);
+    expect(orderAfter.slice(0, 3)).toEqual([orderBefore[1], orderBefore[0], orderBefore[2]]);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: originalElementsFromPoint,
+    });
     mounted.unmount();
   });
 
@@ -779,6 +814,21 @@ describe('PlaytesterPage', () => {
 
     expect(cardContext.defaultPrevented).toBe(true);
     expect(document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent).toContain('Move to Board');
+
+    mounted.unmount();
+  });
+
+  test('stack overlay cards stay draggable without button semantics', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    testZone(mounted.container, 'playtest-hero-zone').click();
+    await flushPage();
+
+    const overlay = document.body.querySelector<HTMLElement>('[data-testid="playtest-stack-overlay"]');
+    expect(overlay?.querySelector('[data-instance-id]')).not.toBeNull();
+    expect(overlay?.querySelector('[data-instance-id][role="button"]')).toBeNull();
+    expect(overlay?.querySelector('[data-instance-id][tabindex]')).toBeNull();
 
     mounted.unmount();
   });

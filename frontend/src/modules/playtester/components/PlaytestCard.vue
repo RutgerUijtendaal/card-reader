@@ -14,8 +14,8 @@
     :data-playtest-zone-id="instance.zoneId"
     :data-playtest-pile-group-id="instance.pileGroupId ?? undefined"
     :data-playtest-selected="selected ? 'true' : undefined"
-    :role="interactive ? 'button' : undefined"
-    :tabindex="interactive ? 0 : undefined"
+    :role="canActivate ? 'button' : undefined"
+    :tabindex="canActivate ? 0 : undefined"
     @click="activateCard"
     @keydown.enter.prevent="activateCard"
     @keydown.space.prevent="activateCard"
@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import type {
   PlaytestCardInstance,
@@ -99,6 +99,7 @@ const props = withDefaults(
   defineProps<{
     instance: PlaytestCardInstance;
     compact?: boolean;
+    activatable?: boolean;
     dragging?: boolean;
     interactive?: boolean;
     pileMember?: boolean;
@@ -107,6 +108,7 @@ const props = withDefaults(
   }>(),
   {
     compact: false,
+    activatable: true,
     dragging: false,
     interactive: true,
     pileMember: false,
@@ -124,6 +126,7 @@ const emit = defineEmits<{
 
 const middleZoomActive = ref(false);
 const middleZoomStyle = ref<Record<string, string>>({});
+const canActivate = computed(() => props.interactive && props.activatable);
 
 const endMiddleZoom = (): void => {
   middleZoomActive.value = false;
@@ -131,7 +134,7 @@ const endMiddleZoom = (): void => {
 };
 
 const activateCard = (): void => {
-  if (!props.interactive) {
+  if (!canActivate.value) {
     return;
   }
   emit('activate', props.instance.instanceId);
@@ -201,6 +204,7 @@ const handlePointerDown = (event: PointerEvent): void => {
 
 .playtest-card-static {
   cursor: default;
+  touch-action: auto;
 }
 
 .playtest-card:hover {

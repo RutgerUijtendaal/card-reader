@@ -263,8 +263,8 @@
                 v-for="instance in stackOverlayInstances"
                 :key="instance.instanceId"
                 :instance="instance"
+                :activatable="false"
                 :dragging="isInstanceDragging(instance.instanceId)"
-                @activate="noopCardActivate"
                 @pointer-card="startCardPointer"
                 @context-menu="openCardContextMenu"
                 @hover="setHoverTarget"
@@ -793,8 +793,6 @@ const startStackPointer = (zoneId: PlaytestZoneId, instanceId: string, event: Po
   startPointerDrag(instanceId, { type: 'stack', zoneId }, event);
 };
 
-const noopCardActivate = (): void => undefined;
-
 const moveCardToZone = (instanceId: string, zoneId: PlaytestZoneId): void => {
   if (!playtest.value) {
     return;
@@ -822,6 +820,18 @@ const moveCardsToZone = (
     ),
     state,
   );
+
+const targetIndexAfterRemovingDraggedCard = (
+  sourceZoneId: PlaytestZoneId,
+  targetZoneId: PlaytestZoneId,
+  sourceIndex: number,
+  targetIndex: number,
+): number => {
+  if (sourceZoneId !== targetZoneId || sourceIndex < 0 || targetIndex < 0) {
+    return targetIndex;
+  }
+  return sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+};
 
 const completeDraggedGroupDrop = (drag: PlaytestDraggedCard, pending: PointerDragStart): void => {
   if (!playtest.value || !drag.groupInstanceIds?.length) {
@@ -889,10 +899,19 @@ const completeDraggedCardDrop = (drag: PlaytestDraggedCard): void => {
       applyState(placeInstanceOnBoard(playtest.value, drag.instanceId, position.x, position.y));
       return;
     }
-    const targetIndex = getZoneInstances(playtest.value, target.zoneId).findIndex(
+    const targetZoneInstances = getZoneInstances(playtest.value, target.zoneId);
+    const sourceIndex = target.zoneId === drag.source.zoneId
+      ? targetZoneInstances.findIndex((instance) => instance.instanceId === drag.instanceId)
+      : -1;
+    const targetIndex = targetZoneInstances.findIndex(
       (instance) => instance.instanceId === target.instanceId,
     );
-    applyState(moveInstanceToZone(playtest.value, drag.instanceId, target.zoneId, targetIndex));
+    applyState(moveInstanceToZone(
+      playtest.value,
+      drag.instanceId,
+      target.zoneId,
+      targetIndexAfterRemovingDraggedCard(drag.source.zoneId, target.zoneId, sourceIndex, targetIndex),
+    ));
     return;
   }
 
