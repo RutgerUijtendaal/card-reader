@@ -105,6 +105,9 @@ class CardVersionTag(TimestampedModel):
 
     class Meta:
         db_table = "card_version_tag"
+        indexes = [
+            models.Index(fields=["tag", "card_version"], name="ix_cv_tag_tag_version"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("card_version", "tag"), name="ux_card_version_tag_pair")
         ]
@@ -127,6 +130,9 @@ class CardVersionSymbol(TimestampedModel):
 
     class Meta:
         db_table = "card_version_symbol"
+        indexes = [
+            models.Index(fields=["symbol", "card_version"], name="ix_cv_symbol_symbol_version"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("card_version", "symbol"), name="ux_card_version_symbol_pair")
         ]
@@ -149,6 +155,9 @@ class CardVersionKeyword(TimestampedModel):
 
     class Meta:
         db_table = "card_version_keyword"
+        indexes = [
+            models.Index(fields=["keyword", "card_version"], name="ix_cv_keyword_keyword_version"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("card_version", "keyword"), name="ux_card_version_keyword_pair")
         ]
@@ -168,6 +177,9 @@ class CardVersionType(TimestampedModel):
 
     class Meta:
         db_table = "card_version_type"
+        indexes = [
+            models.Index(fields=["type", "card_version"], name="ix_cv_type_type_version"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("card_version", "type"), name="ux_card_version_type_pair")
         ]

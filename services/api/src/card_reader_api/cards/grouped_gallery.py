@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 from card_reader_api.card_groups.serializers import card_group_gallery_payload, card_group_visible_members
 from card_reader_api.cards.public_urls import card_image_asset_url
@@ -11,33 +11,37 @@ from card_reader_core.repositories.cards import (
     CARD_SORT_MANA_DESC,
     CARD_SORT_NAME_ASC,
     CARD_SORT_TYPES_ASC,
-    list_matching_cards,
+    get_card_list_rows_by_version_ids,
+    list_matching_card_candidates,
 )
 from card_reader_core.repositories.metadata import list_types_for_card_sort
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import get_card_versions_metadata
 
 if TYPE_CHECKING:
+    from card_reader_core.models import CardGroup
     from card_reader_core.models import Type
-    from card_reader_core.repositories.cards import CardSort
+    from card_reader_core.repositories.cards import CardLifecycleFilter, CardSort
 
 MANA_TYPE_KEY = "mana"
 
 
 class GroupedGalleryItem(TypedDict):
+    result_type: Literal["card", "card_group"]
     item_id: str
+    card_version_id: str | None
+    group_id: str | None
     label: str
     name: str
     mana_value: int | None
     updated_at: datetime
     types: list["Type"]
-    payload: dict[str, object]
 
 
 def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
     page = filters["page"]
     page_size = filters["page_size"]
-    matching_rows = list_matching_cards(
+    matching_rows = list_matching_card_candidates(
         query=filters["query"],
         card_ids=filters["card_ids"],
         max_confidence=filters["max_confidence"],
@@ -87,23 +91,15 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
             continue
         grouped_items.append(
             _build_grouped_gallery_item(
+                result_type="card",
                 item_id=row.version.card.id,
+                card_version_id=row.version.id,
+                group_id=None,
                 label=row.version.card.label,
                 name=row.version.name,
                 mana_value=row.version.mana_value,
                 updated_at=row.version.updated_at,
                 types=row.types,
-                payload=card_payload(
-                    row.version.card,
-                    row.version,
-                    image_url=card_image_asset_url(row.image, fallback_url=f"/cards/{row.version.card.id}/image"),
-                    metadata={
-                        "keywords": row.keywords,
-                        "tags": row.tags,
-                        "symbols": row.symbols,
-                        "types": row.types,
-                    },
-                ),
             )
         )
 
@@ -112,7 +108,11 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
         for group in groups
         if group.anchor_card.latest_version is not None
     }
-    anchor_metadata = get_card_versions_metadata([version.id for version in anchor_versions.values()])
+    anchor_metadata = (
+        get_card_versions_metadata([version.id for version in anchor_versions.values()])
+        if filters["sort"] == CARD_SORT_TYPES_ASC
+        else {}
+    )
     for group in groups:
         anchor_version = anchor_versions.get(group.id)
         member_ids = {member.card.id for member in card_group_visible_members(group, lifecycle_status)}
@@ -120,13 +120,15 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
             continue
         grouped_items.append(
             _build_grouped_gallery_item(
+                result_type="card_group",
                 item_id=group.id,
+                card_version_id=None,
+                group_id=group.id,
                 label=group.anchor_card.label,
                 name=anchor_version.name,
                 mana_value=anchor_version.mana_value,
                 updated_at=anchor_version.updated_at,
                 types=anchor_metadata.get(anchor_version.id, {"types": []})["types"],
-                payload=card_group_gallery_payload(group, lifecycle_status=lifecycle_status),
             )
         )
 
@@ -136,7 +138,8 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
     offset = (normalized_page - 1) * normalized_page_size
-    results = [row["payload"] for row in grouped_items[offset : offset + normalized_page_size]]
+    page_items = grouped_items[offset : offset + normalized_page_size]
+    results = _hydrate_grouped_gallery_payloads(page_items, groups, lifecycle_status)
     return {
         "count": total_count,
         "next_page": normalized_page + 1 if normalized_page * normalized_page_size < total_count else None,
@@ -149,23 +152,67 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
 
 def _build_grouped_gallery_item(
     *,
+    result_type: Literal["card", "card_group"],
     item_id: str,
+    card_version_id: str | None,
+    group_id: str | None,
     label: str,
     name: str,
     mana_value: int | None,
     updated_at: datetime,
     types: list["Type"],
-    payload: dict[str, object],
 ) -> GroupedGalleryItem:
     return {
+        "result_type": result_type,
         "item_id": item_id,
+        "card_version_id": card_version_id,
+        "group_id": group_id,
         "label": label,
         "name": name,
         "mana_value": mana_value,
         "updated_at": updated_at,
         "types": types,
-        "payload": payload,
     }
+
+
+def _hydrate_grouped_gallery_payloads(
+    page_items: list[GroupedGalleryItem],
+    groups: list["CardGroup"],
+    lifecycle_status: "CardLifecycleFilter",
+) -> list[dict[str, object]]:
+    card_version_ids = [
+        item["card_version_id"]
+        for item in page_items
+        if item["result_type"] == "card" and item["card_version_id"] is not None
+    ]
+    card_payloads_by_version_id = {
+        row.version.id: card_payload(
+            row.version.card,
+            row.version,
+            image_url=card_image_asset_url(row.image, fallback_url=f"/cards/{row.version.card.id}/image"),
+            metadata={
+                "keywords": row.keywords,
+                "tags": row.tags,
+                "symbols": row.symbols,
+                "types": row.types,
+            },
+        )
+        for row in get_card_list_rows_by_version_ids(card_version_ids)
+    }
+    groups_by_id = {str(group.id): group for group in groups}
+
+    payloads: list[dict[str, object]] = []
+    for item in page_items:
+        if item["result_type"] == "card":
+            version_id = item["card_version_id"]
+            if version_id is not None and version_id in card_payloads_by_version_id:
+                payloads.append(card_payloads_by_version_id[version_id])
+            continue
+        group_id = item["group_id"]
+        group = groups_by_id.get(group_id or "")
+        if group is not None:
+            payloads.append(card_group_gallery_payload(group, lifecycle_status=lifecycle_status))
+    return payloads
 
 
 def _grouped_gallery_sort_key(

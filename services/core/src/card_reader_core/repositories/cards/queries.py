@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from django.db.models import Case, CharField, Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, QuerySet, Subquery, Value, When
+from typing import Any
+
+from django.db.models import Count, F, Prefetch, Q, QuerySet
 
 from card_reader_core.models import (
     Card,
@@ -26,6 +28,7 @@ from .types import (
     CARD_SORT_UPDATED_DESC,
     DEFAULT_CARD_PAGE_SIZE,
     DEFAULT_CARD_LIFECYCLE_FILTER,
+    CardListCandidate,
     CardLifecycleFilter,
     CardListRow,
     CardSort,
@@ -107,19 +110,16 @@ def list_cards(
         health_min=health_min,
         health_max=health_max,
         lifecycle_status=lifecycle_status,
-        sort=sort,
     )
 
-    total_count = versions.count()
     offset = (normalized_page - 1) * normalized_page_size
-    results = _build_card_list_rows(list(versions[offset : offset + normalized_page_size]))
-    if not results:
-        return PaginatedCardList(
-            count=total_count,
-            page=normalized_page,
-            page_size=normalized_page_size,
-            results=[],
-        )
+    total_count, page_ids = _paginated_card_version_ids(
+        versions,
+        sort=sort,
+        offset=offset,
+        limit=normalized_page_size,
+    )
+    results = get_card_list_rows_by_version_ids(page_ids)
 
     return PaginatedCardList(
         count=total_count,
@@ -196,9 +196,84 @@ def list_matching_cards(
         health_min=health_min,
         health_max=health_max,
         lifecycle_status=lifecycle_status,
-        sort=sort,
     )
-    return _build_card_list_rows(list(versions))
+    version_ids = _ordered_card_version_ids(versions, sort)
+    return get_card_list_rows_by_version_ids(version_ids)
+
+
+def list_matching_card_candidates(
+    *,
+    query: str | None,
+    max_confidence: float | None,
+    card_ids: list[str] | None = None,
+    keyword_ids: list[str] | None = None,
+    keyword_match: str | None = None,
+    tag_ids: list[str] | None = None,
+    tag_match: str | None = None,
+    mana_symbol_ids: list[str] | None = None,
+    mana_symbol_exclude_ids: list[str] | None = None,
+    mana_symbol_match: str | None = None,
+    affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_exclude_ids: list[str] | None = None,
+    affinity_symbol_match: str | None = None,
+    devotion_symbol_ids: list[str] | None = None,
+    devotion_symbol_exclude_ids: list[str] | None = None,
+    devotion_symbol_match: str | None = None,
+    other_symbol_ids: list[str] | None = None,
+    other_symbol_exclude_ids: list[str] | None = None,
+    other_symbol_match: str | None = None,
+    symbol_ids: list[str] | None = None,
+    type_ids: list[str] | None = None,
+    type_match: str | None = None,
+    mana_cost_min: int | None = None,
+    mana_cost_max: int | None = None,
+    template_id: str | None = None,
+    is_hero: bool | None = None,
+    attack_min: int | None = None,
+    attack_max: int | None = None,
+    health_min: int | None = None,
+    health_max: int | None = None,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+    sort: CardSort = CARD_SORT_UPDATED_DESC,
+) -> list[CardListCandidate]:
+    versions = _build_filtered_versions_queryset(
+        query=query,
+        card_ids=card_ids,
+        max_confidence=max_confidence,
+        keyword_ids=keyword_ids,
+        keyword_match=keyword_match,
+        tag_ids=tag_ids,
+        tag_match=tag_match,
+        mana_symbol_ids=mana_symbol_ids,
+        mana_symbol_exclude_ids=mana_symbol_exclude_ids,
+        mana_symbol_match=mana_symbol_match,
+        affinity_symbol_ids=affinity_symbol_ids,
+        affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+        affinity_symbol_match=affinity_symbol_match,
+        devotion_symbol_ids=devotion_symbol_ids,
+        devotion_symbol_exclude_ids=devotion_symbol_exclude_ids,
+        devotion_symbol_match=devotion_symbol_match,
+        other_symbol_ids=other_symbol_ids,
+        other_symbol_exclude_ids=other_symbol_exclude_ids,
+        other_symbol_match=other_symbol_match,
+        symbol_ids=symbol_ids,
+        type_ids=type_ids,
+        type_match=type_match,
+        mana_cost_min=mana_cost_min,
+        mana_cost_max=mana_cost_max,
+        template_id=template_id,
+        is_hero=is_hero,
+        attack_min=attack_min,
+        attack_max=attack_max,
+        health_min=health_min,
+        health_max=health_max,
+        lifecycle_status=lifecycle_status,
+    )
+    version_ids = _ordered_card_version_ids(versions, sort)
+    return _hydrate_card_list_candidates(
+        version_ids,
+        include_types=sort == CARD_SORT_TYPES_ASC,
+    )
 
 
 def get_card(card_id: str) -> Card | None:
@@ -328,10 +403,10 @@ def list_filtered_latest_card_version_reparse_sources(
         health_min=health_min,
         health_max=health_max,
         lifecycle_status=lifecycle_status,
-        sort=sort,
     )
+    version_ids = _ordered_card_version_ids(versions, sort)
     out: list[LatestCardVersionReparseSource] = []
-    for version in versions:
+    for version in _hydrate_card_versions(version_ids):
         image_path = None
         for image in version.images.all():
             image_path = resolve_image_file_path(image)
@@ -481,31 +556,8 @@ def _build_filtered_versions_queryset(
     health_min: int | None,
     health_max: int | None,
     lifecycle_status: CardLifecycleFilter,
-    sort: CardSort,
 ) -> QuerySet[CardVersion]:
-    versions = (
-        CardVersion.objects.filter(is_latest=True)
-        .select_related("card", "template", "previous_version", "content_version")
-        .prefetch_related(
-            "images",
-            Prefetch(
-                "card_version_keywords",
-                queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
-            ),
-            Prefetch(
-                "card_version_tags",
-                queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
-            ),
-            Prefetch(
-                "card_version_symbols",
-                queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
-            ),
-            Prefetch(
-                "card_version_types",
-                queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
-            ),
-        )
-    )
+    versions = CardVersion.objects.filter(is_latest=True)
     versions = apply_card_search(versions, query)
     versions = filter_queryset_by_card_lifecycle(versions, lifecycle_status)
     if card_ids:
@@ -538,10 +590,31 @@ def _build_filtered_versions_queryset(
     versions = exclude_by_links(versions, CardVersionSymbol, "symbol_id", other_symbol_exclude_ids)
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
     versions = filter_by_links(versions, CardVersionType, "type_id", type_ids, match_mode=type_match)
-    return _apply_card_sort(versions, sort)
+    return versions
 
 
-def _apply_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySet[CardVersion]:
+def _paginated_card_version_ids(
+    queryset: QuerySet[CardVersion],
+    *,
+    sort: CardSort,
+    offset: int,
+    limit: int,
+) -> tuple[int, list[str]]:
+    if sort == CARD_SORT_TYPES_ASC:
+        ordered_ids = _ordered_type_sort_card_version_ids(queryset)
+        return len(ordered_ids), ordered_ids[offset : offset + limit]
+    total_count = queryset.count()
+    page_ids = list(_apply_sql_card_sort(queryset, sort).values_list("id", flat=True)[offset : offset + limit])
+    return total_count, page_ids
+
+
+def _ordered_card_version_ids(queryset: QuerySet[CardVersion], sort: CardSort) -> list[str]:
+    if sort == CARD_SORT_TYPES_ASC:
+        return _ordered_type_sort_card_version_ids(queryset)
+    return list(_apply_sql_card_sort(queryset, sort).values_list("id", flat=True))
+
+
+def _apply_sql_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySet[CardVersion]:
     if sort == CARD_SORT_NAME_ASC:
         return queryset.order_by("name", "card__label", "card__id")
     if sort == CARD_SORT_MANA_ASC:
@@ -558,62 +631,138 @@ def _apply_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> QuerySe
             "card__label",
             "card__id",
         )
-    if sort == CARD_SORT_TYPES_ASC:
-        global_type_link_counts = (
-            Type.objects.filter(pk=OuterRef("type_id"))
-            .annotate(
-                linked_card_count=Count(
-                    "card_version_types",
-                    filter=Q(card_version_types__card_version__is_latest=True)
-                    & active_card_lifecycle_q(
-                        field_path="card_version_types__card_version__card__lifecycle_status",
-                    ),
-                    distinct=True,
-                )
-            )
-            .values("linked_card_count")[:1]
-        )
-        best_non_mana_types = (
-            CardVersionType.objects.filter(card_version_id=OuterRef("pk"))
-            .exclude(type__key__iexact=MANA_TYPE_KEY)
-            .annotate(
-                type_linked_card_count=Subquery(global_type_link_counts, output_field=IntegerField()),
-                type_label=F("type__label"),
-            )
-            .order_by(F("type_linked_card_count").desc(nulls_last=True), "type_label", "type_id")
-        )
-        queryset = queryset.annotate(
-            has_mana_type=Exists(
-                CardVersionType.objects.filter(
-                    card_version_id=OuterRef("pk"),
-                    type__key__iexact=MANA_TYPE_KEY,
-                )
-            ),
-            primary_type_count=Subquery(
-                best_non_mana_types.values("type_linked_card_count")[:1],
-                output_field=IntegerField(),
-            ),
-            primary_type_label=Subquery(
-                best_non_mana_types.values("type_label")[:1],
-                output_field=CharField(),
-            ),
-        ).annotate(
-            type_sort_bucket=Case(
-                When(primary_type_count__isnull=False, then=Value(0)),
-                When(has_mana_type=True, then=Value(2)),
-                default=Value(1),
-                output_field=IntegerField(),
-            ),
-        )
-        return queryset.order_by(
-            "type_sort_bucket",
-            F("primary_type_count").desc(nulls_last=True),
-            F("primary_type_label").asc(nulls_last=True),
-            "name",
-            "card__label",
-            "card__id",
-        )
     return queryset.order_by("-updated_at", "card__label", "card__id")
+
+
+def _ordered_type_sort_card_version_ids(queryset: QuerySet[CardVersion]) -> list[str]:
+    version_rows = list(queryset.select_related("card"))
+    version_ids = [version.id for version in version_rows]
+    types_by_version_id = _types_by_card_version_ids(version_ids)
+    type_sort_lookup = _type_sort_lookup()
+    version_rows.sort(
+        key=lambda version: (
+            *_card_type_sort_key(types_by_version_id.get(version.id, []), type_sort_lookup),
+            version.name.casefold(),
+            version.card.label.casefold(),
+            version.card.id,
+        )
+    )
+    return [version.id for version in version_rows]
+
+
+def _hydrate_card_versions(card_version_ids: list[str]) -> list[CardVersion]:
+    if not card_version_ids:
+        return []
+    versions_by_id = {
+        version.id: version
+        for version in CardVersion.objects.filter(id__in=card_version_ids)
+        .select_related("card", "template", "previous_version", "content_version")
+        .prefetch_related(*_card_list_prefetches())
+    }
+    return [versions_by_id[version_id] for version_id in card_version_ids if version_id in versions_by_id]
+
+
+def get_card_list_rows_by_version_ids(card_version_ids: list[str]) -> list[CardListRow]:
+    return _build_card_list_rows(_hydrate_card_versions(card_version_ids))
+
+
+def _hydrate_card_list_candidates(
+    card_version_ids: list[str],
+    *,
+    include_types: bool,
+) -> list[CardListCandidate]:
+    if not card_version_ids:
+        return []
+    versions_by_id = {
+        version.id: version
+        for version in CardVersion.objects.filter(id__in=card_version_ids).select_related("card")
+    }
+    types_by_version_id = _types_by_card_version_ids(card_version_ids) if include_types else {}
+    return [
+        CardListCandidate(
+            version=versions_by_id[version_id],
+            types=types_by_version_id.get(version_id, []),
+        )
+        for version_id in card_version_ids
+        if version_id in versions_by_id
+    ]
+
+
+def _card_list_prefetches() -> tuple[Any, ...]:
+    return (
+        Prefetch("images", queryset=CardVersionImage.objects.order_by("-created_at")),
+        Prefetch(
+            "card_version_keywords",
+            queryset=CardVersionKeyword.objects.select_related("keyword").order_by("keyword__label"),
+        ),
+        Prefetch(
+            "card_version_tags",
+            queryset=CardVersionTag.objects.select_related("tag").order_by("tag__label"),
+        ),
+        Prefetch(
+            "card_version_symbols",
+            queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
+        ),
+        Prefetch(
+            "card_version_types",
+            queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
+        ),
+    )
+
+
+def _types_by_card_version_ids(card_version_ids: list[str]) -> dict[str, list[Type]]:
+    if not card_version_ids:
+        return {}
+    grouped: dict[str, list[Type]] = {version_id: [] for version_id in card_version_ids}
+    for row in (
+        CardVersionType.objects.filter(card_version_id__in=card_version_ids)
+        .select_related("type")
+        .order_by("type__label")
+    ):
+        grouped.setdefault(str(getattr(row, "card_version_id")), []).append(row.type)
+    return grouped
+
+
+def _type_sort_lookup() -> dict[str, tuple[int, str]]:
+    lookup: dict[str, tuple[int, str]] = {}
+    for row in (
+        Type.objects.annotate(
+            linked_card_count=Count(
+                "card_version_types",
+                filter=Q(card_version_types__card_version__is_latest=True)
+                & active_card_lifecycle_q(
+                    field_path="card_version_types__card_version__card__lifecycle_status",
+                ),
+                distinct=True,
+            ),
+        )
+        .order_by("label")
+    ):
+        key = str(row.key).strip().casefold()
+        lookup[key] = (int(getattr(row, "linked_card_count", 0)), str(row.label).casefold())
+    return lookup
+
+
+def _card_type_sort_key(
+    types: list[Type],
+    type_sort_lookup: dict[str, tuple[int, str]],
+) -> tuple[int, int, str]:
+    if not types:
+        return (1, 0, "")
+
+    best_value: tuple[int, int, str] | None = None
+    for row in types:
+        key = str(row.key).strip().casefold()
+        label = str(row.label).casefold()
+        if key == MANA_TYPE_KEY:
+            candidate = (2, 0, "")
+        else:
+            linked_card_count, ranked_label = type_sort_lookup.get(key, (0, label))
+            candidate = (0, -linked_card_count, ranked_label)
+        if best_value is None or candidate < best_value:
+            best_value = candidate
+
+    return best_value or (1, 0, "")
 
 
 def _build_card_list_rows(version_rows: list[CardVersion]) -> list[CardListRow]:
