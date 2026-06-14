@@ -48,8 +48,14 @@
           <span>{{ ttsExportButtonLabel }}</span>
         </button>
         <RouterLink
-          v-if="canEdit"
           class="btn-primary"
+          :to="`/playtester/${deck.id}`"
+        >
+          Playtest
+        </RouterLink>
+        <RouterLink
+          v-if="canEdit"
+          class="btn-secondary"
           :to="buildDeckDetailEditorLocation(deck.id)"
         >
           Edit Deck

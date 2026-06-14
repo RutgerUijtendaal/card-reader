@@ -77,7 +77,7 @@
             data-card-click-ignore="true"
           >
             <slot
-              v-if="isOwnedMode && $slots.actions"
+              v-if="$slots.actions"
               name="actions"
             />
 
@@ -86,6 +86,14 @@
               button-label="Open deck actions"
             >
               <template #default="{ close }">
+                <button
+                  class="btn-secondary w-full justify-center"
+                  type="button"
+                  @click="playtestDeck(close)"
+                >
+                  Playtest
+                </button>
+
                 <button
                   v-if="canShareDeck(deck)"
                   class="btn-secondary w-full justify-center"
@@ -209,6 +217,11 @@ const copyShareLink = async (close: () => void): Promise<void> => {
   }
   await navigator.clipboard.writeText(buildDeckShareUrl(props.deck.id));
   toast.success('Share link copied.');
+  close();
+};
+
+const playtestDeck = (close: () => void): void => {
+  void router.push(`/playtester/${props.deck.id}`);
   close();
 };
 

@@ -75,6 +75,14 @@
                 <ExtraActionsMenu button-label="Open deck actions">
                   <template #default="{ close }">
                     <button
+                      class="btn-secondary w-full justify-center"
+                      type="button"
+                      @click="goToPlaytester(deck); close()"
+                    >
+                      Playtest
+                    </button>
+
+                    <button
                       v-if="canShareDeck(deck)"
                       class="btn-secondary w-full justify-center"
                       type="button"
@@ -316,6 +324,10 @@ const copyShareLink = async (deck: DeckRecord): Promise<void> => {
   }
   await navigator.clipboard.writeText(buildDeckShareUrl(deck.id));
   toast.success('Share link copied.');
+};
+
+const goToPlaytester = (deck: DeckRecord): void => {
+  void router.push(`/playtester/${deck.id}`);
 };
 
 const exportDeck = async (deck: DeckRecord): Promise<void> => {
