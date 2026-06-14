@@ -99,7 +99,7 @@ export type CardBackCurrentResponse = {
 };
 
 export type StoredPlaytestDraft = {
-  version: 3;
+  version: 1;
   deckId: string;
   deckUpdatedAt: string;
   state: PlaytestState;

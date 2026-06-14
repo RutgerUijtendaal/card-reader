@@ -11,7 +11,7 @@ import type {
 
 export const DEFAULT_PLAYTEST_HAND_SIZE = 7;
 export const PLAYTEST_ZONES: PlaytestZoneId[] = ['hero', 'library', 'hand', 'play', 'discard', 'banish', 'other'];
-export const PLAYTEST_DRAFT_VERSION = 3;
+export const PLAYTEST_DRAFT_VERSION = 1;
 export const DEFAULT_PLAYTEST_STACK_FACES: Partial<Record<PlaytestZoneId, PlaytestStackFace>> = {
   library: 'back',
   discard: 'front',
@@ -25,12 +25,6 @@ export const EMPTY_OPENING_SETUP: PlaytestOpeningSetup = {
 
 const cloneInstances = (instances: PlaytestCardInstance[]): PlaytestCardInstance[] =>
   normalizePileGroups(instances.map((instance) => ({ ...instance })));
-
-export const ensurePlaytestInstanceShape = (instance: PlaytestCardInstance): PlaytestCardInstance => ({
-  ...instance,
-  pileGroupId: instance.pileGroupId ?? null,
-  pileOrder: instance.pileOrder ?? null,
-});
 
 const orderedZoneInstances = (
   instances: PlaytestCardInstance[],
@@ -91,10 +85,9 @@ const syncOpeningSelections = (state: PlaytestState): PlaytestState => {
 };
 
 export const normalizePileGroups = (instances: PlaytestCardInstance[]): PlaytestCardInstance[] => {
-  const shaped = instances.map((instance) => ensurePlaytestInstanceShape(instance));
   const groups = new Map<string, PlaytestCardInstance[]>();
 
-  for (const instance of shaped) {
+  for (const instance of instances) {
     if (instance.zoneId !== 'play' || !instance.pileGroupId) {
       continue;
     }
@@ -134,7 +127,7 @@ export const normalizePileGroups = (instances: PlaytestCardInstance[]): Playtest
     });
   }
 
-  return shaped.map((instance) => normalizedById.get(instance.instanceId) ?? instance);
+  return instances.map((instance) => normalizedById.get(instance.instanceId) ?? instance);
 };
 
 const buildMainboardInstances = (entries: DeckEntrySummary[]): PlaytestCardInstance[] =>
@@ -418,11 +411,6 @@ export const drawCards = (state: PlaytestState, count: number): PlaytestState =>
 export const startNextTurn = (state: PlaytestState): PlaytestState =>
   drawCards(untapAllBoardCards(state), 1);
 
-export const drawUpToHandSize = (state: PlaytestState): PlaytestState => {
-  const needed = Math.max(0, state.handSize - countZone(state, 'hand'));
-  return drawCards(state, needed);
-};
-
 export const drawUpToOpeningHandSize = (state: PlaytestState): PlaytestState => {
   let nextState = syncOpeningSelections(state);
   const reservedIds = selectedOpeningIds(nextState);
@@ -546,22 +534,6 @@ export const acceptOpeningSetup = (state: PlaytestState): PlaytestState => {
   };
 };
 
-export const completeSetup = (state: PlaytestState): PlaytestState => {
-  const setupInstances = state.instances.map((instance) => ({
-    ...instance,
-    setupOrigin: instance.zoneId !== 'library',
-  }));
-  const setupSnapshot: PlaytestSetupSnapshot = {
-    instances: cloneInstances(setupInstances),
-  };
-  return drawUpToHandSize({
-    ...state,
-    phase: 'play',
-    instances: setupInstances,
-    setupSnapshot,
-  });
-};
-
 export const resetToSetup = (state: PlaytestState): PlaytestState => {
   if (!state.setupSnapshot) {
     return state;
@@ -573,27 +545,7 @@ export const resetToSetup = (state: PlaytestState): PlaytestState => {
   };
 };
 
-export const mulligan = (
-  state: PlaytestState,
-  random: () => number = Math.random,
-): PlaytestState => {
-  if (state.phase === 'opening') {
-    return mulliganOpeningHand(state, random);
-  }
-  const setupState = resetToSetup(state);
-  const shuffledLibrary = shuffleInstances(getZoneInstances(setupState, 'library'), random);
-  const libraryById = new Map(shuffledLibrary.map((instance) => [instance.instanceId, instance]));
-  const nextInstances = setupState.instances
-    .filter((instance) => instance.zoneId !== 'library')
-    .concat([...libraryById.values()]);
-
-  return drawUpToHandSize({
-    ...setupState,
-    instances: renumberAllZones(nextInstances),
-  });
-};
-
-export const setHandSize = (state: PlaytestState, handSize: number): PlaytestState => ({
+const setHandSize = (state: PlaytestState, handSize: number): PlaytestState => ({
   ...state,
   handSize: Math.max(0, Math.min(99, Math.trunc(handSize))),
 });
@@ -618,8 +570,3 @@ export const serializePlaytestDraft = (state: PlaytestState): StoredPlaytestDraf
 
 export const isStoredDraftStale = (draft: StoredPlaytestDraft, deck: DeckRecord): boolean =>
   draft.deckUpdatedAt !== deck.updated_at;
-
-export const getSetupReminderCards = (deck: DeckRecord): DeckEntrySummary[] =>
-  deck.mainboard.entries.filter((entry) =>
-    entry.card.keywords.some((keyword) => keyword.trim().toLowerCase() === 'setup'),
-  );

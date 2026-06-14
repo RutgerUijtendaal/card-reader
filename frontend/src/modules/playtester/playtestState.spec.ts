@@ -2,13 +2,11 @@ import { describe, expect, test } from 'vitest';
 import {
   addInstanceToVisualPile,
   acceptOpeningSetup,
-  completeSetup,
   countZone,
   createInitialPlaytestState,
   drawCards,
   getOpeningManaInstances,
   getOpeningSetupInstances,
-  getSetupReminderCards,
   getZoneInstances,
   isManaCardInstance,
   isSetupCardInstance,
@@ -236,22 +234,25 @@ describe('playtestState', () => {
     expect(playing.openingSetup.selectedSetupInstanceIds).toEqual([]);
   });
 
-  test('reset restores the completed setup snapshot exactly', () => {
+  test('reset restores the accepted opening setup snapshot exactly', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
-    const playing = completeSetup(initial);
+    const mana = getOpeningManaInstances(initial)[0];
+    if (!mana) {
+      throw new Error('expected mana card');
+    }
+    const playing = acceptOpeningSetup(toggleOpeningManaSelection(initial, mana.instanceId, true));
     const changed = drawCards(moveInstanceToZone(playing, getZoneInstances(playing, 'hand')[0]?.instanceId ?? '', 'discard'), 1);
 
     expect(resetToSetup(changed).instances).toEqual(playing.setupSnapshot?.instances);
   });
 
-  test('detects stale drafts and setup reminder cards', () => {
+  test('detects stale drafts', () => {
     const deck = buildDeck();
     const draft = serializePlaytestDraft(createInitialPlaytestState(deck, noShuffle));
 
-    expect(draft.version).toBe(3);
+    expect(draft.version).toBe(1);
     expect(isStoredDraftStale(draft, deck)).toBe(false);
     expect(isStoredDraftStale(draft, { ...deck, updated_at: '2026-02-01T00:00:00Z' })).toBe(true);
-    expect(getSetupReminderCards(deck).map((entry) => entry.card.id)).toEqual(['setup-card']);
   });
 
   test('creates and extends visual piles from card-level fields', () => {

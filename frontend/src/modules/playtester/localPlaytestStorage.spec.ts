@@ -1,14 +1,46 @@
 import { describe, expect, test, beforeEach } from 'vitest';
 import { createLocalPlaytestStorage } from '@/modules/playtester/localPlaytestStorage';
+import type { StoredPlaytestDraft } from '@/modules/playtester/types';
+import type { DeckCardSummary } from '@/modules/decks/types';
+
+const card: DeckCardSummary = {
+  id: 'card-1',
+  key: 'card-1',
+  label: 'Card 1',
+  result_type: 'card',
+  image_url: null,
+  is_hero: false,
+  lifecycle_status: 'active',
+  template_id: '',
+  version_id: 'card-1-version',
+  version_number: 1,
+  previous_version_id: null,
+  is_latest: true,
+  name: 'Card 1',
+  type_line: '',
+  mana_cost: '',
+  mana_symbols: [],
+  mana_value: 1,
+  attack: null,
+  health: null,
+  rules_text: '',
+  confidence: 1,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  keywords: [],
+  tags: [],
+  symbols: [],
+  types: [],
+};
 
 describe('localPlaytestStorage', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  test('migrates version 1 drafts by adding visual pile and opening setup fields', () => {
+  test('loads current-version drafts', () => {
     const storage = createLocalPlaytestStorage();
-    localStorage.setItem('card-reader.playtester.deck-1', JSON.stringify({
+    const draft: StoredPlaytestDraft = {
       version: 1,
       deckId: 'deck-1',
       deckUpdatedAt: '2026-01-01T00:00:00Z',
@@ -16,21 +48,27 @@ describe('localPlaytestStorage', () => {
       state: {
         deckId: 'deck-1',
         deckUpdatedAt: '2026-01-01T00:00:00Z',
-        phase: 'setup',
+        phase: 'opening',
         handSize: 7,
         stackFaces: { library: 'back' },
+        openingSetup: {
+          selectedManaInstanceIds: [],
+          selectedSetupInstanceIds: [],
+        },
         setupSnapshot: {
           instances: [
             {
               instanceId: 'card-1:main:1',
               cardId: 'card-1',
-              card: {},
+              card,
               zoneId: 'library',
               order: 0,
               tapped: false,
               setupOrigin: false,
               boardX: null,
               boardY: null,
+              pileGroupId: null,
+              pileOrder: null,
             },
           ],
         },
@@ -38,28 +76,32 @@ describe('localPlaytestStorage', () => {
           {
             instanceId: 'card-1:main:1',
             cardId: 'card-1',
-            card: {},
+            card,
             zoneId: 'library',
             order: 0,
             tapped: false,
             setupOrigin: false,
             boardX: null,
             boardY: null,
+            pileGroupId: null,
+            pileOrder: null,
           },
         ],
       },
+    };
+    localStorage.setItem('card-reader.playtester.deck-1', JSON.stringify(draft));
+
+    expect(storage.load('deck-1')).toEqual(draft);
+  });
+
+  test('ignores unsupported draft versions', () => {
+    const storage = createLocalPlaytestStorage();
+    localStorage.setItem('card-reader.playtester.deck-1', JSON.stringify({
+      version: 2,
+      deckId: 'deck-1',
+      state: {},
     }));
 
-    const draft = storage.load('deck-1');
-
-    expect(draft?.version).toBe(3);
-    expect(draft?.state.phase).toBe('opening');
-    expect(draft?.state.openingSetup).toEqual({
-      selectedManaInstanceIds: [],
-      selectedSetupInstanceIds: [],
-    });
-    expect(draft?.state.instances[0]?.pileGroupId).toBeNull();
-    expect(draft?.state.instances[0]?.pileOrder).toBeNull();
-    expect(draft?.state.setupSnapshot?.instances[0]?.pileGroupId).toBeNull();
+    expect(storage.load('deck-1')).toBeNull();
   });
 });

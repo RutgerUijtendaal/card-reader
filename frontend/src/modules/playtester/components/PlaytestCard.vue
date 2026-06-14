@@ -92,6 +92,7 @@ import type {
   PlaytestCardSource,
   PlaytestHoverTarget,
 } from '@/modules/playtester/types';
+import { getCardZoomOverlayStyle } from '@/modules/playtester/utils/zoom';
 
 const props = withDefaults(
   defineProps<{
@@ -120,59 +121,6 @@ const emit = defineEmits<{
 
 const middleZoomActive = ref(false);
 const middleZoomStyle = ref<Record<string, string>>({});
-const MIDDLE_ZOOM_TARGET_WIDTH_REM = 19.5;
-const MIDDLE_ZOOM_VIEWPORT_MARGIN_PX = 12;
-
-const clampCenterToViewport = (
-  center: number,
-  visualSize: number,
-  viewportStart: number,
-  viewportSize: number,
-): number => {
-  const minCenter = viewportStart + MIDDLE_ZOOM_VIEWPORT_MARGIN_PX + visualSize / 2;
-  const maxCenter = viewportStart + viewportSize - MIDDLE_ZOOM_VIEWPORT_MARGIN_PX - visualSize / 2;
-  if (minCenter > maxCenter) {
-    return viewportStart + viewportSize / 2;
-  }
-  return Math.min(Math.max(center, minCenter), maxCenter);
-};
-
-const zoomOverlayStyleFromElement = (element: HTMLElement): Record<string, string> => {
-  const rect = element.getBoundingClientRect();
-  const layoutWidth = element.offsetWidth || rect.width || 1;
-  const layoutHeight = element.offsetHeight || rect.height || layoutWidth * (88 / 63);
-  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-  const targetSourceWidth = MIDDLE_ZOOM_TARGET_WIDTH_REM * rootFontSize;
-  const targetSourceHeight = targetSourceWidth * (layoutHeight / layoutWidth);
-  const viewport = window.visualViewport;
-  const viewportLeft = viewport?.offsetLeft ?? 0;
-  const viewportTop = viewport?.offsetTop ?? 0;
-  const viewportWidth = viewport?.width ?? (window.innerWidth || document.documentElement.clientWidth);
-  const viewportHeight = viewport?.height ?? (window.innerHeight || document.documentElement.clientHeight);
-  const baseVisualWidth = props.instance.tapped ? targetSourceHeight : targetSourceWidth;
-  const baseVisualHeight = props.instance.tapped ? targetSourceWidth : targetSourceHeight;
-  const maxVisualWidth = Math.max(1, viewportWidth - MIDDLE_ZOOM_VIEWPORT_MARGIN_PX * 2);
-  const maxVisualHeight = Math.max(1, viewportHeight - MIDDLE_ZOOM_VIEWPORT_MARGIN_PX * 2);
-  const fitScale = Math.min(
-    1,
-    maxVisualWidth / baseVisualWidth,
-    maxVisualHeight / baseVisualHeight,
-  );
-  const sourceWidth = targetSourceWidth * fitScale;
-  const sourceHeight = targetSourceHeight * fitScale;
-  const visualWidth = baseVisualWidth * fitScale;
-  const visualHeight = baseVisualHeight * fitScale;
-  const centerX = clampCenterToViewport(rect.left + rect.width / 2, visualWidth, viewportLeft, viewportWidth);
-  const centerY = clampCenterToViewport(rect.top + rect.height / 2, visualHeight, viewportTop, viewportHeight);
-  return {
-    '--playtest-zoom-source-height': `${sourceHeight}px`,
-    '--playtest-zoom-source-width': `${sourceWidth}px`,
-    height: `${visualHeight}px`,
-    left: `${centerX - visualWidth / 2}px`,
-    top: `${centerY - visualHeight / 2}px`,
-    width: `${visualWidth}px`,
-  };
-};
 
 const endMiddleZoom = (): void => {
   middleZoomActive.value = false;
@@ -186,7 +134,7 @@ const handlePointerDown = (event: PointerEvent): void => {
     if (!(target instanceof HTMLElement)) {
       return;
     }
-    middleZoomStyle.value = zoomOverlayStyleFromElement(target);
+    middleZoomStyle.value = getCardZoomOverlayStyle(target, props.instance.tapped);
     target.setPointerCapture?.(event.pointerId);
     middleZoomActive.value = true;
     return;

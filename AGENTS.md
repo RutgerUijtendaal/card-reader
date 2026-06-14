@@ -81,6 +81,14 @@ Core stack:
   - Acceptable module-root files are pages/views, `api.ts`, `types.ts`, stores, and other true module entrypoints.
   - Place module-owned implementation details under `components`, `composables`, `utils`, or `tests`.
   - Do not import from another module's `components`, `composables`, or `utils` folders; promote genuinely shared code to root `frontend/src/components` or `frontend/src/composables`.
+- Playtester is a frontend-only manual deck sandbox.
+  - Deck selection lives at `/playtester` and should reuse existing deck list UI patterns; active play lives at `/playtester/:deckId`.
+  - Active playtest state is local-storage backed per deck and `deck.updated_at`; avoid backend persistence or server-side deck search unless explicitly requested.
+  - Mainboard cards expand into physical `PlaytestCardInstance` copies in the shuffled library; sideboards stay reference-only.
+  - The hero starts in the dedicated `hero` stack outside the library.
+  - The flow starts in `opening`, where exact physical mana/setup copies can be reserved across mulligans, then transitions to `play` when the hand is kept.
+  - Board interactions use the custom pointer drag layer, right-click context menus, stacks, card-level visual piles, drag-box group selection, and hold-only middle-click zoom.
+  - Keep Playtester implementation details under `frontend/src/modules/playtester/components`, `utils`, or future `composables`; reusable cross-module pieces still belong in shared frontend folders.
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.

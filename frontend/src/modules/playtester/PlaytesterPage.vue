@@ -386,7 +386,6 @@ import {
   addInstanceToVisualPile,
   countZone,
   createInitialPlaytestState,
-  DEFAULT_PLAYTEST_STACK_FACES,
   drawCards,
   getOpeningManaInstances,
   getOpeningSetupInstances,
@@ -411,12 +410,19 @@ import type {
   PlaytestDraggedCard,
   PlaytestEntityAction,
   PlaytestHoverTarget,
-  PlaytestStackDefinition,
-  PlaytestStackFace,
   PlaytestState,
   PlaytestZoneId,
   StoredPlaytestDraft,
 } from '@/modules/playtester/types';
+import {
+  boardDropPosition,
+  resolvePlaytestDropTarget,
+} from '@/modules/playtester/utils/dropTargets';
+import {
+  getCollapsedStackZoneIds,
+  getPlaytestStackFace,
+  PLAYTEST_STACK_DEFINITIONS,
+} from '@/modules/playtester/utils/stacks';
 
 type PointerDragStart = {
   instanceId: string;
@@ -455,8 +461,6 @@ type DraggedCardOverlay = {
   drag: PlaytestDraggedCard;
   instance: PlaytestCardInstance;
 };
-
-type ResolvedDropTarget = { type: 'card'; instanceId: string } | { type: 'zone'; zoneId: PlaytestZoneId | 'board' };
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -527,21 +531,11 @@ const loosePlayInstances = computed(() =>
 const handInstances = computed(() => zoneInstances('hand'));
 const openingManaInstances = computed(() => (playtest.value ? getOpeningManaInstances(playtest.value) : []));
 const openingSetupInstances = computed(() => (playtest.value ? getOpeningSetupInstances(playtest.value) : []));
-const stackZoneDefinitions: PlaytestStackDefinition[] = [
-  { id: 'library', label: 'Library', defaultAction: 'draw' },
-  { id: 'discard', label: 'Discard', defaultAction: 'open' },
-  { id: 'banish', label: 'Banish', defaultAction: 'open' },
-  { id: 'hero', label: 'Hero', defaultAction: 'open' },
-];
-const stackCollapseOrder: PlaytestZoneId[] = ['hero', 'banish', 'discard', 'library'];
-
-const stackFace = (zoneId: PlaytestZoneId): PlaytestStackFace =>
-  playtest.value?.stackFaces?.[zoneId] ?? DEFAULT_PLAYTEST_STACK_FACES[zoneId] ?? 'front';
 
 const stackZones = computed(() =>
-  stackZoneDefinitions.map((zone) => ({
+  PLAYTEST_STACK_DEFINITIONS.map((zone) => ({
     ...zone,
-    face: stackFace(zone.id),
+    face: getPlaytestStackFace(playtest.value?.stackFaces, zone.id),
     collapsed: collapsedStackZoneIds.value.has(zone.id),
     instances: zoneInstances(zone.id),
   })),
@@ -596,48 +590,15 @@ const selectionBoxStyle = computed(() => {
   };
 });
 
-const stackLayoutMetrics = computed(() => {
+const collapsedStackZoneIds = computed(() => {
   if (typeof window === 'undefined' || lowerBarWidth.value <= 0) {
-    return {
-      buttonWidth: 0,
-      collapsedCount: 0,
-      fullWidth: 0,
-      gap: 0,
-      stackWidthBudget: Number.POSITIVE_INFINITY,
-    };
+    return new Set<PlaytestZoneId>();
   }
-
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-  const fullWidth = 11.35 * cardScale.value * rootFontSize;
-  const buttonWidth = 3.25 * Math.min(cardScale.value, 1.12) * rootFontSize;
-  const gap = 0.75 * rootFontSize;
-  const stackWidthBudget = Math.max((buttonWidth * 4) + (gap * 3), lowerBarWidth.value * 0.52);
-  let collapsedCount = 0;
-
-  for (let count = 0; count <= stackCollapseOrder.length; count += 1) {
-    const expandedCount = stackCollapseOrder.length - count;
-    const requiredWidth = (expandedCount * fullWidth) + (count * buttonWidth) + (gap * 3);
-    if (requiredWidth <= stackWidthBudget) {
-      collapsedCount = count;
-      break;
-    }
-    collapsedCount = count;
-  }
-
-  return {
-    buttonWidth,
-    collapsedCount,
-    fullWidth,
-    gap,
-    stackWidthBudget,
-  };
+  return getCollapsedStackZoneIds(lowerBarWidth.value, cardScale.value, rootFontSize);
 });
 
-const collapsedStackZoneIds = computed(
-  () => new Set<PlaytestZoneId>(stackCollapseOrder.slice(0, stackLayoutMetrics.value.collapsedCount)),
-);
-
-const openStackLabel = computed(() => stackZoneDefinitions.find((zone) => zone.id === openStackZone.value)?.label ?? 'Stack');
+const openStackLabel = computed(() => PLAYTEST_STACK_DEFINITIONS.find((zone) => zone.id === openStackZone.value)?.label ?? 'Stack');
 const stackOverlayInstances = computed(() => {
   if (!openStackZone.value) {
     return [];
@@ -862,68 +823,11 @@ const moveCardsToZone = (
     state,
   );
 
-const boardDropPosition = (drag: Pick<PlaytestDraggedCard, 'pointerX' | 'pointerY' | 'pointerOffsetX' | 'pointerOffsetY' | 'sourceWidth' | 'sourceHeight'>): { x: number; y: number } | null => {
-  const board = document.querySelector<HTMLElement>('[data-testid="playtest-board-zone"]');
-  if (!board) {
-    return null;
-  }
-  const bounds = board.getBoundingClientRect();
-  if (bounds.width <= 0 || bounds.height <= 0) {
-    return null;
-  }
-  if (drag.pointerX < bounds.left || drag.pointerX > bounds.right || drag.pointerY < bounds.top || drag.pointerY > bounds.bottom) {
-    return null;
-  }
-  const centerX = drag.pointerX - drag.pointerOffsetX + drag.sourceWidth / 2;
-  const centerY = drag.pointerY - drag.pointerOffsetY + drag.sourceHeight / 2;
-  return {
-    x: ((centerX - bounds.left) / bounds.width) * 100,
-    y: ((centerY - bounds.top) / bounds.height) * 100,
-  };
-};
-
-const resolveDropTarget = (
-  clientX: number,
-  clientY: number,
-  draggedInstanceId?: string,
-): ResolvedDropTarget | null => {
-  const elements = typeof document.elementsFromPoint === 'function'
-    ? document.elementsFromPoint(clientX, clientY)
-    : typeof document.elementFromPoint === 'function'
-      ? [document.elementFromPoint(clientX, clientY)].filter(Boolean)
-      : [];
-
-  for (const element of elements) {
-    if (!(element instanceof HTMLElement)) {
-      continue;
-    }
-    const card = element.closest<HTMLElement>('[data-instance-id]');
-    if (card?.dataset.instanceId) {
-      if (card.dataset.instanceId === draggedInstanceId) {
-        continue;
-      }
-      return { type: 'card', instanceId: card.dataset.instanceId };
-    }
-    const stack = element.closest<HTMLElement>('[data-playtest-stack-zone-id]');
-    const stackZoneId = stack?.dataset.playtestStackZoneId as PlaytestZoneId | undefined;
-    if (stackZoneId) {
-      return { type: 'zone', zoneId: stackZoneId };
-    }
-    const zone = element.closest<HTMLElement>('[data-playtest-drop-zone]');
-    const zoneId = zone?.dataset.playtestDropZone as PlaytestZoneId | 'board' | undefined;
-    if (zoneId) {
-      return { type: 'zone', zoneId };
-    }
-  }
-
-  return null;
-};
-
 const completeDraggedGroupDrop = (drag: PlaytestDraggedCard, pending: PointerDragStart): void => {
   if (!playtest.value || !drag.groupInstanceIds?.length) {
     return;
   }
-  const dropTarget = resolveDropTarget(drag.pointerX, drag.pointerY, drag.instanceId);
+  const dropTarget = resolvePlaytestDropTarget(drag.pointerX, drag.pointerY, drag.instanceId);
   if (dropTarget?.type === 'zone' && dropTarget.zoneId !== 'board') {
     applyState(moveCardsToZone(playtest.value, drag.groupInstanceIds, dropTarget.zoneId));
     return;
@@ -955,9 +859,9 @@ const completeDraggedCardDrop = (drag: PlaytestDraggedCard): void => {
   if (!playtest.value) {
     return;
   }
-  const dropTarget = resolveDropTarget(drag.pointerX, drag.pointerY, drag.instanceId);
+  const dropTarget = resolvePlaytestDropTarget(drag.pointerX, drag.pointerY, drag.instanceId);
   if (!dropTarget) {
-    const position = boardDropPosition(drag);
+    const position = boardDropPosition(boardRef.value, drag);
     if (position) {
       applyState(removeInstanceFromVisualPile(placeInstanceOnBoard(playtest.value, drag.instanceId, position.x, position.y), drag.instanceId));
     }
@@ -973,7 +877,7 @@ const completeDraggedCardDrop = (drag: PlaytestDraggedCard): void => {
       return;
     }
     if (target.zoneId === 'play') {
-      const position = boardDropPosition(drag) ?? nextBoardPosition();
+      const position = boardDropPosition(boardRef.value, drag) ?? nextBoardPosition();
       applyState(placeInstanceOnBoard(playtest.value, drag.instanceId, position.x, position.y));
       return;
     }
@@ -985,7 +889,7 @@ const completeDraggedCardDrop = (drag: PlaytestDraggedCard): void => {
   }
 
   if (dropTarget.zoneId === 'board') {
-    const position = boardDropPosition(drag) ?? nextBoardPosition();
+    const position = boardDropPosition(boardRef.value, drag) ?? nextBoardPosition();
     applyState(removeInstanceFromVisualPile(placeInstanceOnBoard(playtest.value, drag.instanceId, position.x, position.y), drag.instanceId));
     return;
   }
@@ -1064,7 +968,7 @@ const updatePointerDrag = (event: PointerEvent): void => {
       pointerX: event.clientX,
       pointerY: event.clientY,
       ctrlKey: event.ctrlKey,
-      candidate: resolveDropTarget(event.clientX, event.clientY, pending.instanceId),
+      candidate: resolvePlaytestDropTarget(event.clientX, event.clientY, pending.instanceId),
     };
     if (pending.source.type === 'stack') {
       closeStack();
@@ -1078,7 +982,7 @@ const updatePointerDrag = (event: PointerEvent): void => {
       pointerX: event.clientX,
       pointerY: event.clientY,
       ctrlKey: event.ctrlKey,
-      candidate: resolveDropTarget(event.clientX, event.clientY, activeDrag.value.instanceId),
+      candidate: resolvePlaytestDropTarget(event.clientX, event.clientY, activeDrag.value.instanceId),
     };
     event.preventDefault();
   }
@@ -1109,7 +1013,7 @@ const finishPointerDrag = (event: PointerEvent): void => {
       pointerX: event.clientX,
       pointerY: event.clientY,
       ctrlKey: event.ctrlKey,
-      candidate: resolveDropTarget(event.clientX, event.clientY, activeDrag.value.instanceId),
+      candidate: resolvePlaytestDropTarget(event.clientX, event.clientY, activeDrag.value.instanceId),
     };
     if (completedDrag.groupInstanceIds?.length) {
       completeDraggedGroupDrop(completedDrag, pending);
@@ -1213,7 +1117,7 @@ const cardActions = (instanceId: string): PlaytestEntityAction[] => {
 };
 
 const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
-  const definition = stackZoneDefinitions.find((zone) => zone.id === zoneId);
+  const definition = PLAYTEST_STACK_DEFINITIONS.find((zone) => zone.id === zoneId);
   const hasCards = zoneCount(zoneId) > 0;
   const defaultActions: PlaytestEntityAction[] =
     definition?.defaultAction === 'draw'
@@ -1294,8 +1198,7 @@ const loadCurrentCardBack = async (): Promise<void> => {
   try {
     const response = await fetchCurrentCardBack();
     currentCardBackUrl.value = response.current?.image_url ? toAbsoluteApiUrl(response.current.image_url) : null;
-  } catch (error) {
-    console.error('Current card back could not be loaded', error);
+  } catch {
     currentCardBackUrl.value = null;
   }
 };
