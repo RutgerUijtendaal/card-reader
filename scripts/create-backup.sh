@@ -53,7 +53,9 @@ if [[ "${CARD_READER_BACKUP_RUNNER:-}" == "docker_compose" ]]; then
     --rm
     --no-deps
     -v "$backup_root:$container_backup_root"
+    -e "CARD_READER_APP_DATA_DIR=${CARD_READER_BACKUP_CONTAINER_APP_DATA_DIR:-/var/lib/card-reader}"
     -e "CARD_READER_PUBLIC_APP_DATA_DIR=${CARD_READER_BACKUP_CONTAINER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader}"
+    -e "CARD_READER_DATABASE_PATH=${CARD_READER_BACKUP_CONTAINER_DATABASE_PATH:-card_reader.db}"
     "$compose_service"
     python
     -m
