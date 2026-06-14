@@ -1547,6 +1547,48 @@ def test_cards_list_supports_type_sorting() -> None:
     ]
 
 
+def test_cards_list_type_sorting_happens_before_pagination() -> None:
+    priority_type = _create_type(key="sort-page-priority", label="A Priority")
+    secondary_type = _create_type(key="sort-page-secondary", label="B Secondary")
+    mana_type = _create_type(key="mana", label="Mana")
+
+    priority_card, priority_version = _create_editable_card_version(name="Sort Page Type Priority")
+    secondary_card, secondary_version = _create_editable_card_version(name="Sort Page Type Secondary")
+    untyped_card, untyped_version = _create_editable_card_version(name="Sort Page Type Untyped")
+    mana_card, mana_version = _create_editable_card_version(name="Sort Page Type Mana")
+    filler_card, filler_version = _create_editable_card_version(name="Sort Page Filler Priority")
+
+    for version in (priority_version, secondary_version, untyped_version, mana_version, filler_version):
+        _create_card_image(version)
+
+    replace_card_version_types(card_version_id=priority_version.id, type_ids=[priority_type.id])
+    replace_card_version_types(card_version_id=secondary_version.id, type_ids=[secondary_type.id])
+    replace_card_version_types(card_version_id=mana_version.id, type_ids=[mana_type.id])
+    replace_card_version_types(card_version_id=filler_version.id, type_ids=[priority_type.id])
+
+    client = Client(HTTP_HOST="localhost")
+    first_response = client.get(
+        "/cards",
+        {"sort": "types_asc", "q": "Sort Page Type", "page": 1, "page_size": 2},
+    )
+    second_response = client.get(
+        "/cards",
+        {"sort": "types_asc", "q": "Sort Page Type", "page": 2, "page_size": 2},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["count"] == 4
+    assert [row["id"] for row in first_response.json()["results"]] == [
+        priority_card.id,
+        secondary_card.id,
+    ]
+    assert [row["id"] for row in second_response.json()["results"]] == [
+        untyped_card.id,
+        mana_card.id,
+    ]
+
+
 def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Sort Group Zephyr Group")
     member_card, member_version = _create_editable_card_version(name="Sort Group Zephyr Member")
@@ -1573,6 +1615,36 @@ def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     assert results[0]["id"] == standalone_card.id
     assert results[1]["result_type"] == "card_group"
     assert results[1]["anchor_card_id"] == anchor_card.id
+
+
+def test_grouped_gallery_paginates_before_hydrating_payloads() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(name="Paged Group Beta Anchor")
+    member_card, member_version = _create_editable_card_version(name="Paged Group Beta Member")
+    alpha_card, alpha_version = _create_editable_card_version(name="Paged Group Alpha Solo")
+    zeta_card, zeta_version = _create_editable_card_version(name="Paged Group Zeta Solo")
+    for version in (anchor_version, member_version, alpha_version, zeta_version):
+        _create_card_image(version)
+    _create_card_group("paged-group-beta", anchor_card=anchor_card, members=[anchor_card, member_card])
+
+    client = Client(HTTP_HOST="localhost")
+    first_response = client.get(
+        "/cards",
+        {"show_groups": "true", "sort": "name_asc", "q": "Paged Group", "page": 1, "page_size": 1},
+    )
+    second_response = client.get(
+        "/cards",
+        {"show_groups": "true", "sort": "name_asc", "q": "Paged Group", "page": 2, "page_size": 1},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["count"] == 3
+    assert first_response.json()["next_page"] == 2
+    assert first_response.json()["results"][0]["result_type"] == "card"
+    assert first_response.json()["results"][0]["id"] == alpha_card.id
+    assert second_response.json()["results"][0]["result_type"] == "card_group"
+    assert second_response.json()["results"][0]["anchor_card_id"] == anchor_card.id
+    assert zeta_card.id
 
 
 def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:

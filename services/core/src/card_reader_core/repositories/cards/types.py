@@ -52,6 +52,12 @@ class CardListRow:
 
 
 @dataclass(frozen=True)
+class CardListCandidate:
+    version: CardVersion
+    types: list[Type]
+
+
+@dataclass(frozen=True)
 class PaginatedCardList:
     count: int
     page: int

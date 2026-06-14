@@ -112,6 +112,9 @@ class CardVersionImage(TimestampedModel):
 
     class Meta:
         db_table = "card_version_image"
+        indexes = [
+            models.Index(fields=["card_version", "-created_at"], name="ix_cv_image_version_created"),
+        ]
 
 
 class ParseResult(TimestampedModel):
