@@ -16,6 +16,7 @@
         pile-member
         :dragging="draggedInstanceIds.includes(instance.instanceId)"
         :selected="selectedInstanceIds.includes(instance.instanceId)"
+        :card-back-url="cardBackUrl"
         @activate="emit('activate', $event)"
         @pointer-card="handlePointerCard"
         @context-menu="handleContextMenu"
@@ -39,6 +40,7 @@ const props = defineProps<{
   instances: PlaytestCardInstance[];
   draggedInstanceIds: string[];
   selectedInstanceIds: string[];
+  cardBackUrl: string | null;
 }>();
 
 const emit = defineEmits<{

@@ -59,92 +59,98 @@
       </div>
     </div>
 
-    <div class="playtest-opening-selections">
-      <section
-        class="playtest-opening-selection-panel"
-        data-testid="playtest-opening-mana"
+    <div
+      ref="bottomRef"
+      class="playtest-opening-bottom"
+    >
+      <div
+        class="playtest-opening-selections"
+        :class="setupInstances.length === 0 ? 'playtest-opening-selections-single' : ''"
       >
-        <div class="playtest-opening-section-heading">
-          <div>
-            <h3>Starting Mana</h3>
-            <p>Select exact copies that should begin in play.</p>
-          </div>
-          <span>{{ selectedManaIds.length }} selected</span>
-        </div>
-        <div
-          class="playtest-opening-card-grid app-scrollbar"
-          @wheel="scrollSelectionWheel"
+        <section
+          class="playtest-opening-selection-panel"
+          data-testid="playtest-opening-mana"
         >
-          <button
-            v-for="instance in manaInstances"
-            :key="instance.instanceId"
-            class="playtest-opening-card-choice"
-            :class="selectedManaSet.has(instance.instanceId) ? 'playtest-opening-card-choice-selected' : ''"
-            type="button"
-            :aria-pressed="selectedManaSet.has(instance.instanceId)"
-            @click="emit('toggle-mana', instance.instanceId, !selectedManaSet.has(instance.instanceId))"
+          <div class="playtest-opening-section-heading">
+            <div>
+              <h3>Starting Mana</h3>
+              <p>Select exact copies that should begin in play.</p>
+            </div>
+            <span>{{ selectedManaIds.length }} selected</span>
+          </div>
+          <div
+            class="playtest-opening-card-grid app-scrollbar"
+            @wheel="scrollSelectionWheel"
           >
-            <PlaytestCard
-              :instance="instance"
-              compact
-              :interactive="false"
-              :selected="selectedManaSet.has(instance.instanceId)"
-            />
-          </button>
-          <p
-            v-if="manaInstances.length === 0"
-            class="playtest-opening-empty"
-          >
-            No mana cards in this mainboard.
-          </p>
-        </div>
-      </section>
+            <button
+              v-for="instance in manaInstances"
+              :key="instance.instanceId"
+              class="playtest-opening-card-choice"
+              :class="selectedManaSet.has(instance.instanceId) ? 'playtest-opening-card-choice-selected' : ''"
+              type="button"
+              :aria-pressed="selectedManaSet.has(instance.instanceId)"
+              @click="emit('toggle-mana', instance.instanceId, !selectedManaSet.has(instance.instanceId))"
+            >
+              <PlaytestCard
+                :instance="instance"
+                compact
+                :interactive="false"
+                :selected="selectedManaSet.has(instance.instanceId)"
+              />
+            </button>
+            <p
+              v-if="manaInstances.length === 0"
+              class="playtest-opening-empty"
+            >
+              No mana cards in this mainboard.
+            </p>
+          </div>
+        </section>
 
-      <section
-        class="playtest-opening-selection-panel"
-        data-testid="playtest-opening-setup-cards"
-      >
-        <div class="playtest-opening-section-heading">
-          <div>
-            <h3>Setup Cards</h3>
-            <p>Selected Setup cards start on the board.</p>
-          </div>
-          <span>{{ selectedSetupIds.length }} selected</span>
-        </div>
-        <div
-          class="playtest-opening-card-grid app-scrollbar"
-          @wheel="scrollSelectionWheel"
+        <section
+          v-if="setupInstances.length > 0"
+          class="playtest-opening-selection-panel"
+          data-testid="playtest-opening-setup-cards"
         >
-          <button
-            v-for="instance in setupInstances"
-            :key="instance.instanceId"
-            class="playtest-opening-card-choice"
-            :class="selectedSetupSet.has(instance.instanceId) ? 'playtest-opening-card-choice-selected' : ''"
-            type="button"
-            :aria-pressed="selectedSetupSet.has(instance.instanceId)"
-            @click="emit('toggle-setup', instance.instanceId, !selectedSetupSet.has(instance.instanceId))"
+          <div class="playtest-opening-section-heading">
+            <div>
+              <h3>Setup Cards</h3>
+              <p>Cards with Setup effects to check before keeping.</p>
+            </div>
+            <span>{{ setupInstances.length }} found</span>
+          </div>
+          <div
+            class="playtest-opening-card-grid app-scrollbar"
+            @wheel="scrollSelectionWheel"
           >
-            <PlaytestCard
-              :instance="instance"
-              compact
-              :interactive="false"
-              :selected="selectedSetupSet.has(instance.instanceId)"
-            />
-          </button>
-          <p
-            v-if="setupInstances.length === 0"
-            class="playtest-opening-empty"
-          >
-            No Setup cards in this mainboard.
-          </p>
-        </div>
-      </section>
+            <div
+              v-for="instance in setupInstances"
+              :key="instance.instanceId"
+              class="playtest-opening-card-choice playtest-opening-card-hint"
+            >
+              <PlaytestCard
+                :instance="instance"
+                compact
+                :interactive="false"
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div
+        v-if="$slots.stacks"
+        class="playtest-opening-stacks"
+      >
+        <slot name="stacks" />
+      </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { useResizeObserver } from '@vueuse/core';
 import PlaytestCard from '@/modules/playtester/components/PlaytestCard.vue';
 import type { PlaytestCardInstance } from '@/modules/playtester/types';
 
@@ -153,7 +159,6 @@ const props = defineProps<{
   manaInstances: PlaytestCardInstance[];
   setupInstances: PlaytestCardInstance[];
   selectedManaIds: string[];
-  selectedSetupIds: string[];
   handSize: number;
 }>();
 
@@ -162,11 +167,15 @@ const emit = defineEmits<{
   (e: 'mulligan'): void;
   (e: 'update-hand-size', handSize: number): void;
   (e: 'toggle-mana', instanceId: string, selected: boolean): void;
-  (e: 'toggle-setup', instanceId: string, selected: boolean): void;
+  (e: 'bottom-resize', width: number): void;
 }>();
 
+const bottomRef = ref<HTMLElement | null>(null);
 const selectedManaSet = computed(() => new Set(props.selectedManaIds));
-const selectedSetupSet = computed(() => new Set(props.selectedSetupIds));
+
+useResizeObserver(bottomRef, ([entry]) => {
+  emit('bottom-resize', entry?.contentRect.width ?? 0);
+});
 
 const emitHandSize = (event: Event): void => {
   const value = (event.target as HTMLInputElement).value;
@@ -207,9 +216,8 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   min-height: 0;
   flex: 1 1 auto;
   grid-template-rows: auto minmax(20rem, 1fr) auto;
-  gap: 1.25rem;
+  gap: 0;
   overflow: hidden;
-  padding: clamp(1rem, 2.6vw, 2rem);
 }
 
 .playtest-opening-actions {
@@ -218,6 +226,7 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   display: grid;
   justify-items: center;
   gap: 0.8rem;
+  padding: 0.75rem;
 }
 
 .playtest-opening-eyebrow {
@@ -263,22 +272,52 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
     margin 180ms ease;
 }
 
-.playtest-opening-selections {
+.playtest-opening-bottom {
+  box-sizing: border-box;
   position: relative;
   z-index: 6;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  min-height: 0;
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, max-content);
+  gap: 0.75rem;
+  min-height: calc((var(--playtest-card-width, 9.75rem) * 1.42) + 5.5rem);
+  padding: 0.75rem;
+  border-top: 1px solid var(--playtest-border, rgba(255, 255, 255, 0.1));
+  background: var(--playtest-panel-muted, rgba(8, 10, 10, 0.64));
+  backdrop-filter: blur(12px);
+}
+
+.playtest-opening-selections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(10rem, 1fr));
+  min-width: 0;
+  gap: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--playtest-border, rgba(255, 255, 255, 0.08));
+}
+
+.playtest-opening-stacks {
+  display: flex;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  justify-content: flex-end;
+  padding-bottom: 0.25rem;
 }
 
 .playtest-opening-selection-panel {
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--playtest-border, rgba(255, 255, 255, 0.1));
-  border-radius: 0.75rem;
-  background: var(--playtest-panel-muted, rgba(8, 10, 10, 0.64));
-  backdrop-filter: blur(14px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.playtest-opening-selection-panel + .playtest-opening-selection-panel {
+  border-left: 1px solid var(--playtest-border, rgba(255, 255, 255, 0.08));
+}
+
+.playtest-opening-selections-single {
+  grid-template-columns: 1fr;
 }
 
 .playtest-opening-section-heading {
@@ -286,8 +325,7 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.9rem 1rem;
-  border-bottom: 1px solid var(--playtest-border, rgba(255, 255, 255, 0.08));
+  padding: 0.6rem 0.8rem 0;
 }
 
 .playtest-opening-section-heading h3 {
@@ -311,7 +349,8 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior: contain;
-  padding: 1rem 1rem 1.15rem;
+  padding: 0.9rem 1.25rem 0.5rem 0.8rem;
+  scroll-padding-inline: 0.8rem 1.25rem;
 }
 
 .playtest-opening-card-choice {
@@ -334,6 +373,10 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   transform: translateY(-0.08rem);
 }
 
+.playtest-opening-card-hint {
+  cursor: default;
+}
+
 .playtest-opening-card-choice-selected {
   border-color: transparent;
   background: color-mix(in srgb, var(--color-accent) 24%, transparent);
@@ -353,8 +396,15 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
     --playtest-opening-hand-card-width: clamp(9rem, 28vw, 11rem);
   }
 
+  .playtest-opening-bottom,
   .playtest-opening-selections {
     grid-template-columns: 1fr;
+  }
+
+  .playtest-opening-stacks {
+    min-width: 0;
+    overflow-x: auto;
+    justify-content: flex-start;
   }
 
   .playtest-opening-card-grid {

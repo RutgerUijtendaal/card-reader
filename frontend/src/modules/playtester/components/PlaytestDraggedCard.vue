@@ -7,6 +7,7 @@
     >
       <PlaytestCard
         :instance="instance"
+        :card-back-url="cardBackUrl"
         @activate="noop"
         @pointer-card="noopPointer"
         @context-menu="noopContext"
@@ -27,6 +28,7 @@ import type {
 const props = defineProps<{
   drag: PlaytestDraggedCard;
   instance: PlaytestCardInstance;
+  cardBackUrl: string | null;
 }>();
 
 const dragStyle = computed(() => ({

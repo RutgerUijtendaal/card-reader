@@ -12,11 +12,21 @@
         v-for="action in actions"
         :key="action.id"
         class="playtest-context-menu-action"
+        :class="{
+          'playtest-context-menu-action-divider': action.dividerBefore,
+          'playtest-context-menu-action-danger': action.variant === 'danger',
+        }"
         type="button"
         :disabled="action.disabled"
         @click="runAction(action)"
       >
-        {{ action.label }}
+        <span>{{ action.label }}</span>
+        <span
+          v-if="action.hotkey"
+          class="playtest-context-menu-hotkey"
+        >
+          {{ action.hotkey }}
+        </span>
       </button>
     </div>
   </Teleport>
@@ -89,6 +99,10 @@ onKeyStroke('Escape', () => {
 }
 
 .playtest-context-menu-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   border-radius: 0.45rem;
   padding: 0.55rem 0.65rem;
   color: var(--color-text);
@@ -100,13 +114,41 @@ onKeyStroke('Escape', () => {
     color 120ms ease;
 }
 
+.playtest-context-menu-action-divider {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  padding-top: 0.8rem;
+}
+
 .playtest-context-menu-action:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-accent) 16%, transparent);
   color: var(--color-text-strong);
 }
 
+.playtest-context-menu-action-danger {
+  color: var(--color-danger-text);
+}
+
+.playtest-context-menu-action-danger:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
 .playtest-context-menu-action:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.playtest-context-menu-hotkey {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.35rem;
+  padding: 0.08rem 0.32rem;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 </style>

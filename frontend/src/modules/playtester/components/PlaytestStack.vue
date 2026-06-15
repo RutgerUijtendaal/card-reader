@@ -5,6 +5,7 @@
       instances.length === 0 ? 'playtest-stack-empty' : '',
       collapsed ? 'playtest-stack-collapsed' : '',
       draggingTop ? 'playtest-stack-dragging-top' : '',
+      shuffling ? 'playtest-stack-shuffling' : '',
     ]"
     :data-testid="`playtest-${zoneId}-zone`"
     :data-playtest-stack-zone-id="zoneId"
@@ -29,13 +30,13 @@
         <div class="playtest-stack-shadow playtest-stack-shadow-two" />
         <div class="playtest-stack-card">
           <img
-            v-if="face === 'front' && topInstance?.card.image_url"
+            v-if="showTopFace && topInstance?.card.image_url"
             :src="toAbsoluteApiUrl(topInstance.card.image_url)"
             :alt="topInstance.card.name"
             draggable="false"
           >
           <div
-            v-else-if="face === 'front'"
+            v-else-if="showTopFace"
             class="playtest-stack-no-image"
           >
             {{ topInstance?.card.name ?? 'No cards' }}
@@ -83,6 +84,7 @@ const props = defineProps<{
   collapsed: boolean;
   defaultAction: PlaytestStackDefaultAction;
   draggingTop: boolean;
+  shuffling?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -96,6 +98,7 @@ const emit = defineEmits<{
 const topInstance = computed(() =>
   props.zoneId === 'library' ? props.instances[0] : props.instances[props.instances.length - 1],
 );
+const showTopFace = computed(() => props.face === 'front' && topInstance.value?.face !== 'back');
 
 const runDefaultAction = (): void => {
   if (props.instances.length === 0) {
@@ -240,6 +243,18 @@ const handlePointerDown = (event: PointerEvent): void => {
   transform: translate(-0.2rem, 0.18rem) rotate(-2.5deg);
 }
 
+.playtest-stack-shuffling .playtest-stack-shadow-one {
+  animation: playtest-stack-shuffle-one 650ms ease-in-out;
+}
+
+.playtest-stack-shuffling .playtest-stack-shadow-two {
+  animation: playtest-stack-shuffle-two 650ms ease-in-out;
+}
+
+.playtest-stack-shuffling .playtest-stack-card {
+  animation: playtest-stack-shuffle-top 650ms ease-in-out;
+}
+
 .playtest-stack-card {
   position: relative;
   z-index: 3;
@@ -282,6 +297,45 @@ const handlePointerDown = (event: PointerEvent): void => {
   color: var(--playtest-text-soft, rgba(255, 255, 255, 0.36));
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+@keyframes playtest-stack-shuffle-one {
+  0%,
+  100% {
+    transform: translate(0.22rem, -0.14rem) rotate(2deg);
+  }
+  28% {
+    transform: translate(0.72rem, -0.38rem) rotate(9deg);
+  }
+  62% {
+    transform: translate(-0.44rem, 0.22rem) rotate(-7deg);
+  }
+}
+
+@keyframes playtest-stack-shuffle-two {
+  0%,
+  100% {
+    transform: translate(-0.2rem, 0.18rem) rotate(-2.5deg);
+  }
+  32% {
+    transform: translate(-0.7rem, 0.44rem) rotate(-10deg);
+  }
+  68% {
+    transform: translate(0.48rem, -0.18rem) rotate(6deg);
+  }
+}
+
+@keyframes playtest-stack-shuffle-top {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(-2.4deg);
+  }
+  70% {
+    transform: rotate(2deg);
+  }
 }
 
 @media (max-width: 767px) {

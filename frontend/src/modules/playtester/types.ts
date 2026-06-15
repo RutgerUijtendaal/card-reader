@@ -6,6 +6,8 @@ export type PlaytestPhase = 'opening' | 'play';
 
 export type PlaytestStackFace = 'front' | 'back';
 
+export type PlaytestCardFace = 'front' | 'back';
+
 export type PlaytestStackDefaultAction = 'draw' | 'open';
 
 export type PlaytestStackDefinition = {
@@ -46,6 +48,9 @@ export type PlaytestHoverTarget =
 export type PlaytestEntityAction = {
   id: string;
   label: string;
+  hotkey?: string;
+  dividerBefore?: boolean;
+  variant?: 'default' | 'danger';
   disabled?: boolean;
   run: () => void;
 };
@@ -57,6 +62,7 @@ export type PlaytestCardInstance = {
   zoneId: PlaytestZoneId;
   order: number;
   tapped: boolean;
+  face: PlaytestCardFace;
   setupOrigin: boolean;
   boardX: number | null;
   boardY: number | null;
@@ -101,7 +107,7 @@ export type CardBackCurrentResponse = {
 };
 
 export type StoredPlaytestDraft = {
-  version: 1;
+  version: 2;
   deckId: string;
   deckUpdatedAt: string;
   state: PlaytestState;
