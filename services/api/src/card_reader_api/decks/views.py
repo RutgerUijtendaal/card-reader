@@ -13,6 +13,7 @@ from card_reader_api.decks.serializers import (
     DeckListQuerySerializer,
     DeckWriteSerializer,
     deck_payload,
+    deck_summary_payload,
 )
 from card_reader_core.services.decks import (
     DeckEntryInput,
@@ -41,6 +42,8 @@ class PublicDeckListView(APIView):
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
+                "q": request.query_params.get("q"),
+                "view": request.query_params.get("view"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -51,7 +54,10 @@ class PublicDeckListView(APIView):
         if not serializer.is_valid():
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
-        decks = DeckService().list_public_decks(
+        service = DeckService()
+        list_decks = service.list_public_deck_summaries if serializer.wants_summary() else service.list_public_decks
+        decks = list_decks(
+            search_query=filters["search_query"],
             hero_query=filters["hero_query"],
             author_query=filters["author_query"],
             card_query=filters["card_query"],
@@ -59,6 +65,8 @@ class PublicDeckListView(APIView):
             affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
             affinity_symbol_match=filters["affinity_symbol_match"],
         )
+        if serializer.wants_summary():
+            return Response([deck_summary_payload(deck) for deck in decks])
         return Response([deck_payload(deck) for deck in decks])
 
 
@@ -80,6 +88,8 @@ class OwnerDeckListCreateView(APIView):
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
+                "q": request.query_params.get("q"),
+                "view": request.query_params.get("view"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -91,14 +101,19 @@ class OwnerDeckListCreateView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
         owner_id = _user_id(request)
-        decks = DeckService().list_owner_decks(
+        service = DeckService()
+        list_decks = service.list_owner_deck_summaries if serializer.wants_summary() else service.list_owner_decks
+        decks = list_decks(
             owner_id,
+            search_query=filters["search_query"],
             hero_query=filters["hero_query"],
             card_query=filters["card_query"],
             affinity_symbol_ids=filters["affinity_symbol_ids"],
             affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
             affinity_symbol_match=filters["affinity_symbol_match"],
         )
+        if serializer.wants_summary():
+            return Response([deck_summary_payload(deck) for deck in decks])
         return Response([deck_payload(deck) for deck in decks])
 
     def post(self, request: Request) -> Response:

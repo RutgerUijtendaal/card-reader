@@ -1,8 +1,19 @@
 import { api } from '@/api/client';
-import type { DeckRecord, DeckUpsertRequest } from '@/modules/decks/types';
+import type { DeckRecord, DeckSummaryRecord, DeckUpdateRequest, DeckUpsertRequest } from '@/modules/decks/types';
 
 export const fetchPublicDecks = async (params?: URLSearchParams): Promise<DeckRecord[]> => {
   const response = await api.get<DeckRecord[]>('/decks', { params });
+  return response.data;
+};
+
+const withSummaryView = (params?: URLSearchParams): URLSearchParams => {
+  const nextParams = new URLSearchParams(params);
+  nextParams.set('view', 'summary');
+  return nextParams;
+};
+
+export const fetchPublicDeckSummaries = async (params?: URLSearchParams): Promise<DeckSummaryRecord[]> => {
+  const response = await api.get<DeckSummaryRecord[]>('/decks', { params: withSummaryView(params) });
   return response.data;
 };
 
@@ -16,6 +27,11 @@ export const fetchMyDecks = async (params?: URLSearchParams): Promise<DeckRecord
   return response.data;
 };
 
+export const fetchMyDeckSummaries = async (params?: URLSearchParams): Promise<DeckSummaryRecord[]> => {
+  const response = await api.get<DeckSummaryRecord[]>('/my/decks', { params: withSummaryView(params) });
+  return response.data;
+};
+
 export const fetchMyDeck = async (deckId: string): Promise<DeckRecord> => {
   const response = await api.get<DeckRecord>(`/my/decks/${deckId}`);
   return response.data;
@@ -26,7 +42,7 @@ export const createDeck = async (payload: DeckUpsertRequest): Promise<DeckRecord
   return response.data;
 };
 
-export const updateDeck = async (deckId: string, payload: DeckUpsertRequest): Promise<DeckRecord> => {
+export const updateDeck = async (deckId: string, payload: DeckUpdateRequest): Promise<DeckRecord> => {
   const response = await api.patch<DeckRecord>(`/my/decks/${deckId}`, payload);
   return response.data;
 };

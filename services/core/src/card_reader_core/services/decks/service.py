@@ -10,7 +10,9 @@ from card_reader_core.repositories.decks import (
     get_owner_deck,
     get_public_deck,
     list_card_decks_for_viewer,
+    list_owner_deck_summaries,
     list_owner_decks,
+    list_public_deck_summaries,
     list_public_decks,
     replace_mainboard_entries,
     replace_sideboards,
@@ -34,6 +36,7 @@ class DeckService:
     def list_public_decks(
         self,
         *,
+        search_query: str | None = None,
         hero_query: str | None = None,
         author_query: str | None = None,
         card_query: str | None = None,
@@ -44,6 +47,7 @@ class DeckService:
         return [
             deck
             for deck in list_public_decks(
+                search_query=search_query,
                 hero_query=hero_query,
                 author_query=author_query,
                 card_query=card_query,
@@ -58,6 +62,7 @@ class DeckService:
         self,
         owner_id: str,
         *,
+        search_query: str | None = None,
         hero_query: str | None = None,
         card_query: str | None = None,
         affinity_symbol_ids: list[str] | None = None,
@@ -66,6 +71,53 @@ class DeckService:
     ) -> list[Deck]:
         return list_owner_decks(
             owner_id,
+            search_query=search_query,
+            hero_query=hero_query,
+            card_query=card_query,
+            affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+            affinity_symbol_match=affinity_symbol_match,
+        )
+
+    def list_public_deck_summaries(
+        self,
+        *,
+        search_query: str | None = None,
+        hero_query: str | None = None,
+        author_query: str | None = None,
+        card_query: str | None = None,
+        affinity_symbol_ids: list[str] | None = None,
+        affinity_symbol_exclude_ids: list[str] | None = None,
+        affinity_symbol_match: str | None = None,
+    ) -> list[Deck]:
+        return [
+            deck
+            for deck in list_public_deck_summaries(
+                search_query=search_query,
+                hero_query=hero_query,
+                author_query=author_query,
+                card_query=card_query,
+                affinity_symbol_ids=affinity_symbol_ids,
+                affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+                affinity_symbol_match=affinity_symbol_match,
+            )
+            if self.get_deck_validation(deck).is_valid
+        ]
+
+    def list_owner_deck_summaries(
+        self,
+        owner_id: str,
+        *,
+        search_query: str | None = None,
+        hero_query: str | None = None,
+        card_query: str | None = None,
+        affinity_symbol_ids: list[str] | None = None,
+        affinity_symbol_exclude_ids: list[str] | None = None,
+        affinity_symbol_match: str | None = None,
+    ) -> list[Deck]:
+        return list_owner_deck_summaries(
+            owner_id,
+            search_query=search_query,
             hero_query=hero_query,
             card_query=card_query,
             affinity_symbol_ids=affinity_symbol_ids,

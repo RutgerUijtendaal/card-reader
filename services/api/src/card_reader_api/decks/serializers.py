@@ -1,24 +1,54 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TypedDict, cast
 
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
-from card_reader_api.cards.serializers import card_payload
-from card_reader_core.models import Card, CardVersion, Deck, DeckVisibility
+from card_reader_api.cards.serializers import card_payload, symbol_option
+from card_reader_core.models import Card, CardVersion, CardVersionImage, Deck, DeckVisibility
 from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckConstraintEntry, DeckService, effective_deck_building_rules_json, normalize_deck_building_config
 
 
 class DeckListFilterParams(TypedDict):
+    search_query: str | None
     hero_query: str | None
     author_query: str | None
     card_query: str | None
     affinity_symbol_ids: list[str] | None
     affinity_symbol_exclude_ids: list[str] | None
     affinity_symbol_match: str | None
+
+
+def deck_summary_payload(deck: Deck) -> dict[str, object]:
+    validation = DeckService().get_deck_validation(deck)
+    totals = DeckService().get_deck_totals(deck)
+    return {
+        "id": deck.id,
+        "name": deck.name,
+        "description": deck.description,
+        "visibility": deck.visibility,
+        "owner": {
+            "id": str(getattr(deck.owner, "pk", "")),
+            "username": deck.owner.get_username(),
+        },
+        "hero_card": deck_hero_summary_payload(deck.hero_card),
+        "mainboard": {
+            "total_cards": totals.mainboard_total_cards,
+            "unique_cards": totals.mainboard_unique_cards,
+        },
+        "sideboard_count": len(list(deck.sideboards.all())),
+        "status": {
+            "is_valid": validation.is_valid,
+            "label": validation.status_label,
+            "deprecated_card_count": validation.deprecated_card_count,
+        },
+        "created_at": deck.created_at.isoformat(),
+        "updated_at": deck.updated_at.isoformat(),
+    }
 
 
 def deck_payload(deck: Deck) -> dict[str, object]:
@@ -93,6 +123,49 @@ def deck_payload(deck: Deck) -> dict[str, object]:
         "created_at": deck.created_at.isoformat(),
         "updated_at": deck.updated_at.isoformat(),
     }
+
+
+def deck_hero_summary_payload(card: Card) -> dict[str, object]:
+    version = card.latest_version
+    if version is None:
+        return {
+            "id": card.id,
+            "key": card.key,
+            "label": card.label,
+            "name": card.label,
+            "image_url": None,
+            "symbols": [],
+        }
+
+    images = version.images.all()
+    image_url = _prefetched_card_image_asset_url(images, fallback_url=f"/cards/{card.id}/image")
+    return {
+        "id": card.id,
+        "key": card.key,
+        "label": card.label,
+        "name": version.name,
+        "image_url": image_url,
+        "symbols": [
+            symbol_option(row.symbol)
+            for row in version.card_version_symbols.all()
+            if row.symbol.symbol_type == "affinity"
+        ],
+    }
+
+
+def _prefetched_card_image_asset_url(
+    images: Iterable[CardVersionImage],
+    *,
+    fallback_url: str,
+) -> str | None:
+    first_image: CardVersionImage | None = None
+    for image in images:
+        if first_image is None:
+            first_image = image
+        image_url = card_image_asset_url(image, fallback_url=fallback_url)
+        if image_url is not None:
+            return image_url
+    return card_image_asset_url(first_image, fallback_url=fallback_url)
 
 
 def deck_card_payload(card: Card) -> dict[str, object]:
@@ -183,6 +256,8 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 
 class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
+    q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    view = serializers.ChoiceField(choices=['summary'], required=False, allow_null=True)
     hero_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     author_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     card_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -192,6 +267,7 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
 
     def validated_list_filters(self) -> DeckListFilterParams:
         return {
+            "search_query": self._string_or_none("q"),
             "hero_query": self._string_or_none("hero_q"),
             "author_query": self._string_or_none("author_q"),
             "card_query": self._string_or_none("card_q"),
@@ -199,6 +275,9 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
             "affinity_symbol_exclude_ids": self._string_list_or_none("affinity_symbol_exclude_ids"),
             "affinity_symbol_match": self._string_or_none("affinity_symbol_match"),
         }
+
+    def wants_summary(self) -> bool:
+        return self._string_or_none("view") == "summary"
 
     def _string_or_none(self, key: str) -> str | None:
         value = self.validated_data.get(key)

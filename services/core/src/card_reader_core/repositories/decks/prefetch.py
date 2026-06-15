@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.db.models import Prefetch, QuerySet
 
 from card_reader_core.models import (
+    CardVersionImage,
     CardVersionKeyword,
     CardVersionSymbol,
     CardVersionTag,
@@ -51,6 +52,41 @@ def deck_queryset() -> QuerySet[Deck]:
     )
 
 
+def deck_summary_queryset() -> QuerySet[Deck]:
+    return Deck.objects.select_related(
+        "owner",
+        "hero_card",
+        "hero_card__latest_version",
+    ).prefetch_related(
+        Prefetch(
+            "hero_card__latest_version__images",
+            queryset=CardVersionImage.objects.order_by("-created_at"),
+        ),
+        *summary_version_symbol_prefetches("hero_card__latest_version"),
+        Prefetch(
+            "entries",
+            queryset=DeckEntry.objects.select_related(
+                "card",
+                "card__latest_version",
+            ).prefetch_related(*summary_version_type_prefetches("card__latest_version")).order_by("position", "card_id"),
+        ),
+        Prefetch(
+            "sideboards",
+            queryset=DeckSideboard.objects.prefetch_related(
+                Prefetch(
+                    "entries",
+                    queryset=DeckSideboardEntry.objects.select_related(
+                        "card",
+                        "card__latest_version",
+                    )
+                    .prefetch_related(*summary_version_type_prefetches("card__latest_version"))
+                    .order_by("position", "card_id"),
+                )
+            ).order_by("created_at", "id"),
+        ),
+    )
+
+
 def latest_version_metadata_prefetches(prefix: str) -> tuple[Prefetch[str], ...]:
     return (
         Prefetch(
@@ -65,6 +101,26 @@ def latest_version_metadata_prefetches(prefix: str) -> tuple[Prefetch[str], ...]
             f"{prefix}__card_version_symbols",
             queryset=CardVersionSymbol.objects.select_related("symbol").order_by("symbol__label"),
         ),
+        Prefetch(
+            f"{prefix}__card_version_types",
+            queryset=CardVersionType.objects.select_related("type").order_by("type__label"),
+        ),
+    )
+
+
+def summary_version_symbol_prefetches(prefix: str) -> tuple[Prefetch[str], ...]:
+    return (
+        Prefetch(
+            f"{prefix}__card_version_symbols",
+            queryset=CardVersionSymbol.objects.select_related("symbol")
+            .filter(symbol__symbol_type="affinity")
+            .order_by("symbol__label"),
+        ),
+    )
+
+
+def summary_version_type_prefetches(prefix: str) -> tuple[Prefetch[str], ...]:
+    return (
         Prefetch(
             f"{prefix}__card_version_types",
             queryset=CardVersionType.objects.select_related("type").order_by("type__label"),

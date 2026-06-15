@@ -4,7 +4,9 @@ from collections.abc import Iterable
 from itertools import count
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import Client, override_settings
+from django.test.utils import CaptureQueriesContext
 
 from card_reader_core.models import (
     Card,
@@ -361,6 +363,195 @@ def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
 
     assert response.status_code == 200
     assert deck.id in [row["id"] for row in response.json()]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
+    owner = _create_user("deck-summary-public-owner", "password")
+    hero = _create_card(name="Summary Public Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    public_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Summary Public Deck",
+        description="Visible summary",
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Summary Public Private Deck",
+        description="Hidden summary",
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    invalid_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Summary Public Invalid Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"view": "summary", "q": "Summary Public"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["id"] for row in payload] == [public_deck.id]
+    assert invalid_deck.id not in [row["id"] for row in payload]
+    summary = payload[0]
+    assert summary["mainboard"] == {"total_cards": 60, "unique_cards": 15}
+    assert summary["sideboard_count"] == 0
+    assert "entries" not in summary["mainboard"]
+    assert "sideboards" not in summary
+    assert "deck_building_rules" not in summary
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
+    owner = _create_user("deck-summary-owner-user", "password")
+    other_owner = _create_user("deck-summary-other-user", "password")
+    hero = _create_card(name="Summary Owner Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    _login_and_get_csrf_token(client, owner.username, "password")
+
+    owned_decks = [
+        DeckService().create_owner_deck(
+            owner_id=str(owner.id),
+            name=f"Summary Owned {visibility}",
+            description=None,
+            visibility=visibility,
+            hero_card_id=hero.id,
+            entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+            sideboards=[],
+        )
+        for visibility in ("private", "unlisted", "public")
+    ]
+    DeckService().create_owner_deck(
+        owner_id=str(other_owner.id),
+        name="Summary Other Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+
+    response = client.get("/my/decks", {"view": "summary"})
+
+    assert response.status_code == 200
+    payload_ids = {row["id"] for row in response.json()}
+    assert payload_ids == {deck.id for deck in owned_decks}
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:
+    owner = _create_user("deck-summary-search-owner", "password")
+    other_owner = _create_user("deck-summary-search-other", "password")
+    deck_name_hero = _create_card(name="Neutral Summary Hero", is_hero=True)
+    hero_match = _create_card(name="Summary Search Hero", is_hero=True)
+    mainboard_match = _create_card(name="Summary Search Blade", is_hero=False, type_labels=["Mana"])
+    sideboard_match = _create_card(name="Summary Search Trap", is_hero=False)
+    mainboard_cards = _build_mainboard_cards(total_unique=14)
+
+    name_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Summary Search Deck Name",
+        description=None,
+        visibility="public",
+        hero_card_id=deck_name_hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+    hero_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Hero Query Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero_match.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+    card_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Card Query Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=deck_name_hero.id,
+        entries=[
+            DeckEntryInput(card_id=mainboard_match.id, quantity=4),
+            *[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        ],
+        sideboards=[],
+    )
+    sideboard_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Sideboard Query Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=deck_name_hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[DeckSideboardInput(name="Flex", entries=[DeckEntryInput(card_id=sideboard_match.id, quantity=1)])],
+    )
+    author_deck = DeckService().create_owner_deck(
+        owner_id=str(other_owner.id),
+        name="Author Query Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=deck_name_hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+    private_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Summary Private Search Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=deck_name_hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in _build_mainboard_cards()],
+        sideboards=[],
+    )
+
+    client = Client(HTTP_HOST="localhost")
+
+    assert [row["id"] for row in client.get("/decks", {"view": "summary", "q": "Deck Name"}).json()] == [name_deck.id]
+    assert [row["id"] for row in client.get("/decks", {"view": "summary", "q": "Search Hero"}).json()] == [hero_deck.id]
+    assert [row["id"] for row in client.get("/decks", {"view": "summary", "q": "Search Blade"}).json()] == [card_deck.id]
+    assert [row["id"] for row in client.get("/decks", {"view": "summary", "q": "Search Trap"}).json()] == [sideboard_deck.id]
+    assert [row["id"] for row in client.get("/decks", {"view": "summary", "q": other_owner.username}).json()] == [author_deck.id]
+    assert private_deck.id not in [
+        row["id"] for row in client.get("/decks", {"view": "summary", "q": "Private Search"}).json()
+    ]
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_summary_list_query_count_stays_bounded() -> None:
+    owner = _create_user("deck-summary-query-owner", "password")
+    hero = _create_card(name="Summary Query Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    for index in range(4):
+        DeckService().create_owner_deck(
+            owner_id=str(owner.id),
+            name=f"Summary Query Deck {index}",
+            description=None,
+            visibility="public",
+            hero_card_id=hero.id,
+            entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+            sideboards=[],
+        )
+
+    with CaptureQueriesContext(connection) as queries:
+        response = Client(HTTP_HOST="localhost").get("/decks", {"view": "summary", "q": "Summary Query Deck"})
+
+    assert response.status_code == 200
+    assert len(response.json()) == 4
+    assert len(queries.captured_queries) <= 20
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -866,6 +1057,47 @@ def test_deck_payload_uses_immutable_card_image_urls() -> None:
 
     assert response.status_code == 200
     assert response.json()["hero_card"]["image_url"] == f"/card-images/images/{image_name}"
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_deck_summary_uses_first_existing_prefetched_hero_image() -> None:
+    owner = _create_user("deck-summary-image-owner", "password")
+    hero = _create_card(name="Summary Image Hero", is_hero=True)
+    version = hero.latest_version
+    assert version is not None
+    valid_image_name = f"deck-summary-valid-image-{version.id}.png"
+    valid_image_path = settings.image_store_dir / valid_image_name
+    valid_image_path.parent.mkdir(parents=True, exist_ok=True)
+    valid_image_path.write_bytes(b"deck-summary-image")
+    CardVersionImage.objects.create(
+        card_version=version,
+        source_file=build_storage_relative_path("images", valid_image_name),
+        stored_path=build_storage_relative_path("images", valid_image_name),
+        checksum=f"summary-valid-checksum-{version.id}",
+    )
+    CardVersionImage.objects.create(
+        card_version=version,
+        source_file=build_storage_relative_path("images", f"deck-summary-missing-source-{version.id}.png"),
+        stored_path=build_storage_relative_path("images", f"deck-summary-missing-stored-{version.id}.png"),
+        checksum=f"summary-missing-checksum-{version.id}",
+    )
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Summary Image Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+
+    response = Client(HTTP_HOST="localhost").get("/decks", {"view": "summary", "q": "Summary Image Deck"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["id"] for row in payload] == [deck.id]
+    assert payload[0]["hero_card"]["image_url"] == f"/card-images/images/{valid_image_name}"
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)

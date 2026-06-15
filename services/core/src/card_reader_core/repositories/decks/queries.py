@@ -5,13 +5,14 @@ from django.db.models import Q
 from card_reader_core.models import Deck, DeckVisibility
 
 from .filters import apply_deck_filters
-from .prefetch import deck_queryset
+from .prefetch import deck_queryset, deck_summary_queryset
 
 PUBLIC_DECK_VISIBILITIES: tuple[DeckVisibility, DeckVisibility] = ("public", "unlisted")
 
 
 def list_public_decks(
     *,
+    search_query: str | None = None,
     hero_query: str | None = None,
     author_query: str | None = None,
     card_query: str | None = None,
@@ -22,6 +23,7 @@ def list_public_decks(
     return list(
         apply_deck_filters(
             deck_queryset().filter(visibility="public"),
+            search_query=search_query,
             hero_query=hero_query,
             author_query=author_query,
             card_query=card_query,
@@ -35,6 +37,7 @@ def list_public_decks(
 def list_owner_decks(
     owner_id: str,
     *,
+    search_query: str | None = None,
     hero_query: str | None = None,
     card_query: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
@@ -44,6 +47,55 @@ def list_owner_decks(
     return list(
         apply_deck_filters(
             deck_queryset().filter(owner_id=owner_id),
+            search_query=search_query,
+            hero_query=hero_query,
+            author_query=None,
+            card_query=card_query,
+            affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+            affinity_symbol_match=affinity_symbol_match,
+        ).order_by("-updated_at", "-created_at")
+    )
+
+
+def list_public_deck_summaries(
+    *,
+    search_query: str | None = None,
+    hero_query: str | None = None,
+    author_query: str | None = None,
+    card_query: str | None = None,
+    affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_exclude_ids: list[str] | None = None,
+    affinity_symbol_match: str | None = None,
+) -> list[Deck]:
+    return list(
+        apply_deck_filters(
+            deck_summary_queryset().filter(visibility="public"),
+            search_query=search_query,
+            hero_query=hero_query,
+            author_query=author_query,
+            card_query=card_query,
+            affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+            affinity_symbol_match=affinity_symbol_match,
+        ).order_by("-updated_at", "-created_at")
+    )
+
+
+def list_owner_deck_summaries(
+    owner_id: str,
+    *,
+    search_query: str | None = None,
+    hero_query: str | None = None,
+    card_query: str | None = None,
+    affinity_symbol_ids: list[str] | None = None,
+    affinity_symbol_exclude_ids: list[str] | None = None,
+    affinity_symbol_match: str | None = None,
+) -> list[Deck]:
+    return list(
+        apply_deck_filters(
+            deck_summary_queryset().filter(owner_id=owner_id),
+            search_query=search_query,
             hero_query=hero_query,
             author_query=None,
             card_query=card_query,

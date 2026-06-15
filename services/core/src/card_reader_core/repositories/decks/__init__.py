@@ -5,7 +5,9 @@ from .queries import (
     get_owner_deck,
     get_public_deck,
     list_card_decks_for_viewer,
+    list_owner_deck_summaries,
     list_owner_decks,
+    list_public_deck_summaries,
     list_public_decks,
 )
 from .writes import create_deck, delete_deck, replace_mainboard_entries, replace_sideboards, update_deck
@@ -20,7 +22,9 @@ __all__ = [
     "get_owner_deck",
     "get_public_deck",
     "list_card_decks_for_viewer",
+    "list_owner_deck_summaries",
     "list_owner_decks",
+    "list_public_deck_summaries",
     "list_public_decks",
     "replace_mainboard_entries",
     "replace_sideboards",

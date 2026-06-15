@@ -8,8 +8,8 @@ const {
   authState,
   apiGetMock,
   deleteDeckMock,
-  fetchMyDecksMock,
-  fetchPublicDecksMock,
+  fetchMyDeckSummariesMock,
+  fetchPublicDeckSummariesMock,
   updateDeckMock,
 } = vi.hoisted(() => ({
   authState: {
@@ -18,8 +18,8 @@ const {
   },
   apiGetMock: vi.fn(),
   deleteDeckMock: vi.fn(),
-  fetchMyDecksMock: vi.fn(),
-  fetchPublicDecksMock: vi.fn(),
+  fetchMyDeckSummariesMock: vi.fn(),
+  fetchPublicDeckSummariesMock: vi.fn(),
   updateDeckMock: vi.fn(),
 }));
 
@@ -35,8 +35,8 @@ vi.mock('@/modules/auth/authStore', () => ({
 
 vi.mock('@/modules/decks/api', () => ({
   deleteDeck: deleteDeckMock,
-  fetchMyDecks: fetchMyDecksMock,
-  fetchPublicDecks: fetchPublicDecksMock,
+  fetchMyDeckSummaries: fetchMyDeckSummariesMock,
+  fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
   updateDeck: updateDeckMock,
 }));
 
@@ -74,12 +74,16 @@ vi.mock('@/components/app/AppSelect.vue', () => ({
       modelValue: { type: String, default: null },
       options: { type: Array, default: () => [] },
     },
-    setup(props) {
+    emits: ['update:modelValue'],
+    setup(props, { emit }) {
       return () =>
         h(
           'select',
           {
             value: props.modelValue ?? '',
+            onChange: (event: Event) => {
+              emit('update:modelValue', (event.target as HTMLSelectElement).value);
+            },
           },
           (props.options as Array<{ value: string; label: string }>).map((option) =>
             h('option', { value: option.value }, option.label),
@@ -293,8 +297,9 @@ describe('DeckIndexPage', () => {
     authState.authenticated = true;
     authState.authEnabled = true;
     apiGetMock.mockResolvedValue({ data: filtersPayload });
-    fetchMyDecksMock.mockResolvedValue([deckRecord]);
-    fetchPublicDecksMock.mockResolvedValue([deckRecord]);
+    fetchMyDeckSummariesMock.mockResolvedValue([deckRecord]);
+    fetchPublicDeckSummariesMock.mockResolvedValue([deckRecord]);
+    updateDeckMock.mockResolvedValue(deckRecord);
   });
 
   afterEach(() => {
@@ -306,8 +311,8 @@ describe('DeckIndexPage', () => {
   test('renders public mode on /decks and calls fetchPublicDecks', async () => {
     const mounted = await mountPage('/decks');
 
-    expect(fetchPublicDecksMock).toHaveBeenCalledTimes(1);
-    expect(fetchMyDecksMock).not.toHaveBeenCalled();
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(1);
+    expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
     expect(mounted.container.querySelector('[data-mode="browse"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/decks/deck-1"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Filter public decks');
@@ -328,8 +333,8 @@ describe('DeckIndexPage', () => {
   test('renders owned mode on /my/decks and calls fetchMyDecks', async () => {
     const mounted = await mountPage('/my/decks');
 
-    expect(fetchMyDecksMock).toHaveBeenCalledTimes(1);
-    expect(fetchPublicDecksMock).not.toHaveBeenCalled();
+    expect(fetchMyDeckSummariesMock).toHaveBeenCalledTimes(1);
+    expect(fetchPublicDeckSummariesMock).not.toHaveBeenCalled();
     expect(mounted.container.querySelector('[data-mode="owned"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/my/decks/deck-1"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Filter your decks');
@@ -340,8 +345,8 @@ describe('DeckIndexPage', () => {
 
   test('ignores stale deck responses after switching between public and owned modes', async () => {
     const publicDeferred = createDeferred<Array<typeof deckRecord>>();
-    fetchPublicDecksMock.mockReturnValueOnce(publicDeferred.promise);
-    fetchMyDecksMock.mockResolvedValueOnce([
+    fetchPublicDeckSummariesMock.mockReturnValueOnce(publicDeferred.promise);
+    fetchMyDeckSummariesMock.mockResolvedValueOnce([
       {
         ...deckRecord,
         id: 'owned-deck',
@@ -404,9 +409,25 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
+  test('owned visibility changes send a partial deck patch', async () => {
+    const mounted = await mountPage('/my/decks');
+    const select = mounted.container.querySelector<HTMLSelectElement>('select');
+    if (!select) {
+      throw new Error('expected visibility select');
+    }
+
+    select.value = 'private';
+    select.dispatchEvent(new Event('change'));
+    await flushPage();
+
+    expect(updateDeckMock).toHaveBeenCalledWith('deck-1', { visibility: 'private' });
+
+    mounted.unmount();
+  });
+
   test.each([
-    ['/decks', fetchPublicDecksMock, 'Frosty'],
-    ['/my/decks', fetchMyDecksMock, null],
+    ['/decks', fetchPublicDeckSummariesMock, 'Frosty'],
+    ['/my/decks', fetchMyDeckSummariesMock, null],
   ])('passes route filters to API params for %s', async (path, fetchMock, expectedAuthorQuery) => {
     const mounted = await mountPage(`${path}?card_q=Blade&author_q=Frosty`);
 
