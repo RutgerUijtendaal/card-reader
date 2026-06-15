@@ -167,14 +167,14 @@ const emit = defineEmits<{
   (e: 'mulligan'): void;
   (e: 'update-hand-size', handSize: number): void;
   (e: 'toggle-mana', instanceId: string, selected: boolean): void;
-  (e: 'bottom-resize', width: number): void;
+  (e: 'bottom-resize', width: number, height: number): void;
 }>();
 
 const bottomRef = ref<HTMLElement | null>(null);
 const selectedManaSet = computed(() => new Set(props.selectedManaIds));
 
 useResizeObserver(bottomRef, ([entry]) => {
-  emit('bottom-resize', entry?.contentRect.width ?? 0);
+  emit('bottom-resize', entry?.contentRect.width ?? 0, entry?.contentRect.height ?? 0);
 });
 
 const emitHandSize = (event: Event): void => {

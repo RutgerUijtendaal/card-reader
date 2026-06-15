@@ -10,31 +10,14 @@
 
     <PlaytestTableSurface
       class="playtester-selector-table"
+      :style="cardScaleStyle"
       data-testid="playtester-pre-setup-surface"
+      @wheel="handleSelectorWheel"
     >
       <div class="playtester-selector-board">
         <div class="playtester-selector-board-label">
           <span>Board</span>
           <span>{{ selectedSuggestion ? selectedSuggestion.deck.name : 'Waiting for deck' }}</span>
-        </div>
-
-        <div
-          v-if="selectedSuggestion"
-          class="playtester-selector-hero-preview"
-          aria-hidden="true"
-        >
-          <img
-            v-if="selectedSuggestion.deck.hero_card.image_url"
-            :src="toAbsoluteApiUrl(selectedSuggestion.deck.hero_card.image_url)"
-            :alt="selectedSuggestion.deck.hero_card.name"
-            draggable="false"
-          >
-          <div
-            v-else
-            class="playtester-selector-hero-fallback"
-          >
-            {{ selectedSuggestion.deck.hero_card.name }}
-          </div>
         </div>
 
         <div class="playtester-selector-board-empty">
@@ -150,54 +133,56 @@
                 {{ selectedSuggestion ? `Hero: ${selectedSuggestion.deck.hero_card.name}` : 'Choose a deck from the list.' }}
               </p>
             </div>
-            <button
-              class="btn-primary inline-flex items-center gap-2 whitespace-nowrap"
-              type="button"
-              :disabled="!selectedSuggestion"
-              @click="startSelectedDeck"
-            >
-              <Play class="h-4 w-4" />
-              <span>Start Playtest</span>
-            </button>
+            <div class="playtester-selector-actions">
+              <button
+                v-if="hasOngoingPlaytest"
+                class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+                type="button"
+                :disabled="!selectedSuggestion || !selectedPlaytest"
+                @click="startNewSelectedDeck"
+              >
+                <RotateCcw class="h-4 w-4" />
+                <span>New Playtest</span>
+              </button>
+              <button
+                class="btn-primary inline-flex items-center gap-2 whitespace-nowrap"
+                type="button"
+                :disabled="!selectedSuggestion || (!hasOngoingPlaytest && !selectedPlaytest)"
+                @click="continueSelectedDeck"
+              >
+                <Play class="h-4 w-4" />
+                <span>{{ hasOngoingPlaytest ? 'Continue Playtest' : 'Start Playtest' }}</span>
+              </button>
+            </div>
           </footer>
         </div>
       </section>
 
-      <div class="playtester-selector-lower">
-        <section class="playtester-selector-hand">
-          <div class="playtester-selector-hand-bar">
-            <span>Opening hand</span>
-            <span class="theme-section-muted">Cards appear after setup starts.</span>
-          </div>
-          <div class="playtester-selector-hand-fan">
-            <span
-              v-for="index in 7"
-              :key="`hand-placeholder-${index}`"
-              class="playtester-selector-hand-card"
-              :class="currentCardBackUrl ? 'playtester-selector-hand-card-image' : ''"
-              :style="placeholderHandCardStyle(index - 1)"
-            >
-              <img
-                v-if="currentCardBackUrl"
-                :src="currentCardBackUrl"
-                alt=""
-                draggable="false"
-              >
-            </span>
-          </div>
-        </section>
+      <PlaytestLowerBar
+        class="playtester-selector-lower"
+        :hand-instances="handInstances"
+        :hand-title="selectedPlaytest ? `Opening hand: ${handInstances.length}` : 'Opening hand'"
+        :hand-subtitle="selectedPlaytest ? 'Middle-click a card to inspect.' : 'Select a deck to draw a preview hand.'"
+        :stack-zones="selectorStackZones"
+        :card-back-url="currentCardBackUrl"
+        :card-interactive="false"
+        :placeholder-hand-size="7"
+        :stack-draggable="false"
+        @open-stack="openPreviewStack"
+        @draw-stack="openPreviewStack"
+        @resize="setLowerBarWidth"
+      />
 
-        <div class="playtester-selector-stacks">
-          <div
-            v-for="stack in placeholderStacks"
-            :key="stack"
-            class="playtester-selector-stack"
-          >
-            <span>{{ stack }}</span>
-            <span>0</span>
-          </div>
-        </div>
-      </div>
+      <PlaytestStackPopover
+        :open="Boolean(openStackZone)"
+        :title="openStackLabel"
+        :instances="stackOverlayInstances"
+        :card-back-url="currentCardBackUrl"
+        :card-interactive="false"
+        :bottom-offset-px="stackPopoverBottomOffsetPx"
+        test-id="playtester-selector-stack-overlay"
+        @close="closePreviewStack"
+      />
     </PlaytestTableSurface>
   </section>
 </template>
@@ -205,28 +190,71 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
-import { Gamepad2, Play, Search } from 'lucide-vue-next';
+import { Gamepad2, Play, RotateCcw, Search } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import DeckCompactCard from '@/components/decks/DeckCompactCard.vue';
 import DeckLoadingSkeleton from '@/components/decks/DeckLoadingSkeleton.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { fetchMyDeckSummaries, fetchPublicDeckSummaries } from '@/modules/decks/api';
-import type { DeckSummaryRecord } from '@/modules/decks/types';
+import { fetchDeckDetail, fetchMyDeck, fetchMyDeckSummaries, fetchPublicDeckSummaries } from '@/modules/decks/api';
+import type { DeckRecord, DeckSummaryRecord } from '@/modules/decks/types';
 import { fetchCurrentCardBack } from '@/modules/playtester/api';
+import PlaytestLowerBar, { type PlaytestLowerBarStackZone } from '@/modules/playtester/components/PlaytestLowerBar.vue';
+import PlaytestStackPopover from '@/modules/playtester/components/PlaytestStackPopover.vue';
 import PlaytestTableSurface from '@/modules/playtester/components/PlaytestTableSurface.vue';
-import type { PlaytestDeckSuggestion } from '@/modules/playtester/types';
+import { createLocalPlaytestStorage } from '@/modules/playtester/localPlaytestStorage';
+import {
+  createInitialPlaytestState,
+  getZoneInstances,
+  isStoredDraftStale,
+  serializePlaytestDraft,
+} from '@/modules/playtester/playtestState';
+import type {
+  PlaytestDeckSuggestion,
+  PlaytestState,
+  PlaytestZoneId,
+  StoredPlaytestDraft,
+} from '@/modules/playtester/types';
+import {
+  getPlaytestCardScaleStyle,
+  loadPlaytestCardScale,
+  normalizePlaytestCardScale,
+  PLAYTEST_CARD_SCALE_STEP,
+  savePlaytestCardScale,
+} from '@/modules/playtester/utils/cardScale';
+import { setPlaytestRouteHandoff } from '@/modules/playtester/utils/routeHandoff';
+import {
+  getCollapsedStackZoneIds,
+  getPlaytestStackFace,
+  PLAYTEST_STACK_DEFINITIONS,
+  PLAYTEST_STACK_PLAY_BUDGET_RATIO,
+} from '@/modules/playtester/utils/stacks';
 
 const router = useRouter();
 const auth = useAuthStore();
+const storage = createLocalPlaytestStorage();
 const loading = ref(true);
+const cardScale = ref(loadPlaytestCardScale());
 const searchQuery = ref('');
 const suggestions = ref<PlaytestDeckSuggestion[]>([]);
 const selectedSuggestionKey = ref<string | null>(null);
+const selectedDeck = ref<DeckRecord | null>(null);
+const selectedPlaytest = ref<PlaytestState | null>(null);
+const selectedDraft = ref<StoredPlaytestDraft | null>(null);
+const selectedStaleDraft = ref<StoredPlaytestDraft | null>(null);
 const currentCardBackUrl = ref<string | null>(null);
-const placeholderStacks = ['Library', 'Discard', 'Banish', 'Other'];
+const openStackZone = ref<PlaytestZoneId | null>(null);
+const lowerBarWidth = ref(0);
+const lowerBarHeight = ref(0);
 let suggestionLoadRequestId = 0;
+let deckLoadRequestId = 0;
+const deckDetailCache = new Map<string, Promise<DeckRecord>>();
+
+const setLowerBarWidth = (width: number, height = 0): void => {
+  lowerBarWidth.value = width;
+  lowerBarHeight.value = height;
+};
 
 const nextSuggestionLoadRequestId = (): number => {
   suggestionLoadRequestId += 1;
@@ -252,6 +280,45 @@ const visibleSuggestionCount = computed(() => visibleSuggestions.value.length);
 const selectedSuggestion = computed(() =>
   visibleSuggestions.value.find((suggestion) => suggestionKey(suggestion) === selectedSuggestionKey.value) ?? null,
 );
+const hasOngoingPlaytest = computed(() => selectedDraft.value !== null);
+const cardScaleStyle = computed(() => getPlaytestCardScaleStyle(cardScale.value));
+const stackPopoverBottomOffsetPx = computed(() =>
+  lowerBarHeight.value > 0 ? lowerBarHeight.value + 12 : undefined,
+);
+const handInstances = computed(() =>
+  selectedPlaytest.value ? getZoneInstances(selectedPlaytest.value, 'hand') : [],
+);
+const collapsedStackZoneIds = computed(() => {
+  if (typeof window === 'undefined' || lowerBarWidth.value <= 0) {
+    return new Set<PlaytestZoneId>();
+  }
+  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+  return getCollapsedStackZoneIds(
+    lowerBarWidth.value,
+    cardScale.value,
+    rootFontSize,
+    PLAYTEST_STACK_PLAY_BUDGET_RATIO,
+  );
+});
+const selectorStackZones = computed<PlaytestLowerBarStackZone[]>(() =>
+  PLAYTEST_STACK_DEFINITIONS.map((zone) => ({
+    ...zone,
+    defaultAction: 'open' as const,
+    collapsed: collapsedStackZoneIds.value.has(zone.id),
+    face: getPlaytestStackFace(selectedPlaytest.value?.stackFaces, zone.id),
+    instances: selectedPlaytest.value ? getZoneInstances(selectedPlaytest.value, zone.id) : [],
+  })),
+);
+const openStackLabel = computed(() =>
+  PLAYTEST_STACK_DEFINITIONS.find((zone) => zone.id === openStackZone.value)?.label ?? 'Stack',
+);
+const stackOverlayInstances = computed(() => {
+  if (!selectedPlaytest.value || !openStackZone.value) {
+    return [];
+  }
+  const instances = getZoneInstances(selectedPlaytest.value, openStackZone.value);
+  return openStackZone.value === 'library' ? instances : [...instances].reverse();
+});
 const emptyMessage = computed(() =>
   searchQuery.value.trim() ? 'No decks match the current search.' : 'No decks available for playtesting.',
 );
@@ -284,7 +351,9 @@ const loadSuggestions = async (requestId = nextSuggestionLoadRequestId()): Promi
       ];
       if (!selectedSuggestion.value) {
         selectedSuggestionKey.value = null;
+        clearSelectedDeckPreview();
       }
+      preloadVisibleDeckDetails();
     }
   } finally {
     if (requestId === suggestionLoadRequestId) {
@@ -306,28 +375,153 @@ const debouncedLoadSuggestions = useDebounceFn((requestId: number) => {
   void loadSuggestions(requestId);
 }, 250);
 
+const nextDeckLoadRequestId = (): number => {
+  deckLoadRequestId += 1;
+  return deckLoadRequestId;
+};
+
+const clearSelectedDeckPreview = (): void => {
+  selectedDeck.value = null;
+  selectedPlaytest.value = null;
+  selectedDraft.value = null;
+  selectedStaleDraft.value = null;
+  openStackZone.value = null;
+  nextDeckLoadRequestId();
+};
+
+const fetchVisibleDeck = async (deckId: string): Promise<DeckRecord> => {
+  if (auth.authenticated || !auth.authEnabled) {
+    try {
+      return await fetchMyDeck(deckId);
+    } catch {
+      return await fetchDeckDetail(deckId);
+    }
+  }
+  return await fetchDeckDetail(deckId);
+};
+
+const loadVisibleDeck = (deckId: string): Promise<DeckRecord> => {
+  const cached = deckDetailCache.get(deckId);
+  if (cached) {
+    return cached;
+  }
+  const request = fetchVisibleDeck(deckId).catch((error: unknown) => {
+    deckDetailCache.delete(deckId);
+    throw error;
+  });
+  deckDetailCache.set(deckId, request);
+  return request;
+};
+
+const preloadVisibleDeckDetails = (): void => {
+  for (const suggestion of visibleSuggestions.value) {
+    void loadVisibleDeck(suggestion.deck.id).catch(() => undefined);
+  }
+};
+
+const loadSelectedDeckPreview = async (suggestion: PlaytestDeckSuggestion): Promise<void> => {
+  const requestId = nextDeckLoadRequestId();
+  openStackZone.value = null;
+  try {
+    const deck = await loadVisibleDeck(suggestion.deck.id);
+    if (requestId !== deckLoadRequestId || selectedSuggestionKey.value !== suggestionKey(suggestion)) {
+      return;
+    }
+    const draft = storage.load(deck.id);
+    const draftIsStale = draft ? isStoredDraftStale(draft, deck) : false;
+    selectedDeck.value = deck;
+    selectedDraft.value = draft && !draftIsStale ? draft : null;
+    selectedStaleDraft.value = draft && draftIsStale ? draft : null;
+    selectedPlaytest.value = createInitialPlaytestState(deck);
+  } catch {
+    if (requestId === deckLoadRequestId) {
+      selectedDeck.value = null;
+      selectedPlaytest.value = null;
+      selectedDraft.value = null;
+      selectedStaleDraft.value = null;
+    }
+  }
+};
+
 const selectSuggestion = (suggestion: PlaytestDeckSuggestion): void => {
   selectedSuggestionKey.value = suggestionKey(suggestion);
+  clearSelectedDeckPreview();
+  void loadSelectedDeckPreview(suggestion);
 };
 
-const startSelectedDeck = (): void => {
-  if (!selectedSuggestion.value) {
+const selectedDeckPath = (): string | null =>
+  selectedSuggestion.value ? `/playtester/${selectedSuggestion.value.deck.id}` : null;
+
+const setSelectedDeckHandoff = (draft: StoredPlaytestDraft | null): void => {
+  if (!selectedDeck.value) {
     return;
   }
-  void router.push(`/playtester/${selectedSuggestion.value.deck.id}`);
+  setPlaytestRouteHandoff(selectedDeck.value.id, {
+    deck: selectedDeck.value,
+    draft,
+  });
 };
 
-const placeholderHandCardStyle = (index: number): Record<string, string | number> => {
-  const center = index - 3;
-  return {
-    marginLeft: index === 0 ? '0' : 'calc(var(--playtest-card-width) * -0.5)',
-    transform: `translateY(${Math.abs(center) * 0.28}rem) rotate(${center * 3.6}deg)`,
-    zIndex: 20 + index,
-  };
+const savePreviewAsSelectedDraft = (): StoredPlaytestDraft | null => {
+  if (!selectedPlaytest.value) {
+    return null;
+  }
+  const draft = serializePlaytestDraft(selectedPlaytest.value);
+  storage.save(draft);
+  return draft;
+};
+
+const continueSelectedDeck = (): void => {
+  const path = selectedDeckPath();
+  if (!path) {
+    return;
+  }
+  let draft = selectedDraft.value ?? selectedStaleDraft.value;
+  if (!draft) {
+    draft = savePreviewAsSelectedDraft();
+  }
+  setSelectedDeckHandoff(draft);
+  void router.push(path);
+};
+
+const startNewSelectedDeck = (): void => {
+  const path = selectedDeckPath();
+  if (!path || !selectedSuggestion.value) {
+    return;
+  }
+  storage.clear(selectedSuggestion.value.deck.id);
+  const draft = savePreviewAsSelectedDraft();
+  setSelectedDeckHandoff(draft);
+  void router.push(path);
+};
+
+const openPreviewStack = (zoneId: PlaytestZoneId): void => {
+  if (!selectedPlaytest.value || getZoneInstances(selectedPlaytest.value, zoneId).length === 0) {
+    return;
+  }
+  openStackZone.value = openStackZone.value === zoneId ? null : zoneId;
+};
+
+const closePreviewStack = (): void => {
+  openStackZone.value = null;
+};
+
+const setCardScale = (value: number): void => {
+  cardScale.value = normalizePlaytestCardScale(value);
+  savePlaytestCardScale(cardScale.value);
+};
+
+const handleSelectorWheel = (event: WheelEvent): void => {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return;
+  }
+  setCardScale(cardScale.value + (event.deltaY < 0 ? PLAYTEST_CARD_SCALE_STEP : -PLAYTEST_CARD_SCALE_STEP));
+  event.preventDefault();
 };
 
 watch(searchQuery, () => {
   selectedSuggestionKey.value = null;
+  clearSelectedDeckPreview();
   const requestId = nextSuggestionLoadRequestId();
   loading.value = true;
   debouncedLoadSuggestions(requestId);
@@ -348,8 +542,6 @@ onMounted(() => {
 }
 
 .playtester-selector-table {
-  --playtest-card-width: 7.8rem;
-  --playtest-stack-full-width: 7.6rem;
   isolation: isolate;
 }
 
@@ -370,9 +562,7 @@ onMounted(() => {
   pointer-events: none;
 }
 
-.playtester-selector-board-label,
-.playtester-selector-hand-bar,
-.playtester-selector-stack {
+.playtester-selector-board-label {
   color: var(--playtest-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
@@ -396,40 +586,6 @@ onMounted(() => {
   font-size: 0.95rem;
   font-weight: 800;
   pointer-events: none;
-}
-
-.playtester-selector-hero-preview {
-  position: absolute;
-  right: 8%;
-  bottom: 12%;
-  z-index: 3;
-  display: grid;
-  width: clamp(7.5rem, 12vw, 10rem);
-  aspect-ratio: 63 / 88;
-  place-items: stretch;
-  overflow: hidden;
-  border: 0.22rem solid color-mix(in srgb, var(--playtest-border) 82%, transparent);
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--playtest-panel-strong) 72%, transparent);
-  box-shadow: 0 1.3rem 2rem rgba(0, 0, 0, 0.22);
-  opacity: 0.72;
-  transform: rotate(4deg);
-}
-
-.playtester-selector-hero-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.playtester-selector-hero-fallback {
-  display: grid;
-  place-items: center;
-  padding: 0.75rem;
-  color: var(--playtest-text-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-align: center;
 }
 
 .playtester-selector-overlay {
@@ -549,92 +705,25 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+.playtester-selector-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .playtester-selector-lower {
-  position: relative;
   z-index: 10;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: stretch;
-  gap: 0.75rem;
-  overflow: hidden;
-  padding: 0.75rem;
-  border-top: 1px solid var(--playtest-border);
-  background: var(--playtest-panel-muted);
-  backdrop-filter: blur(12px);
 }
 
-.playtester-selector-hand {
-  flex: 1 1 34rem;
-  min-width: 0;
-  min-height: calc((var(--playtest-card-width) * 1.42) + 4rem);
-  overflow: hidden;
-  border-right: 1px solid var(--playtest-border);
+.playtester-selector-lower :deep(.playtest-stack) {
+  min-height: calc(var(--playtest-card-width) * 1.55);
 }
 
-.playtester-selector-hand-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0.8rem 0;
-}
-
-.playtester-selector-hand-fan {
-  display: flex;
-  box-sizing: border-box;
-  height: calc((var(--playtest-card-width) * 1.42) + 2rem);
-  min-width: max-content;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 1.25rem 1.5rem 0.75rem;
-}
-
-.playtester-selector-hand-card {
-  display: grid;
-  width: var(--playtest-card-width);
-  aspect-ratio: 63 / 88;
-  place-items: stretch;
-  overflow: hidden;
-  flex: 0 0 auto;
-  border: 1px solid var(--playtest-border);
-  border-radius: 0.45rem;
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--playtest-panel-strong) 62%, transparent), color-mix(in srgb, var(--playtest-panel-muted) 82%, transparent));
-  opacity: 0.55;
-}
-
-.playtester-selector-hand-card-image {
-  background: color-mix(in srgb, var(--playtest-panel-strong) 42%, transparent);
-  opacity: 0.68;
-}
-
-.playtester-selector-hand-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.playtester-selector-stacks {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: stretch;
-  gap: 0.75rem;
-}
-
-.playtester-selector-stack {
-  display: grid;
-  width: var(--playtest-stack-full-width);
-  min-height: calc(var(--playtest-card-width) * 1.18);
-  place-items: center;
-  border: 1px solid var(--playtest-border);
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--playtest-panel-strong) 42%, transparent);
-  padding: 0.55rem;
-}
-
-.playtester-selector-stack span:first-child {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+.playtester-selector-lower :deep(.playtest-stack-empty) {
+  border-color: var(--playtest-border);
+  background: color-mix(in srgb, var(--playtest-panel-strong) 28%, transparent);
 }
 
 @media (max-width: 900px) {
@@ -662,13 +751,6 @@ onMounted(() => {
     min-height: 14rem;
   }
 
-  .playtester-selector-lower {
-    overflow-x: auto;
-  }
-
-  .playtester-selector-hand {
-    min-width: 23rem;
-  }
 }
 
 @media (max-width: 640px) {
@@ -678,7 +760,9 @@ onMounted(() => {
     flex-direction: column;
   }
 
-  .playtester-selector-footer .btn-primary {
+  .playtester-selector-actions,
+  .playtester-selector-footer .btn-primary,
+  .playtester-selector-footer .btn-secondary {
     justify-content: center;
   }
 }

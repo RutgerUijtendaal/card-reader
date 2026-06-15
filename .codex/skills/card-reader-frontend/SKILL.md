@@ -15,6 +15,8 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Keep shared card filter behavior in `frontend/src/composables/card-filters`.
 - Keep shared gallery/search behavior in `frontend/src/composables/card-gallery` or root composables such as `useCardCollection`, `useGalleryOptions`, and preference composables.
 - Keep shared Vue components in `frontend/src/components`; if more than one module consumes a component, promote it out of the feature module.
+- Use shared deck list components and `DeckListRecord`-compatible props for deck listing surfaces that can consume either full or summary deck records.
+- Prefer deck summary endpoints and `DeckSummaryRecord` for list/selector views that do not need full card entries; fetch full `DeckRecord` only for detail/editor/export/playtest flows that need complete deck contents.
 - Keep feature module roots limited to pages/views plus core module files such as `api.ts`, `types.ts`, and stores. Put module implementation details under `components`, `composables`, `utils`, or `tests`.
 - Deck-building rule defaults and example config are backend-owned through `GET /decks/rules`; use the shared deck rules client/fallback instead of duplicating rule constants in feature UI.
 - In the card detail editor, keep card-level controls on the `Card` tab and version-level controls on the `Card Version` tab.
@@ -38,16 +40,18 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 4. Keep page modules focused on page behavior like navigation, pagination, and local interaction flow.
 5. Move reusable state, parsing, transformation, export, route, or preference logic into `frontend/src/composables` only when reuse is real.
 6. If a component becomes cross-module, move it to `frontend/src/components` before wiring the second module to it.
-7. If the change touches filters, inspect `frontend/src/composables/card-filters` first and extend it there instead of cloning the logic into a page.
-8. If the change touches deck-building constraints, load defaults/examples from the backend metadata endpoint and keep frontend fallbacks covered by tests.
-9. If the change touches a routed page with initial data fetching, preserve or add a page-shaped skeleton that matches the loaded layout.
-10. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
-11. Run lint and typecheck before finishing.
+7. If the change touches deck list or selector pages, decide explicitly whether summary records are sufficient before requesting full deck records.
+8. If the change touches filters, inspect `frontend/src/composables/card-filters` first and extend it there instead of cloning the logic into a page.
+9. If the change touches deck-building constraints, load defaults/examples from the backend metadata endpoint and keep frontend fallbacks covered by tests.
+10. If the change touches a routed page with initial data fetching, preserve or add a page-shaped skeleton that matches the loaded layout.
+11. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
+12. Run lint and typecheck before finishing.
 
 ## Review Focus
 
 - Shared logic left inside a feature module after it is consumed by another module
 - Shared components left inside feature module `components` folders after cross-module reuse appears
+- Full deck records fetched for list-only surfaces where summary records would preserve payload boundaries
 - Filter logic duplicated outside `frontend/src/composables/card-filters`
 - New helpers added when an existing composable or shared utility already fit
 - Page modules taking on shared state or parsing responsibilities
@@ -66,6 +70,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - `frontend/src/composables/card-filters`
 - `frontend/src/composables/card-gallery`
 - `frontend/src/components`
+- `frontend/src/components/decks`
 - `frontend/src/styles.css`
 - `frontend/src/lib`
 - `frontend/src/pages`

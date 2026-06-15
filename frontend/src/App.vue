@@ -118,7 +118,7 @@ const isSidebarCollapsed = useLocalStorage('card-reader.sidebar-collapsed', fals
   writeDefaults: true,
 });
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
-const isActivePlaytesterRoute = computed(() => route.path.startsWith('/playtester/'));
+const isActivePlaytesterRoute = computed(() => route.path === '/playtester' || route.path.startsWith('/playtester/'));
 const globalHotkeysEnabled = computed(() => !isActivePlaytesterRoute.value);
 const globalNavigationHotkeys = computed(() => [
   {

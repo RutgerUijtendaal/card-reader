@@ -6,18 +6,24 @@
       collapsed ? 'playtest-stack-collapsed' : '',
       draggingTop ? 'playtest-stack-dragging-top' : '',
       shuffling ? 'playtest-stack-shuffling' : '',
+      interactive ? '' : 'playtest-stack-passive',
+      draggable ? '' : 'playtest-stack-open-only',
     ]"
     :data-testid="`playtest-${zoneId}-zone`"
     :data-playtest-stack-zone-id="zoneId"
-    role="button"
-    tabindex="0"
+    :role="interactive ? 'button' : undefined"
+    :tabindex="interactive ? 0 : undefined"
     @click="runDefaultAction"
     @keydown.enter.prevent="runDefaultAction"
     @keydown.space.prevent="runDefaultAction"
     @pointerdown="handlePointerDown"
-    @contextmenu.prevent="emit('context-menu', zoneId, $event)"
-    @mouseenter="emit('hover', { type: 'stack', zoneId })"
-    @mouseleave="emit('hover', null)"
+    @pointerup="endMiddleZoom"
+    @pointercancel="endMiddleZoom"
+    @pointerleave="endMiddleZoom"
+    @auxclick.prevent
+    @contextmenu="openContextMenu"
+    @mouseenter="setHoveredStack"
+    @mouseleave="clearHoveredStack"
   >
     <div class="playtest-stack-header">
       <span class="playtest-stack-title">{{ label }}</span>
@@ -28,7 +34,10 @@
       <template v-if="instances.length > 0">
         <div class="playtest-stack-shadow playtest-stack-shadow-one" />
         <div class="playtest-stack-shadow playtest-stack-shadow-two" />
-        <div class="playtest-stack-card">
+        <div
+          ref="topCardRef"
+          class="playtest-stack-card"
+        >
           <img
             v-if="showTopFace && topInstance?.card.image_url"
             :src="toAbsoluteApiUrl(topInstance.card.image_url)"
@@ -62,10 +71,47 @@
       </span>
     </div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="middleZoomActive && topInstance"
+      class="playtest-stack-zoom-overlay"
+      :style="middleZoomStyle"
+      data-testid="playtest-stack-zoom-overlay"
+    >
+      <div class="playtest-stack-zoom-content">
+        <div class="playtest-stack-zoom-card">
+          <img
+            v-if="showTopFace && topInstance.card.image_url"
+            :src="toAbsoluteApiUrl(topInstance.card.image_url)"
+            :alt="topInstance.card.name"
+            draggable="false"
+          >
+          <div
+            v-else-if="showTopFace"
+            class="playtest-stack-zoom-no-image"
+          >
+            {{ topInstance.card.name }}
+          </div>
+          <img
+            v-else-if="cardBackUrl"
+            :src="cardBackUrl"
+            :alt="`${label} top card`"
+            draggable="false"
+          >
+          <span
+            v-else
+            class="playtest-stack-card-back"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import type {
   PlaytestCardInstance,
@@ -74,8 +120,9 @@ import type {
   PlaytestStackFace,
   PlaytestZoneId,
 } from '@/modules/playtester/types';
+import { getCardZoomOverlayStyle } from '@/modules/playtester/utils/zoom';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   zoneId: PlaytestZoneId;
   label: string;
   instances: PlaytestCardInstance[];
@@ -85,7 +132,13 @@ const props = defineProps<{
   defaultAction: PlaytestStackDefaultAction;
   draggingTop: boolean;
   shuffling?: boolean;
-}>();
+  interactive?: boolean;
+  draggable?: boolean;
+}>(), {
+  draggable: true,
+  interactive: true,
+  shuffling: false,
+});
 
 const emit = defineEmits<{
   (e: 'open', zoneId: PlaytestZoneId): void;
@@ -99,8 +152,19 @@ const topInstance = computed(() =>
   props.zoneId === 'library' ? props.instances[0] : props.instances[props.instances.length - 1],
 );
 const showTopFace = computed(() => props.face === 'front' && topInstance.value?.face !== 'back');
+const middleZoomActive = ref(false);
+const middleZoomStyle = ref<Record<string, string>>({});
+const topCardRef = ref<HTMLElement | null>(null);
+
+const endMiddleZoom = (): void => {
+  middleZoomActive.value = false;
+  middleZoomStyle.value = {};
+};
 
 const runDefaultAction = (): void => {
+  if (!props.interactive) {
+    return;
+  }
   if (props.instances.length === 0) {
     return;
   }
@@ -112,6 +176,29 @@ const runDefaultAction = (): void => {
 };
 
 const handlePointerDown = (event: PointerEvent): void => {
+  if (event.button === 1) {
+    const instance = topInstance.value;
+    if (!instance) {
+      return;
+    }
+    event.preventDefault();
+    const target = topCardRef.value;
+    if (!target) {
+      return;
+    }
+    middleZoomStyle.value = getCardZoomOverlayStyle(target, false);
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    }
+    middleZoomActive.value = true;
+    return;
+  }
+  if (!props.interactive) {
+    return;
+  }
+  if (!props.draggable) {
+    return;
+  }
   if (event.button !== 0) {
     return;
   }
@@ -121,6 +208,32 @@ const handlePointerDown = (event: PointerEvent): void => {
   }
   emit('pointer-top', props.zoneId, instance.instanceId, event);
 };
+
+const openContextMenu = (event: MouseEvent): void => {
+  if (!props.interactive) {
+    return;
+  }
+  event.preventDefault();
+  emit('context-menu', props.zoneId, event);
+};
+
+const setHoveredStack = (): void => {
+  if (!props.interactive) {
+    return;
+  }
+  emit('hover', { type: 'stack', zoneId: props.zoneId });
+};
+
+const clearHoveredStack = (): void => {
+  if (!props.interactive) {
+    return;
+  }
+  emit('hover', null);
+};
+
+onBeforeUnmount(() => {
+  endMiddleZoom();
+});
 </script>
 
 <style scoped>
@@ -155,6 +268,25 @@ const handlePointerDown = (event: PointerEvent): void => {
 
 .playtest-stack-empty {
   cursor: default;
+}
+
+.playtest-stack-open-only {
+  cursor: pointer;
+}
+
+.playtest-stack-open-only:active {
+  cursor: pointer;
+}
+
+.playtest-stack-passive {
+  cursor: default;
+  pointer-events: none;
+}
+
+.playtest-stack-passive:hover {
+  border-color: transparent;
+  background: transparent;
+  transform: none;
 }
 
 .playtest-stack-dragging-top {
@@ -291,6 +423,46 @@ const handlePointerDown = (event: PointerEvent): void => {
     radial-gradient(circle at 34% 35%, rgba(59, 130, 246, 0.7), transparent 12%),
     radial-gradient(circle at 65% 60%, rgba(239, 68, 68, 0.62), transparent 14%),
     linear-gradient(145deg, #5c3516, #92622d 46%, #3d2412);
+}
+
+.playtest-stack-zoom-overlay {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  filter: drop-shadow(0 2rem 2.2rem rgba(0, 0, 0, 0.54));
+}
+
+.playtest-stack-zoom-content {
+  width: 100%;
+  height: 100%;
+}
+
+.playtest-stack-zoom-card {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: stretch;
+  overflow: hidden;
+  border: 0.32rem solid color-mix(in srgb, var(--playtest-border, white) 82%, transparent);
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--playtest-panel-strong, white) 18%, transparent);
+}
+
+.playtest-stack-zoom-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.playtest-stack-zoom-no-image {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  color: var(--playtest-text-muted, rgba(255, 255, 255, 0.72));
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
 }
 
 .playtest-stack-empty-label {

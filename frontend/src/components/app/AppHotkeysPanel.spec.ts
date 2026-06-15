@@ -55,14 +55,16 @@ describe('AppHotkeysPanel', () => {
     mounted.unmount();
   });
 
-  test('shows default hotkeys on the playtester deck selector', async () => {
+  test('shows playtester hotkeys on the playtester deck selector', async () => {
     const mounted = await mountPanel('/playtester');
 
-    expect(mounted.container.textContent).toContain('Search and quick actions');
-    expect(mounted.container.textContent).toContain('Search');
-    expect(mounted.container.textContent).toContain('New Deck');
-    expect(mounted.container.textContent).not.toContain('Playtester actions');
-    expect(mounted.container.textContent).not.toContain('Shuffle');
+    expect(mounted.container.textContent).toContain('Playtester actions');
+    expect(mounted.container.textContent).toContain('Next turn');
+    expect(mounted.container.textContent).toContain('Untap all');
+    expect(mounted.container.textContent).toContain('Draw');
+    expect(mounted.container.textContent).toContain('Shuffle');
+    expect(mounted.container.textContent).not.toContain('Search and quick actions');
+    expect(mounted.container.textContent).not.toContain('New Deck');
 
     mounted.unmount();
   });
