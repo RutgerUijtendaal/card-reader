@@ -15,6 +15,7 @@ from card_reader_api.users.serializers import (
     password_setup_payload,
 )
 from card_reader_api.users.services import ManagedUserService
+from card_reader_core.services.user_activity import UserActivityService
 
 
 class ManagedUserListCreateView(APIView):
@@ -27,13 +28,31 @@ class ManagedUserListCreateView(APIView):
         managed_users, unmanaged_users = ManagedUserService().list_users(
             include_inactive=serializer.validated_data["include_inactive"],
         )
+        include_activity = bool(getattr(request.user, "is_superuser", False))
+        last_active_by_user_id = (
+            UserActivityService().get_last_active_by_user_id(
+                [user.pk for user in [*managed_users, *unmanaged_users]],
+            )
+            if include_activity
+            else {}
+        )
         return Response(
             {
-                "managed_results": [managed_user_payload(user) for user in managed_users],
+                "managed_results": [
+                    managed_user_payload(
+                        user,
+                        include_last_login=include_activity,
+                        include_last_active=include_activity,
+                        last_active_at=last_active_by_user_id.get(user.pk),
+                    )
+                    for user in managed_users
+                ],
                 "unmanaged_results": [
                     managed_user_payload(
                         user,
-                        include_last_login=bool(getattr(request.user, "is_superuser", False)),
+                        include_last_login=include_activity,
+                        include_last_active=include_activity,
+                        last_active_at=last_active_by_user_id.get(user.pk),
                     )
                     for user in unmanaged_users
                 ],

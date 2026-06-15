@@ -1,5 +1,9 @@
 import { api } from '@/api/client';
-import type { PasswordSetupRequest, PasswordSetupValidationResponse } from './types';
+import type {
+  AccessRequestSubmission,
+  PasswordSetupRequest,
+  PasswordSetupValidationResponse,
+} from './types';
 
 export const validatePasswordSetupLink = async (
   uid: string,
@@ -18,5 +22,13 @@ export const submitPasswordSetup = async (
     '/auth/password/setup',
     payload,
   );
+  return response.data;
+};
+
+export const submitAccessRequest = async (payload: {
+  contact_handle: string;
+  message: string;
+}): Promise<AccessRequestSubmission> => {
+  const response = await api.post<AccessRequestSubmission>('/auth/access-requests', payload);
   return response.data;
 };

@@ -1,19 +1,27 @@
 import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import { useAccessRequestSummary } from '@/composables/useAccessRequestSummary';
 import {
+  approveAccessRequest,
   createManagedUser,
   deactivateManagedUser,
+  declineAccessRequest,
+  fetchAccessRequests,
   fetchManagedUsers,
   resetManagedUserPassword,
   restoreManagedUser,
 } from '@/modules/admin/api/users';
-import type { ManagedUserRecord, PasswordSetupResponse } from '@/modules/admin/types';
+import type { AccessRequestRecord, ManagedUserRecord, PasswordSetupResponse } from '@/modules/admin/types';
 
 export const useManagedUsers = () => {
+  const { setPendingAccessRequestCount } = useAccessRequestSummary();
   const users = ref<ManagedUserRecord[]>([]);
   const unmanagedUsers = ref<ManagedUserRecord[]>([]);
+  const accessRequests = ref<AccessRequestRecord[]>([]);
   const includeInactive = ref(false);
+  const includeResolvedAccessRequests = ref(false);
   const loading = ref(false);
+  const loadingAccessRequests = ref(false);
   const setupResponse = ref<PasswordSetupResponse | null>(null);
 
   const loadUsers = async (): Promise<void> => {
@@ -26,6 +34,22 @@ export const useManagedUsers = () => {
       toast.error(extractErrorMessage(error, 'Failed to load users.'));
     } finally {
       loading.value = false;
+    }
+  };
+
+  const loadAccessRequests = async (): Promise<void> => {
+    loadingAccessRequests.value = true;
+    try {
+      accessRequests.value = await fetchAccessRequests(
+        includeResolvedAccessRequests.value ? 'all' : 'pending',
+      );
+      setPendingAccessRequestCount(
+        accessRequests.value.filter((request) => request.status === 'pending').length,
+      );
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Failed to load access requests.'));
+    } finally {
+      loadingAccessRequests.value = false;
     }
   };
 
@@ -48,21 +72,42 @@ export const useManagedUsers = () => {
     setupResponse.value = await resetManagedUserPassword(userId);
   };
 
+  const approveRequest = async (accessRequestId: string, username: string): Promise<void> => {
+    const response = await approveAccessRequest(accessRequestId, username);
+    setupResponse.value = response.password_setup;
+    await Promise.all([loadAccessRequests(), loadUsers()]);
+  };
+
+  const declineRequest = async (accessRequestId: string): Promise<void> => {
+    await declineAccessRequest(accessRequestId);
+    await loadAccessRequests();
+  };
+
   watch(includeInactive, () => {
     void loadUsers();
+  });
+
+  watch(includeResolvedAccessRequests, () => {
+    void loadAccessRequests();
   });
 
   return {
     users,
     unmanagedUsers,
+    accessRequests,
     includeInactive,
+    includeResolvedAccessRequests,
     loading,
+    loadingAccessRequests,
     setupResponse,
     loadUsers,
+    loadAccessRequests,
     createUser,
     deactivateUser,
     restoreUser,
     resetPassword,
+    approveRequest,
+    declineRequest,
   };
 };
 

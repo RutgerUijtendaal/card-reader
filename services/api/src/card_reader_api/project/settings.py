@@ -19,6 +19,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "card_reader_api.common.cors.SimpleCorsMiddleware",
     *core_django_settings.MIDDLEWARE,
+    "card_reader_api.auth.activity.UserActivityMiddleware",
 ]
 
 ROOT_URLCONF = "card_reader_api.project.urls"

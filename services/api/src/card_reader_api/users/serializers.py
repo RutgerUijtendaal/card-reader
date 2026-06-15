@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from django.contrib.auth.models import AbstractBaseUser
@@ -16,7 +17,13 @@ class ManagedUserCreateSerializer(serializers.Serializer[dict[str, Any]]):
     username = serializers.CharField(required=True, allow_blank=False, max_length=150, trim_whitespace=True)
 
 
-def managed_user_payload(user: AbstractBaseUser, *, include_last_login: bool = True) -> dict[str, object]:
+def managed_user_payload(
+    user: AbstractBaseUser,
+    *,
+    include_last_login: bool = True,
+    include_last_active: bool = True,
+    last_active_at: datetime | None = None,
+) -> dict[str, object]:
     return {
         "id": str(user.pk),
         "username": user.get_username(),
@@ -25,6 +32,7 @@ def managed_user_payload(user: AbstractBaseUser, *, include_last_login: bool = T
         "is_superuser": bool(getattr(user, "is_superuser", False)),
         "date_joined": _isoformat(getattr(user, "date_joined", None)),
         "last_login": _isoformat(getattr(user, "last_login", None)) if include_last_login else None,
+        "last_active_at": _isoformat(last_active_at) if include_last_active else None,
     }
 
 
