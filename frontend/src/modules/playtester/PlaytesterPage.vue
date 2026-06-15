@@ -88,6 +88,34 @@
       <template v-else-if="!staleDraft">
         <div class="playtester-topbar">
           <div class="flex flex-wrap items-center gap-2">
+            <div class="playtester-history-controls">
+              <button
+                class="playtester-history-button"
+                type="button"
+                aria-label="Undo"
+                title="Undo (Ctrl+Z)"
+                data-testid="playtest-undo"
+                :disabled="undoStack.length === 0"
+                @click="undoPlaytestState"
+              >
+                <Undo2 class="h-4 w-4" />
+              </button>
+              <button
+                class="playtester-history-button"
+                type="button"
+                aria-label="Redo"
+                title="Redo (Ctrl+Shift+Z or Ctrl+Y)"
+                data-testid="playtest-redo"
+                :disabled="redoStack.length === 0"
+                @click="redoPlaytestState"
+              >
+                <Redo2 class="h-4 w-4" />
+              </button>
+            </div>
+            <span
+              class="playtester-topbar-divider"
+              aria-hidden="true"
+            />
             <label class="playtester-scale-control theme-section-muted">
               Scale
               <input
@@ -317,7 +345,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useEventListener, useResizeObserver } from '@vueuse/core';
-import { Gamepad2 } from 'lucide-vue-next';
+import { Gamepad2, Redo2, Undo2 } from 'lucide-vue-next';
 import { RouterLink, useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
@@ -356,6 +384,7 @@ import {
   setOpeningHandSize,
   shuffleZone,
   startNextTurn,
+  untapAllBoardCards,
   toggleCardFace,
   toggleCardsFace,
   toggleTapped,
@@ -425,6 +454,10 @@ type CopiedPlaytestCard = {
   instanceId: string;
 };
 
+type ApplyPlaytestStateOptions = {
+  recordHistory?: boolean;
+};
+
 const route = useRoute();
 const auth = useAuthStore();
 const storage = createLocalPlaytestStorage();
@@ -442,6 +475,8 @@ const suppressClickUntil = ref(0);
 const restartConfirmOpen = ref(false);
 const saveSuspended = ref(false);
 const cardScale = ref(0.75);
+const undoStack = ref<PlaytestState[]>([]);
+const redoStack = ref<PlaytestState[]>([]);
 const currentCardBackUrl = ref<string | null>(null);
 const openStackZone = ref<PlaytestZoneId | null>(null);
 const copiedCards = ref<CopiedPlaytestCard[]>([]);
@@ -456,6 +491,7 @@ const CLICK_SUPPRESSION_MS = 180;
 const PLAYTEST_CARD_SCALE_MIN = 0.5;
 const PLAYTEST_CARD_SCALE_MAX = 1.6;
 const PLAYTEST_CARD_SCALE_STEP = 0.05;
+const PLAYTEST_HISTORY_LIMIT = 100;
 const STACK_SHUFFLE_ANIMATION_MS = 650;
 let shuffleAnimationTimer: number | null = null;
 
@@ -589,11 +625,88 @@ const fetchVisibleDeck = async (): Promise<DeckRecord> => {
   return await fetchDeckDetail(deckId.value);
 };
 
-const applyState = (nextState: PlaytestState): void => {
-  playtest.value = nextState;
+const pruneSelectedBoardCards = (nextState: PlaytestState): void => {
   selectedBoardInstanceIds.value = selectedBoardInstanceIds.value.filter((instanceId) =>
     nextState.instances.some((instance) => instance.instanceId === instanceId && instance.zoneId === 'play'),
   );
+};
+
+const pushUndoState = (state: PlaytestState): void => {
+  undoStack.value = [...undoStack.value, state].slice(-PLAYTEST_HISTORY_LIMIT);
+};
+
+const pushRedoState = (state: PlaytestState): void => {
+  redoStack.value = [...redoStack.value, state].slice(-PLAYTEST_HISTORY_LIMIT);
+};
+
+const clearHistory = (): void => {
+  undoStack.value = [];
+  redoStack.value = [];
+};
+
+const clearUndoRedoTransientUi = (): void => {
+  pendingDrag.value = null;
+  activeDrag.value = null;
+  boardSelection.value = null;
+  contextMenu.value = null;
+  hoverTarget.value = null;
+  openStackZone.value = null;
+};
+
+const applyState = (
+  nextState: PlaytestState,
+  options: ApplyPlaytestStateOptions = {},
+): void => {
+  const currentState = playtest.value;
+  if (nextState === currentState) {
+    return;
+  }
+  if (currentState && options.recordHistory !== false) {
+    pushUndoState(currentState);
+    redoStack.value = [];
+  }
+  playtest.value = nextState;
+  pruneSelectedBoardCards(nextState);
+};
+
+const replacePlaytestState = (nextState: PlaytestState | null): void => {
+  playtest.value = nextState;
+  clearHistory();
+  if (nextState) {
+    pruneSelectedBoardCards(nextState);
+  } else {
+    selectedBoardInstanceIds.value = [];
+  }
+};
+
+const undoPlaytestState = (): boolean => {
+  if (!playtest.value || undoStack.value.length === 0) {
+    return false;
+  }
+  const previousState = undoStack.value[undoStack.value.length - 1];
+  if (!previousState) {
+    return false;
+  }
+  undoStack.value = undoStack.value.slice(0, -1);
+  pushRedoState(playtest.value);
+  clearUndoRedoTransientUi();
+  applyState(previousState, { recordHistory: false });
+  return true;
+};
+
+const redoPlaytestState = (): boolean => {
+  if (!playtest.value || redoStack.value.length === 0) {
+    return false;
+  }
+  const nextState = redoStack.value[redoStack.value.length - 1];
+  if (!nextState) {
+    return false;
+  }
+  redoStack.value = redoStack.value.slice(0, -1);
+  pushUndoState(playtest.value);
+  clearUndoRedoTransientUi();
+  applyState(nextState, { recordHistory: false });
+  return true;
 };
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -1215,6 +1328,23 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
     return;
   }
 
+  const modifierPressed = (event.ctrlKey || event.metaKey) && !event.altKey;
+  const normalizedModifiedKey = event.key.toLowerCase();
+  const undoPressed = modifierPressed && !event.shiftKey && normalizedModifiedKey === 'z';
+  if (undoPressed && undoPlaytestState()) {
+    event.preventDefault();
+    return;
+  }
+  const redoPressed = modifierPressed
+    && (
+      (event.shiftKey && normalizedModifiedKey === 'z')
+      || (!event.shiftKey && normalizedModifiedKey === 'y')
+    );
+  if (redoPressed && redoPlaytestState()) {
+    event.preventDefault();
+    return;
+  }
+
   const copyPressed = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c';
   if (copyPressed && copyCurrentCards()) {
     event.preventDefault();
@@ -1243,6 +1373,24 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
   }
 
   const normalizedKey = event.key.toLowerCase();
+  if (normalizedKey === 'n') {
+    if (nextTurn()) {
+      event.preventDefault();
+    }
+    return;
+  }
+  if (normalizedKey === 'u') {
+    if (untapAllCards()) {
+      event.preventDefault();
+    }
+    return;
+  }
+  if (normalizedKey === 'd') {
+    if (drawOne()) {
+      event.preventDefault();
+    }
+    return;
+  }
   if (normalizedKey === 't') {
     const ids = hotkeyCardIds({ boardOnly: true });
     if (ids.length > 0) {
@@ -1277,47 +1425,65 @@ const updateOpeningHandSize = (handSize: number): void => {
   if (!playtest.value) {
     return;
   }
-  applyState(setOpeningHandSize(playtest.value, handSize));
+  applyState(setOpeningHandSize(playtest.value, handSize), { recordHistory: false });
 };
 
 const toggleOpeningMana = (instanceId: string, selected: boolean): void => {
   if (!playtest.value) {
     return;
   }
-  applyState(toggleOpeningManaSelection(playtest.value, instanceId, selected));
+  applyState(toggleOpeningManaSelection(playtest.value, instanceId, selected), { recordHistory: false });
 };
 
 const toggleOpeningSetup = (instanceId: string, selected: boolean): void => {
   if (!playtest.value) {
     return;
   }
-  applyState(toggleOpeningSetupSelection(playtest.value, instanceId, selected));
+  applyState(toggleOpeningSetupSelection(playtest.value, instanceId, selected), { recordHistory: false });
 };
 
 const mulliganOpeningSetup = (): void => {
   if (!playtest.value) {
     return;
   }
-  applyState(mulliganOpeningHand(playtest.value));
+  applyState(mulliganOpeningHand(playtest.value), { recordHistory: false });
 };
 
 const keepOpeningSetup = (): void => {
   if (!playtest.value) {
     return;
   }
-  applyState(acceptOpeningSetup(playtest.value));
+  applyState(acceptOpeningSetup(playtest.value), { recordHistory: false });
 };
 
-const drawOne = (): void => {
-  if (playtest.value) {
-    applyState(drawCards(playtest.value, 1));
+const hasTappedBoardCards = (state: PlaytestState): boolean =>
+  state.instances.some((instance) => instance.zoneId === 'play' && instance.tapped);
+
+const hasLibraryCards = (state: PlaytestState): boolean =>
+  countZone(state, 'library') > 0;
+
+const drawOne = (): boolean => {
+  if (!playtest.value || !hasLibraryCards(playtest.value)) {
+    return false;
   }
+  applyState(drawCards(playtest.value, 1));
+  return true;
 };
 
-const nextTurn = (): void => {
-  if (playtest.value) {
-    applyState(startNextTurn(playtest.value));
+const untapAllCards = (): boolean => {
+  if (!playtest.value || !hasTappedBoardCards(playtest.value)) {
+    return false;
   }
+  applyState(untapAllBoardCards(playtest.value));
+  return true;
+};
+
+const nextTurn = (): boolean => {
+  if (!playtest.value || (!hasTappedBoardCards(playtest.value) && !hasLibraryCards(playtest.value))) {
+    return false;
+  }
+  applyState(startNextTurn(playtest.value));
+  return true;
 };
 
 const drawFromStack = (zoneId: PlaytestZoneId): void => {
@@ -1446,7 +1612,7 @@ const restartPlaytest = (): void => {
   storage.clear(deck.value.id);
   staleDraft.value = null;
   restartConfirmOpen.value = false;
-  applyState(createInitialPlaytestState(deck.value));
+  replacePlaytestState(createInitialPlaytestState(deck.value));
 };
 
 const loadCurrentCardBack = async (): Promise<void> => {
@@ -1463,7 +1629,7 @@ const resumeStaleDraft = (): void => {
     return;
   }
   saveSuspended.value = false;
-  playtest.value = staleDraft.value.state;
+  replacePlaytestState(staleDraft.value.state);
   staleDraft.value = null;
 };
 
@@ -1517,7 +1683,7 @@ const loadPlaytestDeck = async (): Promise<void> => {
   const requestId = ++loadRequestId;
   loading.value = true;
   deck.value = null;
-  playtest.value = null;
+  replacePlaytestState(null);
   staleDraft.value = null;
   saveSuspended.value = false;
   resetTransientPlaytestUi();
@@ -1529,14 +1695,14 @@ const loadPlaytestDeck = async (): Promise<void> => {
     deck.value = loadedDeck;
     const draft = storage.load(loadedDeck.id);
     if (draft && !isStoredDraftStale(draft, loadedDeck)) {
-      playtest.value = draft.state;
+      replacePlaytestState(draft.state);
       return;
     }
     if (draft) {
       staleDraft.value = draft;
       saveSuspended.value = true;
     }
-    playtest.value = createInitialPlaytestState(loadedDeck);
+    replacePlaytestState(createInitialPlaytestState(loadedDeck));
   } finally {
     if (requestId === loadRequestId) {
       loading.value = false;
@@ -1654,6 +1820,47 @@ onMounted(() => {
   padding-right: 0.35rem;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.playtester-topbar-divider {
+  width: 1px;
+  height: 1.55rem;
+  background: var(--playtest-border);
+}
+
+.playtester-history-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.playtester-history-button {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--playtest-border);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--playtest-panel-strong) 74%, transparent);
+  color: var(--playtest-text-muted);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.playtester-history-button:not(:disabled):hover,
+.playtester-history-button:not(:disabled):focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 58%, var(--playtest-border));
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--playtest-panel-strong));
+  color: var(--playtest-text);
+}
+
+.playtester-history-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .playtester-board {

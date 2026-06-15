@@ -380,8 +380,28 @@ describe('PlaytesterPage', () => {
     expect(toolbarButtons).not.toContain('Draw to Hand');
     const scaleInput = mounted.container.querySelector<HTMLInputElement>('.playtester-scale');
     const topbar = mounted.container.querySelector<HTMLElement>('.playtester-topbar');
+    const undoButton = mounted.container.querySelector<HTMLButtonElement>('[data-testid="playtest-undo"]');
+    const redoButton = mounted.container.querySelector<HTMLButtonElement>('[data-testid="playtest-redo"]');
+    const topbarGroups = [...topbar?.children ?? []];
+    expect(topbarGroups[0]?.textContent).toContain('Scale');
+    expect(topbarGroups[0]?.contains(scaleInput)).toBe(true);
+    expect(topbarGroups[0]?.contains(undoButton)).toBe(true);
+    expect(topbarGroups[0]?.contains(redoButton)).toBe(true);
+    const firstGroupChildren = [...topbarGroups[0]?.children ?? []];
+    expect(firstGroupChildren[0]?.contains(undoButton)).toBe(true);
+    expect(firstGroupChildren[0]?.contains(redoButton)).toBe(true);
+    expect(firstGroupChildren[2]?.contains(scaleInput)).toBe(true);
+    expect(topbarGroups[1]?.textContent).toContain('Next turn');
+    expect(topbarGroups[1]?.textContent).toContain('Reset to Setup');
+    expect(topbarGroups[1]?.textContent).toContain('Restart');
     expect(topbar?.textContent).toContain('Scale');
     expect(topbar?.contains(scaleInput)).toBe(true);
+    expect(topbar?.contains(undoButton)).toBe(true);
+    expect(topbar?.contains(redoButton)).toBe(true);
+    expect(undoButton?.textContent?.trim()).toBe('');
+    expect(redoButton?.textContent?.trim()).toBe('');
+    expect(undoButton?.disabled).toBe(true);
+    expect(redoButton?.disabled).toBe(true);
     expect(topbar?.querySelectorAll('.theme-pill')).toHaveLength(0);
     expect(topbar?.textContent).not.toContain('Library');
     expect(topbar?.textContent).not.toContain('Hand');
@@ -398,6 +418,8 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(6);
     expect(mounted.container.querySelectorAll('[data-testid="playtest-board-card"] [data-instance-id]')).toHaveLength(1);
     expect(mounted.container.querySelector('.playtest-card-face-animating')).toBeNull();
+    expect(undoButton?.disabled).toBe(false);
+    expect(redoButton?.disabled).toBe(true);
 
     const playCard = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-board-card"] [data-instance-id]');
     playCard?.click();
@@ -412,6 +434,75 @@ describe('PlaytesterPage', () => {
     const updatedPlayCard = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-board-card"] [data-instance-id]');
     expect(updatedPlayCard?.className).not.toContain('playtest-card-tapped');
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(7);
+
+    mounted.unmount();
+  });
+
+  test('supports undo and redo for playtest state while preserving scale', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const board = testZone(mounted.container, 'playtest-board-zone');
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 500, 400));
+    const scaleInput = mounted.container.querySelector<HTMLInputElement>('.playtester-scale');
+    const undoButton = mounted.container.querySelector<HTMLButtonElement>('[data-testid="playtest-undo"]');
+    const redoButton = mounted.container.querySelector<HTMLButtonElement>('[data-testid="playtest-redo"]');
+
+    board.dispatchEvent(new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      altKey: true,
+      deltaY: -100,
+      clientX: 250,
+      clientY: 200,
+    }));
+    await flushPage();
+    expect(scaleInput?.value).toBe('0.8');
+
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(6);
+    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+    expect(undoButton?.disabled).toBe(false);
+    expect(redoButton?.disabled).toBe(true);
+
+    testZone(mounted.container, 'playtest-hero-zone').click();
+    await flushPage();
+    expect(document.body.querySelector('[data-testid="playtest-stack-overlay"]')).not.toBeNull();
+
+    window.dispatchEvent(playtestKeyEvent('z', { ctrlKey: true }));
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(7);
+    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(0);
+    expect(document.body.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
+    expect(scaleInput?.value).toBe('0.8');
+    expect(undoButton?.disabled).toBe(true);
+    expect(redoButton?.disabled).toBe(false);
+
+    window.dispatchEvent(playtestKeyEvent('y', { ctrlKey: true }));
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(6);
+    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+    expect(undoButton?.disabled).toBe(false);
+    expect(redoButton?.disabled).toBe(true);
+
+    window.dispatchEvent(playtestKeyEvent('z', { ctrlKey: true }));
+    await flushPage();
+    window.dispatchEvent(playtestKeyEvent('Z', { ctrlKey: true, shiftKey: true }));
+    await flushPage();
+    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+
+    window.dispatchEvent(playtestKeyEvent('z', { ctrlKey: true }));
+    await flushPage();
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+
+    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+    expect(undoButton?.disabled).toBe(false);
+    expect(redoButton?.disabled).toBe(true);
 
     mounted.unmount();
   });
@@ -907,6 +998,51 @@ describe('PlaytesterPage', () => {
 
     expect(libraryAfter).not.toEqual(libraryBefore);
     expect([...libraryAfter].sort()).toEqual([...libraryBefore].sort());
+
+    mounted.unmount();
+  });
+
+  test('draws, untaps, and advances turns from playtester hotkeys', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const hand = testZone(mounted.container, 'playtest-hand-zone');
+    const board = testZone(mounted.container, 'playtest-board-zone');
+
+    expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(7);
+
+    window.dispatchEvent(playtestKeyEvent('d'));
+    await flushPage();
+    expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(8);
+
+    hand.querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+
+    let boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    expect(boardCard).not.toBeNull();
+    expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(7);
+
+    boardCard?.click();
+    await flushPage();
+    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    expect(boardCard?.className).toContain('playtest-card-tapped');
+
+    window.dispatchEvent(playtestKeyEvent('u'));
+    await flushPage();
+    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    expect(boardCard?.className).not.toContain('playtest-card-tapped');
+    expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(7);
+
+    boardCard?.click();
+    await flushPage();
+    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    expect(boardCard?.className).toContain('playtest-card-tapped');
+
+    window.dispatchEvent(playtestKeyEvent('n'));
+    await flushPage();
+    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    expect(boardCard?.className).not.toContain('playtest-card-tapped');
+    expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(8);
 
     mounted.unmount();
   });

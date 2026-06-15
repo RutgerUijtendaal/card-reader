@@ -58,12 +58,27 @@ describe('AppHotkeysPanel', () => {
     const mounted = await mountPanel('/playtester/deck-1');
 
     expect(mounted.container.textContent).toContain('Playtester actions');
+    expect(mounted.container.textContent).toContain('Next turn');
+    expect(mounted.container.textContent).toContain('Untap all');
+    expect(mounted.container.textContent).toContain('Draw');
+    expect(mounted.container.textContent).toContain('N');
+    expect(mounted.container.textContent).toContain('U');
+    expect(mounted.container.textContent).toContain('D');
     expect(mounted.container.textContent).toContain('Tap');
     expect(mounted.container.textContent).toContain('Flip');
     expect(mounted.container.textContent).toContain('Shuffle');
     expect(mounted.container.textContent).toContain('Delete');
+    expect(mounted.container.textContent).toContain('Undo');
+    expect(mounted.container.textContent).toContain('Ctrl+Z');
+    expect(mounted.container.textContent).toContain('Redo');
+    expect(mounted.container.textContent).toContain('Ctrl+Shift+Z');
+    expect(mounted.container.textContent).toContain('Ctrl+Y');
     expect(mounted.container.textContent).toContain('Copy/Paste');
+    expect(mounted.container.textContent).toContain('Zoom card');
+    expect(mounted.container.textContent).toContain('Middle Mouse');
     expect(mounted.container.textContent).toContain('Scale');
+    expect(mounted.container.textContent).not.toContain('untap + draw');
+    expect(mounted.container.textContent).not.toContain('Draw a card');
     expect(mounted.container.textContent).not.toContain('Tap Card');
     expect(mounted.container.textContent).not.toContain('Card Size');
     expect(mounted.container.textContent).not.toContain('New Deck');

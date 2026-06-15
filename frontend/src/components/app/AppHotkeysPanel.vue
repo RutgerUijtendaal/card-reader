@@ -7,9 +7,12 @@
       <Keyboard class="h-4 w-4" />
       <span class="text-[11px] font-semibold uppercase tracking-[0.18em]">Hotkeys</span>
       <template v-if="isPlaytesterRoute">
+        <span class="text-[11px]">N / U / D</span>
         <span class="text-[11px]">T / F / R</span>
         <span class="text-[11px]">Del</span>
+        <span class="text-[11px]">Ctrl Z/Y</span>
         <span class="text-[11px]">Ctrl C/V</span>
+        <span class="text-[11px]">Middle Mouse</span>
         <span class="text-[11px]">Alt Wheel</span>
       </template>
       <template v-else>
@@ -45,6 +48,18 @@
         class="space-y-2 text-sm"
       >
         <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Next turn</span>
+          <span class="theme-hotkey-chip">N</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Untap all</span>
+          <span class="theme-hotkey-chip">U</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Draw</span>
+          <span class="theme-hotkey-chip">D</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
           <span class="opacity-80">Tap</span>
           <span class="theme-hotkey-chip">T</span>
         </div>
@@ -61,11 +76,26 @@
           <span class="theme-hotkey-chip">Del</span>
         </div>
         <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Undo</span>
+          <span class="theme-hotkey-chip">Ctrl+Z</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Redo</span>
+          <span class="inline-flex items-center gap-1">
+            <span class="theme-hotkey-chip">Ctrl+Shift+Z</span>
+            <span class="theme-hotkey-chip">Ctrl+Y</span>
+          </span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
           <span class="opacity-80">Copy/Paste</span>
           <span class="inline-flex items-center gap-1">
             <span class="theme-hotkey-chip">Ctrl+C</span>
             <span class="theme-hotkey-chip">Ctrl+V</span>
           </span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Zoom card</span>
+          <span class="theme-hotkey-chip">Middle Mouse</span>
         </div>
         <div class="flex items-center justify-between gap-3">
           <span class="opacity-80">Scale</span>
