@@ -93,6 +93,7 @@
                     :key="`owned-${suggestion.deck.id}`"
                     :deck="suggestion.deck"
                     mode="owned"
+                    surface="playtester"
                     :selected="selectedSuggestionKey === suggestionKey(suggestion)"
                     @select="selectSuggestion(suggestion)"
                   />
@@ -114,6 +115,7 @@
                     :key="`public-${suggestion.deck.id}`"
                     :deck="suggestion.deck"
                     mode="browse"
+                    surface="playtester"
                     :selected="selectedSuggestionKey === suggestionKey(suggestion)"
                     @select="selectSuggestion(suggestion)"
                   />
@@ -588,25 +590,25 @@ onMounted(() => {
 }
 
 .playtester-selector-overlay {
+  --playtester-selector-float-top: clamp(1rem, 5vh, 3rem);
   position: absolute;
   inset: 1.25rem 1.25rem calc((var(--playtest-card-width) * 1.42) + 5rem);
   z-index: 20;
   display: grid;
-  place-items: center;
+  box-sizing: border-box;
+  align-items: start;
+  justify-items: center;
+  padding-top: var(--playtester-selector-float-top);
   pointer-events: none;
 }
 
 .playtester-selector-panel {
   display: grid;
   width: min(47rem, 100%);
-  max-height: min(42rem, 100%);
+  max-height: min(42rem, calc(100% - var(--playtester-selector-float-top)));
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  overflow: hidden;
-  border: 1px solid var(--playtest-border);
-  border-radius: 0.9rem;
-  background: color-mix(in srgb, var(--playtest-panel-strong) 94%, transparent);
-  box-shadow: 0 1.6rem 4rem rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(16px);
+  gap: 0.8rem;
+  overflow: visible;
   pointer-events: auto;
 }
 
@@ -616,11 +618,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem;
-}
-
-.playtester-selector-header {
-  border-bottom: 1px solid var(--playtest-border);
+  padding-inline: 0.2rem;
 }
 
 .playtester-selector-kicker {
@@ -643,22 +641,22 @@ onMounted(() => {
 
 .playtester-selector-search {
   position: relative;
-  margin: 1rem 1rem 0;
   color: var(--playtest-text-soft);
 }
 
 .playtester-selector-body {
   min-height: 13rem;
   overflow: auto;
-  padding: 1rem;
+  padding: 0 0.15rem;
 }
 
 .playtester-selector-empty {
   display: grid;
   min-height: 9rem;
   place-items: center;
-  border: 1px dashed var(--playtest-border);
-  border-radius: 0.7rem;
+  border: 1px dashed color-mix(in srgb, var(--playtest-border) 82%, transparent);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--playtest-panel-strong) 24%, transparent);
   color: var(--playtest-text-soft);
   font-size: 0.88rem;
   font-weight: 700;
@@ -682,8 +680,7 @@ onMounted(() => {
 }
 
 .playtester-selector-footer {
-  border-top: 1px solid var(--playtest-border);
-  background: color-mix(in srgb, var(--playtest-panel) 72%, transparent);
+  padding-bottom: 0.2rem;
 }
 
 .playtester-selector-preview-title {
@@ -737,6 +734,7 @@ onMounted(() => {
   }
 
   .playtester-selector-overlay {
+    --playtester-selector-float-top: 0px;
     position: relative;
     inset: auto;
     padding: 1rem;

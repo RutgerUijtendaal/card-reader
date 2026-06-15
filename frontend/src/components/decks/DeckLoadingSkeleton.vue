@@ -98,7 +98,7 @@ withDefaults(defineProps<{
   animation: none;
 }
 
-html.dark .deck-loading-skeleton::after {
+:global(html.dark) .deck-loading-skeleton::after {
   background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
 }
 
@@ -108,10 +108,16 @@ html.dark .deck-loading-skeleton::after {
   width: var(--deck-skeleton-art-width);
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(148, 163, 184, 0.24), transparent 55%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-surface-strong) 78%, #1e293b 22%), color-mix(in srgb, var(--color-surface-soft) 72%, #0f172a 28%));
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-border) 28%, transparent), transparent 58%),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface-strong) 92%, var(--color-border) 8%), color-mix(in srgb, var(--color-surface-soft) 88%, var(--color-border) 12%));
   -webkit-mask-image: var(--deck-skeleton-art-mask);
   mask-image: var(--deck-skeleton-art-mask);
+}
+
+:global(html.dark) .deck-loading-skeleton-art {
+  background:
+    radial-gradient(circle at top left, rgba(148, 163, 184, 0.24), transparent 55%),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface-strong) 78%, #1e293b 22%), color-mix(in srgb, var(--color-surface-soft) 72%, #0f172a 28%));
 }
 
 .deck-loading-skeleton-image-indicator {
@@ -119,14 +125,20 @@ html.dark .deck-loading-skeleton::after {
   inset: 0.5rem 0.7rem 0.5rem 0.5rem;
   display: block;
   border-radius: 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, transparent 42%);
-  background: color-mix(in srgb, var(--color-surface-strong) 78%, transparent 22%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-surface) 64%, transparent 36%);
+  border: 1px solid color-mix(in srgb, var(--color-border) 58%, transparent 42%);
+  background: color-mix(in srgb, var(--color-surface-strong) 54%, transparent 46%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-surface) 44%, transparent 56%);
 }
 
 .deck-loading-skeleton-art-overlay {
   position: absolute;
   inset: 0;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.02) 0%, rgba(15, 23, 42, 0.04) 42%, rgba(15, 23, 42, 0.08) 62%, rgba(15, 23, 42, 0.04) 76%, transparent 100%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.035), rgba(15, 23, 42, 0.02));
+}
+
+:global(html.dark) .deck-loading-skeleton-art-overlay {
   background:
     linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.08) 38%, rgba(15, 23, 42, 0.22) 56%, rgba(15, 23, 42, 0.1) 70%, transparent 100%),
     linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.04));

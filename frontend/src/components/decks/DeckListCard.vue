@@ -246,7 +246,7 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
 <style scoped>
 .deck-list-card-surface {
   --deck-card-art-width: min(21rem, 64%);
-  --deck-card-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 42%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.28) 74%, rgba(0, 0, 0, 0.08) 86%, transparent 100%);
+  --deck-card-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 64%, rgba(0, 0, 0, 0.72) 76%, rgba(0, 0, 0, 0.28) 88%, rgba(0, 0, 0, 0.08) 95%, transparent 100%);
   --deck-card-art-position: 23% 10%;
   --deck-card-art-scale: 1.2;
   --deck-card-art-hover-scale: 1.27;
@@ -256,6 +256,10 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
   height: 14.5rem;
   overflow: hidden;
   padding: 0;
+}
+
+:global(html.dark) .deck-list-card-surface {
+  --deck-card-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 42%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.28) 74%, rgba(0, 0, 0, 0.08) 86%, transparent 100%);
 }
 
 .deck-list-card-art {
