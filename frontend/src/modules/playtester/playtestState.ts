@@ -500,16 +500,11 @@ const cloneSourceInstance = (
   pileOrder: null,
 });
 
-export const cloneCardInstance = (
+export const cloneCardInstanceSnapshot = (
   state: PlaytestState,
-  instanceId: string,
+  source: PlaytestCardInstance,
   placement: ClonePlacement = { type: 'after-source' },
 ): PlaytestState => {
-  const source = state.instances.find((instance) => instance.instanceId === instanceId);
-  if (!source) {
-    return state;
-  }
-
   if (placement.type === 'board') {
     const clone = cloneSourceInstance(
       state,
@@ -538,6 +533,19 @@ export const cloneCardInstance = (
   return insertNewInstanceIntoZone(state, clone, source.zoneId, sourceIndex < 0 ? undefined : sourceIndex + 1);
 };
 
+export const cloneCardInstance = (
+  state: PlaytestState,
+  instanceId: string,
+  placement: ClonePlacement = { type: 'after-source' },
+): PlaytestState => {
+  const source = state.instances.find((instance) => instance.instanceId === instanceId);
+  if (!source) {
+    return state;
+  }
+
+  return cloneCardInstanceSnapshot(state, source, placement);
+};
+
 export const cloneCardInstances = (
   state: PlaytestState,
   instanceIds: string[],
@@ -557,6 +565,28 @@ export const cloneCardInstances = (
     const offsetX = source.zoneId === 'play' ? (source.boardX ?? baseX) - baseX : index * 4;
     const offsetY = source.zoneId === 'play' ? (source.boardY ?? baseY) - baseY : index * 4;
     return cloneCardInstance(nextState, source.instanceId, {
+      type: 'board',
+      anchorX: placement.anchorX + offsetX,
+      anchorY: placement.anchorY + offsetY,
+    });
+  }, state);
+};
+
+export const cloneCardInstanceSnapshots = (
+  state: PlaytestState,
+  sources: PlaytestCardInstance[],
+  placement: ClonePlacement = { type: 'after-source' },
+): PlaytestState => {
+  if (placement.type === 'after-source') {
+    return sources.reduce((nextState, source) => cloneCardInstanceSnapshot(nextState, source), state);
+  }
+
+  const baseX = sources[0]?.boardX ?? placement.anchorX;
+  const baseY = sources[0]?.boardY ?? placement.anchorY;
+  return sources.reduce((nextState, source, index) => {
+    const offsetX = source.zoneId === 'play' ? (source.boardX ?? baseX) - baseX : index * 4;
+    const offsetY = source.zoneId === 'play' ? (source.boardY ?? baseY) - baseY : index * 4;
+    return cloneCardInstanceSnapshot(nextState, source, {
       type: 'board',
       anchorX: placement.anchorX + offsetX,
       anchorY: placement.anchorY + offsetY,
@@ -593,7 +623,11 @@ export const shuffleZone = (
   zoneId: PlaytestZoneId,
   random: () => number = Math.random,
 ): PlaytestState => {
-  const shuffled = shuffleInstances(getZoneInstances(state, zoneId), random);
+  const zoneInstances = getZoneInstances(state, zoneId);
+  if (zoneInstances.length < 2) {
+    return state;
+  }
+  const shuffled = shuffleInstances(zoneInstances, random);
   const shuffledById = new Map(shuffled.map((instance) => [instance.instanceId, instance]));
   return {
     ...state,

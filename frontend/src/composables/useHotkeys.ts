@@ -153,7 +153,7 @@ export const handleGlobalNavigationHotkey = (
     }
   }
 
-  const isKnownPrefix = hotkeys.some((hotkey) => hotkey.sequence[0] === normalizedKey);
+  const isKnownPrefix = hotkeys.some((hotkey) => hotkey.enabled && hotkey.sequence[0] === normalizedKey);
   if (isKnownPrefix) {
     startPendingNavigationPrefix(normalizedKey);
   }
@@ -217,12 +217,17 @@ export const usePrimarySearchTarget = (
   });
 };
 
-export const usePrimarySearchHotkeys = (): void => {
+export const usePrimarySearchHotkeys = (
+  enabled: MaybeRefOrGetter<boolean> = true,
+): void => {
   if (typeof window === 'undefined') {
     return;
   }
 
   useEventListener(window, 'keydown', (event) => {
+    if (!toValue(enabled)) {
+      return;
+    }
     handlePrimarySearchHotkey(event);
   });
 };

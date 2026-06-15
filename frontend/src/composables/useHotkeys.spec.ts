@@ -118,6 +118,31 @@ describe('useHotkeys', () => {
     expect(actionEvent.defaultPrevented).toBe(true);
   });
 
+  test('disabled global navigation prefixes are not remembered for later enabled actions', () => {
+    const onTrigger = vi.fn();
+    const disabledPrefixEvent = new KeyboardEvent('keydown', {
+      key: 'n',
+      cancelable: true,
+    });
+    const enabledActionEvent = new KeyboardEvent('keydown', {
+      key: 'n',
+      cancelable: true,
+    });
+
+    expect(
+      handleGlobalNavigationHotkey(disabledPrefixEvent, [
+        { sequence: ['n', 'n'], enabled: false, onTrigger },
+      ]),
+    ).toBe(false);
+    expect(
+      handleGlobalNavigationHotkey(enabledActionEvent, [
+        { sequence: ['n', 'n'], enabled: true, onTrigger },
+      ]),
+    ).toBe(false);
+    expect(onTrigger).not.toHaveBeenCalled();
+    expect(enabledActionEvent.defaultPrevented).toBe(false);
+  });
+
   test('global navigation sequences do nothing from editable fields', () => {
     const onTrigger = vi.fn();
     const input = document.createElement('input');

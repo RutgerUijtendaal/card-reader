@@ -4,6 +4,7 @@ import {
   acceptOpeningSetup,
   cloneCardInstance,
   cloneCardInstances,
+  cloneCardInstanceSnapshots,
   countZone,
   createInitialPlaytestState,
   deleteCardInstances,
@@ -345,6 +346,31 @@ describe('playtestState', () => {
     expect(boardCopies.map((instance) => [instance.boardX, instance.boardY])).toEqual([[40, 45], [44, 49]]);
   });
 
+  test('clones cards from snapshots after the source instance changes or is removed', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const [first] = getZoneInstances(initial, 'hand');
+    if (!first) {
+      throw new Error('expected hand card');
+    }
+
+    const copiedBeforeFlip = { ...first };
+    const sourceChanged = toggleCardFace(initial, first.instanceId);
+    const sourceRemoved = deleteCardInstances(sourceChanged, [first.instanceId]);
+
+    const pasted = cloneCardInstanceSnapshots(sourceRemoved, [copiedBeforeFlip], {
+      type: 'board',
+      anchorX: 42,
+      anchorY: 46,
+    });
+    const pastedCopy = getZoneInstances(pasted, 'play').find((instance) => instance.cardId === first.cardId);
+
+    expect(sourceRemoved.instances.some((instance) => instance.instanceId === first.instanceId)).toBe(false);
+    expect(pastedCopy?.instanceId).not.toBe(first.instanceId);
+    expect(pastedCopy?.face).toBe('front');
+    expect(pastedCopy?.boardX).toBe(42);
+    expect(pastedCopy?.boardY).toBe(46);
+  });
+
   test('deletes card instances and normalizes remaining pile groups', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
     const [first, second] = getZoneInstances(initial, 'hand');
@@ -380,6 +406,19 @@ describe('playtestState', () => {
     expect([...libraryAfter].sort()).toEqual([...libraryBefore].sort());
     expect(countZone(shuffled, 'hand')).toBe(countZone(initial, 'hand'));
     expect(countZone(shuffled, 'library')).toBe(countZone(initial, 'library'));
+  });
+
+  test('keeps one-card zone shuffles as no-ops', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const singleCardLibrary = getZoneInstances(initial, 'library')
+      .slice(1)
+      .reduce(
+        (state, instance) => moveInstanceToZone(state, instance.instanceId, 'hand'),
+        initial,
+      );
+
+    expect(countZone(singleCardLibrary, 'library')).toBe(1);
+    expect(shuffleZone(singleCardLibrary, 'library', noShuffle)).toBe(singleCardLibrary);
   });
 
   test('creates and extends visual piles from card-level fields', () => {

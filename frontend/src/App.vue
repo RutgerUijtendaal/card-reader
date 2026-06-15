@@ -118,10 +118,12 @@ const isSidebarCollapsed = useLocalStorage('card-reader.sidebar-collapsed', fals
   writeDefaults: true,
 });
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
+const isActivePlaytesterRoute = computed(() => route.path.startsWith('/playtester/'));
+const globalHotkeysEnabled = computed(() => !isActivePlaytesterRoute.value);
 const globalNavigationHotkeys = computed(() => [
   {
     sequence: ['n', 'n'] as const,
-    enabled: auth.authenticated,
+    enabled: auth.authenticated && globalHotkeysEnabled.value,
     onTrigger: () => {
       void router.push(buildContextualNewDeckEditorLocation(route.path, route.query));
     },
@@ -134,6 +136,9 @@ const hoverModeOverrides = {
 } satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
 const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
 const hoverModeHotkeyActions = computed(() => {
+  if (!globalHotkeysEnabled.value) {
+    return null;
+  }
   const surface = activeHoverModeSurface.value;
   if (surface === null) {
     return null;
@@ -151,7 +156,7 @@ const hoverModeHotkeyActions = computed(() => {
 });
 
 provideScrollContainer(scrollContainerRef);
-usePrimarySearchHotkeys();
+usePrimarySearchHotkeys(globalHotkeysEnabled);
 useGlobalNavigationHotkeys(globalNavigationHotkeys);
 useHoverModeHotkeys(hoverModeHotkeyActions);
 
@@ -160,6 +165,9 @@ if (typeof window !== 'undefined') {
     window,
     'wheel',
     (event) => {
+      if (!globalHotkeysEnabled.value) {
+        return;
+      }
       handleHoverPreviewScaleWheel(
         event,
         hoverModePreferences.hoverPreviewScale.value,

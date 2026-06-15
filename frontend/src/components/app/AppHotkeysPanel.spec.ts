@@ -20,6 +20,7 @@ const mountPanel = async (path: string): Promise<{ container: HTMLElement; unmou
     history: createMemoryHistory(),
     routes: [
       { path: '/cards', component: { template: '<div />' } },
+      { path: '/playtester', component: { template: '<div />' } },
       { path: '/playtester/:deckId', component: { template: '<div />' } },
     ],
   });
@@ -49,6 +50,18 @@ describe('AppHotkeysPanel', () => {
     expect(mounted.container.textContent).toContain('Search and quick actions');
     expect(mounted.container.textContent).toContain('Search');
     expect(mounted.container.textContent).toContain('New Deck');
+    expect(mounted.container.textContent).not.toContain('Shuffle');
+
+    mounted.unmount();
+  });
+
+  test('shows default hotkeys on the playtester deck selector', async () => {
+    const mounted = await mountPanel('/playtester');
+
+    expect(mounted.container.textContent).toContain('Search and quick actions');
+    expect(mounted.container.textContent).toContain('Search');
+    expect(mounted.container.textContent).toContain('New Deck');
+    expect(mounted.container.textContent).not.toContain('Playtester actions');
     expect(mounted.container.textContent).not.toContain('Shuffle');
 
     mounted.unmount();

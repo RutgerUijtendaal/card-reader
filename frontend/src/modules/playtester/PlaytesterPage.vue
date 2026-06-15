@@ -365,7 +365,7 @@ import {
   acceptOpeningSetup,
   addInstanceToVisualPile,
   cloneCardInstance,
-  cloneCardInstances,
+  cloneCardInstanceSnapshots,
   countZone,
   createInitialPlaytestState,
   deleteCardInstances,
@@ -443,15 +443,12 @@ type BoardSelectionDrag = {
   startY: number;
   currentX: number;
   currentY: number;
+  initialSelectedInstanceIds: string[];
 };
 
 type DraggedCardOverlay = {
   drag: PlaytestDraggedCard;
   instance: PlaytestCardInstance;
-};
-
-type CopiedPlaytestCard = {
-  instanceId: string;
 };
 
 type ApplyPlaytestStateOptions = {
@@ -479,7 +476,7 @@ const undoStack = ref<PlaytestState[]>([]);
 const redoStack = ref<PlaytestState[]>([]);
 const currentCardBackUrl = ref<string | null>(null);
 const openStackZone = ref<PlaytestZoneId | null>(null);
-const copiedCards = ref<CopiedPlaytestCard[]>([]);
+const copiedCards = ref<PlaytestCardInstance[]>([]);
 const lastBoardPointer = ref<{ x: number; y: number } | null>(null);
 const shufflingStackZone = ref<PlaytestZoneId | null>(null);
 const boardRef = ref<HTMLElement | null>(null);
@@ -1058,6 +1055,7 @@ const startBoardSelection = (event: PointerEvent): void => {
     startY: point.y,
     currentX: point.x,
     currentY: point.y,
+    initialSelectedInstanceIds: [...selectedBoardInstanceIds.value],
   };
   pendingDrag.value = null;
   activeDrag.value = null;
@@ -1171,6 +1169,7 @@ useEventListener(window, 'pointerup', finishPointerDrag);
 
 const abortPointerDrag = (event: PointerEvent): void => {
   if (boardSelection.value?.pointerId === event.pointerId) {
+    selectedBoardInstanceIds.value = boardSelection.value.initialSelectedInstanceIds;
     boardSelection.value = null;
     event.preventDefault();
     return;
@@ -1269,7 +1268,6 @@ const deleteCards = (instanceIds: string[]): boolean => {
     return false;
   }
   applyState(deleteCardInstances(playtest.value, ids));
-  copiedCards.value = copiedCards.value.filter((copy) => !ids.includes(copy.instanceId));
   return true;
 };
 
@@ -1280,24 +1278,19 @@ const copyCurrentCards = (): boolean => {
   const ids = selectedBoardIds();
   const hovered = hoveredCard();
   const copyIds = ids.length > 0 ? ids : hovered ? [hovered.instanceId] : [];
-  copiedCards.value = copyIds.map((instanceId) => ({ instanceId }));
-  return copyIds.length > 0;
+  copiedCards.value = copyIds.flatMap((instanceId) => {
+    const instance = playtest.value?.instances.find((entry) => entry.instanceId === instanceId);
+    return instance ? [{ ...instance }] : [];
+  });
+  return copiedCards.value.length > 0;
 };
 
 const pasteCopiedCards = (): boolean => {
   if (!playtest.value || !isPlayHotkeyEnabled() || copiedCards.value.length === 0) {
     return false;
   }
-  const existingIds = new Set(playtest.value.instances.map((instance) => instance.instanceId));
-  const instanceIds = copiedCards.value
-    .map((copy) => copy.instanceId)
-    .filter((instanceId) => existingIds.has(instanceId));
-  if (instanceIds.length === 0) {
-    copiedCards.value = [];
-    return false;
-  }
   const anchor = lastBoardPointer.value ?? { x: 50, y: 50 };
-  applyState(cloneCardInstances(playtest.value, instanceIds, {
+  applyState(cloneCardInstanceSnapshots(playtest.value, copiedCards.value, {
     type: 'board',
     anchorX: anchor.x,
     anchorY: anchor.y,
@@ -1305,9 +1298,9 @@ const pasteCopiedCards = (): boolean => {
   return true;
 };
 
-const shuffleLibrary = (): void => {
-  if (!playtest.value) {
-    return;
+const shuffleLibrary = (): boolean => {
+  if (!playtest.value || !canShuffleLibrary(playtest.value)) {
+    return false;
   }
   applyState(shuffleZone(playtest.value, 'library'));
   shufflingStackZone.value = 'library';
@@ -1321,6 +1314,7 @@ const shuffleLibrary = (): void => {
   if (openStackZone.value === 'library') {
     closeStack();
   }
+  return true;
 };
 
 const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
@@ -1408,8 +1402,9 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
     return;
   }
   if (normalizedKey === 'r') {
-    shuffleLibrary();
-    event.preventDefault();
+    if (shuffleLibrary()) {
+      event.preventDefault();
+    }
   }
 };
 
@@ -1461,6 +1456,9 @@ const hasTappedBoardCards = (state: PlaytestState): boolean =>
 
 const hasLibraryCards = (state: PlaytestState): boolean =>
   countZone(state, 'library') > 0;
+
+const canShuffleLibrary = (state: PlaytestState): boolean =>
+  countZone(state, 'library') > 1;
 
 const drawOne = (): boolean => {
   if (!playtest.value || !hasLibraryCards(playtest.value)) {
@@ -1543,6 +1541,7 @@ const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
           {
             id: 'stack-default',
             label: 'Draw',
+            hotkey: 'D',
             disabled: !hasCards,
             run: () => drawFromStack(zoneId),
           },
@@ -1552,7 +1551,13 @@ const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
   return [
     ...defaultActions,
     ...(zoneId === 'library'
-      ? [{ id: 'stack-shuffle', label: 'Shuffle', hotkey: 'R', disabled: !hasCards, run: shuffleLibrary }]
+      ? [{
+          id: 'stack-shuffle',
+          label: 'Shuffle',
+          hotkey: 'R',
+          disabled: !playtest.value || !canShuffleLibrary(playtest.value),
+          run: shuffleLibrary,
+        }]
       : []),
     { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
     { id: 'top-hand', label: 'Top to Hand', dividerBefore: true, disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'hand') },

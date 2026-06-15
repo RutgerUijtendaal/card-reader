@@ -768,6 +768,47 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('restores previous board selection when drag-box selection is cancelled', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const board = testZone(mounted.container, 'playtest-board-zone');
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 500, 400));
+
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+
+    const boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+    expect(boardCards).toHaveLength(2);
+    vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
+    vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
+
+    board.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 31, clientX: 40, clientY: 40 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 31, clientX: 180, clientY: 240 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 31, clientX: 180, clientY: 240 }));
+    await flushPage();
+
+    expect([...board.querySelectorAll<HTMLElement>('[data-playtest-selected="true"]')]
+      .map((element) => element.dataset.instanceId)).toEqual([boardCards[0]?.dataset.instanceId]);
+
+    board.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 32, clientX: 200, clientY: 40 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 32, clientX: 360, clientY: 240 }));
+    await flushPage();
+
+    expect([...board.querySelectorAll<HTMLElement>('[data-playtest-selected="true"]')]
+      .map((element) => element.dataset.instanceId)).toEqual([boardCards[1]?.dataset.instanceId]);
+
+    window.dispatchEvent(playtestPointerEvent('pointercancel', { pointerId: 32, clientX: 360, clientY: 240 }));
+    await flushPage();
+
+    expect([...board.querySelectorAll<HTMLElement>('[data-playtest-selected="true"]')]
+      .map((element) => element.dataset.instanceId)).toEqual([boardCards[0]?.dataset.instanceId]);
+
+    mounted.unmount();
+  });
+
   test('ignores selected board group drops outside board and drop targets', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);
@@ -1002,6 +1043,40 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('pastes copied card snapshots after the source card changes or is deleted', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const hand = testZone(mounted.container, 'playtest-hand-zone');
+    const handCard = hand.querySelector<HTMLElement>('[data-instance-id]');
+    const sourceId = handCard?.dataset.instanceId;
+    if (!handCard || !sourceId) {
+      throw new Error('expected hand card');
+    }
+    const draftBefore = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    const sourceCardId = draftBefore.state.instances.find((instance: { instanceId: string }) => instance.instanceId === sourceId)?.cardId;
+
+    handCard.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    window.dispatchEvent(playtestKeyEvent('c', { ctrlKey: true }));
+    window.dispatchEvent(playtestKeyEvent('f'));
+    await flushPage();
+    window.dispatchEvent(playtestKeyEvent('Delete'));
+    await flushPage();
+    window.dispatchEvent(playtestKeyEvent('v', { ctrlKey: true }));
+    await flushPage();
+
+    const draftAfter = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    const pastedCopies = getZoneInstances(draftAfter.state, 'play')
+      .filter((instance) => instance.cardId === sourceCardId);
+
+    expect(draftAfter.state.instances.some((instance: { instanceId: string }) => instance.instanceId === sourceId)).toBe(false);
+    expect(pastedCopies).toHaveLength(1);
+    expect(pastedCopies[0]?.instanceId).not.toBe(sourceId);
+    expect(pastedCopies[0]?.face).toBe('front');
+
+    mounted.unmount();
+  });
+
   test('draws, untaps, and advances turns from playtester hotkeys', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);
@@ -1071,6 +1146,7 @@ describe('PlaytesterPage', () => {
 
     const libraryMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
     expect(libraryMenuText).toContain('Draw');
+    expect(libraryMenuText).toContain('D');
     expect(libraryMenuText).toContain('Shuffle');
     expect(libraryMenuText).toContain('R');
     expect(libraryMenuText).not.toContain('Draw Top Card');
