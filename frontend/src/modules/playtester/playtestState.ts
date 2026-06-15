@@ -75,7 +75,6 @@ const uniqueIds = (ids: string[]): string[] => [...new Set(ids)];
 const selectedOpeningIds = (state: PlaytestState): Set<string> =>
   new Set([
     ...state.openingSetup.selectedManaInstanceIds,
-    ...state.openingSetup.selectedSetupInstanceIds,
   ]);
 
 const openingSetupWith = (
@@ -93,7 +92,6 @@ const openingSetupWith = (
 const selectedOpeningIdsFromSetup = (setup: PlaytestOpeningSetup): Set<string> =>
   new Set([
     ...setup.selectedManaInstanceIds,
-    ...setup.selectedSetupInstanceIds,
   ]);
 
 const syncOpeningSelections = (state: PlaytestState): PlaytestState => {
@@ -111,7 +109,7 @@ const syncOpeningSelections = (state: PlaytestState): PlaytestState => {
     ...state,
     openingSetup: {
       selectedManaInstanceIds: state.openingSetup.selectedManaInstanceIds.filter((id) => ids.has(id)),
-      selectedSetupInstanceIds: state.openingSetup.selectedSetupInstanceIds.filter((id) => ids.has(id)),
+      selectedSetupInstanceIds: [],
       reservedOrigins,
       reservedOriginOrders,
     },
@@ -741,8 +739,17 @@ export const toggleOpeningSetupSelection = (
   state: PlaytestState,
   instanceId: string,
   selected: boolean,
-): PlaytestState =>
-  setOpeningReservation(state, instanceId, 'selectedSetupInstanceIds', selected);
+): PlaytestState => {
+  void instanceId;
+  void selected;
+  return {
+    ...state,
+    openingSetup: {
+      ...state.openingSetup,
+      selectedSetupInstanceIds: [],
+    },
+  };
+};
 
 export const mulliganOpeningHand = (
   state: PlaytestState,
@@ -795,15 +802,11 @@ export const mulliganOpeningHand = (
 export const acceptOpeningSetup = (state: PlaytestState): PlaytestState => {
   const syncedState = syncOpeningSelections(state);
   const selectedManaIds = syncedState.openingSetup.selectedManaInstanceIds;
-  const selectedSetupIds = syncedState.openingSetup.selectedSetupInstanceIds;
-  const selectedIds = [...selectedManaIds, ...selectedSetupIds];
+  const selectedIds = [...selectedManaIds];
   const selectedIdSet = new Set(selectedIds);
   let nextState = syncedState;
   selectedManaIds.forEach((instanceId, index) => {
     nextState = placeInstanceOnBoard(nextState, instanceId, 12 + (index % 6) * 8, 78 - Math.floor(index / 6) * 13);
-  });
-  selectedSetupIds.forEach((instanceId, index) => {
-    nextState = placeInstanceOnBoard(nextState, instanceId, 88 - (index % 6) * 8, 78 - Math.floor(index / 6) * 13);
   });
   const setupInstances = nextState.instances.map((instance) => ({
     ...instance,

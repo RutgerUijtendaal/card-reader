@@ -199,7 +199,7 @@ describe('playtestState', () => {
     expect(deselected.instances.find((instance) => instance.instanceId === handMana.instanceId)?.zoneId).toBe('hand');
   });
 
-  test('opening mulligan preserves reserved mana and Setup selections', () => {
+  test('opening mulligan preserves reserved mana and leaves Setup hints unreserved', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
     const mana = getOpeningManaInstances(initial)[0];
     const setup = getOpeningSetupInstances(initial)[0];
@@ -215,13 +215,26 @@ describe('playtestState', () => {
     const afterMulligan = mulliganOpeningHand(reserved, noShuffle);
 
     expect(afterMulligan.openingSetup.selectedManaInstanceIds).toEqual([mana.instanceId]);
-    expect(afterMulligan.openingSetup.selectedSetupInstanceIds).toEqual([setup.instanceId]);
+    expect(afterMulligan.openingSetup.selectedSetupInstanceIds).toEqual([]);
     expect(afterMulligan.instances.find((instance) => instance.instanceId === mana.instanceId)?.zoneId).toBe('other');
-    expect(afterMulligan.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).toBe('other');
+    expect(afterMulligan.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).not.toBe('other');
     expect(getZoneInstances(afterMulligan, 'hand')).toHaveLength(7);
     expect(getZoneInstances(afterMulligan, 'hand').some((instance) =>
-      instance.instanceId === mana.instanceId || instance.instanceId === setup.instanceId,
+      instance.instanceId === mana.instanceId,
     )).toBe(false);
+  });
+
+  test('opening Setup cards are hints, not selectable reservations', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const setup = getOpeningSetupInstances(initial)[0];
+    if (!setup) {
+      throw new Error('expected Setup card');
+    }
+
+    const selected = toggleOpeningSetupSelection(initial, setup.instanceId, true);
+
+    expect(selected.openingSetup.selectedSetupInstanceIds).toEqual([]);
+    expect(selected.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).toBe(setup.zoneId);
   });
 
   test('deselecting a reserved card after mulligan returns it to library instead of the new hand', () => {
@@ -257,7 +270,7 @@ describe('playtestState', () => {
     expect(countZone(largerHand, 'library')).toBe(4);
   });
 
-  test('keep moves selected opening cards to board and saves setup snapshot', () => {
+  test('keep moves selected mana to board and saves setup snapshot', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
     const mana = getOpeningManaInstances(initial)[0];
     const setup = getOpeningSetupInstances(initial)[0];
@@ -274,8 +287,9 @@ describe('playtestState', () => {
 
     expect(playing.phase).toBe('play');
     expect(playing.setupSnapshot).not.toBeNull();
-    expect(getZoneInstances(playing, 'play').map((instance) => instance.instanceId)).toEqual([mana.instanceId, setup.instanceId]);
-    expect(getZoneInstances(playing, 'play').map((instance) => [instance.boardX, instance.boardY])).toEqual([[12, 78], [88, 78]]);
+    expect(getZoneInstances(playing, 'play').map((instance) => instance.instanceId)).toEqual([mana.instanceId]);
+    expect(getZoneInstances(playing, 'play').map((instance) => [instance.boardX, instance.boardY])).toEqual([[12, 78]]);
+    expect(playing.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).not.toBe('play');
     expect(getZoneInstances(playing, 'hand')).toHaveLength(7);
     expect(getZoneInstances(playing, 'hand').every((instance) => instance.setupOrigin === false)).toBe(true);
     expect(getZoneInstances(playing, 'play').every((instance) => instance.setupOrigin === true)).toBe(true);

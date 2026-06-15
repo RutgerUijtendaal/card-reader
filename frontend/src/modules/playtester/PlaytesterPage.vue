@@ -76,14 +76,38 @@
         :mana-instances="openingManaInstances"
         :setup-instances="openingSetupInstances"
         :selected-mana-ids="playtest.openingSetup.selectedManaInstanceIds"
-        :selected-setup-ids="playtest.openingSetup.selectedSetupInstanceIds"
         :hand-size="playtest.handSize"
         @keep="keepOpeningSetup"
         @mulligan="mulliganOpeningSetup"
         @update-hand-size="updateOpeningHandSize"
         @toggle-mana="toggleOpeningMana"
-        @toggle-setup="toggleOpeningSetup"
-      />
+        @bottom-resize="setLowerBarWidth"
+      >
+        <template #stacks>
+          <div
+            class="playtester-piles playtester-opening-piles"
+          >
+            <PlaytestStack
+              v-for="zone in openingStackZones"
+              :key="zone.id"
+              :zone-id="zone.id"
+              :label="zone.label"
+              :instances="zone.instances"
+              :face="zone.face"
+              :card-back-url="currentCardBackUrl"
+              :collapsed="zone.collapsed"
+              :default-action="zone.defaultAction"
+              :dragging-top="activeDrag?.instanceId === stackTopInstance(zone.id)?.instanceId"
+              :shuffling="shufflingStackZone === zone.id"
+              @open="openStack"
+              @draw="drawFromStack"
+              @pointer-top="startStackPointer"
+              @context-menu="openStackContextMenu"
+              @hover="setHoverTarget"
+            />
+          </div>
+        </template>
+      </PlaytestOpeningSetup>
 
       <template v-else-if="!staleDraft">
         <div class="playtester-topbar">
@@ -275,42 +299,43 @@
             />
           </div>
         </div>
-
-        <div
-          v-if="openStackZone"
-          class="playtester-stack-popover"
-          data-testid="playtest-stack-overlay"
-        >
-          <section class="playtester-stack-panel">
-            <header class="playtester-stack-panel-header">
-              <div>
-                <h3>{{ openStackLabel }}</h3>
-                <p>{{ stackOverlayInstances.length }} cards</p>
-              </div>
-              <button
-                class="btn-secondary"
-                type="button"
-                @click="closeStack"
-              >
-                Close
-              </button>
-            </header>
-            <div class="playtester-stack-card-grid app-scrollbar">
-              <PlaytestCard
-                v-for="instance in stackOverlayInstances"
-                :key="instance.instanceId"
-                :instance="instance"
-                :activatable="false"
-                :dragging="isInstanceDragging(instance.instanceId)"
-                :card-back-url="currentCardBackUrl"
-                @pointer-card="startCardPointer"
-                @context-menu="openCardContextMenu"
-                @hover="setHoverTarget"
-              />
-            </div>
-          </section>
-        </div>
       </template>
+
+      <div
+        v-if="!staleDraft && openStackZone"
+        class="playtester-stack-popover"
+        :class="playtest.phase === 'opening' ? 'playtester-stack-popover-opening' : ''"
+        data-testid="playtest-stack-overlay"
+      >
+        <section class="playtester-stack-panel">
+          <header class="playtester-stack-panel-header">
+            <div>
+              <h3>{{ openStackLabel }}</h3>
+              <p>{{ stackOverlayInstances.length }} cards</p>
+            </div>
+            <button
+              class="btn-secondary"
+              type="button"
+              @click="closeStack"
+            >
+              Close
+            </button>
+          </header>
+          <div class="playtester-stack-card-grid app-scrollbar">
+            <PlaytestCard
+              v-for="instance in stackOverlayInstances"
+              :key="instance.instanceId"
+              :instance="instance"
+              :activatable="false"
+              :dragging="isInstanceDragging(instance.instanceId)"
+              :card-back-url="currentCardBackUrl"
+              @pointer-card="startCardPointer"
+              @context-menu="openCardContextMenu"
+              @hover="setHoverTarget"
+            />
+          </div>
+        </section>
+      </div>
     </section>
 
     <ConfirmModal
@@ -364,7 +389,6 @@ import { createLocalPlaytestStorage } from '@/modules/playtester/localPlaytestSt
 import {
   acceptOpeningSetup,
   addInstanceToVisualPile,
-  cloneCardInstance,
   cloneCardInstanceSnapshots,
   countZone,
   createInitialPlaytestState,
@@ -389,7 +413,6 @@ import {
   toggleCardsFace,
   toggleTapped,
   toggleOpeningManaSelection,
-  toggleOpeningSetupSelection,
 } from '@/modules/playtester/playtestState';
 import type {
   PlaytestCardInstance,
@@ -409,6 +432,8 @@ import {
   getCollapsedStackZoneIds,
   getPlaytestStackFace,
   PLAYTEST_STACK_DEFINITIONS,
+  PLAYTEST_STACK_OPENING_BUDGET_RATIO,
+  PLAYTEST_STACK_PLAY_BUDGET_RATIO,
 } from '@/modules/playtester/utils/stacks';
 import { isEditableKeyboardTarget } from '@/utils/keyboard';
 
@@ -492,6 +517,10 @@ const PLAYTEST_HISTORY_LIMIT = 100;
 const STACK_SHUFFLE_ANIMATION_MS = 650;
 let shuffleAnimationTimer: number | null = null;
 
+const setLowerBarWidth = (width: number): void => {
+  lowerBarWidth.value = width;
+};
+
 const deckId = computed(() => String(route.params.deckId ?? ''));
 const cardScaleStyle = computed(() => ({
   '--playtest-card-width': `${(9.75 * cardScale.value).toFixed(2)}rem`,
@@ -542,6 +571,12 @@ const stackZones = computed(() =>
     face: getPlaytestStackFace(playtest.value?.stackFaces, zone.id),
     collapsed: collapsedStackZoneIds.value.has(zone.id),
     instances: zoneInstances(zone.id),
+  })),
+);
+const openingStackZones = computed(() =>
+  stackZones.value.map((zone) => ({
+    ...zone,
+    defaultAction: 'open' as const,
   })),
 );
 
@@ -599,7 +634,10 @@ const collapsedStackZoneIds = computed(() => {
     return new Set<PlaytestZoneId>();
   }
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-  return getCollapsedStackZoneIds(lowerBarWidth.value, cardScale.value, rootFontSize);
+  const stackBudgetRatio = playtest.value?.phase === 'opening'
+    ? PLAYTEST_STACK_OPENING_BUDGET_RATIO
+    : PLAYTEST_STACK_PLAY_BUDGET_RATIO;
+  return getCollapsedStackZoneIds(lowerBarWidth.value, cardScale.value, rootFontSize, stackBudgetRatio);
 });
 
 const openStackLabel = computed(() => PLAYTEST_STACK_DEFINITIONS.find((zone) => zone.id === openStackZone.value)?.label ?? 'Stack');
@@ -1067,9 +1105,6 @@ const startBoardSelection = (event: PointerEvent): void => {
 const endActiveDrag = (): void => {
   activeDrag.value = null;
   pendingDrag.value = null;
-  if (openStackZone.value) {
-    closeStack();
-  }
 };
 
 const updatePointerDrag = (event: PointerEvent): void => {
@@ -1108,9 +1143,6 @@ const updatePointerDrag = (event: PointerEvent): void => {
       ctrlKey: event.ctrlKey,
       candidate: resolvePlaytestDropTarget(event.clientX, event.clientY, pending.instanceId),
     };
-    if (pending.source.type === 'stack') {
-      closeStack();
-    }
     event.preventDefault();
     return;
   }
@@ -1228,13 +1260,6 @@ const hotkeyCardIds = (options: { boardOnly: boolean }): string[] => {
   return selectedBoardIds();
 };
 
-const cloneCard = (instanceId: string): void => {
-  if (!playtest.value) {
-    return;
-  }
-  applyState(cloneCardInstance(playtest.value, instanceId));
-};
-
 const toggleCardFaceAction = (instanceId: string): void => {
   if (!playtest.value) {
     return;
@@ -1271,6 +1296,17 @@ const deleteCards = (instanceIds: string[]): boolean => {
   return true;
 };
 
+const copyCards = (instanceIds: string[]): boolean => {
+  if (!playtest.value || instanceIds.length === 0) {
+    return false;
+  }
+  copiedCards.value = instanceIds.flatMap((instanceId) => {
+    const instance = playtest.value?.instances.find((entry) => entry.instanceId === instanceId);
+    return instance ? [{ ...instance }] : [];
+  });
+  return copiedCards.value.length > 0;
+};
+
 const copyCurrentCards = (): boolean => {
   if (!playtest.value || !isPlayHotkeyEnabled()) {
     return false;
@@ -1278,11 +1314,7 @@ const copyCurrentCards = (): boolean => {
   const ids = selectedBoardIds();
   const hovered = hoveredCard();
   const copyIds = ids.length > 0 ? ids : hovered ? [hovered.instanceId] : [];
-  copiedCards.value = copyIds.flatMap((instanceId) => {
-    const instance = playtest.value?.instances.find((entry) => entry.instanceId === instanceId);
-    return instance ? [{ ...instance }] : [];
-  });
-  return copiedCards.value.length > 0;
+  return copyCards(copyIds);
 };
 
 const pasteCopiedCards = (): boolean => {
@@ -1430,13 +1462,6 @@ const toggleOpeningMana = (instanceId: string, selected: boolean): void => {
   applyState(toggleOpeningManaSelection(playtest.value, instanceId, selected), { recordHistory: false });
 };
 
-const toggleOpeningSetup = (instanceId: string, selected: boolean): void => {
-  if (!playtest.value) {
-    return;
-  }
-  applyState(toggleOpeningSetupSelection(playtest.value, instanceId, selected), { recordHistory: false });
-};
-
 const mulliganOpeningSetup = (): void => {
   if (!playtest.value) {
     return;
@@ -1512,7 +1537,7 @@ const cardActions = (instanceId: string): PlaytestEntityAction[] => {
     { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveCardToZone(instanceId, 'library') },
   ];
   return [
-    { id: 'copy-card', label: 'Copy', hotkey: 'Ctrl+C', run: () => cloneCard(instanceId) },
+    { id: 'copy-card', label: 'Copy', hotkey: 'Ctrl+C', run: () => copyCards([instanceId]) },
     { id: 'flip-card', label: instance.face === 'front' ? 'Flip Down' : 'Flip Up', hotkey: 'F', run: () => toggleCardFaceAction(instanceId) },
     ...(instance.zoneId === 'play'
       ? [{ id: 'tap', label: instance.tapped ? 'Untap' : 'Tap', hotkey: 'T', run: () => applyState(toggleTapped(playtest.value as PlaytestState, instanceId)) }]
@@ -1668,7 +1693,7 @@ watch(
 );
 
 useResizeObserver(lowerBarRef, ([entry]) => {
-  lowerBarWidth.value = entry?.contentRect.width ?? 0;
+  setLowerBarWidth(entry?.contentRect.width ?? 0);
 });
 
 let loadRequestId = 0;
@@ -2013,12 +2038,21 @@ onMounted(() => {
   gap: 0.75rem;
 }
 
+.playtester-opening-piles {
+  align-self: stretch;
+  overflow: visible;
+}
+
 .playtester-stack-popover {
   position: absolute;
   right: 1rem;
   bottom: 5.5rem;
   z-index: 40;
   width: min(48rem, calc(100% - 2rem));
+}
+
+.playtester-stack-popover-opening {
+  bottom: clamp(13rem, 22vh, 18rem);
 }
 
 .playtester-stack-panel {

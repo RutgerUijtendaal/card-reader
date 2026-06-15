@@ -267,7 +267,7 @@ describe('PlaytesterPage', () => {
     expect(fetchDeckDetailMock).toHaveBeenCalledWith('deck-1');
     expect(mounted.container.textContent).toContain('Playtest Deck');
     expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Opening hand');
-    expect(mounted.container.querySelector('[data-testid="playtest-hero-zone"]')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-hero-zone')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="playtest-other-zone"]')).toBeNull();
 
     mounted.unmount();
@@ -326,6 +326,14 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
     expect(testZone(mounted.container, 'playtest-opening-mana').querySelectorAll('.playtest-opening-card-choice')).toHaveLength(2);
     expect(testZone(mounted.container, 'playtest-opening-setup-cards').querySelectorAll('.playtest-opening-card-choice')).toHaveLength(1);
+    expect(testZone(mounted.container, 'playtest-library-zone')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-discard-zone')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-banish-zone')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-hero-zone')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-library-zone').classList.contains('playtest-stack-collapsed')).toBe(false);
+    expect(testZone(mounted.container, 'playtest-discard-zone').classList.contains('playtest-stack-collapsed')).toBe(false);
+    expect(testZone(mounted.container, 'playtest-banish-zone').classList.contains('playtest-stack-collapsed')).toBe(false);
+    expect(testZone(mounted.container, 'playtest-hero-zone').classList.contains('playtest-stack-collapsed')).toBe(false);
     expect(testZone(mounted.container, 'playtest-opening-hand').querySelector('.theme-section-title')).toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-mana').querySelector('.theme-section-title')).toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-setup-cards').querySelector('.theme-section-title')).toBeNull();
@@ -335,6 +343,14 @@ describe('PlaytesterPage', () => {
       .querySelectorAll('[data-instance-id][tabindex]')).toHaveLength(0);
     expect(testZone(mounted.container, 'playtest-opening-mana')
       .querySelector('.playtest-card-static')).not.toBeNull();
+
+    const openingHandCount = testZone(mounted.container, 'playtest-opening-hand')
+      .querySelectorAll('[data-instance-id]').length;
+    testZone(mounted.container, 'playtest-library-zone').click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-stack-overlay')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(openingHandCount);
 
     const handSizeInput = testZone(mounted.container, 'playtest-opening-setup')
       .querySelector<HTMLInputElement>('input[type="number"]');
@@ -365,6 +381,58 @@ describe('PlaytesterPage', () => {
 
     expect(testZone(mounted.container, 'playtest-board-zone')).not.toBeNull();
     expect(mounted.container.querySelectorAll('[data-testid="playtest-board-card"] [data-instance-id]')).toHaveLength(1);
+
+    mounted.unmount();
+  });
+
+  test('hides the Setup section when the deck has no Setup cards', async () => {
+    fetchDeckDetailMock.mockResolvedValueOnce({
+      ...deckRecord,
+      mainboard: {
+        ...deckRecord.mainboard,
+        total_cards: 9,
+        unique_cards: 2,
+        entries: deckRecord.mainboard.entries.filter((entry) => entry.card.id !== setupCard.id),
+      },
+      totals: {
+        ...deckRecord.totals,
+        overall_total_cards: 9,
+        overall_unique_cards: 2,
+        mainboard_total_cards: 9,
+        mainboard_unique_cards: 2,
+      },
+    });
+    const mounted = await mountPage();
+
+    expect(testZone(mounted.container, 'playtest-opening-mana')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-setup-cards"]')).toBeNull();
+    expect(mounted.container.querySelector('.playtest-opening-selections-single')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('keeps opening stack zone changes after accepting the hand', async () => {
+    const mounted = await mountPage();
+
+    const libraryContext = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 20,
+      clientY: 20,
+    });
+    testZone(mounted.container, 'playtest-library-zone').dispatchEvent(libraryContext);
+    await flushPage();
+
+    const topToDiscard = [...document.body.querySelectorAll<HTMLButtonElement>('[data-testid="playtest-context-menu"] button')]
+      .find((button) => button.textContent?.includes('Top to Discard'));
+    topToDiscard?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-discard-zone').textContent).toContain('1');
+
+    await keepOpeningHand(mounted.container);
+
+    expect(testZone(mounted.container, 'playtest-discard-zone').textContent).toContain('1');
 
     mounted.unmount();
   });
@@ -1171,9 +1239,31 @@ describe('PlaytesterPage', () => {
     expect(cardMenu?.textContent).not.toContain('Move to Hero');
     expect(cardMenu?.querySelector('.playtest-context-menu-action-divider')).not.toBeNull();
 
-    const flipButton = [...cardMenu?.querySelectorAll<HTMLButtonElement>('button') ?? []]
+    const handCountBeforeCopyPaste = testZone(mounted.container, 'playtest-hand-zone')
+      .querySelectorAll('[data-instance-id]').length;
+    const copyButton = [...cardMenu?.querySelectorAll<HTMLButtonElement>('button') ?? []]
+      .find((button) => button.textContent?.includes('Copy'));
+    copyButton?.click();
+    await flushPage();
+
+    window.dispatchEvent(playtestKeyEvent('v', { ctrlKey: true }));
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(handCountBeforeCopyPaste);
+    expect(testZone(mounted.container, 'playtest-board-zone').querySelectorAll('[data-instance-id]')).toHaveLength(1);
+
+    const refreshedCardContext = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 40,
+      clientY: 40,
+    });
+    handCard?.dispatchEvent(refreshedCardContext);
+    await flushPage();
+    const refreshedCardMenu = document.body.querySelector<HTMLElement>('[data-testid="playtest-context-menu"]');
+    const refreshedFlipButton = [...refreshedCardMenu?.querySelectorAll<HTMLButtonElement>('button') ?? []]
       .find((button) => button.textContent?.includes('Flip Down'));
-    flipButton?.click();
+    refreshedFlipButton?.click();
     await flushPage();
 
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelector('img[alt$="face down"]')).not.toBeNull();
@@ -1192,6 +1282,45 @@ describe('PlaytesterPage', () => {
     expect(overlay?.querySelector('[data-instance-id]')).not.toBeNull();
     expect(overlay?.querySelector('[data-instance-id][role="button"]')).toBeNull();
     expect(overlay?.querySelector('[data-instance-id][tabindex]')).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('keeps stack overlay open after dragging a card out', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    testZone(mounted.container, 'playtest-hero-zone').click();
+    await flushPage();
+
+    const overlay = testZone(mounted.container, 'playtest-stack-overlay');
+    const overlayCard = overlay.querySelector<HTMLElement>('[data-instance-id]');
+    if (!overlayCard) {
+      throw new Error('expected stack overlay card');
+    }
+
+    overlayCard.dispatchEvent(playtestPointerEvent('pointerdown', {
+      clientX: 10,
+      clientY: 10,
+      pointerId: 9,
+    }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', {
+      clientX: 24,
+      clientY: 24,
+      pointerId: 9,
+    }));
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-stack-overlay')).not.toBeNull();
+
+    window.dispatchEvent(playtestPointerEvent('pointerup', {
+      clientX: 24,
+      clientY: 24,
+      pointerId: 9,
+    }));
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-stack-overlay')).not.toBeNull();
 
     mounted.unmount();
   });

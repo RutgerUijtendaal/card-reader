@@ -13,6 +13,8 @@ export const PLAYTEST_STACK_DEFINITIONS: PlaytestStackDefinition[] = [
 ];
 
 export const PLAYTEST_STACK_COLLAPSE_ORDER: PlaytestZoneId[] = ['hero', 'banish', 'discard', 'library'];
+export const PLAYTEST_STACK_PLAY_BUDGET_RATIO = 0.52;
+export const PLAYTEST_STACK_OPENING_BUDGET_RATIO = 0.42;
 
 export const getPlaytestStackFace = (
   stackFaces: Partial<Record<PlaytestZoneId, PlaytestStackFace>> | undefined,
@@ -24,6 +26,7 @@ export const getCollapsedStackZoneIds = (
   lowerBarWidth: number,
   cardScale: number,
   rootFontSize: number,
+  stackBudgetRatio = PLAYTEST_STACK_PLAY_BUDGET_RATIO,
 ): Set<PlaytestZoneId> => {
   if (lowerBarWidth <= 0) {
     return new Set();
@@ -31,7 +34,7 @@ export const getCollapsedStackZoneIds = (
   const fullWidth = 11.35 * cardScale * rootFontSize;
   const buttonWidth = 3.25 * Math.min(cardScale, 1.12) * rootFontSize;
   const gap = 0.75 * rootFontSize;
-  const stackWidthBudget = Math.max((buttonWidth * 4) + (gap * 3), lowerBarWidth * 0.52);
+  const stackWidthBudget = Math.max((buttonWidth * 4) + (gap * 3), lowerBarWidth * stackBudgetRatio);
   let collapsedCount = 0;
 
   for (let count = 0; count <= PLAYTEST_STACK_COLLAPSE_ORDER.length; count += 1) {
