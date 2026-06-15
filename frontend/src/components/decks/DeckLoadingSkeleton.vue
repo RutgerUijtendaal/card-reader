@@ -33,10 +33,24 @@
             </div>
           </div>
 
-          <span class="deck-loading-skeleton-actions" />
+          <span
+            v-if="density !== 'compact'"
+            class="deck-loading-skeleton-actions"
+          />
         </div>
 
-        <div class="mt-auto flex items-end justify-between gap-3 pt-3">
+        <div
+          v-if="density === 'compact'"
+          class="deck-loading-skeleton-compact-symbols flex items-center gap-1.5"
+        >
+          <span class="deck-loading-skeleton-symbol" />
+          <span class="deck-loading-skeleton-symbol" />
+        </div>
+
+        <div
+          v-else
+          class="mt-auto flex items-end justify-between gap-3 pt-3"
+        >
           <span class="deck-loading-skeleton-line deck-loading-skeleton-updated" />
           <div class="flex items-center justify-end gap-1.5">
             <span class="deck-loading-skeleton-symbol" />
@@ -183,13 +197,37 @@ html.dark .deck-loading-skeleton::after {
 }
 
 .deck-loading-skeleton-compact {
-  --deck-skeleton-art-width: min(13rem, 58%);
-  --deck-skeleton-content-padding-left: clamp(8rem, 34%, 10rem);
-  height: 10.5rem;
+  --deck-skeleton-art-width: min(12.5rem, 45%);
+  --deck-skeleton-content-padding-left: clamp(8.8rem, 39%, 12.75rem);
+  height: 7.25rem;
 }
 
 .deck-loading-skeleton-compact .deck-loading-skeleton-content {
-  padding: 0.9rem 1rem 0.85rem var(--deck-skeleton-content-padding-left);
+  padding: 0.8rem 0.85rem 0.8rem var(--deck-skeleton-content-padding-left);
+}
+
+.deck-loading-skeleton-compact .deck-loading-skeleton-title {
+  width: min(12rem, 54%);
+  height: 1.15rem;
+}
+
+.deck-loading-skeleton-compact .deck-loading-skeleton-pill {
+  width: 4rem;
+  height: 1.35rem;
+}
+
+.deck-loading-skeleton-compact .deck-loading-skeleton-hero,
+.deck-loading-skeleton-compact .deck-loading-skeleton-summary {
+  height: 0.78rem;
+}
+
+.deck-loading-skeleton-compact-symbols {
+  padding-top: 0.1rem;
+}
+
+.deck-loading-skeleton-compact .deck-loading-skeleton-symbol {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 @keyframes deck-loading-skeleton-sheen {
@@ -214,8 +252,18 @@ html.dark .deck-loading-skeleton::after {
     padding: 0.95rem 1rem 0.95rem var(--deck-skeleton-content-padding-left);
   }
 
+  .deck-loading-skeleton-compact {
+    --deck-skeleton-art-width: min(9.5rem, 58%);
+    --deck-skeleton-content-padding-left: clamp(7rem, 41%, 9.5rem);
+    height: 7.25rem;
+  }
+
+  .deck-loading-skeleton-compact .deck-loading-skeleton-content {
+    padding: 0.8rem 0.85rem 0.8rem var(--deck-skeleton-content-padding-left);
+  }
+
   .deck-loading-skeleton-actions,
-  .deck-loading-skeleton-symbol {
+  .deck-loading-skeleton:not(.deck-loading-skeleton-compact) .deck-loading-skeleton-symbol {
     display: none;
   }
 }

@@ -6,6 +6,7 @@ import PlaytesterIndexPage from '@/modules/playtester/PlaytesterIndexPage.vue';
 
 const {
   authState,
+  fetchCurrentCardBackMock,
   fetchMyDeckSummariesMock,
   fetchPublicDeckSummariesMock,
 } = vi.hoisted(() => ({
@@ -13,6 +14,7 @@ const {
     authEnabled: true,
     authenticated: true,
   },
+  fetchCurrentCardBackMock: vi.fn(),
   fetchMyDeckSummariesMock: vi.fn(),
   fetchPublicDeckSummariesMock: vi.fn(),
 }));
@@ -30,6 +32,10 @@ vi.mock('@/modules/decks/api', () => ({
   fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
 }));
 
+vi.mock('@/modules/playtester/api', () => ({
+  fetchCurrentCardBack: fetchCurrentCardBackMock,
+}));
+
 vi.mock('@/components/app/AppPageHeader.vue', () => ({
   default: defineComponent({
     props: {
@@ -43,8 +49,16 @@ vi.mock('@/components/app/AppPageHeader.vue', () => ({
 
 vi.mock('@/components/decks/DeckLoadingSkeleton.vue', () => ({
   default: defineComponent({
-    setup() {
-      return () => h('div', { class: 'deck-loading-skeleton' });
+    props: {
+      density: { type: String, default: 'default' },
+    },
+    setup(props) {
+      return () => h('div', {
+        class: [
+          'deck-loading-skeleton',
+          props.density === 'compact' ? 'deck-loading-skeleton-compact' : '',
+        ],
+      });
     },
   }),
 }));
@@ -94,7 +108,11 @@ const flushPage = async (): Promise<void> => {
   await nextTick();
 };
 
-const mountPage = async (): Promise<{ container: HTMLElement; unmount: () => void }> => {
+const mountPage = async (): Promise<{
+  container: HTMLElement;
+  router: ReturnType<typeof createRouter>;
+  unmount: () => void;
+}> => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const router = createRouter({
@@ -112,6 +130,7 @@ const mountPage = async (): Promise<{ container: HTMLElement; unmount: () => voi
   await flushPage();
   return {
     container,
+    router,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -123,6 +142,7 @@ describe('PlaytesterIndexPage', () => {
   beforeEach(() => {
     authState.authEnabled = true;
     authState.authenticated = true;
+    fetchCurrentCardBackMock.mockResolvedValue({ current: { image_url: '/card-backs/current.webp' } });
     fetchMyDeckSummariesMock.mockResolvedValue([buildDeck('owned', 'Owned Tempo', 'Owned Hero', 'me')]);
     fetchPublicDeckSummariesMock.mockResolvedValue([buildDeck('public', 'Public Control', 'Public Hero', 'other')]);
   });
@@ -131,6 +151,20 @@ describe('PlaytesterIndexPage', () => {
     document.body.innerHTML = '';
     vi.clearAllMocks();
     vi.useRealTimers();
+  });
+
+  test('renders the pre-setup playtester shell on the deck selector route', async () => {
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[data-testid="playtester-pre-setup-surface"]')).not.toBeNull();
+    expect(mounted.container.textContent).toContain('Board');
+    expect(mounted.container.textContent).toContain('Opening hand');
+    expect(mounted.container.textContent).toContain('Select a deck to start setup.');
+    expect(fetchCurrentCardBackMock).toHaveBeenCalledTimes(1);
+    expect(mounted.container.querySelectorAll<HTMLImageElement>('.playtester-selector-hand-card img')).toHaveLength(7);
+    expect(mounted.container.querySelector<HTMLImageElement>('.playtester-selector-hand-card img')?.src).toContain('/card-backs/current.webp');
+
+    mounted.unmount();
   });
 
   test('renders owned suggestions before public suggestions for signed-in users', async () => {
@@ -143,12 +177,7 @@ describe('PlaytesterIndexPage', () => {
     expect(text.indexOf('Public Control')).toBeGreaterThan(-1);
     expect(text.indexOf('Owned Tempo')).toBeLessThan(text.indexOf('Public Control'));
     expect(mounted.container.textContent).toContain('Start Playtest');
-    expect(
-      mounted.container.querySelector('[data-navigation-target="/playtester/owned"]'),
-    ).not.toBeNull();
-    expect(
-      mounted.container.querySelector('[data-navigation-target="/playtester/public"]'),
-    ).not.toBeNull();
+    expect(mounted.container.querySelectorAll('[data-testid="deck-compact-card"]')).toHaveLength(2);
 
     mounted.unmount();
   });
@@ -202,6 +231,7 @@ describe('PlaytesterIndexPage', () => {
     expect(mounted.container.textContent).not.toContain('Stale Owned');
     expect(mounted.container.textContent).not.toContain('Stale Public');
     expect(mounted.container.querySelectorAll('.deck-loading-skeleton')).toHaveLength(4);
+    expect(mounted.container.querySelectorAll('.deck-loading-skeleton-compact')).toHaveLength(4);
 
     await vi.advanceTimersByTimeAsync(300);
     await flushPage();
@@ -260,6 +290,36 @@ describe('PlaytesterIndexPage', () => {
     expect(mounted.container.textContent).toContain('Owned 1');
     expect(mounted.container.textContent).not.toContain('Owned 7');
     expect(mounted.container.textContent).toContain('Public Extra');
+
+    mounted.unmount();
+  });
+
+  test('selects a deck without routing and starts the selected playtest from the footer action', async () => {
+    const mounted = await mountPage();
+    const ownedOption = [...mounted.container.querySelectorAll<HTMLButtonElement>('[data-testid="deck-compact-card"]')]
+      .find((button) => button.textContent?.includes('Owned Tempo'));
+    if (!ownedOption) {
+      throw new Error('expected owned deck option');
+    }
+
+    ownedOption.click();
+    await flushPage();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/playtester');
+    expect(ownedOption.getAttribute('aria-pressed')).toBe('true');
+    expect(mounted.container.textContent).toContain('Hero: Owned Hero');
+
+    const startButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Start Playtest'));
+    if (!startButton) {
+      throw new Error('expected start button');
+    }
+    const pushSpy = vi.spyOn(mounted.router, 'push');
+    expect(startButton.disabled).toBe(false);
+    startButton.click();
+    await flushPage();
+
+    expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
 
     mounted.unmount();
   });
