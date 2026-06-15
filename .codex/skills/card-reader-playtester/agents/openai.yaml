@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader Playtester"
+  short_description: "Maintain the Card Reader playtester"
+  default_prompt: "Use $card-reader-playtester to change Card Reader playtester deck selection, setup, board, stack, or local draft behavior."

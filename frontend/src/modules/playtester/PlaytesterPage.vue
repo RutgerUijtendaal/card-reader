@@ -39,6 +39,7 @@
       :style="cardScaleStyle"
       :data-playtest-hover-actions="hoverActions.length"
       :data-playtest-selected-count="selectedBoardInstanceIds.length"
+      @wheel="handleTableWheel"
     >
       <div
         v-if="staleDraft"
@@ -187,7 +188,7 @@
           data-playtest-drop-zone="board"
           @pointerdown="startBoardSelection"
           @pointermove="rememberBoardPointer"
-          @wheel="handleBoardWheel"
+          @wheel="rememberBoardPointer"
         >
           <div class="playtester-board-label">
             <span>Board</span>
@@ -272,7 +273,7 @@
         :instances="stackOverlayInstances"
         :dragging-instance-ids="activeDraggedInstanceIds"
         :card-back-url="currentCardBackUrl"
-        :opening="playtest.phase === 'opening'"
+        :bottom-offset-px="stackPopoverBottomOffsetPx"
         @close="closeStack"
         @pointer-card="startCardPointer"
         @context-card="openCardContextMenu"
@@ -381,6 +382,7 @@ import {
   PLAYTEST_CARD_SCALE_STEP,
   savePlaytestCardScale,
 } from '@/modules/playtester/utils/cardScale';
+import { takePlaytestRouteHandoff } from '@/modules/playtester/utils/routeHandoff';
 import {
   getCollapsedStackZoneIds,
   getPlaytestStackFace,
@@ -459,6 +461,7 @@ const lastBoardPointer = ref<{ x: number; y: number } | null>(null);
 const shufflingStackZone = ref<PlaytestZoneId | null>(null);
 const boardRef = ref<HTMLElement | null>(null);
 const lowerBarWidth = ref(0);
+const lowerBarHeight = ref(0);
 const DRAG_START_THRESHOLD_PX = 2;
 const SELECTION_START_THRESHOLD_PX = 4;
 const CLICK_SUPPRESSION_MS = 180;
@@ -466,12 +469,16 @@ const PLAYTEST_HISTORY_LIMIT = 100;
 const STACK_SHUFFLE_ANIMATION_MS = 650;
 let shuffleAnimationTimer: number | null = null;
 
-const setLowerBarWidth = (width: number): void => {
+const setLowerBarWidth = (width: number, height = 0): void => {
   lowerBarWidth.value = width;
+  lowerBarHeight.value = height;
 };
 
 const deckId = computed(() => String(route.params.deckId ?? ''));
 const cardScaleStyle = computed(() => getPlaytestCardScaleStyle(cardScale.value));
+const stackPopoverBottomOffsetPx = computed(() =>
+  lowerBarHeight.value > 0 ? lowerBarHeight.value + 12 : undefined,
+);
 
 const zoneInstances = (zoneId: PlaytestZoneId): PlaytestCardInstance[] =>
   playtest.value ? getZoneInstances(playtest.value, zoneId) : [];
@@ -1211,6 +1218,13 @@ const isPlayHotkeyEnabled = (): boolean =>
   && !pendingDrag.value
   && !boardSelection.value;
 
+const isScaleWheelEnabled = (): boolean =>
+  playtest.value !== null
+  && staleDraft.value === null
+  && !activeDrag.value
+  && !pendingDrag.value
+  && !boardSelection.value;
+
 const rememberBoardPointer = (event: MouseEvent): void => {
   const point = boardRelativeMousePoint(event);
   if (point) {
@@ -1218,9 +1232,8 @@ const rememberBoardPointer = (event: MouseEvent): void => {
   }
 };
 
-const handleBoardWheel = (event: WheelEvent): void => {
-  rememberBoardPointer(event);
-  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !isPlayHotkeyEnabled()) {
+const handleTableWheel = (event: WheelEvent): void => {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !isScaleWheelEnabled()) {
     return;
   }
   setCardScale(cardScale.value + (event.deltaY < 0 ? PLAYTEST_CARD_SCALE_STEP : -PLAYTEST_CARD_SCALE_STEP));
@@ -1731,6 +1744,23 @@ const resetTransientPlaytestUi = (): void => {
   restartConfirmOpen.value = false;
 };
 
+const applyLoadedDeck = (
+  loadedDeck: DeckRecord,
+  preferredDraft: StoredPlaytestDraft | null = null,
+): void => {
+  deck.value = loadedDeck;
+  const draft = preferredDraft ?? storage.load(loadedDeck.id);
+  if (draft && !isStoredDraftStale(draft, loadedDeck)) {
+    replacePlaytestState(draft.state);
+    return;
+  }
+  if (draft) {
+    staleDraft.value = draft;
+    saveSuspended.value = true;
+  }
+  replacePlaytestState(createInitialPlaytestState(loadedDeck));
+};
+
 const loadPlaytestDeck = async (): Promise<void> => {
   const requestId = ++loadRequestId;
   loading.value = true;
@@ -1740,21 +1770,16 @@ const loadPlaytestDeck = async (): Promise<void> => {
   saveSuspended.value = false;
   resetTransientPlaytestUi();
   try {
+    const handoff = takePlaytestRouteHandoff(deckId.value);
+    if (handoff) {
+      applyLoadedDeck(handoff.deck, handoff.draft);
+      return;
+    }
     const loadedDeck = await fetchVisibleDeck();
     if (requestId !== loadRequestId) {
       return;
     }
-    deck.value = loadedDeck;
-    const draft = storage.load(loadedDeck.id);
-    if (draft && !isStoredDraftStale(draft, loadedDeck)) {
-      replacePlaytestState(draft.state);
-      return;
-    }
-    if (draft) {
-      staleDraft.value = draft;
-      saveSuspended.value = true;
-    }
-    replacePlaytestState(createInitialPlaytestState(loadedDeck));
+    applyLoadedDeck(loadedDeck);
   } finally {
     if (requestId === loadRequestId) {
       loading.value = false;

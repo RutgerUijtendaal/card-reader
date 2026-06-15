@@ -8,6 +8,10 @@ import {
   getZoneInstances,
   serializePlaytestDraft,
 } from '@/modules/playtester/playtestState';
+import {
+  clearPlaytestRouteHandoffs,
+  setPlaytestRouteHandoff,
+} from '@/modules/playtester/utils/routeHandoff';
 
 const {
   authState,
@@ -256,6 +260,7 @@ describe('PlaytesterPage', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
+    clearPlaytestRouteHandoffs();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
@@ -269,6 +274,27 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Opening hand');
     expect(testZone(mounted.container, 'playtest-hero-zone')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="playtest-other-zone"]')).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('uses route handoff without refetching deck detail', async () => {
+    const previewState = createInitialPlaytestState(deckRecord, () => 0);
+    const previewDraft = serializePlaytestDraft(previewState);
+    setPlaytestRouteHandoff('deck-1', {
+      deck: deckRecord,
+      draft: previewDraft,
+    });
+
+    const mounted = await mountPage();
+
+    expect(fetchMyDeckMock).not.toHaveBeenCalled();
+    expect(fetchDeckDetailMock).not.toHaveBeenCalled();
+    expect(mounted.container.textContent).toContain('Playtest Deck');
+    expect(getZoneInstances(JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}').state, 'hand')
+      .map((instance) => instance.instanceId)).toEqual(
+      getZoneInstances(previewState, 'hand').map((instance) => instance.instanceId),
+    );
 
     mounted.unmount();
   });
@@ -316,6 +342,27 @@ describe('PlaytesterPage', () => {
     expect(mounted.container.textContent).not.toContain('Saved playtest is from an older deck version.');
     expect(testZone(mounted.container, 'playtest-opening-setup')).not.toBeNull();
     expect(localStorage.getItem('card-reader.playtester.deck-1')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('updates stored playtester card scale from Alt wheel during opening setup', async () => {
+    const mounted = await mountPage();
+    const surface = mounted.container.querySelector<HTMLElement>('.playtester-table');
+    if (!surface) {
+      throw new Error('expected playtester table');
+    }
+
+    surface.dispatchEvent(new WheelEvent('wheel', {
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+      deltaY: -100,
+    }));
+    await flushPage();
+
+    expect(surface.getAttribute('style')).toContain('--playtest-card-width: 7.80rem');
+    expect(localStorage.getItem('card-reader.playtester.card-scale')).toBe('0.8');
 
     mounted.unmount();
   });

@@ -178,7 +178,7 @@
         :instances="stackOverlayInstances"
         :card-back-url="currentCardBackUrl"
         :card-interactive="false"
-        opening
+        :bottom-offset-px="stackPopoverBottomOffsetPx"
         test-id="playtester-selector-stack-overlay"
         @close="closePreviewStack"
       />
@@ -222,6 +222,7 @@ import {
   PLAYTEST_CARD_SCALE_STEP,
   savePlaytestCardScale,
 } from '@/modules/playtester/utils/cardScale';
+import { setPlaytestRouteHandoff } from '@/modules/playtester/utils/routeHandoff';
 import {
   getCollapsedStackZoneIds,
   getPlaytestStackFace,
@@ -237,17 +238,20 @@ const cardScale = ref(loadPlaytestCardScale());
 const searchQuery = ref('');
 const suggestions = ref<PlaytestDeckSuggestion[]>([]);
 const selectedSuggestionKey = ref<string | null>(null);
+const selectedDeck = ref<DeckRecord | null>(null);
 const selectedPlaytest = ref<PlaytestState | null>(null);
 const selectedDraft = ref<StoredPlaytestDraft | null>(null);
 const currentCardBackUrl = ref<string | null>(null);
 const openStackZone = ref<PlaytestZoneId | null>(null);
 const lowerBarWidth = ref(0);
+const lowerBarHeight = ref(0);
 let suggestionLoadRequestId = 0;
 let deckLoadRequestId = 0;
 const deckDetailCache = new Map<string, Promise<DeckRecord>>();
 
-const setLowerBarWidth = (width: number): void => {
+const setLowerBarWidth = (width: number, height = 0): void => {
   lowerBarWidth.value = width;
+  lowerBarHeight.value = height;
 };
 
 const nextSuggestionLoadRequestId = (): number => {
@@ -276,6 +280,9 @@ const selectedSuggestion = computed(() =>
 );
 const hasOngoingPlaytest = computed(() => selectedDraft.value !== null);
 const cardScaleStyle = computed(() => getPlaytestCardScaleStyle(cardScale.value));
+const stackPopoverBottomOffsetPx = computed(() =>
+  lowerBarHeight.value > 0 ? lowerBarHeight.value + 12 : undefined,
+);
 const handInstances = computed(() =>
   selectedPlaytest.value ? getZoneInstances(selectedPlaytest.value, 'hand') : [],
 );
@@ -372,6 +379,7 @@ const nextDeckLoadRequestId = (): number => {
 };
 
 const clearSelectedDeckPreview = (): void => {
+  selectedDeck.value = null;
   selectedPlaytest.value = null;
   selectedDraft.value = null;
   openStackZone.value = null;
@@ -417,10 +425,12 @@ const loadSelectedDeckPreview = async (suggestion: PlaytestDeckSuggestion): Prom
       return;
     }
     const draft = storage.load(deck.id);
+    selectedDeck.value = deck;
     selectedDraft.value = draft && !isStoredDraftStale(draft, deck) ? draft : null;
     selectedPlaytest.value = createInitialPlaytestState(deck);
   } catch {
     if (requestId === deckLoadRequestId) {
+      selectedDeck.value = null;
       selectedPlaytest.value = null;
       selectedDraft.value = null;
     }
@@ -435,11 +445,23 @@ const selectSuggestion = (suggestion: PlaytestDeckSuggestion): void => {
 const selectedDeckPath = (): string | null =>
   selectedSuggestion.value ? `/playtester/${selectedSuggestion.value.deck.id}` : null;
 
-const savePreviewAsSelectedDraft = (): void => {
-  if (!selectedPlaytest.value) {
+const setSelectedDeckHandoff = (draft: StoredPlaytestDraft | null): void => {
+  if (!selectedDeck.value) {
     return;
   }
-  storage.save(serializePlaytestDraft(selectedPlaytest.value));
+  setPlaytestRouteHandoff(selectedDeck.value.id, {
+    deck: selectedDeck.value,
+    draft,
+  });
+};
+
+const savePreviewAsSelectedDraft = (): StoredPlaytestDraft | null => {
+  if (!selectedPlaytest.value) {
+    return null;
+  }
+  const draft = serializePlaytestDraft(selectedPlaytest.value);
+  storage.save(draft);
+  return draft;
 };
 
 const continueSelectedDeck = (): void => {
@@ -447,9 +469,11 @@ const continueSelectedDeck = (): void => {
   if (!path) {
     return;
   }
+  let draft = selectedDraft.value;
   if (!hasOngoingPlaytest.value) {
-    savePreviewAsSelectedDraft();
+    draft = savePreviewAsSelectedDraft();
   }
+  setSelectedDeckHandoff(draft);
   void router.push(path);
 };
 
@@ -459,7 +483,8 @@ const startNewSelectedDeck = (): void => {
     return;
   }
   storage.clear(selectedSuggestion.value.deck.id);
-  savePreviewAsSelectedDraft();
+  const draft = savePreviewAsSelectedDraft();
+  setSelectedDeckHandoff(draft);
   void router.push(path);
 };
 
@@ -467,7 +492,7 @@ const openPreviewStack = (zoneId: PlaytestZoneId): void => {
   if (!selectedPlaytest.value || getZoneInstances(selectedPlaytest.value, zoneId).length === 0) {
     return;
   }
-  openStackZone.value = zoneId;
+  openStackZone.value = openStackZone.value === zoneId ? null : zoneId;
 };
 
 const closePreviewStack = (): void => {

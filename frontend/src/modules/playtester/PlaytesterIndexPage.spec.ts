@@ -4,6 +4,10 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import PlaytesterIndexPage from '@/modules/playtester/PlaytesterIndexPage.vue';
 import { createInitialPlaytestState, getZoneInstances, serializePlaytestDraft } from '@/modules/playtester/playtestState';
+import {
+  clearPlaytestRouteHandoffs,
+  takePlaytestRouteHandoff,
+} from '@/modules/playtester/utils/routeHandoff';
 
 const {
   authState,
@@ -233,6 +237,7 @@ describe('PlaytesterIndexPage', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
+    clearPlaytestRouteHandoffs();
     vi.clearAllMocks();
     vi.useRealTimers();
   });
@@ -443,6 +448,9 @@ describe('PlaytesterIndexPage', () => {
     await flushPage();
     expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')?.textContent).toContain('Library');
     expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')?.textContent).toContain('3 cards');
+    libraryStack?.click();
+    await flushPage();
+    expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')).toBeNull();
 
     const startButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.includes('Start Playtest'));
@@ -455,6 +463,13 @@ describe('PlaytesterIndexPage', () => {
     await flushPage();
 
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
+    const handoff = takePlaytestRouteHandoff('owned');
+    expect(handoff?.deck.id).toBe('owned');
+    expect(handoff?.draft).not.toBeNull();
+    if (!handoff?.draft) {
+      throw new Error('expected playtest route handoff draft');
+    }
+    expect(getZoneInstances(handoff.draft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
     const storedDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
     expect(getZoneInstances(storedDraft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
     expect(getZoneInstances(storedDraft.state, 'library')).toHaveLength(3);

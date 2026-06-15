@@ -82,12 +82,17 @@ Core stack:
   - Place module-owned implementation details under `components`, `composables`, `utils`, or `tests`.
   - Do not import from another module's `components`, `composables`, or `utils` folders; promote genuinely shared code to root `frontend/src/components` or `frontend/src/composables`.
 - Playtester is a frontend-only manual deck sandbox.
-  - Deck selection lives at `/playtester` and should reuse existing deck list UI patterns; active play lives at `/playtester/:deckId`.
-  - Active playtest state is local-storage backed per deck and `deck.updated_at`; avoid backend persistence or server-side deck search unless explicitly requested.
+  - Deck selection lives at `/playtester` and should reuse existing deck list UI patterns, compact deck cards, summary deck records, and the shared playtest table/lower-bar surface; active play lives at `/playtester/:deckId`.
+  - Treat `/playtester` and `/playtester/:deckId` as the playtester surface for route-scoped UI such as hotkey help and global-navigation hotkey suppression.
+  - Deck selector search/listing may use existing deck summary endpoints, including query-backed summaries; fetch full deck detail only when card entries are needed for previewing or active play.
+  - Active playtest state is local-storage backed per deck and `deck.updated_at`; avoid backend persistence unless explicitly requested.
   - Mainboard cards expand into physical `PlaytestCardInstance` copies in the shuffled library; sideboards stay reference-only.
   - The hero starts in the dedicated `hero` stack outside the library.
   - The flow starts in `opening`, where exact physical mana/setup copies can be reserved across mulligans, then transitions to `play` when the hand is kept.
-  - Board interactions use the custom pointer drag layer, right-click context menus, stacks, card-level visual piles, drag-box group selection, and hold-only middle-click zoom.
+  - The selector may build a read-only opening-hand preview from real playtest state and save that preview as the starting draft when starting a new playtest.
+  - Board interactions use the custom pointer drag layer, right-click context menus, stacks, card-level visual piles, drag-box group selection, active play hotkeys, and hold-only middle-click zoom.
+  - Playtester card scale is a local preference shared by the selector and active play surface; keep scale math in the playtester card-scale utility.
+  - Reuse playtester module components such as `PlaytestTableSurface`, `PlaytestLowerBar`, `PlaytestStack`, and `PlaytestStackPopover` before duplicating hand, stack, or table-surface UI.
   - Keep Playtester implementation details under `frontend/src/modules/playtester/components`, `utils`, or future `composables`; reusable cross-module pieces still belong in shared frontend folders.
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
@@ -116,6 +121,7 @@ Core stack:
   - Rules have `scope` values of `mainboard` or `whole_deck`; scope defaults to `mainboard` unless a rule override changes it.
   - Hard rules can set `blocks_action`; action-blocking hard rules should prevent direct builder actions and API submissions that would exceed the rule.
   - Frontend code should consume `/decks/rules` for defaults and examples, keeping local fallback defaults only for load/error resilience.
+- Deck list surfaces that only need listing metadata should use summary deck records/endpoints and `DeckListRecord`-compatible shared components; fetch full `DeckRecord` only for detail, editor, export, or playtest flows that need full board entries.
 - The card detail editor separates card-level and version-level edits:
   - `Card` tab owns Hero Card, Card Status, and Deck-Building Config.
   - `Card Version` tab owns parsed scalar fields, symbols, metadata groups, template selection, reset, and reparse actions.

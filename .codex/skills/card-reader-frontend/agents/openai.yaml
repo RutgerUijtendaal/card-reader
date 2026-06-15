@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader Frontend"
+  short_description: "Maintain the Card Reader Vue frontend"
+  default_prompt: "Use $card-reader-frontend to update a Card Reader Vue page, component, composable, or frontend route."

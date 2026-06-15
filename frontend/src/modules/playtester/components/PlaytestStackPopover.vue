@@ -2,7 +2,7 @@
   <div
     v-if="open"
     class="playtester-stack-popover"
-    :class="opening ? 'playtester-stack-popover-opening' : ''"
+    :style="popoverStyle"
     :data-testid="testId"
   >
     <section class="playtester-stack-panel">
@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import PlaytestCard from '@/modules/playtester/components/PlaytestCard.vue';
 import type {
   PlaytestCardInstance,
@@ -45,19 +46,19 @@ import type {
   PlaytestHoverTarget,
 } from '@/modules/playtester/types';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean;
   title: string;
   instances: PlaytestCardInstance[];
   cardBackUrl: string | null;
   cardInteractive?: boolean;
   draggingInstanceIds?: string[];
-  opening?: boolean;
+  bottomOffsetPx?: number | null;
   testId?: string;
 }>(), {
+  bottomOffsetPx: null,
   cardInteractive: true,
   draggingInstanceIds: () => [],
-  opening: false,
   testId: 'playtest-stack-overlay',
 });
 
@@ -67,6 +68,15 @@ const emit = defineEmits<{
   (e: 'context-card', instanceId: string, event: MouseEvent): void;
   (e: 'hover', target: PlaytestHoverTarget | null): void;
 }>();
+
+const popoverStyle = computed<Record<string, string>>(() => {
+  const style: Record<string, string> = {};
+  if (props.bottomOffsetPx === null || props.bottomOffsetPx <= 0) {
+    return style;
+  }
+  style['--playtester-stack-popover-bottom'] = `${props.bottomOffsetPx}px`;
+  return style;
+});
 
 const handleCardPointer = (
   instanceId: string,
@@ -83,19 +93,16 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
 
 <style scoped>
 .playtester-stack-popover {
+  --playtester-stack-popover-bottom: clamp(13rem, 22vh, 18rem);
   position: absolute;
   right: 1rem;
-  bottom: 5.5rem;
+  bottom: var(--playtester-stack-popover-bottom);
   z-index: 40;
   width: min(48rem, calc(100% - 2rem));
 }
 
-.playtester-stack-popover-opening {
-  bottom: clamp(13rem, 22vh, 18rem);
-}
-
 .playtester-stack-panel {
-  max-height: min(36rem, calc(100vh - 12rem));
+  max-height: min(36rem, calc(100vh - var(--playtester-stack-popover-bottom) - 2rem));
   overflow: hidden;
   border: 1px solid var(--playtest-border);
   border-radius: 0.9rem;
@@ -127,7 +134,7 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
 .playtester-stack-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--playtest-card-width, 9.75rem), 1fr));
-  max-height: min(28rem, calc(100vh - 19rem));
+  max-height: min(28rem, calc(100vh - var(--playtester-stack-popover-bottom) - 9rem));
   gap: 1rem;
   overflow: auto;
   padding: 1rem;

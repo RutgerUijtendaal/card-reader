@@ -1,0 +1,4 @@
+interface:
+  display_name: "Card Reader Review"
+  short_description: "Review Card Reader changes for regressions"
+  default_prompt: "Use $card-reader-review to review Card Reader code changes for bugs, regressions, architecture drift, and missing validation."

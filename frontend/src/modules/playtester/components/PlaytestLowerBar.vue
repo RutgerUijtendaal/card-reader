@@ -129,7 +129,7 @@ const emit = defineEmits<{
   (e: 'pointer-stack', zoneId: PlaytestZoneId, instanceId: string, event: PointerEvent): void;
   (e: 'context-stack', zoneId: PlaytestZoneId, event: MouseEvent): void;
   (e: 'hover', target: PlaytestHoverTarget | null): void;
-  (e: 'resize', width: number): void;
+  (e: 'resize', width: number, height: number): void;
 }>();
 
 const lowerBarRef = ref<HTMLElement | null>(null);
@@ -174,7 +174,7 @@ const handCardStyle = (index: number, total: number): Record<string, string | nu
 };
 
 useResizeObserver(lowerBarRef, ([entry]) => {
-  emit('resize', entry?.contentRect.width ?? 0);
+  emit('resize', entry?.contentRect.width ?? 0, entry?.contentRect.height ?? 0);
 });
 </script>
 
