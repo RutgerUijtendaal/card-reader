@@ -423,6 +423,15 @@ describe('PlaytesterPage', () => {
     testZone(mounted.container, 'playtest-library-zone').dispatchEvent(libraryContext);
     await flushPage();
 
+    const openingLibraryMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    expect(openingLibraryMenuText).toContain('Open');
+    expect(openingLibraryMenuText).toContain('Top to Discard');
+    expect(openingLibraryMenuText).toContain('Top to Banish');
+    expect(openingLibraryMenuText).not.toContain('Draw');
+    expect(openingLibraryMenuText).not.toContain('Shuffle');
+    expect(openingLibraryMenuText).not.toContain('Top to Hand');
+    expect(openingLibraryMenuText).not.toContain('Top to Board');
+
     const topToDiscard = [...document.body.querySelectorAll<HTMLButtonElement>('[data-testid="playtest-context-menu"] button')]
       .find((button) => button.textContent?.includes('Top to Discard'));
     topToDiscard?.click();
@@ -433,6 +442,42 @@ describe('PlaytesterPage', () => {
     await keepOpeningHand(mounted.container);
 
     expect(testZone(mounted.container, 'playtest-discard-zone').textContent).toContain('1');
+    expect(mounted.container.querySelector<HTMLButtonElement>('[data-testid="playtest-undo"]')?.disabled).toBe(true);
+
+    window.dispatchEvent(playtestKeyEvent('z', { ctrlKey: true }));
+    await flushPage();
+
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-setup"]')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-discard-zone').textContent).toContain('1');
+
+    mounted.unmount();
+  });
+
+  test('opening stack overlay card actions cannot move cards to hand or board', async () => {
+    const mounted = await mountPage();
+
+    testZone(mounted.container, 'playtest-library-zone').click();
+    await flushPage();
+
+    const stackCard = document.body.querySelector<HTMLElement>('[data-testid="playtest-stack-overlay"] [data-instance-id]');
+    expect(stackCard).not.toBeNull();
+    const cardContext = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 30,
+      clientY: 30,
+    });
+    stackCard?.dispatchEvent(cardContext);
+    await flushPage();
+
+    const cardMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    expect(cardMenuText).toContain('To Discard');
+    expect(cardMenuText).toContain('To Banish');
+    expect(cardMenuText).not.toContain('To Hand');
+    expect(cardMenuText).not.toContain('To Board');
+    expect(cardMenuText).not.toContain('Copy');
+    expect(cardMenuText).not.toContain('Flip');
+    expect(cardMenuText).not.toContain('Delete');
 
     mounted.unmount();
   });

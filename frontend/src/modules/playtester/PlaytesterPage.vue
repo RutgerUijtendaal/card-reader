@@ -427,6 +427,7 @@ import type {
 import {
   boardDropPosition,
   resolvePlaytestDropTarget,
+  type PlaytestResolvedDropTarget,
 } from '@/modules/playtester/utils/dropTargets';
 import {
   getCollapsedStackZoneIds,
@@ -978,11 +979,46 @@ const targetIndexAfterRemovingDraggedCard = (
   return sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
 };
 
+const completeOpeningDraggedCardDrop = (
+  drag: PlaytestDraggedCard,
+  dropTarget: PlaytestResolvedDropTarget | null,
+): void => {
+  if (!playtest.value || !isOpeningTransferZone(drag.source.zoneId) || !dropTarget) {
+    return;
+  }
+  if (dropTarget.type === 'zone') {
+    if (!isOpeningTransferZone(dropTarget.zoneId) || drag.source.zoneId === dropTarget.zoneId) {
+      return;
+    }
+    applyState(moveInstanceToZone(playtest.value, drag.instanceId, dropTarget.zoneId));
+    return;
+  }
+
+  const target = playtest.value.instances.find((instance) => instance.instanceId === dropTarget.instanceId);
+  if (!target || !isOpeningTransferZone(target.zoneId)) {
+    return;
+  }
+  const targetZoneInstances = getZoneInstances(playtest.value, target.zoneId);
+  const sourceIndex = target.zoneId === drag.source.zoneId
+    ? targetZoneInstances.findIndex((instance) => instance.instanceId === drag.instanceId)
+    : -1;
+  const targetIndex = targetZoneInstances.findIndex((instance) => instance.instanceId === target.instanceId);
+  applyState(moveInstanceToZone(
+    playtest.value,
+    drag.instanceId,
+    target.zoneId,
+    targetIndexAfterRemovingDraggedCard(drag.source.zoneId, target.zoneId, sourceIndex, targetIndex),
+  ));
+};
+
 const completeDraggedGroupDrop = (drag: PlaytestDraggedCard, pending: PointerDragStart): void => {
   if (!playtest.value || !drag.groupInstanceIds?.length) {
     return;
   }
   const dropTarget = resolvePlaytestDropTarget(drag.pointerX, drag.pointerY, drag.instanceId);
+  if (isOpeningPhase()) {
+    return;
+  }
   if (dropTarget?.type === 'zone' && dropTarget.zoneId !== 'board') {
     applyState(moveCardsToZone(playtest.value, drag.groupInstanceIds, dropTarget.zoneId));
     return;
@@ -1023,6 +1059,10 @@ const completeDraggedCardDrop = (drag: PlaytestDraggedCard): void => {
     return;
   }
   const dropTarget = resolvePlaytestDropTarget(drag.pointerX, drag.pointerY, drag.instanceId);
+  if (isOpeningPhase()) {
+    completeOpeningDraggedCardDrop(drag, dropTarget);
+    return;
+  }
   if (!dropTarget) {
     const position = boardDropPosition(boardRef.value, drag);
     if (position) {
@@ -1473,6 +1513,7 @@ const keepOpeningSetup = (): void => {
   if (!playtest.value) {
     return;
   }
+  clearHistory();
   applyState(acceptOpeningSetup(playtest.value), { recordHistory: false });
 };
 
@@ -1524,10 +1565,34 @@ const closeContextMenu = (): void => {
   contextMenu.value = null;
 };
 
+const isOpeningPhase = (): boolean => playtest.value?.phase === 'opening';
+
+const isOpeningTransferZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'discard' | 'banish' =>
+  zoneId === 'library' || zoneId === 'discard' || zoneId === 'banish';
+
+const openingCardActions = (instanceId: string, instance: PlaytestCardInstance): PlaytestEntityAction[] => {
+  if (!isOpeningTransferZone(instance.zoneId)) {
+    return [];
+  }
+  const zoneActions: PlaytestEntityAction[] = [
+    { id: 'move-discard', label: 'To Discard', disabled: instance.zoneId === 'discard', run: () => moveCardToZone(instanceId, 'discard') },
+    { id: 'move-banish', label: 'To Banish', disabled: instance.zoneId === 'banish', run: () => moveCardToZone(instanceId, 'banish') },
+    { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveCardToZone(instanceId, 'library') },
+  ].filter((action) => !action.disabled);
+
+  if (zoneActions[0]) {
+    zoneActions[0] = { ...zoneActions[0], dividerBefore: true };
+  }
+  return zoneActions;
+};
+
 const cardActions = (instanceId: string): PlaytestEntityAction[] => {
   const instance = playtest.value?.instances.find((entry) => entry.instanceId === instanceId);
   if (!instance) {
     return [];
+  }
+  if (isOpeningPhase()) {
+    return openingCardActions(instanceId, instance);
   }
   const zoneActions: PlaytestEntityAction[] = [
     { id: 'move-hand', label: 'To Hand', dividerBefore: true, disabled: instance.zoneId === 'hand', run: () => moveCardToZone(instanceId, 'hand') },
@@ -1557,9 +1622,31 @@ const cardActions = (instanceId: string): PlaytestEntityAction[] => {
   ];
 };
 
+const openingStackActions = (zoneId: PlaytestZoneId, hasCards: boolean): PlaytestEntityAction[] => {
+  const actions: PlaytestEntityAction[] = [
+    { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
+  ];
+  if (!isOpeningTransferZone(zoneId)) {
+    return actions;
+  }
+  const zoneActions: PlaytestEntityAction[] = [
+    { id: 'top-discard', label: 'Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },
+    { id: 'top-banish', label: 'Top to Banish', disabled: !hasCards || zoneId === 'banish', run: () => moveTopStackCard(zoneId, 'banish') },
+    { id: 'top-library', label: 'Top to Library', disabled: !hasCards || zoneId === 'library', run: () => moveTopStackCard(zoneId, 'library') },
+  ].filter((action) => !action.disabled);
+
+  if (zoneActions[0]) {
+    zoneActions[0] = { ...zoneActions[0], dividerBefore: true };
+  }
+  return [...actions, ...zoneActions];
+};
+
 const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
   const definition = PLAYTEST_STACK_DEFINITIONS.find((zone) => zone.id === zoneId);
   const hasCards = zoneCount(zoneId) > 0;
+  if (isOpeningPhase()) {
+    return openingStackActions(zoneId, hasCards);
+  }
   const defaultActions: PlaytestEntityAction[] =
     definition?.defaultAction === 'draw'
       ? [

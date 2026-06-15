@@ -29,7 +29,6 @@ import {
   toggleCardsFace,
   toggleTapped,
   toggleOpeningManaSelection,
-  toggleOpeningSetupSelection,
 } from '@/modules/playtester/playtestState';
 import type { DeckCardSummary, DeckMetadataOption, DeckRecord } from '@/modules/decks/types';
 
@@ -206,11 +205,7 @@ describe('playtestState', () => {
     if (!mana || !setup) {
       throw new Error('expected opening selections');
     }
-    const reserved = toggleOpeningSetupSelection(
-      toggleOpeningManaSelection(initial, mana.instanceId, true),
-      setup.instanceId,
-      true,
-    );
+    const reserved = toggleOpeningManaSelection(initial, mana.instanceId, true);
 
     const afterMulligan = mulliganOpeningHand(reserved, noShuffle);
 
@@ -231,10 +226,19 @@ describe('playtestState', () => {
       throw new Error('expected Setup card');
     }
 
-    const selected = toggleOpeningSetupSelection(initial, setup.instanceId, true);
+    const afterMulligan = mulliganOpeningHand({
+      ...initial,
+      openingSetup: {
+        ...initial.openingSetup,
+        selectedSetupInstanceIds: [setup.instanceId],
+        reservedOrigins: { [setup.instanceId]: setup.zoneId },
+        reservedOriginOrders: { [setup.instanceId]: setup.order },
+      },
+    }, noShuffle);
 
-    expect(selected.openingSetup.selectedSetupInstanceIds).toEqual([]);
-    expect(selected.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).toBe(setup.zoneId);
+    expect(afterMulligan.openingSetup.selectedSetupInstanceIds).toEqual([]);
+    expect(afterMulligan.openingSetup.reservedOrigins).toEqual({});
+    expect(afterMulligan.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).not.toBe('other');
   });
 
   test('deselecting a reserved card after mulligan returns it to library instead of the new hand', () => {
@@ -277,11 +281,7 @@ describe('playtestState', () => {
     if (!mana || !setup) {
       throw new Error('expected opening selections');
     }
-    const reserved = toggleOpeningSetupSelection(
-      toggleOpeningManaSelection(initial, mana.instanceId, true),
-      setup.instanceId,
-      true,
-    );
+    const reserved = toggleOpeningManaSelection(initial, mana.instanceId, true);
 
     const playing = acceptOpeningSetup(reserved);
 

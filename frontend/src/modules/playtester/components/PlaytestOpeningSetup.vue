@@ -211,15 +211,13 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
 
 <style scoped>
 .playtest-opening {
-  --playtest-opening-padding: clamp(1rem, 2.6vw, 2rem);
   position: relative;
   display: grid;
   min-height: 0;
   flex: 1 1 auto;
   grid-template-rows: auto minmax(20rem, 1fr) auto;
-  gap: 1.25rem;
+  gap: 0;
   overflow: hidden;
-  padding: var(--playtest-opening-padding) var(--playtest-opening-padding) 0;
 }
 
 .playtest-opening-actions {
@@ -228,6 +226,7 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   display: grid;
   justify-items: center;
   gap: 0.8rem;
+  padding: 0.75rem;
 }
 
 .playtest-opening-eyebrow {
@@ -281,8 +280,7 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   grid-template-columns: minmax(16rem, 1fr) minmax(0, max-content);
   gap: 0.75rem;
   min-height: calc((var(--playtest-card-width, 9.75rem) * 1.42) + 5.5rem);
-  margin-inline: calc(var(--playtest-opening-padding) * -1);
-  padding: 0.75rem var(--playtest-opening-padding);
+  padding: 0.75rem;
   border-top: 1px solid var(--playtest-border, rgba(255, 255, 255, 0.1));
   background: var(--playtest-panel-muted, rgba(8, 10, 10, 0.64));
   backdrop-filter: blur(12px);

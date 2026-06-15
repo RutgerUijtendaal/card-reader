@@ -26,7 +26,6 @@ export const EMPTY_OPENING_SETUP: PlaytestOpeningSetup = {
   reservedOriginOrders: {},
 };
 
-type OpeningSelectionKey = 'selectedManaInstanceIds' | 'selectedSetupInstanceIds';
 type ClonePlacement =
   | { type: 'after-source' }
   | { type: 'board'; anchorX: number; anchorY: number };
@@ -77,16 +76,16 @@ const selectedOpeningIds = (state: PlaytestState): Set<string> =>
     ...state.openingSetup.selectedManaInstanceIds,
   ]);
 
-const openingSetupWith = (
+const openingManaSetupWith = (
   setup: PlaytestOpeningSetup,
-  key: OpeningSelectionKey,
   instanceId: string,
   selected: boolean,
 ): PlaytestOpeningSetup => ({
   ...setup,
-  [key]: selected
-    ? uniqueIds([...setup[key], instanceId])
-    : setup[key].filter((id) => id !== instanceId),
+  selectedManaInstanceIds: selected
+    ? uniqueIds([...setup.selectedManaInstanceIds, instanceId])
+    : setup.selectedManaInstanceIds.filter((id) => id !== instanceId),
+  selectedSetupInstanceIds: [],
 });
 
 const selectedOpeningIdsFromSetup = (setup: PlaytestOpeningSetup): Set<string> =>
@@ -680,7 +679,6 @@ export const getOpeningSetupInstances = (state: PlaytestState): PlaytestCardInst
 const setOpeningReservation = (
   state: PlaytestState,
   instanceId: string,
-  key: OpeningSelectionKey,
   selected: boolean,
 ): PlaytestState => {
   const instance = state.instances.find((entry) => entry.instanceId === instanceId);
@@ -689,7 +687,7 @@ const setOpeningReservation = (
   }
   const currentOrigins = state.openingSetup.reservedOrigins ?? {};
   const currentOriginOrders = state.openingSetup.reservedOriginOrders ?? {};
-  const nextSetupWithoutOrigins = openingSetupWith(state.openingSetup, key, instanceId, selected);
+  const nextSetupWithoutOrigins = openingManaSetupWith(state.openingSetup, instanceId, selected);
   const nextSelectedIds = selectedOpeningIdsFromSetup(nextSetupWithoutOrigins);
   const nextOrigins: Partial<Record<string, PlaytestZoneId>> = {
     ...currentOrigins,
@@ -733,23 +731,7 @@ export const toggleOpeningManaSelection = (
   instanceId: string,
   selected: boolean,
 ): PlaytestState =>
-  setOpeningReservation(state, instanceId, 'selectedManaInstanceIds', selected);
-
-export const toggleOpeningSetupSelection = (
-  state: PlaytestState,
-  instanceId: string,
-  selected: boolean,
-): PlaytestState => {
-  void instanceId;
-  void selected;
-  return {
-    ...state,
-    openingSetup: {
-      ...state.openingSetup,
-      selectedSetupInstanceIds: [],
-    },
-  };
-};
+  setOpeningReservation(state, instanceId, selected);
 
 export const mulliganOpeningHand = (
   state: PlaytestState,
