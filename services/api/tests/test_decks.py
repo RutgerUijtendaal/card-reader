@@ -5,7 +5,7 @@ from itertools import count
 
 from django.contrib.auth import get_user_model
 from django.db import connection
-from django.test import Client, override_settings
+from django.test import Client
 from django.test.utils import CaptureQueriesContext
 
 from card_reader_core.models import (
@@ -242,7 +242,6 @@ def test_deck_rules_metadata_endpoint_returns_backend_owned_defaults() -> None:
     assert payload["example_config"]["overrides"]["legendary_copy_limit"]["scope"] == "whole_deck"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_excludes_private_decks() -> None:
     owner = _create_user("deck-public-owner", "password")
     hero = _create_card(name="Public Hero", is_hero=True)
@@ -283,7 +282,6 @@ def test_public_deck_list_excludes_private_decks() -> None:
     assert [row["id"] for row in payload] == [public_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_excludes_invalid_public_decks() -> None:
     owner = _create_user("deck-invalid-public-owner", "password")
     hero = _create_card(name="Draft Hero", is_hero=True)
@@ -303,7 +301,6 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
     assert deck.id not in [row["id"] for row in response.json()]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_excludes_decks_with_deprecated_cards_but_owner_can_view_warning() -> None:
     owner = _create_user("deck-deprecated-card-owner", "password")
     hero = _create_card(name="Deprecated Warning Hero", is_hero=True)
@@ -344,7 +341,6 @@ def test_public_deck_list_excludes_decks_with_deprecated_cards_but_owner_can_vie
     assert "Deck contains deprecated cards." in status_payload["issues"]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
     owner = _create_user("deck-minimum-public-owner", "password")
     hero = _create_card(name="Minimum Hero", is_hero=True)
@@ -365,7 +361,6 @@ def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
     assert deck.id in [row["id"] for row in response.json()]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
     owner = _create_user("deck-summary-public-owner", "password")
     hero = _create_card(name="Summary Public Hero", is_hero=True)
@@ -412,7 +407,6 @@ def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
     assert "deck_building_rules" not in summary
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     owner = _create_user("deck-summary-owner-user", "password")
     other_owner = _create_user("deck-summary-other-user", "password")
@@ -450,7 +444,6 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     assert payload_ids == {deck.id for deck in owned_decks}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:
     owner = _create_user("deck-summary-search-owner", "password")
     other_owner = _create_user("deck-summary-search-other", "password")
@@ -530,7 +523,6 @@ def test_deck_summary_search_matches_overview_fields_without_leaking_private_dec
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_summary_list_query_count_stays_bounded() -> None:
     owner = _create_user("deck-summary-query-owner", "password")
     hero = _create_card(name="Summary Query Hero", is_hero=True)
@@ -554,7 +546,6 @@ def test_deck_summary_list_query_count_stays_bounded() -> None:
     assert len(queries.captured_queries) <= 20
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_hero_name() -> None:
     owner = _create_user("deck-filter-hero-owner", "password")
     target_hero = _create_card(name="Aurora Captain", is_hero=True)
@@ -586,7 +577,6 @@ def test_public_deck_list_filters_by_hero_name() -> None:
     assert [row["id"] for row in response.json()] == [target_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_author_username() -> None:
     target_owner = _create_user("deck-author-target", "password")
     other_owner = _create_user("deck-author-other", "password")
@@ -619,7 +609,6 @@ def test_public_deck_list_filters_by_author_username() -> None:
     assert other_deck.id not in [row["id"] for row in response.json()]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_mainboard_card_name() -> None:
     owner = _create_user("deck-filter-mainboard-owner", "password")
     hero = _create_card(name="Mainboard Hero", is_hero=True)
@@ -655,7 +644,6 @@ def test_public_deck_list_filters_by_mainboard_card_name() -> None:
     assert other_deck.id not in [row["id"] for row in response.json()]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_sideboard_card_name() -> None:
     owner = _create_user("deck-filter-sideboard-owner", "password")
     hero = _create_card(name="Sideboard Filter Hero", is_hero=True)
@@ -692,7 +680,6 @@ def test_public_deck_list_filters_by_sideboard_card_name() -> None:
     assert [row["id"] for row in response.json()] == [target_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
     owner = _create_user("deck-filter-and-owner", "password")
     matching_hero = _create_card(name="Ember Warden", is_hero=True)
@@ -740,7 +727,6 @@ def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
     assert [row["id"] for row in response.json()] == [target_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_affinity_symbols_with_any_match() -> None:
     owner = _create_user("deck-filter-affinity-any-owner", "password")
     hero = _create_card(name="Affinity Any Hero", is_hero=True)
@@ -785,7 +771,6 @@ def test_public_deck_list_filters_by_affinity_symbols_with_any_match() -> None:
     assert {row["id"] for row in response.json()} == {fire_deck.id, water_deck.id}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
     owner = _create_user("deck-filter-affinity-all-owner", "password")
     hero = _create_card(name="Affinity All Hero", is_hero=True)
@@ -836,7 +821,6 @@ def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
     assert [row["id"] for row in response.json()] == [dual_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_by_affinity_symbol_exclusions() -> None:
     owner = _create_user("deck-filter-affinity-exclude-owner", "password")
     hero = _create_card(name="Affinity Exclude Hero", is_hero=True)
@@ -905,7 +889,6 @@ def test_public_deck_list_filters_by_affinity_symbol_exclusions() -> None:
     assert [row["id"] for row in response.json()] == [fire_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> None:
     owner = _create_user("deck-filter-visibility-owner", "password")
     target_hero = _create_card(name="Visible Filter Hero", is_hero=True)
@@ -954,7 +937,6 @@ def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> N
     assert [row["id"] for row in response.json()] == [public_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_payload_includes_card_types() -> None:
     owner = _create_user("deck-types-owner", "password")
     hero = _create_card(name="Typed Hero", is_hero=True, type_labels=["Hero", "Mage"])
@@ -978,7 +960,6 @@ def test_deck_payload_includes_card_types() -> None:
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_payload_includes_tooltip_metadata() -> None:
     owner = _create_user("deck-tooltip-owner", "password")
     hero = _create_card(name="Tooltip Hero", is_hero=True)
@@ -1026,7 +1007,6 @@ def test_deck_payload_includes_tooltip_metadata() -> None:
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_payload_uses_immutable_card_image_urls() -> None:
     owner = _create_user("deck-image-owner", "password")
     hero = _create_card(name="Image Hero", is_hero=True)
@@ -1059,7 +1039,6 @@ def test_deck_payload_uses_immutable_card_image_urls() -> None:
     assert response.json()["hero_card"]["image_url"] == f"/card-images/images/{image_name}"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_summary_uses_first_existing_prefetched_hero_image() -> None:
     owner = _create_user("deck-summary-image-owner", "password")
     hero = _create_card(name="Summary Image Hero", is_hero=True)
@@ -1100,7 +1079,6 @@ def test_deck_summary_uses_first_existing_prefetched_hero_image() -> None:
     assert payload[0]["hero_card"]["image_url"] == f"/card-images/images/{valid_image_name}"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_detail_hides_private_decks_from_non_owners() -> None:
     owner = _create_user("deck-private-owner", "password")
     hero = _create_card(name="Private Hero", is_hero=True)
@@ -1120,7 +1098,6 @@ def test_public_deck_detail_hides_private_decks_from_non_owners() -> None:
     assert response.status_code == 404
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_detail_allows_unlisted_decks_for_guests() -> None:
     owner = _create_user("deck-unlisted-owner", "password")
     hero = _create_card(name="Unlisted Hero", is_hero=True)
@@ -1141,7 +1118,6 @@ def test_public_deck_detail_allows_unlisted_decks_for_guests() -> None:
     assert response.json()["visibility"] == "unlisted"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_authenticated_owner_can_crud_decks() -> None:
     username = "deck-owner-user"
     password = "password"
@@ -1197,7 +1173,6 @@ def test_authenticated_owner_can_crud_decks() -> None:
     assert Deck.objects.filter(id=deck_id).count() == 0
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_owner_deck_list_filters_owned_decks_by_card_name_without_leaking_other_users_decks() -> None:
     owner = _create_user("deck-owner-filter-user", "password")
     other_owner = _create_user("deck-owner-filter-other-user", "password")
@@ -1248,7 +1223,6 @@ def test_owner_deck_list_filters_owned_decks_by_card_name_without_leaking_other_
     assert other_user_deck.id not in [row["id"] for row in response.json()]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_owner_deck_list_ignores_public_author_filter() -> None:
     owner = _create_user("deck-owner-author-filter-user", "password")
     other_owner = _create_user("deck-owner-author-filter-other", "password")
@@ -1282,7 +1256,6 @@ def test_owner_deck_list_ignores_public_author_filter() -> None:
     assert other_user_deck.id not in [row["id"] for row in response.json()]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_owner_deck_list_filters_owned_decks_by_affinity_symbol() -> None:
     owner = _create_user("deck-owner-affinity-filter-user", "password")
     hero = _create_card(name="Owner Affinity Hero", is_hero=True)
@@ -1328,7 +1301,6 @@ def test_owner_deck_list_filters_owned_decks_by_affinity_symbol() -> None:
     assert [row["id"] for row in response.json()] == [fire_deck.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_payload_includes_sideboards_and_aggregate_totals() -> None:
     owner = _create_user("deck-sideboard-owner", "password")
     hero = _create_card(name="Sideboard Hero", is_hero=True)
@@ -1376,7 +1348,6 @@ def test_deck_payload_includes_sideboards_and_aggregate_totals() -> None:
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
     username = "deck-sideboard-crud-user"
     password = "password"
@@ -1417,7 +1388,6 @@ def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
     assert payload["status"]["is_valid"] is True
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_preserves_submitted_board_entry_order() -> None:
     username = "deck-create-entry-order-user"
     password = "password"
@@ -1470,7 +1440,6 @@ def test_deck_create_preserves_submitted_board_entry_order() -> None:
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_patch_preserves_sideboards_when_omitted() -> None:
     username = "deck-patch-preserve-sideboards-user"
     password = "password"
@@ -1529,7 +1498,6 @@ def test_patch_preserves_sideboards_when_omitted() -> None:
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_patch_clears_sideboards_when_explicitly_empty() -> None:
     username = "deck-patch-clear-sideboards-user"
     password = "password"
@@ -1574,7 +1542,6 @@ def test_patch_clears_sideboards_when_explicitly_empty() -> None:
     assert payload["totals"]["overall_total_cards"] == payload["totals"]["mainboard_total_cards"] == 60
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_patch_persists_reordered_board_entries() -> None:
     username = "deck-patch-entry-order-user"
     password = "password"
@@ -1654,7 +1621,6 @@ def test_deck_patch_persists_reordered_board_entries() -> None:
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_patch_preserves_mainboard_when_entries_omitted() -> None:
     username = "deck-patch-preserve-entries-user"
     password = "password"
@@ -1693,7 +1659,6 @@ def test_patch_preserves_mainboard_when_entries_omitted() -> None:
     assert len(payload["mainboard"]["entries"]) == 15
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_sideboard_name_is_required() -> None:
     username = "deck-sideboard-name-user"
     password = "password"
@@ -1726,7 +1691,6 @@ def test_sideboard_name_is_required() -> None:
     assert response.status_code == 400
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_sideboards_reject_hero_cards() -> None:
     username = "deck-sideboard-hero-user"
     password = "password"
@@ -1759,7 +1723,6 @@ def test_sideboards_reject_hero_cards() -> None:
     assert response.json()["detail"] == "Hero cards cannot appear in sideboards."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_sideboards_reject_quantities_above_100() -> None:
     username = "deck-sideboard-quantity-user"
     password = "password"
@@ -1792,7 +1755,6 @@ def test_sideboards_reject_quantities_above_100() -> None:
     assert response.status_code == 400
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_warns_for_multiple_legendary_mainboard_copies() -> None:
     username = "deck-legendary-mainboard-user"
     password = "password"
@@ -1826,7 +1788,6 @@ def test_deck_create_warns_for_multiple_legendary_mainboard_copies() -> None:
     assert payload["status"]["warnings"] == ["Legendary cards are limited to 1 copy per deck."]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_update_uses_legendary_scope_for_warnings() -> None:
     username = "deck-legendary-sideboard-user"
     password = "password"
@@ -1882,7 +1843,6 @@ def test_deck_update_uses_legendary_scope_for_warnings() -> None:
     assert response.json()["status"]["warnings"] == ["Legendary cards are limited to 1 copy per deck."]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_allows_one_legendary_copy_and_large_non_legendary_sideboard() -> None:
     username = "deck-legendary-valid-user"
     password = "password"
@@ -1919,7 +1879,6 @@ def test_deck_create_allows_one_legendary_copy_and_large_non_legendary_sideboard
     assert response.status_code == 201
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_rejects_non_legendary_mainboard_copies_above_four() -> None:
     username = "deck-mainboard-limit-user"
     password = "password"
@@ -1950,7 +1909,6 @@ def test_deck_create_rejects_non_legendary_mainboard_copies_above_four() -> None
     assert response.json()["detail"] == "Each mainboard card quantity must be between 1 and 4."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_hero_override_allows_six_mainboard_copies() -> None:
     username = "deck-mainboard-override-user"
     password = "password"
@@ -2026,7 +1984,6 @@ def test_card_deck_building_overrides_resolve_independent_of_entry_order() -> No
     assert forward_rules == reverse_rules
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_whole_deck_mainboard_copy_scope_counts_sideboard_copies() -> None:
     username = "deck-whole-copy-scope-user"
     password = "password"
@@ -2074,7 +2031,6 @@ def test_whole_deck_mainboard_copy_scope_counts_sideboard_copies() -> None:
     assert response.json()["detail"] == "Each mainboard card quantity must be between 1 and 4."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_whole_deck_mainboard_card_count_scope_counts_sideboard_cards() -> None:
     username = "deck-whole-count-scope-user"
     password = "password"
@@ -2119,7 +2075,6 @@ def test_whole_deck_mainboard_card_count_scope_counts_sideboard_cards() -> None:
     assert response.json()["detail"] == "Deck cannot contain more than 100 mainboard cards."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
     username = "deck-sideboard-duplicate-user"
     password = "password"
@@ -2156,7 +2111,6 @@ def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
     assert response.json()["detail"] == "Each card can only appear once within a sideboard."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_non_owner_cannot_update_or_delete_deck() -> None:
     owner = _create_user("deck-owner-locked", "password")
     other_user = _create_user("deck-other-locked", "password")
@@ -2195,7 +2149,6 @@ def test_non_owner_cannot_update_or_delete_deck() -> None:
     assert delete_response.status_code == 404
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_unauthenticated_users_are_blocked_from_my_decks() -> None:
     client = Client(HTTP_HOST="localhost")
 
@@ -2204,7 +2157,6 @@ def test_unauthenticated_users_are_blocked_from_my_decks() -> None:
     assert response.status_code in {401, 403}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_rejects_non_hero_card_as_hero() -> None:
     username = "deck-invalid-hero-user"
     password = "password"
@@ -2231,7 +2183,6 @@ def test_deck_create_rejects_non_hero_card_as_hero() -> None:
     assert response.json()["detail"] == "Hero card must be marked as a hero."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_allows_invalid_in_progress_drafts_below_minimum_card_count() -> None:
     username = "deck-invalid-count-user"
     password = "password"
@@ -2260,7 +2211,6 @@ def test_deck_create_allows_invalid_in_progress_drafts_below_minimum_card_count(
     assert response.json()["status"]["issues"] == ["Deck must contain at least 20 mainboard cards."]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_marks_deck_invalid_without_enough_mana_type_cards() -> None:
     username = "deck-invalid-mana-user"
     password = "password"
@@ -2288,7 +2238,6 @@ def test_deck_create_marks_deck_invalid_without_enough_mana_type_cards() -> None
     assert response.json()["status"]["issues"] == ["Deck must contain at least 3 mainboard cards with type 'Mana'."]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_hero_override_allows_deck_without_mana_type_cards() -> None:
     username = "deck-mana-override-user"
     password = "password"
@@ -2326,7 +2275,6 @@ def test_hero_override_allows_deck_without_mana_type_cards() -> None:
     assert response.json()["status"]["issues"] == []
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_deck_create_rejects_hero_in_mainboard() -> None:
     username = "deck-invalid-duplicate-hero-user"
     password = "password"
@@ -2356,7 +2304,6 @@ def test_deck_create_rejects_hero_in_mainboard() -> None:
     assert response.json()["detail"] == "Hero cards cannot appear in mainboard entries."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_cards_list_can_filter_by_is_hero() -> None:
     hero_card = _create_card(name="Filter Hero", is_hero=True)
     non_hero_card = _create_card(name="Filter Non Hero", is_hero=False)
@@ -2372,7 +2319,6 @@ def test_cards_list_can_filter_by_is_hero() -> None:
     assert non_hero_card.id in {row["id"] for row in non_hero_response.json()["results"]}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_cards_list_hides_deprecated_cards_by_default_but_can_include_them() -> None:
     active_card = _create_card(name="Active Lifecycle Card", is_hero=False)
     deprecated_card = _create_card(
@@ -2401,7 +2347,6 @@ def test_cards_list_hides_deprecated_cards_by_default_but_can_include_them() -> 
     assert detail_response.json()["lifecycle_status"] == "deprecated"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_can_toggle_is_hero() -> None:
     username = "deck-card-hero-toggle-user"
     password = "password"
@@ -2423,7 +2368,6 @@ def test_latest_version_patch_can_toggle_is_hero() -> None:
     assert response.json()["is_hero"] is True
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_can_deprecate_card() -> None:
     username = "deck-card-lifecycle-toggle-user"
     password = "password"
@@ -2445,7 +2389,6 @@ def test_latest_version_patch_can_deprecate_card() -> None:
     assert response.json()["lifecycle_status"] == "deprecated"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_rejects_non_object_deck_building_overrides() -> None:
     username = "deck-card-invalid-overrides-user"
     password = "password"
@@ -2465,7 +2408,6 @@ def test_latest_version_patch_rejects_non_object_deck_building_overrides() -> No
     assert response.json()["detail"] == "Deck-building config overrides must be a JSON object."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_rejects_boolean_deck_building_numeric_values() -> None:
     username = "deck-card-boolean-rule-user"
     password = "password"
@@ -2485,7 +2427,6 @@ def test_latest_version_patch_rejects_boolean_deck_building_numeric_values() -> 
     assert response.json()["detail"] == "Deck-building numeric rule values must be non-negative integers."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_rejects_duplicate_deck_building_numeric_aliases() -> None:
     username = "deck-card-duplicate-rule-alias-user"
     password = "password"

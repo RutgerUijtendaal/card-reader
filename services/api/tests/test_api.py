@@ -24,7 +24,7 @@ from django.contrib.auth import get_user_model  # noqa: E402
 from django.db import connection  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from django.test.utils import CaptureQueriesContext  # noqa: E402
-from django.test import Client, override_settings  # noqa: E402
+from django.test import Client  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
 from card_reader_api.seeds.users import seed_users  # noqa: E402
@@ -57,9 +57,8 @@ def test_health() -> None:
     assert response.json()["status"] == "ok"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_create_import_upload_rejects_unknown_template() -> None:
-    response = Client(HTTP_HOST="localhost").post(
+    response = _staff_client("import-unknown-template-user").post(
         "/imports/upload",
         data={
             "template_id": "unknown-template",
@@ -73,9 +72,8 @@ def test_create_import_upload_rejects_unknown_template() -> None:
     assert response.json()["detail"] == "Unknown template_id 'unknown-template'"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_create_import_upload_rejects_unsupported_files() -> None:
-    response = Client(HTTP_HOST="localhost").post(
+    response = _staff_client("import-unsupported-files-user").post(
         "/imports/upload",
         data={
             "template_id": "mtg-like-v1",
@@ -87,9 +85,8 @@ def test_create_import_upload_rejects_unsupported_files() -> None:
     assert response.status_code == 400
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_create_import_upload_stores_relative_paths() -> None:
-    response = Client(HTTP_HOST="localhost").post(
+    response = _staff_client("import-relative-paths-user").post(
         "/imports/upload",
         data={
             "template_id": "mtg-like-v1",
@@ -110,11 +107,10 @@ def test_create_import_upload_stores_relative_paths() -> None:
     assert item.source_file.startswith(f"{job.source_path}/")
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 @pytest.mark.parametrize("base_version", ["", "14", "14.1.2", "v14.1", "14.a"])
 def test_create_import_upload_rejects_invalid_content_version_base(base_version: str) -> None:
     existing_count = ContentVersion.objects.count()
-    response = Client(HTTP_HOST="localhost").post(
+    response = _staff_client("import-invalid-version-user").post(
         "/imports/upload",
         data={
             "template_id": "mtg-like-v1",
@@ -129,10 +125,9 @@ def test_create_import_upload_rejects_invalid_content_version_base(base_version:
     assert ContentVersion.objects.count() == existing_count
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_create_import_upload_rejects_blank_content_version_description() -> None:
     existing_count = ContentVersion.objects.count()
-    response = Client(HTTP_HOST="localhost").post(
+    response = _staff_client("import-blank-description-user").post(
         "/imports/upload",
         data={
             "template_id": "mtg-like-v1",
@@ -147,9 +142,8 @@ def test_create_import_upload_rejects_blank_content_version_description() -> Non
     assert ContentVersion.objects.count() == existing_count
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_create_import_upload_increments_content_version_patch() -> None:
-    client = Client(HTTP_HOST="localhost")
+    client = _staff_client("import-version-increment-user")
     for filename in ["first.png", "second.png"]:
         response = client.post(
             "/imports/upload",
@@ -169,7 +163,6 @@ def test_create_import_upload_increments_content_version_patch() -> None:
     assert versions == ["98.7.0", "98.7.1"]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_current_content_version_uses_numeric_semantic_sorting() -> None:
     ContentVersion.objects.create(
         version_number="99.9.9",
@@ -188,13 +181,12 @@ def test_current_content_version_uses_numeric_semantic_sorting() -> None:
         description="Current version.",
     )
 
-    response = Client(HTTP_HOST="localhost").get("/imports/current-version")
+    response = _staff_client("current-content-version-user").get("/imports/current-version")
 
     assert response.status_code == 200
     assert response.json()["version_number"] == "99.10.0"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_cancel_queued_import_job_marks_it_cancelled() -> None:
     job = ImportJob.objects.create(
         source_path="uploads/test-job",
@@ -206,7 +198,11 @@ def test_cancel_queued_import_job_marks_it_cancelled() -> None:
     ImportJobItem.objects.create(job=job, source_file="uploads/test-job/0001.png")
     ImportJobItem.objects.create(job=job, source_file="uploads/test-job/0002.png")
 
-    response = Client(HTTP_HOST="localhost").post(f"/imports/{job.id}/cancel", data={}, content_type="application/json")
+    response = _staff_client("cancel-import-job-user").post(
+        f"/imports/{job.id}/cancel",
+        data={},
+        content_type="application/json",
+    )
 
     assert response.status_code == 202
     job.refresh_from_db()
@@ -270,16 +266,14 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
     assert [item.status for item in items] == ["completed", "cancelled"]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_auth_enabled_keeps_card_gallery_public() -> None:
+def test_card_gallery_routes_are_public() -> None:
     client = Client(HTTP_HOST="localhost")
 
     assert client.get("/cards").status_code == 200
     assert client.get("/cards/filters").status_code == 200
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_auth_enabled_protects_non_gallery_routes() -> None:
+def test_non_gallery_routes_require_authentication() -> None:
     client = Client(HTTP_HOST="localhost")
 
     response = client.get("/imports")
@@ -287,8 +281,7 @@ def test_auth_enabled_protects_non_gallery_routes() -> None:
     assert response.status_code in {401, 403}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_auth_enabled_requires_staff_for_non_gallery_routes() -> None:
+def test_non_gallery_routes_require_staff() -> None:
     staff_client = Client(HTTP_HOST="localhost")
     regular_client = Client(HTTP_HOST="localhost")
     staff_user = _create_user("staff-route-user", "password", is_staff=True)
@@ -300,8 +293,7 @@ def test_auth_enabled_requires_staff_for_non_gallery_routes() -> None:
     assert regular_client.get("/imports").status_code == 403
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_auth_enabled_requires_superuser_for_maintenance() -> None:
+def test_maintenance_routes_require_superuser() -> None:
     staff_client = Client(HTTP_HOST="localhost")
     superuser_client = Client(HTTP_HOST="localhost")
     staff_user = _create_user("staff-maintenance-user", "password", is_staff=True)
@@ -325,7 +317,6 @@ def test_auth_enabled_requires_superuser_for_maintenance() -> None:
         assert superuser_response.status_code == 200
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_manage_catalog_entries() -> None:
     username = "staff-catalog-user"
     password = "password"
@@ -345,7 +336,6 @@ def test_staff_can_manage_catalog_entries() -> None:
     assert create_response.status_code == 200
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_catalog_response_groups_known_and_suggested_entries() -> None:
     username = "staff-catalog-suggestions-user"
     password = "password"
@@ -379,7 +369,6 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
     assert card.id
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
     username = "staff-catalog-deprecated-links-user"
     password = "password"
@@ -409,7 +398,6 @@ def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
     assert detail_payload["linked_cards"] == []
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_create_keyword_identifiers() -> None:
     username = "staff-keyword-alias-user"
     password = "password"
@@ -432,7 +420,6 @@ def test_staff_can_create_keyword_identifiers() -> None:
     assert response.json()["identifiers"] == ["turn start", "at the beginning of your turn"]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_create_tag_and_type_identifiers() -> None:
     username = "staff-tag-type-identifiers-user"
     password = "password"
@@ -467,7 +454,6 @@ def test_staff_can_create_tag_and_type_identifiers() -> None:
     assert type_response.json()["identifiers"] == ["persistent", "ongoing"]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_accept_tag_suggestion_to_existing_and_preserve_manual_cards() -> None:
     username = "staff-suggestion-accept-user"
     password = "password"
@@ -539,7 +525,6 @@ def test_staff_can_accept_tag_suggestion_to_existing_and_preserve_manual_cards()
     assert manual_card.id
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_reject_type_suggestion() -> None:
     username = "staff-suggestion-reject-user"
     password = "password"
@@ -574,7 +559,6 @@ def test_staff_can_reject_type_suggestion() -> None:
     assert card.id
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_manage_templates() -> None:
     username = "staff-template-user"
     password = "password"
@@ -598,7 +582,6 @@ def test_staff_can_manage_templates() -> None:
     assert create_response.status_code == 200
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_template_key_cannot_be_updated() -> None:
     username = "staff-template-key-lock-user"
     password = "password"
@@ -625,7 +608,6 @@ def test_template_key_cannot_be_updated() -> None:
     assert template.key == "immutable-template-key"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_template_create_rejects_old_keyed_regions_schema() -> None:
     username = "staff-template-invalid-user"
     password = "password"
@@ -660,7 +642,6 @@ def test_template_create_rejects_old_keyed_regions_schema() -> None:
     assert response.json()["detail"] == "definition_json.regions must be a non-empty array"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_logout_accepts_trusted_frontend_origin() -> None:
     username = "staff-logout-user"
     password = "password"
@@ -677,7 +658,6 @@ def test_logout_accepts_trusted_frontend_origin() -> None:
     assert response.status_code == 204
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_login_and_current_user() -> None:
     username = "auth-test-user"
     password = "auth-test-password"
@@ -693,7 +673,6 @@ def test_login_and_current_user() -> None:
 
     assert login_response.status_code == 200
     assert login_response.json()["authenticated"] is True
-    assert login_response.json()["auth_enabled"] is True
     assert isinstance(login_response.json()["csrf_token"], str)
     assert login_response.json()["is_staff"] is True
     assert login_response.json()["is_superuser"] is False
@@ -701,13 +680,11 @@ def test_login_and_current_user() -> None:
     assert isinstance(me_response.json()["csrf_token"], str)
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_current_user_reports_unauthenticated_when_no_session() -> None:
     response = Client(HTTP_HOST="localhost").get("/auth/me")
     payload = response.json()
 
     assert response.status_code == 200
-    assert payload["auth_enabled"] is True
     assert payload["authenticated"] is False
     assert isinstance(payload["csrf_token"], str)
 
@@ -805,7 +782,6 @@ def test_card_payloads_include_content_version() -> None:
     assert generations_response.json()[0]["content_version"]["version_number"] == "72.3.0"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_admin_content_versions_list_counts_linked_cards() -> None:
     _older_card, older_version = _create_editable_card_version(name="Older Content Version Card")
     _latest_card, latest_version = _create_editable_card_version(name="Latest Content Version Card")
@@ -830,7 +806,7 @@ def test_admin_content_versions_list_counts_linked_cards() -> None:
     latest_version.content_version = latest_content_version
     latest_version.save(update_fields=["content_version"])
 
-    response = Client(HTTP_HOST="localhost").get("/admin/content-versions")
+    response = _staff_client("content-version-list-user").get("/admin/content-versions")
 
     assert response.status_code == 200
     payload = response.json()
@@ -839,7 +815,6 @@ def test_admin_content_versions_list_counts_linked_cards() -> None:
     assert latest_row["card_count"] == 1
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_admin_content_version_cards_returns_cards_for_selected_version() -> None:
     matching_card, matching_version = _create_editable_card_version(name="Version Gallery Match")
     _other_card, other_version = _create_editable_card_version(name="Version Gallery Other")
@@ -864,7 +839,7 @@ def test_admin_content_version_cards_returns_cards_for_selected_version() -> Non
     other_version.content_version = other_content_version
     other_version.save(update_fields=["content_version"])
 
-    response = Client(HTTP_HOST="localhost").get(f"/admin/content-versions/{content_version.id}/cards")
+    response = _staff_client("content-version-cards-user").get(f"/admin/content-versions/{content_version.id}/cards")
 
     assert response.status_code == 200
     payload = response.json()
@@ -872,7 +847,6 @@ def test_admin_content_version_cards_returns_cards_for_selected_version() -> Non
     assert payload[0]["content_version"]["version_number"] == "74.1.0"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_admin_content_version_patch_updates_version_and_description() -> None:
     content_version = ContentVersion.objects.create(
         version_number="175.1.0",
@@ -883,7 +857,7 @@ def test_admin_content_version_patch_updates_version_and_description() -> None:
         description="Old description.",
     )
 
-    response = Client(HTTP_HOST="localhost").patch(
+    response = _staff_client("content-version-patch-user").patch(
         f"/admin/content-versions/{content_version.id}",
         data={"version_number": "175.2.3", "description": "Updated description."},
         content_type="application/json",
@@ -900,7 +874,6 @@ def test_admin_content_version_patch_updates_version_and_description() -> None:
     assert response.json()["version_number"] == "175.2.3"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_admin_content_version_patch_rejects_invalid_version_number() -> None:
     content_version = ContentVersion.objects.create(
         version_number="176.1.0",
@@ -911,7 +884,7 @@ def test_admin_content_version_patch_rejects_invalid_version_number() -> None:
         description="Valid description.",
     )
 
-    response = Client(HTTP_HOST="localhost").patch(
+    response = _staff_client("content-version-invalid-patch-user").patch(
         f"/admin/content-versions/{content_version.id}",
         data={"version_number": "176.1"},
         content_type="application/json",
@@ -922,7 +895,6 @@ def test_admin_content_version_patch_rejects_invalid_version_number() -> None:
     assert content_version.version_number == "176.1.0"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_admin_content_version_patch_rejects_duplicate_version_number() -> None:
     first = ContentVersion.objects.create(
         version_number="177.1.0",
@@ -941,7 +913,7 @@ def test_admin_content_version_patch_rejects_duplicate_version_number() -> None:
         description="Second.",
     )
 
-    response = Client(HTTP_HOST="localhost").patch(
+    response = _staff_client("content-version-duplicate-patch-user").patch(
         f"/admin/content-versions/{second.id}",
         data={"version_number": first.version_number},
         content_type="application/json",
@@ -1679,7 +1651,6 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
     assert results[1]["anchor_card_id"] == anchor_card.id
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
 def test_export_cards_csv_honors_selected_sort() -> None:
     _zebra_card, zebra_version = _create_editable_card_version(name="Sort Export Zebra Export")
     _alpha_card, alpha_version = _create_editable_card_version(name="Sort Export Alpha Export")
@@ -1690,7 +1661,7 @@ def test_export_cards_csv_honors_selected_sort() -> None:
     zebra_version.save(update_fields=["updated_at"])
     alpha_version.save(update_fields=["updated_at"])
 
-    response = Client(HTTP_HOST="localhost").get("/exports/csv", {"sort": "name_asc", "q": "Sort Export"})
+    response = _staff_client("csv-export-sort-user").get("/exports/csv", {"sort": "name_asc", "q": "Sort Export"})
 
     assert response.status_code == 200
     rows = response.content.decode("utf-8").splitlines()
@@ -1720,7 +1691,6 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     assert group_payload["members"][0]["is_anchor"] is True
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_detail_includes_viewer_visible_deck_references() -> None:
     owner = _create_user("card-deck-reference-owner", "password", is_staff=False)
     other_owner = _create_user("card-deck-reference-other", "password", is_staff=False)
@@ -1763,7 +1733,6 @@ def test_card_detail_includes_viewer_visible_deck_references() -> None:
     assert anonymous_response.json()["deck_references"] == []
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_detail_limits_deck_references_to_three_latest() -> None:
     owner = _create_user("card-deck-reference-limit-owner", "password", is_staff=False)
     hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Limit Hero")
@@ -1792,7 +1761,6 @@ def test_card_detail_limits_deck_references_to_three_latest() -> None:
     assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> None:
     owner = _create_user("group-deck-reference-owner", "password", is_staff=False)
     other_owner = _create_user("group-deck-reference-other", "password", is_staff=False)
@@ -1833,7 +1801,6 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
     assert anonymous_response.json()["anchor_deck_references"] == []
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_group_detail_limits_anchor_deck_references_to_three_latest() -> None:
     owner = _create_user("group-deck-reference-limit-owner", "password", is_staff=False)
     anchor_card, anchor_version = _create_editable_card_version(name="Group Deck Reference Limit Anchor")
@@ -1887,7 +1854,6 @@ def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> 
     ]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_group_anchor_cannot_be_deprecated() -> None:
     username = "staff-anchor-lifecycle-user"
     password = "password"
@@ -1914,7 +1880,6 @@ def test_card_group_anchor_cannot_be_deprecated() -> None:
     assert anchor_card.lifecycle_status == "active"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_group_management_rejects_deprecated_anchor_but_allows_deprecated_member() -> None:
     username = "staff-deprecated-anchor-user"
     password = "password"
@@ -1968,7 +1933,6 @@ def test_card_group_management_rejects_deprecated_anchor_but_allows_deprecated_m
     assert update_anchor_response.json()["detail"] == "Card group anchors cannot be deprecated."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_manage_card_groups() -> None:
     username = "staff-card-groups-user"
     password = "password"
@@ -2023,7 +1987,6 @@ def test_staff_can_manage_card_groups() -> None:
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_preview_and_apply_card_merge() -> None:
     target_card, target_version = _create_editable_card_version(name="Renamed Card")
     source_card, source_version = _create_editable_card_version(name="Old Card Name")
@@ -2075,7 +2038,6 @@ def test_staff_can_preview_and_apply_card_merge() -> None:
     assert redirected_response.json()["id"] == target_card.id
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_merge_endpoints_require_staff() -> None:
     target_card, _target_version = _create_editable_card_version(name="Staff Merge Target")
     source_card, _source_version = _create_editable_card_version(name="Staff Merge Source")
@@ -2092,7 +2054,6 @@ def test_card_merge_endpoints_require_staff() -> None:
     assert response.status_code == 403
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_merge_retargets_existing_redirect_chains() -> None:
     first_card, _first_version = _create_editable_card_version(name="Redirect Chain First")
     middle_card, _middle_version = _create_editable_card_version(name="Redirect Chain Middle")
@@ -2484,7 +2445,6 @@ def test_seed_users_creates_missing_configured_users(
     assert viewer_user.is_superuser is False
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
     username = "staff-card-editor-user"
     password = "password"
@@ -2533,7 +2493,6 @@ def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
     assert [row.id for row in get_tags_for_card_version(latest.id)] == []
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_version_patch_can_restore_and_unlock() -> None:
     username = "staff-card-restore-user"
     password = "password"
@@ -2618,7 +2577,6 @@ def test_latest_version_patch_can_restore_and_unlock() -> None:
     assert [row.id for row in get_tags_for_card_version(latest.id)] == [tag.id]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_version_promote_sets_historical_version_as_latest() -> None:
     username = "staff-card-promote-user"
     password = "password"
@@ -2671,7 +2629,6 @@ def test_card_version_promote_sets_historical_version_as_latest() -> None:
     assert card.label == "Historical Card"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_symbol_text_token_update_refreshes_rendered_rule_text_for_linked_cards() -> None:
     username = "staff-symbol-refresh-user"
     password = "password"
@@ -2706,7 +2663,6 @@ def test_symbol_text_token_update_refreshes_rendered_rule_text_for_linked_cards(
     assert latest.rules_text == "{TAP}: Deal 2 damage."
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_card_reparse_queues_import_job() -> None:
     username = "staff-card-reparse-user"
     password = "password"
@@ -2741,7 +2697,6 @@ def test_latest_card_reparse_queues_import_job() -> None:
     assert items[0].target_card_version_id == version.id
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_card_reparse_accepts_template_switch() -> None:
     username = "staff-card-reparse-template-user"
     password = "password"
@@ -2769,7 +2724,6 @@ def test_latest_card_reparse_accepts_template_switch() -> None:
     assert job.template.key == "api-template-switch"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_latest_card_reparse_rejects_unknown_template() -> None:
     username = "staff-card-reparse-template-missing-user"
     password = "password"
@@ -2791,7 +2745,6 @@ def test_latest_card_reparse_rejects_unknown_template() -> None:
     assert response.json()["detail"] == "Unknown template_id 'missing-template'"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_filtered_maintenance_reparse_queues_only_matching_latest_versions() -> None:
     username = "superuser-filtered-reparse-user"
     password = "password"
@@ -2851,6 +2804,13 @@ def _login_and_get_csrf_token(client: Client, username: str, password: str) -> s
     csrf_token = response.json()["csrf_token"]
     assert isinstance(csrf_token, str)
     return csrf_token
+
+
+def _staff_client(username: str) -> Client:
+    user = _create_user(username, "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    return client
 
 
 def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:

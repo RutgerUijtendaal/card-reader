@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
-from django.test import Client, override_settings
+from django.test import Client
 
 from card_reader_core.models import (
     CardVersion,
@@ -25,7 +25,6 @@ from test_decks import _create_card
 from test_parse_flags import _create_card_version
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_notification_api_lists_and_updates_current_user_notifications() -> None:
     _clear_notifications()
     user = _create_user("notification-owner", "password")
@@ -80,7 +79,6 @@ def test_notification_api_lists_and_updates_current_user_notifications() -> None
     assert read_response.json()["count"] == 1
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_notifications_coalesce_and_mark_all_read() -> None:
     _clear_notifications()
     user = _create_user("notification-coalesce", "password")
@@ -119,7 +117,6 @@ def test_notifications_coalesce_and_mark_all_read() -> None:
     assert client.get("/notifications/summary").json()["unread_count"] == 0
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_notification_coalesce_retry_preserves_outer_transaction(monkeypatch) -> None:
     _clear_notifications()
     user = _create_user("notification-race-user", "password")
@@ -176,7 +173,6 @@ def test_notification_coalesce_retry_preserves_outer_transaction(monkeypatch) ->
     assert updated.message == "Race update"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_notification_coalesce_retries_when_found_row_becomes_read(monkeypatch) -> None:
     _clear_notifications()
     user = _create_user("notification-stale-dedupe-user", "password")
@@ -246,7 +242,6 @@ def test_notification_coalesce_retries_when_found_row_becomes_read(monkeypatch) 
     assert UserNotification.objects.filter(recipient_id=str(user.pk), read_at__isnull=True).count() == 1
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_marking_read_deduped_notification_unread_conflicts_with_active_unread() -> None:
     _clear_notifications()
     user = _create_user("notification-unread-conflict", "password")
@@ -295,8 +290,7 @@ def test_marking_read_deduped_notification_unread_conflicts_with_active_unread()
     assert second.read_at is None
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
-def test_notifications_are_empty_when_auth_is_disabled() -> None:
+def test_notifications_are_empty_for_unauthenticated_users() -> None:
     _clear_notifications()
     response = Client(HTTP_HOST="localhost").get("/notifications")
     summary_response = Client(HTTP_HOST="localhost").get("/notifications/summary")
@@ -309,7 +303,6 @@ def test_notifications_are_empty_when_auth_is_disabled() -> None:
     assert update_response.status_code == 403
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_parse_flag_review_creates_submitter_notification() -> None:
     _clear_notifications()
     submitter = _create_user("notification-flag-submit", "password")
@@ -342,7 +335,6 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     assert notification.target_url == f"/cards/{card.id}"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_update_does_not_notify_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-deck-owner", "password")
@@ -374,7 +366,6 @@ def test_card_update_does_not_notify_deck_owner() -> None:
     assert UserNotification.objects.filter(recipient_id=str(actor.pk)).count() == 0
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_promotion_notifies_sideboard_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-sideboard-owner", "password")
@@ -428,7 +419,6 @@ def test_card_promotion_notifies_sideboard_deck_owner() -> None:
     assert notification.metadata_json["change_label"] == "promoted"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-noop-promotion-owner", "password")
@@ -458,7 +448,6 @@ def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
     assert UserNotification.objects.filter(recipient_id=str(actor.pk)).count() == 0
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-owner", "password")
@@ -507,7 +496,6 @@ def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
     assert UserNotification.objects.filter(recipient_id=str(owner.pk)).count() == 0
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_import_new_version_notifies_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-new-owner", "password")

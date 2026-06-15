@@ -3,13 +3,12 @@ from __future__ import annotations
 import base64
 import json
 
-from django.test import Client, override_settings
+from django.test import Client
 
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_deck_tts_export_returns_base64_payload() -> None:
     owner = _create_user("tts-export-public-owner", "password")
     hero = _create_card(name="TTS Export Hero", is_hero=True)
@@ -54,7 +53,6 @@ def test_public_deck_tts_export_returns_base64_payload() -> None:
     assert payload["cards"][0]["role"] == "mainboard"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner() -> None:
     owner = _create_user("tts-export-private-owner", "password")
     hero = _create_card(name="Private Export Hero", is_hero=True)
@@ -79,7 +77,6 @@ def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner()
     assert owner_response.status_code == 200
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_unlisted_deck_tts_export_is_visible_to_non_owner_by_link() -> None:
     owner = _create_user("tts-export-unlisted-owner", "password")
     hero = _create_card(name="Unlisted Export Hero", is_hero=True)
@@ -99,7 +96,6 @@ def test_unlisted_deck_tts_export_is_visible_to_non_owner_by_link() -> None:
     assert response.status_code == 200
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_tts_export_omits_sideboard_entries_ignored_by_importer() -> None:
     owner = _create_user("tts-export-sideboard-owner", "password")
     hero = _create_card(name="TTS Export Sideboard Hero", is_hero=True)
@@ -129,7 +125,6 @@ def test_tts_export_omits_sideboard_entries_ignored_by_importer() -> None:
     assert "overall_total_cards" not in payload["deck"]
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_tts_export_can_target_one_sideboard() -> None:
     owner = _create_user("tts-export-target-sideboard-owner", "password")
     hero = _create_card(name="TTS Export Target Sideboard Hero", is_hero=True)
@@ -178,7 +173,6 @@ def test_tts_export_can_target_one_sideboard() -> None:
     assert "hero" not in payload
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_tts_export_rejects_unknown_sideboard_id() -> None:
     owner = _create_user("tts-export-missing-sideboard-owner", "password")
     hero = _create_card(name="TTS Export Missing Sideboard Hero", is_hero=True)
@@ -199,7 +193,6 @@ def test_tts_export_rejects_unknown_sideboard_id() -> None:
     assert response.json()["detail"] == "Sideboard not found"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_tts_export_preserves_saved_entry_order() -> None:
     owner = _create_user("tts-export-order-owner", "password")
     hero = _create_card(name="TTS Export Order Hero", is_hero=True)

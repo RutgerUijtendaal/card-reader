@@ -5,13 +5,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
-from card_reader_api.common.permissions import AuthEnabledOrSuperuserAllowed
+from card_reader_api.common.permissions import SuperuserAllowed
 
 from .services import MaintenanceService
 
 
 class BackfillMetadataSuggestionsView(APIView):
-    permission_classes = [AuthEnabledOrSuperuserAllowed]
+    permission_classes = [SuperuserAllowed]
 
     def post(self, _request: Request) -> Response:
         result = MaintenanceService().backfill_metadata_suggestions()
@@ -19,7 +19,7 @@ class BackfillMetadataSuggestionsView(APIView):
 
 
 class ConvertCardImagesToWebpView(APIView):
-    permission_classes = [AuthEnabledOrSuperuserAllowed]
+    permission_classes = [SuperuserAllowed]
 
     def post(self, _request: Request) -> Response:
         result = MaintenanceService().convert_card_images_to_webp()
@@ -47,7 +47,7 @@ class ConvertCardImagesToWebpView(APIView):
 
 
 class QueueLatestReparseView(APIView):
-    permission_classes = [AuthEnabledOrSuperuserAllowed]
+    permission_classes = [SuperuserAllowed]
 
     def post(self, _request: Request) -> Response:
         result = MaintenanceService().queue_reparse_latest_versions()
@@ -55,7 +55,7 @@ class QueueLatestReparseView(APIView):
 
 
 class QueueFilteredLatestReparseView(APIView):
-    permission_classes = [AuthEnabledOrSuperuserAllowed]
+    permission_classes = [SuperuserAllowed]
 
     def post(self, request: Request) -> Response:
         serializer = CardFiltersQuerySerializer(data=request.data)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.conf import settings
 from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 
@@ -12,29 +11,21 @@ from card_reader_api.common.auth_access import (
 )
 
 
-class AuthEnabledOrStaffAllowed(BasePermission):
+class StaffAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
-        if not settings.CARD_READER_AUTH_ENABLED:
-            return True
         return can_access_admin(request.user)
 
 
-class AuthEnabledOrSuperuserAllowed(BasePermission):
+class SuperuserAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
-        if not settings.CARD_READER_AUTH_ENABLED:
-            return True
         return can_access_maintenance(request.user)
 
 
-class AuthEnabledOrAuthenticatedAllowed(BasePermission):
+class AuthenticatedAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
-        if not settings.CARD_READER_AUTH_ENABLED:
-            return True
         return can_access_authenticated_features(request.user)
 
 
-class AuthEnabledOrUserManagementAllowed(BasePermission):
+class UserManagementAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
-        if not settings.CARD_READER_AUTH_ENABLED:
-            return True
         return can_manage_users(request.user)

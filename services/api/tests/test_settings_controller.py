@@ -5,7 +5,7 @@ from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, override_settings
+from django.test import Client
 from PIL import Image
 
 from card_reader_api.catalog.assets import store_symbol_asset
@@ -155,7 +155,6 @@ def test_convert_card_images_to_webp_repairs_missing_stored_path_from_source(
         assert converted.format == "WEBP"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_convert_card_images_to_webp_endpoint_returns_summary(
     tmp_path: Path,
     monkeypatch,

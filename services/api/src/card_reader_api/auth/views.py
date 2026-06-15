@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import AbstractBaseUser
 from django.middleware.csrf import get_token
@@ -48,7 +47,6 @@ class CurrentUserView(APIView):
         if not request.user.is_authenticated:
             return Response(
                 {
-                    "auth_enabled": settings.CARD_READER_AUTH_ENABLED,
                     "authenticated": False,
                     "csrf_token": csrf_token,
                     **capability_payload(None),
@@ -88,7 +86,6 @@ class PasswordSetupView(APIView):
 
 def _user_payload(user: Any, *, authenticated: bool, csrf_token: str) -> dict[str, object]:
     return {
-        "auth_enabled": settings.CARD_READER_AUTH_ENABLED,
         "authenticated": authenticated,
         "csrf_token": csrf_token,
         "id": str(user.id),

@@ -4,6 +4,7 @@
     :class="[
       mode === 'owned' ? 'deck-compact-card-owned' : 'deck-compact-card-browse',
       selected ? 'deck-compact-card-selected' : '',
+      surface === 'playtester' ? 'deck-compact-card-playtester' : '',
     ]"
     type="button"
     :aria-pressed="selected"
@@ -87,8 +88,10 @@ const props = withDefaults(defineProps<{
   deck: DeckListRecord;
   mode: 'browse' | 'owned';
   selected?: boolean;
+  surface?: 'default' | 'playtester';
 }>(), {
   selected: false,
+  surface: 'default',
 });
 
 const emit = defineEmits<{
@@ -123,7 +126,7 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
 <style scoped>
 .deck-compact-card {
   --deck-compact-art-width: min(12.5rem, 45%);
-  --deck-compact-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.96) 38%, rgba(0, 0, 0, 0.72) 56%, rgba(0, 0, 0, 0.24) 78%, transparent 100%);
+  --deck-compact-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.96) 62%, rgba(0, 0, 0, 0.72) 76%, rgba(0, 0, 0, 0.24) 91%, transparent 100%);
   --deck-compact-art-position: 26% 12%;
   --deck-compact-content-padding-left: clamp(8.8rem, 39%, 12.75rem);
   position: relative;
@@ -143,6 +146,10 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
     box-shadow 150ms ease;
 }
 
+:global(html.dark) .deck-compact-card {
+  --deck-compact-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.96) 38%, rgba(0, 0, 0, 0.72) 56%, rgba(0, 0, 0, 0.24) 78%, transparent 100%);
+}
+
 .deck-compact-card:hover,
 .deck-compact-card:focus-visible {
   border-color: color-mix(in srgb, var(--color-accent) 46%, var(--color-border));
@@ -155,6 +162,41 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
   border-color: color-mix(in srgb, var(--color-accent) 76%, var(--color-border));
   background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface-strong));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 48%, transparent);
+}
+
+.deck-compact-card-playtester.deck-compact-card-selected {
+  border-color: color-mix(in srgb, var(--color-control-accent) 24%, var(--color-border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-surface-strong) 94%, var(--color-control-accent) 6%) 0%,
+      color-mix(in srgb, var(--color-surface-soft) 92%, var(--color-control-accent) 8%) 100%
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-control-accent) 18%, transparent);
+}
+
+.deck-compact-card-playtester.deck-compact-card-selected:hover,
+.deck-compact-card-playtester.deck-compact-card-selected:focus-visible {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-surface-strong) 90%, var(--color-control-accent) 10%) 0%,
+      color-mix(in srgb, var(--color-surface-soft) 88%, var(--color-control-accent) 12%) 100%
+    );
+}
+
+.deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-title {
+  color: var(--color-text);
+}
+
+.deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-meta {
+  color: var(--color-text-muted);
+}
+
+.deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-art-overlay {
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.08) 42%, rgba(15, 23, 42, 0.18) 62%, rgba(15, 23, 42, 0.08) 76%, transparent 100%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.06), rgba(15, 23, 42, 0.03));
 }
 
 .deck-compact-card-art {

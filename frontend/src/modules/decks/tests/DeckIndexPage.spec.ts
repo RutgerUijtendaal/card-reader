@@ -13,7 +13,6 @@ const {
   updateDeckMock,
 } = vi.hoisted(() => ({
   authState: {
-    authEnabled: true,
     authenticated: true,
   },
   apiGetMock: vi.fn(),
@@ -295,7 +294,6 @@ const lastSearchParams = (mock: ReturnType<typeof vi.fn>): URLSearchParams => {
 describe('DeckIndexPage', () => {
   beforeEach(() => {
     authState.authenticated = true;
-    authState.authEnabled = true;
     apiGetMock.mockResolvedValue({ data: filtersPayload });
     fetchMyDeckSummariesMock.mockResolvedValue([deckRecord]);
     fetchPublicDeckSummariesMock.mockResolvedValue([deckRecord]);
@@ -395,7 +393,6 @@ describe('DeckIndexPage', () => {
 
   test('hides the deck library tab selector for anonymous public browsing', async () => {
     authState.authenticated = false;
-    authState.authEnabled = true;
     const mounted = await mountPage('/decks');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
 

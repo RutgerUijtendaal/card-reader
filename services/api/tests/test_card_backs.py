@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, override_settings
+from django.test import Client
 from PIL import Image
 
 from card_reader_core.config.settings import settings
@@ -25,7 +25,6 @@ def clear_card_backs() -> None:
     CardBack.objects.all().delete()
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_current_card_back_endpoint_returns_null_without_auth_when_unset() -> None:
     response = Client(HTTP_HOST="localhost").get("/card-backs/current")
 
@@ -33,7 +32,6 @@ def test_current_card_back_endpoint_returns_null_without_auth_when_unset() -> No
     assert response.json() == {"current": None}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_upload_creates_current_card_back_with_canonical_webp(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -80,7 +78,6 @@ def test_staff_upload_creates_current_card_back_with_canonical_webp(
     assert "original_filename" not in current_payload
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_upload_rejects_unreadable_card_back_and_cleans_source(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -108,7 +105,6 @@ def test_staff_upload_rejects_unreadable_card_back_and_cleans_source(
     assert not upload_dir.exists() or list(upload_dir.iterdir()) == []
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_activate_older_card_back() -> None:
     username = "staff-card-back-activate-user"
     password = "password"
@@ -134,7 +130,6 @@ def test_staff_can_activate_older_card_back() -> None:
     assert response.json()["is_current"] is True
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_cannot_activate_card_back_with_missing_image() -> None:
     username = "staff-card-back-missing-image-user"
     password = "password"
@@ -159,7 +154,6 @@ def test_staff_cannot_activate_card_back_with_missing_image() -> None:
     assert missing.is_current is False
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_card_back_admin_endpoints_require_staff() -> None:
     client = Client(HTTP_HOST="localhost")
     regular_client = Client(HTTP_HOST="localhost")

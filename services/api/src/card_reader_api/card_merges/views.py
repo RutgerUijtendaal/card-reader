@@ -6,12 +6,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.card_merges.serializers import CardMergeRequestSerializer, card_merge_preview_payload
-from card_reader_api.common.permissions import AuthEnabledOrStaffAllowed
+from card_reader_api.common.permissions import StaffAllowed
 from card_reader_core.services.card_merges import CardMergeError, merge_cards, preview_card_merge
 
 
 class CardMergePreviewView(APIView):
-    permission_classes = [AuthEnabledOrStaffAllowed]
+    permission_classes = [StaffAllowed]
 
     def post(self, request: Request) -> Response:
         serializer = CardMergeRequestSerializer(data=request.data)
@@ -27,7 +27,7 @@ class CardMergePreviewView(APIView):
 
 
 class CardMergeApplyView(APIView):
-    permission_classes = [AuthEnabledOrStaffAllowed]
+    permission_classes = [StaffAllowed]
 
     def post(self, request: Request) -> Response:
         serializer = CardMergeRequestSerializer(data=request.data)

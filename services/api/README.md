@@ -50,7 +50,7 @@ pnpm --filter @card-reader/api typecheck
 
 ## Auth
 
-Auth is enabled by default with `CARD_READER_AUTH_ENABLED=true`.
+Auth is always enabled.
 
 - `/cards`, `/cards/filters`, card image endpoints, symbol assets, `/health`, and `/auth/*` are public.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck.

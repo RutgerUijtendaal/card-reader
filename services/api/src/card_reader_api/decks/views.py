@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.common.auth_access import is_authenticated
-from card_reader_api.common.permissions import AuthEnabledOrAuthenticatedAllowed
+from card_reader_api.common.permissions import AuthenticatedAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.decks.serializers import (
     DeckListQuerySerializer,
@@ -82,7 +82,7 @@ class PublicDeckDetailView(APIView):
 
 
 class OwnerDeckListCreateView(APIView):
-    permission_classes = [AuthEnabledOrAuthenticatedAllowed]
+    permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request) -> Response:
         serializer = DeckListQuerySerializer(
@@ -142,7 +142,7 @@ class OwnerDeckListCreateView(APIView):
 
 
 class OwnerDeckDetailView(APIView):
-    permission_classes = [AuthEnabledOrAuthenticatedAllowed]
+    permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request, deck_id: str) -> Response:
         deck = DeckService().get_owner_deck(deck_id, _user_id(request))

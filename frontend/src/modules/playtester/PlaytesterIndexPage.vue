@@ -14,16 +14,7 @@
       data-testid="playtester-pre-setup-surface"
       @wheel="handleSelectorWheel"
     >
-      <div class="playtester-selector-board">
-        <div class="playtester-selector-board-label">
-          <span>Board</span>
-          <span>{{ selectedSuggestion ? selectedSuggestion.deck.name : 'Waiting for deck' }}</span>
-        </div>
-
-        <div class="playtester-selector-board-empty">
-          {{ selectedSuggestion ? 'Ready to build the opening hand.' : 'Select a deck to start setup.' }}
-        </div>
-      </div>
+      <div class="playtester-selector-board" />
 
       <section
         class="playtester-selector-overlay"
@@ -93,6 +84,7 @@
                     :key="`owned-${suggestion.deck.id}`"
                     :deck="suggestion.deck"
                     mode="owned"
+                    surface="playtester"
                     :selected="selectedSuggestionKey === suggestionKey(suggestion)"
                     @select="selectSuggestion(suggestion)"
                   />
@@ -114,6 +106,7 @@
                     :key="`public-${suggestion.deck.id}`"
                     :deck="suggestion.deck"
                     mode="browse"
+                    surface="playtester"
                     :selected="selectedSuggestionKey === suggestionKey(suggestion)"
                     @select="selectSuggestion(suggestion)"
                   />
@@ -340,7 +333,7 @@ const loadSuggestions = async (requestId = nextSuggestionLoadRequestId()): Promi
   try {
     const params = buildSearchParams();
     const [ownedDecks, publicDecks] = await Promise.all([
-      auth.authenticated || !auth.authEnabled ? fetchMyDeckSummaries(params) : Promise.resolve<DeckSummaryRecord[]>([]),
+      auth.authenticated ? fetchMyDeckSummaries(params) : Promise.resolve<DeckSummaryRecord[]>([]),
       fetchPublicDeckSummaries(params),
     ]);
     if (requestId === suggestionLoadRequestId) {
@@ -389,7 +382,7 @@ const clearSelectedDeckPreview = (): void => {
 };
 
 const fetchVisibleDeck = async (deckId: string): Promise<DeckRecord> => {
-  if (auth.authenticated || !auth.authEnabled) {
+  if (auth.authenticated) {
     try {
       return await fetchMyDeck(deckId);
     } catch {
@@ -561,52 +554,26 @@ onMounted(() => {
   pointer-events: none;
 }
 
-.playtester-selector-board-label {
-  color: var(--playtest-text-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.playtester-selector-board-label {
-  position: absolute;
-  top: 0.85rem;
-  left: 1rem;
-  z-index: 5;
-  display: flex;
-  gap: 0.7rem;
-}
-
-.playtester-selector-board-empty {
-  position: absolute;
-  inset: 45% auto auto 50%;
-  z-index: 4;
-  transform: translate(-50%, -50%);
-  color: var(--playtest-text-soft);
-  font-size: 0.95rem;
-  font-weight: 800;
-  pointer-events: none;
-}
-
 .playtester-selector-overlay {
+  --playtester-selector-float-top: clamp(1rem, 5vh, 3rem);
   position: absolute;
   inset: 1.25rem 1.25rem calc((var(--playtest-card-width) * 1.42) + 5rem);
   z-index: 20;
   display: grid;
-  place-items: center;
+  box-sizing: border-box;
+  align-items: start;
+  justify-items: center;
+  padding-top: var(--playtester-selector-float-top);
   pointer-events: none;
 }
 
 .playtester-selector-panel {
   display: grid;
   width: min(47rem, 100%);
-  max-height: min(42rem, 100%);
+  max-height: min(42rem, calc(100% - var(--playtester-selector-float-top)));
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  overflow: hidden;
-  border: 1px solid var(--playtest-border);
-  border-radius: 0.9rem;
-  background: color-mix(in srgb, var(--playtest-panel-strong) 94%, transparent);
-  box-shadow: 0 1.6rem 4rem rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(16px);
+  gap: 0.8rem;
+  overflow: visible;
   pointer-events: auto;
 }
 
@@ -616,11 +583,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem;
-}
-
-.playtester-selector-header {
-  border-bottom: 1px solid var(--playtest-border);
+  padding-inline: 0.2rem;
 }
 
 .playtester-selector-kicker {
@@ -643,22 +606,22 @@ onMounted(() => {
 
 .playtester-selector-search {
   position: relative;
-  margin: 1rem 1rem 0;
   color: var(--playtest-text-soft);
 }
 
 .playtester-selector-body {
   min-height: 13rem;
   overflow: auto;
-  padding: 1rem;
+  padding: 0 0.15rem;
 }
 
 .playtester-selector-empty {
   display: grid;
   min-height: 9rem;
   place-items: center;
-  border: 1px dashed var(--playtest-border);
-  border-radius: 0.7rem;
+  border: 1px dashed color-mix(in srgb, var(--playtest-border) 82%, transparent);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--playtest-panel-strong) 24%, transparent);
   color: var(--playtest-text-soft);
   font-size: 0.88rem;
   font-weight: 700;
@@ -682,8 +645,7 @@ onMounted(() => {
 }
 
 .playtester-selector-footer {
-  border-top: 1px solid var(--playtest-border);
-  background: color-mix(in srgb, var(--playtest-panel) 72%, transparent);
+  padding-bottom: 0.2rem;
 }
 
 .playtester-selector-preview-title {
@@ -737,6 +699,7 @@ onMounted(() => {
   }
 
   .playtester-selector-overlay {
+    --playtester-selector-float-top: 0px;
     position: relative;
     inset: auto;
     padding: 1rem;

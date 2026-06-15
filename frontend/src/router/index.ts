@@ -56,7 +56,7 @@ router.beforeEach(async (to) => {
     return '/import-jobs';
   }
 
-  if (to.meta.requiresAuth && auth.authEnabled && !auth.authenticated) {
+  if (to.meta.requiresAuth && !auth.authenticated) {
     return {
       path: '/login',
       query: { redirect: to.fullPath },
@@ -64,7 +64,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresStaff && !auth.canAccessStaffRoutes) {
-    if (auth.authEnabled && auth.authenticated) {
+    if (auth.authenticated) {
       return '/cards';
     }
     return {

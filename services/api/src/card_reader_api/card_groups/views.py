@@ -14,7 +14,7 @@ from card_reader_api.card_groups.serializers import (
 from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.auth_access import is_authenticated
-from card_reader_api.common.permissions import AuthEnabledOrStaffAllowed
+from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.card_groups import CardGroupMemberInput, CardGroupService
 
@@ -41,7 +41,7 @@ class PublicCardGroupDetailView(APIView):
 
 
 class StaffCardGroupListCreateView(APIView):
-    permission_classes = [AuthEnabledOrStaffAllowed]
+    permission_classes = [StaffAllowed]
 
     def get(self, _request: Request) -> Response:
         groups = CardGroupService().list_groups()
@@ -67,7 +67,7 @@ class StaffCardGroupListCreateView(APIView):
 
 
 class StaffCardGroupDetailView(APIView):
-    permission_classes = [AuthEnabledOrStaffAllowed]
+    permission_classes = [StaffAllowed]
 
     def get(self, _request: Request, group_id: str) -> Response:
         group = CardGroupService().get_group(group_id)

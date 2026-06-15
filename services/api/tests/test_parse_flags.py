@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 
 from django.contrib.auth import get_user_model
-from django.test import Client, override_settings
+from django.test import Client
 
 from card_reader_core.models import Card, CardVersion, CardVersionParseFlag, ParseResult, Template
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_authenticated_user_can_create_parse_flag_with_multiple_items() -> None:
     _clear_parse_flags()
     user = _create_user("parse-flag-user", "password", is_staff=False)
@@ -49,7 +48,6 @@ def test_authenticated_user_can_create_parse_flag_with_multiple_items() -> None:
     assert report["submitted_by"]["username"] == "parse-flag-user"
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_anonymous_user_cannot_create_parse_flag() -> None:
     _clear_parse_flags()
     card, version = _create_card_version(name="Anonymous Flag Card")
@@ -63,10 +61,9 @@ def test_anonymous_user_cannot_create_parse_flag() -> None:
     assert response.status_code in {401, 403}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=False)
-def test_parse_flag_still_requires_real_user_when_auth_is_disabled() -> None:
+def test_parse_flag_requires_real_user() -> None:
     _clear_parse_flags()
-    card, version = _create_card_version(name="Auth Disabled Flag Card")
+    card, version = _create_card_version(name="Unauthenticated Flag Card")
 
     response = Client(HTTP_HOST="localhost").post(
         f"/cards/{card.id}/versions/{version.id}/flags",
@@ -77,7 +74,6 @@ def test_parse_flag_still_requires_real_user_when_auth_is_disabled() -> None:
     assert response.status_code in {401, 403}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_parse_flag_rejects_invalid_card_version_pairing_and_property() -> None:
     _clear_parse_flags()
     user = _create_user("parse-flag-invalid-user", "password", is_staff=False)
@@ -101,7 +97,6 @@ def test_parse_flag_rejects_invalid_card_version_pairing_and_property() -> None:
     assert property_response.status_code == 400
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_resolve_and_dismiss_parse_flag_items() -> None:
     _clear_parse_flags()
     submitter = _create_user("parse-flag-submit-status", "password", is_staff=False)

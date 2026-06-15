@@ -180,7 +180,7 @@ const filterController = useDeckBrowseFilters();
 const { filtersLoaded, selectionState, readFilterState, applyRouteFilterState, loadFilters } = filterController;
 
 const isOwnedMode = computed(() => route.path === '/my/decks');
-const canUseOwnedDecks = computed(() => auth.authenticated || !auth.authEnabled || isOwnedMode.value);
+const canUseOwnedDecks = computed(() => auth.authenticated || isOwnedMode.value);
 const activeHeaderIcon = computed(() => (isOwnedMode.value ? Folders : BookOpen));
 const activeTitle = computed(() => (isOwnedMode.value ? 'My Decks' : 'Decks'));
 const activeSubtitle = computed(() =>

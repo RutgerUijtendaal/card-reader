@@ -17,7 +17,7 @@ from card_reader_api.access_requests.serializers import (
     access_request_payload,
 )
 from card_reader_api.auth.password_flow import PasswordSetupService
-from card_reader_api.common.permissions import AuthEnabledOrUserManagementAllowed
+from card_reader_api.common.permissions import UserManagementAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.users.serializers import password_setup_payload
 from card_reader_api.users.services import ManagedUserService
@@ -47,7 +47,7 @@ class PublicAccessRequestView(APIView):
 
 
 class AdminAccessRequestListView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def get(self, request: Request) -> Response:
         serializer = AccessRequestListQuerySerializer(data=request.query_params)
@@ -60,7 +60,7 @@ class AdminAccessRequestListView(APIView):
 
 
 class AdminAccessRequestSummaryView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def get(self, _request: Request) -> Response:
         return Response(
@@ -71,7 +71,7 @@ class AdminAccessRequestSummaryView(APIView):
 
 
 class AdminAccessRequestApproveView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def post(self, request: Request, access_request_id: str) -> Response:
         serializer = AccessRequestApproveSerializer(data=request.data)
@@ -105,7 +105,7 @@ class AdminAccessRequestApproveView(APIView):
 
 
 class AdminAccessRequestDeclineView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def post(self, request: Request, access_request_id: str) -> Response:
         try:

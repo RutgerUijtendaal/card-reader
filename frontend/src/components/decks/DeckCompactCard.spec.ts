@@ -53,6 +53,7 @@ const mountDeckCompactCard = async (
     deck?: DeckSummaryRecord;
     mode?: 'browse' | 'owned';
     selected?: boolean;
+    surface?: 'default' | 'playtester';
     onSelect?: () => void;
   } = {},
 ) => {
@@ -64,6 +65,7 @@ const mountDeckCompactCard = async (
       deck: options.deck ?? buildDeck(),
       mode: options.mode ?? 'browse',
       selected: options.selected,
+      surface: options.surface,
       onSelect: options.onSelect,
     }),
   });
@@ -162,6 +164,19 @@ describe('DeckCompactCard', () => {
     await nextTick();
 
     expect(onSelect).toHaveBeenCalledTimes(3);
+
+    mounted.unmount();
+  });
+
+  test('applies playtester surface class when requested', async () => {
+    const mounted = await mountDeckCompactCard({ surface: 'playtester', selected: true });
+    const card = mounted.container.querySelector<HTMLButtonElement>('[data-testid="deck-compact-card"]');
+    if (!card) {
+      throw new Error('expected compact deck card');
+    }
+
+    expect(card.classList.contains('deck-compact-card-playtester')).toBe(true);
+    expect(card.classList.contains('deck-compact-card-selected')).toBe(true);
 
     mounted.unmount();
   });

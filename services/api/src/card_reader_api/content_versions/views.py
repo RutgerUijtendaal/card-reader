@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload
-from card_reader_api.common.permissions import AuthEnabledOrStaffAllowed
+from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.content_versions.serializers import ContentVersionUpdateSerializer, content_version_payload
 from card_reader_core.repositories.cards import list_cards_for_content_version
@@ -14,14 +14,14 @@ from card_reader_core.repositories.content_versions import list_content_versions
 
 
 class ContentVersionListView(APIView):
-    permission_classes = [AuthEnabledOrStaffAllowed]
+    permission_classes = [StaffAllowed]
 
     def get(self, _request: Request) -> Response:
         return Response([content_version_payload(version) for version in list_content_versions()])
 
 
 class ContentVersionCardsView(APIView):
-    permission_classes = [AuthEnabledOrStaffAllowed]
+    permission_classes = [StaffAllowed]
 
     def get(self, _request: Request, version_id: str) -> Response:
         versions = {version.id for version in list_content_versions()}
@@ -50,7 +50,7 @@ class ContentVersionCardsView(APIView):
 
 
 class ContentVersionDetailView(APIView):
-    permission_classes = [AuthEnabledOrStaffAllowed]
+    permission_classes = [StaffAllowed]
 
     def patch(self, request: Request, version_id: str) -> Response:
         serializer = ContentVersionUpdateSerializer(data=request.data, partial=True)

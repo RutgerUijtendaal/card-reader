@@ -3,7 +3,7 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
-from django.test import Client, override_settings
+from django.test import Client
 from django.utils import timezone
 
 from card_reader_core.models import (
@@ -15,7 +15,6 @@ from card_reader_core.models import (
 )
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_current_user_payload_includes_capabilities() -> None:
     username = "capability-staff-user"
     password = "password123!"
@@ -35,7 +34,6 @@ def test_current_user_payload_includes_capabilities() -> None:
     assert payload["can_access_maintenance"] is False
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_create_list_archive_restore_and_reset_managed_users() -> None:
     username = "staff-user-manager"
     password = "password123!"
@@ -100,7 +98,6 @@ def test_staff_can_create_list_archive_restore_and_reset_managed_users() -> None
     assert created_user.is_active is True
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_non_staff_cannot_access_user_management_endpoints() -> None:
     username = "regular-user-manager"
     password = "password123!"
@@ -113,7 +110,6 @@ def test_non_staff_cannot_access_user_management_endpoints() -> None:
     assert response.status_code == 403
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_cannot_manage_privileged_accounts_through_managed_users_surface() -> None:
     username = "staff-privileged-guard"
     password = "password123!"
@@ -143,7 +139,6 @@ def test_staff_cannot_manage_privileged_accounts_through_managed_users_surface()
     assert privileged_user.is_active is True
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_authenticated_requests_record_last_active() -> None:
     user = _create_user("activity-tracked-user", "password123!", is_staff=False)
     UserActivity.objects.filter(user=user).delete()
@@ -157,7 +152,6 @@ def test_authenticated_requests_record_last_active() -> None:
     assert activity.last_active_at is not None
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_only_superusers_can_see_last_activity_for_users() -> None:
     staff_username = "staff-unmanaged-viewer"
     superuser_username = "superuser-unmanaged-viewer"
@@ -205,7 +199,6 @@ def test_only_superusers_can_see_last_activity_for_users() -> None:
     assert isinstance(superuser_unmanaged["last_active_at"], str)
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_managed_user_can_set_password_once_and_then_only_access_public_routes() -> None:
     username = "staff-password-issuer"
     password = "password123!"
@@ -260,7 +253,6 @@ def test_managed_user_can_set_password_once_and_then_only_access_public_routes()
     assert managed_client.get("/imports").status_code == 403
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_archived_user_cannot_log_in() -> None:
     user = _create_user("archived-login-user", "ValidPassword123!", is_staff=False)
     user.is_active = False
@@ -276,7 +268,6 @@ def test_archived_user_cannot_log_in() -> None:
     assert response.status_code == 401
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_public_access_request_submission_deduplicates_pending_requests() -> None:
     UserAccessRequest.objects.filter(normalized_contact_handle="discord user").delete()
     client = Client(HTTP_HOST="localhost")
@@ -322,7 +313,6 @@ def test_public_access_request_submission_deduplicates_pending_requests() -> Non
     )
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_non_staff_cannot_access_access_request_admin_endpoints() -> None:
     username = "regular-access-request-manager"
     password = "password123!"
@@ -335,7 +325,6 @@ def test_non_staff_cannot_access_access_request_admin_endpoints() -> None:
     assert response.status_code == 403
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_approve_access_request_and_issue_setup_link() -> None:
     staff_username = "staff-access-request-approver"
     password = "password123!"
@@ -380,7 +369,6 @@ def test_staff_can_approve_access_request_and_issue_setup_link() -> None:
     assert request_record.id in {row["id"] for row in all_response.json()}
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_fetch_pending_access_request_summary() -> None:
     staff_username = "staff-access-request-summary"
     password = "password123!"
@@ -403,7 +391,6 @@ def test_staff_can_fetch_pending_access_request_summary() -> None:
     assert response.json()["pending_access_request_count"] >= 1
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_staff_can_decline_access_request_without_creating_user() -> None:
     staff_username = "staff-access-request-decliner"
     password = "password123!"
@@ -429,7 +416,6 @@ def test_staff_can_decline_access_request_without_creating_user() -> None:
     assert request_record.created_user_id is None
 
 
-@override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_access_request_approval_username_conflict_keeps_request_pending() -> None:
     staff_username = "staff-access-request-conflict"
     password = "password123!"

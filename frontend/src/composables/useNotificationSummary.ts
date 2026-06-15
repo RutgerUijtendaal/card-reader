@@ -8,7 +8,7 @@ const unreadNotificationCount = ref(0);
 export function useNotificationSummary() {
   const auth = useAuthStore();
   const summary = usePollingSummary('notifications', {
-    canLoad: () => auth.authEnabled && auth.authenticated,
+    canLoad: () => auth.authenticated,
     reset: () => {
       unreadNotificationCount.value = 0;
     },
