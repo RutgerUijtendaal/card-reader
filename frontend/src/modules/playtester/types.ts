@@ -1,4 +1,4 @@
-import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
+import type { DeckCardSummary, DeckSummaryRecord } from '@/modules/decks/types';
 
 export type PlaytestZoneId = 'library' | 'hand' | 'play' | 'discard' | 'banish' | 'other' | 'hero';
 
@@ -121,6 +121,6 @@ export type PlaytestStorageAdapter = {
 };
 
 export type PlaytestDeckSuggestion = {
-  deck: DeckRecord;
+  deck: DeckSummaryRecord;
   source: 'owned' | 'public';
 };

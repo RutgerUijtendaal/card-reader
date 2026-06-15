@@ -62,6 +62,34 @@ export type DeckRecord = {
   updated_at: string;
 };
 
+export type DeckHeroSummary = Pick<DeckCardSummary, 'id' | 'key' | 'label' | 'name' | 'image_url' | 'symbols'>;
+
+export type DeckSummaryRecord = {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: DeckVisibility;
+  owner: {
+    id: string;
+    username: string;
+  };
+  hero_card: DeckHeroSummary;
+  mainboard: {
+    total_cards: number;
+    unique_cards: number;
+  };
+  sideboard_count: number;
+  status: {
+    is_valid: boolean;
+    label: string;
+    deprecated_card_count?: number;
+  };
+  created_at: string;
+  updated_at: string;
+};
+
+export type DeckListRecord = DeckRecord | DeckSummaryRecord;
+
 export type DeckEntryInput = {
   card_id: string;
   quantity: number;
@@ -78,3 +106,5 @@ export type DeckUpsertRequest = {
     entries: DeckEntryInput[];
   }>;
 };
+
+export type DeckUpdateRequest = Partial<DeckUpsertRequest>;

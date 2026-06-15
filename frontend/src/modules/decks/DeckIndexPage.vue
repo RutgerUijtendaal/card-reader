@@ -149,7 +149,7 @@ import AppSelect from '@/components/app/AppSelect.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { deleteDeck, fetchMyDecks, fetchPublicDecks, updateDeck } from '@/modules/decks/api';
+import { deleteDeck, fetchMyDeckSummaries, fetchPublicDeckSummaries, updateDeck } from '@/modules/decks/api';
 import DeckBrowseFiltersPanel from '@/modules/decks/components/DeckBrowseFiltersPanel.vue';
 import DeckLoadingSkeleton from '@/components/decks/DeckLoadingSkeleton.vue';
 import DeckListCard from '@/components/decks/DeckListCard.vue';
@@ -161,20 +161,19 @@ import {
   parseDeckBrowseFilterRouteQuery,
   sameDeckBrowseFilterState,
 } from '@/composables/decks/deckBrowseFilterState';
-import { buildDeckUpsertRequestFromRecord } from '@/composables/decks/deckPayload';
 import { buildMyDeckEditorLocation, buildNewDeckEditorLocation } from '@/composables/decks/deckRouteState';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
-import type { DeckRecord, DeckVisibility } from '@/modules/decks/types';
+import type { DeckSummaryRecord, DeckVisibility } from '@/modules/decks/types';
 import { useDeckExport } from '@/composables/useDeckExport';
 import { deckVisibilityLabels, deckVisibilityOptions } from '@/composables/decks/visibility';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
-const decks = ref<DeckRecord[]>([]);
+const decks = ref<DeckSummaryRecord[]>([]);
 const loading = ref(false);
 const deleting = ref(false);
-const deleteTarget = ref<DeckRecord | null>(null);
+const deleteTarget = ref<DeckSummaryRecord | null>(null);
 const savingDeckIds = ref(new Set<string>());
 const visibilityOptions = deckVisibilityOptions;
 const { exportTtsDeck } = useDeckExport();
@@ -229,7 +228,7 @@ const loadDecks = async (): Promise<void> => {
       ...selectionState.value,
       authorQuery: requestedPath === '/my/decks' ? '' : selectionState.value.authorQuery,
     });
-    const nextDecks = requestedPath === '/my/decks' ? await fetchMyDecks(params) : await fetchPublicDecks(params);
+    const nextDecks = requestedPath === '/my/decks' ? await fetchMyDeckSummaries(params) : await fetchPublicDeckSummaries(params);
     if (requestId === deckLoadRequestId && currentDeckPath.value === requestedPath) {
       decks.value = nextDecks;
     }
@@ -287,21 +286,31 @@ watch(
   { immediate: true },
 );
 
-const promptDelete = (deck: DeckRecord): void => {
+const promptDelete = (deck: DeckSummaryRecord): void => {
   deleteTarget.value = deck;
 };
 
-const updateDeckVisibility = async (deck: DeckRecord, visibility: DeckVisibility): Promise<void> => {
+const updateDeckVisibility = async (deck: DeckSummaryRecord, visibility: DeckVisibility): Promise<void> => {
   if (deck.visibility === visibility) {
     return;
   }
   savingDeckIds.value = new Set(savingDeckIds.value).add(deck.id);
   try {
-    const nextDeck = await updateDeck(deck.id, {
-      ...buildDeckUpsertRequestFromRecord(deck),
-      visibility,
-    });
-    decks.value = decks.value.map((entry) => (entry.id === nextDeck.id ? nextDeck : entry));
+    const nextDeck = await updateDeck(deck.id, { visibility });
+    decks.value = decks.value.map((entry) =>
+      entry.id === nextDeck.id
+        ? {
+            ...entry,
+            visibility: nextDeck.visibility,
+            status: {
+              is_valid: nextDeck.status.is_valid,
+              label: nextDeck.status.label,
+              deprecated_card_count: nextDeck.status.deprecated_card_count,
+            },
+            updated_at: nextDeck.updated_at,
+          }
+        : entry,
+    );
     toast.success(`Deck is now ${deckVisibilityLabels[nextDeck.visibility].toLowerCase()}.`);
   } catch {
     toast.error('Unable to update deck visibility.');
@@ -312,13 +321,13 @@ const updateDeckVisibility = async (deck: DeckRecord, visibility: DeckVisibility
   }
 };
 
-const handleVisibilitySelect = (deck: DeckRecord, value: string | number | null): void => {
+const handleVisibilitySelect = (deck: DeckSummaryRecord, value: string | number | null): void => {
   if (value === 'private' || value === 'unlisted' || value === 'public') {
     void updateDeckVisibility(deck, value);
   }
 };
 
-const copyShareLink = async (deck: DeckRecord): Promise<void> => {
+const copyShareLink = async (deck: DeckSummaryRecord): Promise<void> => {
   if (!canShareDeck(deck)) {
     return;
   }
@@ -326,11 +335,11 @@ const copyShareLink = async (deck: DeckRecord): Promise<void> => {
   toast.success('Share link copied.');
 };
 
-const goToPlaytester = (deck: DeckRecord): void => {
+const goToPlaytester = (deck: DeckSummaryRecord): void => {
   void router.push(`/playtester/${deck.id}`);
 };
 
-const exportDeck = async (deck: DeckRecord): Promise<void> => {
+const exportDeck = async (deck: DeckSummaryRecord): Promise<void> => {
   await exportTtsDeck(deck.id);
 };
 

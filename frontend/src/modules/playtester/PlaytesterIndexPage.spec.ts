@@ -6,15 +6,15 @@ import PlaytesterIndexPage from '@/modules/playtester/PlaytesterIndexPage.vue';
 
 const {
   authState,
-  fetchMyDecksMock,
-  fetchPublicDecksMock,
+  fetchMyDeckSummariesMock,
+  fetchPublicDeckSummariesMock,
 } = vi.hoisted(() => ({
   authState: {
     authEnabled: true,
     authenticated: true,
   },
-  fetchMyDecksMock: vi.fn(),
-  fetchPublicDecksMock: vi.fn(),
+  fetchMyDeckSummariesMock: vi.fn(),
+  fetchPublicDeckSummariesMock: vi.fn(),
 }));
 
 vi.mock('@/api/client', () => ({
@@ -26,8 +26,8 @@ vi.mock('@/modules/auth/authStore', () => ({
 }));
 
 vi.mock('@/modules/decks/api', () => ({
-  fetchMyDecks: fetchMyDecksMock,
-  fetchPublicDecks: fetchPublicDecksMock,
+  fetchMyDeckSummaries: fetchMyDeckSummariesMock,
+  fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
 }));
 
 vi.mock('@/components/app/AppPageHeader.vue', () => ({
@@ -61,82 +61,30 @@ const buildDeck = (id: string, name: string, heroName: string, owner = 'owner') 
     label: heroName,
     result_type: 'card' as const,
     image_url: null,
-    is_hero: true,
-    lifecycle_status: 'active' as const,
-    template_id: '',
-    version_id: `${id}-hero-version`,
-    version_number: 1,
-    previous_version_id: null,
-    is_latest: true,
     name: heroName,
-    type_line: '',
-    mana_cost: '',
-    mana_symbols: [],
-    mana_value: 1,
-    attack: null,
-    health: null,
-    rules_text: '',
-    confidence: 1,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
-    keywords: [],
-    tags: [],
     symbols: [],
-    types: [],
   },
   mainboard: {
     total_cards: 1,
     unique_cards: 1,
-    entries: [
-      {
-        quantity: 1,
-        card: {
-          id: `${id}-card`,
-          key: `${id}-card`,
-          label: 'Blade',
-          result_type: 'card' as const,
-          image_url: null,
-          is_hero: false,
-          lifecycle_status: 'active' as const,
-          template_id: '',
-          version_id: `${id}-card-version`,
-          version_number: 1,
-          previous_version_id: null,
-          is_latest: true,
-          name: 'Blade',
-          type_line: '',
-          mana_cost: '',
-          mana_symbols: [],
-          mana_value: 1,
-          attack: null,
-          health: null,
-          rules_text: '',
-          confidence: 1,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-          keywords: [],
-          tags: [],
-          symbols: [],
-          types: [],
-        },
-      },
-    ],
   },
-  sideboards: [],
-  totals: {
-    overall_total_cards: 1,
-    overall_unique_cards: 1,
-    mainboard_total_cards: 1,
-    mainboard_unique_cards: 1,
-  },
+  sideboard_count: 0,
   status: {
     is_valid: true,
     label: 'Ready',
-    issues: [],
+    deprecated_card_count: 0,
   },
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 });
+
+const createDeferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+  return { promise, resolve };
+};
 
 const flushPage = async (): Promise<void> => {
   await nextTick();
@@ -175,21 +123,22 @@ describe('PlaytesterIndexPage', () => {
   beforeEach(() => {
     authState.authEnabled = true;
     authState.authenticated = true;
-    fetchMyDecksMock.mockResolvedValue([buildDeck('owned', 'Owned Tempo', 'Owned Hero', 'me')]);
-    fetchPublicDecksMock.mockResolvedValue([buildDeck('public', 'Public Control', 'Public Hero', 'other')]);
+    fetchMyDeckSummariesMock.mockResolvedValue([buildDeck('owned', 'Owned Tempo', 'Owned Hero', 'me')]);
+    fetchPublicDeckSummariesMock.mockResolvedValue([buildDeck('public', 'Public Control', 'Public Hero', 'other')]);
   });
 
   afterEach(() => {
     document.body.innerHTML = '';
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   test('renders owned suggestions before public suggestions for signed-in users', async () => {
     const mounted = await mountPage();
     const text = mounted.container.textContent ?? '';
 
-    expect(fetchMyDecksMock).toHaveBeenCalledTimes(1);
-    expect(fetchPublicDecksMock).toHaveBeenCalledTimes(1);
+    expect(fetchMyDeckSummariesMock).toHaveBeenCalledTimes(1);
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(1);
     expect(text.indexOf('Owned Tempo')).toBeGreaterThan(-1);
     expect(text.indexOf('Public Control')).toBeGreaterThan(-1);
     expect(text.indexOf('Owned Tempo')).toBeLessThan(text.indexOf('Public Control'));
@@ -204,7 +153,39 @@ describe('PlaytesterIndexPage', () => {
     mounted.unmount();
   });
 
-  test('filters suggestions by included card names', async () => {
+  test('searches suggestions through summary API params', async () => {
+    vi.useFakeTimers();
+    const mounted = await mountPage();
+    const input = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Search by deck, hero, owner, or card"]');
+    if (!input) {
+      throw new Error('expected search input');
+    }
+    fetchMyDeckSummariesMock.mockResolvedValueOnce([buildDeck('owned', 'Owned Tempo', 'Owned Hero', 'me')]);
+    fetchPublicDeckSummariesMock.mockResolvedValueOnce([]);
+
+    input.value = 'Blade';
+    input.dispatchEvent(new Event('input'));
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPage();
+
+    const ownedParams = fetchMyDeckSummariesMock.mock.calls.at(-1)?.[0];
+    const publicParams = fetchPublicDeckSummariesMock.mock.calls.at(-1)?.[0];
+    expect(ownedParams).toBeInstanceOf(URLSearchParams);
+    expect(publicParams).toBeInstanceOf(URLSearchParams);
+    expect((ownedParams as URLSearchParams).get('q')).toBe('Blade');
+    expect((publicParams as URLSearchParams).get('q')).toBe('Blade');
+    expect(mounted.container.textContent).toContain('Owned Tempo');
+    expect(mounted.container.textContent).not.toContain('Public Control');
+
+    mounted.unmount();
+  });
+
+  test('does not render stale suggestions while debounced search is pending', async () => {
+    vi.useFakeTimers();
+    const ownedDeferred = createDeferred<ReturnType<typeof buildDeck>[]>();
+    const publicDeferred = createDeferred<ReturnType<typeof buildDeck>[]>();
+    fetchMyDeckSummariesMock.mockReturnValueOnce(ownedDeferred.promise);
+    fetchPublicDeckSummariesMock.mockReturnValueOnce(publicDeferred.promise);
     const mounted = await mountPage();
     const input = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Search by deck, hero, owner, or card"]');
     if (!input) {
@@ -214,16 +195,39 @@ describe('PlaytesterIndexPage', () => {
     input.value = 'Blade';
     input.dispatchEvent(new Event('input'));
     await flushPage();
-
-    expect(mounted.container.textContent).toContain('Owned Tempo');
-    expect(mounted.container.textContent).toContain('Public Control');
-
-    input.value = 'Owned Hero';
-    input.dispatchEvent(new Event('input'));
+    ownedDeferred.resolve([buildDeck('stale-owned', 'Stale Owned', 'Old Hero', 'me')]);
+    publicDeferred.resolve([buildDeck('stale-public', 'Stale Public', 'Old Hero', 'other')]);
     await flushPage();
 
-    expect(mounted.container.textContent).toContain('Owned Tempo');
-    expect(mounted.container.textContent).not.toContain('Public Control');
+    expect(mounted.container.textContent).not.toContain('Stale Owned');
+    expect(mounted.container.textContent).not.toContain('Stale Public');
+    expect(mounted.container.querySelectorAll('.deck-loading-skeleton')).toHaveLength(4);
+
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPage();
+
+    mounted.unmount();
+  });
+
+  test('deduplicates owned and public search results after server search', async () => {
+    vi.useFakeTimers();
+    const mounted = await mountPage();
+    const input = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Search by deck, hero, owner, or card"]');
+    if (!input) {
+      throw new Error('expected search input');
+    }
+    const ownedDeck = buildDeck('shared', 'Shared Search Deck', 'Owned Hero', 'me');
+    fetchMyDeckSummariesMock.mockResolvedValueOnce([ownedDeck]);
+    fetchPublicDeckSummariesMock.mockResolvedValueOnce([ownedDeck, buildDeck('public-extra', 'Public Extra', 'Public Hero', 'other')]);
+
+    input.value = 'Shared';
+    input.dispatchEvent(new Event('input'));
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPage();
+
+    expect(mounted.container.textContent).toContain('Shared Search Deck');
+    expect(mounted.container.textContent).toContain('Public Extra');
+    expect((mounted.container.textContent?.match(/Shared Search Deck/g) ?? [])).toHaveLength(1);
 
     mounted.unmount();
   });
@@ -232,8 +236,8 @@ describe('PlaytesterIndexPage', () => {
     authState.authenticated = false;
     const mounted = await mountPage();
 
-    expect(fetchMyDecksMock).not.toHaveBeenCalled();
-    expect(fetchPublicDecksMock).toHaveBeenCalledTimes(1);
+    expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(1);
     expect(mounted.container.textContent).not.toContain('Your Decks');
     expect(mounted.container.textContent).toContain('Public Control');
     expect(mounted.container.textContent).toContain('Start Playtest');
@@ -245,8 +249,8 @@ describe('PlaytesterIndexPage', () => {
     const ownedDecks = Array.from({ length: 7 }, (_, index) =>
       buildDeck(`owned-${index + 1}`, `Owned ${index + 1}`, `Owned Hero ${index + 1}`, 'me'),
     );
-    fetchMyDecksMock.mockResolvedValue(ownedDecks);
-    fetchPublicDecksMock.mockResolvedValue([
+    fetchMyDeckSummariesMock.mockResolvedValue(ownedDecks);
+    fetchPublicDeckSummariesMock.mockResolvedValue([
       ownedDecks[6],
       buildDeck('public-extra', 'Public Extra', 'Public Hero', 'other'),
     ]);

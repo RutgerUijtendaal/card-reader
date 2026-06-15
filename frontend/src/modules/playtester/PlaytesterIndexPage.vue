@@ -114,45 +114,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Gamepad2, Search } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import DeckListCard from '@/components/decks/DeckListCard.vue';
 import DeckLoadingSkeleton from '@/components/decks/DeckLoadingSkeleton.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { fetchMyDecks, fetchPublicDecks } from '@/modules/decks/api';
-import type { DeckRecord } from '@/modules/decks/types';
+import { fetchMyDeckSummaries, fetchPublicDeckSummaries } from '@/modules/decks/api';
+import type { DeckSummaryRecord } from '@/modules/decks/types';
 import type { PlaytestDeckSuggestion } from '@/modules/playtester/types';
 
 const auth = useAuthStore();
 const loading = ref(true);
 const searchQuery = ref('');
 const suggestions = ref<PlaytestDeckSuggestion[]>([]);
+let suggestionLoadRequestId = 0;
 
-const cardNamesForDeck = (deck: DeckRecord): string =>
-  [
-    ...deck.mainboard.entries.map((entry) => entry.card.name),
-    ...deck.sideboards.flatMap((sideboard) => sideboard.entries.map((entry) => entry.card.name)),
-  ].join(' ');
-
-const suggestionMatches = (suggestion: PlaytestDeckSuggestion, query: string): boolean => {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return true;
-  }
-  const deck = suggestion.deck;
-  return [
-    deck.name,
-    deck.hero_card.name,
-    deck.owner.username,
-    cardNamesForDeck(deck),
-  ].some((value) => value.toLowerCase().includes(normalizedQuery));
+const nextSuggestionLoadRequestId = (): number => {
+  suggestionLoadRequestId += 1;
+  return suggestionLoadRequestId;
 };
 
-const filteredSuggestions = computed(() =>
-  suggestions.value.filter((suggestion) => suggestionMatches(suggestion, searchQuery.value)),
-);
+const filteredSuggestions = computed(() => suggestions.value);
 const ownedSuggestions = computed(() =>
   filteredSuggestions.value.filter((suggestion) => suggestion.source === 'owned').slice(0, 6),
 );
@@ -167,21 +152,46 @@ const publicSuggestions = computed(() => {
     .slice(0, 8);
 });
 
-const loadSuggestions = async (): Promise<void> => {
+const buildSearchParams = (): URLSearchParams | undefined => {
+  const query = searchQuery.value.trim();
+  if (!query) {
+    return undefined;
+  }
+  const params = new URLSearchParams();
+  params.set('q', query);
+  return params;
+};
+
+const loadSuggestions = async (requestId = nextSuggestionLoadRequestId()): Promise<void> => {
   loading.value = true;
   try {
+    const params = buildSearchParams();
     const [ownedDecks, publicDecks] = await Promise.all([
-      auth.authenticated || !auth.authEnabled ? fetchMyDecks() : Promise.resolve<DeckRecord[]>([]),
-      fetchPublicDecks(),
+      auth.authenticated || !auth.authEnabled ? fetchMyDeckSummaries(params) : Promise.resolve<DeckSummaryRecord[]>([]),
+      fetchPublicDeckSummaries(params),
     ]);
-    suggestions.value = [
-      ...ownedDecks.map((deck) => ({ deck, source: 'owned' as const })),
-      ...publicDecks.map((deck) => ({ deck, source: 'public' as const })),
-    ];
+    if (requestId === suggestionLoadRequestId) {
+      suggestions.value = [
+        ...ownedDecks.map((deck) => ({ deck, source: 'owned' as const })),
+        ...publicDecks.map((deck) => ({ deck, source: 'public' as const })),
+      ];
+    }
   } finally {
-    loading.value = false;
+    if (requestId === suggestionLoadRequestId) {
+      loading.value = false;
+    }
   }
 };
+
+const debouncedLoadSuggestions = useDebounceFn((requestId: number) => {
+  void loadSuggestions(requestId);
+}, 250);
+
+watch(searchQuery, () => {
+  const requestId = nextSuggestionLoadRequestId();
+  loading.value = true;
+  debouncedLoadSuggestions(requestId);
+});
 
 onMounted(() => {
   void loadSuggestions();

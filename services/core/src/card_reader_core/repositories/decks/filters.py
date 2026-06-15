@@ -8,6 +8,7 @@ from card_reader_core.models import Deck
 def apply_deck_filters(
     queryset: QuerySet[Deck],
     *,
+    search_query: str | None = None,
     hero_query: str | None,
     author_query: str | None,
     card_query: str | None,
@@ -16,6 +17,19 @@ def apply_deck_filters(
     affinity_symbol_match: str | None,
 ) -> QuerySet[Deck]:
     filtered = queryset
+
+    normalized_search_query = (search_query or "").strip()
+    if normalized_search_query:
+        filtered = filtered.filter(
+            Q(name__icontains=normalized_search_query)
+            | Q(hero_card__label__icontains=normalized_search_query)
+            | Q(hero_card__latest_version__name__icontains=normalized_search_query)
+            | Q(owner__username__icontains=normalized_search_query)
+            | Q(entries__card__label__icontains=normalized_search_query)
+            | Q(entries__card__latest_version__name__icontains=normalized_search_query)
+            | Q(sideboards__entries__card__label__icontains=normalized_search_query)
+            | Q(sideboards__entries__card__latest_version__name__icontains=normalized_search_query)
+        )
 
     normalized_hero_query = (hero_query or "").strip()
     if normalized_hero_query:

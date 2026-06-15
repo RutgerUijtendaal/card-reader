@@ -148,12 +148,12 @@ import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolToken from '@/components/SymbolToken.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
-import type { DeckRecord } from '@/modules/decks/types';
+import type { DeckListRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/composables/useDeckExport';
 import { deckVisibilityBadgeClasses, deckVisibilityLabels } from '@/composables/decks/visibility';
 
 const props = defineProps<{
-  deck: DeckRecord;
+  deck: DeckListRecord;
   mode: 'browse' | 'owned';
   titleTo?: RouteLocationRaw;
   density?: 'default' | 'compact';
@@ -171,10 +171,11 @@ const navigationTarget = computed(() =>
 );
 const formatDate = (value: string): string => new Date(value).toLocaleDateString();
 const sideboardSummary = computed(() => {
-  if (props.deck.sideboards.length === 0) {
+  const sideboardCount = 'sideboard_count' in props.deck ? props.deck.sideboard_count : props.deck.sideboards.length;
+  if (sideboardCount === 0) {
     return 'No sideboards';
   }
-  return `${props.deck.sideboards.length} sideboard${props.deck.sideboards.length === 1 ? '' : 's'}`;
+  return `${sideboardCount} sideboard${sideboardCount === 1 ? '' : 's'}`;
 });
 const boardSummary = computed(() => `Maindeck ${props.deck.mainboard.total_cards} · ${props.deck.mainboard.unique_cards} unique · ${sideboardSummary.value}`);
 const heroAffinitySymbols = computed(() => props.deck.hero_card.symbols.filter((symbol) => symbol.symbol_type === 'affinity'));
