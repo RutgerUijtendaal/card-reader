@@ -157,6 +157,7 @@ export type ManagedUserRecord = {
   is_superuser: boolean;
   date_joined: string | null;
   last_login: string | null;
+  last_active_at: string | null;
 };
 
 export type ManagedUserListResponse = {
@@ -174,6 +175,32 @@ export type PasswordSetupResponse = {
   token: string;
   setup_url: string;
   expires_in_seconds: number;
+};
+
+export type AccessRequestStatus = 'pending' | 'approved' | 'declined';
+
+export type AccessRequestStatusFilter = 'pending' | 'all';
+
+export type AccessRequestUserReference = {
+  id: string;
+  username: string;
+};
+
+export type AccessRequestRecord = {
+  id: string;
+  contact_handle: string;
+  message: string;
+  status: AccessRequestStatus;
+  created_at: string | null;
+  updated_at: string | null;
+  resolved_at: string | null;
+  resolved_by: AccessRequestUserReference | null;
+  created_user: AccessRequestUserReference | null;
+};
+
+export type AccessRequestApprovalResponse = {
+  access_request: AccessRequestRecord;
+  password_setup: PasswordSetupResponse;
 };
 
 export type CardGroupMemberRecord = {

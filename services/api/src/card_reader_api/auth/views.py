@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from card_reader_api.auth.password_flow import PasswordSetupService
 from card_reader_api.common.auth_access import capability_payload
+from card_reader_core.services.user_activity import UserActivityService
 
 
 class LoginView(APIView):
@@ -26,6 +27,7 @@ class LoginView(APIView):
         if user is None:
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         login(request, user)
+        UserActivityService().touch_user(user, throttle_seconds=0)
         csrf_token = get_token(request)
         return Response(_user_payload(user, authenticated=True, csrf_token=csrf_token))
 

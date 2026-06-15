@@ -6,6 +6,14 @@ from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 from django.utils import timezone
 
+from card_reader_core.models import (
+    ACCESS_REQUEST_STATUS_APPROVED,
+    ACCESS_REQUEST_STATUS_DECLINED,
+    ACCESS_REQUEST_STATUS_PENDING,
+    UserAccessRequest,
+    UserActivity,
+)
+
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
 def test_current_user_payload_includes_capabilities() -> None:
@@ -136,15 +144,34 @@ def test_staff_cannot_manage_privileged_accounts_through_managed_users_surface()
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
-def test_only_superusers_can_see_last_login_for_unmanaged_users() -> None:
+def test_authenticated_requests_record_last_active() -> None:
+    user = _create_user("activity-tracked-user", "password123!", is_staff=False)
+    UserActivity.objects.filter(user=user).delete()
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+
+    response = client.get("/auth/me")
+
+    assert response.status_code == 200
+    activity = UserActivity.objects.get(user=user)
+    assert activity.last_active_at is not None
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_only_superusers_can_see_last_activity_for_users() -> None:
     staff_username = "staff-unmanaged-viewer"
     superuser_username = "superuser-unmanaged-viewer"
     password = "password123!"
     _create_user(staff_username, password, is_staff=True)
     _create_user(superuser_username, password, is_staff=True, is_superuser=True)
+    managed_user = _create_user("managed-last-active-target", password, is_staff=False)
     unmanaged_user = _create_user("staff-last-login-target", password, is_staff=True)
+    managed_activity = timezone.now()
+    unmanaged_activity = timezone.now()
     unmanaged_user.last_login = timezone.now()
     unmanaged_user.save(update_fields=["last_login"])
+    UserActivity.objects.update_or_create(user=managed_user, defaults={"last_active_at": managed_activity})
+    UserActivity.objects.update_or_create(user=unmanaged_user, defaults={"last_active_at": unmanaged_activity})
 
     staff_client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     superuser_client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
@@ -157,6 +184,12 @@ def test_only_superusers_can_see_last_login_for_unmanaged_users() -> None:
     assert staff_response.status_code == 200
     assert superuser_response.status_code == 200
 
+    staff_managed = {
+        row["username"]: row for row in staff_response.json()["managed_results"]
+    }["managed-last-active-target"]
+    superuser_managed = {
+        row["username"]: row for row in superuser_response.json()["managed_results"]
+    }["managed-last-active-target"]
     staff_unmanaged = {
         row["username"]: row for row in staff_response.json()["unmanaged_results"]
     }["staff-last-login-target"]
@@ -164,8 +197,12 @@ def test_only_superusers_can_see_last_login_for_unmanaged_users() -> None:
         row["username"]: row for row in superuser_response.json()["unmanaged_results"]
     }["staff-last-login-target"]
 
+    assert staff_managed["last_active_at"] is None
+    assert isinstance(superuser_managed["last_active_at"], str)
     assert staff_unmanaged["last_login"] is None
+    assert staff_unmanaged["last_active_at"] is None
     assert isinstance(superuser_unmanaged["last_login"], str)
+    assert isinstance(superuser_unmanaged["last_active_at"], str)
 
 
 @override_settings(CARD_READER_AUTH_ENABLED=True)
@@ -237,6 +274,185 @@ def test_archived_user_cannot_log_in() -> None:
     )
 
     assert response.status_code == 401
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_public_access_request_submission_deduplicates_pending_requests() -> None:
+    UserAccessRequest.objects.filter(normalized_contact_handle="discord user").delete()
+    client = Client(HTTP_HOST="localhost")
+
+    response = client.post(
+        "/auth/access-requests",
+        data={"contact_handle": " Discord User ", "message": "I would like access."},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["contact_handle"] == "Discord User"
+    assert payload["message"] == "I would like access."
+    assert payload["status"] == ACCESS_REQUEST_STATUS_PENDING
+
+    duplicate_response = client.post(
+        "/auth/access-requests",
+        data={"contact_handle": "discord   user", "message": "Updated context."},
+        content_type="application/json",
+    )
+
+    assert duplicate_response.status_code == 200
+    duplicate_payload = duplicate_response.json()
+    assert duplicate_payload["id"] == payload["id"]
+    assert duplicate_payload["message"] == "Updated context."
+
+    cleared_message_response = client.post(
+        "/auth/access-requests",
+        data={"contact_handle": "DISCORD USER", "message": ""},
+        content_type="application/json",
+    )
+
+    assert cleared_message_response.status_code == 200
+    assert cleared_message_response.json()["id"] == payload["id"]
+    assert cleared_message_response.json()["message"] == ""
+    assert (
+        UserAccessRequest.objects.filter(
+            normalized_contact_handle="discord user",
+            status=ACCESS_REQUEST_STATUS_PENDING,
+        ).count()
+        == 1
+    )
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_non_staff_cannot_access_access_request_admin_endpoints() -> None:
+    username = "regular-access-request-manager"
+    password = "password123!"
+    _create_user(username, password, is_staff=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.get("/admin/access-requests", HTTP_X_CSRFTOKEN=csrf_token)
+
+    assert response.status_code == 403
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_approve_access_request_and_issue_setup_link() -> None:
+    staff_username = "staff-access-request-approver"
+    password = "password123!"
+    _create_user(staff_username, password, is_staff=True)
+    request_record = UserAccessRequest.objects.create(
+        contact_handle="Discord: requester",
+        normalized_contact_handle="discord: requester",
+        message="Please add me.",
+    )
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, staff_username, password)
+
+    response = client.post(
+        f"/admin/access-requests/{request_record.id}/approve",
+        data={"username": "approved-request-user"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["access_request"]["status"] == ACCESS_REQUEST_STATUS_APPROVED
+    assert payload["password_setup"]["user"]["username"] == "approved-request-user"
+    created_user = get_user_model().objects.get(username="approved-request-user")
+    assert created_user.is_staff is False
+    assert created_user.is_superuser is False
+    assert created_user.has_usable_password() is False
+    request_record.refresh_from_db()
+    assert request_record.status == ACCESS_REQUEST_STATUS_APPROVED
+    assert request_record.created_user_id == created_user.id
+
+    pending_response = client.get("/admin/access-requests", HTTP_X_CSRFTOKEN=csrf_token)
+    assert pending_response.status_code == 200
+    assert request_record.id not in {row["id"] for row in pending_response.json()}
+
+    all_response = client.get(
+        "/admin/access-requests",
+        {"status": "all"},
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert all_response.status_code == 200
+    assert request_record.id in {row["id"] for row in all_response.json()}
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_fetch_pending_access_request_summary() -> None:
+    staff_username = "staff-access-request-summary"
+    password = "password123!"
+    _create_user(staff_username, password, is_staff=True)
+    UserAccessRequest.objects.create(
+        contact_handle="Pending Summary Handle",
+        normalized_contact_handle="pending summary handle",
+    )
+    UserAccessRequest.objects.create(
+        contact_handle="Resolved Summary Handle",
+        normalized_contact_handle="resolved summary handle",
+        status=ACCESS_REQUEST_STATUS_DECLINED,
+    )
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, staff_username, password)
+
+    response = client.get("/admin/access-requests/summary", HTTP_X_CSRFTOKEN=csrf_token)
+
+    assert response.status_code == 200
+    assert response.json()["pending_access_request_count"] >= 1
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_staff_can_decline_access_request_without_creating_user() -> None:
+    staff_username = "staff-access-request-decliner"
+    password = "password123!"
+    _create_user(staff_username, password, is_staff=True)
+    request_record = UserAccessRequest.objects.create(
+        contact_handle="Handle To Decline",
+        normalized_contact_handle="handle to decline",
+    )
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, staff_username, password)
+
+    response = client.post(
+        f"/admin/access-requests/{request_record.id}/decline",
+        data={},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == ACCESS_REQUEST_STATUS_DECLINED
+    request_record.refresh_from_db()
+    assert request_record.status == ACCESS_REQUEST_STATUS_DECLINED
+    assert request_record.created_user_id is None
+
+
+@override_settings(CARD_READER_AUTH_ENABLED=True)
+def test_access_request_approval_username_conflict_keeps_request_pending() -> None:
+    staff_username = "staff-access-request-conflict"
+    password = "password123!"
+    _create_user(staff_username, password, is_staff=True)
+    _create_user("existing-request-user", password, is_staff=False)
+    request_record = UserAccessRequest.objects.create(
+        contact_handle="Conflict Handle",
+        normalized_contact_handle="conflict handle",
+    )
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, staff_username, password)
+
+    response = client.post(
+        f"/admin/access-requests/{request_record.id}/approve",
+        data={"username": "existing-request-user"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    request_record.refresh_from_db()
+    assert request_record.status == ACCESS_REQUEST_STATUS_PENDING
+    assert request_record.created_user_id is None
 
 
 def _extract_setup_values(setup_url: str) -> dict[str, str]:

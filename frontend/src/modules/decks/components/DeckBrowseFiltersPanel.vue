@@ -8,7 +8,10 @@
     :total-count="totalCount"
     :on-reset="controller.resetFilters"
   >
-    <div class="theme-divider space-y-3 border-b pb-4">
+    <div
+      v-if="canUseOwnedDecks"
+      class="theme-divider space-y-3 border-b pb-4"
+    >
       <div class="space-y-1">
         <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
           Deck Library
@@ -24,7 +27,6 @@
           Public
         </RouterLink>
         <RouterLink
-          v-if="canUseOwnedDecks"
           class="theme-tab flex-1"
           :class="mode === 'owned' ? 'theme-tab-active' : ''"
           :to="ownedTo"

@@ -193,6 +193,7 @@ import { Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Gamepad2, Hammer
 import { RouterLink, useRouter } from 'vue-router';
 import AppHotkeysPanel from '@/components/app/AppHotkeysPanel.vue';
 import ThemeModeMenu from '@/components/app/ThemeModeMenu.vue';
+import { useAccessRequestSummary } from '@/composables/useAccessRequestSummary';
 import { useNotificationSummary } from '@/composables/useNotificationSummary';
 import { useReviewSummary } from '@/composables/useReviewSummary';
 import { useAuthStore } from '@/modules/auth/authStore';
@@ -230,6 +231,7 @@ const router = useRouter();
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
 const { openParseFlagItemCount } = useReviewSummary();
 const { unreadNotificationCount } = useNotificationSummary();
+const { pendingAccessRequestCount } = useAccessRequestSummary();
 
 const items = computed<NavItem[]>(() => [
   { label: 'Gallery', to: '/cards', icon: Images },
@@ -241,7 +243,7 @@ const items = computed<NavItem[]>(() => [
   { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
   { label: 'Import Jobs', to: '/import-jobs', icon: Upload, requiresStaff: true },
   { label: 'Review Queue', to: '/review', icon: ClipboardCheck, requiresStaff: true, badgeCount: openParseFlagItemCount.value },
-  { label: 'Admin', to: '/admin', icon: Settings, requiresStaff: true },
+  { label: 'Admin', to: '/admin', icon: Settings, requiresStaff: true, badgeCount: pendingAccessRequestCount.value },
 ]);
 
 const canShowItem = (item: NavItem): boolean => {

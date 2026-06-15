@@ -72,6 +72,12 @@
           >
             <Users class="h-4 w-4" />
             <span>Users</span>
+            <span
+              v-if="pendingAccessRequestCount > 0"
+              class="theme-pill theme-pill-success ml-1 px-2 py-0.5 text-[11px] font-semibold"
+            >
+              {{ pendingAccessRequestCount }}
+            </span>
           </button>
           <button
             v-if="auth.canAccessMaintenance"
@@ -102,6 +108,7 @@
 import { ref, watch } from 'vue';
 import { Database, GitMerge, History, Images, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import { useAccessRequestSummary } from '@/composables/useAccessRequestSummary';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
   parseAdminTab,
@@ -118,6 +125,7 @@ import TemplatesAdminView from './views/TemplatesAdminView.vue';
 import UsersAdminView from './views/UsersAdminView.vue';
 
 const auth = useAuthStore();
+const { pendingAccessRequestCount } = useAccessRequestSummary();
 const { route, replaceAdminQuery } = useAdminRouteSync();
 const activeTab = ref<AdminTab>('catalog');
 

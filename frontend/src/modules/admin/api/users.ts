@@ -1,5 +1,8 @@
 import { api } from '@/api/client';
 import type {
+  AccessRequestApprovalResponse,
+  AccessRequestRecord,
+  AccessRequestStatusFilter,
   CreateManagedUserRequest,
   ManagedUserListResponse,
   ManagedUserRecord,
@@ -33,5 +36,34 @@ export const restoreManagedUser = async (userId: string): Promise<ManagedUserRec
 
 export const resetManagedUserPassword = async (userId: string): Promise<PasswordSetupResponse> => {
   const response = await api.post<PasswordSetupResponse>(`/admin/users/${userId}/reset-password`);
+  return response.data;
+};
+
+export const fetchAccessRequests = async (
+  status: AccessRequestStatusFilter,
+): Promise<AccessRequestRecord[]> => {
+  const response = await api.get<AccessRequestRecord[]>('/admin/access-requests', {
+    params: { status },
+  });
+  return response.data;
+};
+
+export const approveAccessRequest = async (
+  accessRequestId: string,
+  username: string,
+): Promise<AccessRequestApprovalResponse> => {
+  const response = await api.post<AccessRequestApprovalResponse>(
+    `/admin/access-requests/${accessRequestId}/approve`,
+    { username },
+  );
+  return response.data;
+};
+
+export const declineAccessRequest = async (
+  accessRequestId: string,
+): Promise<AccessRequestRecord> => {
+  const response = await api.post<AccessRequestRecord>(
+    `/admin/access-requests/${accessRequestId}/decline`,
+  );
   return response.data;
 };

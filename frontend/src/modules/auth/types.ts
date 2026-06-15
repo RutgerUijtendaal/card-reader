@@ -27,3 +27,10 @@ export type PasswordSetupRequest = {
   token: string;
   password: string;
 };
+
+export type AccessRequestSubmission = {
+  id: string;
+  contact_handle: string;
+  message: string;
+  status: 'pending' | 'approved' | 'declined';
+};
