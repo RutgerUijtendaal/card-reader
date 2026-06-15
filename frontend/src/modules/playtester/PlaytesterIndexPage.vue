@@ -82,6 +82,7 @@
               <DeckLoadingSkeleton
                 v-for="index in 4"
                 :key="`playtester-loading-${index}`"
+                density="compact"
               />
             </div>
 

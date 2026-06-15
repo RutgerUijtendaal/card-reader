@@ -49,8 +49,16 @@ vi.mock('@/components/app/AppPageHeader.vue', () => ({
 
 vi.mock('@/components/decks/DeckLoadingSkeleton.vue', () => ({
   default: defineComponent({
-    setup() {
-      return () => h('div', { class: 'deck-loading-skeleton' });
+    props: {
+      density: { type: String, default: 'default' },
+    },
+    setup(props) {
+      return () => h('div', {
+        class: [
+          'deck-loading-skeleton',
+          props.density === 'compact' ? 'deck-loading-skeleton-compact' : '',
+        ],
+      });
     },
   }),
 }));
@@ -223,6 +231,7 @@ describe('PlaytesterIndexPage', () => {
     expect(mounted.container.textContent).not.toContain('Stale Owned');
     expect(mounted.container.textContent).not.toContain('Stale Public');
     expect(mounted.container.querySelectorAll('.deck-loading-skeleton')).toHaveLength(4);
+    expect(mounted.container.querySelectorAll('.deck-loading-skeleton-compact')).toHaveLength(4);
 
     await vi.advanceTimersByTimeAsync(300);
     await flushPage();
