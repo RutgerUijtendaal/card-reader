@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.auth.password_flow import PasswordSetupService
-from card_reader_api.common.permissions import AuthEnabledOrUserManagementAllowed
+from card_reader_api.common.permissions import UserManagementAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.users.serializers import (
     ManagedUserCreateSerializer,
@@ -19,7 +19,7 @@ from card_reader_core.services.user_activity import UserActivityService
 
 
 class ManagedUserListCreateView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def get(self, request: Request) -> Response:
         serializer = ManagedUserListQuerySerializer(data=request.query_params)
@@ -72,7 +72,7 @@ class ManagedUserListCreateView(APIView):
 
 
 class ManagedUserDetailView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def delete(self, _request: Request, user_id: str) -> Response:
         user = ManagedUserService().deactivate_user(user_id=user_id)
@@ -82,7 +82,7 @@ class ManagedUserDetailView(APIView):
 
 
 class ManagedUserRestoreView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def post(self, _request: Request, user_id: str) -> Response:
         user = ManagedUserService().restore_user(user_id=user_id)
@@ -92,7 +92,7 @@ class ManagedUserRestoreView(APIView):
 
 
 class ManagedUserResetPasswordView(APIView):
-    permission_classes = [AuthEnabledOrUserManagementAllowed]
+    permission_classes = [UserManagementAllowed]
 
     def post(self, request: Request, user_id: str) -> Response:
         user = ManagedUserService().get_managed_user(user_id=user_id)

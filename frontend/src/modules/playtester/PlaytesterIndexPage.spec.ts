@@ -18,7 +18,6 @@ const {
   fetchPublicDeckSummariesMock,
 } = vi.hoisted(() => ({
   authState: {
-    authEnabled: true,
     authenticated: true,
   },
   fetchDeckDetailMock: vi.fn(),
@@ -222,7 +221,6 @@ const mountPage = async (): Promise<{
 describe('PlaytesterIndexPage', () => {
   beforeEach(() => {
     localStorage.clear();
-    authState.authEnabled = true;
     authState.authenticated = true;
     fetchCurrentCardBackMock.mockResolvedValue({ current: { image_url: '/card-backs/current.webp' } });
     fetchMyDeckMock.mockImplementation((deckId: string) =>
@@ -246,9 +244,7 @@ describe('PlaytesterIndexPage', () => {
     const mounted = await mountPage();
 
     expect(mounted.container.querySelector('[data-testid="playtester-pre-setup-surface"]')).not.toBeNull();
-    expect(mounted.container.textContent).toContain('Board');
     expect(mounted.container.textContent).toContain('Opening hand');
-    expect(mounted.container.textContent).toContain('Select a deck to start setup.');
     expect(fetchCurrentCardBackMock).toHaveBeenCalledTimes(1);
     expect(mounted.container.querySelectorAll<HTMLImageElement>('.playtester-hand-placeholder-card img')).toHaveLength(7);
     expect(mounted.container.querySelector<HTMLImageElement>('.playtester-hand-placeholder-card img')?.src).toContain('/card-backs/current.webp');

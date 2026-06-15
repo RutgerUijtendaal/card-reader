@@ -110,13 +110,12 @@ Important settings in `./.env.example`:
 - `CARD_READER_ALLOWED_HOSTS`
 - `CARD_READER_CSRF_TRUSTED_ORIGINS`
 - `CARD_READER_CORS_ORIGINS`
-- `CARD_READER_AUTH_ENABLED`
 - `CARD_READER_APP_DATA_DIR`
 - `CARD_READER_DATABASE_PATH`
 
 ## Auth Model
 
-Auth is enabled by default.
+Auth is always enabled.
 
 - Card gallery and card assets are public
 - Public deck detail and deck TTS export are available to any viewer who can access the deck

@@ -14,16 +14,7 @@
       data-testid="playtester-pre-setup-surface"
       @wheel="handleSelectorWheel"
     >
-      <div class="playtester-selector-board">
-        <div class="playtester-selector-board-label">
-          <span>Board</span>
-          <span>{{ selectedSuggestion ? selectedSuggestion.deck.name : 'Waiting for deck' }}</span>
-        </div>
-
-        <div class="playtester-selector-board-empty">
-          {{ selectedSuggestion ? 'Ready to build the opening hand.' : 'Select a deck to start setup.' }}
-        </div>
-      </div>
+      <div class="playtester-selector-board" />
 
       <section
         class="playtester-selector-overlay"
@@ -342,7 +333,7 @@ const loadSuggestions = async (requestId = nextSuggestionLoadRequestId()): Promi
   try {
     const params = buildSearchParams();
     const [ownedDecks, publicDecks] = await Promise.all([
-      auth.authenticated || !auth.authEnabled ? fetchMyDeckSummaries(params) : Promise.resolve<DeckSummaryRecord[]>([]),
+      auth.authenticated ? fetchMyDeckSummaries(params) : Promise.resolve<DeckSummaryRecord[]>([]),
       fetchPublicDeckSummaries(params),
     ]);
     if (requestId === suggestionLoadRequestId) {
@@ -391,7 +382,7 @@ const clearSelectedDeckPreview = (): void => {
 };
 
 const fetchVisibleDeck = async (deckId: string): Promise<DeckRecord> => {
-  if (auth.authenticated || !auth.authEnabled) {
+  if (auth.authenticated) {
     try {
       return await fetchMyDeck(deckId);
     } catch {
@@ -560,32 +551,6 @@ onMounted(() => {
   z-index: 2;
   background: color-mix(in srgb, var(--playtest-surface) 42%, transparent);
   content: "";
-  pointer-events: none;
-}
-
-.playtester-selector-board-label {
-  color: var(--playtest-text-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.playtester-selector-board-label {
-  position: absolute;
-  top: 0.85rem;
-  left: 1rem;
-  z-index: 5;
-  display: flex;
-  gap: 0.7rem;
-}
-
-.playtester-selector-board-empty {
-  position: absolute;
-  inset: 45% auto auto 50%;
-  z-index: 4;
-  transform: translate(-50%, -50%);
-  color: var(--playtest-text-soft);
-  font-size: 0.95rem;
-  font-weight: 800;
   pointer-events: none;
 }
 

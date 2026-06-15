@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.conf import settings
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -111,7 +110,7 @@ class MarkAllNotificationsReadView(APIView):
 
 
 def _notification_user_id(request: Request) -> str | None:
-    if not settings.CARD_READER_AUTH_ENABLED or not is_authenticated(request.user):
+    if not is_authenticated(request.user):
         return None
     user_id = str(getattr(request.user, "pk", ""))
     return user_id or None

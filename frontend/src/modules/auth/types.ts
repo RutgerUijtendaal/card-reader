@@ -1,5 +1,4 @@
 export type CurrentUser = {
-  auth_enabled: boolean;
   authenticated: boolean;
   csrf_token?: string;
   id?: string;

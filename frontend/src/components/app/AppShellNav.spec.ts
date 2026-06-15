@@ -4,7 +4,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import AppShellNav from '@/components/app/AppShellNav.vue';
 
 const authState = {
-  authEnabled: true,
   authenticated: true,
   canAccessStaffRoutes: false,
   logout: vi.fn(),
@@ -89,7 +88,6 @@ const mountNav = async (props: { collapsed?: boolean } = {}) => {
 
 describe('AppShellNav', () => {
   afterEach(() => {
-    authState.authEnabled = true;
     authState.authenticated = true;
     unreadNotificationCount.value = 3;
     pendingAccessRequestCount.value = 0;
@@ -118,7 +116,6 @@ describe('AppShellNav', () => {
   });
 
   test('hides notification link when there is no real authenticated user', async () => {
-    authState.authEnabled = false;
     authState.authenticated = false;
 
     const mounted = await mountNav();

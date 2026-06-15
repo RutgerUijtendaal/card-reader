@@ -8,17 +8,10 @@ export const useAuthStore = defineStore('auth', () => {
   const initialized = ref(false);
   const loading = ref(false);
 
-  const authEnabled = computed(() => user.value?.auth_enabled ?? true);
   const authenticated = computed(() => user.value?.authenticated ?? false);
-  const canAccessStaffRoutes = computed(
-    () => !authEnabled.value || user.value?.can_access_admin === true,
-  );
-  const canManageUsers = computed(
-    () => !authEnabled.value || user.value?.can_manage_users === true,
-  );
-  const canAccessMaintenance = computed(
-    () => !authEnabled.value || user.value?.can_access_maintenance === true,
-  );
+  const canAccessStaffRoutes = computed(() => user.value?.can_access_admin === true);
+  const canManageUsers = computed(() => user.value?.can_manage_users === true);
+  const canAccessMaintenance = computed(() => user.value?.can_access_maintenance === true);
 
   const applyCsrfToken = (currentUser: CurrentUser): void => {
     const token = currentUser.csrf_token;
@@ -35,7 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
       applyCsrfToken(response.data);
       return response.data;
     } catch {
-      const fallback = { auth_enabled: true, authenticated: false };
+      const fallback = { authenticated: false };
       user.value = fallback;
       return fallback;
     } finally {
@@ -59,7 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = async (): Promise<void> => {
     await api.post('/auth/logout');
-    user.value = { auth_enabled: authEnabled.value, authenticated: false };
+    user.value = { authenticated: false };
     initialized.value = true;
   };
 
@@ -67,7 +60,6 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     initialized,
     loading,
-    authEnabled,
     authenticated,
     canAccessStaffRoutes,
     canManageUsers,

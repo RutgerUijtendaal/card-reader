@@ -158,7 +158,7 @@
 
       <div class="app-sidebar-divider pt-4">
         <RouterLink
-          v-if="auth.authEnabled && !auth.authenticated"
+          v-if="!auth.authenticated"
           class="nav-link"
           :class="collapsed ? 'w-full justify-center px-0' : 'w-full'"
           to="/login"
@@ -171,7 +171,7 @@
         </RouterLink>
 
         <button
-          v-if="auth.authEnabled && auth.authenticated"
+          v-if="auth.authenticated"
           class="nav-link"
           :class="collapsed ? 'w-full justify-center px-0' : 'w-full'"
           type="button"
@@ -250,10 +250,10 @@ const canShowItem = (item: NavItem): boolean => {
   if (item.requiresStaff && !auth.canAccessStaffRoutes) {
     return false;
   }
-  if (item.requiresAuth && auth.authEnabled && !auth.authenticated) {
+  if (item.requiresAuth && !auth.authenticated) {
     return false;
   }
-  if (item.requiresAuthenticatedUser && (!auth.authEnabled || !auth.authenticated)) {
+  if (item.requiresAuthenticatedUser && !auth.authenticated) {
     return false;
   }
   return true;

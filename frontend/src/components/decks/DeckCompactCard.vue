@@ -165,12 +165,12 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
 }
 
 .deck-compact-card-playtester.deck-compact-card-selected {
-  border-color: color-mix(in srgb, var(--color-control-accent) 24%, #cbd5e1);
+  border-color: color-mix(in srgb, var(--color-control-accent) 24%, var(--color-border));
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, #ffffff 94%, var(--color-control-accent) 6%) 0%,
-      color-mix(in srgb, #f8fafc 92%, var(--color-control-accent) 8%) 100%
+      color-mix(in srgb, var(--color-surface-strong) 94%, var(--color-control-accent) 6%) 0%,
+      color-mix(in srgb, var(--color-surface-soft) 92%, var(--color-control-accent) 8%) 100%
     );
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-control-accent) 18%, transparent);
 }
@@ -180,48 +180,23 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, #ffffff 90%, var(--color-control-accent) 10%) 0%,
-      color-mix(in srgb, #f8fafc 88%, var(--color-control-accent) 12%) 100%
+      color-mix(in srgb, var(--color-surface-strong) 90%, var(--color-control-accent) 10%) 0%,
+      color-mix(in srgb, var(--color-surface-soft) 88%, var(--color-control-accent) 12%) 100%
     );
 }
 
 .deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-title {
-  color: #0f172a;
+  color: var(--color-text);
 }
 
 .deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-meta {
-  color: #526176;
+  color: var(--color-text-muted);
 }
 
 .deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-art-overlay {
   background:
     linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.08) 42%, rgba(15, 23, 42, 0.18) 62%, rgba(15, 23, 42, 0.08) 76%, transparent 100%),
     linear-gradient(180deg, rgba(15, 23, 42, 0.06), rgba(15, 23, 42, 0.03));
-}
-
-:global(html.dark) .deck-compact-card-playtester.deck-compact-card-selected {
-  border-color: color-mix(in srgb, var(--color-control-accent) 28%, rgba(255, 255, 255, 0.18));
-  background: #232c2b;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-control-accent) 16%, transparent);
-}
-
-:global(html.dark) .deck-compact-card-playtester.deck-compact-card-selected:hover,
-:global(html.dark) .deck-compact-card-playtester.deck-compact-card-selected:focus-visible {
-  background: #283332;
-}
-
-:global(html.dark) .deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-title {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-:global(html.dark) .deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-meta {
-  color: rgba(226, 232, 240, 0.74);
-}
-
-:global(html.dark) .deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-art-overlay {
-  background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.18) 0%, rgba(15, 23, 42, 0.28) 42%, rgba(15, 23, 42, 0.38) 62%, rgba(15, 23, 42, 0.2) 76%, transparent 100%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0.06));
 }
 
 .deck-compact-card-art {
