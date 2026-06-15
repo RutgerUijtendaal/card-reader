@@ -24,26 +24,20 @@ const filters: CardFiltersResponse = {
 describe('deckBrowseFilterState', () => {
   test('parses and rebuilds route query using stable keys', () => {
     const parsed = parseDeckBrowseFilterRouteQuery({
-      hero_q: '  Aurora  ',
-      author_q: '  Mina ',
-      card_q: '  Spear ',
+      q: '  Aurora Spear  ',
       affinity_symbol_match: 'all',
       affinity_symbol_keys: ['water', 'fire'],
       affinity_symbol_exclude_keys: ['fire'],
     });
 
     expect(parsed).toEqual({
-      heroQuery: 'Aurora',
-      authorQuery: 'Mina',
-      cardQuery: 'Spear',
+      query: 'Aurora Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolKeys: ['fire', 'water'],
       affinitySymbolExcludeKeys: ['fire'],
     });
     expect(buildDeckBrowseFilterRouteQuery(parsed)).toEqual({
-      hero_q: 'Aurora',
-      author_q: 'Mina',
-      card_q: 'Spear',
+      q: 'Aurora Spear',
       affinity_symbol_match: 'all',
       affinity_symbol_keys: ['fire', 'water'],
       affinity_symbol_exclude_keys: ['fire'],
@@ -54,9 +48,7 @@ describe('deckBrowseFilterState', () => {
     const catalog = createDeckBrowseFilterCatalog(filters);
     const selection = buildDeckBrowseFilterSelectionState(
       {
-        heroQuery: 'Aurora',
-        authorQuery: 'Mina',
-        cardQuery: 'Spear',
+        query: 'Aurora Spear',
         affinitySymbolMatch: 'all',
         affinitySymbolKeys: ['fire', 'water'],
         affinitySymbolExcludeKeys: ['fire'],
@@ -65,17 +57,13 @@ describe('deckBrowseFilterState', () => {
     );
 
     expect(selection).toEqual({
-      heroQuery: 'Aurora',
-      authorQuery: 'Mina',
-      cardQuery: 'Spear',
+      query: 'Aurora Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolIds: ['sym-1', 'sym-2'],
       affinitySymbolExcludeIds: ['sym-1'],
     });
     expect(buildDeckBrowseFilterStateFromSelection(selection, catalog)).toEqual({
-      heroQuery: 'Aurora',
-      authorQuery: 'Mina',
-      cardQuery: 'Spear',
+      query: 'Aurora Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolKeys: ['fire', 'water'],
       affinitySymbolExcludeKeys: ['fire'],
@@ -84,27 +72,21 @@ describe('deckBrowseFilterState', () => {
 
   test('builds api params for text and affinity filters', () => {
     const params = buildDeckBrowseFilterApiSearchParams({
-      heroQuery: 'Aurora',
-      authorQuery: 'Mina',
-      cardQuery: 'Spear',
+      query: 'Aurora Spear',
       affinitySymbolMatch: 'all',
       affinitySymbolIds: ['sym-1', 'sym-2'],
       affinitySymbolExcludeIds: ['sym-1'],
     });
 
-    expect(params.get('hero_q')).toBe('Aurora');
-    expect(params.get('author_q')).toBe('Mina');
-    expect(params.get('card_q')).toBe('Spear');
+    expect(params.get('q')).toBe('Aurora Spear');
     expect(params.get('affinity_symbol_match')).toBe('all');
     expect(params.getAll('affinity_symbol_ids')).toEqual(['sym-1', 'sym-2']);
     expect(params.getAll('affinity_symbol_exclude_ids')).toEqual(['sym-1']);
   });
 
-  test('empty state clears both text filters and affinity selections', () => {
+  test('empty state clears text search and affinity selections', () => {
     expect(createEmptyDeckBrowseFilterState()).toEqual({
-      heroQuery: '',
-      authorQuery: '',
-      cardQuery: '',
+      query: '',
       affinitySymbolMatch: 'any',
       affinitySymbolKeys: [],
       affinitySymbolExcludeKeys: [],

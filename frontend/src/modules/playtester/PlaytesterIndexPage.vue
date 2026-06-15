@@ -48,14 +48,12 @@
             </div>
           </header>
 
-          <div class="playtester-selector-search">
-            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-            <input
-              v-model="searchQuery"
-              class="input-base h-10 w-full pl-10 pr-3 text-sm"
-              placeholder="Search by deck, hero, owner, or card"
-            >
-          </div>
+          <AppSearchInput
+            v-model="searchQuery"
+            class="playtester-selector-search"
+            input-class="h-10 text-sm"
+            placeholder="Search by deck, hero, owner, or card"
+          />
 
           <div class="playtester-selector-body app-scrollbar">
             <div
@@ -190,10 +188,11 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
-import { Gamepad2, Play, RotateCcw, Search } from 'lucide-vue-next';
+import { Gamepad2, Play, RotateCcw } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppSearchInput from '@/components/app/AppSearchInput.vue';
 import DeckCompactCard from '@/components/decks/DeckCompactCard.vue';
 import DeckLoadingSkeleton from '@/components/decks/DeckLoadingSkeleton.vue';
 import { useAuthStore } from '@/modules/auth/authStore';

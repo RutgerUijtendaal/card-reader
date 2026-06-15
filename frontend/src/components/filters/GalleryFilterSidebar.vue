@@ -28,23 +28,19 @@
       </div>
 
       <div class="space-y-2">
-        <div class="relative">
-          <input
-            ref="searchInputRef"
-            :value="query"
-            class="input-base"
-            :class="showSearchHotkeyHint ? 'pr-28' : ''"
-            :placeholder="searchPlaceholder"
-            @input="onUpdateQuery(($event.target as HTMLInputElement).value)"
-          >
-          <div
+        <AppSearchInput
+          ref="searchInputRef"
+          :model-value="query"
+          :placeholder="searchPlaceholder"
+          @update:model-value="onUpdateQuery"
+        >
+          <template
             v-if="showSearchHotkeyHint"
-            class="pointer-events-none absolute inset-y-0 right-3 flex items-center gap-1.5"
-            aria-hidden="true"
+            #trailing
           >
             <span class="theme-hotkey-chip">/</span>
-          </div>
-        </div>
+          </template>
+        </AppSearchInput>
         <p class="theme-section-muted text-xs">
           {{ totalCount }} results
         </p>
@@ -67,6 +63,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { RotateCcw } from 'lucide-vue-next';
+import AppSearchInput from '@/components/app/AppSearchInput.vue';
 import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import { usePrimarySearchTarget } from '@/composables/useHotkeys';
 
@@ -89,8 +86,11 @@ const props = withDefaults(
   },
 );
 
-const searchInputRef = ref<HTMLInputElement | null>(null);
+type AppSearchInputInstance = InstanceType<typeof AppSearchInput>;
+
+const searchInputRef = ref<AppSearchInputInstance | null>(null);
+const searchInputElement = computed(() => searchInputRef.value?.inputElement ?? null);
 const showSearchHotkeyHint = computed(() => props.enableSearchHotkey);
 
-usePrimarySearchTarget(searchInputRef, () => props.enableSearchHotkey);
+usePrimarySearchTarget(searchInputElement, () => props.enableSearchHotkey);
 </script>

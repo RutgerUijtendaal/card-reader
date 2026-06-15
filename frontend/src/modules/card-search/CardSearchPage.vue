@@ -22,10 +22,10 @@
       <template #aside>
         <GalleryFilterSidebar
           title="Gallery"
-          description="Filter the visible card pool by symbols, stats, and metadata."
+          description="Search cards by name, type line, rules text, or cost, then refine by symbols, stats, and metadata."
           :query="query"
           :on-update-query="updateQuery"
-          search-placeholder="Search cards..."
+          search-placeholder="Search by name, type, rules, or cost..."
           :total-count="totalCount"
           :on-reset="resetFilters"
         >

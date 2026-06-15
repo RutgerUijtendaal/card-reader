@@ -2,18 +2,14 @@ import type { LocationQuery, LocationQueryRaw, LocationQueryValue } from 'vue-ro
 import type { CardFiltersResponse, SymbolFilterOption } from '@/modules/card-detail/types';
 
 export type DeckBrowseFilterState = {
-  heroQuery: string;
-  authorQuery: string;
-  cardQuery: string;
+  query: string;
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolKeys: string[];
   affinitySymbolExcludeKeys: string[];
 };
 
 export type DeckBrowseFilterSelectionState = {
-  heroQuery: string;
-  authorQuery: string;
-  cardQuery: string;
+  query: string;
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolIds: string[];
   affinitySymbolExcludeIds: string[];
@@ -55,18 +51,14 @@ const resolveKeysFromIds = (ids: string[], options: SymbolFilterOption[]): strin
 };
 
 export const createEmptyDeckBrowseFilterState = (): DeckBrowseFilterState => ({
-  heroQuery: '',
-  authorQuery: '',
-  cardQuery: '',
+  query: '',
   affinitySymbolMatch: 'any',
   affinitySymbolKeys: [],
   affinitySymbolExcludeKeys: [],
 });
 
 export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): DeckBrowseFilterState => ({
-  heroQuery: normalizeStringValue(state.heroQuery),
-  authorQuery: normalizeStringValue(state.authorQuery),
-  cardQuery: normalizeStringValue(state.cardQuery),
+  query: normalizeStringValue(state.query),
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolKeys: normalizeStringArray(state.affinitySymbolKeys),
   affinitySymbolExcludeKeys: normalizeStringArray(state.affinitySymbolExcludeKeys),
@@ -75,9 +67,7 @@ export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): De
 export const normalizeDeckBrowseFilterSelectionState = (
   state: DeckBrowseFilterSelectionState,
 ): DeckBrowseFilterSelectionState => ({
-  heroQuery: normalizeStringValue(state.heroQuery),
-  authorQuery: normalizeStringValue(state.authorQuery),
-  cardQuery: normalizeStringValue(state.cardQuery),
+  query: normalizeStringValue(state.query),
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolIds: normalizeStringArray(state.affinitySymbolIds),
   affinitySymbolExcludeIds: normalizeStringArray(state.affinitySymbolExcludeIds),
@@ -85,9 +75,7 @@ export const normalizeDeckBrowseFilterSelectionState = (
 
 export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrowseFilterState =>
   normalizeDeckBrowseFilterState({
-    heroQuery: typeof query.hero_q === 'string' ? query.hero_q : '',
-    authorQuery: typeof query.author_q === 'string' ? query.author_q : '',
-    cardQuery: typeof query.card_q === 'string' ? query.card_q : '',
+    query: typeof query.q === 'string' ? query.q : '',
     affinitySymbolMatch: query.affinity_symbol_match === 'all' ? 'all' : 'any',
     affinitySymbolKeys: readQueryValues(query.affinity_symbol_keys),
     affinitySymbolExcludeKeys: readQueryValues(query.affinity_symbol_exclude_keys),
@@ -97,9 +85,7 @@ export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): L
   const normalized = normalizeDeckBrowseFilterState(state);
   const query: LocationQueryRaw = {};
 
-  if (normalized.heroQuery) query.hero_q = normalized.heroQuery;
-  if (normalized.authorQuery) query.author_q = normalized.authorQuery;
-  if (normalized.cardQuery) query.card_q = normalized.cardQuery;
+  if (normalized.query) query.q = normalized.query;
   if (normalized.affinitySymbolMatch === 'all') query.affinity_symbol_match = 'all';
   if (normalized.affinitySymbolKeys.length > 0) query.affinity_symbol_keys = normalized.affinitySymbolKeys;
   if (normalized.affinitySymbolExcludeKeys.length > 0) {
@@ -141,9 +127,7 @@ export const buildDeckBrowseFilterSelectionState = (
   catalog: DeckBrowseFilterCatalog,
 ): DeckBrowseFilterSelectionState =>
   normalizeDeckBrowseFilterSelectionState({
-    heroQuery: state.heroQuery,
-    authorQuery: state.authorQuery,
-    cardQuery: state.cardQuery,
+    query: state.query,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolIds: resolveIdsFromKeys(state.affinitySymbolKeys, catalog.affinitySymbols),
     affinitySymbolExcludeIds: resolveIdsFromKeys(state.affinitySymbolExcludeKeys, catalog.affinitySymbols),
@@ -154,9 +138,7 @@ export const buildDeckBrowseFilterStateFromSelection = (
   catalog: DeckBrowseFilterCatalog,
 ): DeckBrowseFilterState =>
   normalizeDeckBrowseFilterState({
-    heroQuery: state.heroQuery,
-    authorQuery: state.authorQuery,
-    cardQuery: state.cardQuery,
+    query: state.query,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.affinitySymbols),
     affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.affinitySymbols),
@@ -168,9 +150,7 @@ export const buildDeckBrowseFilterApiSearchParams = (
   const normalized = normalizeDeckBrowseFilterSelectionState(state);
   const params = new URLSearchParams();
 
-  if (normalized.heroQuery) params.set('hero_q', normalized.heroQuery);
-  if (normalized.authorQuery) params.set('author_q', normalized.authorQuery);
-  if (normalized.cardQuery) params.set('card_q', normalized.cardQuery);
+  if (normalized.query) params.set('q', normalized.query);
   if (normalized.affinitySymbolIds.length > 0) {
     normalized.affinitySymbolIds.forEach((id) => params.append('affinity_symbol_ids', id));
     params.set('affinity_symbol_match', normalized.affinitySymbolMatch);

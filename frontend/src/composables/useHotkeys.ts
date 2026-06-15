@@ -204,7 +204,7 @@ export const handleHoverModeHotkey = (
 };
 
 export const usePrimarySearchTarget = (
-  target: Ref<HTMLInputElement | null>,
+  target: Readonly<Ref<HTMLInputElement | null>>,
   enabled: MaybeRefOrGetter<boolean> = true,
 ): void => {
   watchEffect((onCleanup) => {
