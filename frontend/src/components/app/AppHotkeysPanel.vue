@@ -151,5 +151,5 @@ withDefaults(
 
 const auth = useAuthStore();
 const route = useRoute();
-const isPlaytesterRoute = computed(() => route.path.startsWith('/playtester/'));
+const isPlaytesterRoute = computed(() => route.path === '/playtester' || route.path.startsWith('/playtester/'));
 </script>
