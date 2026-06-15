@@ -166,6 +166,7 @@
         :stack-zones="selectorStackZones"
         :card-back-url="currentCardBackUrl"
         :card-interactive="false"
+        :placeholder-hand-size="7"
         :stack-draggable="false"
         @open-stack="openPreviewStack"
         @draw-stack="openPreviewStack"
@@ -241,6 +242,7 @@ const selectedSuggestionKey = ref<string | null>(null);
 const selectedDeck = ref<DeckRecord | null>(null);
 const selectedPlaytest = ref<PlaytestState | null>(null);
 const selectedDraft = ref<StoredPlaytestDraft | null>(null);
+const selectedStaleDraft = ref<StoredPlaytestDraft | null>(null);
 const currentCardBackUrl = ref<string | null>(null);
 const openStackZone = ref<PlaytestZoneId | null>(null);
 const lowerBarWidth = ref(0);
@@ -382,6 +384,7 @@ const clearSelectedDeckPreview = (): void => {
   selectedDeck.value = null;
   selectedPlaytest.value = null;
   selectedDraft.value = null;
+  selectedStaleDraft.value = null;
   openStackZone.value = null;
   nextDeckLoadRequestId();
 };
@@ -425,20 +428,24 @@ const loadSelectedDeckPreview = async (suggestion: PlaytestDeckSuggestion): Prom
       return;
     }
     const draft = storage.load(deck.id);
+    const draftIsStale = draft ? isStoredDraftStale(draft, deck) : false;
     selectedDeck.value = deck;
-    selectedDraft.value = draft && !isStoredDraftStale(draft, deck) ? draft : null;
+    selectedDraft.value = draft && !draftIsStale ? draft : null;
+    selectedStaleDraft.value = draft && draftIsStale ? draft : null;
     selectedPlaytest.value = createInitialPlaytestState(deck);
   } catch {
     if (requestId === deckLoadRequestId) {
       selectedDeck.value = null;
       selectedPlaytest.value = null;
       selectedDraft.value = null;
+      selectedStaleDraft.value = null;
     }
   }
 };
 
 const selectSuggestion = (suggestion: PlaytestDeckSuggestion): void => {
   selectedSuggestionKey.value = suggestionKey(suggestion);
+  clearSelectedDeckPreview();
   void loadSelectedDeckPreview(suggestion);
 };
 
@@ -469,8 +476,8 @@ const continueSelectedDeck = (): void => {
   if (!path) {
     return;
   }
-  let draft = selectedDraft.value;
-  if (!hasOngoingPlaytest.value) {
+  let draft = selectedDraft.value ?? selectedStaleDraft.value;
+  if (!draft) {
     draft = savePreviewAsSelectedDraft();
   }
   setSelectedDeckHandoff(draft);

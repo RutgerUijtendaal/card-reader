@@ -477,6 +477,86 @@ describe('PlaytesterIndexPage', () => {
     mounted.unmount();
   });
 
+  test('preserves a stale local draft when starting from the selector', async () => {
+    const staleState = {
+      ...createInitialPlaytestState(buildDeckDetail('owned', 'Owned Tempo', 'Owned Hero', 'me'), () => 0),
+      deckUpdatedAt: '2025-01-01T00:00:00Z',
+    };
+    const staleDraft = serializePlaytestDraft(staleState);
+    localStorage.setItem('card-reader.playtester.owned', JSON.stringify(staleDraft));
+    const mounted = await mountPage();
+    const ownedOption = [...mounted.container.querySelectorAll<HTMLButtonElement>('[data-testid="deck-compact-card"]')]
+      .find((button) => button.textContent?.includes('Owned Tempo'));
+    if (!ownedOption) {
+      throw new Error('expected owned deck option');
+    }
+
+    ownedOption.click();
+    await flushPage();
+
+    expect(mounted.container.textContent).toContain('Start Playtest');
+    expect(mounted.container.textContent).not.toContain('Continue Playtest');
+    expect(mounted.container.textContent).not.toContain('New Playtest');
+
+    const startButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Start Playtest'));
+    if (!startButton) {
+      throw new Error('expected start button');
+    }
+    const pushSpy = vi.spyOn(mounted.router, 'push');
+    startButton.click();
+    await flushPage();
+
+    expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
+    const storedDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
+    expect(storedDraft.state.deckUpdatedAt).toBe('2025-01-01T00:00:00Z');
+    const handoff = takePlaytestRouteHandoff('owned');
+    expect(handoff?.draft?.state.deckUpdatedAt).toBe('2025-01-01T00:00:00Z');
+
+    mounted.unmount();
+  });
+
+  test('clears the previous preview while loading a newly selected deck', async () => {
+    const publicDeferred = createDeferred<ReturnType<typeof buildDeckDetail>>();
+    fetchMyDeckMock.mockImplementation((deckId: string) => {
+      if (deckId === 'public') {
+        return publicDeferred.promise;
+      }
+      return Promise.resolve(buildDeckDetail(deckId, 'Owned Tempo', 'Owned Hero', 'me'));
+    });
+    const mounted = await mountPage();
+    const ownedOption = [...mounted.container.querySelectorAll<HTMLButtonElement>('[data-testid="deck-compact-card"]')]
+      .find((button) => button.textContent?.includes('Owned Tempo'));
+    const publicOption = [...mounted.container.querySelectorAll<HTMLButtonElement>('[data-testid="deck-compact-card"]')]
+      .find((button) => button.textContent?.includes('Public Control'));
+    if (!ownedOption || !publicOption) {
+      throw new Error('expected owned and public deck options');
+    }
+
+    ownedOption.click();
+    await flushPage();
+    expect(mounted.container.textContent).toContain('Opening hand: 7');
+
+    publicOption.click();
+    await flushPage();
+
+    const startButtonWhileLoading = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Start Playtest'));
+    expect(mounted.container.textContent).toContain('Hero: Public Hero');
+    expect(mounted.container.textContent).not.toContain('Opening hand: 7');
+    expect(startButtonWhileLoading?.disabled).toBe(true);
+
+    publicDeferred.resolve(buildDeckDetail('public', 'Public Control', 'Public Hero', 'other'));
+    await flushPage();
+
+    const startButtonAfterLoad = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Start Playtest'));
+    expect(mounted.container.textContent).toContain('Opening hand: 7');
+    expect(startButtonAfterLoad?.disabled).toBe(false);
+
+    mounted.unmount();
+  });
+
   test('shows continue and new playtest actions when the selected deck has a current draft', async () => {
     const draft = serializePlaytestDraft(createInitialPlaytestState(
       buildDeckDetail('owned', 'Owned Tempo', 'Owned Hero', 'me'),

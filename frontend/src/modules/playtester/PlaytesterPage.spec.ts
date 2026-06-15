@@ -598,6 +598,22 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('does not render placeholder cards when the active hand is empty', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    for (let count = 0; count < 7; count += 1) {
+      testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+      await flushPage();
+    }
+
+    const handZone = testZone(mounted.container, 'playtest-hand-zone');
+    expect(handZone.querySelectorAll('[data-instance-id]')).toHaveLength(0);
+    expect(handZone.querySelectorAll('.playtester-hand-placeholder-card')).toHaveLength(0);
+
+    mounted.unmount();
+  });
+
   test('supports undo and redo for playtest state while preserving scale', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);

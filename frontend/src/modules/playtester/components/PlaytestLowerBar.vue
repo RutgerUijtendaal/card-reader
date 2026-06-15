@@ -114,7 +114,7 @@ withDefaults(defineProps<{
   draggingTopInstanceId: null,
   handSubtitle: 'Click a card to put it on the board.',
   handTitle: 'Cards in hand',
-  placeholderHandSize: 7,
+  placeholderHandSize: 0,
   shufflingStackZone: null,
   stackDraggable: true,
   stackInteractive: true,
