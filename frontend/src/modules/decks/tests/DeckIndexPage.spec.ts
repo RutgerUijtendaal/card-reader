@@ -118,7 +118,6 @@ vi.mock('@/modules/decks/components/DeckBrowseFiltersPanel.vue', () => ({
       mode: { type: String, required: true },
       ownedTo: { type: Object, required: true },
       publicTo: { type: Object, required: true },
-      showAuthor: { type: Boolean, default: true },
       totalCount: { type: Number, required: true },
     },
     setup(props) {
@@ -139,13 +138,12 @@ vi.mock('@/modules/decks/components/DeckBrowseFiltersPanel.vue', () => ({
           props.canUseOwnedDecks
             ? h('a', { href: routeHref(props.ownedTo as { path?: string; query?: Record<string, unknown> }) }, 'My Decks')
             : null,
-          props.showAuthor ? h('span', 'Author filter') : null,
           h('span', `Total ${props.totalCount}`),
           h('input', {
-            'data-testid': 'card-query',
-            value: (props.controller as { cardQuery: { value: string } }).cardQuery.value,
+            'data-testid': 'deck-query',
+            value: (props.controller as { query: { value: string } }).query.value,
             onInput: (event: Event) => {
-              (props.controller as { updateCardQuery: (value: string) => void }).updateCardQuery(
+              (props.controller as { updateQuery: (value: string) => void }).updateQuery(
                 (event.target as HTMLInputElement).value,
               );
             },
@@ -315,7 +313,7 @@ describe('DeckIndexPage', () => {
     expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
     expect(mounted.container.querySelector('[data-mode="browse"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/decks/deck-1"]')).not.toBeNull();
-    expect(mounted.container.textContent).toContain('Filter public decks');
+    expect(mounted.container.textContent).toContain('Search public decks');
 
     mounted.unmount();
   });
@@ -337,8 +335,7 @@ describe('DeckIndexPage', () => {
     expect(fetchPublicDeckSummariesMock).not.toHaveBeenCalled();
     expect(mounted.container.querySelector('[data-mode="owned"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/my/decks/deck-1"]')).not.toBeNull();
-    expect(mounted.container.textContent).toContain('Filter your decks');
-    expect(mounted.container.textContent).not.toContain('Author filter');
+    expect(mounted.container.textContent).toContain('Search your decks');
 
     mounted.unmount();
   });
@@ -374,8 +371,8 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('tabs link to public and owned deck routes without carrying author into owned mode', async () => {
-    const mounted = await mountPage('/decks?card_q=Blade&author_q=Frosty');
+  test('tabs link to public and owned deck routes with the shared deck search query', async () => {
+    const mounted = await mountPage('/decks?q=Blade');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
     const publicLink = links.find((link) => link.textContent?.trim() === 'Public');
     const ownedLink = links.find((link) => link.textContent?.trim() === 'My Decks');
@@ -385,13 +382,11 @@ describe('DeckIndexPage', () => {
 
     const publicUrl = new URL(publicLink?.getAttribute('href') ?? '', 'http://localhost');
     expect(publicUrl.pathname).toBe('/decks');
-    expect(publicUrl.searchParams.get('author_q')).toBe('Frosty');
-    expect(publicUrl.searchParams.get('card_q')).toBe('Blade');
+    expect(publicUrl.searchParams.get('q')).toBe('Blade');
 
     const ownedUrl = new URL(ownedLink?.getAttribute('href') ?? '', 'http://localhost');
     expect(ownedUrl.pathname).toBe('/my/decks');
-    expect(ownedUrl.searchParams.get('author_q')).toBeNull();
-    expect(ownedUrl.searchParams.get('card_q')).toBe('Blade');
+    expect(ownedUrl.searchParams.get('q')).toBe('Blade');
 
     mounted.unmount();
   });
@@ -426,13 +421,12 @@ describe('DeckIndexPage', () => {
   });
 
   test.each([
-    ['/decks', fetchPublicDeckSummariesMock, 'Frosty'],
-    ['/my/decks', fetchMyDeckSummariesMock, null],
-  ])('passes route filters to API params for %s', async (path, fetchMock, expectedAuthorQuery) => {
-    const mounted = await mountPage(`${path}?card_q=Blade&author_q=Frosty`);
+    ['/decks', fetchPublicDeckSummariesMock],
+    ['/my/decks', fetchMyDeckSummariesMock],
+  ])('passes route filters to API params for %s', async (path, fetchMock) => {
+    const mounted = await mountPage(`${path}?q=Blade`);
 
-    expect(lastSearchParams(fetchMock).get('card_q')).toBe('Blade');
-    expect(lastSearchParams(fetchMock).get('author_q')).toBe(expectedAuthorQuery);
+    expect(lastSearchParams(fetchMock).get('q')).toBe('Blade');
 
     mounted.unmount();
   });
@@ -440,9 +434,9 @@ describe('DeckIndexPage', () => {
   test.each(['/decks', '/my/decks'])('filter input updates the %s route query', async (path) => {
     vi.useFakeTimers();
     const mounted = await mountPage(path);
-    const input = mounted.container.querySelector<HTMLInputElement>('[data-testid="card-query"]');
+    const input = mounted.container.querySelector<HTMLInputElement>('[data-testid="deck-query"]');
     if (!input) {
-      throw new Error('expected card filter input');
+      throw new Error('expected deck filter input');
     }
 
     input.value = 'Blade';
@@ -451,7 +445,7 @@ describe('DeckIndexPage', () => {
     await vi.advanceTimersByTimeAsync(300);
     await flushPage();
 
-    expect(mounted.router.currentRoute.value.query.card_q).toBe('Blade');
+    expect(mounted.router.currentRoute.value.query.q).toBe('Blade');
 
     mounted.unmount();
   });

@@ -24,7 +24,6 @@
           :controller="filterController"
           :total-count="decks.length"
           :description="filterDescription"
-          :show-author="!isOwnedMode"
           :mode="isOwnedMode ? 'owned' : 'public'"
           :can-use-owned-decks="canUseOwnedDecks"
           :public-to="{ path: '/decks', query: publicFilterRouteQuery }"
@@ -191,22 +190,14 @@ const activeSubtitle = computed(() =>
 );
 const filterDescription = computed(() =>
   isOwnedMode.value
-    ? 'Filter your decks by hero, included cards, and affinity.'
-    : 'Filter public decks by hero, author, included cards, and affinity.',
+    ? 'Search your decks by deck, hero, included cards, and affinity.'
+    : 'Search public decks by deck, hero, owner, included cards, and affinity.',
 );
 const loadingSkeletonCount = 10;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
-const effectiveRouteFilterState = computed(() => ({
-  ...currentRouteFilterState.value,
-  authorQuery: isOwnedMode.value ? '' : currentRouteFilterState.value.authorQuery,
-}));
+const effectiveRouteFilterState = computed(() => currentRouteFilterState.value);
 const publicFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
-const ownedFilterRouteQuery = computed(() =>
-  buildDeckBrowseFilterRouteQuery({
-    ...currentRouteFilterState.value,
-    authorQuery: '',
-  }),
-);
+const ownedFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
 const currentRouteSignature = computed(() => getDeckBrowseFilterSignature(effectiveRouteFilterState.value));
 const hasActiveFilters = computed(() => currentRouteSignature.value.length > 0);
 const emptyLabel = computed(() => {
@@ -224,10 +215,7 @@ const loadDecks = async (): Promise<void> => {
   const requestedPath = currentDeckPath.value;
   loading.value = true;
   try {
-    const params = buildDeckBrowseFilterApiSearchParams({
-      ...selectionState.value,
-      authorQuery: requestedPath === '/my/decks' ? '' : selectionState.value.authorQuery,
-    });
+    const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
     const nextDecks = requestedPath === '/my/decks' ? await fetchMyDeckSummaries(params) : await fetchPublicDeckSummaries(params);
     if (requestId === deckLoadRequestId && currentDeckPath.value === requestedPath) {
       decks.value = nextDecks;
@@ -244,10 +232,7 @@ const debouncedUpdateRoute = useDebounceFn(() => {
     return;
   }
   const nextRouteState = readFilterState();
-  const effectiveNextRouteState = {
-    ...nextRouteState,
-    authorQuery: isOwnedMode.value ? '' : nextRouteState.authorQuery,
-  };
+  const effectiveNextRouteState = nextRouteState;
   if (sameDeckBrowseFilterState(effectiveNextRouteState, effectiveRouteFilterState.value)) {
     return;
   }
@@ -270,12 +255,6 @@ watch(
   async ([, , ready]) => {
     if (!ready) {
       return;
-    }
-    if (isOwnedMode.value && currentRouteFilterState.value.authorQuery) {
-      void router.replace({
-        path: currentDeckPath.value,
-        query: ownedFilterRouteQuery.value,
-      });
     }
     const routeState = effectiveRouteFilterState.value;
     if (!sameDeckBrowseFilterState(readFilterState(), routeState)) {

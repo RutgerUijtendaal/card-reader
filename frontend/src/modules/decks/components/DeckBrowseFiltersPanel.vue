@@ -2,9 +2,9 @@
   <GalleryFilterSidebar
     title="Deck Filters"
     :description="description"
-    :query="controller.heroQuery.value"
-    :on-update-query="controller.updateHeroQuery"
-    search-placeholder="Search hero cards..."
+    :query="controller.query.value"
+    :on-update-query="controller.updateQuery"
+    search-placeholder="Search decks, heroes, owners, or cards..."
     :total-count="totalCount"
     :on-reset="controller.resetFilters"
   >
@@ -34,43 +34,6 @@
       </div>
     </div>
 
-    <div
-      v-if="showAuthor"
-      class="theme-muted-panel space-y-2 p-3"
-    >
-      <div class="space-y-1">
-        <h4 class="theme-section-title text-sm font-semibold">
-          Author
-        </h4>
-        <p class="theme-section-muted text-xs">
-          Match decks published by a username.
-        </p>
-      </div>
-      <input
-        :value="controller.authorQuery.value"
-        class="input-base"
-        placeholder="Search authors..."
-        @input="controller.updateAuthorQuery(($event.target as HTMLInputElement).value)"
-      >
-    </div>
-
-    <div class="theme-muted-panel space-y-2 p-3">
-      <div class="space-y-1">
-        <h4 class="theme-section-title text-sm font-semibold">
-          Cards In Deck
-        </h4>
-        <p class="theme-section-muted text-xs">
-          Match decks containing any mainboard or sideboard card with this name.
-        </p>
-      </div>
-      <input
-        :value="controller.cardQuery.value"
-        class="input-base"
-        placeholder="Search deck cards..."
-        @input="controller.updateCardQuery(($event.target as HTMLInputElement).value)"
-      >
-    </div>
-
     <SymbolToggleGroup
       v-model:included-value="selectedAffinitySymbolIds"
       v-model:excluded-value="excludedAffinitySymbolIds"
@@ -95,7 +58,6 @@ const props = defineProps<{
   controller: DeckBrowseFiltersController;
   totalCount: number;
   description?: string;
-  showAuthor?: boolean;
   mode: 'public' | 'owned';
   canUseOwnedDecks: boolean;
   publicTo: RouteLocationRaw;
@@ -103,7 +65,7 @@ const props = defineProps<{
 }>();
 
 const description = computed(
-  () => props.description ?? 'Filter public decks by hero, author, included cards, and affinity.',
+  () => props.description ?? 'Filter public decks by deck, hero, owner, included cards, and affinity.',
 );
 
 const selectedAffinitySymbolIds = computed({
