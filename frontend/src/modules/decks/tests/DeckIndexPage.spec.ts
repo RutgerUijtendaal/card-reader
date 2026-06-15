@@ -134,9 +134,11 @@ vi.mock('@/modules/decks/components/DeckBrowseFiltersPanel.vue', () => ({
       return () =>
         h('aside', [
           h('p', props.description),
-          h('a', { href: routeHref(props.publicTo as { path?: string; query?: Record<string, unknown> }) }, 'Public'),
           props.canUseOwnedDecks
-            ? h('a', { href: routeHref(props.ownedTo as { path?: string; query?: Record<string, unknown> }) }, 'My Decks')
+            ? [
+                h('a', { href: routeHref(props.publicTo as { path?: string; query?: Record<string, unknown> }) }, 'Public'),
+                h('a', { href: routeHref(props.ownedTo as { path?: string; query?: Record<string, unknown> }) }, 'My Decks'),
+              ]
             : null,
           h('span', `Total ${props.totalCount}`),
           h('input', {
@@ -387,6 +389,21 @@ describe('DeckIndexPage', () => {
     const ownedUrl = new URL(ownedLink?.getAttribute('href') ?? '', 'http://localhost');
     expect(ownedUrl.pathname).toBe('/my/decks');
     expect(ownedUrl.searchParams.get('q')).toBe('Blade');
+
+    mounted.unmount();
+  });
+
+  test('hides the deck library tab selector for anonymous public browsing', async () => {
+    authState.authenticated = false;
+    authState.authEnabled = true;
+    const mounted = await mountPage('/decks');
+    const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
+
+    expect(links.find((link) => link.textContent?.trim() === 'Public')).toBeUndefined();
+    expect(links.find((link) => link.textContent?.trim() === 'My Decks')).toBeUndefined();
+    expect(mounted.container.textContent).toContain('Search public decks');
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(1);
+    expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
 
     mounted.unmount();
   });
