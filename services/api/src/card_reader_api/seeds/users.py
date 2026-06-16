@@ -53,9 +53,11 @@ def seed_users(seed_path: Path) -> UserSeedResult:
         created = bool(user_result[1])
         changed_fields: list[str] = []
 
-        if created:
+        if created or not user.check_password(seed_user.password):
             user.set_password(seed_user.password)
             changed_fields.append("password")
+
+        if created:
             created_count += 1
         else:
             existing_count += 1

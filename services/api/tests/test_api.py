@@ -2445,6 +2445,43 @@ def test_seed_users_creates_missing_configured_users(
     assert viewer_user.is_superuser is False
 
 
+def test_seed_users_updates_existing_user_password(
+    tmp_path: Path,
+) -> None:
+    seed_path = tmp_path / "seed-users.json"
+    seed_path.write_text(
+        """
+        {
+          "users": [
+            {
+              "username": "existing-seed-user",
+              "password": "updated-seed-password",
+              "is_staff": true,
+              "is_superuser": true
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    get_user_model().objects.filter(username="existing-seed-user").delete()
+    existing_user = get_user_model().objects.create_user(
+        username="existing-seed-user",
+        password="old-seed-password",
+        is_staff=False,
+        is_superuser=False,
+    )
+
+    result = seed_users(seed_path)
+
+    existing_user.refresh_from_db()
+    assert result.created == 0
+    assert result.existing == 1
+    assert existing_user.check_password("updated-seed-password")
+    assert existing_user.is_staff is True
+    assert existing_user.is_superuser is True
+
+
 def test_latest_version_patch_updates_manual_fields_and_metadata() -> None:
     username = "staff-card-editor-user"
     password = "password"

@@ -72,6 +72,8 @@ Default seed JSON files live in `src/card_reader_api/seeds`:
 Private local users live in `src/card_reader_api/seeds/seed-users.local.json`. The local users file is
 gitignored and read by `python manage.py seed_users`.
 
+Re-running `seed_users` updates existing configured users, including their password and staff flags.
+
 User seed format:
 
 ```json
