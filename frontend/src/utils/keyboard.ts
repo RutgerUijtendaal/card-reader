@@ -8,6 +8,25 @@ export const isEditableKeyboardTarget = (event: KeyboardEvent): boolean => {
     return true;
   }
 
-  const editableSelector = 'input, textarea, select, [contenteditable="true"], [role="textbox"]';
+  if (target instanceof HTMLInputElement) {
+    const type = target.type.toLowerCase();
+    return type === ''
+      || [
+        'date',
+        'datetime-local',
+        'email',
+        'month',
+        'number',
+        'password',
+        'search',
+        'tel',
+        'text',
+        'time',
+        'url',
+        'week',
+      ].includes(type);
+  }
+
+  const editableSelector = 'textarea, select, [contenteditable="true"], [role="textbox"]';
   return target.matches(editableSelector) || target.closest(editableSelector) !== null;
 };

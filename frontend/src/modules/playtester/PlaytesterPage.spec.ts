@@ -1219,6 +1219,61 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('keeps active play hotkeys available from focused non-text controls and cards', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const hand = testZone(mounted.container, 'playtest-hand-zone');
+    const board = testZone(mounted.container, 'playtest-board-zone');
+    const scaleInput = mounted.container.querySelector<HTMLInputElement>('.playtester-scale');
+    if (!scaleInput) {
+      throw new Error('expected scale input');
+    }
+
+    expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(7);
+    scaleInput.focus();
+    expect(document.activeElement).toBe(scaleInput);
+    scaleInput.dispatchEvent(playtestPointerEvent('pointerup'));
+    await flushPage();
+    expect(document.activeElement).not.toBe(scaleInput);
+
+    const nextTurnButton = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Next turn'));
+    if (!nextTurnButton) {
+      throw new Error('expected next turn button');
+    }
+    nextTurnButton.focus();
+    expect(document.activeElement).toBe(nextTurnButton);
+    nextTurnButton.dispatchEvent(playtestPointerEvent('pointerup'));
+    await flushPage();
+    expect(document.activeElement).not.toBe(nextTurnButton);
+
+    scaleInput.focus();
+    scaleInput.dispatchEvent(playtestKeyEvent('d'));
+    await flushPage();
+    expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(8);
+
+    hand.querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+
+    const boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    if (!boardCard) {
+      throw new Error('expected board card');
+    }
+
+    boardCard.focus();
+    boardCard.dispatchEvent(playtestKeyEvent('t'));
+    await flushPage();
+    expect(board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')?.className)
+      .toContain('playtest-card-tapped');
+
+    boardCard.dispatchEvent(playtestKeyEvent('f'));
+    await flushPage();
+    expect(board.querySelector('[data-instance-id][data-playtest-zone-id="play"] img[alt$="face down"]')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
   test('pastes copied card snapshots after the source card changes or is deleted', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);

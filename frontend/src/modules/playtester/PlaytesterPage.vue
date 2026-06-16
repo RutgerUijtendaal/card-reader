@@ -122,6 +122,8 @@
                 data-testid="playtest-undo"
                 :disabled="undoStack.length === 0"
                 @click="undoPlaytestState"
+                @pointerup="releasePointerFocus"
+                @pointercancel="releasePointerFocus"
               >
                 <Undo2 class="h-4 w-4" />
               </button>
@@ -133,6 +135,8 @@
                 data-testid="playtest-redo"
                 :disabled="redoStack.length === 0"
                 @click="redoPlaytestState"
+                @pointerup="releasePointerFocus"
+                @pointercancel="releasePointerFocus"
               >
                 <Redo2 class="h-4 w-4" />
               </button>
@@ -151,6 +155,8 @@
                 max="1.6"
                 step="0.05"
                 @input="setCardScaleFromInput"
+                @pointerup="releasePointerFocus"
+                @pointercancel="releasePointerFocus"
               >
             </label>
           </div>
@@ -160,6 +166,8 @@
               class="btn-primary"
               type="button"
               @click="nextTurn"
+              @pointerup="releasePointerFocus"
+              @pointercancel="releasePointerFocus"
             >
               Next turn
             </button>
@@ -168,6 +176,8 @@
               type="button"
               :disabled="!playtest.setupSnapshot"
               @click="resetSetup"
+              @pointerup="releasePointerFocus"
+              @pointercancel="releasePointerFocus"
             >
               Reset to Setup
             </button>
@@ -175,6 +185,8 @@
               class="btn-danger-secondary"
               type="button"
               @click="restartConfirmOpen = true"
+              @pointerup="releasePointerFocus"
+              @pointercancel="releasePointerFocus"
             >
               Restart
             </button>
@@ -709,6 +721,13 @@ const setCardScaleFromInput = (event: Event): void => {
     return;
   }
   setCardScale(input.valueAsNumber);
+};
+
+const releasePointerFocus = (event: PointerEvent): void => {
+  const target = event.currentTarget;
+  if (target instanceof HTMLElement) {
+    target.blur();
+  }
 };
 
 const isInstanceDragging = (instanceId: string): boolean =>
@@ -1248,6 +1267,20 @@ const hoveredCard = (): PlaytestCardInstance | null => {
   return playtest.value?.instances.find((instance) => instance.instanceId === target.instanceId) ?? null;
 };
 
+const focusedCard = (): PlaytestCardInstance | null => {
+  const focusedElement = document.activeElement;
+  if (!(focusedElement instanceof HTMLElement) || !focusedElement.closest('.playtester-page')) {
+    return null;
+  }
+
+  const instanceId = focusedElement.closest<HTMLElement>('[data-instance-id]')?.dataset.instanceId;
+  if (!instanceId) {
+    return null;
+  }
+
+  return playtest.value?.instances.find((instance) => instance.instanceId === instanceId) ?? null;
+};
+
 const selectedBoardIds = (): string[] =>
   selectedBoardInstanceIds.value.filter((instanceId) =>
     playtest.value?.instances.some((instance) => instance.instanceId === instanceId && instance.zoneId === 'play') === true,
@@ -1257,6 +1290,10 @@ const hotkeyCardIds = (options: { boardOnly: boolean }): string[] => {
   const hovered = hoveredCard();
   if (hovered && (!options.boardOnly || hovered.zoneId === 'play')) {
     return [hovered.instanceId];
+  }
+  const focused = focusedCard();
+  if (focused && (!options.boardOnly || focused.zoneId === 'play')) {
+    return [focused.instanceId];
   }
   return selectedBoardIds();
 };
@@ -1911,6 +1948,7 @@ onMounted(() => {
   color: var(--playtest-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
+  user-select: none;
 }
 
 .playtester-board-label {
@@ -1931,6 +1969,7 @@ onMounted(() => {
   font-size: 0.95rem;
   font-weight: 700;
   pointer-events: none;
+  user-select: none;
 }
 
 .playtester-board-card {

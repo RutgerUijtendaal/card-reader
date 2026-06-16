@@ -210,6 +210,7 @@ useResizeObserver(lowerBarRef, ([entry]) => {
   color: var(--playtest-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
+  user-select: none;
 }
 
 .playtester-hand-fan {
