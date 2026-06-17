@@ -187,10 +187,10 @@ useResizeObserver(lowerBarRef, ([entry]) => {
   flex: 0 0 auto;
   gap: 0.75rem;
   overflow: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--playtest-border) 82%, transparent);
+  background: color-mix(in srgb, var(--playtest-surface) 42%, transparent);
   padding: 0.75rem;
-  border-top: 1px solid var(--playtest-border);
-  background: var(--playtest-panel-muted);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 -0.75rem 1.5rem color-mix(in srgb, var(--color-shadow) 16%, transparent);
 }
 
 .playtester-hand {

@@ -8,16 +8,14 @@ import {
   getZoneInstances,
   serializePlaytestDraft,
 } from '@/modules/playtester/playtestState';
-import {
-  clearPlaytestRouteHandoffs,
-  setPlaytestRouteHandoff,
-} from '@/modules/playtester/utils/routeHandoff';
 
 const {
   authState,
   fetchCurrentCardBackMock,
   fetchDeckDetailMock,
   fetchMyDeckMock,
+  fetchMyDeckSummariesMock,
+  fetchPublicDeckSummariesMock,
 } = vi.hoisted(() => ({
   authState: {
     authenticated: true,
@@ -25,6 +23,8 @@ const {
   fetchCurrentCardBackMock: vi.fn(),
   fetchDeckDetailMock: vi.fn(),
   fetchMyDeckMock: vi.fn(),
+  fetchMyDeckSummariesMock: vi.fn(),
+  fetchPublicDeckSummariesMock: vi.fn(),
 }));
 
 vi.mock('@/api/client', () => ({
@@ -38,6 +38,8 @@ vi.mock('@/modules/auth/authStore', () => ({
 vi.mock('@/modules/decks/api', () => ({
   fetchDeckDetail: fetchDeckDetailMock,
   fetchMyDeck: fetchMyDeckMock,
+  fetchMyDeckSummaries: fetchMyDeckSummariesMock,
+  fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
 }));
 
 vi.mock('@/modules/playtester/api', () => ({
@@ -160,7 +162,7 @@ const mountPage = async (): Promise<{ container: HTMLElement; router: ReturnType
     history: createMemoryHistory(),
     routes: [
       { path: '/playtester/:deckId', component: PlaytesterPage },
-      { path: '/playtester', component: { template: '<div />' } },
+      { path: '/playtester', component: PlaytesterPage },
       { path: '/decks/:id', component: { template: '<div />' } },
     ],
   });
@@ -245,6 +247,8 @@ describe('PlaytesterPage', () => {
     authState.authenticated = true;
     fetchMyDeckMock.mockRejectedValue(new Error('not owned'));
     fetchDeckDetailMock.mockResolvedValue(deckRecord);
+    fetchMyDeckSummariesMock.mockResolvedValue([]);
+    fetchPublicDeckSummariesMock.mockResolvedValue([]);
     fetchCurrentCardBackMock.mockResolvedValue({
       current: {
         id: 'card-back-1',
@@ -260,7 +264,6 @@ describe('PlaytesterPage', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
-    clearPlaytestRouteHandoffs();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
@@ -274,27 +277,6 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Opening hand');
     expect(testZone(mounted.container, 'playtest-hero-zone')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="playtest-other-zone"]')).toBeNull();
-
-    mounted.unmount();
-  });
-
-  test('uses route handoff without refetching deck detail', async () => {
-    const previewState = createInitialPlaytestState(deckRecord, () => 0);
-    const previewDraft = serializePlaytestDraft(previewState);
-    setPlaytestRouteHandoff('deck-1', {
-      deck: deckRecord,
-      draft: previewDraft,
-    });
-
-    const mounted = await mountPage();
-
-    expect(fetchMyDeckMock).not.toHaveBeenCalled();
-    expect(fetchDeckDetailMock).not.toHaveBeenCalled();
-    expect(mounted.container.textContent).toContain('Playtest Deck');
-    expect(getZoneInstances(JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}').state, 'hand')
-      .map((instance) => instance.instanceId)).toEqual(
-      getZoneInstances(previewState, 'hand').map((instance) => instance.instanceId),
-    );
 
     mounted.unmount();
   });
@@ -317,6 +299,22 @@ describe('PlaytesterPage', () => {
     expect(fetchDeckDetailMock).toHaveBeenCalledWith('deck-2');
     expect(mounted.container.textContent).toContain('Second Playtest Deck');
     expect(localStorage.getItem('card-reader.playtester.deck-2')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('returns to pre-setup without clearing the saved draft', async () => {
+    const mounted = await mountPage();
+
+    expect(mounted.container.textContent).toContain('Playtest Deck');
+    expect(localStorage.getItem('card-reader.playtester.deck-1')).not.toBeNull();
+
+    await mounted.router.push('/playtester');
+    await flushPage();
+
+    expect(mounted.container.querySelector('[data-testid="playtester-pre-setup-surface"]')).not.toBeNull();
+    expect(mounted.container.textContent).toContain('Select Deck');
+    expect(localStorage.getItem('card-reader.playtester.deck-1')).not.toBeNull();
 
     mounted.unmount();
   });

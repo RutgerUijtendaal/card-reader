@@ -2,12 +2,8 @@
 import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import PlaytesterIndexPage from '@/modules/playtester/PlaytesterIndexPage.vue';
+import PlaytesterPage from '@/modules/playtester/PlaytesterPage.vue';
 import { createInitialPlaytestState, getZoneInstances, serializePlaytestDraft } from '@/modules/playtester/playtestState';
-import {
-  clearPlaytestRouteHandoffs,
-  takePlaytestRouteHandoff,
-} from '@/modules/playtester/utils/routeHandoff';
 
 const {
   authState,
@@ -198,13 +194,13 @@ const mountPage = async (): Promise<{
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/playtester', component: PlaytesterIndexPage },
-      { path: '/playtester/:deckId', component: { template: '<div />' } },
+      { path: '/playtester', component: PlaytesterPage },
+      { path: '/playtester/:deckId', component: PlaytesterPage },
     ],
   });
   await router.push('/playtester');
   await router.isReady();
-  const app = createApp(PlaytesterIndexPage);
+  const app = createApp(PlaytesterPage);
   app.use(router);
   app.mount(container);
   await flushPage();
@@ -218,7 +214,7 @@ const mountPage = async (): Promise<{
   };
 };
 
-describe('PlaytesterIndexPage', () => {
+describe('PlaytesterPage pre-setup stage', () => {
   beforeEach(() => {
     localStorage.clear();
     authState.authenticated = true;
@@ -235,7 +231,6 @@ describe('PlaytesterIndexPage', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
-    clearPlaytestRouteHandoffs();
     vi.clearAllMocks();
     vi.useRealTimers();
   });
@@ -459,13 +454,6 @@ describe('PlaytesterIndexPage', () => {
     await flushPage();
 
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
-    const handoff = takePlaytestRouteHandoff('owned');
-    expect(handoff?.deck.id).toBe('owned');
-    expect(handoff?.draft).not.toBeNull();
-    if (!handoff?.draft) {
-      throw new Error('expected playtest route handoff draft');
-    }
-    expect(getZoneInstances(handoff.draft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
     const storedDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
     expect(getZoneInstances(storedDraft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
     expect(getZoneInstances(storedDraft.state, 'library')).toHaveLength(3);
@@ -506,8 +494,6 @@ describe('PlaytesterIndexPage', () => {
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
     const storedDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
     expect(storedDraft.state.deckUpdatedAt).toBe('2025-01-01T00:00:00Z');
-    const handoff = takePlaytestRouteHandoff('owned');
-    expect(handoff?.draft?.state.deckUpdatedAt).toBe('2025-01-01T00:00:00Z');
 
     mounted.unmount();
   });
@@ -571,7 +557,6 @@ describe('PlaytesterIndexPage', () => {
 
     expect(mounted.container.textContent).toContain('Continue Playtest');
     expect(mounted.container.textContent).toContain('New Playtest');
-    const pushSpy = vi.spyOn(mounted.router, 'push');
     const continueButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.includes('Continue Playtest'));
     const newButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
@@ -580,6 +565,7 @@ describe('PlaytesterIndexPage', () => {
       throw new Error('expected continue and new playtest buttons');
     }
 
+    const pushSpy = vi.spyOn(mounted.router, 'push');
     continueButton.click();
     await flushPage();
 

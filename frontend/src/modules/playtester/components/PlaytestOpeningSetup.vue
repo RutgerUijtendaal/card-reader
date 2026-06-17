@@ -280,10 +280,10 @@ const openingHandCardStyle = (index: number, total: number): Record<string, stri
   grid-template-columns: minmax(16rem, 1fr) minmax(0, max-content);
   gap: 0.75rem;
   min-height: calc((var(--playtest-card-width, 9.75rem) * 1.42) + 5.5rem);
+  border-top: 1px solid color-mix(in srgb, var(--playtest-border) 82%, transparent);
+  background: color-mix(in srgb, var(--playtest-surface) 42%, transparent);
   padding: 0.75rem;
-  border-top: 1px solid var(--playtest-border, rgba(255, 255, 255, 0.1));
-  background: var(--playtest-panel-muted, rgba(8, 10, 10, 0.64));
-  backdrop-filter: blur(12px);
+  box-shadow: 0 -0.75rem 1.5rem color-mix(in srgb, var(--color-shadow) 16%, transparent);
 }
 
 .playtest-opening-selections {
