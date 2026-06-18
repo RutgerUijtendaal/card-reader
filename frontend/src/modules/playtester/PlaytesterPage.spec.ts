@@ -494,14 +494,9 @@ describe('PlaytesterPage', () => {
       .some((button) => button.textContent?.includes('Draw hand'))).toBe(true);
     expect(testZone(mounted.container, 'playtest-opening-library-browser')).not.toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-library-browser').textContent).toContain('Library');
-    const handButton = [...testZone(mounted.container, 'playtest-opening-library-browser')
+    expect([...testZone(mounted.container, 'playtest-opening-library-browser')
       .querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.includes('Hand'));
-    handButton?.click();
-    await flushPage();
-    expect(testZone(mounted.container, 'playtest-opening-picked-mana')
-      .querySelectorAll('[data-instance-id]')).toHaveLength(4);
-    expect(testZone(mounted.container, 'playtest-opening-picked-mana').textContent).toContain('Hand 1');
+      .some((button) => button.textContent?.includes('Hand'))).toBe(false);
     const playButton = [...testZone(mounted.container, 'playtest-opening-library-browser')
       .querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.includes('Play'));
@@ -509,7 +504,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
     expect(mounted.container.querySelector('[data-testid="playtest-opening-setup-play-zone"]')).toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-picked-mana')
-      .querySelectorAll('[data-instance-id]')).toHaveLength(5);
+      .querySelectorAll('[data-instance-id]')).toHaveLength(4);
     expect(testZone(mounted.container, 'playtest-opening-picked-mana').textContent).toContain('Play 1');
     const banishButton = [...testZone(mounted.container, 'playtest-opening-library-browser')
       .querySelectorAll<HTMLButtonElement>('button')]
@@ -574,7 +569,8 @@ describe('PlaytesterPage', () => {
     if (!libraryCard) {
       throw new Error('expected setup library card');
     }
-    vi.spyOn(libraryCard, 'getBoundingClientRect').mockReturnValue(rect(40, 120, 100, 140));
+    const libraryCardRect = vi.spyOn(libraryCard, 'getBoundingClientRect');
+    libraryCardRect.mockReturnValue(rect(40, 120, 100, 140));
 
     const originalElementsFromPoint = document.elementsFromPoint;
     Object.defineProperty(document, 'elementsFromPoint', {
@@ -587,19 +583,15 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 41, clientX: 90, clientY: 170 }));
     await flushPage();
 
-    expect(handDropZone.textContent).toContain('Hand 1');
-    const handCard = handDropZone.querySelector<HTMLElement>('[data-playtest-zone-id="hand"]');
-    if (!handCard) {
-      throw new Error('expected setup hand card');
-    }
-    vi.spyOn(handCard, 'getBoundingClientRect').mockReturnValue(rect(80, 420, 100, 140));
+    expect(handDropZone.textContent).not.toContain('Hand 1');
     const banishZone = testZone(mounted.container, 'playtest-banish-zone');
+    libraryCardRect.mockReturnValue(rect(80, 420, 100, 140));
     Object.defineProperty(document, 'elementsFromPoint', {
       configurable: true,
       value: () => [banishZone],
     });
 
-    handCard.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 42, clientX: 90, clientY: 430 }));
+    libraryCard.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 42, clientX: 90, clientY: 430 }));
     window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 42, clientX: 180, clientY: 430 }));
     window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 42, clientX: 180, clientY: 430 }));
     await flushPage();
@@ -724,7 +716,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     const openingLibraryMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
-    expect(openingLibraryMenuText).toContain('To Hand');
+    expect(openingLibraryMenuText).not.toContain('To Hand');
     expect(openingLibraryMenuText).toContain('To Discard');
     expect(openingLibraryMenuText).toContain('To Banish');
     expect(openingLibraryMenuText).toContain('To Hero');
@@ -753,7 +745,7 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
-  test('opening stack overlay card actions can move cards to hand but not board', async () => {
+  test('opening setup card actions can move cards between setup zones but not hand or board', async () => {
     const mounted = await mountPage();
 
     const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
@@ -787,7 +779,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     const cardMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
-    expect(cardMenuText).toContain('To Hand');
+    expect(cardMenuText).not.toContain('To Hand');
     expect(cardMenuText).toContain('To Discard');
     expect(cardMenuText).toContain('To Banish');
     expect(cardMenuText).toContain('To Hero');
@@ -1532,6 +1524,11 @@ describe('PlaytesterPage', () => {
     expect(libraryAfter).not.toEqual(libraryBefore);
     expect([...libraryAfter].sort()).toEqual([...libraryBefore].sort());
 
+    expect(mounted.container.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
+    window.dispatchEvent(playtestKeyEvent('o'));
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-stack-overlay').textContent).toContain('Library');
+
     mounted.unmount();
   });
 
@@ -1691,11 +1688,15 @@ describe('PlaytesterPage', () => {
     testZone(mounted.container, 'playtest-library-zone').dispatchEvent(libraryContext);
     await flushPage();
 
-    const libraryMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    const libraryMenu = document.body.querySelector<HTMLElement>('[data-testid="playtest-context-menu"]');
+    const libraryMenuText = libraryMenu?.textContent ?? '';
     expect(libraryMenuText).toContain('Draw');
     expect(libraryMenuText).toContain('D');
     expect(libraryMenuText).toContain('Shuffle');
     expect(libraryMenuText).toContain('R');
+    expect(libraryMenuText).toContain('Open');
+    const openAction = Array.from(libraryMenu?.querySelectorAll('button') ?? []).find((action) => action.textContent?.includes('Open'));
+    expect(openAction?.querySelector('.playtest-context-menu-hotkey')?.textContent).toContain('O');
     expect(libraryMenuText).not.toContain('Draw Top Card');
     expect(libraryMenuText).not.toContain('Shuffle Library');
     expect(libraryMenuText).not.toContain('Open Stack');

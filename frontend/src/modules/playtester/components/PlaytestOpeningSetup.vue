@@ -49,6 +49,7 @@
     <div class="playtest-opening-main">
       <section
         v-if="openingStep === 'mana'"
+        key="mana"
         class="playtest-opening-panel playtest-opening-mana"
         data-testid="playtest-opening-mana"
       >
@@ -104,6 +105,7 @@
 
       <section
         v-else-if="openingStep === 'setup'"
+        key="setup"
         class="playtest-opening-setup-stage"
       >
         <section
@@ -121,6 +123,7 @@
           <div class="playtest-opening-setup-list app-scrollbar">
             <div
               v-if="setupGroups.length === 0"
+              key="setup-empty"
               class="playtest-opening-empty"
             >
               No cards with Setup tags found.
@@ -212,19 +215,13 @@
             >
               Play
             </button>
-            <button
-              class="btn-secondary"
-              type="button"
-              @click="emit('move-setup-card', group.instances[0].instanceId, 'hand')"
-            >
-              Hand
-            </button>
           </template>
         </PlaytestStackBrowser>
       </section>
 
       <section
         v-else
+        key="hand"
         class="playtest-opening-hand-stage"
         data-testid="playtest-opening-hand"
       >
@@ -243,6 +240,7 @@
           </div>
           <div
             v-if="handInstances.length === 0"
+            key="opening-hand-empty"
             class="playtest-opening-empty"
           >
             No cards available.
@@ -286,7 +284,6 @@
       <section
         class="playtest-opening-picked-mana"
         :class="selectedManaInstances.length === 0 ? 'playtest-opening-picked-mana-empty' : ''"
-        data-playtest-drop-zone="hand"
         data-testid="playtest-opening-picked-mana"
       >
         <div class="playtest-opening-picked-mana-bar">
@@ -310,6 +307,7 @@
           </div>
           <span
             v-if="bottomZoneInstances.length === 0"
+            key="bottom-placeholder"
             class="playtest-opening-picked-mana-placeholder"
           />
         </div>
@@ -605,6 +603,12 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   border-radius: 999px;
   background: color-mix(in srgb, var(--playtest-panel-strong) 38%, transparent);
   color: var(--playtest-text);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
 }
 
 .playtest-opening-step-nav-button svg {
@@ -615,6 +619,13 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
 .playtest-opening-step-nav-button:disabled {
   cursor: default;
   opacity: 0.38;
+}
+
+.playtest-opening-step-nav-button:not(:disabled):hover,
+.playtest-opening-step-nav-button:not(:disabled):focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 58%, var(--playtest-border));
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--playtest-panel-strong));
+  transform: translateY(-0.08rem);
 }
 
 .playtest-opening-step {
@@ -628,6 +639,9 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   font-size: 0.78rem;
   font-weight: 400;
   padding: 0;
+  transition:
+    color 150ms ease,
+    opacity 150ms ease;
 }
 
 .playtest-opening-step:disabled {
@@ -642,6 +656,10 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   border: 1px solid var(--playtest-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--playtest-panel-strong) 42%, transparent);
+  transition:
+    background-color 170ms ease,
+    border-color 170ms ease,
+    transform 170ms ease;
 }
 
 .playtest-opening-step-active {
@@ -652,6 +670,31 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
 .playtest-opening-step-complete span {
   border-color: color-mix(in srgb, var(--color-accent) 62%, var(--playtest-border));
   background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+.playtest-opening-step:not(:disabled):hover span,
+.playtest-opening-step:not(:disabled):focus-visible span {
+  transform: translateY(-0.08rem);
+}
+
+.playtest-opening-stage-enter-active,
+.playtest-opening-stage-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.playtest-opening-stage-enter-from {
+  opacity: 0;
+  filter: blur(0.2rem);
+  transform: translateY(0.6rem) scale(0.992);
+}
+
+.playtest-opening-stage-leave-to {
+  opacity: 0;
+  filter: blur(0.16rem);
+  transform: translateY(-0.45rem) scale(0.996);
 }
 
 .playtest-opening-hand-actions {
@@ -758,6 +801,16 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   flex-direction: column;
   align-items: center;
   cursor: pointer;
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease,
+    filter 170ms ease;
+}
+
+.playtest-opening-mana-card:hover,
+.playtest-opening-mana-card:focus-visible {
+  filter: brightness(1.05);
+  transform: translateY(-0.18rem);
 }
 
 .playtest-opening-card-copy-actions {
@@ -778,12 +831,18 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   color: var(--playtest-text-muted);
   font-size: 0.78rem;
   font-weight: 900;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .playtest-opening-copy-button-selected {
   border-color: color-mix(in srgb, var(--color-accent) 70%, var(--playtest-border));
   background: color-mix(in srgb, var(--color-accent) 26%, transparent);
   color: var(--playtest-text);
+  transform: translateY(-0.08rem);
 }
 
 .playtest-opening-mana-accept {
@@ -842,11 +901,20 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   gap: 1rem;
   cursor: pointer;
   padding-right: 0.2rem;
+  transition:
+    border-color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
 .playtest-opening-setup-card:hover,
 .playtest-opening-setup-card:focus-visible {
   border-top-color: color-mix(in srgb, var(--color-accent) 54%, var(--playtest-border));
+  transform: translateX(0.16rem);
+}
+
+.playtest-opening-setup-card-handled {
+  opacity: 0.72;
 }
 
 .playtest-opening-setup-card-preview {
@@ -882,6 +950,14 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   line-height: 1.55;
   overflow-wrap: anywhere;
   padding: 0.75rem 0.85rem;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.playtest-opening-setup-card-handled .playtest-opening-setup-rule-text {
+  border-color: color-mix(in srgb, var(--color-accent) 44%, var(--playtest-border));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--playtest-panel-strong));
 }
 
 .playtest-opening-setup-check {
@@ -995,7 +1071,47 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   flex: 0 0 auto;
   transition:
     transform 180ms ease,
-    margin 180ms ease;
+    margin 180ms ease,
+    opacity 160ms ease,
+    filter 160ms ease;
+}
+
+.playtest-card-list-enter-active,
+.playtest-card-list-leave-active {
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease,
+    filter 170ms ease;
+}
+
+.playtest-card-list-enter-from,
+.playtest-card-list-leave-to {
+  opacity: 0;
+  filter: blur(0.12rem);
+  transform: translateY(0.35rem) scale(0.98);
+}
+
+.playtest-card-list-move {
+  transition: transform 180ms ease;
+}
+
+.playtest-hand-fan-enter-active,
+.playtest-hand-fan-leave-active {
+  transition:
+    opacity 170ms ease,
+    filter 170ms ease;
+}
+
+.playtest-hand-fan-enter-from,
+.playtest-hand-fan-leave-to {
+  opacity: 0;
+  filter: blur(0.12rem);
+}
+
+.playtest-hand-fan-move {
+  transition:
+    transform 190ms ease,
+    margin 190ms ease;
 }
 
 .playtest-opening-stacks {
@@ -1039,6 +1155,21 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     min-width: 0;
     overflow-x: auto;
     justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playtest-opening *,
+  .playtest-opening-stage-enter-active,
+  .playtest-opening-stage-leave-active,
+  .playtest-card-list-enter-active,
+  .playtest-card-list-leave-active,
+  .playtest-card-list-move,
+  .playtest-hand-fan-enter-active,
+  .playtest-hand-fan-leave-active,
+  .playtest-hand-fan-move {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
   }
 }
 </style>

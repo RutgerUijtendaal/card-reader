@@ -1315,7 +1315,38 @@ const shuffleLibrary = (): boolean => {
   return true;
 };
 
+const openLibraryStack = (): boolean => {
+  if (!playtest.value || countZone(playtest.value, 'library') === 0) {
+    return false;
+  }
+  openStack('library');
+  return true;
+};
+
+const openPreviewLibraryStack = (): boolean => {
+  const previewState = deckSelection.selectedPlaytest.value;
+  if (!previewState || countZone(previewState, 'library') === 0) {
+    return false;
+  }
+  deckSelection.openPreviewStack('library');
+  return true;
+};
+
 const handlePlaytesterHotkey = (event: KeyboardEvent): boolean => {
+  const plainSingleKey =
+    !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey
+    && !event.shiftKey
+    && event.key.length === 1;
+  const normalizedKey = event.key.toLowerCase();
+
+  if (isPreSetupStage.value) {
+    return plainSingleKey && normalizedKey === 'o'
+      ? openPreviewLibraryStack()
+      : false;
+  }
+
   if (!isPlayHotkeyEnabled()) {
     return false;
   }
@@ -1355,11 +1386,10 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): boolean => {
     return true;
   }
 
-  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.key.length !== 1) {
+  if (!plainSingleKey) {
     return false;
   }
 
-  const normalizedKey = event.key.toLowerCase();
   if (normalizedKey === 'n') {
     return nextTurn();
   }
@@ -1388,11 +1418,14 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): boolean => {
   if (normalizedKey === 'r') {
     return shuffleLibrary();
   }
+  if (normalizedKey === 'o') {
+    return openLibraryStack();
+  }
   return false;
 };
 
 usePlaytestHotkeys({
-  enabled: computed(() => !isPreSetupStage.value),
+  enabled: computed(() => isPreSetupStage.value || playtest.value !== null),
   handleHotkey: handlePlaytesterHotkey,
 });
 
@@ -1547,21 +1580,24 @@ const closeContextMenu = (): void => {
 
 const isOpeningPhase = (): boolean => playtest.value?.phase === 'opening';
 
-const isOpeningDestinationZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'hand' | 'discard' | 'banish' | 'hero' =>
-  zoneId === 'library' || zoneId === 'hand' || zoneId === 'discard' || zoneId === 'banish' || zoneId === 'hero';
+const isOpeningTransferSourceZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'hand' | 'discard' | 'banish' =>
+  zoneId === 'library' || zoneId === 'hand' || zoneId === 'discard' || zoneId === 'banish';
+
+const isOpeningTransferDestinationZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'discard' | 'banish' | 'hero' =>
+  zoneId === 'library' || zoneId === 'discard' || zoneId === 'banish' || zoneId === 'hero';
 
 const isOpeningStagedPlaySource = (state: PlaytestState, instance: PlaytestCardInstance): boolean =>
   instance.zoneId === 'other' && state.openingSetup.selectedSetupInstanceIds.includes(instance.instanceId);
 
 const isOpeningTransferSource = (state: PlaytestState, instance: PlaytestCardInstance): boolean =>
-  instance.zoneId !== 'hero' && (isOpeningDestinationZone(instance.zoneId) || isOpeningStagedPlaySource(state, instance));
+  isOpeningTransferSourceZone(instance.zoneId) || isOpeningStagedPlaySource(state, instance);
 
 const canMoveOpeningTransferToZone = (
   state: PlaytestState,
   instance: PlaytestCardInstance,
   zoneId: PlaytestZoneId | 'board',
-): zoneId is 'library' | 'hand' | 'discard' | 'banish' | 'hero' =>
-  isOpeningDestinationZone(zoneId)
+): zoneId is 'library' | 'discard' | 'banish' | 'hero' =>
+  isOpeningTransferDestinationZone(zoneId)
   && state.openingSetup.step === 'setup';
 
 const moveOpeningTransferCard = (
@@ -1594,7 +1630,6 @@ const openingCardActions = (instanceId: string, instance: PlaytestCardInstance):
     return [];
   }
   const zoneActions: PlaytestEntityAction[] = [
-    { id: 'move-hand', label: 'To Hand', disabled: instance.zoneId === 'hand' || !canMoveOpeningTransferToZone(playtest.value, instance, 'hand'), run: () => moveOpeningSetupCard(instanceId, 'hand') },
     { id: 'move-discard', label: 'To Discard', disabled: instance.zoneId === 'discard', run: () => moveOpeningSetupCard(instanceId, 'discard') },
     { id: 'move-banish', label: 'To Banish', disabled: instance.zoneId === 'banish', run: () => moveOpeningSetupCard(instanceId, 'banish') },
     { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveOpeningSetupCard(instanceId, 'library') },
@@ -1650,12 +1685,10 @@ const openingStackActions = (zoneId: PlaytestZoneId, hasCards: boolean): Playtes
   const actions: PlaytestEntityAction[] = [
     { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
   ];
-  if (!isOpeningDestinationZone(zoneId) || zoneId === 'hero') {
+  if (!isOpeningTransferSourceZone(zoneId)) {
     return actions;
   }
-  const topInstance = stackTopInstance(zoneId);
   const zoneActions: PlaytestEntityAction[] = [
-    { id: 'top-hand', label: 'Top to Hand', disabled: !topInstance || !playtest.value || zoneId === 'hand' || !canMoveOpeningTransferToZone(playtest.value, topInstance, 'hand'), run: () => moveTopStackCard(zoneId, 'hand') },
     { id: 'top-discard', label: 'Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },
     { id: 'top-banish', label: 'Top to Banish', disabled: !hasCards || zoneId === 'banish', run: () => moveTopStackCard(zoneId, 'banish') },
     { id: 'top-library', label: 'Top to Library', disabled: !hasCards || zoneId === 'library', run: () => moveTopStackCard(zoneId, 'library') },
@@ -1698,7 +1731,7 @@ const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
           run: shuffleLibrary,
         }]
       : []),
-    { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
+    { id: 'stack-open', label: 'Open', hotkey: zoneId === 'library' ? 'O' : undefined, disabled: !hasCards, run: () => openStack(zoneId) },
     { id: 'top-hand', label: 'Top to Hand', dividerBefore: true, disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'hand') },
     { id: 'top-play', label: 'Top to Board', disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'play') },
     { id: 'top-discard', label: 'Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },

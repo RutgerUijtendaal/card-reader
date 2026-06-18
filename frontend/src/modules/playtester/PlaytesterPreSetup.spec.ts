@@ -184,6 +184,12 @@ const flushPage = async (): Promise<void> => {
   await nextTick();
 };
 
+const playtestKeyEvent = (key: string): KeyboardEvent => new KeyboardEvent('keydown', {
+  key,
+  bubbles: true,
+  cancelable: true,
+});
+
 const mountPage = async (): Promise<{
   container: HTMLElement;
   router: ReturnType<typeof createRouter>;
@@ -440,6 +446,10 @@ describe('PlaytesterPage pre-setup stage', () => {
     libraryStack?.click();
     await flushPage();
     expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')).toBeNull();
+    window.dispatchEvent(playtestKeyEvent('o'));
+    await flushPage();
+    expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')?.textContent).toContain('Library');
+    expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')?.textContent).toContain('3 cards');
 
     const startButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.includes('Start Playtest'));

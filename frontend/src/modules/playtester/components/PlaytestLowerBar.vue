@@ -227,7 +227,9 @@ useResizeObserver(lowerBarRef, ([entry]) => {
   flex: 0 0 auto;
   transition:
     transform 180ms ease,
-    margin 180ms ease;
+    margin 180ms ease,
+    opacity 160ms ease,
+    filter 160ms ease;
 }
 
 .playtester-hand-placeholder-card {
@@ -255,6 +257,25 @@ useResizeObserver(lowerBarRef, ([entry]) => {
   object-fit: contain;
 }
 
+.playtest-lower-hand-enter-active,
+.playtest-lower-hand-leave-active {
+  transition:
+    opacity 160ms ease,
+    filter 160ms ease;
+}
+
+.playtest-lower-hand-enter-from,
+.playtest-lower-hand-leave-to {
+  opacity: 0;
+  filter: blur(0.12rem);
+}
+
+.playtest-lower-hand-move {
+  transition:
+    transform 190ms ease,
+    margin 190ms ease;
+}
+
 .playtester-piles {
   display: flex;
   flex: 0 0 auto;
@@ -269,6 +290,16 @@ useResizeObserver(lowerBarRef, ([entry]) => {
 
   .playtester-hand {
     min-width: 23rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playtester-lower *,
+  .playtest-lower-hand-enter-active,
+  .playtest-lower-hand-leave-active,
+  .playtest-lower-hand-move {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
   }
 }
 </style>

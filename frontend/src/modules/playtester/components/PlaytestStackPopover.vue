@@ -97,4 +97,29 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
   height: 100%;
   max-height: 100%;
 }
+
+.playtester-stack-popover-enter-active,
+.playtester-stack-popover-leave-active {
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease,
+    filter 170ms ease;
+}
+
+.playtester-stack-popover-enter-from,
+.playtester-stack-popover-leave-to {
+  opacity: 0;
+  filter: blur(0.14rem);
+  transform: translateY(0.45rem) scale(0.992);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playtester-stack-popover,
+  .playtester-stack-popover *,
+  .playtester-stack-popover-enter-active,
+  .playtester-stack-popover-leave-active {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
 </style>

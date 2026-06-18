@@ -349,6 +349,11 @@ onBeforeUnmount(() => {
 .playtester-board-card {
   position: absolute;
   transform: translate(-50%, -50%);
+  animation: playtester-board-card-in 120ms ease-out;
+}
+
+.playtester-board-pile {
+  animation: playtester-board-card-in 120ms ease-out;
 }
 
 .playtester-selection-box {
@@ -376,6 +381,26 @@ onBeforeUnmount(() => {
 
   .playtester-board {
     min-height: 22rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playtester-topbar *,
+  .playtester-board * {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+@keyframes playtester-board-card-in {
+  from {
+    opacity: 0;
+    filter: blur(0.08rem);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
   }
 }
 </style>

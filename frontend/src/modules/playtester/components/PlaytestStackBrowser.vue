@@ -68,6 +68,7 @@
 
       <p
         v-if="filteredGroups.length === 0"
+        key="stack-browser-empty"
         class="playtest-stack-browser-empty"
       >
         {{ emptyMessage }}
@@ -192,6 +193,7 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
   border-radius: 0.9rem;
   background: var(--playtest-panel-strong);
   box-shadow: 0 2rem 5rem color-mix(in srgb, var(--color-shadow) 20%, transparent);
+  animation: playtest-stack-browser-in 170ms ease-out;
 }
 
 .playtest-stack-browser-flush {
@@ -249,6 +251,15 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
   gap: 0.7rem;
   border-top: 1px solid color-mix(in srgb, var(--playtest-border) 72%, transparent);
   padding-top: 0.75rem;
+  transition:
+    border-color 150ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.playtest-stack-browser-card:hover {
+  border-top-color: color-mix(in srgb, var(--color-accent) 42%, var(--playtest-border));
+  transform: translateX(0.12rem);
 }
 
 .playtest-stack-browser-card-main {
@@ -274,5 +285,47 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 0.35rem;
+}
+
+.playtest-stack-browser-list-enter-active,
+.playtest-stack-browser-list-leave-active {
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    filter 160ms ease;
+}
+
+.playtest-stack-browser-list-enter-from,
+.playtest-stack-browser-list-leave-to {
+  opacity: 0;
+  filter: blur(0.1rem);
+  transform: translateY(0.3rem);
+}
+
+.playtest-stack-browser-list-move {
+  transition: transform 180ms ease;
+}
+
+@keyframes playtest-stack-browser-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem) scale(0.992);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playtest-stack-browser,
+  .playtest-stack-browser *,
+  .playtest-stack-browser-list-enter-active,
+  .playtest-stack-browser-list-leave-active,
+  .playtest-stack-browser-list-move {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }
 </style>
