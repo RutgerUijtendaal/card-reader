@@ -874,10 +874,6 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   display: grid;
   gap: 0.75rem;
   overflow: auto;
-}
-
-.playtest-opening-setup-list {
-  max-height: min(36rem, 64vh);
   align-content: start;
   padding: 1rem 0.35rem 0.5rem 0.2rem;
 }
