@@ -4,6 +4,7 @@ import { fetchDeckDetail, fetchMyDeck, fetchMyDeckSummaries, fetchPublicDeckSumm
 import type { DeckRecord, DeckSummaryRecord } from '@/modules/decks/types';
 import {
   createInitialPlaytestState,
+  createOpeningHandPreviewState,
   getZoneInstances,
   isStoredDraftStale,
   serializePlaytestDraft,
@@ -47,7 +48,7 @@ export const usePlaytestDeckSelection = ({
   const suggestions = ref<PlaytestDeckSuggestion[]>([]);
   const selectedSuggestionKey = ref<string | null>(null);
   const selectedDeck = ref<DeckRecord | null>(null);
-  const selectedPlaytest = ref<ReturnType<typeof createInitialPlaytestState> | null>(null);
+  const selectedPlaytest = ref<ReturnType<typeof createOpeningHandPreviewState> | null>(null);
   const selectedDraft = ref<StoredPlaytestDraft | null>(null);
   const selectedStaleDraft = ref<StoredPlaytestDraft | null>(null);
   const openStackZone = ref<PlaytestZoneId | null>(null);
@@ -224,7 +225,7 @@ export const usePlaytestDeckSelection = ({
       selectedDeck.value = loadedDeck;
       selectedDraft.value = draft && !draftIsStale ? draft : null;
       selectedStaleDraft.value = draft && draftIsStale ? draft : null;
-      selectedPlaytest.value = createInitialPlaytestState(loadedDeck);
+      selectedPlaytest.value = createOpeningHandPreviewState(loadedDeck);
     } catch {
       if (requestId === selectedDeckLoadRequestId) {
         selectedDeck.value = null;
@@ -244,11 +245,11 @@ export const usePlaytestDeckSelection = ({
   const selectedDeckPath = (): string | null =>
     selectedSuggestion.value ? `/playtester/${selectedSuggestion.value.deck.id}` : null;
 
-  const savePreviewAsSelectedDraft = (): StoredPlaytestDraft | null => {
-    if (!selectedPlaytest.value) {
+  const saveInitialSelectedDraft = (): StoredPlaytestDraft | null => {
+    if (!selectedDeck.value) {
       return null;
     }
-    const draft = serializePlaytestDraft(selectedPlaytest.value);
+    const draft = serializePlaytestDraft(createInitialPlaytestState(selectedDeck.value));
     storage.save(draft);
     return draft;
   };
@@ -260,7 +261,7 @@ export const usePlaytestDeckSelection = ({
     }
     let draft = selectedDraft.value ?? selectedStaleDraft.value;
     if (!draft) {
-      draft = savePreviewAsSelectedDraft();
+      draft = saveInitialSelectedDraft();
     }
     return {
       path,
@@ -275,7 +276,7 @@ export const usePlaytestDeckSelection = ({
       return null;
     }
     storage.clear(selectedSuggestion.value.deck.id);
-    const draft = savePreviewAsSelectedDraft();
+    const draft = saveInitialSelectedDraft();
     return {
       path,
       deck: selectedDeck.value,

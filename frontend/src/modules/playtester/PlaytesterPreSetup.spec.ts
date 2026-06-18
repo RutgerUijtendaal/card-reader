@@ -427,8 +427,6 @@ describe('PlaytesterPage pre-setup stage', () => {
     expect(ownedOption.getAttribute('aria-pressed')).toBe('true');
     expect(mounted.container.textContent).toContain('Hero: Owned Hero');
     expect(mounted.container.textContent).toContain('Opening hand: 7');
-    const previewHandIds = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-hand-zone"] [data-instance-id]')]
-      .map((element) => element.dataset.instanceId);
     const libraryStack = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-library-zone"]');
     const heroStack = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-hero-zone"]');
     expect(libraryStack?.querySelector('.playtest-stack-card img')?.getAttribute('src')).toContain('/card-backs/current.webp');
@@ -455,8 +453,9 @@ describe('PlaytesterPage pre-setup stage', () => {
 
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
     const storedDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
-    expect(getZoneInstances(storedDraft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
-    expect(getZoneInstances(storedDraft.state, 'library')).toHaveLength(3);
+    expect(storedDraft.state.openingSetup.step).toBe('mana');
+    expect(getZoneInstances(storedDraft.state, 'hand')).toHaveLength(0);
+    expect(getZoneInstances(storedDraft.state, 'library')).toHaveLength(10);
 
     mounted.unmount();
   });
@@ -573,15 +572,14 @@ describe('PlaytesterPage pre-setup stage', () => {
     expect(localStorage.getItem('card-reader.playtester.owned')).not.toBeNull();
 
     pushSpy.mockClear();
-    const previewHandIds = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-hand-zone"] [data-instance-id]')]
-      .map((element) => element.dataset.instanceId);
     newButton.click();
     await flushPage();
 
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
     const newDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
-    expect(getZoneInstances(newDraft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
-    expect(getZoneInstances(newDraft.state, 'library')).toHaveLength(3);
+    expect(newDraft.state.openingSetup.step).toBe('mana');
+    expect(getZoneInstances(newDraft.state, 'hand')).toHaveLength(0);
+    expect(getZoneInstances(newDraft.state, 'library')).toHaveLength(10);
 
     mounted.unmount();
   });

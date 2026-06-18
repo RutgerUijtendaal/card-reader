@@ -106,15 +106,30 @@
 
       <PlaytestOpeningSetup
         v-else-if="playtest?.phase === 'opening'"
+        :opening-step="playtest.openingSetup.step"
         :hand-instances="handInstances"
+        :library-instances="libraryInstances"
         :mana-instances="openingManaInstances"
         :setup-instances="openingSetupInstances"
+        :staged-play-instances="openingStagedPlayInstances"
         :selected-mana-ids="playtest.openingSetup.selectedManaInstanceIds"
+        :handled-setup-card-ids="playtest.openingSetup.handledSetupCardIds"
         :hand-size="playtest.handSize"
+        :mulligan-count="playtest.openingSetup.mulliganCount"
+        :dragging-instance-ids="activeDraggedInstanceIds"
+        @continue-mana="continueOpeningMana"
+        @continue-setup="continueOpeningSetup"
+        @previous-step="previousOpeningStep"
+        @select-step="selectOpeningStep"
         @keep="keepOpeningSetup"
         @mulligan="mulliganOpeningSetup"
         @update-hand-size="updateOpeningHandSize"
         @toggle-mana="toggleOpeningMana"
+        @toggle-setup-handled="toggleOpeningSetupCardHandled"
+        @move-setup-card="moveOpeningSetupCard"
+        @pointer-card="startCardPointer"
+        @context-card="openCardContextMenu"
+        @hover="setHoverTarget"
         @bottom-resize="setLowerBarWidth"
       >
         <template #stacks>
@@ -131,6 +146,8 @@
               :card-back-url="currentCardBackUrl"
               :collapsed="zone.collapsed"
               :default-action="zone.defaultAction"
+              :interactive="zone.interactive"
+              :draggable="zone.draggable"
               :dragging-top="activeDrag?.instanceId === stackTopInstance(zone.id)?.instanceId"
               :shuffling="shufflingStackZone === zone.id"
               @open="openStack"
@@ -186,6 +203,7 @@
         :open="!staleDraft && Boolean(openStackZone)"
         :title="openStackLabel"
         :instances="stackOverlayInstances"
+        :drop-zone-id="openStackZone"
         :dragging-instance-ids="activeDraggedInstanceIds"
         :card-back-url="currentCardBackUrl"
         :card-interactive="true"
@@ -258,6 +276,7 @@ import {
   countZone,
   createInitialPlaytestState,
   deleteCardInstances,
+  drawOpeningHand,
   drawCards,
   getOpeningManaInstances,
   getOpeningSetupInstances,
@@ -271,11 +290,15 @@ import {
   resetToSetup,
   serializePlaytestDraft,
   setOpeningHandSize,
+  setOpeningStep,
+  stageOpeningSetupCardForPlay,
   shuffleZone,
+  STARTING_MANA_REQUIRED,
   startNextTurn,
   untapAllBoardCards,
   toggleCardFace,
   toggleCardsFace,
+  toggleOpeningSetupHandled,
   toggleTapped,
   toggleOpeningManaSelection,
 } from '@/modules/playtester/playtestState';
@@ -285,6 +308,7 @@ import type {
   PlaytestDraggedCard,
   PlaytestEntityAction,
   PlaytestHoverTarget,
+  PlaytestOpeningStep,
   PlaytestState,
   PlaytestZoneId,
   StoredPlaytestDraft,
@@ -439,8 +463,16 @@ const loosePlayInstances = computed(() =>
   playInstances.value.filter((instance) => !piledInstanceIds.value.has(instance.instanceId)),
 );
 const handInstances = computed(() => zoneInstances('hand'));
+const libraryInstances = computed(() => zoneInstances('library'));
 const openingManaInstances = computed(() => (playtest.value ? getOpeningManaInstances(playtest.value) : []));
 const openingSetupInstances = computed(() => (playtest.value ? getOpeningSetupInstances(playtest.value) : []));
+const openingStagedPlayInstances = computed(() => {
+  if (!playtest.value) {
+    return [];
+  }
+  const stagedIds = new Set(playtest.value.openingSetup.selectedSetupInstanceIds);
+  return zoneInstances('other').filter((instance) => stagedIds.has(instance.instanceId));
+});
 
 const stackZones = computed(() =>
   PLAYTEST_STACK_DEFINITIONS.map((zone) => ({
@@ -451,10 +483,15 @@ const stackZones = computed(() =>
   })),
 );
 const openingStackZones = computed(() =>
-  stackZones.value.map((zone) => ({
-    ...zone,
-    defaultAction: 'open' as const,
-  })),
+  stackZones.value
+    .map((zone) => ({
+      ...zone,
+      interactive: playtest.value?.openingSetup.step === 'setup'
+        && !(playtest.value?.openingSetup.step === 'setup' && zone.id === 'library'),
+      draggable: playtest.value?.openingSetup.step === 'setup'
+        && !(playtest.value?.openingSetup.step === 'setup' && zone.id === 'library'),
+      defaultAction: 'open' as const,
+    })),
 );
 
 const activeDraggedInstanceIds = computed(() =>
@@ -702,6 +739,9 @@ const activateCard = (instanceId: string): void => {
   if (!instance) {
     return;
   }
+  if (playtest.value.phase === 'opening') {
+    return;
+  }
   if (instance.zoneId === 'library') {
     applyState(drawCards(playtest.value, 1));
     return;
@@ -718,6 +758,9 @@ const activateCard = (instanceId: string): void => {
 
 const openStack = (zoneId: PlaytestZoneId): void => {
   if (Date.now() < suppressClickUntil.value) {
+    return;
+  }
+  if (playtest.value?.phase === 'opening' && playtest.value.openingSetup.step !== 'setup') {
     return;
   }
   openStackZone.value = openStackZone.value === zoneId ? null : zoneId;
@@ -839,19 +882,23 @@ const completeOpeningDraggedCardDrop = (
   drag: PlaytestDraggedCard,
   dropTarget: PlaytestResolvedDropTarget | null,
 ): void => {
-  if (!playtest.value || !isOpeningTransferZone(drag.source.zoneId) || !dropTarget) {
+  if (!playtest.value || !dropTarget) {
+    return;
+  }
+  const draggedInstance = playtest.value.instances.find((instance) => instance.instanceId === drag.instanceId);
+  if (!draggedInstance || !isOpeningTransferSource(playtest.value, draggedInstance)) {
     return;
   }
   if (dropTarget.type === 'zone') {
-    if (!isOpeningTransferZone(dropTarget.zoneId) || drag.source.zoneId === dropTarget.zoneId) {
+    if (!canMoveOpeningTransferToZone(playtest.value, draggedInstance, dropTarget.zoneId) || drag.source.zoneId === dropTarget.zoneId) {
       return;
     }
-    applyState(moveInstanceToZone(playtest.value, drag.instanceId, dropTarget.zoneId));
+    applyState(moveOpeningTransferCard(playtest.value, drag.instanceId, dropTarget.zoneId));
     return;
   }
 
   const target = playtest.value.instances.find((instance) => instance.instanceId === dropTarget.instanceId);
-  if (!target || !isOpeningTransferZone(target.zoneId)) {
+  if (!target || !canMoveOpeningTransferToZone(playtest.value, draggedInstance, target.zoneId)) {
     return;
   }
   const targetZoneInstances = getZoneInstances(playtest.value, target.zoneId);
@@ -859,7 +906,7 @@ const completeOpeningDraggedCardDrop = (
     ? targetZoneInstances.findIndex((instance) => instance.instanceId === drag.instanceId)
     : -1;
   const targetIndex = targetZoneInstances.findIndex((instance) => instance.instanceId === target.instanceId);
-  applyState(moveInstanceToZone(
+  applyState(moveOpeningTransferCard(
     playtest.value,
     drag.instanceId,
     target.zoneId,
@@ -1369,15 +1416,78 @@ const toggleOpeningMana = (instanceId: string, selected: boolean): void => {
   applyState(toggleOpeningManaSelection(playtest.value, instanceId, selected), { recordHistory: false });
 };
 
-const mulliganOpeningSetup = (): void => {
+const toggleOpeningSetupCardHandled = (cardId: string, handled: boolean): void => {
   if (!playtest.value) {
+    return;
+  }
+  applyState(toggleOpeningSetupHandled(playtest.value, cardId, handled), { recordHistory: false });
+};
+
+const continueOpeningMana = (): void => {
+  if (!playtest.value || playtest.value.openingSetup.selectedManaInstanceIds.length !== STARTING_MANA_REQUIRED) {
+    return;
+  }
+  closeStack();
+  applyState(setOpeningStep(playtest.value, 'setup'), { recordHistory: false });
+};
+
+const continueOpeningSetup = (): void => {
+  if (!playtest.value) {
+    return;
+  }
+  closeStack();
+  applyState(drawOpeningHand(playtest.value), { recordHistory: false });
+};
+
+const previousOpeningStep = (): void => {
+  if (!playtest.value) {
+    return;
+  }
+  if (playtest.value.openingSetup.step === 'setup') {
+    applyState(setOpeningStep(playtest.value, 'mana'), { recordHistory: false });
+    return;
+  }
+  if (playtest.value.openingSetup.step === 'hand') {
+    applyState(setOpeningStep(playtest.value, 'setup'), {
+      recordHistory: false,
+    });
+  }
+};
+
+const selectOpeningStep = (targetStep: PlaytestOpeningStep): void => {
+  if (!playtest.value || playtest.value.phase !== 'opening') {
+    return;
+  }
+  const visibleSteps: PlaytestOpeningStep[] = ['mana', 'setup', 'hand'];
+  const currentIndex = visibleSteps.indexOf(playtest.value.openingSetup.step);
+  const targetIndex = visibleSteps.indexOf(targetStep);
+  if (targetIndex < 0 || currentIndex < 0 || targetIndex >= currentIndex) {
+    return;
+  }
+  closeStack();
+  applyState(setOpeningStep(playtest.value, targetStep), { recordHistory: false });
+};
+
+const moveOpeningSetupCard = (instanceId: string, zoneId: PlaytestZoneId): void => {
+  if (!playtest.value) {
+    return;
+  }
+  if (zoneId === 'play') {
+    applyState(stageOpeningSetupCardForPlay(playtest.value, instanceId));
+    return;
+  }
+  applyState(moveOpeningTransferCard(playtest.value, instanceId, zoneId));
+};
+
+const mulliganOpeningSetup = (): void => {
+  if (!playtest.value || playtest.value.openingSetup.step !== 'hand') {
     return;
   }
   applyState(mulliganOpeningHand(playtest.value), { recordHistory: false });
 };
 
 const keepOpeningSetup = (): void => {
-  if (!playtest.value) {
+  if (!playtest.value || playtest.value.openingSetup.step !== 'hand') {
     return;
   }
   clearHistory();
@@ -1421,6 +1531,9 @@ const drawFromStack = (zoneId: PlaytestZoneId): void => {
   if (Date.now() < suppressClickUntil.value) {
     return;
   }
+  if (playtest.value?.phase === 'opening' && playtest.value.openingSetup.step === 'hand') {
+    return;
+  }
   if (zoneId === 'library') {
     drawOne();
   } else {
@@ -1434,17 +1547,58 @@ const closeContextMenu = (): void => {
 
 const isOpeningPhase = (): boolean => playtest.value?.phase === 'opening';
 
-const isOpeningTransferZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'discard' | 'banish' =>
-  zoneId === 'library' || zoneId === 'discard' || zoneId === 'banish';
+const isOpeningDestinationZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'hand' | 'discard' | 'banish' | 'hero' =>
+  zoneId === 'library' || zoneId === 'hand' || zoneId === 'discard' || zoneId === 'banish' || zoneId === 'hero';
+
+const isOpeningStagedPlaySource = (state: PlaytestState, instance: PlaytestCardInstance): boolean =>
+  instance.zoneId === 'other' && state.openingSetup.selectedSetupInstanceIds.includes(instance.instanceId);
+
+const isOpeningTransferSource = (state: PlaytestState, instance: PlaytestCardInstance): boolean =>
+  instance.zoneId !== 'hero' && (isOpeningDestinationZone(instance.zoneId) || isOpeningStagedPlaySource(state, instance));
+
+const canMoveOpeningTransferToZone = (
+  state: PlaytestState,
+  instance: PlaytestCardInstance,
+  zoneId: PlaytestZoneId | 'board',
+): zoneId is 'library' | 'hand' | 'discard' | 'banish' | 'hero' =>
+  isOpeningDestinationZone(zoneId)
+  && state.openingSetup.step === 'setup';
+
+const moveOpeningTransferCard = (
+  state: PlaytestState,
+  instanceId: string,
+  zoneId: PlaytestZoneId,
+  targetIndex?: number,
+): PlaytestState => {
+  const instance = state.instances.find((entry) => entry.instanceId === instanceId);
+  if (!instance || !isOpeningTransferSource(state, instance) || !canMoveOpeningTransferToZone(state, instance, zoneId)) {
+    return state;
+  }
+  const movedState = moveInstanceToZone(state, instanceId, zoneId, targetIndex);
+  return {
+    ...movedState,
+    openingSetup: {
+      ...movedState.openingSetup,
+      selectedSetupInstanceIds: movedState.openingSetup.selectedSetupInstanceIds.filter((id) => id !== instanceId),
+    },
+    instances: movedState.instances.map((instance) =>
+      instance.instanceId === instanceId
+        ? { ...instance, setupOrigin: zoneId !== 'library' }
+        : instance,
+    ),
+  };
+};
 
 const openingCardActions = (instanceId: string, instance: PlaytestCardInstance): PlaytestEntityAction[] => {
-  if (!isOpeningTransferZone(instance.zoneId)) {
+  if (!playtest.value || playtest.value.openingSetup.step !== 'setup' || !isOpeningTransferSource(playtest.value, instance)) {
     return [];
   }
   const zoneActions: PlaytestEntityAction[] = [
-    { id: 'move-discard', label: 'To Discard', disabled: instance.zoneId === 'discard', run: () => moveCardToZone(instanceId, 'discard') },
-    { id: 'move-banish', label: 'To Banish', disabled: instance.zoneId === 'banish', run: () => moveCardToZone(instanceId, 'banish') },
-    { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveCardToZone(instanceId, 'library') },
+    { id: 'move-hand', label: 'To Hand', disabled: instance.zoneId === 'hand' || !canMoveOpeningTransferToZone(playtest.value, instance, 'hand'), run: () => moveOpeningSetupCard(instanceId, 'hand') },
+    { id: 'move-discard', label: 'To Discard', disabled: instance.zoneId === 'discard', run: () => moveOpeningSetupCard(instanceId, 'discard') },
+    { id: 'move-banish', label: 'To Banish', disabled: instance.zoneId === 'banish', run: () => moveOpeningSetupCard(instanceId, 'banish') },
+    { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveOpeningSetupCard(instanceId, 'library') },
+    { id: 'move-hero', label: 'To Hero', disabled: instance.zoneId === 'hero', run: () => moveOpeningSetupCard(instanceId, 'hero') },
   ].filter((action) => !action.disabled);
 
   if (zoneActions[0]) {
@@ -1490,16 +1644,22 @@ const cardActions = (instanceId: string): PlaytestEntityAction[] => {
 };
 
 const openingStackActions = (zoneId: PlaytestZoneId, hasCards: boolean): PlaytestEntityAction[] => {
+  if (playtest.value?.openingSetup.step !== 'setup') {
+    return [];
+  }
   const actions: PlaytestEntityAction[] = [
     { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
   ];
-  if (!isOpeningTransferZone(zoneId)) {
+  if (!isOpeningDestinationZone(zoneId) || zoneId === 'hero') {
     return actions;
   }
+  const topInstance = stackTopInstance(zoneId);
   const zoneActions: PlaytestEntityAction[] = [
+    { id: 'top-hand', label: 'Top to Hand', disabled: !topInstance || !playtest.value || zoneId === 'hand' || !canMoveOpeningTransferToZone(playtest.value, topInstance, 'hand'), run: () => moveTopStackCard(zoneId, 'hand') },
     { id: 'top-discard', label: 'Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },
     { id: 'top-banish', label: 'Top to Banish', disabled: !hasCards || zoneId === 'banish', run: () => moveTopStackCard(zoneId, 'banish') },
     { id: 'top-library', label: 'Top to Library', disabled: !hasCards || zoneId === 'library', run: () => moveTopStackCard(zoneId, 'library') },
+    { id: 'top-hero', label: 'Top to Hero', disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'hero') },
   ].filter((action) => !action.disabled);
 
   if (zoneActions[0]) {
@@ -1577,6 +1737,13 @@ const moveTopStackCard = (fromZoneId: PlaytestZoneId, toZoneId: PlaytestZoneId):
   }
   const top = stackTopInstance(fromZoneId);
   if (!top) {
+    return;
+  }
+  if (isOpeningPhase()) {
+    if (fromZoneId === 'hero') {
+      return;
+    }
+    applyState(moveOpeningTransferCard(playtest.value, top.instanceId, toZoneId));
     return;
   }
   moveCardToZone(top.instanceId, toZoneId);

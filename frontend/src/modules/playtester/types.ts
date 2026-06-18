@@ -4,6 +4,8 @@ export type PlaytestZoneId = 'library' | 'hand' | 'play' | 'discard' | 'banish' 
 
 export type PlaytestPhase = 'opening' | 'play';
 
+export type PlaytestOpeningStep = 'mana' | 'setup' | 'hand';
+
 export type PlaytestStackFace = 'front' | 'back';
 
 export type PlaytestCardFace = 'front' | 'back';
@@ -75,8 +77,11 @@ export type PlaytestSetupSnapshot = {
 };
 
 export type PlaytestOpeningSetup = {
+  step: PlaytestOpeningStep;
+  mulliganCount: number;
   selectedManaInstanceIds: string[];
   selectedSetupInstanceIds: string[];
+  handledSetupCardIds: string[];
   reservedOrigins?: Partial<Record<string, PlaytestZoneId>>;
   reservedOriginOrders?: Partial<Record<string, number>>;
 };

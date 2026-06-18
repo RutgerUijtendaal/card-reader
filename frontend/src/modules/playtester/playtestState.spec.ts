@@ -8,6 +8,7 @@ import {
   countZone,
   createInitialPlaytestState,
   deleteCardInstances,
+  drawOpeningHand,
   drawCards,
   getOpeningManaInstances,
   getOpeningSetupInstances,
@@ -23,10 +24,13 @@ import {
   resetToSetup,
   serializePlaytestDraft,
   setOpeningHandSize,
+  setOpeningStep,
+  stageOpeningSetupCardForPlay,
   shuffleZone,
   startNextTurn,
   toggleCardFace,
   toggleCardsFace,
+  toggleOpeningSetupHandled,
   toggleTapped,
   toggleOpeningManaSelection,
 } from '@/modules/playtester/playtestState';
@@ -102,13 +106,14 @@ const buildDeck = (): DeckRecord => ({
 const noShuffle = () => 0;
 
 describe('playtestState', () => {
-  test('expands deck quantities, draws an opening hand, and keeps hero outside the library', () => {
+  test('expands deck quantities, starts mana-first, and keeps hero outside the library', () => {
     const state = createInitialPlaytestState(buildDeck(), noShuffle);
 
     expect(state.phase).toBe('opening');
+    expect(state.openingSetup.step).toBe('mana');
     expect(countZone(state, 'hero')).toBe(1);
-    expect(countZone(state, 'hand')).toBe(7);
-    expect(countZone(state, 'library')).toBe(5);
+    expect(countZone(state, 'hand')).toBe(0);
+    expect(countZone(state, 'library')).toBe(12);
     expect(new Set(state.instances.map((instance) => instance.instanceId)).size).toBe(13);
     expect(getZoneInstances(state, 'hero')[0]?.card.name).toBe('Hero');
     expect(state.instances.every((instance) => instance.pileGroupId === null && instance.pileOrder === null)).toBe(true);
@@ -117,7 +122,7 @@ describe('playtestState', () => {
 
   test('draws, moves, taps, and resets without duplicating card instances', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
-    const playing = acceptOpeningSetup(initial);
+    const playing = acceptOpeningSetup(drawOpeningHand(initial));
     const handCard = getZoneInstances(playing, 'hand')[0];
     if (!handCard) {
       throw new Error('expected hand card');
@@ -143,7 +148,7 @@ describe('playtestState', () => {
     expect(boardCard?.instanceId).toBe(card.instanceId);
     expect(boardCard?.boardX).toBe(100);
     expect(boardCard?.boardY).toBe(0);
-    expect(countZone(placed, 'library')).toBe(4);
+    expect(countZone(placed, 'library')).toBe(11);
   });
 
   test('moves multiple board cards by a shared bounded delta', () => {
@@ -176,26 +181,24 @@ describe('playtestState', () => {
     expect(getOpeningSetupInstances(initial).every(isSetupCardInstance)).toBe(true);
   });
 
-  test('selecting opening mana reserves the exact instance and refills hand', () => {
+  test('selecting opening mana reserves the exact instance without drawing hand', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
-    const initialHandIds = getZoneInstances(initial, 'hand').map((instance) => instance.instanceId);
-    const handMana = getZoneInstances(initial, 'hand').find(isManaCardInstance);
-    if (!handMana) {
-      throw new Error('expected hand mana card');
+    const mana = getOpeningManaInstances(initial)[0];
+    if (!mana) {
+      throw new Error('expected mana card');
     }
 
-    const selected = toggleOpeningManaSelection(initial, handMana.instanceId, true);
+    const selected = toggleOpeningManaSelection(initial, mana.instanceId, true);
 
-    expect(selected.openingSetup.selectedManaInstanceIds).toEqual([handMana.instanceId]);
-    expect(selected.instances.find((instance) => instance.instanceId === handMana.instanceId)?.zoneId).toBe('other');
-    expect(getZoneInstances(selected, 'hand').some((instance) => instance.instanceId === handMana.instanceId)).toBe(false);
-    expect(countZone(selected, 'hand')).toBe(7);
+    expect(selected.openingSetup.selectedManaInstanceIds).toEqual([mana.instanceId]);
+    expect(selected.instances.find((instance) => instance.instanceId === mana.instanceId)?.zoneId).toBe('other');
+    expect(getZoneInstances(selected, 'hand')).toHaveLength(0);
 
-    const deselected = toggleOpeningManaSelection(selected, handMana.instanceId, false);
+    const deselected = toggleOpeningManaSelection(selected, mana.instanceId, false);
 
     expect(deselected.openingSetup.selectedManaInstanceIds).toEqual([]);
-    expect(getZoneInstances(deselected, 'hand').map((instance) => instance.instanceId)).toEqual(initialHandIds);
-    expect(deselected.instances.find((instance) => instance.instanceId === handMana.instanceId)?.zoneId).toBe('hand');
+    expect(deselected.instances.find((instance) => instance.instanceId === mana.instanceId)?.zoneId).toBe('library');
+    expect(getZoneInstances(deselected, 'hand')).toHaveLength(0);
   });
 
   test('opening mulligan preserves reserved mana and leaves Setup hints unreserved', () => {
@@ -205,10 +208,11 @@ describe('playtestState', () => {
     if (!mana || !setup) {
       throw new Error('expected opening selections');
     }
-    const reserved = toggleOpeningManaSelection(initial, mana.instanceId, true);
+    const reserved = drawOpeningHand(toggleOpeningManaSelection(initial, mana.instanceId, true));
 
     const afterMulligan = mulliganOpeningHand(reserved, noShuffle);
 
+    expect(afterMulligan.openingSetup.mulliganCount).toBe(1);
     expect(afterMulligan.openingSetup.selectedManaInstanceIds).toEqual([mana.instanceId]);
     expect(afterMulligan.openingSetup.selectedSetupInstanceIds).toEqual([]);
     expect(afterMulligan.instances.find((instance) => instance.instanceId === mana.instanceId)?.zoneId).toBe('other');
@@ -226,7 +230,7 @@ describe('playtestState', () => {
       throw new Error('expected Setup card');
     }
 
-    const afterMulligan = mulliganOpeningHand({
+    const afterMulligan = mulliganOpeningHand(drawOpeningHand({
       ...initial,
       openingSetup: {
         ...initial.openingSetup,
@@ -234,34 +238,138 @@ describe('playtestState', () => {
         reservedOrigins: { [setup.instanceId]: setup.zoneId },
         reservedOriginOrders: { [setup.instanceId]: setup.order },
       },
-    }, noShuffle);
+    }), noShuffle);
 
     expect(afterMulligan.openingSetup.selectedSetupInstanceIds).toEqual([]);
     expect(afterMulligan.openingSetup.reservedOrigins).toEqual({});
     expect(afterMulligan.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).not.toBe('other');
   });
 
+  test('opening Setup handled markers are persisted by card identity', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const setup = getOpeningSetupInstances(initial)[0];
+    if (!setup) {
+      throw new Error('expected Setup card');
+    }
+
+    const handled = toggleOpeningSetupHandled(initial, setup.cardId, true);
+    const unhandled = toggleOpeningSetupHandled(handled, setup.cardId, false);
+
+    expect(handled.openingSetup.handledSetupCardIds).toEqual([setup.cardId]);
+    expect(unhandled.openingSetup.handledSetupCardIds).toEqual([]);
+  });
+
+  test('opening mulligan preserves setup-action cards moved into hand', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const mana = getOpeningManaInstances(initial)[0];
+    const setupActionCard = getZoneInstances(initial, 'library')
+      .find((instance) => !isManaCardInstance(instance) && !isSetupCardInstance(instance));
+    if (!mana || !setupActionCard) {
+      throw new Error('expected opening mana and setup action card');
+    }
+    const selected = toggleOpeningManaSelection(initial, mana.instanceId, true);
+    const movedToHand = moveInstanceToZone(selected, setupActionCard.instanceId, 'hand');
+    const markedSetupAction = {
+      ...movedToHand,
+      instances: movedToHand.instances.map((instance) =>
+        instance.instanceId === setupActionCard.instanceId
+          ? { ...instance, setupOrigin: true }
+          : instance,
+      ),
+    };
+    const drawn = drawOpeningHand(markedSetupAction);
+
+    const afterMulligan = mulliganOpeningHand(drawn, noShuffle);
+
+    expect(afterMulligan.instances.find((instance) => instance.instanceId === setupActionCard.instanceId)?.zoneId).toBe('hand');
+    expect(getZoneInstances(afterMulligan, 'hand')).toHaveLength(7);
+  });
+
+  test('stepping back from opening hand clears drawn hand cards but preserves setup hand cards', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const setupActionCard = getZoneInstances(initial, 'library')
+      .find((instance) => !isManaCardInstance(instance) && !isSetupCardInstance(instance));
+    if (!setupActionCard) {
+      throw new Error('expected setup action card');
+    }
+    const movedToHand = moveInstanceToZone(initial, setupActionCard.instanceId, 'hand');
+    const markedSetupAction = {
+      ...movedToHand,
+      instances: movedToHand.instances.map((instance) =>
+        instance.instanceId === setupActionCard.instanceId
+          ? { ...instance, setupOrigin: true }
+          : instance,
+      ),
+    };
+    const drawn = drawOpeningHand(markedSetupAction);
+
+    const backToSetup = setOpeningStep(drawn, 'setup');
+
+    expect(getZoneInstances(backToSetup, 'hand').map((instance) => instance.instanceId)).toEqual([setupActionCard.instanceId]);
+    expect(getZoneInstances(backToSetup, 'library')).toHaveLength(getZoneInstances(initial, 'library').length - 1);
+    expect(drawOpeningHand(backToSetup).openingSetup.step).toBe('hand');
+    expect(getZoneInstances(drawOpeningHand(backToSetup), 'hand')).toHaveLength(7);
+  });
+
+  test('opening setup Play action stages cards until the hand is kept', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const mana = getOpeningManaInstances(initial).slice(0, 3);
+    const setupActionCard = getZoneInstances(initial, 'library')
+      .find((instance) => !isManaCardInstance(instance) && !isSetupCardInstance(instance));
+    if (mana.length !== 3 || !setupActionCard) {
+      throw new Error('expected opening mana and setup action card');
+    }
+    const selected = mana.reduce(
+      (state, instance) => toggleOpeningManaSelection(state, instance.instanceId, true),
+      initial,
+    );
+    const staged = stageOpeningSetupCardForPlay(selected, setupActionCard.instanceId);
+
+    expect(staged.openingSetup.selectedSetupInstanceIds).toEqual([setupActionCard.instanceId]);
+    expect(staged.instances.find((instance) => instance.instanceId === setupActionCard.instanceId)?.zoneId).toBe('other');
+    expect(getZoneInstances(staged, 'play')).toHaveLength(0);
+
+    const drawn = drawOpeningHand(staged);
+
+    expect(drawn.openingSetup.selectedSetupInstanceIds).toEqual([setupActionCard.instanceId]);
+    expect(drawn.instances.find((instance) => instance.instanceId === setupActionCard.instanceId)?.zoneId).toBe('other');
+
+    const playing = acceptOpeningSetup(drawn);
+
+    expect(getZoneInstances(playing, 'play').map((instance) => instance.instanceId)).toEqual([
+      ...mana.map((instance) => instance.instanceId),
+      setupActionCard.instanceId,
+    ]);
+    expect(playing.openingSetup.selectedSetupInstanceIds).toEqual([]);
+  });
+
   test('deselecting a reserved card after mulligan returns it to library instead of the new hand', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
-    const handMana = getZoneInstances(initial, 'hand').find(isManaCardInstance);
-    if (!handMana) {
-      throw new Error('expected hand mana card');
+    const mana = getOpeningManaInstances(initial)[0];
+    if (!mana) {
+      throw new Error('expected mana card');
     }
-    const reserved = toggleOpeningManaSelection(initial, handMana.instanceId, true);
+    const reserved = drawOpeningHand(toggleOpeningManaSelection(initial, mana.instanceId, true));
     const afterMulligan = mulliganOpeningHand(reserved, noShuffle);
 
-    const deselected = toggleOpeningManaSelection(afterMulligan, handMana.instanceId, false);
+    const deselected = toggleOpeningManaSelection(afterMulligan, mana.instanceId, false);
 
     expect(deselected.openingSetup.selectedManaInstanceIds).toEqual([]);
-    expect(deselected.instances.find((instance) => instance.instanceId === handMana.instanceId)?.zoneId).toBe('library');
-    expect(getZoneInstances(deselected, 'hand').some((instance) => instance.instanceId === handMana.instanceId)).toBe(false);
+    expect(deselected.instances.find((instance) => instance.instanceId === mana.instanceId)?.zoneId).toBe('library');
+    expect(getZoneInstances(deselected, 'hand').some((instance) => instance.instanceId === mana.instanceId)).toBe(false);
     expect(getZoneInstances(deselected, 'hand')).toHaveLength(7);
   });
 
-  test('opening hand size changes trim or refill the current hand', () => {
+  test('opening hand size changes do not draw before hand step, then trim or refill the current hand', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
 
-    const smallerHand = setOpeningHandSize(initial, 5);
+    const resizedBeforeDraw = setOpeningHandSize(initial, 5);
+
+    expect(resizedBeforeDraw.handSize).toBe(5);
+    expect(getZoneInstances(resizedBeforeDraw, 'hand')).toHaveLength(0);
+    expect(countZone(resizedBeforeDraw, 'library')).toBe(12);
+
+    const smallerHand = drawOpeningHand(resizedBeforeDraw);
 
     expect(smallerHand.handSize).toBe(5);
     expect(getZoneInstances(smallerHand, 'hand')).toHaveLength(5);
@@ -276,19 +384,22 @@ describe('playtestState', () => {
 
   test('keep moves selected mana to board and saves setup snapshot', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
-    const mana = getOpeningManaInstances(initial)[0];
+    const mana = getOpeningManaInstances(initial).slice(0, 3);
     const setup = getOpeningSetupInstances(initial)[0];
-    if (!mana || !setup) {
+    if (mana.length !== 3 || !setup) {
       throw new Error('expected opening selections');
     }
-    const reserved = toggleOpeningManaSelection(initial, mana.instanceId, true);
+    const reserved = drawOpeningHand(mana.reduce(
+      (state, instance) => toggleOpeningManaSelection(state, instance.instanceId, true),
+      initial,
+    ));
 
     const playing = acceptOpeningSetup(reserved);
 
     expect(playing.phase).toBe('play');
     expect(playing.setupSnapshot).not.toBeNull();
-    expect(getZoneInstances(playing, 'play').map((instance) => instance.instanceId)).toEqual([mana.instanceId]);
-    expect(getZoneInstances(playing, 'play').map((instance) => [instance.boardX, instance.boardY])).toEqual([[12, 78]]);
+    expect(getZoneInstances(playing, 'play').map((instance) => instance.instanceId)).toEqual(mana.map((instance) => instance.instanceId));
+    expect(getZoneInstances(playing, 'play').map((instance) => [instance.boardX, instance.boardY])).toEqual([[12, 78], [20, 78], [28, 78]]);
     expect(playing.instances.find((instance) => instance.instanceId === setup.instanceId)?.zoneId).not.toBe('play');
     expect(getZoneInstances(playing, 'hand')).toHaveLength(7);
     expect(getZoneInstances(playing, 'hand').every((instance) => instance.setupOrigin === false)).toBe(true);
@@ -303,7 +414,7 @@ describe('playtestState', () => {
     if (!mana) {
       throw new Error('expected mana card');
     }
-    const playing = acceptOpeningSetup(toggleOpeningManaSelection(initial, mana.instanceId, true));
+    const playing = acceptOpeningSetup(drawOpeningHand(toggleOpeningManaSelection(initial, mana.instanceId, true)));
     const changed = drawCards(moveInstanceToZone(playing, getZoneInstances(playing, 'hand')[0]?.instanceId ?? '', 'discard'), 1);
 
     expect(resetToSetup(changed).instances).toEqual(playing.setupSnapshot?.instances);
@@ -319,7 +430,7 @@ describe('playtestState', () => {
   });
 
   test('flips one or multiple cards', () => {
-    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const initial = drawOpeningHand(createInitialPlaytestState(buildDeck(), noShuffle));
     const [first, second] = getZoneInstances(initial, 'hand');
     if (!first || !second) {
       throw new Error('expected hand cards');
@@ -334,7 +445,7 @@ describe('playtestState', () => {
   });
 
   test('clones cards with new ids and preserves face state', () => {
-    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const initial = drawOpeningHand(createInitialPlaytestState(buildDeck(), noShuffle));
     const [first, second] = getZoneInstances(initial, 'hand');
     if (!first || !second) {
       throw new Error('expected hand cards');
@@ -361,7 +472,7 @@ describe('playtestState', () => {
   });
 
   test('clones cards from snapshots after the source instance changes or is removed', () => {
-    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const initial = drawOpeningHand(createInitialPlaytestState(buildDeck(), noShuffle));
     const [first] = getZoneInstances(initial, 'hand');
     if (!first) {
       throw new Error('expected hand card');
@@ -386,7 +497,7 @@ describe('playtestState', () => {
   });
 
   test('deletes card instances and normalizes remaining pile groups', () => {
-    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const initial = drawOpeningHand(createInitialPlaytestState(buildDeck(), noShuffle));
     const [first, second] = getZoneInstances(initial, 'hand');
     if (!first || !second) {
       throw new Error('expected hand cards');
@@ -458,7 +569,7 @@ describe('playtestState', () => {
 
   test('next turn draws one card and untaps board cards', () => {
     const initial = createInitialPlaytestState(buildDeck(), noShuffle);
-    const playing = acceptOpeningSetup(initial);
+    const playing = acceptOpeningSetup(drawOpeningHand(initial));
     const handCard = getZoneInstances(playing, 'hand')[0];
     if (!handCard) {
       throw new Error('expected hand card');
