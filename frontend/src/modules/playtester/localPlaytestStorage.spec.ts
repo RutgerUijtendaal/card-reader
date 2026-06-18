@@ -52,8 +52,11 @@ describe('localPlaytestStorage', () => {
         handSize: 7,
         stackFaces: { library: 'back' },
         openingSetup: {
+          step: 'mana',
+          mulliganCount: 0,
           selectedManaInstanceIds: [],
           selectedSetupInstanceIds: [],
+          handledSetupCardIds: [],
           reservedOrigins: {},
           reservedOriginOrders: {},
         },

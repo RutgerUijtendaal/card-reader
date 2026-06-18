@@ -7,7 +7,7 @@
       <Keyboard class="h-4 w-4" />
       <span class="text-[11px] font-semibold uppercase tracking-[0.18em]">Hotkeys</span>
       <template v-if="isPlaytesterRoute">
-        <span class="text-[11px]">N / U / D</span>
+        <span class="text-[11px]">N / U / D / O</span>
         <span class="text-[11px]">T / F / R</span>
         <span class="text-[11px]">Del</span>
         <span class="text-[11px]">Ctrl Z/Y</span>
@@ -58,6 +58,10 @@
         <div class="flex items-center justify-between gap-3">
           <span class="opacity-80">Draw</span>
           <span class="theme-hotkey-chip">D</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="opacity-80">Library</span>
+          <span class="theme-hotkey-chip">O</span>
         </div>
         <div class="flex items-center justify-between gap-3">
           <span class="opacity-80">Tap</span>

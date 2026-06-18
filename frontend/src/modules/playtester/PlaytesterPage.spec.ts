@@ -8,16 +8,14 @@ import {
   getZoneInstances,
   serializePlaytestDraft,
 } from '@/modules/playtester/playtestState';
-import {
-  clearPlaytestRouteHandoffs,
-  setPlaytestRouteHandoff,
-} from '@/modules/playtester/utils/routeHandoff';
 
 const {
   authState,
   fetchCurrentCardBackMock,
   fetchDeckDetailMock,
   fetchMyDeckMock,
+  fetchMyDeckSummariesMock,
+  fetchPublicDeckSummariesMock,
 } = vi.hoisted(() => ({
   authState: {
     authenticated: true,
@@ -25,6 +23,8 @@ const {
   fetchCurrentCardBackMock: vi.fn(),
   fetchDeckDetailMock: vi.fn(),
   fetchMyDeckMock: vi.fn(),
+  fetchMyDeckSummariesMock: vi.fn(),
+  fetchPublicDeckSummariesMock: vi.fn(),
 }));
 
 vi.mock('@/api/client', () => ({
@@ -38,6 +38,8 @@ vi.mock('@/modules/auth/authStore', () => ({
 vi.mock('@/modules/decks/api', () => ({
   fetchDeckDetail: fetchDeckDetailMock,
   fetchMyDeck: fetchMyDeckMock,
+  fetchMyDeckSummaries: fetchMyDeckSummariesMock,
+  fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
 }));
 
 vi.mock('@/modules/playtester/api', () => ({
@@ -121,19 +123,19 @@ const deckRecord = {
   owner: { id: 'user-1', username: 'owner' },
   hero_card: { ...card, id: 'hero', key: 'hero', name: 'Hero', label: 'Hero', is_hero: true },
   mainboard: {
-    total_cards: 10,
+    total_cards: 14,
     unique_cards: 3,
     entries: [
-      { quantity: 2, card: manaCard },
+      { quantity: 3, card: manaCard },
       { quantity: 1, card: setupCard },
-      { quantity: 7, card },
+      { quantity: 10, card },
     ],
   },
   sideboards: [],
   totals: {
-    overall_total_cards: 10,
+    overall_total_cards: 14,
     overall_unique_cards: 3,
-    mainboard_total_cards: 10,
+    mainboard_total_cards: 14,
     mainboard_unique_cards: 3,
   },
   status: {
@@ -160,7 +162,7 @@ const mountPage = async (): Promise<{ container: HTMLElement; router: ReturnType
     history: createMemoryHistory(),
     routes: [
       { path: '/playtester/:deckId', component: PlaytesterPage },
-      { path: '/playtester', component: { template: '<div />' } },
+      { path: '/playtester', component: PlaytesterPage },
       { path: '/decks/:id', component: { template: '<div />' } },
     ],
   });
@@ -188,7 +190,38 @@ const testZone = (container: HTMLElement, testId: string): HTMLElement => {
   return zone;
 };
 
+const nonSetupBoardCards = (board: HTMLElement): HTMLElement[] =>
+  [...board.querySelectorAll<HTMLElement>(
+    '[data-instance-id][data-playtest-zone-id="play"]:not([data-playtest-setup-origin="true"])',
+  )];
+
+const nonSetupBoardWrappers = (board: HTMLElement): HTMLElement[] =>
+  nonSetupBoardCards(board)
+    .map((card) => card.closest<HTMLElement>('[data-testid="playtest-board-card"]'))
+    .filter((card): card is HTMLElement => card !== null);
+
 const keepOpeningHand = async (container: HTMLElement): Promise<void> => {
+  if (container.querySelector('[data-testid="playtest-opening-mana"]')) {
+    const manaButtons = [...container.querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    for (const button of manaButtons.slice(0, 3)) {
+      button.click();
+      await flushPage();
+    }
+    const nextButton = container.querySelector<HTMLButtonElement>('button[aria-label="Next step"]');
+    if (!nextButton) {
+      throw new Error('expected opening mana next button');
+    }
+    nextButton.click();
+    await flushPage();
+  }
+  if (container.querySelector('[data-testid="playtest-opening-setup-cards"]')) {
+    const drawHandButton = container.querySelector<HTMLButtonElement>('button[aria-label="Next step"]');
+    if (!drawHandButton) {
+      throw new Error('expected setup draw hand button');
+    }
+    drawHandButton.click();
+    await flushPage();
+  }
   const keepButton = [...container.querySelectorAll<HTMLButtonElement>('button')]
     .find((button) => button.textContent?.includes('Keep this'));
   if (!keepButton) {
@@ -245,6 +278,8 @@ describe('PlaytesterPage', () => {
     authState.authenticated = true;
     fetchMyDeckMock.mockRejectedValue(new Error('not owned'));
     fetchDeckDetailMock.mockResolvedValue(deckRecord);
+    fetchMyDeckSummariesMock.mockResolvedValue([]);
+    fetchPublicDeckSummariesMock.mockResolvedValue([]);
     fetchCurrentCardBackMock.mockResolvedValue({
       current: {
         id: 'card-back-1',
@@ -260,7 +295,6 @@ describe('PlaytesterPage', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
-    clearPlaytestRouteHandoffs();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
@@ -271,30 +305,9 @@ describe('PlaytesterPage', () => {
     expect(fetchMyDeckMock).toHaveBeenCalledWith('deck-1');
     expect(fetchDeckDetailMock).toHaveBeenCalledWith('deck-1');
     expect(mounted.container.textContent).toContain('Playtest Deck');
-    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Opening hand');
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Starting mana');
     expect(testZone(mounted.container, 'playtest-hero-zone')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="playtest-other-zone"]')).toBeNull();
-
-    mounted.unmount();
-  });
-
-  test('uses route handoff without refetching deck detail', async () => {
-    const previewState = createInitialPlaytestState(deckRecord, () => 0);
-    const previewDraft = serializePlaytestDraft(previewState);
-    setPlaytestRouteHandoff('deck-1', {
-      deck: deckRecord,
-      draft: previewDraft,
-    });
-
-    const mounted = await mountPage();
-
-    expect(fetchMyDeckMock).not.toHaveBeenCalled();
-    expect(fetchDeckDetailMock).not.toHaveBeenCalled();
-    expect(mounted.container.textContent).toContain('Playtest Deck');
-    expect(getZoneInstances(JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}').state, 'hand')
-      .map((instance) => instance.instanceId)).toEqual(
-      getZoneInstances(previewState, 'hand').map((instance) => instance.instanceId),
-    );
 
     mounted.unmount();
   });
@@ -317,6 +330,22 @@ describe('PlaytesterPage', () => {
     expect(fetchDeckDetailMock).toHaveBeenCalledWith('deck-2');
     expect(mounted.container.textContent).toContain('Second Playtest Deck');
     expect(localStorage.getItem('card-reader.playtester.deck-2')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('returns to pre-setup without clearing the saved draft', async () => {
+    const mounted = await mountPage();
+
+    expect(mounted.container.textContent).toContain('Playtest Deck');
+    expect(localStorage.getItem('card-reader.playtester.deck-1')).not.toBeNull();
+
+    await mounted.router.push('/playtester');
+    await flushPage();
+
+    expect(mounted.container.querySelector('[data-testid="playtester-pre-setup-surface"]')).not.toBeNull();
+    expect(mounted.container.textContent).toContain('Select Deck');
+    expect(localStorage.getItem('card-reader.playtester.deck-1')).not.toBeNull();
 
     mounted.unmount();
   });
@@ -367,12 +396,15 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
-  test('opening setup shows physical mana and Setup selections before the board', async () => {
+  test('opening setup guides mana, setup actions, then hand before the board', async () => {
     const mounted = await mountPage();
 
-    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
-    expect(testZone(mounted.container, 'playtest-opening-mana').querySelectorAll('.playtest-opening-card-choice')).toHaveLength(2);
-    expect(testZone(mounted.container, 'playtest-opening-setup-cards').querySelectorAll('.playtest-opening-card-choice')).toHaveLength(1);
+    expect(testZone(mounted.container, 'playtest-opening-mana')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-hand"]')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Mana');
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Setup');
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Hand');
+    expect(testZone(mounted.container, 'playtest-opening-mana').querySelectorAll('.playtest-opening-copy-button')).toHaveLength(3);
     expect(testZone(mounted.container, 'playtest-library-zone')).not.toBeNull();
     expect(testZone(mounted.container, 'playtest-discard-zone')).not.toBeNull();
     expect(testZone(mounted.container, 'playtest-banish-zone')).not.toBeNull();
@@ -381,24 +413,112 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-discard-zone').classList.contains('playtest-stack-collapsed')).toBe(false);
     expect(testZone(mounted.container, 'playtest-banish-zone').classList.contains('playtest-stack-collapsed')).toBe(false);
     expect(testZone(mounted.container, 'playtest-hero-zone').classList.contains('playtest-stack-collapsed')).toBe(false);
-    expect(testZone(mounted.container, 'playtest-opening-hand').querySelector('.theme-section-title')).toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-mana').querySelector('.theme-section-title')).toBeNull();
-    expect(testZone(mounted.container, 'playtest-opening-setup-cards').querySelector('.theme-section-title')).toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-setup')
       .querySelectorAll('[data-instance-id][role="button"]')).toHaveLength(0);
     expect(testZone(mounted.container, 'playtest-opening-setup')
       .querySelectorAll('[data-instance-id][tabindex]')).toHaveLength(0);
     expect(testZone(mounted.container, 'playtest-opening-mana')
       .querySelector('.playtest-card-static')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-library-zone').className).toContain('playtest-stack-passive');
 
-    const openingHandCount = testZone(mounted.container, 'playtest-opening-hand')
-      .querySelectorAll('[data-instance-id]').length;
     testZone(mounted.container, 'playtest-library-zone').click();
     await flushPage();
 
-    expect(testZone(mounted.container, 'playtest-stack-overlay')).not.toBeNull();
-    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(openingHandCount);
+    expect(document.body.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-hand"]')).toBeNull();
 
+    const nextStepButton = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Next step"]');
+    expect(nextStepButton?.disabled).toBe(true);
+    expect(testZone(mounted.container, 'playtest-opening-picked-mana')
+      .querySelectorAll('[data-instance-id]')).toHaveLength(0);
+    const manaGroup = testZone(mounted.container, 'playtest-opening-mana')
+      .querySelector<HTMLElement>('.playtest-opening-mana-card');
+    manaGroup?.click();
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll('.playtest-opening-copy-button-selected')).toHaveLength(1);
+    manaGroup?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll('.playtest-opening-copy-button-selected')).toHaveLength(0);
+    const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    manaChoices[0]?.click();
+    await flushPage();
+    expect(manaChoices[0]?.getAttribute('aria-pressed')).toBe('true');
+    expect(nextStepButton?.disabled).toBe(true);
+    manaChoices[1]?.click();
+    await flushPage();
+    manaChoices[2]?.click();
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-opening-picked-mana')
+      .querySelectorAll('[data-instance-id]')).toHaveLength(3);
+    const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Accept');
+    expect(acceptButton?.disabled).toBe(false);
+    expect(nextStepButton?.disabled).toBe(false);
+    acceptButton?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-opening-setup-cards').textContent).toContain('Setup instructions');
+    const manaStepButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('.playtest-opening-step')]
+      .find((button) => button.textContent?.includes('Mana'));
+    expect(manaStepButton?.disabled).toBe(false);
+    manaStepButton?.click();
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-opening-mana')).not.toBeNull();
+    const returnedManaAcceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Accept');
+    expect(returnedManaAcceptButton?.disabled).toBe(false);
+    returnedManaAcceptButton?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-opening-setup-cards').textContent).toContain('Setup instructions');
+    expect(testZone(mounted.container, 'playtest-library-zone')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-library-zone').className).toContain('playtest-stack-passive');
+    testZone(mounted.container, 'playtest-library-zone').click();
+    await flushPage();
+    expect(document.body.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-setup-cards').textContent).toContain('Setup Card');
+    const setupInstruction = testZone(mounted.container, 'playtest-opening-setup-cards')
+      .querySelector<HTMLElement>('.playtest-opening-setup-card');
+    const handledCheckbox = testZone(mounted.container, 'playtest-opening-setup-cards')
+      .querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(handledCheckbox?.checked).toBe(false);
+    setupInstruction?.click();
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-opening-setup-cards')
+      .querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
+    expect([...testZone(mounted.container, 'playtest-opening-setup-cards').querySelectorAll<HTMLButtonElement>('button')]
+      .some((button) => button.textContent?.includes('Draw hand'))).toBe(true);
+    expect(testZone(mounted.container, 'playtest-opening-library-browser')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-library-browser').textContent).toContain('Library');
+    expect([...testZone(mounted.container, 'playtest-opening-library-browser')
+      .querySelectorAll<HTMLButtonElement>('button')]
+      .some((button) => button.textContent?.includes('Hand'))).toBe(false);
+    const playButton = [...testZone(mounted.container, 'playtest-opening-library-browser')
+      .querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Play'));
+    playButton?.click();
+    await flushPage();
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-setup-play-zone"]')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-picked-mana')
+      .querySelectorAll('[data-instance-id]')).toHaveLength(4);
+    expect(testZone(mounted.container, 'playtest-opening-picked-mana').textContent).toContain('Play 1');
+    const banishButton = [...testZone(mounted.container, 'playtest-opening-library-browser')
+      .querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Banish'));
+    banishButton?.click();
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-banish-zone').textContent).toContain('1');
+
+    const drawHandButton = [...testZone(mounted.container, 'playtest-opening-setup-cards').querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Draw hand'));
+    drawHandButton?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
     const handSizeInput = testZone(mounted.container, 'playtest-opening-setup')
       .querySelector<HTMLInputElement>('input[type="number"]');
     if (!handSizeInput) {
@@ -408,52 +528,148 @@ describe('PlaytesterPage', () => {
     handSizeInput.dispatchEvent(new Event('input', { bubbles: true }));
     await flushPage();
     expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
-
-    const manaChoice = testZone(mounted.container, 'playtest-opening-mana')
-      .querySelector<HTMLButtonElement>('.playtest-opening-card-choice');
-    manaChoice?.click();
-    await flushPage();
-
-    expect(manaChoice?.getAttribute('aria-pressed')).toBe('true');
-
     const mulliganButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.includes('Mulligan'));
+    expect(mulliganButton?.textContent).toContain('[0]');
     mulliganButton?.click();
     await flushPage();
 
-    expect(testZone(mounted.container, 'playtest-opening-mana')
-      .querySelector<HTMLButtonElement>('.playtest-opening-card-choice')?.getAttribute('aria-pressed')).toBe('true');
+    expect([...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Mulligan'))?.textContent).toContain('[1]');
+    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
 
     await keepOpeningHand(mounted.container);
 
     expect(testZone(mounted.container, 'playtest-board-zone')).not.toBeNull();
-    expect(mounted.container.querySelectorAll('[data-testid="playtest-board-card"] [data-instance-id]')).toHaveLength(1);
+    expect(mounted.container.querySelectorAll('[data-testid="playtest-board-card"] [data-instance-id]')).toHaveLength(4);
+    expect(testZone(mounted.container, 'playtest-banish-zone').textContent).toContain('1');
 
     mounted.unmount();
   });
 
-  test('hides the Setup section when the deck has no Setup cards', async () => {
+  test('setup library cards can be dragged between setup zones without using the board', async () => {
+    const mounted = await mountPage();
+
+    const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    for (const button of manaChoices.slice(0, 3)) {
+      button.click();
+      await flushPage();
+    }
+    const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Accept');
+    acceptButton?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-library-zone')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-library-zone').className).toContain('playtest-stack-passive');
+    const libraryBrowser = testZone(mounted.container, 'playtest-opening-library-browser');
+    const libraryCard = libraryBrowser.querySelector<HTMLElement>('[data-instance-id]');
+    const handDropZone = testZone(mounted.container, 'playtest-opening-picked-mana');
+    if (!libraryCard) {
+      throw new Error('expected setup library card');
+    }
+    const libraryCardRect = vi.spyOn(libraryCard, 'getBoundingClientRect');
+    libraryCardRect.mockReturnValue(rect(40, 120, 100, 140));
+
+    const originalElementsFromPoint = document.elementsFromPoint;
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: () => [handDropZone],
+    });
+
+    libraryCard.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 41, clientX: 50, clientY: 130 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 41, clientX: 90, clientY: 170 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 41, clientX: 90, clientY: 170 }));
+    await flushPage();
+
+    expect(handDropZone.textContent).not.toContain('Hand 1');
+    const banishZone = testZone(mounted.container, 'playtest-banish-zone');
+    libraryCardRect.mockReturnValue(rect(80, 420, 100, 140));
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: () => [banishZone],
+    });
+
+    libraryCard.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 42, clientX: 90, clientY: 430 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 42, clientX: 180, clientY: 430 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 42, clientX: 180, clientY: 430 }));
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-banish-zone').textContent).toContain('1');
+    const playButton = [...libraryBrowser.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Play'));
+    playButton?.click();
+    await flushPage();
+
+    expect(handDropZone.textContent).toContain('Play 1');
+    const stagedPlayCard = handDropZone.querySelector<HTMLElement>(
+      '[data-playtest-zone-id="other"][data-playtest-setup-origin="true"]',
+    );
+    if (!stagedPlayCard) {
+      throw new Error('expected staged play card');
+    }
+    vi.spyOn(stagedPlayCard, 'getBoundingClientRect').mockReturnValue(rect(120, 420, 100, 140));
+    const discardZone = testZone(mounted.container, 'playtest-discard-zone');
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: () => [discardZone],
+    });
+
+    stagedPlayCard.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 43, clientX: 130, clientY: 430 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 43, clientX: 210, clientY: 430 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 43, clientX: 210, clientY: 430 }));
+    await flushPage();
+
+    expect(handDropZone.textContent).not.toContain('Play 1');
+    expect(testZone(mounted.container, 'playtest-discard-zone').textContent).toContain('1');
+    expect(mounted.container.querySelectorAll('[data-testid="playtest-board-card"] [data-instance-id]')).toHaveLength(0);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: originalElementsFromPoint,
+    });
+    mounted.unmount();
+  });
+
+  test('shows an empty Setup step when the deck has no Setup cards', async () => {
     fetchDeckDetailMock.mockResolvedValueOnce({
       ...deckRecord,
       mainboard: {
         ...deckRecord.mainboard,
-        total_cards: 9,
+        total_cards: 13,
         unique_cards: 2,
         entries: deckRecord.mainboard.entries.filter((entry) => entry.card.id !== setupCard.id),
       },
       totals: {
         ...deckRecord.totals,
-        overall_total_cards: 9,
+        overall_total_cards: 13,
         overall_unique_cards: 2,
-        mainboard_total_cards: 9,
+        mainboard_total_cards: 13,
         mainboard_unique_cards: 2,
       },
     });
     const mounted = await mountPage();
 
     expect(testZone(mounted.container, 'playtest-opening-mana')).not.toBeNull();
-    expect(mounted.container.querySelector('[data-testid="playtest-opening-setup-cards"]')).toBeNull();
-    expect(mounted.container.querySelector('.playtest-opening-selections-single')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Mana');
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Setup');
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Hand');
+
+    const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    for (const button of manaChoices.slice(0, 3)) {
+      button.click();
+      await flushPage();
+    }
+    const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Accept');
+    acceptButton?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-opening-setup-cards')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-setup-cards').textContent).toContain('No cards with Setup tags found.');
+    expect(testZone(mounted.container, 'playtest-opening-library-browser')).not.toBeNull();
 
     mounted.unmount();
   });
@@ -461,26 +677,55 @@ describe('PlaytesterPage', () => {
   test('keeps opening stack zone changes after accepting the hand', async () => {
     const mounted = await mountPage();
 
+    const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    for (const button of manaChoices.slice(0, 3)) {
+      button.click();
+      await flushPage();
+    }
+    const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Accept');
+    acceptButton?.click();
+    await flushPage();
+
+    const heroContext = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 10,
+      clientY: 10,
+    });
+    testZone(mounted.container, 'playtest-hero-zone').dispatchEvent(heroContext);
+    await flushPage();
+
+    const openingHeroMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    expect(openingHeroMenuText).toContain('Open');
+    expect(openingHeroMenuText).not.toContain('Top to Hand');
+    expect(openingHeroMenuText).not.toContain('Top to Discard');
+    expect(openingHeroMenuText).not.toContain('Top to Banish');
+    expect(openingHeroMenuText).not.toContain('Top to Library');
+
+    const libraryCard = testZone(mounted.container, 'playtest-opening-library-browser')
+      .querySelector<HTMLElement>('[data-instance-id]');
     const libraryContext = new MouseEvent('contextmenu', {
       bubbles: true,
       cancelable: true,
       clientX: 20,
       clientY: 20,
     });
-    testZone(mounted.container, 'playtest-library-zone').dispatchEvent(libraryContext);
+    libraryCard?.dispatchEvent(libraryContext);
     await flushPage();
 
     const openingLibraryMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
-    expect(openingLibraryMenuText).toContain('Open');
-    expect(openingLibraryMenuText).toContain('Top to Discard');
-    expect(openingLibraryMenuText).toContain('Top to Banish');
+    expect(openingLibraryMenuText).not.toContain('To Hand');
+    expect(openingLibraryMenuText).toContain('To Discard');
+    expect(openingLibraryMenuText).toContain('To Banish');
+    expect(openingLibraryMenuText).toContain('To Hero');
     expect(openingLibraryMenuText).not.toContain('Draw');
     expect(openingLibraryMenuText).not.toContain('Shuffle');
-    expect(openingLibraryMenuText).not.toContain('Top to Hand');
-    expect(openingLibraryMenuText).not.toContain('Top to Board');
+    expect(openingLibraryMenuText).not.toContain('To Board');
 
     const topToDiscard = [...document.body.querySelectorAll<HTMLButtonElement>('[data-testid="playtest-context-menu"] button')]
-      .find((button) => button.textContent?.includes('Top to Discard'));
+      .find((button) => button.textContent?.includes('To Discard'));
     topToDiscard?.click();
     await flushPage();
 
@@ -500,13 +745,29 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
-  test('opening stack overlay card actions cannot move cards to hand or board', async () => {
+  test('opening setup card actions can move cards between setup zones but not hand or board', async () => {
     const mounted = await mountPage();
+
+    const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    for (const button of manaChoices.slice(0, 3)) {
+      button.click();
+      await flushPage();
+    }
+    const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Accept');
+    acceptButton?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-opening-setup-cards')).not.toBeNull();
 
     testZone(mounted.container, 'playtest-library-zone').click();
     await flushPage();
 
-    const stackCard = document.body.querySelector<HTMLElement>('[data-testid="playtest-stack-overlay"] [data-instance-id]');
+    expect(document.body.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
+
+    const stackCard = testZone(mounted.container, 'playtest-opening-library-browser')
+      .querySelector<HTMLElement>('[data-instance-id]');
     expect(stackCard).not.toBeNull();
     const cardContext = new MouseEvent('contextmenu', {
       bubbles: true,
@@ -518,13 +779,60 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     const cardMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    expect(cardMenuText).not.toContain('To Hand');
     expect(cardMenuText).toContain('To Discard');
     expect(cardMenuText).toContain('To Banish');
-    expect(cardMenuText).not.toContain('To Hand');
+    expect(cardMenuText).toContain('To Hero');
     expect(cardMenuText).not.toContain('To Board');
     expect(cardMenuText).not.toContain('Copy');
     expect(cardMenuText).not.toContain('Flip');
     expect(cardMenuText).not.toContain('Delete');
+
+    mounted.unmount();
+  });
+
+  test('opening hand phase does not allow stack cards to be moved into hand', async () => {
+    const mounted = await mountPage();
+
+    const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    for (const button of manaChoices.slice(0, 3)) {
+      button.click();
+      await flushPage();
+    }
+    const acceptManaButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Accept');
+    acceptManaButton?.click();
+    await flushPage();
+
+    const drawHandButton = [...testZone(mounted.container, 'playtest-opening-setup-cards').querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('Draw hand'));
+    drawHandButton?.click();
+    await flushPage();
+
+    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
+
+    const stackContext = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 40,
+      clientY: 40,
+    });
+    testZone(mounted.container, 'playtest-library-zone').dispatchEvent(stackContext);
+    await flushPage();
+
+    const stackMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    expect(stackMenuText).not.toContain('Open');
+    expect(stackMenuText).not.toContain('Top to Hand');
+    expect(stackMenuText).not.toContain('Top to Discard');
+    expect(stackMenuText).not.toContain('Top to Banish');
+    expect(stackMenuText).not.toContain('Top to Library');
+
+    testZone(mounted.container, 'playtest-library-zone').click();
+    await flushPage();
+
+    const stackCard = document.body.querySelector<HTMLElement>('[data-testid="playtest-stack-overlay"] [data-instance-id]');
+    expect(stackCard).toBeNull();
 
     mounted.unmount();
   });
@@ -576,12 +884,12 @@ describe('PlaytesterPage', () => {
     handCard?.click();
     await flushPage();
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(6);
-    expect(mounted.container.querySelectorAll('[data-testid="playtest-board-card"] [data-instance-id]')).toHaveLength(1);
+    expect(nonSetupBoardCards(testZone(mounted.container, 'playtest-board-zone'))).toHaveLength(1);
     expect(mounted.container.querySelector('.playtest-card-face-animating')).toBeNull();
     expect(undoButton?.disabled).toBe(false);
     expect(redoButton?.disabled).toBe(true);
 
-    const playCard = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-board-card"] [data-instance-id]');
+    const playCard = nonSetupBoardCards(testZone(mounted.container, 'playtest-board-zone'))[0];
     playCard?.click();
     await flushPage();
     expect(playCard?.className).toContain('playtest-card-tapped');
@@ -591,7 +899,7 @@ describe('PlaytesterPage', () => {
     nextTurnButton?.click();
     await flushPage();
 
-    const updatedPlayCard = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-board-card"] [data-instance-id]');
+    const updatedPlayCard = nonSetupBoardCards(testZone(mounted.container, 'playtest-board-zone'))[0];
     expect(updatedPlayCard?.className).not.toContain('playtest-card-tapped');
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(7);
 
@@ -639,7 +947,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(6);
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+    expect(nonSetupBoardCards(board)).toHaveLength(1);
     expect(undoButton?.disabled).toBe(false);
     expect(redoButton?.disabled).toBe(true);
 
@@ -651,7 +959,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(7);
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(0);
+    expect(nonSetupBoardCards(board)).toHaveLength(0);
     expect(document.body.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
     expect(scaleInput?.value).toBe('0.8');
     expect(undoButton?.disabled).toBe(true);
@@ -661,7 +969,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(6);
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+    expect(nonSetupBoardCards(board)).toHaveLength(1);
     expect(undoButton?.disabled).toBe(false);
     expect(redoButton?.disabled).toBe(true);
 
@@ -669,14 +977,14 @@ describe('PlaytesterPage', () => {
     await flushPage();
     window.dispatchEvent(playtestKeyEvent('Z', { ctrlKey: true, shiftKey: true }));
     await flushPage();
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+    expect(nonSetupBoardCards(board)).toHaveLength(1);
 
     window.dispatchEvent(playtestKeyEvent('z', { ctrlKey: true }));
     await flushPage();
     testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
     await flushPage();
 
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(1);
+    expect(nonSetupBoardCards(board)).toHaveLength(1);
     expect(undoButton?.disabled).toBe(false);
     expect(redoButton?.disabled).toBe(true);
 
@@ -713,7 +1021,7 @@ describe('PlaytesterPage', () => {
     handCard?.click();
     await flushPage();
 
-    const playCard = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-board-card"] [data-instance-id]');
+    const playCard = nonSetupBoardCards(testZone(mounted.container, 'playtest-board-zone'))[0];
     vi.stubGlobal('innerWidth', 800);
     vi.stubGlobal('innerHeight', 600);
     if (playCard) {
@@ -847,7 +1155,7 @@ describe('PlaytesterPage', () => {
 
     expect(document.body.querySelector('[data-testid="playtest-dragged-card"]')).toBeNull();
     expect(handZone.querySelectorAll('[data-instance-id]')).toHaveLength(7);
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(0);
+    expect(nonSetupBoardCards(board)).toHaveLength(0);
 
     mounted.unmount();
   });
@@ -884,9 +1192,9 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestPointerEvent('pointerup', { clientX: 110, clientY: 110 }));
     await flushPage();
 
-    expect(mounted.container.querySelectorAll('[data-testid="playtest-board-card"] [data-instance-id]')).toHaveLength(1);
+    expect(nonSetupBoardCards(board)).toHaveLength(1);
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(6);
-    const boardCard = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-board-card"]');
+    const boardCard = nonSetupBoardWrappers(board)[0];
     expect(boardCard?.style.left).toBe('30%');
     expect(boardCard?.style.top).toBe('42.5%');
 
@@ -911,7 +1219,7 @@ describe('PlaytesterPage', () => {
     secondHandCard?.click();
     await flushPage();
 
-    const boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+    const boardCards = nonSetupBoardCards(board);
     expect(boardCards).toHaveLength(2);
     vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
     vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
@@ -937,8 +1245,8 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 3, clientX: 150, clientY: 100 }));
     await flushPage();
 
-    const boardWrappers = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-board-card"]')];
-    expect(boardWrappers.map((element) => element.style.left)).toEqual(['26%', '42%']);
+    const boardWrappers = nonSetupBoardWrappers(board);
+    expect(boardWrappers.map((element) => element.style.left)).toEqual(['74%', '90%']);
     expect(boardWrappers.map((element) => element.style.top)).toEqual(['22%', '22%']);
 
     mounted.unmount();
@@ -956,7 +1264,7 @@ describe('PlaytesterPage', () => {
     testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
     await flushPage();
 
-    const boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+    const boardCards = nonSetupBoardCards(board);
     expect(boardCards).toHaveLength(2);
     vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
     vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
@@ -999,7 +1307,7 @@ describe('PlaytesterPage', () => {
     secondHandCard?.click();
     await flushPage();
 
-    const boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+    const boardCards = nonSetupBoardCards(board);
     expect(boardCards).toHaveLength(2);
     vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
     vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
@@ -1009,7 +1317,7 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 11, clientX: 340, clientY: 240 }));
     await flushPage();
 
-    const boardWrappersBefore = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-board-card"]')];
+    const boardWrappersBefore = nonSetupBoardWrappers(board);
     const positionsBefore = boardWrappersBefore.map((element) => [element.style.left, element.style.top]);
     const originalElementsFromPoint = document.elementsFromPoint;
     Object.defineProperty(document, 'elementsFromPoint', {
@@ -1022,7 +1330,7 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 12, clientX: 650, clientY: 100 }));
     await flushPage();
 
-    const boardWrappersAfter = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-board-card"]')];
+    const boardWrappersAfter = nonSetupBoardWrappers(board);
     expect(boardWrappersAfter.map((element) => [element.style.left, element.style.top])).toEqual(positionsBefore);
 
     Object.defineProperty(document, 'elementsFromPoint', {
@@ -1079,7 +1387,7 @@ describe('PlaytesterPage', () => {
         testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
         await flushPage();
       }
-      const boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+      const boardCards = nonSetupBoardCards(board);
       expect(boardCards).toHaveLength(4);
       return boardCards;
     };
@@ -1116,10 +1424,10 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 5, clientX: 160, clientY: 360 }));
     await flushPage();
 
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(2);
+    expect(nonSetupBoardCards(board)).toHaveLength(2);
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(5);
 
-    boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+    boardCards = nonSetupBoardCards(board);
     mockSelectedPairBounds(boardCards);
     await selectBoardCards();
 
@@ -1134,7 +1442,7 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 6, clientX: 420, clientY: 360 }));
     await flushPage();
 
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(0);
+    expect(nonSetupBoardCards(board)).toHaveLength(0);
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(5);
     expect(testZone(mounted.container, 'playtest-discard-zone').textContent).toContain('2');
 
@@ -1157,7 +1465,7 @@ describe('PlaytesterPage', () => {
       await flushPage();
     }
 
-    const boardCards = [...board.querySelectorAll<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')];
+    const boardCards = nonSetupBoardCards(board);
     expect(boardCards).toHaveLength(2);
     vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
     vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
@@ -1175,7 +1483,7 @@ describe('PlaytesterPage', () => {
     window.dispatchEvent(playtestKeyEvent('v', { ctrlKey: true }));
     await flushPage();
 
-    expect(board.querySelectorAll('[data-instance-id][data-playtest-zone-id="play"]')).toHaveLength(4);
+    expect(nonSetupBoardCards(board)).toHaveLength(4);
 
     window.dispatchEvent(playtestKeyEvent('t'));
     await flushPage();
@@ -1215,6 +1523,11 @@ describe('PlaytesterPage', () => {
 
     expect(libraryAfter).not.toEqual(libraryBefore);
     expect([...libraryAfter].sort()).toEqual([...libraryBefore].sort());
+
+    expect(mounted.container.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
+    window.dispatchEvent(playtestKeyEvent('o'));
+    await flushPage();
+    expect(testZone(mounted.container, 'playtest-stack-overlay').textContent).toContain('Library');
 
     mounted.unmount();
   });
@@ -1256,7 +1569,7 @@ describe('PlaytesterPage', () => {
     hand.querySelector<HTMLElement>('[data-instance-id]')?.click();
     await flushPage();
 
-    const boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    const boardCard = nonSetupBoardCards(board)[0];
     if (!boardCard) {
       throw new Error('expected board card');
     }
@@ -1264,12 +1577,12 @@ describe('PlaytesterPage', () => {
     boardCard.focus();
     boardCard.dispatchEvent(playtestKeyEvent('t'));
     await flushPage();
-    expect(board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]')?.className)
+    expect(nonSetupBoardCards(board)[0]?.className)
       .toContain('playtest-card-tapped');
 
     boardCard.dispatchEvent(playtestKeyEvent('f'));
     await flushPage();
-    expect(board.querySelector('[data-instance-id][data-playtest-zone-id="play"] img[alt$="face down"]')).not.toBeNull();
+    expect(nonSetupBoardCards(board)[0]?.querySelector('img[alt$="face down"]')).not.toBeNull();
 
     mounted.unmount();
   });
@@ -1324,29 +1637,29 @@ describe('PlaytesterPage', () => {
     hand.querySelector<HTMLElement>('[data-instance-id]')?.click();
     await flushPage();
 
-    let boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    let boardCard = nonSetupBoardCards(board)[0];
     expect(boardCard).not.toBeNull();
     expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(7);
 
     boardCard?.click();
     await flushPage();
-    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    boardCard = nonSetupBoardCards(board)[0];
     expect(boardCard?.className).toContain('playtest-card-tapped');
 
     window.dispatchEvent(playtestKeyEvent('u'));
     await flushPage();
-    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    boardCard = nonSetupBoardCards(board)[0];
     expect(boardCard?.className).not.toContain('playtest-card-tapped');
     expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(7);
 
     boardCard?.click();
     await flushPage();
-    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    boardCard = nonSetupBoardCards(board)[0];
     expect(boardCard?.className).toContain('playtest-card-tapped');
 
     window.dispatchEvent(playtestKeyEvent('n'));
     await flushPage();
-    boardCard = board.querySelector<HTMLElement>('[data-instance-id][data-playtest-zone-id="play"]');
+    boardCard = nonSetupBoardCards(board)[0];
     expect(boardCard?.className).not.toContain('playtest-card-tapped');
     expect(hand.querySelectorAll('[data-instance-id]')).toHaveLength(8);
 
@@ -1375,11 +1688,15 @@ describe('PlaytesterPage', () => {
     testZone(mounted.container, 'playtest-library-zone').dispatchEvent(libraryContext);
     await flushPage();
 
-    const libraryMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    const libraryMenu = document.body.querySelector<HTMLElement>('[data-testid="playtest-context-menu"]');
+    const libraryMenuText = libraryMenu?.textContent ?? '';
     expect(libraryMenuText).toContain('Draw');
     expect(libraryMenuText).toContain('D');
     expect(libraryMenuText).toContain('Shuffle');
     expect(libraryMenuText).toContain('R');
+    expect(libraryMenuText).toContain('Open');
+    const openAction = Array.from(libraryMenu?.querySelectorAll('button') ?? []).find((action) => action.textContent?.includes('Open'));
+    expect(openAction?.querySelector('.playtest-context-menu-hotkey')?.textContent).toContain('O');
     expect(libraryMenuText).not.toContain('Draw Top Card');
     expect(libraryMenuText).not.toContain('Shuffle Library');
     expect(libraryMenuText).not.toContain('Open Stack');
@@ -1413,7 +1730,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     expect(testZone(mounted.container, 'playtest-hand-zone').querySelectorAll('[data-instance-id]')).toHaveLength(handCountBeforeCopyPaste);
-    expect(testZone(mounted.container, 'playtest-board-zone').querySelectorAll('[data-instance-id]')).toHaveLength(1);
+    expect(nonSetupBoardCards(testZone(mounted.container, 'playtest-board-zone'))).toHaveLength(1);
 
     const refreshedCardContext = new MouseEvent('contextmenu', {
       bubbles: true,

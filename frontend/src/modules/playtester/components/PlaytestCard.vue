@@ -12,6 +12,7 @@
     ]"
     :data-instance-id="instance.instanceId"
     :data-playtest-zone-id="instance.zoneId"
+    :data-playtest-setup-origin="instance.setupOrigin ? 'true' : undefined"
     :data-playtest-pile-group-id="instance.pileGroupId ?? undefined"
     :data-playtest-selected="selected ? 'true' : undefined"
     :role="canActivate ? 'button' : undefined"
@@ -292,6 +293,7 @@ onBeforeUnmount(() => {
 .playtest-card-drag-source {
   opacity: 0.22;
   filter: grayscale(0.35) drop-shadow(0 0.3rem 0.4rem rgba(0, 0, 0, 0.16));
+  transition: none;
 }
 
 .playtest-card-selected {

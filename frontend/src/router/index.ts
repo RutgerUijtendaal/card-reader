@@ -10,7 +10,6 @@ import CardPublicDetailPage from '@/modules/card-detail/CardPublicDetailPage.vue
 import DeckDetailPage from '@/modules/decks/DeckDetailPage.vue';
 import DeckEditorPage from '@/modules/decks/DeckEditorPage.vue';
 import DeckIndexPage from '@/modules/decks/DeckIndexPage.vue';
-import PlaytesterIndexPage from '@/modules/playtester/PlaytesterIndexPage.vue';
 import PlaytesterPage from '@/modules/playtester/PlaytesterPage.vue';
 import NotificationsPage from '@/modules/notifications/NotificationsPage.vue';
 import ReviewQueuePage from '@/modules/review-queue/ReviewQueuePage.vue';
@@ -29,7 +28,7 @@ export const router = createRouter({
     { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { title: 'Card Group' } },
     { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks' } },
     { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck' } },
-    { path: '/playtester', component: PlaytesterIndexPage, meta: { title: 'Playtester' } },
+    { path: '/playtester', component: PlaytesterPage, meta: { title: 'Playtester' } },
     { path: '/playtester/:deckId', component: PlaytesterPage, meta: { title: 'Playtester' } },
     { path: '/login', component: LoginPage, meta: { public: true, title: 'Sign In' } },
     { path: '/password-setup', component: PasswordSetupPage, meta: { public: true, title: 'Password Setup' } },

@@ -1,17 +1,20 @@
 <template>
-  <section class="playtester-page flex flex-col">
+  <section
+    class="playtester-page flex flex-col"
+    :class="isPreSetupStage ? 'playtester-page-pre-setup' : ''"
+  >
     <AppPageHeader
       :icon="Gamepad2"
-      :title="deck?.name ?? 'Playtester'"
-      :subtitle="deck ? `Hero: ${deck.hero_card.name}` : 'Loading deck playtest.'"
-      back-to="/playtester"
-      back-label="Back to Playtester"
+      :title="pageTitle"
+      :subtitle="pageSubtitle"
+      :back-to="isPreSetupStage ? null : '/playtester'"
+      :back-label="isPreSetupStage ? '' : 'Back to Playtester'"
       title-tag="h2"
       title-class="text-xl"
     >
       <template #actions>
         <RouterLink
-          v-if="deck"
+          v-if="!isPreSetupStage && deck"
           class="btn-secondary"
           :to="`/decks/${deck.id}`"
         >
@@ -21,17 +24,47 @@
     </AppPageHeader>
 
     <div
-      v-if="loading"
+      v-if="!isPreSetupStage && activeDeckLoading"
       class="playtester-loading theme-card-frame-muted"
       aria-label="Loading playtester"
     />
 
     <div
-      v-else-if="!deck || !playtest"
+      v-else-if="!isPreSetupStage && (!deck || !playtest)"
       class="theme-empty-state text-sm"
     >
       Deck not found.
     </div>
+
+    <PlaytestPreSetupStage
+      v-else-if="isPreSetupStage"
+      v-model:search-query="deckSelection.searchQuery.value"
+      :card-scale-style="cardScaleStyle"
+      :current-card-back-url="currentCardBackUrl"
+      :empty-message="deckSelection.emptyMessage.value"
+      :filtered-suggestions="deckSelection.filteredSuggestions.value"
+      :has-ongoing-playtest="deckSelection.hasOngoingPlaytest.value"
+      :open-stack-label="deckSelection.openStackLabel.value"
+      :open-stack-zone="deckSelection.openStackZone.value"
+      :owned-suggestions="deckSelection.ownedSuggestions.value"
+      :public-suggestions="deckSelection.publicSuggestions.value"
+      :selected-playtest="deckSelection.selectedPlaytest.value"
+      :selected-suggestion="deckSelection.selectedSuggestion.value"
+      :selected-suggestion-key="deckSelection.selectedSuggestionKey.value"
+      :selector-hand-instances="deckSelection.selectorHandInstances.value"
+      :selector-loading="deckSelection.selectorLoading.value"
+      :selector-stack-zones="deckSelection.selectorStackZones.value"
+      :stack-overlay-instances="deckSelection.stackOverlayInstances.value"
+      :stack-popover-bottom-offset-px="deckSelection.stackPopoverBottomOffsetPx.value"
+      :visible-suggestion-count="deckSelection.visibleSuggestionCount.value"
+      @wheel-scale="handleTableWheel"
+      @select-suggestion="deckSelection.selectSuggestion"
+      @continue-selected="continueSelectedDeck"
+      @start-new-selected="startNewSelectedDeck"
+      @open-stack="deckSelection.openPreviewStack"
+      @close-stack="deckSelection.closePreviewStack"
+      @resize="deckSelection.setLowerBarSize"
+    />
 
     <PlaytestTableSurface
       v-else
@@ -72,16 +105,31 @@
       </div>
 
       <PlaytestOpeningSetup
-        v-if="!staleDraft && playtest.phase === 'opening'"
+        v-else-if="playtest?.phase === 'opening'"
+        :opening-step="playtest.openingSetup.step"
         :hand-instances="handInstances"
+        :library-instances="libraryInstances"
         :mana-instances="openingManaInstances"
         :setup-instances="openingSetupInstances"
+        :staged-play-instances="openingStagedPlayInstances"
         :selected-mana-ids="playtest.openingSetup.selectedManaInstanceIds"
+        :handled-setup-card-ids="playtest.openingSetup.handledSetupCardIds"
         :hand-size="playtest.handSize"
+        :mulligan-count="playtest.openingSetup.mulliganCount"
+        :dragging-instance-ids="activeDraggedInstanceIds"
+        @continue-mana="continueOpeningMana"
+        @continue-setup="continueOpeningSetup"
+        @previous-step="previousOpeningStep"
+        @select-step="selectOpeningStep"
         @keep="keepOpeningSetup"
         @mulligan="mulliganOpeningSetup"
         @update-hand-size="updateOpeningHandSize"
         @toggle-mana="toggleOpeningMana"
+        @toggle-setup-handled="toggleOpeningSetupCardHandled"
+        @move-setup-card="moveOpeningSetupCard"
+        @pointer-card="startCardPointer"
+        @context-card="openCardContextMenu"
+        @hover="setHoverTarget"
         @bottom-resize="setLowerBarWidth"
       >
         <template #stacks>
@@ -98,6 +146,8 @@
               :card-back-url="currentCardBackUrl"
               :collapsed="zone.collapsed"
               :default-action="zone.defaultAction"
+              :interactive="zone.interactive"
+              :draggable="zone.draggable"
               :dragging-top="activeDrag?.instanceId === stackTopInstance(zone.id)?.instanceId"
               :shuffling="shufflingStackZone === zone.id"
               @open="openStack"
@@ -110,182 +160,55 @@
         </template>
       </PlaytestOpeningSetup>
 
-      <template v-else-if="!staleDraft">
-        <div class="playtester-topbar">
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="playtester-history-controls">
-              <button
-                class="playtester-history-button"
-                type="button"
-                aria-label="Undo"
-                title="Undo (Ctrl+Z)"
-                data-testid="playtest-undo"
-                :disabled="undoStack.length === 0"
-                @click="undoPlaytestState"
-                @pointerup="releasePointerFocus"
-                @pointercancel="releasePointerFocus"
-              >
-                <Undo2 class="h-4 w-4" />
-              </button>
-              <button
-                class="playtester-history-button"
-                type="button"
-                aria-label="Redo"
-                title="Redo (Ctrl+Shift+Z or Ctrl+Y)"
-                data-testid="playtest-redo"
-                :disabled="redoStack.length === 0"
-                @click="redoPlaytestState"
-                @pointerup="releasePointerFocus"
-                @pointercancel="releasePointerFocus"
-              >
-                <Redo2 class="h-4 w-4" />
-              </button>
-            </div>
-            <span
-              class="playtester-topbar-divider"
-              aria-hidden="true"
-            />
-            <label class="playtester-scale-control theme-section-muted">
-              Scale
-              <input
-                class="playtester-scale"
-                type="range"
-                :value="cardScale"
-                min="0.5"
-                max="1.6"
-                step="0.05"
-                @input="setCardScaleFromInput"
-                @pointerup="releasePointerFocus"
-                @pointercancel="releasePointerFocus"
-              >
-            </label>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <button
-              class="btn-primary"
-              type="button"
-              @click="nextTurn"
-              @pointerup="releasePointerFocus"
-              @pointercancel="releasePointerFocus"
-            >
-              Next turn
-            </button>
-            <button
-              class="btn-secondary"
-              type="button"
-              :disabled="!playtest.setupSnapshot"
-              @click="resetSetup"
-              @pointerup="releasePointerFocus"
-              @pointercancel="releasePointerFocus"
-            >
-              Reset to Setup
-            </button>
-            <button
-              class="btn-danger-secondary"
-              type="button"
-              @click="restartConfirmOpen = true"
-              @pointerup="releasePointerFocus"
-              @pointercancel="releasePointerFocus"
-            >
-              Restart
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref="boardRef"
-          class="playtester-board"
-          data-testid="playtest-board-zone"
-          data-playtest-drop-zone="board"
-          @pointerdown="startBoardSelection"
-          @pointermove="rememberBoardPointer"
-          @wheel="rememberBoardPointer"
-        >
-          <div class="playtester-board-label">
-            <span>Board</span>
-            <span>{{ playInstances.length }} cards</span>
-          </div>
-
-          <div
-            v-if="playInstances.length === 0"
-            class="playtester-board-empty"
-          >
-            Drag cards here or click a card in hand.
-          </div>
-
-          <div
-            v-for="pile in visualPiles"
-            :key="pile.groupId"
-            class="playtester-board-pile"
-          >
-            <PlaytestVisualPile
-              :group-id="pile.groupId"
-              :instances="pile.instances"
-              :dragged-instance-ids="activeDraggedInstanceIds"
-              :selected-instance-ids="selectedBoardInstanceIds"
-              :card-back-url="currentCardBackUrl"
-              @activate="activateCard"
-              @pointer-card="startCardPointer"
-              @context-menu="openCardContextMenu"
-              @hover="setHoverTarget"
-            />
-          </div>
-
-          <div
-            v-for="(instance, index) in loosePlayInstances"
-            :key="instance.instanceId"
-            class="playtester-board-card"
-            data-testid="playtest-board-card"
-            :style="boardCardStyle(instance, index)"
-          >
-            <PlaytestCard
-              :instance="instance"
-              :dragging="isInstanceDragging(instance.instanceId)"
-              :selected="selectedBoardInstanceIds.includes(instance.instanceId)"
-              :card-back-url="currentCardBackUrl"
-              @activate="activateCard"
-              @pointer-card="startCardPointer"
-              @context-menu="openCardContextMenu"
-              @hover="setHoverTarget"
-            />
-          </div>
-
-          <div
-            v-if="boardSelection"
-            class="playtester-selection-box"
-            data-testid="playtest-selection-box"
-            :style="selectionBoxStyle"
-          />
-        </div>
-
-        <PlaytestLowerBar
-          :hand-instances="handInstances"
-          :hand-title="`Cards in hand: ${handInstances.length}`"
-          :stack-zones="stackZones"
-          :card-back-url="currentCardBackUrl"
-          :dragging-instance-ids="activeDraggedInstanceIds"
-          :dragging-top-instance-id="activeDrag?.instanceId ?? null"
-          :shuffling-stack-zone="shufflingStackZone"
-          @activate-card="activateCard"
-          @pointer-card="startCardPointer"
-          @context-card="openCardContextMenu"
-          @open-stack="openStack"
-          @draw-stack="drawFromStack"
-          @pointer-stack="startStackPointer"
-          @context-stack="openStackContextMenu"
-          @hover="setHoverTarget"
-          @resize="setLowerBarWidth"
-        />
-      </template>
+      <PlaytestActiveStage
+        v-else
+        :active-drag-instance-id="activeDrag?.instanceId ?? null"
+        :active-dragged-instance-ids="activeDraggedInstanceIds"
+        :board-selection-active="Boolean(boardSelection)"
+        :can-reset-setup="Boolean(playtest?.setupSnapshot)"
+        :card-scale="cardScale"
+        :current-card-back-url="currentCardBackUrl"
+        :hand-instances="handInstances"
+        :loose-play-instances="loosePlayInstances"
+        :play-instances="playInstances"
+        :redo-disabled="redoStack.length === 0"
+        :selected-board-instance-ids="selectedBoardInstanceIds"
+        :selection-box-style="selectionBoxStyle"
+        :shuffling-stack-zone="shufflingStackZone"
+        :stack-zones="stackZones"
+        :undo-disabled="undoStack.length === 0"
+        :visual-piles="visualPiles"
+        @board-ref="boardRef = $event"
+        @undo="undoPlaytestState"
+        @redo="redoPlaytestState"
+        @release-pointer-focus="releasePointerFocus"
+        @update-card-scale="setCardScaleFromInput"
+        @next-turn="nextTurn"
+        @reset-setup="resetSetup"
+        @restart="restartConfirmOpen = true"
+        @start-board-selection="startBoardSelection"
+        @remember-board-pointer="rememberBoardPointer"
+        @activate-card="activateCard"
+        @pointer-card="startCardPointer"
+        @context-card="openCardContextMenu"
+        @hover="setHoverTarget"
+        @open-stack="openStack"
+        @draw-stack="drawFromStack"
+        @pointer-stack="startStackPointer"
+        @context-stack="openStackContextMenu"
+        @resize="setLowerBarWidth"
+      />
 
       <PlaytestStackPopover
         :open="!staleDraft && Boolean(openStackZone)"
         :title="openStackLabel"
         :instances="stackOverlayInstances"
+        :drop-zone-id="openStackZone"
         :dragging-instance-ids="activeDraggedInstanceIds"
         :card-back-url="currentCardBackUrl"
+        :card-interactive="true"
         :bottom-offset-px="stackPopoverBottomOffsetPx"
+        test-id="playtest-stack-overlay"
         @close="closeStack"
         @pointer-card="startCardPointer"
         @context-card="openCardContextMenu"
@@ -325,8 +248,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useEventListener } from '@vueuse/core';
-import { Gamepad2, Redo2, Undo2 } from 'lucide-vue-next';
-import { RouterLink, useRoute } from 'vue-router';
+import { Gamepad2 } from 'lucide-vue-next';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
@@ -334,15 +257,17 @@ import { useAuthStore } from '@/modules/auth/authStore';
 import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import type { DeckRecord } from '@/modules/decks/types';
 import { fetchCurrentCardBack } from '@/modules/playtester/api';
-import PlaytestCard from '@/modules/playtester/components/PlaytestCard.vue';
+import PlaytestActiveStage, { type PlaytestActiveVisualPile } from '@/modules/playtester/components/PlaytestActiveStage.vue';
 import PlaytestContextMenu from '@/modules/playtester/components/PlaytestContextMenu.vue';
 import PlaytestDraggedCardOverlay from '@/modules/playtester/components/PlaytestDraggedCard.vue';
-import PlaytestLowerBar from '@/modules/playtester/components/PlaytestLowerBar.vue';
 import PlaytestOpeningSetup from '@/modules/playtester/components/PlaytestOpeningSetup.vue';
+import PlaytestPreSetupStage from '@/modules/playtester/components/PlaytestPreSetupStage.vue';
 import PlaytestStack from '@/modules/playtester/components/PlaytestStack.vue';
 import PlaytestStackPopover from '@/modules/playtester/components/PlaytestStackPopover.vue';
 import PlaytestTableSurface from '@/modules/playtester/components/PlaytestTableSurface.vue';
-import PlaytestVisualPile from '@/modules/playtester/components/PlaytestVisualPile.vue';
+import { usePlaytestDeckSelection } from '@/modules/playtester/composables/usePlaytestDeckSelection';
+import { usePlaytestHistory } from '@/modules/playtester/composables/usePlaytestHistory';
+import { usePlaytestHotkeys } from '@/modules/playtester/composables/usePlaytestHotkeys';
 import { createLocalPlaytestStorage } from '@/modules/playtester/localPlaytestStorage';
 import {
   acceptOpeningSetup,
@@ -351,6 +276,7 @@ import {
   countZone,
   createInitialPlaytestState,
   deleteCardInstances,
+  drawOpeningHand,
   drawCards,
   getOpeningManaInstances,
   getOpeningSetupInstances,
@@ -364,11 +290,15 @@ import {
   resetToSetup,
   serializePlaytestDraft,
   setOpeningHandSize,
+  setOpeningStep,
+  stageOpeningSetupCardForPlay,
   shuffleZone,
+  STARTING_MANA_REQUIRED,
   startNextTurn,
   untapAllBoardCards,
   toggleCardFace,
   toggleCardsFace,
+  toggleOpeningSetupHandled,
   toggleTapped,
   toggleOpeningManaSelection,
 } from '@/modules/playtester/playtestState';
@@ -378,6 +308,7 @@ import type {
   PlaytestDraggedCard,
   PlaytestEntityAction,
   PlaytestHoverTarget,
+  PlaytestOpeningStep,
   PlaytestState,
   PlaytestZoneId,
   StoredPlaytestDraft,
@@ -394,7 +325,6 @@ import {
   PLAYTEST_CARD_SCALE_STEP,
   savePlaytestCardScale,
 } from '@/modules/playtester/utils/cardScale';
-import { takePlaytestRouteHandoff } from '@/modules/playtester/utils/routeHandoff';
 import {
   getCollapsedStackZoneIds,
   getPlaytestStackFace,
@@ -402,7 +332,6 @@ import {
   PLAYTEST_STACK_OPENING_BUDGET_RATIO,
   PLAYTEST_STACK_PLAY_BUDGET_RATIO,
 } from '@/modules/playtester/utils/stacks';
-import { isEditableKeyboardTarget } from '@/utils/keyboard';
 
 type PointerDragStart = {
   instanceId: string;
@@ -424,11 +353,6 @@ type PlaytestContextMenuState = {
   actions: PlaytestEntityAction[];
 };
 
-type VisualPile = {
-  groupId: string;
-  instances: PlaytestCardInstance[];
-};
-
 type BoardSelectionDrag = {
   pointerId: number;
   startX: number;
@@ -443,17 +367,15 @@ type DraggedCardOverlay = {
   instance: PlaytestCardInstance;
 };
 
-type ApplyPlaytestStateOptions = {
-  recordHistory?: boolean;
-};
-
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const storage = createLocalPlaytestStorage();
 const deck = ref<DeckRecord | null>(null);
 const playtest = ref<PlaytestState | null>(null);
 const staleDraft = ref<StoredPlaytestDraft | null>(null);
-const loading = ref(true);
+const activeDeckLoading = ref(false);
+const pendingRouteDeck = ref<{ deck: DeckRecord; draft: StoredPlaytestDraft | null } | null>(null);
 const pendingDrag = ref<PointerDragStart | null>(null);
 const activeDrag = ref<PlaytestDraggedCard | null>(null);
 const selectedBoardInstanceIds = ref<string[]>([]);
@@ -464,8 +386,6 @@ const suppressClickUntil = ref(0);
 const restartConfirmOpen = ref(false);
 const saveSuspended = ref(false);
 const cardScale = ref(loadPlaytestCardScale());
-const undoStack = ref<PlaytestState[]>([]);
-const redoStack = ref<PlaytestState[]>([]);
 const currentCardBackUrl = ref<string | null>(null);
 const openStackZone = ref<PlaytestZoneId | null>(null);
 const copiedCards = ref<PlaytestCardInstance[]>([]);
@@ -477,9 +397,14 @@ const lowerBarHeight = ref(0);
 const DRAG_START_THRESHOLD_PX = 2;
 const SELECTION_START_THRESHOLD_PX = 4;
 const CLICK_SUPPRESSION_MS = 180;
-const PLAYTEST_HISTORY_LIMIT = 100;
 const STACK_SHUFFLE_ANIMATION_MS = 650;
 let shuffleAnimationTimer: number | null = null;
+let activeDeckLoadRequestId = 0;
+const deckSelection = usePlaytestDeckSelection({
+  authenticated: computed(() => auth.authenticated),
+  cardScale,
+  storage,
+});
 
 const setLowerBarWidth = (width: number, height = 0): void => {
   lowerBarWidth.value = width;
@@ -487,6 +412,19 @@ const setLowerBarWidth = (width: number, height = 0): void => {
 };
 
 const deckId = computed(() => String(route.params.deckId ?? ''));
+const isPreSetupStage = computed(() => deckId.value === '');
+const pageTitle = computed(() => {
+  if (isPreSetupStage.value) {
+    return 'Playtester';
+  }
+  return deck.value?.name ?? 'Playtester';
+});
+const pageSubtitle = computed(() => {
+  if (isPreSetupStage.value) {
+    return 'Choose a deck and run opening hands, setup, and early turns.';
+  }
+  return deck.value ? `Hero: ${deck.value.hero_card.name}` : 'Loading deck playtest.';
+});
 const cardScaleStyle = computed(() => getPlaytestCardScaleStyle(cardScale.value));
 const stackPopoverBottomOffsetPx = computed(() =>
   lowerBarHeight.value > 0 ? lowerBarHeight.value + 12 : undefined,
@@ -499,7 +437,7 @@ const zoneCount = (zoneId: PlaytestZoneId): number =>
   playtest.value ? countZone(playtest.value, zoneId) : 0;
 
 const playInstances = computed(() => zoneInstances('play'));
-const visualPiles = computed<VisualPile[]>(() => {
+const visualPiles = computed<PlaytestActiveVisualPile[]>(() => {
   const groups = new Map<string, PlaytestCardInstance[]>();
   for (const instance of playInstances.value) {
     if (!instance.pileGroupId) {
@@ -525,8 +463,16 @@ const loosePlayInstances = computed(() =>
   playInstances.value.filter((instance) => !piledInstanceIds.value.has(instance.instanceId)),
 );
 const handInstances = computed(() => zoneInstances('hand'));
+const libraryInstances = computed(() => zoneInstances('library'));
 const openingManaInstances = computed(() => (playtest.value ? getOpeningManaInstances(playtest.value) : []));
 const openingSetupInstances = computed(() => (playtest.value ? getOpeningSetupInstances(playtest.value) : []));
+const openingStagedPlayInstances = computed(() => {
+  if (!playtest.value) {
+    return [];
+  }
+  const stagedIds = new Set(playtest.value.openingSetup.selectedSetupInstanceIds);
+  return zoneInstances('other').filter((instance) => stagedIds.has(instance.instanceId));
+});
 
 const stackZones = computed(() =>
   PLAYTEST_STACK_DEFINITIONS.map((zone) => ({
@@ -537,10 +483,15 @@ const stackZones = computed(() =>
   })),
 );
 const openingStackZones = computed(() =>
-  stackZones.value.map((zone) => ({
-    ...zone,
-    defaultAction: 'open' as const,
-  })),
+  stackZones.value
+    .map((zone) => ({
+      ...zone,
+      interactive: playtest.value?.openingSetup.step === 'setup'
+        && !(playtest.value?.openingSetup.step === 'setup' && zone.id === 'library'),
+      draggable: playtest.value?.openingSetup.step === 'setup'
+        && !(playtest.value?.openingSetup.step === 'setup' && zone.id === 'library'),
+      defaultAction: 'open' as const,
+    })),
 );
 
 const activeDraggedInstanceIds = computed(() =>
@@ -597,7 +548,7 @@ const collapsedStackZoneIds = computed(() => {
     return new Set<PlaytestZoneId>();
   }
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-  const stackBudgetRatio = playtest.value?.phase === 'opening'
+  const stackBudgetRatio = !isPreSetupStage.value && playtest.value?.phase === 'opening'
     ? PLAYTEST_STACK_OPENING_BUDGET_RATIO
     : PLAYTEST_STACK_PLAY_BUDGET_RATIO;
   return getCollapsedStackZoneIds(lowerBarWidth.value, cardScale.value, rootFontSize, stackBudgetRatio);
@@ -612,34 +563,45 @@ const stackOverlayInstances = computed(() => {
   return openStackZone.value === 'library' ? instances : [...instances].reverse();
 });
 
-const fetchVisibleDeck = async (): Promise<DeckRecord> => {
+const fetchVisibleDeck = async (targetDeckId: string): Promise<DeckRecord> => {
   if (auth.authenticated) {
     try {
-      return await fetchMyDeck(deckId.value);
+      return await fetchMyDeck(targetDeckId);
     } catch {
-      return await fetchDeckDetail(deckId.value);
+      return await fetchDeckDetail(targetDeckId);
     }
   }
-  return await fetchDeckDetail(deckId.value);
+  return await fetchDeckDetail(targetDeckId);
+};
+
+const continueSelectedDeck = (): void => {
+  const preparedDeck = deckSelection.prepareContinueSelectedDeck();
+  if (!preparedDeck) {
+    return;
+  }
+  pendingRouteDeck.value = {
+    deck: preparedDeck.deck,
+    draft: preparedDeck.draft,
+  };
+  void router.push(preparedDeck.path);
+};
+
+const startNewSelectedDeck = (): void => {
+  const preparedDeck = deckSelection.prepareNewSelectedDeck();
+  if (!preparedDeck) {
+    return;
+  }
+  pendingRouteDeck.value = {
+    deck: preparedDeck.deck,
+    draft: preparedDeck.draft,
+  };
+  void router.push(preparedDeck.path);
 };
 
 const pruneSelectedBoardCards = (nextState: PlaytestState): void => {
   selectedBoardInstanceIds.value = selectedBoardInstanceIds.value.filter((instanceId) =>
     nextState.instances.some((instance) => instance.instanceId === instanceId && instance.zoneId === 'play'),
   );
-};
-
-const pushUndoState = (state: PlaytestState): void => {
-  undoStack.value = [...undoStack.value, state].slice(-PLAYTEST_HISTORY_LIMIT);
-};
-
-const pushRedoState = (state: PlaytestState): void => {
-  redoStack.value = [...redoStack.value, state].slice(-PLAYTEST_HISTORY_LIMIT);
-};
-
-const clearHistory = (): void => {
-  undoStack.value = [];
-  redoStack.value = [];
 };
 
 const clearUndoRedoTransientUi = (): void => {
@@ -651,61 +613,22 @@ const clearUndoRedoTransientUi = (): void => {
   openStackZone.value = null;
 };
 
-const applyState = (
-  nextState: PlaytestState,
-  options: ApplyPlaytestStateOptions = {},
-): void => {
-  const currentState = playtest.value;
-  if (nextState === currentState) {
-    return;
-  }
-  if (currentState && options.recordHistory !== false) {
-    pushUndoState(currentState);
-    redoStack.value = [];
-  }
-  playtest.value = nextState;
-  pruneSelectedBoardCards(nextState);
-};
-
-const replacePlaytestState = (nextState: PlaytestState | null): void => {
-  playtest.value = nextState;
-  clearHistory();
-  if (nextState) {
-    pruneSelectedBoardCards(nextState);
-  } else {
+const {
+  applyState,
+  clearHistory,
+  redoStack,
+  redoPlaytestState,
+  replacePlaytestState,
+  undoStack,
+  undoPlaytestState,
+} = usePlaytestHistory({
+  playtest,
+  clearSelection: () => {
     selectedBoardInstanceIds.value = [];
-  }
-};
-
-const undoPlaytestState = (): boolean => {
-  if (!playtest.value || undoStack.value.length === 0) {
-    return false;
-  }
-  const previousState = undoStack.value[undoStack.value.length - 1];
-  if (!previousState) {
-    return false;
-  }
-  undoStack.value = undoStack.value.slice(0, -1);
-  pushRedoState(playtest.value);
-  clearUndoRedoTransientUi();
-  applyState(previousState, { recordHistory: false });
-  return true;
-};
-
-const redoPlaytestState = (): boolean => {
-  if (!playtest.value || redoStack.value.length === 0) {
-    return false;
-  }
-  const nextState = redoStack.value[redoStack.value.length - 1];
-  if (!nextState) {
-    return false;
-  }
-  redoStack.value = redoStack.value.slice(0, -1);
-  pushUndoState(playtest.value);
-  clearUndoRedoTransientUi();
-  applyState(nextState, { recordHistory: false });
-  return true;
-};
+  },
+  clearTransientUi: clearUndoRedoTransientUi,
+  pruneState: pruneSelectedBoardCards,
+});
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
@@ -723,16 +646,12 @@ const setCardScaleFromInput = (event: Event): void => {
   setCardScale(input.valueAsNumber);
 };
 
-const releasePointerFocus = (event: PointerEvent): void => {
-  const target = event.currentTarget;
+const releasePointerFocus = (event?: PointerEvent): void => {
+  const target = event?.currentTarget;
   if (target instanceof HTMLElement) {
     target.blur();
   }
 };
-
-const isInstanceDragging = (instanceId: string): boolean =>
-  activeDrag.value?.instanceId === instanceId
-  || activeDrag.value?.groupInstanceIds?.includes(instanceId) === true;
 
 const boardRelativePoint = (event: PointerEvent): { x: number; y: number } | null => {
   const board = boardRef.value;
@@ -820,6 +739,9 @@ const activateCard = (instanceId: string): void => {
   if (!instance) {
     return;
   }
+  if (playtest.value.phase === 'opening') {
+    return;
+  }
   if (instance.zoneId === 'library') {
     applyState(drawCards(playtest.value, 1));
     return;
@@ -836,6 +758,9 @@ const activateCard = (instanceId: string): void => {
 
 const openStack = (zoneId: PlaytestZoneId): void => {
   if (Date.now() < suppressClickUntil.value) {
+    return;
+  }
+  if (playtest.value?.phase === 'opening' && playtest.value.openingSetup.step !== 'setup') {
     return;
   }
   openStackZone.value = openStackZone.value === zoneId ? null : zoneId;
@@ -957,19 +882,23 @@ const completeOpeningDraggedCardDrop = (
   drag: PlaytestDraggedCard,
   dropTarget: PlaytestResolvedDropTarget | null,
 ): void => {
-  if (!playtest.value || !isOpeningTransferZone(drag.source.zoneId) || !dropTarget) {
+  if (!playtest.value || !dropTarget) {
+    return;
+  }
+  const draggedInstance = playtest.value.instances.find((instance) => instance.instanceId === drag.instanceId);
+  if (!draggedInstance || !isOpeningTransferSource(playtest.value, draggedInstance)) {
     return;
   }
   if (dropTarget.type === 'zone') {
-    if (!isOpeningTransferZone(dropTarget.zoneId) || drag.source.zoneId === dropTarget.zoneId) {
+    if (!canMoveOpeningTransferToZone(playtest.value, draggedInstance, dropTarget.zoneId) || drag.source.zoneId === dropTarget.zoneId) {
       return;
     }
-    applyState(moveInstanceToZone(playtest.value, drag.instanceId, dropTarget.zoneId));
+    applyState(moveOpeningTransferCard(playtest.value, drag.instanceId, dropTarget.zoneId));
     return;
   }
 
   const target = playtest.value.instances.find((instance) => instance.instanceId === dropTarget.instanceId);
-  if (!target || !isOpeningTransferZone(target.zoneId)) {
+  if (!target || !canMoveOpeningTransferToZone(playtest.value, draggedInstance, target.zoneId)) {
     return;
   }
   const targetZoneInstances = getZoneInstances(playtest.value, target.zoneId);
@@ -977,7 +906,7 @@ const completeOpeningDraggedCardDrop = (
     ? targetZoneInstances.findIndex((instance) => instance.instanceId === drag.instanceId)
     : -1;
   const targetIndex = targetZoneInstances.findIndex((instance) => instance.instanceId === target.instanceId);
-  applyState(moveInstanceToZone(
+  applyState(moveOpeningTransferCard(
     playtest.value,
     drag.instanceId,
     target.zoneId,
@@ -1238,8 +1167,7 @@ const isPlayHotkeyEnabled = (): boolean =>
   && !boardSelection.value;
 
 const isScaleWheelEnabled = (): boolean =>
-  playtest.value !== null
-  && staleDraft.value === null
+  (isPreSetupStage.value || (playtest.value !== null && staleDraft.value === null))
   && !activeDrag.value
   && !pendingDrag.value
   && !boardSelection.value;
@@ -1387,17 +1315,47 @@ const shuffleLibrary = (): boolean => {
   return true;
 };
 
-const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
-  if (isEditableKeyboardTarget(event) || !isPlayHotkeyEnabled()) {
-    return;
+const openLibraryStack = (): boolean => {
+  if (!playtest.value || countZone(playtest.value, 'library') === 0) {
+    return false;
+  }
+  openStack('library');
+  return true;
+};
+
+const openPreviewLibraryStack = (): boolean => {
+  const previewState = deckSelection.selectedPlaytest.value;
+  if (!previewState || countZone(previewState, 'library') === 0) {
+    return false;
+  }
+  deckSelection.openPreviewStack('library');
+  return true;
+};
+
+const handlePlaytesterHotkey = (event: KeyboardEvent): boolean => {
+  const plainSingleKey =
+    !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey
+    && !event.shiftKey
+    && event.key.length === 1;
+  const normalizedKey = event.key.toLowerCase();
+
+  if (isPreSetupStage.value) {
+    return plainSingleKey && normalizedKey === 'o'
+      ? openPreviewLibraryStack()
+      : false;
+  }
+
+  if (!isPlayHotkeyEnabled()) {
+    return false;
   }
 
   const modifierPressed = (event.ctrlKey || event.metaKey) && !event.altKey;
   const normalizedModifiedKey = event.key.toLowerCase();
   const undoPressed = modifierPressed && !event.shiftKey && normalizedModifiedKey === 'z';
   if (undoPressed && undoPlaytestState()) {
-    event.preventDefault();
-    return;
+    return true;
   }
   const redoPressed = modifierPressed
     && (
@@ -1405,20 +1363,17 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
       || (!event.shiftKey && normalizedModifiedKey === 'y')
     );
   if (redoPressed && redoPlaytestState()) {
-    event.preventDefault();
-    return;
+    return true;
   }
 
   const copyPressed = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c';
   if (copyPressed && copyCurrentCards()) {
-    event.preventDefault();
-    return;
+    return true;
   }
 
   const pastePressed = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v';
   if (pastePressed && pasteCopiedCards()) {
-    event.preventDefault();
-    return;
+    return true;
   }
 
   const deletePressed =
@@ -1428,57 +1383,51 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): void => {
     && !event.shiftKey
     && (event.key === 'Delete' || event.key === 'Backspace');
   if (deletePressed && deleteCards(hotkeyCardIds({ boardOnly: false }))) {
-    event.preventDefault();
-    return;
+    return true;
   }
 
-  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.key.length !== 1) {
-    return;
+  if (!plainSingleKey) {
+    return false;
   }
 
-  const normalizedKey = event.key.toLowerCase();
   if (normalizedKey === 'n') {
-    if (nextTurn()) {
-      event.preventDefault();
-    }
-    return;
+    return nextTurn();
   }
   if (normalizedKey === 'u') {
-    if (untapAllCards()) {
-      event.preventDefault();
-    }
-    return;
+    return untapAllCards();
   }
   if (normalizedKey === 'd') {
-    if (drawOne()) {
-      event.preventDefault();
-    }
-    return;
+    return drawOne();
   }
   if (normalizedKey === 't') {
     const ids = hotkeyCardIds({ boardOnly: true });
     if (ids.length > 0) {
       toggleTappedCards(ids);
-      event.preventDefault();
+      return true;
     }
-    return;
+    return false;
   }
   if (normalizedKey === 'f') {
     const ids = hotkeyCardIds({ boardOnly: false });
     if (ids.length > 0 && playtest.value) {
       applyState(toggleCardsFace(playtest.value, ids));
-      event.preventDefault();
+      return true;
     }
-    return;
+    return false;
   }
   if (normalizedKey === 'r') {
-    if (shuffleLibrary()) {
-      event.preventDefault();
-    }
+    return shuffleLibrary();
   }
+  if (normalizedKey === 'o') {
+    return openLibraryStack();
+  }
+  return false;
 };
 
-useEventListener(window, 'keydown', handlePlaytesterHotkey);
+usePlaytestHotkeys({
+  enabled: computed(() => isPreSetupStage.value || playtest.value !== null),
+  handleHotkey: handlePlaytesterHotkey,
+});
 
 onBeforeUnmount(() => {
   if (shuffleAnimationTimer) {
@@ -1500,15 +1449,78 @@ const toggleOpeningMana = (instanceId: string, selected: boolean): void => {
   applyState(toggleOpeningManaSelection(playtest.value, instanceId, selected), { recordHistory: false });
 };
 
-const mulliganOpeningSetup = (): void => {
+const toggleOpeningSetupCardHandled = (cardId: string, handled: boolean): void => {
   if (!playtest.value) {
+    return;
+  }
+  applyState(toggleOpeningSetupHandled(playtest.value, cardId, handled), { recordHistory: false });
+};
+
+const continueOpeningMana = (): void => {
+  if (!playtest.value || playtest.value.openingSetup.selectedManaInstanceIds.length !== STARTING_MANA_REQUIRED) {
+    return;
+  }
+  closeStack();
+  applyState(setOpeningStep(playtest.value, 'setup'), { recordHistory: false });
+};
+
+const continueOpeningSetup = (): void => {
+  if (!playtest.value) {
+    return;
+  }
+  closeStack();
+  applyState(drawOpeningHand(playtest.value), { recordHistory: false });
+};
+
+const previousOpeningStep = (): void => {
+  if (!playtest.value) {
+    return;
+  }
+  if (playtest.value.openingSetup.step === 'setup') {
+    applyState(setOpeningStep(playtest.value, 'mana'), { recordHistory: false });
+    return;
+  }
+  if (playtest.value.openingSetup.step === 'hand') {
+    applyState(setOpeningStep(playtest.value, 'setup'), {
+      recordHistory: false,
+    });
+  }
+};
+
+const selectOpeningStep = (targetStep: PlaytestOpeningStep): void => {
+  if (!playtest.value || playtest.value.phase !== 'opening') {
+    return;
+  }
+  const visibleSteps: PlaytestOpeningStep[] = ['mana', 'setup', 'hand'];
+  const currentIndex = visibleSteps.indexOf(playtest.value.openingSetup.step);
+  const targetIndex = visibleSteps.indexOf(targetStep);
+  if (targetIndex < 0 || currentIndex < 0 || targetIndex >= currentIndex) {
+    return;
+  }
+  closeStack();
+  applyState(setOpeningStep(playtest.value, targetStep), { recordHistory: false });
+};
+
+const moveOpeningSetupCard = (instanceId: string, zoneId: PlaytestZoneId): void => {
+  if (!playtest.value) {
+    return;
+  }
+  if (zoneId === 'play') {
+    applyState(stageOpeningSetupCardForPlay(playtest.value, instanceId));
+    return;
+  }
+  applyState(moveOpeningTransferCard(playtest.value, instanceId, zoneId));
+};
+
+const mulliganOpeningSetup = (): void => {
+  if (!playtest.value || playtest.value.openingSetup.step !== 'hand') {
     return;
   }
   applyState(mulliganOpeningHand(playtest.value), { recordHistory: false });
 };
 
 const keepOpeningSetup = (): void => {
-  if (!playtest.value) {
+  if (!playtest.value || playtest.value.openingSetup.step !== 'hand') {
     return;
   }
   clearHistory();
@@ -1552,6 +1564,9 @@ const drawFromStack = (zoneId: PlaytestZoneId): void => {
   if (Date.now() < suppressClickUntil.value) {
     return;
   }
+  if (playtest.value?.phase === 'opening' && playtest.value.openingSetup.step === 'hand') {
+    return;
+  }
   if (zoneId === 'library') {
     drawOne();
   } else {
@@ -1565,17 +1580,60 @@ const closeContextMenu = (): void => {
 
 const isOpeningPhase = (): boolean => playtest.value?.phase === 'opening';
 
-const isOpeningTransferZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'discard' | 'banish' =>
-  zoneId === 'library' || zoneId === 'discard' || zoneId === 'banish';
+const isOpeningTransferSourceZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'hand' | 'discard' | 'banish' =>
+  zoneId === 'library' || zoneId === 'hand' || zoneId === 'discard' || zoneId === 'banish';
+
+const isOpeningTransferDestinationZone = (zoneId: PlaytestZoneId | 'board'): zoneId is 'library' | 'discard' | 'banish' | 'hero' =>
+  zoneId === 'library' || zoneId === 'discard' || zoneId === 'banish' || zoneId === 'hero';
+
+const isOpeningStagedPlaySource = (state: PlaytestState, instance: PlaytestCardInstance): boolean =>
+  instance.zoneId === 'other' && state.openingSetup.selectedSetupInstanceIds.includes(instance.instanceId);
+
+const isOpeningTransferSource = (state: PlaytestState, instance: PlaytestCardInstance): boolean =>
+  isOpeningTransferSourceZone(instance.zoneId) || isOpeningStagedPlaySource(state, instance);
+
+const canMoveOpeningTransferToZone = (
+  state: PlaytestState,
+  instance: PlaytestCardInstance,
+  zoneId: PlaytestZoneId | 'board',
+): zoneId is 'library' | 'discard' | 'banish' | 'hero' =>
+  isOpeningTransferDestinationZone(zoneId)
+  && state.openingSetup.step === 'setup';
+
+const moveOpeningTransferCard = (
+  state: PlaytestState,
+  instanceId: string,
+  zoneId: PlaytestZoneId,
+  targetIndex?: number,
+): PlaytestState => {
+  const instance = state.instances.find((entry) => entry.instanceId === instanceId);
+  if (!instance || !isOpeningTransferSource(state, instance) || !canMoveOpeningTransferToZone(state, instance, zoneId)) {
+    return state;
+  }
+  const movedState = moveInstanceToZone(state, instanceId, zoneId, targetIndex);
+  return {
+    ...movedState,
+    openingSetup: {
+      ...movedState.openingSetup,
+      selectedSetupInstanceIds: movedState.openingSetup.selectedSetupInstanceIds.filter((id) => id !== instanceId),
+    },
+    instances: movedState.instances.map((instance) =>
+      instance.instanceId === instanceId
+        ? { ...instance, setupOrigin: zoneId !== 'library' }
+        : instance,
+    ),
+  };
+};
 
 const openingCardActions = (instanceId: string, instance: PlaytestCardInstance): PlaytestEntityAction[] => {
-  if (!isOpeningTransferZone(instance.zoneId)) {
+  if (!playtest.value || playtest.value.openingSetup.step !== 'setup' || !isOpeningTransferSource(playtest.value, instance)) {
     return [];
   }
   const zoneActions: PlaytestEntityAction[] = [
-    { id: 'move-discard', label: 'To Discard', disabled: instance.zoneId === 'discard', run: () => moveCardToZone(instanceId, 'discard') },
-    { id: 'move-banish', label: 'To Banish', disabled: instance.zoneId === 'banish', run: () => moveCardToZone(instanceId, 'banish') },
-    { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveCardToZone(instanceId, 'library') },
+    { id: 'move-discard', label: 'To Discard', disabled: instance.zoneId === 'discard', run: () => moveOpeningSetupCard(instanceId, 'discard') },
+    { id: 'move-banish', label: 'To Banish', disabled: instance.zoneId === 'banish', run: () => moveOpeningSetupCard(instanceId, 'banish') },
+    { id: 'move-library', label: 'To Library', disabled: instance.zoneId === 'library', run: () => moveOpeningSetupCard(instanceId, 'library') },
+    { id: 'move-hero', label: 'To Hero', disabled: instance.zoneId === 'hero', run: () => moveOpeningSetupCard(instanceId, 'hero') },
   ].filter((action) => !action.disabled);
 
   if (zoneActions[0]) {
@@ -1621,16 +1679,20 @@ const cardActions = (instanceId: string): PlaytestEntityAction[] => {
 };
 
 const openingStackActions = (zoneId: PlaytestZoneId, hasCards: boolean): PlaytestEntityAction[] => {
+  if (playtest.value?.openingSetup.step !== 'setup') {
+    return [];
+  }
   const actions: PlaytestEntityAction[] = [
     { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
   ];
-  if (!isOpeningTransferZone(zoneId)) {
+  if (!isOpeningTransferSourceZone(zoneId)) {
     return actions;
   }
   const zoneActions: PlaytestEntityAction[] = [
     { id: 'top-discard', label: 'Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },
     { id: 'top-banish', label: 'Top to Banish', disabled: !hasCards || zoneId === 'banish', run: () => moveTopStackCard(zoneId, 'banish') },
     { id: 'top-library', label: 'Top to Library', disabled: !hasCards || zoneId === 'library', run: () => moveTopStackCard(zoneId, 'library') },
+    { id: 'top-hero', label: 'Top to Hero', disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'hero') },
   ].filter((action) => !action.disabled);
 
   if (zoneActions[0]) {
@@ -1669,7 +1731,7 @@ const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
           run: shuffleLibrary,
         }]
       : []),
-    { id: 'stack-open', label: 'Open', disabled: !hasCards, run: () => openStack(zoneId) },
+    { id: 'stack-open', label: 'Open', hotkey: zoneId === 'library' ? 'O' : undefined, disabled: !hasCards, run: () => openStack(zoneId) },
     { id: 'top-hand', label: 'Top to Hand', dividerBefore: true, disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'hand') },
     { id: 'top-play', label: 'Top to Board', disabled: !hasCards, run: () => moveTopStackCard(zoneId, 'play') },
     { id: 'top-discard', label: 'Top to Discard', disabled: !hasCards || zoneId === 'discard', run: () => moveTopStackCard(zoneId, 'discard') },
@@ -1710,6 +1772,13 @@ const moveTopStackCard = (fromZoneId: PlaytestZoneId, toZoneId: PlaytestZoneId):
   if (!top) {
     return;
   }
+  if (isOpeningPhase()) {
+    if (fromZoneId === 'hero') {
+      return;
+    }
+    applyState(moveOpeningTransferCard(playtest.value, top.instanceId, toZoneId));
+    return;
+  }
   moveCardToZone(top.instanceId, toZoneId);
 };
 
@@ -1748,16 +1817,6 @@ const resumeStaleDraft = (): void => {
   staleDraft.value = null;
 };
 
-const boardCardStyle = (instance: PlaytestCardInstance, index: number): Record<string, string | number> => {
-  const x = instance.boardX ?? 16 + (index % 5) * 16;
-  const y = instance.boardY ?? 22 + Math.floor(index / 5) * 24;
-  return {
-    left: `${x}%`,
-    top: `${y}%`,
-    zIndex: 20 + index,
-  };
-};
-
 watch(
   playtest,
   (state) => {
@@ -1767,8 +1826,6 @@ watch(
     storage.save(serializePlaytestDraft(state));
   },
 );
-
-let loadRequestId = 0;
 
 const resetTransientPlaytestUi = (): void => {
   pendingDrag.value = null;
@@ -1798,36 +1855,55 @@ const applyLoadedDeck = (
   replacePlaytestState(createInitialPlaytestState(loadedDeck));
 };
 
-const loadPlaytestDeck = async (): Promise<void> => {
-  const requestId = ++loadRequestId;
-  loading.value = true;
+const enterPreSetupStage = (): void => {
+  activeDeckLoadRequestId += 1;
+  activeDeckLoading.value = false;
+  deck.value = null;
+  replacePlaytestState(null);
+  staleDraft.value = null;
+  saveSuspended.value = false;
+  pendingRouteDeck.value = null;
+  resetTransientPlaytestUi();
+  if (deckSelection.suggestions.value.length === 0) {
+    void deckSelection.loadSuggestions();
+  }
+};
+
+const loadPlaytestDeck = async (targetDeckId: string): Promise<void> => {
+  const requestId = ++activeDeckLoadRequestId;
+  activeDeckLoading.value = true;
   deck.value = null;
   replacePlaytestState(null);
   staleDraft.value = null;
   saveSuspended.value = false;
   resetTransientPlaytestUi();
   try {
-    const handoff = takePlaytestRouteHandoff(deckId.value);
-    if (handoff) {
-      applyLoadedDeck(handoff.deck, handoff.draft);
+    const pendingDeck = pendingRouteDeck.value;
+    if (pendingDeck?.deck.id === targetDeckId) {
+      pendingRouteDeck.value = null;
+      applyLoadedDeck(pendingDeck.deck, pendingDeck.draft);
       return;
     }
-    const loadedDeck = await fetchVisibleDeck();
-    if (requestId !== loadRequestId) {
+    const loadedDeck = await fetchVisibleDeck(targetDeckId);
+    if (requestId !== activeDeckLoadRequestId) {
       return;
     }
     applyLoadedDeck(loadedDeck);
   } finally {
-    if (requestId === loadRequestId) {
-      loading.value = false;
+    if (requestId === activeDeckLoadRequestId) {
+      activeDeckLoading.value = false;
     }
   }
 };
 
 watch(
   deckId,
-  () => {
-    void loadPlaytestDeck();
+  (nextDeckId) => {
+    if (!nextDeckId) {
+      enterPreSetupStage();
+      return;
+    }
+    void loadPlaytestDeck(nextDeckId);
   },
   { immediate: true },
 );
@@ -1856,13 +1932,9 @@ onMounted(() => {
   background-size: 1.4rem 1.4rem;
 }
 
-.playtester-stale,
-.playtester-topbar {
+.playtester-stale {
   position: relative;
   z-index: 30;
-}
-
-.playtester-stale {
   display: flex;
   gap: 1rem;
   align-items: center;
@@ -1872,75 +1944,6 @@ onMounted(() => {
   border-radius: 0.75rem;
 }
 
-.playtester-topbar {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--playtest-border);
-  background: var(--playtest-panel);
-  backdrop-filter: blur(12px);
-}
-
-.playtester-scale-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-right: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.playtester-topbar-divider {
-  width: 1px;
-  height: 1.55rem;
-  background: var(--playtest-border);
-}
-
-.playtester-history-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.playtester-history-button {
-  display: inline-flex;
-  width: 2rem;
-  height: 2rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--playtest-border);
-  border-radius: 0.45rem;
-  background: color-mix(in srgb, var(--playtest-panel-strong) 74%, transparent);
-  color: var(--playtest-text-muted);
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease,
-    opacity 120ms ease;
-}
-
-.playtester-history-button:not(:disabled):hover,
-.playtester-history-button:not(:disabled):focus-visible {
-  border-color: color-mix(in srgb, var(--color-accent) 58%, var(--playtest-border));
-  background: color-mix(in srgb, var(--color-accent) 18%, var(--playtest-panel-strong));
-  color: var(--playtest-text);
-}
-
-.playtester-history-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-}
-
-.playtester-board {
-  position: relative;
-  min-height: 20rem;
-  flex: 1 1 auto;
-  border-bottom: 1px solid var(--playtest-border);
-}
-
-.playtester-board-label,
 .playtester-zone-heading,
 .playtester-hand-bar,
 .playtester-pile-title,
@@ -1949,44 +1952,6 @@ onMounted(() => {
   font-size: 0.78rem;
   font-weight: 700;
   user-select: none;
-}
-
-.playtester-board-label {
-  position: absolute;
-  top: 0.85rem;
-  left: 1rem;
-  z-index: 10;
-  display: flex;
-  gap: 0.7rem;
-}
-
-.playtester-board-empty {
-  position: absolute;
-  inset: 45% auto auto 50%;
-  z-index: 1;
-  transform: translate(-50%, -50%);
-  color: var(--playtest-text-soft);
-  font-size: 0.95rem;
-  font-weight: 700;
-  pointer-events: none;
-  user-select: none;
-}
-
-.playtester-board-card {
-  position: absolute;
-  transform: translate(-50%, -50%);
-}
-
-.playtester-selection-box {
-  position: absolute;
-  z-index: 35;
-  border: 2px solid color-mix(in srgb, var(--color-accent) 76%, white 24%);
-  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.34),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.22),
-    0 0.5rem 1.5rem rgba(0, 0, 0, 0.22);
-  pointer-events: none;
 }
 
 .playtester-library-browser {
@@ -2038,20 +2003,18 @@ onMounted(() => {
   overflow: visible;
 }
 
-.playtester-scale {
-  width: 8rem;
-  accent-color: var(--color-accent);
+@media (max-width: 900px) {
+  .playtester-page-pre-setup {
+    height: auto;
+    min-height: calc(100dvh - var(--app-page-header-height, 0px));
+    overflow: visible;
+  }
 }
 
 @media (max-width: 767px) {
-  .playtester-topbar,
   .playtester-stale {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .playtester-board {
-    min-height: 22rem;
   }
 
   .playtester-library-browser {
@@ -2066,4 +2029,5 @@ onMounted(() => {
   }
 
 }
+
 </style>

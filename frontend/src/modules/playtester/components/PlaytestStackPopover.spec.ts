@@ -38,7 +38,7 @@ describe('PlaytestStackPopover', () => {
     const mounted = mountPopover({ bottomOffsetPx: 212 });
 
     const popover = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-stack-overlay"]');
-    expect(popover?.style.getPropertyValue('--playtester-stack-popover-bottom')).toBe('212px');
+    expect(popover?.style.getPropertyValue('--playtester-stack-popover-bottom')).toBe('calc(212px + var(--playtester-stack-popover-gap))');
 
     mounted.unmount();
   });
@@ -48,6 +48,15 @@ describe('PlaytestStackPopover', () => {
 
     const popover = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-stack-overlay"]');
     expect(popover?.style.getPropertyValue('--playtester-stack-popover-bottom')).toBe('');
+
+    mounted.unmount();
+  });
+
+  test('renders stack contents with the shared stack browser shell', () => {
+    const mounted = mountPopover();
+
+    expect(mounted.container.querySelector('[data-testid="playtest-stack-browser"]')).not.toBeNull();
+    expect(mounted.container.querySelector('.playtester-stack-panel')).toBeNull();
 
     mounted.unmount();
   });

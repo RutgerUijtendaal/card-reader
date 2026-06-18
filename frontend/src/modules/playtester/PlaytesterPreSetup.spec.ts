@@ -2,12 +2,8 @@
 import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import PlaytesterIndexPage from '@/modules/playtester/PlaytesterIndexPage.vue';
+import PlaytesterPage from '@/modules/playtester/PlaytesterPage.vue';
 import { createInitialPlaytestState, getZoneInstances, serializePlaytestDraft } from '@/modules/playtester/playtestState';
-import {
-  clearPlaytestRouteHandoffs,
-  takePlaytestRouteHandoff,
-} from '@/modules/playtester/utils/routeHandoff';
 
 const {
   authState,
@@ -188,6 +184,12 @@ const flushPage = async (): Promise<void> => {
   await nextTick();
 };
 
+const playtestKeyEvent = (key: string): KeyboardEvent => new KeyboardEvent('keydown', {
+  key,
+  bubbles: true,
+  cancelable: true,
+});
+
 const mountPage = async (): Promise<{
   container: HTMLElement;
   router: ReturnType<typeof createRouter>;
@@ -198,13 +200,13 @@ const mountPage = async (): Promise<{
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/playtester', component: PlaytesterIndexPage },
-      { path: '/playtester/:deckId', component: { template: '<div />' } },
+      { path: '/playtester', component: PlaytesterPage },
+      { path: '/playtester/:deckId', component: PlaytesterPage },
     ],
   });
   await router.push('/playtester');
   await router.isReady();
-  const app = createApp(PlaytesterIndexPage);
+  const app = createApp(PlaytesterPage);
   app.use(router);
   app.mount(container);
   await flushPage();
@@ -218,7 +220,7 @@ const mountPage = async (): Promise<{
   };
 };
 
-describe('PlaytesterIndexPage', () => {
+describe('PlaytesterPage pre-setup stage', () => {
   beforeEach(() => {
     localStorage.clear();
     authState.authenticated = true;
@@ -235,7 +237,6 @@ describe('PlaytesterIndexPage', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
-    clearPlaytestRouteHandoffs();
     vi.clearAllMocks();
     vi.useRealTimers();
   });
@@ -432,8 +433,6 @@ describe('PlaytesterIndexPage', () => {
     expect(ownedOption.getAttribute('aria-pressed')).toBe('true');
     expect(mounted.container.textContent).toContain('Hero: Owned Hero');
     expect(mounted.container.textContent).toContain('Opening hand: 7');
-    const previewHandIds = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-hand-zone"] [data-instance-id]')]
-      .map((element) => element.dataset.instanceId);
     const libraryStack = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-library-zone"]');
     const heroStack = mounted.container.querySelector<HTMLElement>('[data-testid="playtest-hero-zone"]');
     expect(libraryStack?.querySelector('.playtest-stack-card img')?.getAttribute('src')).toContain('/card-backs/current.webp');
@@ -447,6 +446,10 @@ describe('PlaytesterIndexPage', () => {
     libraryStack?.click();
     await flushPage();
     expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')).toBeNull();
+    window.dispatchEvent(playtestKeyEvent('o'));
+    await flushPage();
+    expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')?.textContent).toContain('Library');
+    expect(mounted.container.querySelector('[data-testid="playtester-selector-stack-overlay"]')?.textContent).toContain('3 cards');
 
     const startButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.includes('Start Playtest'));
@@ -459,16 +462,10 @@ describe('PlaytesterIndexPage', () => {
     await flushPage();
 
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
-    const handoff = takePlaytestRouteHandoff('owned');
-    expect(handoff?.deck.id).toBe('owned');
-    expect(handoff?.draft).not.toBeNull();
-    if (!handoff?.draft) {
-      throw new Error('expected playtest route handoff draft');
-    }
-    expect(getZoneInstances(handoff.draft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
     const storedDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
-    expect(getZoneInstances(storedDraft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
-    expect(getZoneInstances(storedDraft.state, 'library')).toHaveLength(3);
+    expect(storedDraft.state.openingSetup.step).toBe('mana');
+    expect(getZoneInstances(storedDraft.state, 'hand')).toHaveLength(0);
+    expect(getZoneInstances(storedDraft.state, 'library')).toHaveLength(10);
 
     mounted.unmount();
   });
@@ -506,8 +503,6 @@ describe('PlaytesterIndexPage', () => {
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
     const storedDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
     expect(storedDraft.state.deckUpdatedAt).toBe('2025-01-01T00:00:00Z');
-    const handoff = takePlaytestRouteHandoff('owned');
-    expect(handoff?.draft?.state.deckUpdatedAt).toBe('2025-01-01T00:00:00Z');
 
     mounted.unmount();
   });
@@ -571,7 +566,6 @@ describe('PlaytesterIndexPage', () => {
 
     expect(mounted.container.textContent).toContain('Continue Playtest');
     expect(mounted.container.textContent).toContain('New Playtest');
-    const pushSpy = vi.spyOn(mounted.router, 'push');
     const continueButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.includes('Continue Playtest'));
     const newButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
@@ -580,6 +574,7 @@ describe('PlaytesterIndexPage', () => {
       throw new Error('expected continue and new playtest buttons');
     }
 
+    const pushSpy = vi.spyOn(mounted.router, 'push');
     continueButton.click();
     await flushPage();
 
@@ -587,15 +582,14 @@ describe('PlaytesterIndexPage', () => {
     expect(localStorage.getItem('card-reader.playtester.owned')).not.toBeNull();
 
     pushSpy.mockClear();
-    const previewHandIds = [...mounted.container.querySelectorAll<HTMLElement>('[data-testid="playtest-hand-zone"] [data-instance-id]')]
-      .map((element) => element.dataset.instanceId);
     newButton.click();
     await flushPage();
 
     expect(pushSpy).toHaveBeenCalledWith('/playtester/owned');
     const newDraft = JSON.parse(localStorage.getItem('card-reader.playtester.owned') ?? '{}');
-    expect(getZoneInstances(newDraft.state, 'hand').map((instance) => instance.instanceId)).toEqual(previewHandIds);
-    expect(getZoneInstances(newDraft.state, 'library')).toHaveLength(3);
+    expect(newDraft.state.openingSetup.step).toBe('mana');
+    expect(getZoneInstances(newDraft.state, 'hand')).toHaveLength(0);
+    expect(getZoneInstances(newDraft.state, 'library')).toHaveLength(10);
 
     mounted.unmount();
   });

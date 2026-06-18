@@ -82,6 +82,26 @@ const handleContextMenu = (instanceId: string, event: MouseEvent): void => {
   position: absolute;
   left: 0;
   width: var(--playtest-card-width, 9.75rem);
+  animation: playtest-pile-card-in 120ms ease-out;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .playtest-visual-pile *,
+  .playtest-visual-pile-card {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+@keyframes playtest-pile-card-in {
+  from {
+    opacity: 0;
+    filter: blur(0.08rem);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
 </style>

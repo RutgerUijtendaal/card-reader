@@ -3,6 +3,7 @@ import type {
   PlaytestCardFace,
   PlaytestCardInstance,
   PlaytestOpeningSetup,
+  PlaytestOpeningStep,
   PlaytestSetupSnapshot,
   PlaytestStackFace,
   PlaytestState,
@@ -11,6 +12,7 @@ import type {
 } from '@/modules/playtester/types';
 
 export const DEFAULT_PLAYTEST_HAND_SIZE = 7;
+export const STARTING_MANA_REQUIRED = 3;
 export const PLAYTEST_ZONES: PlaytestZoneId[] = ['hero', 'library', 'hand', 'play', 'discard', 'banish', 'other'];
 export const PLAYTEST_DRAFT_VERSION = 2;
 export const DEFAULT_PLAYTEST_STACK_FACES: Partial<Record<PlaytestZoneId, PlaytestStackFace>> = {
@@ -20,8 +22,11 @@ export const DEFAULT_PLAYTEST_STACK_FACES: Partial<Record<PlaytestZoneId, Playte
   other: 'front',
 };
 export const EMPTY_OPENING_SETUP: PlaytestOpeningSetup = {
+  step: 'mana',
+  mulliganCount: 0,
   selectedManaInstanceIds: [],
   selectedSetupInstanceIds: [],
+  handledSetupCardIds: [],
   reservedOrigins: {},
   reservedOriginOrders: {},
 };
@@ -74,6 +79,7 @@ const uniqueIds = (ids: string[]): string[] => [...new Set(ids)];
 const selectedOpeningIds = (state: PlaytestState): Set<string> =>
   new Set([
     ...state.openingSetup.selectedManaInstanceIds,
+    ...state.openingSetup.selectedSetupInstanceIds,
   ]);
 
 const openingManaSetupWith = (
@@ -82,20 +88,36 @@ const openingManaSetupWith = (
   selected: boolean,
 ): PlaytestOpeningSetup => ({
   ...setup,
+  step: setup.step ?? 'mana',
+  mulliganCount: setup.mulliganCount ?? 0,
   selectedManaInstanceIds: selected
     ? uniqueIds([...setup.selectedManaInstanceIds, instanceId])
     : setup.selectedManaInstanceIds.filter((id) => id !== instanceId),
-  selectedSetupInstanceIds: [],
+  selectedSetupInstanceIds: setup.selectedSetupInstanceIds,
 });
 
 const selectedOpeningIdsFromSetup = (setup: PlaytestOpeningSetup): Set<string> =>
   new Set([
     ...setup.selectedManaInstanceIds,
+    ...setup.selectedSetupInstanceIds,
   ]);
 
+const setupCardIds = (instances: PlaytestCardInstance[]): Set<string> =>
+  new Set(instances.filter(isSetupCardInstance).map((instance) => instance.cardId));
+
 const syncOpeningSelections = (state: PlaytestState): PlaytestState => {
-  const ids = new Set(state.instances.map((instance) => instance.instanceId));
-  const selectedIds = selectedOpeningIdsFromSetup(state.openingSetup);
+  const instancesById = new Map(state.instances.map((instance) => [instance.instanceId, instance]));
+  const ids = new Set(instancesById.keys());
+  const selectedManaInstanceIds = state.openingSetup.selectedManaInstanceIds.filter((id) => ids.has(id));
+  const selectedSetupInstanceIds = state.openingSetup.selectedSetupInstanceIds.filter((id) => {
+    const instance = instancesById.get(id);
+    return Boolean(instance?.setupOrigin && instance.zoneId === 'other');
+  });
+  const selectedIds = selectedOpeningIdsFromSetup({
+    ...state.openingSetup,
+    selectedManaInstanceIds,
+    selectedSetupInstanceIds,
+  });
   const reservedOrigins = Object.fromEntries(
     Object.entries(state.openingSetup.reservedOrigins ?? {})
       .filter(([id]) => ids.has(id) && selectedIds.has(id)),
@@ -107,8 +129,12 @@ const syncOpeningSelections = (state: PlaytestState): PlaytestState => {
   return {
     ...state,
     openingSetup: {
-      selectedManaInstanceIds: state.openingSetup.selectedManaInstanceIds.filter((id) => ids.has(id)),
-      selectedSetupInstanceIds: [],
+      step: state.openingSetup.step ?? 'mana',
+      mulliganCount: state.openingSetup.mulliganCount ?? 0,
+      selectedManaInstanceIds,
+      selectedSetupInstanceIds,
+      handledSetupCardIds: uniqueIds(state.openingSetup.handledSetupCardIds ?? [])
+        .filter((cardId) => setupCardIds(state.instances).has(cardId)),
       reservedOrigins,
       reservedOriginOrders,
     },
@@ -201,7 +227,7 @@ export const shuffleInstances = (
 export const createInitialPlaytestState = (
   deck: DeckRecord,
   random: () => number = Math.random,
-): PlaytestState => drawUpToOpeningHandSize({
+): PlaytestState => ({
   deckId: deck.id,
   deckUpdatedAt: deck.updated_at,
   phase: 'opening',
@@ -226,6 +252,17 @@ export const createInitialPlaytestState = (
     ...shuffleInstances(buildMainboardInstances(deck.mainboard.entries), random),
   ]),
   setupSnapshot: null,
+});
+
+export const createOpeningHandPreviewState = (
+  deck: DeckRecord,
+  random: () => number = Math.random,
+): PlaytestState => drawUpToOpeningHandSize({
+  ...createInitialPlaytestState(deck, random),
+  openingSetup: {
+    ...EMPTY_OPENING_SETUP,
+    step: 'hand',
+  },
 });
 
 export const setStackFace = (
@@ -667,9 +704,15 @@ export const isSetupCardInstance = (instance: PlaytestCardInstance): boolean =>
   instance.card.keywords.some((keyword) => keyword.trim().toLowerCase() === 'setup');
 
 export const getOpeningManaInstances = (state: PlaytestState): PlaytestCardInstance[] =>
-  state.instances
-    .filter((instance) => instance.zoneId !== 'hero' && isManaCardInstance(instance))
-    .sort((left, right) => left.card.name.localeCompare(right.card.name) || left.instanceId.localeCompare(right.instanceId));
+  {
+    const selectedIds = new Set(state.openingSetup.selectedManaInstanceIds);
+    return state.instances
+      .filter((instance) =>
+        isManaCardInstance(instance)
+        && (instance.zoneId === 'library' || selectedIds.has(instance.instanceId)),
+      )
+      .sort((left, right) => left.card.name.localeCompare(right.card.name) || left.instanceId.localeCompare(right.instanceId));
+  };
 
 export const getOpeningSetupInstances = (state: PlaytestState): PlaytestCardInstance[] =>
   state.instances
@@ -707,23 +750,12 @@ const setOpeningReservation = (
     reservedOriginOrders: nextOriginOrders,
   };
   if (selected || nextSelectedIds.has(instanceId)) {
-    return drawUpToOpeningHandSize(moveInstanceToZone({ ...state, openingSetup }, instanceId, 'other'));
+    return moveInstanceToZone({ ...state, openingSetup }, instanceId, 'other');
   }
 
   const origin = currentOrigins[instanceId] ?? 'library';
-  let nextState = { ...state, openingSetup };
-  if (origin === 'hand' && state.handSize > 0) {
-    const reservedIds = selectedOpeningIds(nextState);
-    const replacement = [...getZoneInstances(nextState, 'hand')]
-      .reverse()
-      .find((entry) => !reservedIds.has(entry.instanceId));
-    if (replacement && countZone(nextState, 'hand') >= state.handSize) {
-      nextState = moveInstanceToZone(nextState, replacement.instanceId, 'library', 0);
-    }
-    return drawUpToOpeningHandSize(moveInstanceToZone(nextState, instanceId, 'hand', currentOriginOrders[instanceId]));
-  }
-
-  return drawUpToOpeningHandSize(moveInstanceToZone(nextState, instanceId, 'library'));
+  const nextState = { ...state, openingSetup };
+  return moveInstanceToZone(nextState, instanceId, origin, currentOriginOrders[instanceId]);
 };
 
 export const toggleOpeningManaSelection = (
@@ -750,7 +782,7 @@ export const mulliganOpeningHand = (
     delete reservedOriginOrders[instanceId];
   });
   const returnedHand = syncedState.instances.map((instance) =>
-    instance.zoneId === 'hand' && !selectedIds.has(instance.instanceId)
+    instance.zoneId === 'hand' && !selectedIds.has(instance.instanceId) && !instance.setupOrigin
       ? {
           ...instance,
           zoneId: 'library' as const,
@@ -774,6 +806,8 @@ export const mulliganOpeningHand = (
     phase: 'opening',
     openingSetup: {
       ...syncedState.openingSetup,
+      step: 'hand',
+      mulliganCount: (syncedState.openingSetup.mulliganCount ?? 0) + 1,
       reservedOrigins,
       reservedOriginOrders,
     },
@@ -781,18 +815,96 @@ export const mulliganOpeningHand = (
   });
 };
 
+export const setOpeningStep = (
+  state: PlaytestState,
+  step: PlaytestOpeningStep,
+): PlaytestState => {
+  const syncedState = syncOpeningSelections(state);
+  const nextInstances = syncedState.phase === 'opening' && syncedState.openingSetup.step === 'hand' && step !== 'hand'
+    ? renumberAllZones(syncedState.instances.map((instance) =>
+        instance.zoneId === 'hand' && !instance.setupOrigin
+          ? {
+              ...instance,
+              zoneId: 'library' as const,
+              tapped: false,
+              boardX: null,
+              boardY: null,
+              pileGroupId: null,
+              pileOrder: null,
+            }
+          : instance,
+      ))
+    : syncedState.instances;
+  return {
+    ...syncedState,
+    phase: 'opening',
+    instances: nextInstances,
+    openingSetup: {
+      ...syncedState.openingSetup,
+      step,
+    },
+  };
+};
+
+export const drawOpeningHand = (state: PlaytestState): PlaytestState =>
+  drawUpToOpeningHandSize(setOpeningStep(state, 'hand'));
+
+export const toggleOpeningSetupHandled = (
+  state: PlaytestState,
+  cardId: string,
+  handled: boolean,
+): PlaytestState => {
+  if (!setupCardIds(state.instances).has(cardId)) {
+    return state;
+  }
+  const current = state.openingSetup.handledSetupCardIds ?? [];
+  return {
+    ...state,
+    openingSetup: {
+      ...state.openingSetup,
+      handledSetupCardIds: handled
+        ? uniqueIds([...current, cardId])
+        : current.filter((id) => id !== cardId),
+    },
+  };
+};
+
+export const stageOpeningSetupCardForPlay = (
+  state: PlaytestState,
+  instanceId: string,
+): PlaytestState => {
+  const instance = state.instances.find((entry) => entry.instanceId === instanceId);
+  if (!instance || instance.zoneId === 'hero') {
+    return state;
+  }
+  const movedState = moveInstanceToZone(state, instanceId, 'other');
+  return {
+    ...movedState,
+    openingSetup: {
+      ...movedState.openingSetup,
+      selectedSetupInstanceIds: uniqueIds([...movedState.openingSetup.selectedSetupInstanceIds, instanceId]),
+    },
+    instances: movedState.instances.map((entry) =>
+      entry.instanceId === instanceId
+        ? { ...entry, setupOrigin: true }
+        : entry,
+    ),
+  };
+};
+
 export const acceptOpeningSetup = (state: PlaytestState): PlaytestState => {
   const syncedState = syncOpeningSelections(state);
   const selectedManaIds = syncedState.openingSetup.selectedManaInstanceIds;
-  const selectedIds = [...selectedManaIds];
+  const selectedSetupIds = syncedState.openingSetup.selectedSetupInstanceIds;
+  const selectedIds = [...selectedManaIds, ...selectedSetupIds];
   const selectedIdSet = new Set(selectedIds);
   let nextState = syncedState;
-  selectedManaIds.forEach((instanceId, index) => {
+  selectedIds.forEach((instanceId, index) => {
     nextState = placeInstanceOnBoard(nextState, instanceId, 12 + (index % 6) * 8, 78 - Math.floor(index / 6) * 13);
   });
   const setupInstances = nextState.instances.map((instance) => ({
     ...instance,
-    setupOrigin: instance.zoneId === 'hero' || selectedIdSet.has(instance.instanceId),
+    setupOrigin: instance.setupOrigin || instance.zoneId === 'hero' || selectedIdSet.has(instance.instanceId),
   }));
   const setupSnapshot: PlaytestSetupSnapshot = {
     instances: cloneInstances(setupInstances),
@@ -823,7 +935,9 @@ const setHandSize = (state: PlaytestState, handSize: number): PlaytestState => (
 });
 
 export const setOpeningHandSize = (state: PlaytestState, handSize: number): PlaytestState =>
-  drawUpToOpeningHandSize(setHandSize(state, handSize));
+  state.openingSetup.step === 'hand'
+    ? drawUpToOpeningHandSize(setHandSize(state, handSize))
+    : setHandSize(state, handSize);
 
 export const serializePlaytestDraft = (state: PlaytestState): StoredPlaytestDraft => ({
   version: PLAYTEST_DRAFT_VERSION,
@@ -840,7 +954,14 @@ export const serializePlaytestDraft = (state: PlaytestState): StoredPlaytestDraf
   savedAt: new Date().toISOString(),
 });
 
-type LegacyPlaytestState = Omit<PlaytestState, 'instances' | 'setupSnapshot'> & {
+type LegacyPlaytestOpeningSetup = Omit<PlaytestOpeningSetup, 'handledSetupCardIds' | 'mulliganCount' | 'step'> & {
+  handledSetupCardIds?: string[];
+  mulliganCount?: number;
+  step?: PlaytestOpeningStep;
+};
+
+type LegacyPlaytestState = Omit<PlaytestState, 'instances' | 'setupSnapshot' | 'openingSetup'> & {
+  openingSetup: LegacyPlaytestOpeningSetup;
   instances: LegacyPlaytestCardInstance[];
   setupSnapshot: null | { instances: LegacyPlaytestCardInstance[] };
 };
@@ -853,17 +974,68 @@ type LegacyStoredPlaytestDraft = Omit<StoredPlaytestDraft, 'version' | 'state'> 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
 
-const migratePlaytestState = (state: LegacyPlaytestState): PlaytestState => ({
-  ...state,
-  openingSetup: {
-    ...EMPTY_OPENING_SETUP,
-    ...state.openingSetup,
-  },
-  instances: normalizePileGroups(renumberAllZones(state.instances.map(normalizeInstanceFields))),
-  setupSnapshot: state.setupSnapshot
-    ? { instances: normalizePileGroups(renumberAllZones(state.setupSnapshot.instances.map(normalizeInstanceFields))) }
-    : null,
-});
+const isOpeningStep = (value: unknown): value is PlaytestOpeningStep =>
+  value === 'mana' || value === 'setup' || value === 'hand';
+
+const migratedOpeningStep = (
+  state: LegacyPlaytestState,
+  instances: PlaytestCardInstance[],
+): PlaytestOpeningStep => {
+  if (isOpeningStep(state.openingSetup.step)) {
+    return state.openingSetup.step;
+  }
+  if (
+    state.phase === 'opening'
+    && state.openingSetup.selectedManaInstanceIds.length > 0
+    && instances.some((instance) => instance.zoneId === 'hand')
+  ) {
+    return 'hand';
+  }
+  return 'mana';
+};
+
+const migrateOpeningStepInstances = (
+  state: LegacyPlaytestState,
+  instances: PlaytestCardInstance[],
+  step: PlaytestOpeningStep,
+): PlaytestCardInstance[] => {
+  if (state.phase !== 'opening' || step === 'hand') {
+    return instances;
+  }
+  return instances.map((instance) =>
+    instance.zoneId === 'hand'
+      ? {
+          ...instance,
+          zoneId: 'library',
+          tapped: false,
+          boardX: null,
+          boardY: null,
+          pileGroupId: null,
+          pileOrder: null,
+        }
+      : instance,
+  );
+};
+
+const migratePlaytestState = (state: LegacyPlaytestState): PlaytestState => {
+  const normalizedInstances = normalizePileGroups(renumberAllZones(state.instances.map(normalizeInstanceFields)));
+  const step = migratedOpeningStep(state, normalizedInstances);
+  const instances = normalizePileGroups(renumberAllZones(migrateOpeningStepInstances(state, normalizedInstances, step)));
+  return {
+    ...state,
+    openingSetup: {
+      ...EMPTY_OPENING_SETUP,
+      ...state.openingSetup,
+      step,
+      handledSetupCardIds: uniqueIds(state.openingSetup.handledSetupCardIds ?? [])
+        .filter((cardId) => setupCardIds(instances).has(cardId)),
+    },
+    instances,
+    setupSnapshot: state.setupSnapshot
+      ? { instances: normalizePileGroups(renumberAllZones(state.setupSnapshot.instances.map(normalizeInstanceFields))) }
+      : null,
+  };
+};
 
 export const migrateStoredPlaytestDraft = (value: unknown): StoredPlaytestDraft | null => {
   if (!isRecord(value)) {
