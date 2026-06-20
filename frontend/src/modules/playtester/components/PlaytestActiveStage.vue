@@ -260,8 +260,17 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem;
-  border-bottom: 1px solid var(--playtest-border);
-  background: var(--playtest-panel);
+  border-bottom: 1px solid color-mix(in srgb, var(--playtest-border) 82%, transparent);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--playtest-surface) 38%, transparent),
+      color-mix(in srgb, var(--playtest-surface) 38%, transparent)
+    ),
+    linear-gradient(var(--playtest-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--playtest-grid-line) 1px, transparent 1px),
+    transparent;
+  background-size: auto, 1.35rem 1.35rem, 1.35rem 1.35rem, auto;
+  box-shadow: 0 0.75rem 1.5rem color-mix(in srgb, var(--color-shadow) 16%, transparent);
   backdrop-filter: blur(12px);
 }
 

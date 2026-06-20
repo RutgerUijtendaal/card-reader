@@ -107,6 +107,7 @@
       <PlaytestOpeningSetup
         v-else-if="playtest?.phase === 'opening'"
         :opening-step="playtest.openingSetup.step"
+        :card-scale="cardScale"
         :hand-instances="handInstances"
         :library-instances="libraryInstances"
         :mana-instances="openingManaInstances"
@@ -121,8 +122,10 @@
         @continue-setup="continueOpeningSetup"
         @previous-step="previousOpeningStep"
         @select-step="selectOpeningStep"
+        @release-pointer-focus="releasePointerFocus"
         @keep="keepOpeningSetup"
         @mulligan="mulliganOpeningSetup"
+        @update-card-scale="setCardScaleFromInput"
         @update-hand-size="updateOpeningHandSize"
         @toggle-mana="toggleOpeningMana"
         @toggle-setup-handled="toggleOpeningSetupCardHandled"

@@ -74,6 +74,13 @@
         {{ emptyMessage }}
       </p>
     </div>
+
+    <div
+      v-if="$slots.footer"
+      class="playtest-stack-browser-footer"
+    >
+      <slot name="footer" />
+    </div>
   </section>
 </template>
 
@@ -129,6 +136,7 @@ const emit = defineEmits<{
 
 defineSlots<{
   actions?: (props: { group: PlaytestStackBrowserGroup }) => unknown;
+  footer?: () => unknown;
 }>();
 
 const query = ref('');
@@ -186,7 +194,7 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
 <style scoped>
 .playtest-stack-browser {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--playtest-border);
@@ -242,6 +250,14 @@ const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
   gap: 0.75rem;
   overflow: auto;
   padding: 0 1rem 1rem;
+}
+
+.playtest-stack-browser-footer {
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--playtest-border);
+  background: color-mix(in srgb, var(--playtest-panel-strong) 84%, var(--playtest-surface));
+  padding: 0.9rem 1rem;
 }
 
 .playtest-stack-browser-card {

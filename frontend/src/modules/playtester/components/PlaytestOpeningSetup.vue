@@ -4,6 +4,21 @@
     data-testid="playtest-opening-setup"
   >
     <header class="playtest-opening-header">
+      <label class="playtester-scale-control theme-section-muted">
+        Scale
+        <input
+          class="playtester-scale"
+          type="range"
+          :value="cardScale"
+          min="0.5"
+          max="1.6"
+          step="0.05"
+          @input="emit('update-card-scale', $event)"
+          @pointerup="emit('release-pointer-focus', $event)"
+          @pointercancel="emit('release-pointer-focus', $event)"
+        >
+      </label>
+
       <div class="playtest-opening-step-nav">
         <button
           class="playtest-opening-step-nav-button"
@@ -44,6 +59,11 @@
           <ArrowRight aria-hidden="true" />
         </button>
       </div>
+
+      <div
+        class="playtest-opening-header-spacer"
+        aria-hidden="true"
+      />
     </header>
 
     <div class="playtest-opening-main">
@@ -107,8 +127,10 @@
         v-else-if="openingStep === 'setup'"
         key="setup"
         class="playtest-opening-setup-stage"
+        :class="hasSetupCards ? '' : 'playtest-opening-setup-stage-library-only'"
       >
         <section
+          v-if="hasSetupCards"
           class="playtest-opening-panel playtest-opening-setup-guide"
           data-testid="playtest-opening-setup-cards"
         >
@@ -121,13 +143,6 @@
           </div>
 
           <div class="playtest-opening-setup-list app-scrollbar">
-            <div
-              v-if="setupGroups.length === 0"
-              key="setup-empty"
-              class="playtest-opening-empty"
-            >
-              No cards with Setup tags found.
-            </div>
             <article
               v-for="group in setupGroups"
               :key="group.cardId"
@@ -180,43 +195,58 @@
           </div>
         </section>
 
-        <PlaytestStackBrowser
-          title="Library"
-          subtitle="Move one copy at a time while resolving setup."
-          :instances="libraryInstances"
-          :card-interactive="true"
-          :dragging-instance-ids="draggingInstanceIds"
-          drop-zone-id="library"
-          search-placeholder="Search library"
-          test-id="playtest-opening-library-browser"
-          @pointer-card="handleCardPointer"
-          @context-card="handleCardContextMenu"
-          @hover="emit('hover', $event)"
-        >
-          <template #actions="{ group }">
-            <button
-              class="btn-primary"
-              type="button"
-              @click="emit('move-setup-card', group.instances[0].instanceId, 'banish')"
+        <div class="playtest-opening-setup-library-area">
+          <PlaytestStackBrowser
+            title="Library"
+            subtitle="Set up the starting board state before drawing your hand."
+            :instances="libraryInstances"
+            :card-interactive="true"
+            :dragging-instance-ids="draggingInstanceIds"
+            drop-zone-id="library"
+            search-placeholder="Search library"
+            test-id="playtest-opening-library-browser"
+            @pointer-card="handleCardPointer"
+            @context-card="handleCardContextMenu"
+            @hover="emit('hover', $event)"
+          >
+            <template #actions="{ group }">
+              <button
+                class="btn-primary"
+                type="button"
+                @click="emit('move-setup-card', group.instances[0].instanceId, 'banish')"
+              >
+                Banish
+              </button>
+              <button
+                class="btn-secondary"
+                type="button"
+                @click="emit('move-setup-card', group.instances[0].instanceId, 'discard')"
+              >
+                Discard
+              </button>
+              <button
+                class="btn-secondary"
+                type="button"
+                @click="emit('move-setup-card', group.instances[0].instanceId, 'play')"
+              >
+                Play
+              </button>
+            </template>
+
+            <template
+              v-if="!hasSetupCards"
+              #footer
             >
-              Banish
-            </button>
-            <button
-              class="btn-secondary"
-              type="button"
-              @click="emit('move-setup-card', group.instances[0].instanceId, 'discard')"
-            >
-              Discard
-            </button>
-            <button
-              class="btn-secondary"
-              type="button"
-              @click="emit('move-setup-card', group.instances[0].instanceId, 'play')"
-            >
-              Play
-            </button>
-          </template>
-        </PlaytestStackBrowser>
+              <button
+                class="btn-primary"
+                type="button"
+                @click="emit('continue-setup')"
+              >
+                Draw hand
+              </button>
+            </template>
+          </PlaytestStackBrowser>
+        </div>
       </section>
 
       <section
@@ -345,6 +375,7 @@ type CardInstanceGroup = {
 
 const props = defineProps<{
   openingStep: PlaytestOpeningStep;
+  cardScale: number;
   handInstances: PlaytestCardInstance[];
   manaInstances: PlaytestCardInstance[];
   setupInstances: PlaytestCardInstance[];
@@ -362,8 +393,10 @@ const emit = defineEmits<{
   (e: 'continue-setup'): void;
   (e: 'previous-step'): void;
   (e: 'select-step', step: PlaytestOpeningStep): void;
+  (e: 'release-pointer-focus', event: PointerEvent): void;
   (e: 'keep'): void;
   (e: 'mulligan'): void;
+  (e: 'update-card-scale', event: Event): void;
   (e: 'update-hand-size', handSize: number): void;
   (e: 'toggle-mana', instanceId: string, selected: boolean): void;
   (e: 'toggle-setup-handled', cardId: string, handled: boolean): void;
@@ -402,6 +435,7 @@ const groupInstancesByCard = (instances: PlaytestCardInstance[]): CardInstanceGr
 
 const manaGroups = computed(() => groupInstancesByCard(props.manaInstances));
 const setupGroups = computed(() => groupInstancesByCard(props.setupInstances));
+const hasSetupCards = computed(() => setupGroups.value.length > 0);
 const selectedManaInstances = computed(() => {
   const selectedIds = new Set(props.selectedManaIds);
   return props.manaInstances.filter((instance) => selectedIds.has(instance.instanceId));
@@ -570,14 +604,44 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
 
 .playtest-opening-header {
   position: relative;
-  z-index: 7;
-  display: flex;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  flex-direction: column;
   gap: 1rem;
   padding: 0.75rem;
-  text-align: center;
+  border-bottom: 1px solid color-mix(in srgb, var(--playtest-border) 82%, transparent);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--playtest-surface) 38%, transparent),
+      color-mix(in srgb, var(--playtest-surface) 38%, transparent)
+    ),
+    linear-gradient(var(--playtest-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--playtest-grid-line) 1px, transparent 1px),
+    transparent;
+  background-size: auto, 1.35rem 1.35rem, 1.35rem 1.35rem, auto;
+  box-shadow: 0 0.75rem 1.5rem color-mix(in srgb, var(--color-shadow) 16%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.playtest-opening-header-spacer {
+  min-width: 0;
+}
+
+.playtester-scale-control {
+  display: inline-flex;
+  width: min(100%, 12rem);
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  justify-self: start;
+}
+
+.playtester-scale {
+  width: 8rem;
+  accent-color: var(--color-accent);
 }
 
 .playtest-opening-steps {
@@ -860,6 +924,11 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   justify-self: center;
 }
 
+.playtest-opening-setup-stage-library-only {
+  width: min(100%, 54rem);
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .playtest-opening-setup-guide {
   min-height: 0;
 }
@@ -868,6 +937,15 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: stretch;
+}
+
+.playtest-opening-setup-library-area {
+  display: grid;
+  min-height: 0;
+}
+
+.playtest-opening-setup-stage-library-only .playtest-opening-setup-library-area {
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .playtest-opening-setup-list {
@@ -1125,10 +1203,28 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     overflow: auto;
   }
 
-  .playtest-opening-header,
   .playtest-opening-hand-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .playtest-opening-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .playtester-scale-control {
+    width: min(100%, 18rem);
+    justify-content: center;
+    justify-self: center;
+  }
+
+  .playtester-scale {
+    width: min(12rem, 58vw);
+  }
+
+  .playtest-opening-header-spacer {
+    display: none;
   }
 
   .playtest-opening-main {

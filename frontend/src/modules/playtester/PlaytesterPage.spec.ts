@@ -214,7 +214,10 @@ const keepOpeningHand = async (container: HTMLElement): Promise<void> => {
     nextButton.click();
     await flushPage();
   }
-  if (container.querySelector('[data-testid="playtest-opening-setup-cards"]')) {
+  if (
+    container.querySelector('[data-testid="playtest-opening-setup-cards"]')
+    || container.querySelector('[data-testid="playtest-opening-library-browser"]')
+  ) {
     const drawHandButton = container.querySelector<HTMLButtonElement>('button[aria-label="Next step"]');
     if (!drawHandButton) {
       throw new Error('expected setup draw hand button');
@@ -392,6 +395,18 @@ describe('PlaytesterPage', () => {
 
     expect(surface.getAttribute('style')).toContain('--playtest-card-width: 7.80rem');
     expect(localStorage.getItem('card-reader.playtester.card-scale')).toBe('0.8');
+
+    const scaleInput = testZone(mounted.container, 'playtest-opening-setup')
+      .querySelector<HTMLInputElement>('.playtester-scale');
+    if (!scaleInput) {
+      throw new Error('expected opening setup scale input');
+    }
+    scaleInput.value = '1.05';
+    scaleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPage();
+
+    expect(surface.getAttribute('style')).toContain('--playtest-card-width: 10.24rem');
+    expect(localStorage.getItem('card-reader.playtester.card-scale')).toBe('1.05');
 
     mounted.unmount();
   });
@@ -632,7 +647,7 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
-  test('shows an empty Setup step when the deck has no Setup cards', async () => {
+  test('centers the setup library when the deck has no Setup cards', async () => {
     fetchDeckDetailMock.mockResolvedValueOnce({
       ...deckRecord,
       mainboard: {
@@ -667,9 +682,12 @@ describe('PlaytesterPage', () => {
     acceptButton?.click();
     await flushPage();
 
-    expect(testZone(mounted.container, 'playtest-opening-setup-cards')).not.toBeNull();
-    expect(testZone(mounted.container, 'playtest-opening-setup-cards').textContent).toContain('No cards with Setup tags found.');
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-setup-cards"]')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-setup').textContent).not.toContain('No cards with Setup tags found.');
+    expect(testZone(mounted.container, 'playtest-opening-setup').querySelector('.playtest-opening-setup-stage-library-only')).not.toBeNull();
     expect(testZone(mounted.container, 'playtest-opening-library-browser')).not.toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-library-browser')
+      .querySelector('.playtest-stack-browser-footer button')?.textContent).toContain('Draw hand');
 
     mounted.unmount();
   });
