@@ -113,14 +113,25 @@
           </article>
         </div>
 
-        <button
-          class="btn-primary playtest-opening-mana-accept"
-          type="button"
-          :disabled="selectedManaIds.length !== STARTING_MANA_REQUIRED"
-          @click="emit('continue-mana')"
-        >
-          Accept
-        </button>
+        <div class="playtest-opening-mana-actions">
+          <button
+            :class="hasSetupCards ? 'btn-primary' : 'btn-secondary'"
+            type="button"
+            :disabled="selectedManaIds.length !== STARTING_MANA_REQUIRED"
+            @click="emit('continue-mana')"
+          >
+            Setup board
+          </button>
+          <button
+            v-if="!hasSetupCards"
+            class="btn-primary"
+            type="button"
+            :disabled="selectedManaIds.length !== STARTING_MANA_REQUIRED"
+            @click="emit('draw-hand')"
+          >
+            Draw hand
+          </button>
+        </div>
       </section>
 
       <section
@@ -391,6 +402,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'continue-mana'): void;
   (e: 'continue-setup'): void;
+  (e: 'draw-hand'): void;
   (e: 'previous-step'): void;
   (e: 'select-step', step: PlaytestOpeningStep): void;
   (e: 'release-pointer-focus', event: PointerEvent): void;
@@ -909,7 +921,14 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   transform: translateY(-0.08rem);
 }
 
-.playtest-opening-mana-accept {
+.playtest-opening-mana-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.playtest-opening-mana-actions > button {
   min-width: 8rem;
 }
 

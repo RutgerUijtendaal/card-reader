@@ -147,6 +147,23 @@ const deckRecord = {
   updated_at: '2026-01-01T00:00:00Z',
 };
 
+const deckRecordWithoutSetupCards = () => ({
+  ...deckRecord,
+  mainboard: {
+    ...deckRecord.mainboard,
+    total_cards: 13,
+    unique_cards: 2,
+    entries: deckRecord.mainboard.entries.filter((entry) => entry.card.id !== setupCard.id),
+  },
+  totals: {
+    ...deckRecord.totals,
+    overall_total_cards: 13,
+    overall_unique_cards: 2,
+    mainboard_total_cards: 13,
+    mainboard_unique_cards: 2,
+  },
+});
+
 const flushPage = async (): Promise<void> => {
   await nextTick();
   await Promise.resolve();
@@ -436,6 +453,10 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-opening-mana')
       .querySelector('.playtest-card-static')).not.toBeNull();
     expect(testZone(mounted.container, 'playtest-library-zone').className).toContain('playtest-stack-passive');
+    expect([...testZone(mounted.container, 'playtest-opening-mana').querySelectorAll<HTMLButtonElement>('button')]
+      .some((button) => button.textContent?.trim() === 'Setup board')).toBe(true);
+    expect([...testZone(mounted.container, 'playtest-opening-mana').querySelectorAll<HTMLButtonElement>('button')]
+      .some((button) => button.textContent?.trim() === 'Draw hand')).toBe(false);
 
     testZone(mounted.container, 'playtest-library-zone').click();
     await flushPage();
@@ -470,7 +491,7 @@ describe('PlaytesterPage', () => {
     expect(testZone(mounted.container, 'playtest-opening-picked-mana')
       .querySelectorAll('[data-instance-id]')).toHaveLength(3);
     const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Accept');
+      .find((button) => button.textContent?.trim() === 'Setup board');
     expect(acceptButton?.disabled).toBe(false);
     expect(nextStepButton?.disabled).toBe(false);
     acceptButton?.click();
@@ -484,7 +505,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
     expect(testZone(mounted.container, 'playtest-opening-mana')).not.toBeNull();
     const returnedManaAcceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Accept');
+      .find((button) => button.textContent?.trim() === 'Setup board');
     expect(returnedManaAcceptButton?.disabled).toBe(false);
     returnedManaAcceptButton?.click();
     await flushPage();
@@ -562,6 +583,38 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('can draw an opening hand directly after choosing starting mana', async () => {
+    fetchDeckDetailMock.mockResolvedValueOnce(deckRecordWithoutSetupCards());
+    const mounted = await mountPage();
+
+    const drawHandButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Draw hand');
+    const setupBoardButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Setup board');
+    expect(drawHandButton?.disabled).toBe(true);
+    expect(setupBoardButton?.disabled).toBe(true);
+
+    const manaChoices = [...testZone(mounted.container, 'playtest-opening-mana')
+      .querySelectorAll<HTMLButtonElement>('.playtest-opening-copy-button')];
+    for (const button of manaChoices.slice(0, 3)) {
+      button.click();
+      await flushPage();
+    }
+
+    expect(drawHandButton?.disabled).toBe(false);
+    expect(setupBoardButton?.disabled).toBe(false);
+    drawHandButton?.click();
+    await flushPage();
+
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-setup-cards"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="playtest-opening-library-browser"]')).toBeNull();
+    expect(testZone(mounted.container, 'playtest-opening-hand').querySelectorAll('[data-instance-id]')).toHaveLength(7);
+    expect(testZone(mounted.container, 'playtest-opening-picked-mana')
+      .querySelectorAll('[data-instance-id]')).toHaveLength(3);
+
+    mounted.unmount();
+  });
+
   test('setup library cards can be dragged between setup zones without using the board', async () => {
     const mounted = await mountPage();
 
@@ -572,7 +625,7 @@ describe('PlaytesterPage', () => {
       await flushPage();
     }
     const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Accept');
+      .find((button) => button.textContent?.trim() === 'Setup board');
     acceptButton?.click();
     await flushPage();
 
@@ -648,22 +701,7 @@ describe('PlaytesterPage', () => {
   });
 
   test('centers the setup library when the deck has no Setup cards', async () => {
-    fetchDeckDetailMock.mockResolvedValueOnce({
-      ...deckRecord,
-      mainboard: {
-        ...deckRecord.mainboard,
-        total_cards: 13,
-        unique_cards: 2,
-        entries: deckRecord.mainboard.entries.filter((entry) => entry.card.id !== setupCard.id),
-      },
-      totals: {
-        ...deckRecord.totals,
-        overall_total_cards: 13,
-        overall_unique_cards: 2,
-        mainboard_total_cards: 13,
-        mainboard_unique_cards: 2,
-      },
-    });
+    fetchDeckDetailMock.mockResolvedValueOnce(deckRecordWithoutSetupCards());
     const mounted = await mountPage();
 
     expect(testZone(mounted.container, 'playtest-opening-mana')).not.toBeNull();
@@ -678,7 +716,7 @@ describe('PlaytesterPage', () => {
       await flushPage();
     }
     const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Accept');
+      .find((button) => button.textContent?.trim() === 'Setup board');
     acceptButton?.click();
     await flushPage();
 
@@ -702,7 +740,7 @@ describe('PlaytesterPage', () => {
       await flushPage();
     }
     const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Accept');
+      .find((button) => button.textContent?.trim() === 'Setup board');
     acceptButton?.click();
     await flushPage();
 
@@ -773,7 +811,7 @@ describe('PlaytesterPage', () => {
       await flushPage();
     }
     const acceptButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Accept');
+      .find((button) => button.textContent?.trim() === 'Setup board');
     acceptButton?.click();
     await flushPage();
 
@@ -819,7 +857,7 @@ describe('PlaytesterPage', () => {
       await flushPage();
     }
     const acceptManaButton = [...mounted.container.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent?.trim() === 'Accept');
+      .find((button) => button.textContent?.trim() === 'Setup board');
     acceptManaButton?.click();
     await flushPage();
 

@@ -120,6 +120,7 @@
         :dragging-instance-ids="activeDraggedInstanceIds"
         @continue-mana="continueOpeningMana"
         @continue-setup="continueOpeningSetup"
+        @draw-hand="continueOpeningSetup"
         @previous-step="previousOpeningStep"
         @select-step="selectOpeningStep"
         @release-pointer-focus="releasePointerFocus"
