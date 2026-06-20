@@ -148,7 +148,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'activate', instanceId: string): void;
+  (e: 'activate', instanceId: string, event: MouseEvent | KeyboardEvent): void;
   (e: 'pointer-card', instanceId: string, source: PlaytestCardSource, event: PointerEvent): void;
   (e: 'context-menu', instanceId: string, event: MouseEvent): void;
   (e: 'hover', target: PlaytestHoverTarget | null): void;
@@ -165,11 +165,11 @@ const endMiddleZoom = (): void => {
   middleZoomStyle.value = {};
 };
 
-const activateCard = (): void => {
+const activateCard = (event: MouseEvent | KeyboardEvent): void => {
   if (!canActivate.value) {
     return;
   }
-  emit('activate', props.instance.instanceId);
+  emit('activate', props.instance.instanceId, event);
 };
 
 const openContextMenu = (event: MouseEvent): void => {

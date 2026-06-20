@@ -428,6 +428,29 @@ export const addInstanceToVisualPile = (
   };
 };
 
+export const groupInstancesIntoVisualPile = (
+  state: PlaytestState,
+  instanceIds: string[],
+): PlaytestState => {
+  const uniqueIds = [...new Set(instanceIds)];
+  const boardIds = uniqueIds.filter((instanceId) =>
+    state.instances.some((instance) => instance.instanceId === instanceId && instance.zoneId === 'play'),
+  );
+  const [anchorId, ...memberIds] = boardIds;
+  if (!anchorId || memberIds.length === 0) {
+    return state;
+  }
+
+  return memberIds.reduce((nextState, memberId) => {
+    const anchor = nextState.instances.find((instance) => instance.instanceId === anchorId);
+    const member = nextState.instances.find((instance) => instance.instanceId === memberId);
+    if (anchor?.pileGroupId && member?.pileGroupId === anchor.pileGroupId) {
+      return nextState;
+    }
+    return addInstanceToVisualPile(nextState, memberId, anchorId);
+  }, state);
+};
+
 export const removeInstanceFromVisualPile = (
   state: PlaytestState,
   instanceId: string,
