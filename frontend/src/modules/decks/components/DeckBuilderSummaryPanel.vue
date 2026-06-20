@@ -65,10 +65,12 @@
       <label class="field-label">
         <span>Name <span class="theme-error-text">*</span></span>
         <input
+          ref="deckNameInputRef"
           v-model="deckName"
           class="input-base"
           placeholder="Deck name"
           required
+          @keydown.enter.prevent="continueSetup"
         >
       </label>
 
@@ -107,12 +109,8 @@
       <button
         class="btn-primary w-full justify-center"
         type="button"
-        :disabled="
-          !controller.deck.selectedHero.value ||
-            !deckName.trim() ||
-            setupBlockingMessages.length > 0
-        "
-        @click="controller.lockSetup"
+        :disabled="!canContinueSetup"
+        @click="continueSetup"
       >
         Continue
       </button>
@@ -468,6 +466,14 @@ const setupBlockingMessages = computed(() => [
   ...props.controller.deck.setupMessages.value,
   ...props.controller.deck.blockingMessages.value,
 ]);
+const canContinueSetup = computed(() =>
+  Boolean(
+    props.controller.deck.selectedHero.value &&
+      deckName.value.trim() &&
+      setupBlockingMessages.value.length === 0,
+  ),
+);
+const deckNameInputRef = ref<HTMLInputElement | null>(null);
 const {
   isOpen: heroDetailsExpanded,
   triggerRef: heroDetailsTriggerRef,
@@ -536,6 +542,18 @@ const sortableController = useSortable(boardEntriesSortableRef, sortableEntries,
     );
   },
 });
+
+watch(
+  () => props.controller.deck.selectedHero.value?.id ?? '',
+  async (heroId, previousHeroId) => {
+    if (!heroId || heroId === previousHeroId || !props.controller.deck.isSetupStep.value) {
+      return;
+    }
+
+    await nextTick();
+    deckNameInputRef.value?.focus({ preventScroll: true });
+  },
+);
 
 watch(
   boardListRef,
@@ -655,6 +673,13 @@ onBeforeUnmount(() => {
 
 const updateDeckVisibility = (value: DeckVisibility): void => {
   props.controller.deck.setDeckVisibility(value);
+};
+
+const continueSetup = (): void => {
+  if (!canContinueSetup.value) {
+    return;
+  }
+  void props.controller.lockSetup();
 };
 
 const selectSideboard = (sideboardId: string): void => {

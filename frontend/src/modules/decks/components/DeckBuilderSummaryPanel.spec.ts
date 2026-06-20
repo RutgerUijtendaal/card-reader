@@ -325,6 +325,47 @@ describe('DeckBuilderSummaryPanel', () => {
     mounted.unmount();
   });
 
+  test('focuses the deck name after selecting a hero during setup', async () => {
+    const mounted = await mountPanel();
+    mounted.controller.deck.isSetupStep.value = true;
+    mounted.controller.deck.selectedHero.value = null;
+    await nextTick();
+
+    mounted.controller.deck.selectedHero.value = {
+      id: 'hero-2',
+      name: 'Borealis Hero',
+      label: 'Hero',
+      image_url: '/hero-2.png',
+    };
+    await nextTick();
+    await nextTick();
+
+    expect(document.activeElement).toBe(
+      mounted.container.querySelector<HTMLInputElement>('input[placeholder="Deck name"]'),
+    );
+
+    mounted.unmount();
+  });
+
+  test('uses enter in the setup deck name field to continue when setup is complete', async () => {
+    const mounted = await mountPanel();
+    mounted.controller.deck.isSetupStep.value = true;
+    mounted.controller.deck.form.name = 'Aurora Tempo';
+    await nextTick();
+
+    const nameInput = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Deck name"]');
+    if (!(nameInput instanceof HTMLInputElement)) {
+      throw new Error('expected deck name input');
+    }
+
+    nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await nextTick();
+
+    expect(mounted.controller.lockSetup).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
+
   test('does not duplicate validation messages in the build sidebar', async () => {
     const mounted = await mountPanel();
     mounted.controller.deck.validationMessages.value = ['Deck must contain at least 20 mainboard cards.'];
