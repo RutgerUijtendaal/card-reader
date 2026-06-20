@@ -24,7 +24,7 @@
             :dragging="draggingInstanceIds.includes(instance.instanceId)"
             :card-back-url="cardBackUrl"
             :interactive="cardInteractive"
-            @activate="emit('activate-card', $event)"
+            @activate="(instanceId, event) => emit('activate-card', instanceId, event)"
             @pointer-card="handleCardPointer"
             @context-menu="handleCardContextMenu"
             @hover="emit('hover', $event)"
@@ -121,7 +121,7 @@ withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
-  (e: 'activate-card', instanceId: string): void;
+  (e: 'activate-card', instanceId: string, event: MouseEvent | KeyboardEvent): void;
   (e: 'pointer-card', instanceId: string, source: PlaytestCardSource, event: PointerEvent): void;
   (e: 'context-card', instanceId: string, event: MouseEvent): void;
   (e: 'open-stack', zoneId: PlaytestZoneId): void;

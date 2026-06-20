@@ -13,6 +13,7 @@ import {
   getOpeningManaInstances,
   getOpeningSetupInstances,
   getZoneInstances,
+  groupInstancesIntoVisualPile,
   isManaCardInstance,
   isSetupCardInstance,
   isStoredDraftStale,
@@ -561,6 +562,27 @@ describe('playtestState', () => {
     const extended = addInstanceToVisualPile(piled, third.instanceId, first.instanceId);
     const pileMembers = getZoneInstances(extended, 'play').filter((instance) => instance.pileGroupId);
 
+    expect(new Set(pileMembers.map((instance) => instance.pileGroupId)).size).toBe(1);
+    expect(pileMembers.map((instance) => instance.pileOrder)).toEqual([0, 1, 2]);
+    expect(pileMembers.every((instance) => instance.boardX === 20)).toBe(true);
+    expect(pileMembers.every((instance) => instance.boardY === 30)).toBe(true);
+  });
+
+  test('groups selected board instances into one visual pile', () => {
+    const initial = createInitialPlaytestState(buildDeck(), noShuffle);
+    const [first, second, third] = getZoneInstances(initial, 'library');
+    if (!first || !second || !third) {
+      throw new Error('expected library cards');
+    }
+    const placed = [first, second, third].reduce(
+      (state, instance, index) => placeInstanceOnBoard(state, instance.instanceId, 20 + index * 10, 30),
+      initial,
+    );
+
+    const grouped = groupInstancesIntoVisualPile(placed, [first.instanceId, second.instanceId, third.instanceId]);
+    const pileMembers = getZoneInstances(grouped, 'play').filter((instance) => instance.pileGroupId);
+
+    expect(pileMembers.map((instance) => instance.instanceId)).toEqual([first.instanceId, second.instanceId, third.instanceId]);
     expect(new Set(pileMembers.map((instance) => instance.pileGroupId)).size).toBe(1);
     expect(pileMembers.map((instance) => instance.pileOrder)).toEqual([0, 1, 2]);
     expect(pileMembers.every((instance) => instance.boardX === 20)).toBe(true);

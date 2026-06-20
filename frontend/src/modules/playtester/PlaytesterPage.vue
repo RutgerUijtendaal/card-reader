@@ -285,6 +285,7 @@ import {
   getOpeningManaInstances,
   getOpeningSetupInstances,
   getZoneInstances,
+  groupInstancesIntoVisualPile,
   isStoredDraftStale,
   moveInstanceToZone,
   moveBoardInstancesByDelta,
@@ -732,7 +733,11 @@ const nextBoardPosition = (): { x: number; y: number } => {
   };
 };
 
-const activateCard = (instanceId: string): void => {
+const addBoardCardToSelection = (instanceId: string): void => {
+  selectedBoardInstanceIds.value = [...new Set([...selectedBoardInstanceIds.value, instanceId])];
+};
+
+const activateCard = (instanceId: string, event?: MouseEvent | KeyboardEvent): void => {
   if (Date.now() < suppressClickUntil.value) {
     return;
   }
@@ -744,6 +749,11 @@ const activateCard = (instanceId: string): void => {
     return;
   }
   if (playtest.value.phase === 'opening') {
+    return;
+  }
+  if (event?.shiftKey && instance.zoneId === 'play') {
+    addBoardCardToSelection(instanceId);
+    event.preventDefault();
     return;
   }
   if (instance.zoneId === 'library') {
@@ -801,6 +811,9 @@ const startPointerDrag = (
     && source.zoneId === 'play'
     && selectedPlayIds.includes(instanceId)
     && selectedPlayIds.length > 1;
+  const isShiftSelectingBoardCard = source.type === 'card'
+    && source.zoneId === 'play'
+    && event.shiftKey;
   const groupInstanceIds = isSelectedBoardCard ? selectedPlayIds : [];
   const groupOffsets = Object.fromEntries(groupInstanceIds.flatMap((selectedId) => {
     const element = boardRef.value?.querySelector<HTMLElement>(`[data-instance-id="${selectedId}"]`);
@@ -826,7 +839,7 @@ const startPointerDrag = (
     groupInstanceIds,
     groupOffsets,
   };
-  if (!isSelectedBoardCard) {
+  if (!isSelectedBoardCard && !isShiftSelectingBoardCard) {
     selectedBoardInstanceIds.value = [];
   }
   contextMenu.value = null;
@@ -1132,6 +1145,7 @@ const finishPointerDrag = (event: PointerEvent): void => {
       ctrlKey: event.ctrlKey,
       candidate: resolvePlaytestDropTarget(event.clientX, event.clientY, activeDrag.value.instanceId),
     };
+    endActiveDrag();
     if (completedDrag.groupInstanceIds?.length) {
       completeDraggedGroupDrop(completedDrag, pending);
     } else {
@@ -1139,6 +1153,7 @@ const finishPointerDrag = (event: PointerEvent): void => {
     }
     suppressClickUntil.value = Date.now() + CLICK_SUPPRESSION_MS;
     event.preventDefault();
+    return;
   }
   endActiveDrag();
 };
@@ -1244,6 +1259,18 @@ const toggleTappedCards = (instanceIds: string[]): void => {
   applyState(instanceIds.reduce((nextState, instanceId) => toggleTapped(nextState, instanceId), playtest.value));
 };
 
+const groupSelectedBoardCards = (): boolean => {
+  if (!playtest.value) {
+    return false;
+  }
+  const ids = selectedBoardIds();
+  if (ids.length < 2) {
+    return false;
+  }
+  applyState(groupInstancesIntoVisualPile(playtest.value, ids));
+  return true;
+};
+
 const deletableCardIds = (instanceIds: string[]): string[] => {
   if (!playtest.value) {
     return [];
@@ -1300,12 +1327,12 @@ const pasteCopiedCards = (): boolean => {
   return true;
 };
 
-const shuffleLibrary = (): boolean => {
-  if (!playtest.value || !canShuffleLibrary(playtest.value)) {
+const shuffleStack = (zoneId: PlaytestZoneId): boolean => {
+  if (!playtest.value || !canShuffleZone(playtest.value, zoneId)) {
     return false;
   }
-  applyState(shuffleZone(playtest.value, 'library'));
-  shufflingStackZone.value = 'library';
+  applyState(shuffleZone(playtest.value, zoneId));
+  shufflingStackZone.value = zoneId;
   if (shuffleAnimationTimer) {
     window.clearTimeout(shuffleAnimationTimer);
   }
@@ -1313,9 +1340,20 @@ const shuffleLibrary = (): boolean => {
     shufflingStackZone.value = null;
     shuffleAnimationTimer = null;
   }, STACK_SHUFFLE_ANIMATION_MS);
-  if (openStackZone.value === 'library') {
+  if (openStackZone.value === zoneId) {
     closeStack();
   }
+  return true;
+};
+
+const runHoveredActionHotkey = (hotkey: string): boolean => {
+  const action = hoverActions.value.find((action) =>
+    !action.disabled && action.hotkey?.toLowerCase() === hotkey.toLowerCase(),
+  );
+  if (!action) {
+    return false;
+  }
+  action.run();
   return true;
 };
 
@@ -1419,8 +1457,11 @@ const handlePlaytesterHotkey = (event: KeyboardEvent): boolean => {
     }
     return false;
   }
+  if (normalizedKey === 'g') {
+    return groupSelectedBoardCards();
+  }
   if (normalizedKey === 'r') {
-    return shuffleLibrary();
+    return runHoveredActionHotkey('R');
   }
   if (normalizedKey === 'o') {
     return openLibraryStack();
@@ -1537,8 +1578,8 @@ const hasTappedBoardCards = (state: PlaytestState): boolean =>
 const hasLibraryCards = (state: PlaytestState): boolean =>
   countZone(state, 'library') > 0;
 
-const canShuffleLibrary = (state: PlaytestState): boolean =>
-  countZone(state, 'library') > 1;
+const canShuffleZone = (state: PlaytestState, zoneId: PlaytestZoneId): boolean =>
+  countZone(state, zoneId) > 1;
 
 const drawOne = (): boolean => {
   if (!playtest.value || !hasLibraryCards(playtest.value)) {
@@ -1726,13 +1767,12 @@ const stackActions = (zoneId: PlaytestZoneId): PlaytestEntityAction[] => {
 
   return [
     ...defaultActions,
-    ...(zoneId === 'library'
+    ...(playtest.value && canShuffleZone(playtest.value, zoneId)
       ? [{
           id: 'stack-shuffle',
           label: 'Shuffle',
           hotkey: 'R',
-          disabled: !playtest.value || !canShuffleLibrary(playtest.value),
-          run: shuffleLibrary,
+          run: () => shuffleStack(zoneId),
         }]
       : []),
     { id: 'stack-open', label: 'Open', hotkey: zoneId === 'library' ? 'O' : undefined, disabled: !hasCards, run: () => openStack(zoneId) },

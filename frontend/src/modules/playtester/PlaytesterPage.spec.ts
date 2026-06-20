@@ -6,6 +6,7 @@ import PlaytesterPage from '@/modules/playtester/PlaytesterPage.vue';
 import {
   createInitialPlaytestState,
   getZoneInstances,
+  moveInstanceToZone,
   serializePlaytestDraft,
 } from '@/modules/playtester/playtestState';
 
@@ -249,6 +250,17 @@ const keepOpeningHand = async (container: HTMLElement): Promise<void> => {
   }
   keepButton.click();
   await flushPage();
+};
+
+const createPlaytestDraftWithDiscardStack = (): void => {
+  let state = createInitialPlaytestState(deckRecord, () => 0);
+  for (const instance of getZoneInstances(state, 'library').slice(0, 2)) {
+    state = moveInstanceToZone(state, instance.instanceId, 'discard');
+  }
+  localStorage.setItem('card-reader.playtester.deck-1', JSON.stringify(serializePlaytestDraft({
+    ...state,
+    phase: 'play',
+  })));
 };
 
 const playtestPointerEvent = (
@@ -1308,6 +1320,119 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
+  test('adds board cards to selection with shift click', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const board = testZone(mounted.container, 'playtest-board-zone');
+
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+
+    const boardCards = nonSetupBoardCards(board);
+    expect(boardCards).toHaveLength(2);
+
+    boardCards[0]?.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 36, clientX: 100, clientY: 100, shiftKey: true }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 36, clientX: 100, clientY: 100, shiftKey: true }));
+    boardCards[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }));
+    await flushPage();
+
+    boardCards[1]?.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 37, clientX: 260, clientY: 100, shiftKey: true }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 37, clientX: 260, clientY: 100, shiftKey: true }));
+    boardCards[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }));
+    await flushPage();
+
+    const table = mounted.container.querySelector<HTMLElement>('.playtester-table');
+    expect(table?.dataset.playtestSelectedCount).toBe('2');
+    expect(board.querySelectorAll('[data-playtest-selected="true"]')).toHaveLength(2);
+    expect(boardCards.every((element) => element.className.includes('playtest-card-selected'))).toBe(true);
+
+    mounted.unmount();
+  });
+
+  test('groups selected board cards from the G hotkey', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const board = testZone(mounted.container, 'playtest-board-zone');
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 500, 400));
+
+    const firstHandCard = testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]');
+    firstHandCard?.click();
+    await flushPage();
+    const secondHandCard = testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]');
+    secondHandCard?.click();
+    await flushPage();
+
+    const boardCards = nonSetupBoardCards(board);
+    expect(boardCards).toHaveLength(2);
+    vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
+    vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
+
+    board.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 34, clientX: 40, clientY: 40 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 34, clientX: 340, clientY: 240 }));
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 34, clientX: 340, clientY: 240 }));
+    await flushPage();
+
+    window.dispatchEvent(playtestKeyEvent('g'));
+    await flushPage();
+
+    expect(board.querySelectorAll('[data-testid="playtest-visual-pile"]')).toHaveLength(1);
+    const draftAfter = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    const groupedCards = getZoneInstances(draftAfter.state, 'play').filter((instance) =>
+      boardCards.some((card) => card.dataset.instanceId === instance.instanceId),
+    );
+
+    expect(new Set(groupedCards.map((instance) => instance.pileGroupId)).size).toBe(1);
+    expect(groupedCards.every((instance) => instance.pileGroupId !== null)).toBe(true);
+    expect(groupedCards.map((instance) => instance.pileOrder)).toEqual([0, 1]);
+
+    mounted.unmount();
+  });
+
+  test('clears drag overlays before creating a ctrl-drop visual pile', async () => {
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const board = testZone(mounted.container, 'playtest-board-zone');
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 500, 400));
+
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+    testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]')?.click();
+    await flushPage();
+
+    const boardCards = nonSetupBoardCards(board);
+    expect(boardCards).toHaveLength(2);
+    vi.spyOn(boardCards[0] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(60, 60, 100, 140));
+    vi.spyOn(boardCards[1] as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(220, 60, 100, 140));
+
+    const originalElementsFromPoint = document.elementsFromPoint;
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: () => [boardCards[1], board],
+    });
+
+    boardCards[0]?.dispatchEvent(playtestPointerEvent('pointerdown', { pointerId: 35, clientX: 100, clientY: 100 }));
+    window.dispatchEvent(playtestPointerEvent('pointermove', { pointerId: 35, clientX: 260, clientY: 100, ctrlKey: true }));
+    await flushPage();
+    expect(document.body.querySelectorAll('[data-testid="playtest-dragged-card"]')).toHaveLength(1);
+
+    window.dispatchEvent(playtestPointerEvent('pointerup', { pointerId: 35, clientX: 260, clientY: 100, ctrlKey: true }));
+    await flushPage();
+
+    expect(board.querySelectorAll('[data-testid="playtest-visual-pile"]')).toHaveLength(1);
+    expect(document.body.querySelector('[data-testid="playtest-dragged-card"]')).toBeNull();
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: originalElementsFromPoint,
+    });
+    mounted.unmount();
+  });
+
   test('restores previous board selection when drag-box selection is cancelled', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);
@@ -1568,23 +1693,46 @@ describe('PlaytesterPage', () => {
     await flushPage();
     expect(scaleInput?.value).toBe('0.8');
 
-    const draftBefore = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
-    const libraryBefore = getZoneInstances(draftBefore.state, 'library').map((instance) => instance.instanceId);
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    window.dispatchEvent(playtestKeyEvent('r'));
-    await flushPage();
-    expect(testZone(mounted.container, 'playtest-library-zone').className).toContain('playtest-stack-shuffling');
-    const draftAfter = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
-    const libraryAfter = getZoneInstances(draftAfter.state, 'library').map((instance) => instance.instanceId);
-
-    expect(libraryAfter).not.toEqual(libraryBefore);
-    expect([...libraryAfter].sort()).toEqual([...libraryBefore].sort());
-
     expect(mounted.container.querySelector('[data-testid="playtest-stack-overlay"]')).toBeNull();
     window.dispatchEvent(playtestKeyEvent('o'));
     await flushPage();
     expect(testZone(mounted.container, 'playtest-stack-overlay').textContent).toContain('Library');
 
+    mounted.unmount();
+  });
+
+  test('shuffles the hovered stack from the R hotkey', async () => {
+    createPlaytestDraftWithDiscardStack();
+    const mounted = await mountPage();
+    const discardZone = testZone(mounted.container, 'playtest-discard-zone');
+
+    const draftBefore = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    const libraryBefore = getZoneInstances(draftBefore.state, 'library').map((instance) => instance.instanceId);
+    const discardBefore = getZoneInstances(draftBefore.state, 'discard').map((instance) => instance.instanceId);
+    const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    window.dispatchEvent(playtestKeyEvent('r'));
+    await flushPage();
+
+    let draftAfter = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    expect(getZoneInstances(draftAfter.state, 'library').map((instance) => instance.instanceId)).toEqual(libraryBefore);
+    expect(getZoneInstances(draftAfter.state, 'discard').map((instance) => instance.instanceId)).toEqual(discardBefore);
+
+    discardZone.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await flushPage();
+    window.dispatchEvent(playtestKeyEvent('r'));
+    await flushPage();
+
+    expect(discardZone.className).toContain('playtest-stack-shuffling');
+    draftAfter = JSON.parse(localStorage.getItem('card-reader.playtester.deck-1') ?? '{}');
+    const libraryAfter = getZoneInstances(draftAfter.state, 'library').map((instance) => instance.instanceId);
+    const discardAfter = getZoneInstances(draftAfter.state, 'discard').map((instance) => instance.instanceId);
+
+    expect(libraryAfter).toEqual(libraryBefore);
+    expect(discardAfter).not.toEqual(discardBefore);
+    expect([...discardAfter].sort()).toEqual([...discardBefore].sort());
+
+    randomMock.mockRestore();
     mounted.unmount();
   });
 

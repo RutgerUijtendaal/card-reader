@@ -83,6 +83,8 @@ describe('AppHotkeysPanel', () => {
     expect(mounted.container.textContent).toContain('O');
     expect(mounted.container.textContent).toContain('Tap');
     expect(mounted.container.textContent).toContain('Flip');
+    expect(mounted.container.textContent).toContain('Group');
+    expect(mounted.container.textContent).toContain('G');
     expect(mounted.container.textContent).toContain('Shuffle');
     expect(mounted.container.textContent).toContain('Delete');
     expect(mounted.container.textContent).toContain('Undo');

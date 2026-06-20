@@ -102,23 +102,19 @@
       Drag cards here or click a card in hand.
     </div>
 
-    <div
+    <PlaytestVisualPile
       v-for="pile in visualPiles"
       :key="pile.groupId"
-      class="playtester-board-pile"
-    >
-      <PlaytestVisualPile
-        :group-id="pile.groupId"
-        :instances="pile.instances"
-        :dragged-instance-ids="activeDraggedInstanceIds"
-        :selected-instance-ids="selectedBoardInstanceIds"
-        :card-back-url="currentCardBackUrl"
-        @activate="emit('activate-card', $event)"
-        @pointer-card="(instanceId, source, event) => emit('pointer-card', instanceId, source, event)"
-        @context-menu="(instanceId, event) => emit('context-card', instanceId, event)"
-        @hover="emit('hover', $event)"
-      />
-    </div>
+      :group-id="pile.groupId"
+      :instances="pile.instances"
+      :dragged-instance-ids="activeDraggedInstanceIds"
+      :selected-instance-ids="selectedBoardInstanceIds"
+      :card-back-url="currentCardBackUrl"
+      @activate="(instanceId, event) => emit('activate-card', instanceId, event)"
+      @pointer-card="(instanceId, source, event) => emit('pointer-card', instanceId, source, event)"
+      @context-menu="(instanceId, event) => emit('context-card', instanceId, event)"
+      @hover="emit('hover', $event)"
+    />
 
     <div
       v-for="(instance, index) in loosePlayInstances"
@@ -132,7 +128,7 @@
         :dragging="activeDraggedInstanceIds.includes(instance.instanceId)"
         :selected="selectedBoardInstanceIds.includes(instance.instanceId)"
         :card-back-url="currentCardBackUrl"
-        @activate="emit('activate-card', $event)"
+        @activate="(instanceId, event) => emit('activate-card', instanceId, event)"
         @pointer-card="(instanceId, source, event) => emit('pointer-card', instanceId, source, event)"
         @context-menu="(instanceId, event) => emit('context-card', instanceId, event)"
         @hover="emit('hover', $event)"
@@ -155,7 +151,7 @@
     :dragging-instance-ids="activeDraggedInstanceIds"
     :dragging-top-instance-id="activeDragInstanceId"
     :shuffling-stack-zone="shufflingStackZone"
-    @activate-card="emit('activate-card', $event)"
+    @activate-card="(instanceId, event) => emit('activate-card', instanceId, event)"
     @pointer-card="(instanceId, source, event) => emit('pointer-card', instanceId, source, event)"
     @context-card="(instanceId, event) => emit('context-card', instanceId, event)"
     @open-stack="emit('open-stack', $event)"
@@ -205,7 +201,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'activate-card', instanceId: string): void;
+  (e: 'activate-card', instanceId: string, event: MouseEvent | KeyboardEvent): void;
   (e: 'board-ref', element: HTMLElement | null): void;
   (e: 'context-card', instanceId: string, event: MouseEvent): void;
   (e: 'context-stack', zoneId: PlaytestZoneId, event: MouseEvent): void;
@@ -358,10 +354,6 @@ onBeforeUnmount(() => {
 .playtester-board-card {
   position: absolute;
   transform: translate(-50%, -50%);
-  animation: playtester-board-card-in 120ms ease-out;
-}
-
-.playtester-board-pile {
   animation: playtester-board-card-in 120ms ease-out;
 }
 
