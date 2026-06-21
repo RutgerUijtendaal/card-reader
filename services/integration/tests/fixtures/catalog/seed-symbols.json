@@ -197,6 +197,32 @@
     "enabled": true,
     "asset_files": ["colorless-mana-3.webp"]
   },
+    {
+    "key": "colorless-mana-4",
+    "label": "Colorless Mana 4",
+    "symbol_type": "mana",
+    "detector_type": "template",
+    "text_token": "{C4}",
+    "detection_config_json": "{\"threshold\":0.9,\"scales\":[1.0,0.9,1.1],\"max_candidates_per_asset\":40,\"max_detections_per_symbol\":8,\"nms_iou_threshold\":0.25,\"center_crop_ratio\":0.8}",
+    "text_enrichment_json": {
+      "ocr_aliases": [
+        {
+          "match_regex": "(,\\s?)(4)(\\s?:)",
+          "replace_group": 2
+        },
+        {
+          "match_regex": "(\\s)(4)",
+          "replace_group": 2
+        },
+        {
+          "match_regex": "(\\s)(04)",
+          "replace_group": 2
+        }
+      ]
+    },
+    "enabled": true,
+    "asset_files": ["colorless-mana-4.webp"]
+  },
   {
     "key": "primal-mana",
     "label": "Primal Mana",

@@ -17,6 +17,7 @@
       "type_line": "Unique 2h Equipment - Melee Weapon Sword",
       "mana_cost": "8",
       "mana_symbols": [
+        "colorless-mana-4",
         "martial-mana",
         "martial-mana",
         "divine-mana",
@@ -42,7 +43,8 @@
         "divine-mana",
         "martial-mana",
         "sola-affinity",
-        "sola-devotion"
+        "sola-devotion",
+        "colorless-mana-4"
       ],
       "types": [
         "2h",
@@ -53,7 +55,8 @@
         "divine-mana": "mana",
         "martial-mana": "mana",
         "sola-affinity": "affinity",
-        "sola-devotion": "devotion"
+        "sola-devotion": "devotion",
+        "colorless-mana-4": "mana"
       }
     },
     "suggestions": {
@@ -87,7 +90,8 @@
           "divine-mana",
           "martial-mana",
           "sola-affinity",
-          "sola-devotion"
+          "sola-devotion",
+          "colorless-mana-4"
         ]
       }
     },

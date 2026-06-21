@@ -57,33 +57,24 @@ class NameManaCostParser:
         )
         detected_symbols = detected_symbols_all
         mana_symbol_keys = self._mana_symbol_keys(detected_symbols)
-        key_integer_values = self._extract_integer_values_from_symbol_keys(mana_symbol_keys)
-        ocr_integer_values = self._extract_integer_values_from_text(full_text)
-        integer_values = self._dedupe_preserving_order(key_integer_values + ocr_integer_values)
         variable_x_in_symbols = any(self._is_variable_symbol_key(key) for key in mana_symbol_keys)
         variable_x_in_ocr = self._has_variable_x_in_text(full_text)
         has_variable_x = variable_x_in_symbols or variable_x_in_ocr
 
-        non_integer_symbol_count = sum(
-            1
-            for key in mana_symbol_keys
-            if self._extract_integer_values_from_symbol_key(key) == [] and not self._is_variable_symbol_key(key)
-        )
+        mana_total = sum(self._mana_value_from_symbol_key(key) for key in mana_symbol_keys)
         if has_variable_x and not variable_x_in_symbols:
             mana_symbol_keys.append("x")
 
-        mana_total = sum(integer_values) + non_integer_symbol_count
         mana_cost = self._format_mana_cost(mana_total=mana_total, has_variable_x=has_variable_x)
-        any_color = sum(integer_values)
         name = self._extract_name(
             full_text,
-            has_mana=any_color > 0 or len(mana_symbol_keys) > 0 or has_variable_x,
+            has_mana=mana_total > 0 or len(mana_symbol_keys) > 0 or has_variable_x,
         ) or image_stem
 
         logger.info(
-            "Name/mana parse summary. text=%r any_color=%s symbols_all=%s symbols_right=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
+            "Name/mana parse summary. text=%r symbol_mana_total=%s symbols_all=%s symbols_right=%s symbol_keys=%s name=%r mana_cost=%r mana_total=%s",
             full_text,
-            any_color,
+            mana_total,
             len(detected_symbols_all),
             len(detected_symbols),
             mana_symbol_keys,
@@ -175,25 +166,6 @@ class NameManaCostParser:
             out.append(row.key)
         return out
 
-    def _extract_any_color_mana(self, text: str) -> int:
-        compact = text.replace("\n", " ").strip()
-        match = self._trailing_integer_pattern.search(compact)
-        if not match:
-            return 0
-        try:
-            return int(match.group(1))
-        except ValueError:
-            return 0
-
-    def _extract_integer_values_from_text(self, text: str) -> list[int]:
-        out: list[int] = []
-        for raw in self._integer_pattern.findall(text):
-            try:
-                out.append(int(raw))
-            except ValueError:
-                continue
-        return out
-
     def _extract_integer_values_from_symbol_key(self, key: str) -> list[int]:
         out: list[int] = []
         for raw in self._integer_pattern.findall(key):
@@ -203,11 +175,13 @@ class NameManaCostParser:
                 continue
         return out
 
-    def _extract_integer_values_from_symbol_keys(self, keys: list[str]) -> list[int]:
-        out: list[int] = []
-        for key in keys:
-            out.extend(self._extract_integer_values_from_symbol_key(key))
-        return out
+    def _mana_value_from_symbol_key(self, key: str) -> int:
+        if self._is_variable_symbol_key(key):
+            return 0
+        integer_values = self._extract_integer_values_from_symbol_key(key)
+        if integer_values:
+            return sum(integer_values)
+        return 1
 
     def _has_variable_x_in_text(self, text: str) -> bool:
         return self._variable_x_pattern.search(text or "") is not None
@@ -217,16 +191,6 @@ class NameManaCostParser:
         if compact == "x":
             return True
         return any(part == "x" for part in compact.split("-"))
-
-    def _dedupe_preserving_order(self, values: list[int]) -> list[int]:
-        out: list[int] = []
-        seen: set[int] = set()
-        for value in values:
-            if value in seen:
-                continue
-            seen.add(value)
-            out.append(value)
-        return out
 
     def _format_mana_cost(self, *, mana_total: int, has_variable_x: bool) -> str:
         if not has_variable_x:
