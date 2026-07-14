@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.db.models import Count, Q
 
 from card_reader_core.models import CardVersion, Keyword, Symbol, Tag, Type, active_card_lifecycle_q, now_utc
 
-from .types import MANA_TYPE_KEY, MetadataRow
+from .types import MetadataRow
 
 
 def _list(model: Any, *, keys: set[str] | None = None) -> list[Any]:
@@ -49,13 +49,7 @@ def list_types_for_card_sort() -> list[Type]:
                 ),
                 distinct=True,
             ),
-            type_sort_is_mana=Case(
-                When(key__iexact=MANA_TYPE_KEY, then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField(),
-            ),
         ).order_by(
-            "type_sort_is_mana",
             "-linked_card_count",
             "label",
             "id",

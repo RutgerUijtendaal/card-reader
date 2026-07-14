@@ -405,6 +405,38 @@ describe('useDeckEditorDraft', () => {
     expect(controller.validationMessages.value).not.toContain('Each mainboard card quantity must be between 1 and 4.');
   });
 
+  test('uses self-targeted copy limits only for the owning card', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      selfLimited: {
+        ...buildCard('selfLimited', 'Self Limited Card', 2),
+        deck_building_config: {
+          overrides: {
+            mainboard_copy_limit: { applies_to: 'self', max: 6 },
+          },
+        },
+      },
+      defaultLimited: buildCard('defaultLimited', 'Default Limited Card', 2),
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'selfLimited', quantity: 5 }];
+
+    expect(controller.getCardQuantityLimit('selfLimited')).toBe(6);
+    expect(controller.getCardQuantityLimit('defaultLimited')).toBe(4);
+    expect(controller.validationMessages.value).not.toContain('Each mainboard card quantity must be between 1 and 4.');
+
+    controller.form.entries.push({ card_id: 'defaultLimited', quantity: 5 });
+
+    expect(controller.validationMessages.value).toContain('Each mainboard card quantity must be between 1 and 4.');
+  });
+
   test('resolves card overrides in deterministic card id order', () => {
     const repeated = {
       ...buildCard('repeated', 'Repeated Override', 2),
@@ -588,6 +620,34 @@ describe('useDeckEditorDraft', () => {
     expect(controller.galleryActionDisabled({ ...cardLookup.value.cardA, result_type: 'card' })).toBe(true);
     controller.handleGalleryAction({ ...cardLookup.value.cardA, result_type: 'card' });
     expect(controller.activeSideboard.value?.entries).toEqual([]);
+  });
+
+  test('applies candidate self copy limits before sideboard adds', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const candidate: DeckCardSummary = {
+      ...buildCard('candidate', 'Candidate Card', 2),
+      deck_building_config: {
+        overrides: {
+          mainboard_copy_limit: { applies_to: 'self', scope: 'whole_deck', max: 1 },
+        },
+      },
+    };
+    const cardLookup = ref<Record<string, DeckCardSummary>>({
+      hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
+      candidate,
+    });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+
+    controller.form.hero_card_id = 'hero';
+    controller.form.entries = [{ card_id: 'candidate', quantity: 1 }];
+    controller.addSideboard();
+
+    expect(controller.getCardQuantityLimit('candidate')).toBe(0);
+    expect(controller.galleryActionDisabled({ ...candidate, result_type: 'card' })).toBe(true);
   });
 
   test('uses whole-deck mainboard card count scope for mainboard add gates', () => {

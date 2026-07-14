@@ -1005,6 +1005,30 @@ def test_filters_payload_includes_type_linked_card_counts() -> None:
     assert returned["linked_card_count"] == 1
 
 
+def test_filters_payload_orders_types_by_linked_card_count_without_pinning_mana() -> None:
+    mana_type = _create_type(key="mana", label="Mana")
+    common_type = _create_type(key="filters-order-common-type", label="Filters Order Common Type")
+    rare_type = _create_type(key="filters-order-rare-type", label="Filters Order Rare Type")
+
+    for index in range(3):
+        _card, version = _create_editable_card_version(name=f"Filters Order Mana Card {index}")
+        replace_card_version_types(card_version_id=version.id, type_ids=[mana_type.id])
+
+    for index in range(2):
+        _card, version = _create_editable_card_version(name=f"Filters Order Common Card {index}")
+        replace_card_version_types(card_version_id=version.id, type_ids=[common_type.id])
+
+    _card, version = _create_editable_card_version(name="Filters Order Rare Card")
+    replace_card_version_types(card_version_id=version.id, type_ids=[rare_type.id])
+
+    response = Client(HTTP_HOST="localhost").get("/cards/filters")
+
+    assert response.status_code == 200
+    target_keys = {mana_type.key, common_type.key, rare_type.key}
+    returned_keys = [row["key"] for row in response.json()["types"] if row["key"] in target_keys]
+    assert returned_keys == [mana_type.key, common_type.key, rare_type.key]
+
+
 def test_storage_paths_resolve_relative_to_storage_root(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
 

@@ -25,6 +25,7 @@ const backendMetadataFixture: DeckRulesMetadata = {
   ],
   allowed_severities: ['hard', 'soft'],
   allowed_scopes: ['mainboard', 'whole_deck'],
+  allowed_applications: ['deck', 'self'],
   default_config: fallbackDeckBuildingDefaultConfig,
   default_rules: fallbackDeckBuildingRules(),
   example_config: fallbackDeckBuildingConfigExample,
@@ -51,6 +52,9 @@ describe('deckRules', () => {
     expect(formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig)).toContain('overrides');
     expect(formatDeckBuildingConfigJson(fallbackDeckBuildingConfigExample)).toContain(
       'mainboard_copy_limit',
+    );
+    expect(formatDeckBuildingConfigJson(fallbackDeckBuildingConfigExample)).toContain(
+      'applies_to',
     );
   });
 });

@@ -6,6 +6,7 @@ export const LEGENDARY_COPY_LIMIT_MESSAGE = 'Legendary cards are limited to 1 co
 
 export type DeckConstraintSeverity = 'hard' | 'soft';
 export type DeckConstraintScope = 'mainboard' | 'whole_deck';
+export type DeckConstraintApplication = 'deck' | 'self';
 
 export type DeckBuildingRule = {
   rule_id: string;
@@ -26,12 +27,14 @@ export type DeckBuildingRules = {
 
 export type DeckBuildingConfig = {
   overrides?: Partial<Record<keyof DeckBuildingRules | string, Partial<DeckBuildingRule> & {
+    applies_to?: DeckConstraintApplication;
     count?: number;
     minimum?: number;
     maximum?: number;
   }>>;
 };
 type DeckBuildingRuleOverride = Partial<DeckBuildingRule> & {
+  applies_to?: DeckConstraintApplication;
   count?: number;
   minimum?: number;
   maximum?: number;
@@ -91,7 +94,7 @@ export const resolveDeckBuildingRules = (
 ): DeckBuildingRules => {
   let rules = context.baseRules ?? fallbackDeckBuildingRules();
   if (context.heroCard) {
-    rules = applyDeckBuildingConfig(rules, context.heroCard.deck_building_config);
+    rules = applyDeckBuildingConfig(rules, context.heroCard.deck_building_config, 'deck');
   }
 
   const ruleEntries: RuleApplicationEntry[] = [
@@ -113,7 +116,7 @@ export const resolveDeckBuildingRules = (
     appliedCardIds.add(cardId);
     const card = context.cardLookup[cardId];
     if (card) {
-      rules = applyDeckBuildingConfig(rules, card.deck_building_config);
+      rules = applyDeckBuildingConfig(rules, card.deck_building_config, 'deck');
     }
   };
 
@@ -121,7 +124,7 @@ export const resolveDeckBuildingRules = (
     applyCard(entry.cardId);
   }
   if (candidateCard && candidateBoardId === undefined && !appliedCardIds.has(candidateCard.id)) {
-    rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config);
+    rules = applyDeckBuildingConfig(rules, candidateCard.deck_building_config, 'deck');
   }
   return rules;
 };
@@ -130,7 +133,8 @@ export const getDeckEntryQuantityLimit = (
   card: DeckConstraintCard,
   context: DeckConstraintContext,
 ): DeckQuantityLimit => {
-  const rules = resolveDeckBuildingRules(context, card, context.boardId);
+  const deckRules = resolveDeckBuildingRules(context, card, context.boardId);
+  const rules = applySelfDeckBuildingConfig(deckRules, card);
   const boardRule = context.boardId === context.mainboardId
     ? rules.mainboard_copy_limit
     : rules.sideboard_entry_quantity;
@@ -236,34 +240,35 @@ const validateEntryQuantities = (
   rules: DeckBuildingRules,
   violations: DeckConstraintViolation[],
 ): void => {
-  const mainboardRule = rules.mainboard_copy_limit;
-  const mainboardMax = mainboardRule.max;
-  const mainboardEntries = scopedEntries(context, mainboardRule.scope);
-  const mainboardCopyLimitViolated = mainboardRule.scope === 'whole_deck'
-    ? hasAggregateQuantityViolation(mainboardEntries, mainboardMax)
-    : mainboardEntries.some((entry) => entry.quantity < 1 || (mainboardMax !== undefined && entry.quantity > mainboardMax));
-  if (mainboardMax !== undefined && mainboardCopyLimitViolated) {
-    violations.push({
-      ruleId: 'mainboard_copy_limit',
-      severity: mainboardRule.severity,
-      blocksAction: mainboardRule.blocks_action,
-      message: `Each mainboard card quantity must be between 1 and ${mainboardMax}.`,
-    });
+  for (const cardId of uniqueEntryCardIds(context)) {
+    const cardRules = applySelfDeckBuildingConfig(rules, context.cardLookup[cardId]);
+    const mainboardRule = cardRules.mainboard_copy_limit;
+    const mainboardMax = mainboardRule.max;
+    const mainboardEntries = scopedEntries(context, mainboardRule.scope).filter((entry) => entry.card_id === cardId);
+    const mainboardCopyLimitViolated = mainboardRule.scope === 'whole_deck'
+      ? hasAggregateQuantityViolation(mainboardEntries, mainboardMax)
+      : mainboardEntries.some((entry) => entry.quantity < 1 || (mainboardMax !== undefined && entry.quantity > mainboardMax));
+    if (mainboardMax !== undefined && mainboardCopyLimitViolated) {
+      violations.push({
+        ruleId: 'mainboard_copy_limit',
+        severity: mainboardRule.severity,
+        blocksAction: mainboardRule.blocks_action,
+        message: `Each mainboard card quantity must be between 1 and ${mainboardMax}.`,
+      });
+    }
   }
 
-  const sideboardMax = rules.sideboard_entry_quantity.max;
-  if (
-    sideboardMax !== undefined
-    && context.sideboards.some((sideboard) =>
-      sideboard.entries.some((entry) => entry.quantity < 1 || entry.quantity > sideboardMax),
-    )
-  ) {
-    violations.push({
-      ruleId: 'sideboard_entry_quantity',
-      severity: rules.sideboard_entry_quantity.severity,
-      blocksAction: rules.sideboard_entry_quantity.blocks_action,
-      message: `Each sideboard card quantity must be between 1 and ${sideboardMax}.`,
-    });
+  for (const entry of context.sideboards.flatMap((sideboard) => sideboard.entries)) {
+    const sideboardRule = applySelfDeckBuildingConfig(rules, context.cardLookup[entry.card_id]).sideboard_entry_quantity;
+    const sideboardMax = sideboardRule.max;
+    if (sideboardMax !== undefined && (entry.quantity < 1 || entry.quantity > sideboardMax)) {
+      violations.push({
+        ruleId: 'sideboard_entry_quantity',
+        severity: sideboardRule.severity,
+        blocksAction: sideboardRule.blocks_action,
+        message: `Each sideboard card quantity must be between 1 and ${sideboardMax}.`,
+      });
+    }
   }
 };
 
@@ -296,32 +301,37 @@ const validateLegendaryCopies = (
   rules: DeckBuildingRules,
   violations: DeckConstraintViolation[],
 ): void => {
-  const rule = rules.legendary_copy_limit;
-  if (rule.max === undefined) {
-    return;
-  }
-  const max = rule.max;
-  const totals = new Map<string, number>();
-  for (const entry of scopedEntries(context, rule.scope)) {
-    const card = context.cardLookup[entry.card_id];
+  const legendaryCardIds = uniqueEntryCardIds(context).filter((cardId) => {
+    const card = context.cardLookup[cardId];
     if (!isLegendaryCard(card)) {
+      return false;
+    }
+    return true;
+  });
+  for (const cardId of legendaryCardIds) {
+    const cardRules = applySelfDeckBuildingConfig(rules, context.cardLookup[cardId]);
+    const rule = cardRules.legendary_copy_limit;
+    if (rule.max === undefined) {
       continue;
     }
-    totals.set(entry.card_id, (totals.get(entry.card_id) ?? 0) + entry.quantity);
-  }
-  if ([...totals.values()].some((quantity) => quantity > max)) {
-    violations.push({
-      ruleId: 'legendary_copy_limit',
-      severity: rule.severity,
-      blocksAction: rule.blocks_action,
-      message: legendaryCopyLimitMessage(max),
-    });
+    const total = scopedEntries(context, rule.scope)
+      .filter((entry) => entry.card_id === cardId)
+      .reduce((sum, entry) => sum + entry.quantity, 0);
+    if (total > rule.max) {
+      violations.push({
+        ruleId: 'legendary_copy_limit',
+        severity: rule.severity,
+        blocksAction: rule.blocks_action,
+        message: legendaryCopyLimitMessage(rule.max),
+      });
+    }
   }
 };
 
 const applyDeckBuildingConfig = (
   rules: DeckBuildingRules,
   config: DeckBuildingConfig | undefined,
+  appliesTo: DeckConstraintApplication,
 ): DeckBuildingRules => {
   const overrides = config?.overrides;
   if (!overrides) {
@@ -329,7 +339,7 @@ const applyDeckBuildingConfig = (
   }
   return (Object.keys(rules) as Array<keyof DeckBuildingRules>).reduce((nextRules, ruleId) => {
     const override = overrides[ruleId] as DeckBuildingRuleOverride | undefined;
-    if (!override) {
+    if (!override || (override.applies_to ?? 'deck') !== appliesTo) {
       return nextRules;
     }
     return {
@@ -338,6 +348,11 @@ const applyDeckBuildingConfig = (
     };
   }, rules);
 };
+
+const applySelfDeckBuildingConfig = (
+  rules: DeckBuildingRules,
+  card: DeckConstraintCard | null | undefined,
+): DeckBuildingRules => applyDeckBuildingConfig(rules, card?.deck_building_config, 'self');
 
 const applyRuleOverride = (
   rule: DeckBuildingRule,
@@ -424,6 +439,12 @@ const getCopiesOutsideBoard = (
 
 const getEntryQuantity = (entries: DeckConstraintEntry[], cardId: string): number =>
   entries.find((entry) => entry.card_id === cardId)?.quantity ?? 0;
+
+const uniqueEntryCardIds = (context: Omit<DeckConstraintContext, 'boardId'>): string[] =>
+  [...new Set([
+    ...context.mainboardEntries.map((entry) => entry.card_id),
+    ...context.sideboards.flatMap((sideboard) => sideboard.entries.map((entry) => entry.card_id)),
+  ])].sort((left, right) => left.localeCompare(right));
 
 const getAggregateMainboardCopyLimit = (
   cardId: string,
