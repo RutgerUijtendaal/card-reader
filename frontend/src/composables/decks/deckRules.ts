@@ -12,6 +12,7 @@ export type DeckRulesMetadata = {
   supported_rule_ids: string[];
   allowed_severities: Array<'hard' | 'soft'>;
   allowed_scopes: Array<'mainboard' | 'whole_deck'>;
+  allowed_applications: Array<'deck' | 'self'>;
   default_config: { overrides: Record<string, unknown> };
   default_rules: DeckBuildingRules;
   example_config: { overrides: Record<string, unknown> };
@@ -63,12 +64,14 @@ export const fallbackDeckBuildingRules = (): DeckBuildingRules => ({
 export const fallbackDeckBuildingConfigExample = {
   overrides: {
     mainboard_copy_limit: {
+      applies_to: 'self',
       max: 6,
     },
     mana_type_count: {
       min: 0,
     },
     legendary_copy_limit: {
+      applies_to: 'deck',
       severity: 'hard',
       scope: 'whole_deck',
       blocks_action: true,

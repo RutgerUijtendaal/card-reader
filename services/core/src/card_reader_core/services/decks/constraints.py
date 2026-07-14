@@ -16,6 +16,7 @@ from .types import (
 DeckBoard = Literal["mainboard", "sideboard"]
 DeckConstraintSeverity = Literal["hard", "soft"]
 DeckConstraintScope = Literal["mainboard", "whole_deck"]
+DeckConstraintApplication = Literal["deck", "self"]
 
 MAINBOARD_COPY_LIMIT_RULE_ID = "mainboard_copy_limit"
 MAINBOARD_CARD_COUNT_RULE_ID = "mainboard_card_count"
@@ -28,6 +29,7 @@ MANA_TYPE_KEY = "mana"
 DEFAULT_DECK_BUILDING_CONFIG: dict[str, object] = {"overrides": {}}
 DECK_CONSTRAINT_SEVERITIES: tuple[DeckConstraintSeverity, ...] = ("hard", "soft")
 DECK_CONSTRAINT_SCOPES: tuple[DeckConstraintScope, ...] = ("mainboard", "whole_deck")
+DECK_CONSTRAINT_APPLICATIONS: tuple[DeckConstraintApplication, ...] = ("deck", "self")
 SUPPORTED_RULE_IDS = {
     MAINBOARD_COPY_LIMIT_RULE_ID,
     MAINBOARD_CARD_COUNT_RULE_ID,
@@ -35,15 +37,22 @@ SUPPORTED_RULE_IDS = {
     LEGENDARY_COPY_LIMIT_RULE_ID,
     SIDEBOARD_ENTRY_QUANTITY_RULE_ID,
 }
+SELF_APPLICABLE_RULE_IDS = {
+    MAINBOARD_COPY_LIMIT_RULE_ID,
+    LEGENDARY_COPY_LIMIT_RULE_ID,
+    SIDEBOARD_ENTRY_QUANTITY_RULE_ID,
+}
 DECK_BUILDING_CONFIG_EXAMPLE: dict[str, object] = {
     "overrides": {
         MAINBOARD_COPY_LIMIT_RULE_ID: {
+            "applies_to": "self",
             "max": 6,
         },
         MANA_TYPE_COUNT_RULE_ID: {
             "min": 0,
         },
         LEGENDARY_COPY_LIMIT_RULE_ID: {
+            "applies_to": "deck",
             "severity": "hard",
             "scope": "whole_deck",
             "blocks_action": True,
@@ -137,22 +146,24 @@ class DeckConstraintRules:
             ),
         )
 
-    def apply_config(self, config: object) -> Self:
+    def apply_config(self, config: object, *, applies_to: DeckConstraintApplication = "deck") -> Self:
         overrides = _extract_rule_overrides(config)
         return replace(
             self,
             mainboard_copy_limit=self.mainboard_copy_limit.with_override(
-                overrides.get(MAINBOARD_COPY_LIMIT_RULE_ID)
+                _override_for_application(overrides, MAINBOARD_COPY_LIMIT_RULE_ID, applies_to)
             ),
             mainboard_card_count=self.mainboard_card_count.with_override(
-                overrides.get(MAINBOARD_CARD_COUNT_RULE_ID)
+                _override_for_application(overrides, MAINBOARD_CARD_COUNT_RULE_ID, applies_to)
             ),
-            mana_type_count=self.mana_type_count.with_override(overrides.get(MANA_TYPE_COUNT_RULE_ID)),
+            mana_type_count=self.mana_type_count.with_override(
+                _override_for_application(overrides, MANA_TYPE_COUNT_RULE_ID, applies_to)
+            ),
             legendary_copy_limit=self.legendary_copy_limit.with_override(
-                overrides.get(LEGENDARY_COPY_LIMIT_RULE_ID)
+                _override_for_application(overrides, LEGENDARY_COPY_LIMIT_RULE_ID, applies_to)
             ),
             sideboard_entry_quantity=self.sideboard_entry_quantity.with_override(
-                overrides.get(SIDEBOARD_ENTRY_QUANTITY_RULE_ID)
+                _override_for_application(overrides, SIDEBOARD_ENTRY_QUANTITY_RULE_ID, applies_to)
             ),
         )
 
@@ -217,9 +228,9 @@ class DeckConstraintEvaluator:
         return DeckConstraintEvaluation(
             rules=rules,
             violations=[
-                *self._validate_mainboard_copy_limits(entries, rules.mainboard_copy_limit),
-                *self._validate_sideboard_entry_quantities(entries, rules.sideboard_entry_quantity),
-                *self._validate_legendary_copy_limits(entries, rules.legendary_copy_limit),
+                *self._validate_mainboard_copy_limits(entries, rules),
+                *self._validate_sideboard_entry_quantities(entries, rules),
+                *self._validate_legendary_copy_limits(entries, rules),
                 *self._validate_mainboard_card_count(entries, rules.mainboard_card_count),
                 *self._validate_mana_type_count(entries, rules.mana_type_count),
             ],
@@ -249,102 +260,103 @@ class DeckConstraintEvaluator:
     def _validate_mainboard_copy_limits(
         self,
         entries: list[DeckConstraintEntry],
-        rule: DeckConstraintRule,
+        rules: DeckConstraintRules,
     ) -> list[DeckConstraintViolation]:
-        if rule.max_count is None:
-            return []
-        scoped_entries = _scoped_entries(entries, rule.scope)
-        if rule.scope == "whole_deck":
-            totals_by_card_id: dict[str, int] = {}
-            cards_by_id: dict[str, Card] = {}
-            invalid_entry_cards: set[str] = set()
-            for entry in scoped_entries:
-                card_id = entry.card.id
-                totals_by_card_id[card_id] = totals_by_card_id.get(card_id, 0) + entry.quantity
-                cards_by_id[card_id] = entry.card
-                if entry.quantity < 1:
-                    invalid_entry_cards.add(card_id)
-            invalid_card_ids = {
-                card_id
-                for card_id, quantity in totals_by_card_id.items()
-                if quantity > rule.max_count
-            } | invalid_entry_cards
-            return [
+        violations: list[DeckConstraintViolation] = []
+        for card in _unique_cards(entries):
+            rule = self._rules_for_card(rules, card).mainboard_copy_limit
+            if rule.max_count is None:
+                continue
+            card_entries = [
+                entry
+                for entry in _scoped_entries(entries, rule.scope)
+                if entry.card.id == card.id
+            ]
+            if not card_entries:
+                continue
+            if rule.scope == "whole_deck":
+                total = sum(entry.quantity for entry in card_entries)
+                if total > rule.max_count or any(entry.quantity < 1 for entry in card_entries):
+                    violations.append(
+                        DeckConstraintViolation(
+                            rule_id=rule.rule_id,
+                            severity=rule.severity,
+                            scope=rule.scope,
+                            blocks_action=rule.blocks_action,
+                            card_id=card.id,
+                            message=f"Each mainboard card quantity must be between 1 and {rule.max_count}.",
+                        )
+                    )
+                continue
+            violations.extend(
                 DeckConstraintViolation(
                     rule_id=rule.rule_id,
                     severity=rule.severity,
                     scope=rule.scope,
                     blocks_action=rule.blocks_action,
-                    card_id=card_id,
+                    card_id=entry.card.id,
+                    board=entry.board,
                     message=f"Each mainboard card quantity must be between 1 and {rule.max_count}.",
                 )
-                for card_id in sorted(invalid_card_ids)
-                if card_id in cards_by_id
-            ]
-        return [
-            DeckConstraintViolation(
-                rule_id=rule.rule_id,
-                severity=rule.severity,
-                scope=rule.scope,
-                blocks_action=rule.blocks_action,
-                card_id=entry.card.id,
-                board=entry.board,
-                message=f"Each mainboard card quantity must be between 1 and {rule.max_count}.",
+                for entry in card_entries
+                if entry.board == "mainboard" and (entry.quantity < 1 or entry.quantity > rule.max_count)
             )
-            for entry in entries
-            if entry.board == "mainboard" and (entry.quantity < 1 or entry.quantity > rule.max_count)
-        ]
+        return violations
 
     def _validate_sideboard_entry_quantities(
         self,
         entries: list[DeckConstraintEntry],
-        rule: DeckConstraintRule,
+        rules: DeckConstraintRules,
     ) -> list[DeckConstraintViolation]:
-        if rule.max_count is None:
-            return []
-        return [
-            DeckConstraintViolation(
-                rule_id=rule.rule_id,
-                severity=rule.severity,
-                scope=rule.scope,
-                blocks_action=rule.blocks_action,
-                card_id=entry.card.id,
-                board=entry.board,
-                message=f"Each sideboard card quantity must be between 1 and {rule.max_count}.",
+        violations: list[DeckConstraintViolation] = []
+        for entry in entries:
+            if entry.board != "sideboard":
+                continue
+            rule = self._rules_for_card(rules, entry.card).sideboard_entry_quantity
+            if rule.max_count is None or (entry.quantity >= 1 and entry.quantity <= rule.max_count):
+                continue
+            violations.append(
+                DeckConstraintViolation(
+                    rule_id=rule.rule_id,
+                    severity=rule.severity,
+                    scope=rule.scope,
+                    blocks_action=rule.blocks_action,
+                    card_id=entry.card.id,
+                    board=entry.board,
+                    message=f"Each sideboard card quantity must be between 1 and {rule.max_count}.",
+                )
             )
-            for entry in entries
-            if entry.board == "sideboard" and (entry.quantity < 1 or entry.quantity > rule.max_count)
-        ]
+        return violations
 
     def _validate_legendary_copy_limits(
         self,
         entries: list[DeckConstraintEntry],
-        rule: DeckConstraintRule,
+        rules: DeckConstraintRules,
     ) -> list[DeckConstraintViolation]:
-        if rule.max_count is None:
-            return []
-
-        scoped_entries = _scoped_entries(entries, rule.scope)
-        totals_by_card_id: dict[str, int] = {}
-        legendary_cards: dict[str, Card] = {}
-        for entry in scoped_entries:
-            card_id = entry.card.id
-            totals_by_card_id[card_id] = totals_by_card_id.get(card_id, 0) + entry.quantity
-            if _card_has_type(entry.card, LEGENDARY_TYPE_KEY):
-                legendary_cards[card_id] = entry.card
-
-        return [
-            DeckConstraintViolation(
-                rule_id=rule.rule_id,
-                severity=rule.severity,
-                scope=rule.scope,
-                blocks_action=rule.blocks_action,
-                card_id=card_id,
-                message=f"Legendary cards are limited to {rule.max_count} copy per deck.",
+        violations: list[DeckConstraintViolation] = []
+        for card in _unique_cards(entries):
+            if not _card_has_type(card, LEGENDARY_TYPE_KEY):
+                continue
+            rule = self._rules_for_card(rules, card).legendary_copy_limit
+            if rule.max_count is None:
+                continue
+            total = sum(
+                entry.quantity
+                for entry in _scoped_entries(entries, rule.scope)
+                if entry.card.id == card.id
             )
-            for card_id in sorted(legendary_cards)
-            if totals_by_card_id.get(card_id, 0) > rule.max_count
-        ]
+            if total > rule.max_count:
+                violations.append(
+                    DeckConstraintViolation(
+                        rule_id=rule.rule_id,
+                        severity=rule.severity,
+                        scope=rule.scope,
+                        blocks_action=rule.blocks_action,
+                        card_id=card.id,
+                        message=f"Legendary cards are limited to {rule.max_count} copy per deck.",
+                    )
+                )
+        return violations
 
     def _validate_mainboard_card_count(
         self,
@@ -399,6 +411,9 @@ class DeckConstraintEvaluator:
             )
         ]
 
+    def _rules_for_card(self, rules: DeckConstraintRules, card: Card) -> DeckConstraintRules:
+        return rules.apply_config(card.deck_building_config_json, applies_to="self")
+
 
 def normalize_deck_building_config(value: object) -> dict[str, object]:
     if value in (None, ""):
@@ -429,6 +444,12 @@ def normalize_deck_building_config(value: object) -> dict[str, object]:
                 if not isinstance(raw_value, bool):
                     raise ValueError("Deck-building blocks_action must be a boolean.")
                 normalized_override[key] = raw_value
+            elif key == "applies_to":
+                if raw_value not in DECK_CONSTRAINT_APPLICATIONS:
+                    raise ValueError("Deck-building applies_to must be 'deck' or 'self'.")
+                if raw_value == "self" and rule_id not in SELF_APPLICABLE_RULE_IDS:
+                    raise ValueError("Deck-building applies_to 'self' is only supported for card-specific rules.")
+                normalized_override[key] = raw_value
             elif key in {"min", "max", "count", "minimum", "maximum"}:
                 if isinstance(raw_value, bool) or not isinstance(raw_value, int) or raw_value < 0:
                     raise ValueError("Deck-building numeric rule values must be non-negative integers.")
@@ -452,6 +473,7 @@ def deck_building_rules_metadata_json() -> dict[str, object]:
         "supported_rule_ids": sorted(SUPPORTED_RULE_IDS),
         "allowed_severities": list(DECK_CONSTRAINT_SEVERITIES),
         "allowed_scopes": list(DECK_CONSTRAINT_SCOPES),
+        "allowed_applications": list(DECK_CONSTRAINT_APPLICATIONS),
         "default_config": DEFAULT_DECK_BUILDING_CONFIG,
         "default_rules": DeckConstraintRules.defaults().to_json(),
         "example_config": DECK_BUILDING_CONFIG_EXAMPLE,
@@ -465,6 +487,18 @@ def _extract_rule_overrides(config: object) -> dict[str, object]:
     if not isinstance(overrides, dict):
         return {}
     return {str(key): value for key, value in overrides.items()}
+
+
+def _override_for_application(
+    overrides: dict[str, object],
+    rule_id: str,
+    applies_to: DeckConstraintApplication,
+) -> object:
+    override = overrides.get(rule_id)
+    if not isinstance(override, dict):
+        return None
+    override_application = override.get("applies_to", "deck")
+    return override if override_application == applies_to else None
 
 
 def _rule_to_json(rule: DeckConstraintRule) -> dict[str, object]:
@@ -498,6 +532,11 @@ def _validate_numeric_aliases(override: dict[object, object]) -> None:
 
 def _sorted_rule_entries(entries: list[DeckConstraintEntry]) -> list[DeckConstraintEntry]:
     return sorted(entries, key=lambda entry: (entry.card.id, entry.board))
+
+
+def _unique_cards(entries: list[DeckConstraintEntry]) -> list[Card]:
+    cards_by_id = {entry.card.id: entry.card for entry in entries}
+    return [cards_by_id[card_id] for card_id in sorted(cards_by_id)]
 
 
 def _scoped_entries(

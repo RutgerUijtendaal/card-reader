@@ -226,6 +226,7 @@ def test_deck_rules_metadata_endpoint_returns_backend_owned_defaults() -> None:
     payload = response.json()
     assert payload["allowed_severities"] == ["hard", "soft"]
     assert payload["allowed_scopes"] == ["mainboard", "whole_deck"]
+    assert payload["allowed_applications"] == ["deck", "self"]
     assert payload["default_config"] == {"overrides": {}}
     assert set(payload["supported_rule_ids"]) == {
         "mainboard_copy_limit",
@@ -238,7 +239,9 @@ def test_deck_rules_metadata_endpoint_returns_backend_owned_defaults() -> None:
     assert payload["default_rules"]["mainboard_copy_limit"]["severity"] == "hard"
     assert payload["default_rules"]["mana_type_count"]["min"] == 3
     assert payload["default_rules"]["legendary_copy_limit"]["severity"] == "soft"
+    assert payload["example_config"]["overrides"]["mainboard_copy_limit"]["applies_to"] == "self"
     assert payload["example_config"]["overrides"]["mainboard_copy_limit"]["max"] == 6
+    assert payload["example_config"]["overrides"]["legendary_copy_limit"]["applies_to"] == "deck"
     assert payload["example_config"]["overrides"]["legendary_copy_limit"]["scope"] == "whole_deck"
 
 
@@ -1949,6 +1952,155 @@ def test_hero_override_allows_six_mainboard_copies() -> None:
     assert response.json()["deck_building_rules"]["mainboard_copy_limit"]["max"] == 6
 
 
+def test_card_self_override_allows_only_that_card_above_default_copy_limit() -> None:
+    username = "deck-self-copy-limit-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Self Copy Limit Hero", is_hero=True)
+    self_limited_card = _create_card(
+        name="Self Six Copy Card",
+        is_hero=False,
+        deck_building_config={
+            "overrides": {
+                "mainboard_copy_limit": {
+                    "applies_to": "self",
+                    "max": 6,
+                }
+            }
+        },
+    )
+    mainboard_cards = _build_mainboard_cards(total_unique=14)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Self Six Copies Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": self_limited_card.id, "quantity": 6},
+                *_valid_entries(mainboard_cards),
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["deck_building_rules"]["mainboard_copy_limit"]["max"] == 4
+
+
+def test_card_self_override_does_not_raise_other_cards_copy_limit() -> None:
+    username = "deck-self-copy-limit-other-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Self Copy Limit Other Hero", is_hero=True)
+    self_limited_card = _create_card(
+        name="Self Limit Source Card",
+        is_hero=False,
+        deck_building_config={
+            "overrides": {
+                "mainboard_copy_limit": {
+                    "applies_to": "self",
+                    "max": 6,
+                }
+            }
+        },
+    )
+    other_limited_card = _create_card(name="Default Limited Other Card", is_hero=False)
+    mainboard_cards = _build_mainboard_cards(total_unique=14)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Self Limit Does Not Leak Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": self_limited_card.id, "quantity": 1},
+                {"card_id": other_limited_card.id, "quantity": 5},
+                *_valid_entries(mainboard_cards),
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Each mainboard card quantity must be between 1 and 4."
+
+
+def test_card_self_legendary_limit_applies_only_to_that_legendary_card() -> None:
+    username = "deck-self-legendary-limit-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Self Legendary Hero", is_hero=True)
+    self_limited_legendary = _create_card(
+        name="Self Limited Legendary",
+        is_hero=False,
+        type_labels=["Legendary"],
+        deck_building_config={
+            "overrides": {
+                "legendary_copy_limit": {
+                    "applies_to": "self",
+                    "severity": "hard",
+                    "blocks_action": True,
+                    "max": 1,
+                }
+            }
+        },
+    )
+    other_legendary = _create_card(name="Other Soft Legendary", is_hero=False, type_labels=["Legendary"])
+    mainboard_cards = _build_mainboard_cards(total_unique=14)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={
+            "name": "Self Legendary Does Not Leak Deck",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": self_limited_legendary.id, "quantity": 1},
+                {"card_id": other_legendary.id, "quantity": 2},
+                *_valid_entries(mainboard_cards),
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"]["warnings"] == ["Legendary cards are limited to 1 copy per deck."]
+
+    blocked_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Self Legendary Blocks Owner",
+            "description": None,
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": [
+                {"card_id": self_limited_legendary.id, "quantity": 2},
+                *_valid_entries(mainboard_cards),
+            ],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert blocked_response.status_code == 400
+    assert blocked_response.json()["detail"] == "Legendary cards are limited to 1 copy per deck."
+
+
 def test_card_deck_building_overrides_resolve_independent_of_entry_order() -> None:
     first_card = _create_card(
         name="Ordered Override First",
@@ -2444,3 +2596,41 @@ def test_latest_version_patch_rejects_duplicate_deck_building_numeric_aliases() 
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Deck-building numeric aliases cannot be combined for the same rule."
+
+
+def test_latest_version_patch_rejects_invalid_deck_building_applies_to() -> None:
+    username = "deck-card-invalid-applies-to-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    card = _create_card(name="Invalid Applies To Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"deck_building_config": {"overrides": {"mainboard_copy_limit": {"applies_to": "card"}}}},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Deck-building applies_to must be 'deck' or 'self'."
+
+
+def test_latest_version_patch_rejects_self_applies_to_for_deck_aggregate_rules() -> None:
+    username = "deck-card-self-applies-to-aggregate-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    card = _create_card(name="Invalid Self Aggregate Rule Card", is_hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"deck_building_config": {"overrides": {"mainboard_card_count": {"applies_to": "self"}}}},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Deck-building applies_to 'self' is only supported for card-specific rules."
