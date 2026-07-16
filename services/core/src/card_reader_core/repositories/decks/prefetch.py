@@ -12,6 +12,8 @@ from card_reader_core.models import (
     DeckEntry,
     DeckSideboard,
     DeckSideboardEntry,
+    DeckTagAssignment,
+    DeckTagSuggestionDeck,
 )
 
 
@@ -23,6 +25,7 @@ def deck_queryset() -> QuerySet[Deck]:
         "hero_card__latest_version__template",
         "hero_card__latest_version__previous_version",
     ).prefetch_related(
+        *deck_metadata_prefetches(),
         *latest_version_metadata_prefetches("hero_card__latest_version"),
         Prefetch(
             "entries",
@@ -58,6 +61,7 @@ def deck_summary_queryset() -> QuerySet[Deck]:
         "hero_card",
         "hero_card__latest_version",
     ).prefetch_related(
+        *deck_metadata_prefetches(),
         Prefetch(
             "hero_card__latest_version__images",
             queryset=CardVersionImage.objects.order_by("-created_at"),
@@ -83,6 +87,21 @@ def deck_summary_queryset() -> QuerySet[Deck]:
                     .order_by("position", "card_id"),
                 )
             ).order_by("created_at", "id"),
+        ),
+    )
+
+
+def deck_metadata_prefetches() -> tuple[Prefetch[str], ...]:
+    return (
+        Prefetch(
+            "tag_assignments",
+            queryset=DeckTagAssignment.objects.select_related("tag").order_by("tag__kind", "tag__label"),
+        ),
+        Prefetch(
+            "tag_suggestion_occurrences",
+            queryset=DeckTagSuggestionDeck.objects.select_related("suggestion")
+            .filter(suggestion__status="pending")
+            .order_by("suggestion__display_value"),
         ),
     )
 

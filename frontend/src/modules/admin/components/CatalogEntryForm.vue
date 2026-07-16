@@ -116,7 +116,34 @@
         >
       </label>
     </div>
-    <label class="field-label">
+    <div
+      v-if="kind === 'deck-roles' || kind === 'deck-types'"
+      class="space-y-1.5"
+    >
+      <span class="field-label">Category</span>
+      <div class="theme-tablist w-fit">
+        <button
+          type="button"
+          class="theme-tab"
+          :class="deckTagKindModel === 'role' ? 'theme-tab-active' : ''"
+          @click="deckTagKindModel = 'role'"
+        >
+          Role
+        </button>
+        <button
+          type="button"
+          class="theme-tab"
+          :class="deckTagKindModel === 'type' ? 'theme-tab-active' : ''"
+          @click="deckTagKindModel = 'type'"
+        >
+          Type
+        </button>
+      </div>
+    </div>
+    <label
+      v-if="kind !== 'deck-roles' && kind !== 'deck-types'"
+      class="field-label"
+    >
       Identifiers
       <textarea
         v-model="identifiersTextModel"
@@ -170,6 +197,11 @@ const keyModel = computed({
 const identifiersTextModel = computed({
   get: () => props.entry.identifiers_text ?? '',
   set: (value: string) => updateEntry({ identifiers_text: value }),
+});
+
+const deckTagKindModel = computed({
+  get: () => props.entry.deck_tag_kind ?? (props.kind === 'deck-types' ? 'type' : 'role'),
+  set: (value: 'role' | 'type') => updateEntry({ deck_tag_kind: value }),
 });
 
 const textTokenModel = computed({

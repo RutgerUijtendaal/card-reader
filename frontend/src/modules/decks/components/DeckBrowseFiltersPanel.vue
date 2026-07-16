@@ -45,6 +45,15 @@
       :options="controller.filterCatalog.value.affinitySymbols"
       @reset="controller.resetAffinitySymbols"
     />
+
+    <MetadataPillGroup
+      v-model="selectedDeckTagIds"
+      v-model:match-mode="deckTagMatch"
+      label="Tags"
+      :options="controller.filterCatalog.value.deckTags"
+      :groups="deckTagGroups"
+      @reset="controller.resetDeckTags"
+    />
   </GalleryFilterSidebar>
 </template>
 
@@ -53,6 +62,7 @@ import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import type { RouteLocationRaw } from 'vue-router';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
+import MetadataPillGroup, { type MetadataPillOptionGroup } from '@/components/filters/MetadataPillGroup.vue';
 import GalleryFilterSidebar from '@/components/filters/GalleryFilterSidebar.vue';
 import type { DeckBrowseFiltersController } from '@/modules/decks/composables/useDeckBrowseFilters';
 
@@ -67,7 +77,7 @@ const props = defineProps<{
 }>();
 
 const description = computed(
-  () => props.description ?? 'Filter public decks by deck, hero, owner, included cards, and affinity.',
+  () => props.description ?? 'Filter public decks by deck, hero, owner, included cards, affinity, and tags.',
 );
 
 const selectedAffinitySymbolIds = computed({
@@ -83,4 +93,27 @@ const affinitySymbolMatch = computed({
   get: () => props.controller.affinitySymbolMatch.value,
   set: props.controller.updateAffinitySymbolMatch,
 });
+
+const selectedDeckTagIds = computed({
+  get: () => props.controller.deckTagIds.value,
+  set: props.controller.updateDeckTagIds,
+});
+const deckTagMatch = computed({
+  get: () => props.controller.deckTagMatch.value,
+  set: props.controller.updateDeckTagMatch,
+});
+const deckTagGroups = computed<MetadataPillOptionGroup[]>(() => [
+  {
+    key: 'roles',
+    label: 'Roles',
+    options: props.controller.filterCatalog.value.deckTags.filter((tag) => tag.kind === 'role'),
+    selectedClass: 'theme-choice-chip-active shadow-sm',
+  },
+  {
+    key: 'types',
+    label: 'Types',
+    options: props.controller.filterCatalog.value.deckTags.filter((tag) => tag.kind === 'type'),
+    selectedClass: 'theme-pill-keyword shadow-sm',
+  },
+]);
 </script>

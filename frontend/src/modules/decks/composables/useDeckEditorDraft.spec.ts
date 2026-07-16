@@ -55,6 +55,8 @@ describe('useDeckEditorDraft', () => {
 
     controller.form.name = 'Example';
     controller.form.hero_card_id = 'hero';
+    controller.form.tag_ids = ['role-damage', 'type-armor'];
+    controller.form.suggested_type_labels = ['Tempo Burst'];
     controller.form.entries = [{ card_id: 'cardA', quantity: 4 }];
     controller.addSideboard();
     const sideboardId = controller.activeBoardId.value;
@@ -66,6 +68,8 @@ describe('useDeckEditorDraft', () => {
       description: null,
       visibility: 'private',
       hero_card_id: 'hero',
+      tag_ids: ['role-damage', 'type-armor'],
+      suggested_type_labels: ['Tempo Burst'],
       entries: [{ card_id: 'cardA', quantity: 4 }],
       sideboards: [
         {

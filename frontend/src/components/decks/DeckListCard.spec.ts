@@ -92,6 +92,19 @@ const buildDeck = (): DeckRecord => ({
     label: 'Ready',
     issues: [],
   },
+  tags: [
+    { id: 'role-damage', kind: 'role', key: 'damage', label: 'Damage' },
+    { id: 'type-armor', kind: 'type', key: 'armor', label: 'Armor' },
+  ],
+  pending_tag_suggestions: [
+    {
+      id: 'suggestion-tempo',
+      label: 'Tempo Burst',
+      normalized_value: 'tempo burst',
+      kind: 'type',
+      status: 'pending',
+    },
+  ],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
 });
@@ -171,6 +184,9 @@ describe('DeckListCard', () => {
     expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).toContain('{F}');
     expect(text).toContain('Pressure early, then pivot into efficient trades.');
+    expect(text).toContain('Damage');
+    expect(text).toContain('Armor');
+    expect(text).not.toContain('Tempo Burst');
     expect(text).not.toContain('Mainboard 40 · 24 unique · 1 sideboard');
     expect(text).toContain('Updated');
 
@@ -187,6 +203,9 @@ describe('DeckListCard', () => {
     expect(text).toContain('Hero: Azure Hero');
     expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).toContain('{F}');
+    expect(text).toContain('Damage');
+    expect(text).toContain('Armor');
+    expect(text).toContain('Tempo Burst');
     expect(text).toContain('Updated');
 
     mounted.unmount();

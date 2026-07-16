@@ -1,19 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCreatePayload,
   CATALOG_KIND_GROUPS,
+  createEmptyCatalogEntry,
   isKnownCatalogKind,
   isSuggestedCatalogKind,
   normalizeCatalogResponse,
 } from './catalogAdminUtils';
 
 describe('catalogAdminUtils', () => {
-  it('groups known and suggested catalog kinds separately', () => {
+  it('groups card catalog and deck tag kinds separately', () => {
     expect(CATALOG_KIND_GROUPS).toEqual([
-      { label: 'Known', kinds: ['keywords', 'tags', 'symbols', 'types'] },
-      { label: 'Suggested', kinds: ['suggested-tags', 'suggested-types'] },
+      {
+        label: 'Card catalog',
+        kinds: ['keywords', 'tags', 'symbols', 'types', 'suggested-tags', 'suggested-types'],
+      },
+      { label: 'Deck tags', kinds: ['deck-roles', 'deck-types', 'suggested-deck-types'] },
     ]);
     expect(isKnownCatalogKind('tags')).toBe(true);
+    expect(isKnownCatalogKind('deck-roles')).toBe(true);
     expect(isSuggestedCatalogKind('suggested-types')).toBe(true);
+    expect(isSuggestedCatalogKind('suggested-deck-types')).toBe(true);
+  });
+
+  it('builds deck tag catalog payloads without card identifiers', () => {
+    const entry = createEmptyCatalogEntry();
+    entry.label = 'Damage';
+    entry.key = 'damage';
+    entry.identifiers_text = 'ignored';
+
+    expect(buildCreatePayload('deck-roles', entry)).toEqual({
+      kind: 'role',
+      label: 'Damage',
+      key: 'damage',
+    });
   });
 
   it('normalizes grouped catalog responses including suggestions', () => {

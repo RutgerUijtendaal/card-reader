@@ -19,6 +19,8 @@ def list_public_decks(
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
+    deck_tag_ids: list[str] | None = None,
+    deck_tag_match: str | None = None,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -30,6 +32,8 @@ def list_public_decks(
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_match=deck_tag_match,
         ).order_by("-updated_at", "-created_at")
     )
 
@@ -43,6 +47,8 @@ def list_owner_decks(
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
+    deck_tag_ids: list[str] | None = None,
+    deck_tag_match: str | None = None,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -54,6 +60,8 @@ def list_owner_decks(
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_match=deck_tag_match,
         ).order_by("-updated_at", "-created_at")
     )
 
@@ -67,6 +75,8 @@ def list_public_deck_summaries(
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
+    deck_tag_ids: list[str] | None = None,
+    deck_tag_match: str | None = None,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -78,6 +88,8 @@ def list_public_deck_summaries(
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_match=deck_tag_match,
         ).order_by("-updated_at", "-created_at")
     )
 
@@ -91,6 +103,8 @@ def list_owner_deck_summaries(
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
+    deck_tag_ids: list[str] | None = None,
+    deck_tag_match: str | None = None,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -102,6 +116,8 @@ def list_owner_deck_summaries(
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_match=deck_tag_match,
         ).order_by("-updated_at", "-created_at")
     )
 

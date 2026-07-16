@@ -38,18 +38,24 @@ export const useCatalogEntryActions = ({
     kind: CatalogKind | null;
     entryId: string | null;
     entryLabel: string;
+    linkedDeckCount: number | null;
   }>({
     open: false,
     loading: false,
     kind: null,
     entryId: null,
     entryLabel: '',
+    linkedDeckCount: null,
   });
 
-  const deleteModalMessage = computed(
-    () =>
-      `Delete "${deleteModal.entryLabel || 'this entry'}"?\n\nThis also removes existing relations from card versions and cannot be undone.`,
-  );
+  const deleteModalMessage = computed(() => {
+    const label = deleteModal.entryLabel || 'this entry';
+    if (deleteModal.linkedDeckCount !== null) {
+      const noun = deleteModal.linkedDeckCount === 1 ? 'deck' : 'decks';
+      return `Delete "${label}"?\n\nThis detaches the tag from ${deleteModal.linkedDeckCount} ${noun} and cannot be undone.`;
+    }
+    return `Delete "${label}"?\n\nThis also removes existing relations from card versions and cannot be undone.`;
+  });
 
   const createEntry = async (): Promise<void> => {
     if (creatingEntry.value) return;
@@ -102,6 +108,8 @@ export const useCatalogEntryActions = ({
     deleteModal.kind = kind;
     deleteModal.entryId = entry.id;
     deleteModal.entryLabel = entry.label?.trim() || entry.key || 'this entry';
+    deleteModal.linkedDeckCount =
+      'linked_deck_count' in entry ? (entry.linked_deck_count ?? 0) : null;
     deleteModal.open = true;
   };
 
@@ -111,6 +119,7 @@ export const useCatalogEntryActions = ({
     deleteModal.kind = null;
     deleteModal.entryId = null;
     deleteModal.entryLabel = '';
+    deleteModal.linkedDeckCount = null;
   };
 
   const closeDeleteModal = (): void => {

@@ -22,11 +22,17 @@
       title-class="text-xl"
     >
       <template #titleMeta>
-        <div class="theme-section-muted flex items-center gap-2 text-sm">
-          <span>By</span>
-          <span class="theme-pill theme-pill-keyword text-xs">
-            {{ deck.owner.username }}
-          </span>
+        <div class="space-y-2">
+          <div class="theme-section-muted flex items-center gap-2 text-sm">
+            <span>By</span>
+            <span class="theme-pill theme-pill-keyword text-xs">
+              {{ deck.owner.username }}
+            </span>
+          </div>
+          <DeckTagPills
+            :tags="deck.tags ?? []"
+            :pending-suggestions="canEdit ? deck.pending_tag_suggestions ?? [] : []"
+          />
         </div>
       </template>
 
@@ -258,6 +264,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
 import { BookOpenText, Clipboard } from 'lucide-vue-next';
+import DeckTagPills from '@/components/decks/DeckTagPills.vue';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';

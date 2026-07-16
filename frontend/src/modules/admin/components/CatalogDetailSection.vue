@@ -42,13 +42,20 @@
         class="theme-muted-panel"
       >
         <div class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
-          Linked cards
+          {{ isDeckTagKind ? 'Linked decks' : 'Linked cards' }}
         </div>
         <div class="theme-section-muted mt-1 text-sm">
-          {{ linkedCardCount }} cards currently use this {{ kindItemLabel(selectedKind).toLowerCase() }}.
+          {{ isDeckTagKind ? linkedDeckCount : linkedCardCount }}
+          {{ isDeckTagKind ? 'decks' : 'cards' }} currently use this {{ kindItemLabel(selectedKind).toLowerCase() }}.
         </div>
         <div class="mt-4">
+          <CatalogLinkedDecksGrid
+            v-if="isDeckTagKind"
+            :decks="linkedDecks"
+            :empty-message="`No linked decks found for this ${kindItemLabel(selectedKind).toLowerCase()}.`"
+          />
           <CatalogLinkedCardsGrid
+            v-else
             :cards="linkedCards"
             :empty-message="`No linked cards found for this ${kindItemLabel(selectedKind).toLowerCase()}.`"
           />
@@ -85,15 +92,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import CatalogLinkedCardsGrid from '@/modules/admin/components/CatalogLinkedCardsGrid.vue';
+import CatalogLinkedDecksGrid from '@/modules/admin/components/CatalogLinkedDecksGrid.vue';
 import CatalogEntryForm from '@/modules/admin/components/CatalogEntryForm.vue';
 import type {
   CatalogFormEntry,
   CatalogKind,
   CatalogRow,
   LinkedCardPreview,
+  LinkedDeckPreview,
 } from '@/modules/admin/types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   selectedKind: CatalogKind;
   selectedRow: CatalogRow | null;
   isCreatingNew: boolean;
@@ -107,7 +116,14 @@ const props = defineProps<{
   kindItemLabel: (kind: CatalogKind) => string;
   linkedCards: LinkedCardPreview[];
   linkedCardCount: number;
-}>();
+  linkedDecks?: LinkedDeckPreview[];
+  linkedDeckCount?: number;
+}>(), {
+  linkedDecks: () => [],
+  linkedDeckCount: 0,
+});
+
+const isDeckTagKind = computed(() => props.selectedKind === 'deck-roles' || props.selectedKind === 'deck-types');
 
 const emit = defineEmits<{
   (e: 'create'): void;

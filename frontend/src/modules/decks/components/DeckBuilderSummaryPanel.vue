@@ -83,6 +83,14 @@
         />
       </label>
 
+      <DeckTagPicker
+        :catalog="controller.deckTagCatalog.value"
+        :model-value="controller.deck.form.tag_ids"
+        :suggested-type-labels="controller.deck.form.suggested_type_labels"
+        @update:model-value="controller.deck.setDeckTagIds"
+        @update:suggested-type-labels="controller.deck.setSuggestedTypeLabels"
+      />
+
       <div class="space-y-2">
         <p class="theme-section-title text-sm font-semibold">
           Visibility
@@ -438,6 +446,7 @@ import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
+import DeckTagPicker from '@/components/decks/DeckTagPicker.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
 import type { DeckEntrySummary, DeckVisibility } from '@/modules/decks/types';

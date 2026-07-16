@@ -5,6 +5,8 @@ export const buildDeckUpsertRequestFromRecord = (deck: DeckRecord): DeckUpsertRe
   description: deck.description?.trim() || null,
   visibility: deck.visibility,
   hero_card_id: deck.hero_card.id,
+  tag_ids: (deck.tags ?? []).map((tag) => tag.id),
+  suggested_type_labels: (deck.pending_tag_suggestions ?? []).map((suggestion) => suggestion.label),
   entries: deck.mainboard.entries.map((entry) => ({
     card_id: entry.card.id,
     quantity: entry.quantity,

@@ -3,7 +3,7 @@ import { useDebounceFn, useEventListener, useLocalStorage } from '@vueuse/core';
 import { toast } from 'vue-sonner';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import type { CardListItem } from '@/modules/card-detail/types';
-import { createDeck, fetchMyDeck, updateDeck } from '@/modules/decks/api';
+import { createDeck, fetchDeckTags, fetchMyDeck, updateDeck } from '@/modules/decks/api';
 import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { useDeckEditorFilters } from '@/modules/decks/composables/useDeckEditorFilters';
 import { useDeckEditorGallery } from '@/modules/decks/composables/useDeckEditorGallery';
@@ -12,7 +12,7 @@ import {
   buildDeckEditorReturnLocation,
   getDeckEditorReturnLabel,
 } from '@/composables/decks/deckRouteState';
-import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
+import type { DeckCardSummary, DeckRecord, DeckTagCatalog } from '@/modules/decks/types';
 import { fallbackDeckBuildingRules, fetchDeckRulesMetadata } from '@/composables/decks/deckRules';
 
 export const useDeckEditor = () => {
@@ -26,6 +26,7 @@ export const useDeckEditor = () => {
   const manualSaving = ref(false);
   const cardLookup = ref<Record<string, DeckCardSummary>>({});
   const deckBuildingRules = ref(fallbackDeckBuildingRules());
+  const deckTagCatalog = ref<DeckTagCatalog>({ roles: [], types: [] });
   const savedPayloadSignature = ref('');
   const autosyncFailedSignature = ref('');
   const discardChangesModalOpen = ref(false);
@@ -94,6 +95,14 @@ export const useDeckEditor = () => {
       deckBuildingRules.value = (await fetchDeckRulesMetadata()).default_rules;
     } catch {
       deckBuildingRules.value = fallbackDeckBuildingRules();
+    }
+  };
+
+  const loadDeckTags = async (): Promise<void> => {
+    try {
+      deckTagCatalog.value = await fetchDeckTags();
+    } catch {
+      deckTagCatalog.value = { roles: [], types: [] };
     }
   };
 
@@ -239,7 +248,7 @@ export const useDeckEditor = () => {
   }, 900);
 
   onMounted(async () => {
-    await Promise.all([filters.loadFilters(), loadDeckRules(), loadDeck()]);
+    await Promise.all([filters.loadFilters(), loadDeckRules(), loadDeckTags(), loadDeck()]);
     if (builderStep.value === 'build') {
       filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
     }
@@ -288,6 +297,7 @@ export const useDeckEditor = () => {
     autosyncEnabled,
     discardChangesModalOpen,
     deckBuildingRules,
+    deckTagCatalog,
     filters,
     gallery,
     deck,

@@ -21,9 +21,11 @@ class DeckListFilterParams(TypedDict):
     affinity_symbol_ids: list[str] | None
     affinity_symbol_exclude_ids: list[str] | None
     affinity_symbol_match: str | None
+    deck_tag_ids: list[str] | None
+    deck_tag_match: str | None
 
 
-def deck_summary_payload(deck: Deck) -> dict[str, object]:
+def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> dict[str, object]:
     validation = DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     return {
@@ -46,12 +48,16 @@ def deck_summary_payload(deck: Deck) -> dict[str, object]:
             "label": validation.status_label,
             "deprecated_card_count": validation.deprecated_card_count,
         },
+        "tags": deck_tags_payload(deck),
+        "pending_tag_suggestions": pending_deck_tag_suggestions_payload(deck)
+        if include_pending_suggestions
+        else [],
         "created_at": deck.created_at.isoformat(),
         "updated_at": deck.updated_at.isoformat(),
     }
 
 
-def deck_payload(deck: Deck) -> dict[str, object]:
+def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> dict[str, object]:
     validation = DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
@@ -120,9 +126,39 @@ def deck_payload(deck: Deck) -> dict[str, object]:
             hero_card=deck.hero_card,
             entries=constraint_entries,
         ),
+        "tags": deck_tags_payload(deck),
+        "pending_tag_suggestions": pending_deck_tag_suggestions_payload(deck)
+        if include_pending_suggestions
+        else [],
         "created_at": deck.created_at.isoformat(),
         "updated_at": deck.updated_at.isoformat(),
     }
+
+
+def deck_tags_payload(deck: Deck) -> list[dict[str, object]]:
+    return [
+        {
+            "id": assignment.tag.id,
+            "key": assignment.tag.key,
+            "label": assignment.tag.label,
+            "kind": assignment.tag.kind,
+        }
+        for assignment in deck.tag_assignments.all()
+    ]
+
+
+def pending_deck_tag_suggestions_payload(deck: Deck) -> list[dict[str, object]]:
+    return [
+        {
+            "id": occurrence.suggestion.id,
+            "label": occurrence.suggestion.display_value,
+            "normalized_value": occurrence.suggestion.normalized_value,
+            "kind": occurrence.suggestion.kind,
+            "status": occurrence.suggestion.status,
+        }
+        for occurrence in deck.tag_suggestion_occurrences.all()
+        if occurrence.suggestion.status == "pending"
+    ]
 
 
 def deck_hero_summary_payload(card: Card) -> dict[str, object]:
@@ -253,6 +289,13 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     hero_card_id = serializers.CharField(required=True)
     entries = MainboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
     sideboards = DeckSideboardWriteSerializer(many=True, required=False, allow_empty=True, default=list)
+    tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, default=list)
+    suggested_type_labels = serializers.ListField(
+        child=serializers.CharField(allow_blank=False),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
 
 
 class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
@@ -264,6 +307,8 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     affinity_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     affinity_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    deck_tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    deck_tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
 
     def validated_list_filters(self) -> DeckListFilterParams:
         return {
@@ -274,6 +319,8 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
             "affinity_symbol_ids": self._string_list_or_none("affinity_symbol_ids"),
             "affinity_symbol_exclude_ids": self._string_list_or_none("affinity_symbol_exclude_ids"),
             "affinity_symbol_match": self._string_or_none("affinity_symbol_match"),
+            "deck_tag_ids": self._string_list_or_none("deck_tag_ids"),
+            "deck_tag_match": self._string_or_none("deck_tag_match"),
         }
 
     def wants_summary(self) -> bool:

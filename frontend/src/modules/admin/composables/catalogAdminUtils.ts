@@ -6,6 +6,8 @@ import type {
   CatalogKind,
   CatalogApiResponse,
   CatalogRow,
+  DeckTagRecord,
+  DeckTagUpsertRequest,
   KnownCatalogKind,
   KeywordRecord,
   KeywordUpsertRequest,
@@ -23,12 +25,12 @@ import type {
   TypeUpsertRequest,
 } from '@/modules/admin/types';
 
-export const KNOWN_CATALOG_KINDS: KnownCatalogKind[] = ['keywords', 'tags', 'symbols', 'types'];
-export const SUGGESTED_CATALOG_KINDS: SuggestedCatalogKind[] = ['suggested-tags', 'suggested-types'];
+export const KNOWN_CATALOG_KINDS: KnownCatalogKind[] = ['keywords', 'tags', 'symbols', 'types', 'deck-roles', 'deck-types'];
+export const SUGGESTED_CATALOG_KINDS: SuggestedCatalogKind[] = ['suggested-tags', 'suggested-types', 'suggested-deck-types'];
 export const CATALOG_KINDS: CatalogKind[] = [...KNOWN_CATALOG_KINDS, ...SUGGESTED_CATALOG_KINDS];
 export const CATALOG_KIND_GROUPS = [
-  { label: 'Known', kinds: KNOWN_CATALOG_KINDS },
-  { label: 'Suggested', kinds: SUGGESTED_CATALOG_KINDS },
+  { label: 'Card catalog', kinds: ['keywords', 'tags', 'symbols', 'types', 'suggested-tags', 'suggested-types'] as CatalogKind[] },
+  { label: 'Deck tags', kinds: ['deck-roles', 'deck-types', 'suggested-deck-types'] as CatalogKind[] },
 ] as const;
 
 export const isKnownCatalogKind = (kind: CatalogKind): kind is KnownCatalogKind =>
@@ -37,7 +39,8 @@ export const isKnownCatalogKind = (kind: CatalogKind): kind is KnownCatalogKind 
 export const isSuggestedCatalogKind = (kind: CatalogKind): kind is SuggestedCatalogKind =>
   SUGGESTED_CATALOG_KINDS.includes(kind as SuggestedCatalogKind);
 
-export const isSuggestionRecord = (row: CatalogRow): row is SuggestionRecord => 'status' in row;
+export const isSuggestionRecord = (row: CatalogRow): row is SuggestionRecord =>
+  'status' in row && 'occurrence_count' in row;
 
 export const kindLabel = (kind: CatalogKind): string => {
   if (kind === 'keywords') return 'Keywords';
@@ -45,6 +48,9 @@ export const kindLabel = (kind: CatalogKind): string => {
   if (kind === 'symbols') return 'Symbols';
   if (kind === 'types') return 'Types';
   if (kind === 'suggested-tags') return 'Tags';
+  if (kind === 'deck-roles') return 'Roles';
+  if (kind === 'deck-types') return 'Types';
+  if (kind === 'suggested-deck-types') return 'Suggested types';
   return 'Types';
 };
 
@@ -54,6 +60,9 @@ export const kindItemLabel = (kind: CatalogKind): string => {
   if (kind === 'symbols') return 'Symbol';
   if (kind === 'types') return 'Type';
   if (kind === 'suggested-tags') return 'Tag Suggestion';
+  if (kind === 'deck-roles') return 'Role Tag';
+  if (kind === 'deck-types') return 'Type Tag';
+  if (kind === 'suggested-deck-types') return 'Type Tag Suggestion';
   return 'Type Suggestion';
 };
 
@@ -144,6 +153,15 @@ export const catalogRowToFormEntry = (row: CatalogRow): CatalogFormEntry => {
     };
   }
 
+  if ('kind' in row && !('status' in row)) {
+    return {
+      ...createEmptyCatalogEntry(),
+      label: row.label,
+      key: row.key,
+      deck_tag_kind: row.kind,
+    };
+  }
+
   return {
     label: row.label,
     key: row.key,
@@ -178,6 +196,17 @@ export const catalogFormEntryToRow = (
       reference_assets_json: entry.reference_assets_json,
       text_token: entry.text_token,
       enabled: entry.enabled,
+    };
+  }
+
+  if (kind === 'deck-roles' || kind === 'deck-types') {
+    return {
+      id: entryId,
+      label: entry.label,
+      key: entry.key,
+      kind: entry.deck_tag_kind ?? (kind === 'deck-roles' ? 'role' : 'type'),
+      identifiers: [],
+      identifiers_text: '',
     };
   }
 
@@ -224,7 +253,7 @@ const parseStringArrayText = (rawText: string, fieldLabel: string): string[] => 
 export const buildCreatePayload = (
   kind: CatalogKind,
   entry: CatalogFormEntry,
-): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest => {
+): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest | DeckTagUpsertRequest => {
   if (isSuggestedCatalogKind(kind)) {
     throw new Error('Suggestions cannot be created from the catalog editor.');
   }
@@ -259,6 +288,14 @@ export const buildCreatePayload = (
     };
   }
 
+  if (kind === 'deck-roles' || kind === 'deck-types') {
+    return {
+      kind: entry.deck_tag_kind ?? (kind === 'deck-roles' ? 'role' : 'type'),
+      label: entry.label.trim(),
+      key: entry.key.trim() || undefined,
+    };
+  }
+
   return {
     label: entry.label.trim(),
     key: entry.key.trim() || undefined,
@@ -269,7 +306,7 @@ export const buildCreatePayload = (
 export const buildUpdatePayload = (
   kind: CatalogKind,
   entry: CatalogRow,
-): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest => {
+): KeywordUpsertRequest | TagUpsertRequest | TypeUpsertRequest | SymbolUpsertRequest | DeckTagUpsertRequest => {
   if (isSuggestedCatalogKind(kind)) {
     throw new Error('Suggestions cannot be updated from the catalog editor.');
   }
@@ -280,6 +317,11 @@ export const buildUpdatePayload = (
       key: keyword.key,
       identifiers: parseIdentifiersText(keyword.identifiers_text),
     };
+  }
+
+  if (kind === 'deck-roles' || kind === 'deck-types') {
+    const tag = entry as DeckTagRecord;
+    return { kind: tag.kind, label: tag.label, key: tag.key };
   }
 
   if (kind === 'symbols') {
@@ -358,15 +400,16 @@ export const normalizeSuggestionRecord = (row: SuggestionApiRecord): SuggestionR
 
 export const normalizeKnownCatalogDetail = (
   kind: KnownCatalogKind,
-  row: KeywordRecord | TagRecord | TypeRecord | SymbolApiRecord | SymbolRecord,
-): KeywordRecord | TagRecord | TypeRecord | SymbolRecord => {
+  row: KeywordRecord | TagRecord | TypeRecord | SymbolApiRecord | SymbolRecord | DeckTagRecord,
+): KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord => {
   if (kind === 'symbols') {
     return normalizeSymbolRecord(row as SymbolApiRecord);
   }
 
   return {
-    ...(row as KeywordRecord | TagRecord | TypeRecord),
-    identifiers_text: formatIdentifiersText((row as KeywordRecord | TagRecord | TypeRecord).identifiers ?? []),
+    ...(row as KeywordRecord | TagRecord | TypeRecord | DeckTagRecord),
+    identifiers: 'identifiers' in row ? row.identifiers : [],
+    identifiers_text: formatIdentifiersText('identifiers' in row ? row.identifiers : []),
   };
 };
 

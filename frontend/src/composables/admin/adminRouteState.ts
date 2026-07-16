@@ -27,6 +27,9 @@ const CATALOG_KINDS: CatalogKind[] = [
   'types',
   'suggested-tags',
   'suggested-types',
+  'deck-roles',
+  'deck-types',
+  'suggested-deck-types',
 ];
 
 const ADMIN_TABS: AdminTab[] = [

@@ -13,6 +13,8 @@ import type {
   SymbolRecord,
   TagRecord,
   TypeRecord,
+  DeckTagRecord,
+  CatalogKind,
 } from '@/modules/admin/types';
 import {
   parseAdminCatalogKind,
@@ -53,7 +55,7 @@ export const useCatalogAdmin = () => {
   const suggestionNewLabel = ref('');
   const suggestionNewKey = ref('');
   const suggestionActionLoading = ref(false);
-  const selectedKnownDetail = ref<KeywordRecord | TagRecord | TypeRecord | SymbolRecord | null>(null);
+  const selectedKnownDetail = ref<KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | null>(null);
 
   const selectedRow = computed(() =>
     selectedEntryId.value
@@ -69,16 +71,18 @@ export const useCatalogAdmin = () => {
     }
     return selectedKnownDetail.value ?? selectedRow.value;
   });
-  const selectedSuggestionKind = computed<'tag' | 'type' | null>(() => {
-    const row = selectedSuggestionRow.value;
-    return row?.kind ?? null;
-  });
-  const existingSuggestionOptions = computed<TagRecord[] | TypeRecord[]>(() => {
+  const selectedSuggestionKind = computed<CatalogKind | null>(() =>
+    isSuggestedCatalogKind(catalogData.selectedKind.value) ? catalogData.selectedKind.value : null,
+  );
+  const existingSuggestionOptions = computed<Array<TagRecord | TypeRecord | DeckTagRecord>>(() => {
     if (catalogData.selectedKind.value === 'suggested-tags') {
       return catalogData.catalog.tags;
     }
     if (catalogData.selectedKind.value === 'suggested-types') {
       return catalogData.catalog.types;
+    }
+    if (catalogData.selectedKind.value === 'suggested-deck-types') {
+      return catalogData.catalog['deck-types'];
     }
     return [];
   });

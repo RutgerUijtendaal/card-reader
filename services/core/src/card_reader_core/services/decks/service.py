@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.db import transaction
 
 from card_reader_core.models import Deck, DeckVisibility
+from card_reader_core.services.deck_tags import DeckTagService
 from card_reader_core.repositories.decks import (
     create_deck,
     delete_deck,
@@ -29,9 +30,11 @@ class DeckService:
         *,
         normalizer: DeckPayloadNormalizer | None = None,
         validator: DeckValidationService | None = None,
+        tag_service: DeckTagService | None = None,
     ) -> None:
         self._normalizer = normalizer or DeckPayloadNormalizer()
         self._validator = validator or DeckValidationService()
+        self._tag_service = tag_service or DeckTagService()
 
     def list_public_decks(
         self,
@@ -43,6 +46,8 @@ class DeckService:
         affinity_symbol_ids: list[str] | None = None,
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
+        deck_tag_ids: list[str] | None = None,
+        deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return [
             deck
@@ -54,6 +59,8 @@ class DeckService:
                 affinity_symbol_ids=affinity_symbol_ids,
                 affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
                 affinity_symbol_match=affinity_symbol_match,
+                deck_tag_ids=deck_tag_ids,
+                deck_tag_match=deck_tag_match,
             )
             if self.get_deck_validation(deck).is_valid
         ]
@@ -68,6 +75,8 @@ class DeckService:
         affinity_symbol_ids: list[str] | None = None,
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
+        deck_tag_ids: list[str] | None = None,
+        deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return list_owner_decks(
             owner_id,
@@ -77,6 +86,8 @@ class DeckService:
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_match=deck_tag_match,
         )
 
     def list_public_deck_summaries(
@@ -89,6 +100,8 @@ class DeckService:
         affinity_symbol_ids: list[str] | None = None,
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
+        deck_tag_ids: list[str] | None = None,
+        deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return [
             deck
@@ -100,6 +113,8 @@ class DeckService:
                 affinity_symbol_ids=affinity_symbol_ids,
                 affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
                 affinity_symbol_match=affinity_symbol_match,
+                deck_tag_ids=deck_tag_ids,
+                deck_tag_match=deck_tag_match,
             )
             if self.get_deck_validation(deck).is_valid
         ]
@@ -114,6 +129,8 @@ class DeckService:
         affinity_symbol_ids: list[str] | None = None,
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
+        deck_tag_ids: list[str] | None = None,
+        deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return list_owner_deck_summaries(
             owner_id,
@@ -123,6 +140,8 @@ class DeckService:
             affinity_symbol_ids=affinity_symbol_ids,
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_match=deck_tag_match,
         )
 
     def list_card_decks_for_viewer(self, card_id: str, *, viewer_id: str | None = None) -> list[Deck]:
@@ -164,6 +183,8 @@ class DeckService:
         hero_card_id: str,
         entries: list[DeckEntryInput],
         sideboards: list[DeckSideboardInput],
+        tag_ids: list[str] | None = None,
+        suggested_type_labels: list[str] | None = None,
     ) -> Deck:
         normalized_name = self._normalizer.normalize_name(name)
         normalized_description = self._normalizer.normalize_description(description)
@@ -181,6 +202,11 @@ class DeckService:
         )
         replace_mainboard_entries(deck=deck, entries=normalized_entries)
         replace_sideboards(deck=deck, sideboards=normalized_sideboards)
+        self._tag_service.replace_deck_metadata(
+            deck=deck,
+            tag_ids=tag_ids or [],
+            suggested_type_labels=suggested_type_labels or [],
+        )
         return self.get_owner_deck(deck.id, owner_id) or deck
 
     @transaction.atomic
@@ -255,6 +281,25 @@ class DeckService:
             replace_mainboard_entries(deck=updated, entries=normalized_entries)
         if updates.update_sideboards:
             replace_sideboards(deck=updated, sideboards=normalized_sideboards)
+        if updates.update_tags:
+            effective_tag_ids = (
+                updates.tag_ids
+                if updates.tag_ids is not None
+                else [assignment.tag.id for assignment in existing_deck.tag_assignments.all()]
+            )
+            effective_suggested_type_labels = (
+                updates.suggested_type_labels
+                if updates.suggested_type_labels is not None
+                else [
+                    occurrence.suggestion.display_value
+                    for occurrence in existing_deck.tag_suggestion_occurrences.all()
+                ]
+            )
+            self._tag_service.replace_deck_metadata(
+                deck=updated,
+                tag_ids=effective_tag_ids,
+                suggested_type_labels=effective_suggested_type_labels,
+            )
         return self.get_owner_deck(deck_id, owner_id) or updated
 
     def delete_owner_deck(self, *, deck_id: str, owner_id: str) -> bool:

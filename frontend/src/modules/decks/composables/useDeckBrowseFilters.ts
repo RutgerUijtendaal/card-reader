@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue';
 import { api } from '@/api/client';
 import type { CardFiltersResponse } from '@/modules/card-detail/types';
+import { fetchDeckTags } from '@/modules/decks/api';
+import type { DeckTagCatalog } from '@/modules/decks/types';
 import {
   buildDeckBrowseFilterSelectionState,
   buildDeckBrowseFilterStateFromSelection,
@@ -19,11 +21,14 @@ const EMPTY_FILTERS: CardFiltersResponse = {
 export const useDeckBrowseFilters = () => {
   const filters = ref<CardFiltersResponse>(EMPTY_FILTERS);
   const filtersLoaded = ref(false);
-  const filterCatalog = computed(() => createDeckBrowseFilterCatalog(filters.value));
+  const deckTags = ref<DeckTagCatalog>({ roles: [], types: [] });
+  const filterCatalog = computed(() => createDeckBrowseFilterCatalog(filters.value, deckTags.value));
   const query = ref('');
   const affinitySymbolIds = ref<string[]>([]);
   const affinitySymbolExcludeIds = ref<string[]>([]);
   const affinitySymbolMatch = ref<'any' | 'all'>('any');
+  const deckTagIds = ref<string[]>([]);
+  const deckTagMatch = ref<'any' | 'all'>('any');
 
   const selectionState = computed(() =>
     buildDeckBrowseFilterSelectionState(readFilterState(), filterCatalog.value),
@@ -36,6 +41,8 @@ export const useDeckBrowseFilters = () => {
         affinitySymbolMatch: affinitySymbolMatch.value,
         affinitySymbolIds: affinitySymbolIds.value,
         affinitySymbolExcludeIds: affinitySymbolExcludeIds.value,
+        deckTagMatch: deckTagMatch.value,
+        deckTagIds: deckTagIds.value,
       },
       filterCatalog.value,
     );
@@ -47,6 +54,8 @@ export const useDeckBrowseFilters = () => {
     affinitySymbolMatch.value = normalized.affinitySymbolMatch;
     affinitySymbolIds.value = [...normalized.affinitySymbolIds];
     affinitySymbolExcludeIds.value = [...normalized.affinitySymbolExcludeIds];
+    deckTagMatch.value = normalized.deckTagMatch;
+    deckTagIds.value = [...normalized.deckTagIds];
   };
 
   const resetFilters = (): void => {
@@ -75,10 +84,27 @@ export const useDeckBrowseFilters = () => {
     affinitySymbolMatch.value = 'any';
   };
 
+  const updateDeckTagIds = (value: string[]): void => {
+    deckTagIds.value = value;
+  };
+
+  const updateDeckTagMatch = (value: 'any' | 'all'): void => {
+    deckTagMatch.value = value;
+  };
+
+  const resetDeckTags = (): void => {
+    deckTagIds.value = [];
+    deckTagMatch.value = 'any';
+  };
+
   const loadFilters = async (): Promise<void> => {
     try {
-      const response = await api.get<CardFiltersResponse>('/cards/filters');
-      filters.value = response.data;
+      const [filtersResponse, deckTagResponse] = await Promise.all([
+        api.get<CardFiltersResponse>('/cards/filters'),
+        fetchDeckTags(),
+      ]);
+      filters.value = filtersResponse.data;
+      deckTags.value = deckTagResponse;
     } finally {
       filtersLoaded.value = true;
     }
@@ -91,6 +117,8 @@ export const useDeckBrowseFilters = () => {
     affinitySymbolIds,
     affinitySymbolExcludeIds,
     affinitySymbolMatch,
+    deckTagIds,
+    deckTagMatch,
     selectionState,
     readFilterState,
     applyRouteFilterState,
@@ -100,6 +128,9 @@ export const useDeckBrowseFilters = () => {
     updateAffinitySymbolExcludeIds,
     updateAffinitySymbolMatch,
     resetAffinitySymbols,
+    updateDeckTagIds,
+    updateDeckTagMatch,
+    resetDeckTags,
     loadFilters,
   };
 };

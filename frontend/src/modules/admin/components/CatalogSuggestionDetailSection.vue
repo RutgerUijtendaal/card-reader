@@ -100,10 +100,10 @@
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
-              Linked cards
+              {{ isDeckSuggestion ? 'Linked decks' : 'Linked cards' }}
             </div>
             <div class="theme-section-muted mt-1 text-sm">
-              {{ selectedRow.occurrence_count }} cards where this suggestion was found.
+              {{ selectedRow.occurrence_count }} {{ isDeckSuggestion ? 'decks use' : 'cards contain' }} this suggestion.
             </div>
           </div>
           <button
@@ -117,7 +117,13 @@
         </div>
 
         <div class="mt-4">
+          <CatalogLinkedDecksGrid
+            v-if="isDeckSuggestion"
+            :decks="selectedRow.linked_decks ?? []"
+            empty-message="No linked decks found for this suggestion."
+          />
           <CatalogLinkedCardsGrid
+            v-else
             :cards="selectedRow.occurrences"
             empty-message="No linked cards found for this suggestion."
           />
@@ -131,24 +137,28 @@
 import { computed } from 'vue';
 import AppSelect from '@/components/app/AppSelect.vue';
 import CatalogLinkedCardsGrid from '@/modules/admin/components/CatalogLinkedCardsGrid.vue';
+import CatalogLinkedDecksGrid from '@/modules/admin/components/CatalogLinkedDecksGrid.vue';
 import type {
   CatalogKind,
   SuggestionAcceptNewRequest,
   SuggestionRecord,
   TagRecord,
   TypeRecord,
+  DeckTagRecord,
 } from '@/modules/admin/types';
 
 const props = defineProps<{
   selectedKind: CatalogKind;
   selectedRow: SuggestionRecord | null;
-  existingOptions: TagRecord[] | TypeRecord[];
+  existingOptions: Array<TagRecord | TypeRecord | DeckTagRecord>;
   existingTargetId: string;
   newLabel: string;
   newKey: string;
   actionLoading: boolean;
   kindItemLabel: (kind: CatalogKind) => string;
 }>();
+
+const isDeckSuggestion = computed(() => props.selectedKind === 'suggested-deck-types');
 
 const emit = defineEmits<{
   (e: 'update:existing-target-id', value: string): void;

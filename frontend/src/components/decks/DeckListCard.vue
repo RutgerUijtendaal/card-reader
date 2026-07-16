@@ -58,6 +58,12 @@
               {{ boardSummary }}
             </p>
 
+            <DeckTagPills
+              :tags="deck.tags ?? []"
+              :pending-suggestions="isOwnedMode ? deck.pending_tag_suggestions ?? [] : []"
+              :max-visible="4"
+            />
+
             <p
               v-if="deck.description"
               class="deck-list-card-description theme-section-title text-sm"
@@ -147,6 +153,7 @@ import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolToken from '@/components/SymbolToken.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
+import DeckTagPills from '@/components/decks/DeckTagPills.vue';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
 import type { DeckListRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/composables/useDeckExport';

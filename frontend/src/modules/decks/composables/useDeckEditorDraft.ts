@@ -36,6 +36,8 @@ export type DeckForm = {
   hero_card_id: string;
   entries: DeckFormEntry[];
   sideboards: DeckFormSideboard[];
+  tag_ids: string[];
+  suggested_type_labels: string[];
 };
 
 export type BuilderStep = 'setup' | 'build';
@@ -88,6 +90,8 @@ export const useDeckEditorDraft = ({
     hero_card_id: '',
     entries: [],
     sideboards: [],
+    tag_ids: [],
+    suggested_type_labels: [],
   });
   const activeBoardId = ref<string>(MAINBOARD_ID);
   const lastBoardEntryChange = ref<DeckBoardEntryChange | null>(null);
@@ -350,6 +354,8 @@ export const useDeckEditorDraft = ({
     form.description = deck.description ?? '';
     form.visibility = deck.visibility;
     form.hero_card_id = deck.hero_card.id;
+    form.tag_ids = (deck.tags ?? []).map((tag) => tag.id);
+    form.suggested_type_labels = (deck.pending_tag_suggestions ?? []).map((suggestion) => suggestion.label);
     form.entries = deck.mainboard.entries.map((entry) => ({
       card_id: entry.card.id,
       quantity: entry.quantity,
@@ -392,7 +398,17 @@ export const useDeckEditorDraft = ({
         quantity: entry.quantity,
       })),
     })),
+    tag_ids: [...form.tag_ids],
+    suggested_type_labels: [...form.suggested_type_labels],
   });
+
+  const setDeckTagIds = (tagIds: string[]): void => {
+    form.tag_ids = [...new Set(tagIds)];
+  };
+
+  const setSuggestedTypeLabels = (labels: string[]): void => {
+    form.suggested_type_labels = [...new Set(labels.map((label) => label.trim()).filter(Boolean))];
+  };
 
   const getBoardEntries = (boardId: string): DeckFormEntry[] => {
     if (boardId === MAINBOARD_ID) {
@@ -884,6 +900,8 @@ export const useDeckEditorDraft = ({
     setDeckName,
     setDeckDescription,
     setDeckVisibility,
+    setDeckTagIds,
+    setSuggestedTypeLabels,
     selectBoard,
     addSideboard,
     renameSideboard,

@@ -1,5 +1,5 @@
-export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types';
-export type SuggestedCatalogKind = 'suggested-tags' | 'suggested-types';
+export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types' | 'deck-roles' | 'deck-types';
+export type SuggestedCatalogKind = 'suggested-tags' | 'suggested-types' | 'suggested-deck-types';
 export type CatalogKind = KnownCatalogKind | SuggestedCatalogKind;
 
 export type CatalogSearchState = Record<CatalogKind, string>;
@@ -230,6 +230,26 @@ export type LinkedCardPreview = {
   image_url: string | null;
 };
 
+export type LinkedDeckPreview = {
+  id: string;
+  name: string;
+  visibility: 'private' | 'unlisted' | 'public';
+  owner: { id: string; username: string };
+  hero_card: { id: string; name: string; image_url: string | null };
+  updated_at: string;
+};
+
+export type DeckTagRecord = {
+  id: string;
+  kind: 'role' | 'type';
+  key: string;
+  label: string;
+  identifiers: string[];
+  identifiers_text: string;
+  linked_decks?: LinkedDeckPreview[];
+  linked_deck_count?: number;
+};
+
 export type KeywordRecord = {
   id: string;
   key: string;
@@ -381,6 +401,12 @@ export type TemplateUpsertRequest = {
   definition_json?: TemplateDefinition;
 };
 
+export type DeckTagUpsertRequest = {
+  kind?: 'role' | 'type';
+  label?: string;
+  key?: string;
+};
+
 export type SuggestionStatus = 'pending' | 'accepted' | 'rejected';
 export type SuggestionKind = 'tag' | 'type';
 
@@ -410,6 +436,7 @@ export type SuggestionApiRecord = {
   occurrence_count: number;
   accepted_target: SuggestionAcceptedTarget | null;
   occurrences: SuggestionOccurrencePreview[];
+  linked_decks?: LinkedDeckPreview[];
 };
 
 export type SuggestionRecord = SuggestionApiRecord & {
@@ -417,11 +444,18 @@ export type SuggestionRecord = SuggestionApiRecord & {
   key: string;
 };
 
-export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord | SuggestionRecord;
+export type DeckTagCatalogApiResponse = {
+  roles: Array<Omit<DeckTagRecord, 'identifiers' | 'identifiers_text'>>;
+  types: Array<Omit<DeckTagRecord, 'identifiers' | 'identifiers_text'>>;
+  suggested_types: Array<Omit<SuggestionApiRecord, 'occurrences'> & { linked_decks?: LinkedDeckPreview[] }>;
+};
+
+export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | SuggestionRecord;
 
 export type CatalogFormEntry = {
   label: string;
   key: string;
+  deck_tag_kind?: 'role' | 'type';
   identifiers_text?: string;
   symbol_type: string;
   detector_type: SymbolDetectorType;
