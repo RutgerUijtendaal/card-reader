@@ -17,7 +17,7 @@
         type="button"
         @click="groupManagerOpen = true"
       >
-        Manage groups
+        Add group
       </button>
     </div>
 
@@ -47,12 +47,6 @@
           :colors="groupSummary.colors"
         />
       </div>
-      <p
-        v-else
-        class="theme-section-muted theme-divider border-t pt-4 text-xs"
-      >
-        Add named type groups to compare subsets of this board.
-      </p>
     </template>
 
     <DeckManaTypeGroupsDialog
@@ -67,8 +61,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { isManaTypeKey } from '@/composables/card-gallery/cardSort';
+import { groupDeckEntriesByType } from '@/composables/decks/deckTypeGroups';
 import {
-  buildManaDistribution,
+  buildManaDistributionFromEntryGroups,
+  filterManaDistributionEntriesByTypeGroup,
   type ManaDistributionCardLike,
   type ManaDistributionEntryLike,
   type ManaDistributionSymbolLike,
@@ -87,7 +84,30 @@ const props = defineProps<{
 
 const { groups, saveGroups } = useManaTypeGroups();
 const groupManagerOpen = ref(false);
-const summary = computed(() => buildManaDistribution(props.entries, props.symbols, groups.value));
+const summary = computed(() => {
+  const baseTypeGroups = groupDeckEntriesByType(props.entries, props.types)
+    .filter((group) => group.key !== 'untyped' && !isManaTypeKey(group.key))
+    .map((group) => ({
+      group: {
+        id: `base-type:${group.key}`,
+        name: group.label,
+        typeKeys: [group.key],
+        excludedTypeKeys: [],
+        isVisible: true,
+      },
+      entries: group.entries,
+    }));
+  const customGroups = groups.value.filter((group) => group.isVisible).map((group) => ({
+    group,
+    entries: filterManaDistributionEntriesByTypeGroup(props.entries, group),
+  }));
+
+  return buildManaDistributionFromEntryGroups(
+    props.entries,
+    props.symbols,
+    [...baseTypeGroups, ...customGroups],
+  );
+});
 
 const saveTypeGroups = (nextGroups: ManaTypeGroup[]): void => {
   saveGroups(nextGroups);

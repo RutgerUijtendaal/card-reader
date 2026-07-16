@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { buildManaDistribution, type ManaDistributionSymbolLike } from '@/composables/decks/manaDistribution';
+import {
+  buildManaDistribution,
+  buildManaDistributionFromEntryGroups,
+  type ManaDistributionSymbolLike,
+} from '@/composables/decks/manaDistribution';
 
 const symbols: ManaDistributionSymbolLike[] = [
   { key: 'blue-mana', label: 'Blue Mana', symbol_type: 'mana', text_token: '{B}', asset_url: '/blue.webp' },
@@ -69,8 +73,20 @@ describe('buildManaDistribution', () => {
         card: { mana_symbols: ['white-mana', 'white-mana'], types: [{ key: 'attachment' }] },
       },
     ], symbols, [
-      { id: 'actions', name: 'Actions', typeKeys: ['spell', 'attachment'] },
-      { id: 'units', name: 'Units', typeKeys: ['follower'] },
+      {
+        id: 'actions',
+        name: 'Actions',
+        typeKeys: ['spell', 'attachment'],
+        excludedTypeKeys: [],
+        isVisible: true,
+      },
+      {
+        id: 'units',
+        name: 'Units',
+        typeKeys: ['follower', 'creature'],
+        excludedTypeKeys: [],
+        isVisible: true,
+      },
     ]);
 
     expect(summary.groups[0]?.totalCards).toBe(5);
@@ -91,12 +107,126 @@ describe('buildManaDistribution', () => {
         quantity: 1,
         card: { mana_symbols: ['blue-mana'], types: [{ key: 'spell' }] },
       },
-    ], symbols, [{ id: 'followers', name: 'Followers', typeKeys: ['follower'] }]);
+    ], symbols, [{
+      id: 'followers',
+      name: 'Followers',
+      typeKeys: ['follower', 'creature'],
+      excludedTypeKeys: [],
+      isVisible: true,
+    }]);
 
     expect(summary.groups[0]).toEqual({
-      group: { id: 'followers', name: 'Followers', typeKeys: ['follower'] },
+      group: {
+        id: 'followers',
+        name: 'Followers',
+        typeKeys: ['follower', 'creature'],
+        excludedTypeKeys: [],
+        isVisible: true,
+      },
       totalCards: 0,
       colors: [expect.objectContaining({ key: 'blue-mana', total: 0, average: 0, highest: 0, matchingCards: 0 })],
     });
+  });
+
+  test('calculates exact pre-grouped entry subsets without matching secondary types', () => {
+    const entries = [
+      {
+        quantity: 3,
+        card: {
+          mana_symbols: ['blue-mana'],
+          types: [{ key: 'spell' }, { key: 'follower' }],
+        },
+      },
+      {
+        quantity: 2,
+        card: { mana_symbols: ['white-mana'], types: [{ key: 'follower' }] },
+      },
+    ];
+    const summary = buildManaDistributionFromEntryGroups(entries, symbols, [
+      {
+        group: {
+          id: 'base-type:spell',
+          name: 'Spell',
+          typeKeys: ['spell'],
+          excludedTypeKeys: [],
+          isVisible: true,
+        },
+        entries: [entries[0]!],
+      },
+      {
+        group: {
+          id: 'base-type:follower',
+          name: 'Follower',
+          typeKeys: ['follower'],
+          excludedTypeKeys: [],
+          isVisible: true,
+        },
+        entries: [entries[1]!],
+      },
+    ]);
+
+    expect(summary.groups[0]?.totalCards).toBe(3);
+    expect(summary.groups[1]?.totalCards).toBe(2);
+    expect(summary.groups[1]?.colors).toEqual([
+      expect.objectContaining({ key: 'blue-mana', total: 0 }),
+      expect.objectContaining({ key: 'white-mana', total: 2 }),
+    ]);
+  });
+
+  test('rejects cards containing an excluded type after matching an included type', () => {
+    const summary = buildManaDistribution([
+      {
+        quantity: 3,
+        card: { mana_symbols: ['blue-mana'], types: [{ key: 'spell' }] },
+      },
+      {
+        quantity: 4,
+        card: {
+          mana_symbols: ['white-mana'],
+          types: [{ key: 'spell' }, { key: 'follower' }],
+        },
+      },
+    ], symbols, [{
+      id: 'actions',
+      name: 'Actions',
+      typeKeys: ['spell', 'attachment'],
+      excludedTypeKeys: ['follower'],
+      isVisible: true,
+    }]);
+
+    expect(summary.groups[0]?.totalCards).toBe(3);
+    expect(summary.groups[0]?.colors).toEqual([
+      expect.objectContaining({ key: 'blue-mana', total: 3 }),
+      expect.objectContaining({ key: 'white-mana', total: 0 }),
+    ]);
+  });
+
+  test('treats all eligible cards as candidates for exclusion-only groups', () => {
+    const summary = buildManaDistribution([
+      {
+        quantity: 2,
+        card: { mana_symbols: ['blue-mana'], types: [{ key: 'spell' }] },
+      },
+      {
+        quantity: 3,
+        card: { mana_symbols: ['white-mana'], types: [{ key: 'follower' }] },
+      },
+      {
+        quantity: 4,
+        card: { mana_symbols: ['blue-mana'], types: [{ key: 'attachment' }] },
+      },
+    ], symbols, [{
+      id: 'not-units',
+      name: 'Not units',
+      typeKeys: [],
+      excludedTypeKeys: ['follower', 'creature'],
+      isVisible: true,
+    }]);
+
+    expect(summary.groups[0]?.totalCards).toBe(6);
+    expect(summary.groups[0]?.colors).toEqual([
+      expect.objectContaining({ key: 'blue-mana', total: 6 }),
+      expect.objectContaining({ key: 'white-mana', total: 0 }),
+    ]);
   });
 });

@@ -26,6 +26,8 @@ export type ManaTypeGroup = {
   id: string;
   name: string;
   typeKeys: string[];
+  excludedTypeKeys: string[];
+  isVisible: boolean;
 };
 
 export type ManaColorStatistics = {
@@ -49,6 +51,11 @@ export type ManaDistributionSummary = {
   totalCards: number;
   colors: ManaColorStatistics[];
   groups: ManaTypeGroupStatistics[];
+};
+
+export type ManaDistributionEntryGroup<TCard extends ManaDistributionCardLike = ManaDistributionCardLike> = {
+  group: ManaTypeGroup;
+  entries: ManaDistributionEntryLike<TCard>[];
 };
 
 const normalizeKey = (value: string): string => value.trim().toLowerCase();
@@ -113,13 +120,21 @@ const buildColorStatistics = (
 
 const cardMatchesTypeGroup = (card: ManaDistributionCardLike, group: ManaTypeGroup): boolean => {
   const groupKeys = new Set(group.typeKeys.map(normalizeKey));
-  return (card.types ?? []).some((type) => groupKeys.has(normalizeKey(type.key)));
+  const excludedGroupKeys = new Set(group.excludedTypeKeys.map(normalizeKey));
+  const cardTypeKeys = (card.types ?? []).map((type) => normalizeKey(type.key));
+  return (groupKeys.size === 0 || cardTypeKeys.some((key) => groupKeys.has(key)))
+    && !cardTypeKeys.some((key) => excludedGroupKeys.has(key));
 };
 
-export const buildManaDistribution = <TCard extends ManaDistributionCardLike>(
+export const filterManaDistributionEntriesByTypeGroup = <TCard extends ManaDistributionCardLike>(
+  entries: ManaDistributionEntryLike<TCard>[],
+  group: ManaTypeGroup,
+): ManaDistributionEntryLike<TCard>[] => entries.filter((entry) => cardMatchesTypeGroup(entry.card, group));
+
+export const buildManaDistributionFromEntryGroups = <TCard extends ManaDistributionCardLike>(
   entries: ManaDistributionEntryLike<TCard>[],
   symbols: ManaDistributionSymbolLike[],
-  groups: ManaTypeGroup[] = [],
+  entryGroups: ManaDistributionEntryGroup<TCard>[] = [],
 ): ManaDistributionSummary => {
   const eligibleEntries: ManaDistributionEntryLike[] = entries.filter(isEligibleEntry);
   const foundSymbolKeys = new Set(
@@ -132,13 +147,29 @@ export const buildManaDistribution = <TCard extends ManaDistributionCardLike>(
   return {
     totalCards: eligibleEntries.reduce((total, entry) => total + normalizedQuantity(entry.quantity), 0),
     colors: buildColorStatistics(eligibleEntries, colors),
-    groups: groups.map((group) => {
-      const matchingEntries = eligibleEntries.filter((entry) => cardMatchesTypeGroup(entry.card, group));
+    groups: entryGroups.map(({ group, entries: groupEntries }) => {
+      const eligibleGroupEntries: ManaDistributionEntryLike[] = groupEntries.filter(isEligibleEntry);
       return {
         group,
-        totalCards: matchingEntries.reduce((total, entry) => total + normalizedQuantity(entry.quantity), 0),
-        colors: buildColorStatistics(matchingEntries, colors),
+        totalCards: eligibleGroupEntries.reduce(
+          (total, entry) => total + normalizedQuantity(entry.quantity),
+          0,
+        ),
+        colors: buildColorStatistics(eligibleGroupEntries, colors),
       };
     }),
   };
 };
+
+export const buildManaDistribution = <TCard extends ManaDistributionCardLike>(
+  entries: ManaDistributionEntryLike<TCard>[],
+  symbols: ManaDistributionSymbolLike[],
+  groups: ManaTypeGroup[] = [],
+): ManaDistributionSummary => buildManaDistributionFromEntryGroups(
+  entries,
+  symbols,
+  groups.map((group) => ({
+    group,
+    entries: filterManaDistributionEntriesByTypeGroup(entries, group),
+  })),
+);

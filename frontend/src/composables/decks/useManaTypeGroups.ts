@@ -3,7 +3,7 @@ import { createGlobalState, useLocalStorage } from '@vueuse/core';
 import type { ManaTypeGroup } from '@/composables/decks/manaDistribution';
 
 export const MANA_TYPE_GROUPS_STORAGE_KEY = 'card-reader.deck-mana-groups';
-export const MANA_TYPE_GROUPS_STORAGE_VERSION = 1;
+export const MANA_TYPE_GROUPS_STORAGE_VERSION = 3;
 
 export type ManaTypeGroupsStorage = {
   version: typeof MANA_TYPE_GROUPS_STORAGE_VERSION;
@@ -40,10 +40,14 @@ const normalizeGroup = (value: unknown): ManaTypeGroup | null => {
   const id = typeof group.id === 'string' ? group.id.trim() : '';
   const name = typeof group.name === 'string' ? group.name.trim() : '';
   const typeKeys = normalizeStringList(group.typeKeys);
-  if (!id || !name || typeKeys.length === 0) {
+  const includedTypeKeys = new Set(typeKeys);
+  const excludedTypeKeys = normalizeStringList(group.excludedTypeKeys)
+    .filter((key) => !includedTypeKeys.has(key));
+  const isVisible = typeof group.isVisible === 'boolean' ? group.isVisible : true;
+  if (!id || !name || typeKeys.length + excludedTypeKeys.length < 2) {
     return null;
   }
-  return { id, name, typeKeys };
+  return { id, name, typeKeys, excludedTypeKeys, isVisible };
 };
 
 export const normalizeManaTypeGroupsStorage = (value: unknown): ManaTypeGroupsStorage => {
@@ -51,7 +55,8 @@ export const normalizeManaTypeGroupsStorage = (value: unknown): ManaTypeGroupsSt
     return { ...EMPTY_STORAGE, groups: [] };
   }
   const storage = value as { version?: unknown; groups?: unknown };
-  if (storage.version !== MANA_TYPE_GROUPS_STORAGE_VERSION || !Array.isArray(storage.groups)) {
+  if (![1, 2, MANA_TYPE_GROUPS_STORAGE_VERSION].includes(storage.version as number)
+    || !Array.isArray(storage.groups)) {
     return { ...EMPTY_STORAGE, groups: [] };
   }
 
@@ -82,6 +87,7 @@ export const validateManaTypeGroups = (
     const name = group.name.trim();
     const normalizedName = name.toLowerCase();
     const normalizedTypeKeys = normalizeStringList(group.typeKeys);
+    const normalizedExcludedTypeKeys = normalizeStringList(group.excludedTypeKeys);
     if (!name) {
       errors.push({ groupId: group.id, message: 'Enter a group name.' });
     } else if (names.has(normalizedName)) {
@@ -92,8 +98,15 @@ export const validateManaTypeGroups = (
     const validTypeKeys = availableTypeKeys
       ? normalizedTypeKeys.filter((key) => availableTypeKeys.has(key))
       : normalizedTypeKeys;
-    if (validTypeKeys.length === 0) {
-      errors.push({ groupId: group.id, message: 'Select at least one card type.' });
+    const validExcludedTypeKeys = availableTypeKeys
+      ? normalizedExcludedTypeKeys.filter((key) => availableTypeKeys.has(key))
+      : normalizedExcludedTypeKeys;
+    const activeTypeKeys = new Set([...validTypeKeys, ...validExcludedTypeKeys]);
+    if (activeTypeKeys.size < 2) {
+      errors.push({ groupId: group.id, message: 'Activate at least two card types.' });
+    }
+    if (validExcludedTypeKeys.some((key) => normalizedTypeKeys.includes(key))) {
+      errors.push({ groupId: group.id, message: 'A type cannot be both included and excluded.' });
     }
   }
   return errors;

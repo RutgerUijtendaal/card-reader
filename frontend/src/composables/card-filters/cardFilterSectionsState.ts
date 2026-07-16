@@ -1,10 +1,11 @@
 import type { MetadataOption, SymbolFilterOption } from '@/modules/card-detail/types';
 import type { CardLifecycleFilterValue } from '@/composables/card-filters/cardLifecycle';
 import type { MetadataFavoriteGroup } from '@/composables/card-filters/useMetadataFilterFavorites';
+import type { TriStateSelection } from '@/composables/card-filters/triStateSelection';
 
 export type MatchMode = 'any' | 'all';
 export type LifecycleFilterValue = CardLifecycleFilterValue;
-export type SymbolFilterTriState = 'off' | 'include' | 'exclude';
+export type SymbolFilterTriState = TriStateSelection;
 export type CardFilterSectionKey =
   | 'mana'
   | 'types'

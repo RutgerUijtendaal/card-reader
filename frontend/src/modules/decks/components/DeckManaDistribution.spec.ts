@@ -21,6 +21,7 @@ const props = {
   types: [
     { id: 'spell', key: 'spell', label: 'Spell' },
     { id: 'follower', key: 'follower', label: 'Follower' },
+    { id: 'attachment', key: 'attachment', label: 'Attachment' },
   ],
 };
 
@@ -42,37 +43,70 @@ const mountDistribution = async () => {
 describe('DeckManaDistribution', () => {
   beforeEach(() => {
     localStorage.clear();
-    useManaTypeGroups().saveGroups([{ id: 'spells', name: 'Spells', typeKeys: ['spell'] }]);
+    useManaTypeGroups().saveGroups([
+      {
+        id: 'spells',
+        name: 'Spells',
+        typeKeys: ['spell', 'attachment'],
+        excludedTypeKeys: ['follower'],
+        isVisible: true,
+      },
+      {
+        id: 'hidden-followers',
+        name: 'Hidden followers',
+        typeKeys: ['follower', 'attachment'],
+        excludedTypeKeys: [],
+        isVisible: false,
+      },
+    ]);
   });
 
   afterEach(() => {
     document.body.innerHTML = '';
   });
 
-  test('renders overall and saved-group statistics with two-decimal averages', async () => {
+  test('renders base-type and saved custom-group statistics with two-decimal averages', async () => {
     const mounted = await mountDistribution();
     const sections = mounted.container.querySelectorAll('[data-testid="mana-statistics-section"]');
-    expect(sections).toHaveLength(2);
+    expect(sections).toHaveLength(4);
     expect(sections[0]?.textContent).toContain('All cards');
     expect(sections[0]?.textContent).toContain('Blue Mana');
     expect(sections[0]?.textContent).toContain('2.00');
     expect(sections[0]?.textContent).toContain('1.33');
-    expect(sections[1]?.textContent).toContain('Spells');
-    expect(sections[1]?.textContent).toContain('2.00');
+    expect(Array.from(sections).map((section) => section.querySelector('h4')?.textContent?.trim())).toEqual([
+      'All cards',
+      'Follower',
+      'Spell',
+      'Spells',
+    ]);
+    expect(sections[3]?.textContent).toContain('2.00');
+    expect(mounted.container.textContent).not.toContain('Hidden followers');
+    mounted.unmount();
+  });
+
+  test('renders base-type statistics without requiring custom groups', async () => {
+    useManaTypeGroups().saveGroups([]);
+    const mounted = await mountDistribution();
+    const sectionTitles = Array.from(
+      mounted.container.querySelectorAll('[data-testid="mana-statistics-section"] h4'),
+    ).map((heading) => heading.textContent?.trim());
+
+    expect(sectionTitles).toEqual(['All cards', 'Follower', 'Spell']);
     mounted.unmount();
   });
 
   test('opens the group manager from the statistics panel', async () => {
     const mounted = await mountDistribution();
     const manageButton = Array.from(mounted.container.querySelectorAll('button')).find(
-      (button) => button.textContent?.trim() === 'Manage groups',
+      (button) => button.textContent?.trim() === 'Add group',
     );
     if (!(manageButton instanceof HTMLButtonElement)) {
-      throw new Error('expected manage groups button');
+      throw new Error('expected add group button');
     }
     manageButton.click();
     await nextTick();
-    expect(mounted.container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
     mounted.unmount();
   });
 });
