@@ -109,16 +109,16 @@ const containerClass = computed(() =>
 );
 const chartShellClass = computed(() =>
   props.compact
-    ? 'deck-mana-curve-shell-compact rounded-lg px-2 py-1.5'
-    : 'deck-mana-curve-shell rounded-xl px-3 py-3',
+    ? 'deck-mana-curve-shell-compact px-1 py-1'
+    : 'deck-mana-curve-shell px-1 py-2',
 );
-const chartGridClass = computed(() => (props.compact ? 'grid gap-1.5' : 'grid gap-3'));
+const chartGridClass = computed(() => (props.compact ? 'grid gap-1' : 'grid gap-2'));
 const chartGridStyle = computed(() => ({
   gridTemplateColumns: `repeat(${curveSummary.value.buckets.length}, minmax(0, 1fr))`,
 }));
-const bucketColumnClass = computed(() => (props.compact ? 'space-y-1' : 'space-y-2'));
-const countClass = computed(() => (props.compact ? 'theme-section-title text-[10px]' : 'theme-section-title text-sm'));
-const zeroCountClass = computed(() => (props.compact ? 'theme-kicker text-[10px]' : 'theme-kicker text-sm'));
+const bucketColumnClass = computed(() => (props.compact ? 'space-y-1' : 'space-y-1.5'));
+const countClass = computed(() => (props.compact ? 'theme-section-title text-[10px]' : 'theme-section-title text-xs'));
+const zeroCountClass = computed(() => (props.compact ? 'theme-kicker text-[10px]' : 'theme-kicker text-xs'));
 const labelClass = computed(() =>
   props.compact
     ? 'theme-kicker text-center text-[9px] font-medium uppercase tracking-[0.14em]'
@@ -126,8 +126,8 @@ const labelClass = computed(() =>
 );
 const barTrackClass = computed(() =>
   props.compact
-    ? 'flex h-14 items-end border-b pb-1 theme-divider'
-    : 'flex h-24 items-end border-b pb-1.5 theme-divider',
+    ? 'theme-divider flex h-12 items-end justify-center border-b pb-1'
+    : 'theme-divider flex h-20 items-end justify-center border-b pb-1',
 );
 const filledBarClass = computed(() => (props.compact ? 'mana-curve-bar-filled-compact' : 'mana-curve-bar-filled'));
 const emptyBarClass = computed(() => (props.compact ? 'mana-curve-bar-empty-compact' : 'mana-curve-bar-empty'));
@@ -139,37 +139,37 @@ const barStyle = (count: number, heightRatio: number): Record<string, string> =>
 <style scoped>
 .deck-mana-curve-shell,
 .deck-mana-curve-shell-compact {
-  border: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent 38%);
-  background: color-mix(in srgb, var(--color-surface-soft) 42%, transparent 58%);
+  background: transparent;
 }
 
 .mana-curve-bar {
+  max-width: 0.75rem;
   transition:
     height 180ms ease,
     background 180ms ease,
     border-color 180ms ease;
-  border-radius: 6px 6px 0 0;
+  border-radius: 999px 999px 2px 2px;
 }
 
 .mana-curve-bar-filled {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary-to) 74%, white 26%) 0%, color-mix(in srgb, var(--color-primary-from) 88%, white 12%) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 8px 18px rgba(99, 102, 241, 0.12);
+  background: color-mix(in srgb, var(--color-primary-to) 78%, var(--color-text) 22%);
 }
 
 .mana-curve-bar-filled-compact {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary-to) 72%, white 28%) 0%, color-mix(in srgb, var(--color-primary-from) 84%, white 16%) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 6px 14px rgba(99, 102, 241, 0.1);
+  background: color-mix(in srgb, var(--color-primary-to) 72%, var(--color-text) 28%);
 }
 
 .mana-curve-bar-empty {
-  background: color-mix(in srgb, var(--color-border) 26%, transparent 74%);
+  background: color-mix(in srgb, var(--color-border) 42%, transparent 58%);
 }
 
 .mana-curve-bar-empty-compact {
-  background: color-mix(in srgb, var(--color-border) 24%, transparent 76%);
+  background: color-mix(in srgb, var(--color-border) 38%, transparent 62%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mana-curve-bar {
+    transition-duration: 0.01ms;
+  }
 }
 </style>

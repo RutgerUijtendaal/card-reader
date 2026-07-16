@@ -35,9 +35,7 @@
         <div
           class="theme-card-frame-muted inline-flex h-6 w-6 items-center justify-center rounded-full shadow-sm"
           :class="
-            parseError
-              ? 'border-rose-200 text-rose-600'
-              : 'border-emerald-200 text-emerald-600'
+            parseError ? 'border-rose-200 text-rose-600' : 'border-emerald-200 text-emerald-600'
           "
         >
           <CircleAlert
@@ -50,7 +48,9 @@
           />
         </div>
 
-        <div class="theme-popover pointer-events-none absolute right-0 top-8 z-10 hidden w-64 px-3 py-2 text-xs shadow-lg group-hover:block">
+        <div
+          class="theme-popover pointer-events-none absolute right-0 top-8 z-10 hidden w-64 px-3 py-2 text-xs shadow-lg group-hover:block"
+        >
           <span
             class="font-semibold"
             :class="parseError ? 'text-rose-700' : 'text-emerald-700'"
@@ -84,42 +84,45 @@
       </button>
     </p>
 
-    <Teleport to="body">
-      <div
-        v-if="showExample"
-        class="theme-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-        @click.self="showExample = false"
-      >
-        <div class="theme-popover flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden shadow-xl">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h3 class="theme-section-title text-base font-semibold">
-                {{ exampleTitle || 'Example JSON' }}
-              </h3>
-              <p class="theme-section-muted mt-1 text-sm">
-                Reference example for this field.
-              </p>
-            </div>
-            <button
-              class="btn-secondary px-3 py-1.5 text-xs"
-              type="button"
-              @click="showExample = false"
-            >
-              Close
-            </button>
-          </div>
-
-          <pre class="theme-card-frame-muted theme-section-title app-scrollbar mt-4 min-h-0 flex-1 overflow-auto rounded-lg p-4 text-xs"><code>{{ exampleJson }}</code></pre>
+    <AppModal
+      :open="showExample"
+      :aria-labelledby="exampleTitleId"
+      panel-class="theme-popover flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden shadow-xl"
+      @close="showExample = false"
+    >
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3
+            :id="exampleTitleId"
+            class="theme-section-title text-base font-semibold"
+          >
+            {{ exampleTitle || 'Example JSON' }}
+          </h3>
+          <p class="theme-section-muted mt-1 text-sm">
+            Reference example for this field.
+          </p>
         </div>
+        <button
+          class="btn-secondary px-3 py-1.5 text-xs"
+          type="button"
+          @click="showExample = false"
+        >
+          Close
+        </button>
       </div>
-    </Teleport>
+
+      <pre
+        class="theme-card-frame-muted theme-section-title app-scrollbar mt-4 min-h-0 flex-1 overflow-auto rounded-lg p-4 text-xs"
+      ><code>{{ exampleJson }}</code></pre>
+    </AppModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, useId } from 'vue';
 import { CircleAlert, CircleCheck, CircleHelp } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
+import AppModal from '@/components/modals/AppModal.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -147,6 +150,7 @@ const emit = defineEmits<{
 }>();
 
 const showExample = ref(false);
+const exampleTitleId = `json-example-title-${useId()}`;
 
 const textareaStyle = computed<Record<string, string>>(() => {
   if (props.fillHeight) {

@@ -98,11 +98,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { ChevronDown, RotateCcw } from 'lucide-vue-next';
 import SymbolToken from '@/components/SymbolToken.vue';
 import type { SymbolFilterOption } from '@/modules/card-detail/types';
-import type { SymbolFilterTriState } from '@/composables/card-filters/cardFilterSectionsState';
+import {
+  getTriStateSelection,
+  getTriStateSelectionClass,
+  getTriStateSelectionLabel,
+  toggleTriStateSelection,
+  type TriStateSelection,
+} from '@/composables/card-filters/triStateSelection';
 
 const props = withDefaults(
   defineProps<{
@@ -129,58 +135,19 @@ const emit = defineEmits<{
   (e: 'reset'): void;
 }>();
 
-const includedIds = computed(() => new Set(props.includedValue));
-const excludedIds = computed(() => new Set(props.excludedValue));
 const isOpen = ref(props.defaultOpen);
 
-const chipState = (id: string): SymbolFilterTriState => {
-  if (includedIds.value.has(id)) {
-    return 'include';
-  }
-  if (excludedIds.value.has(id)) {
-    return 'exclude';
-  }
-  return 'off';
-};
+const chipState = (id: string): TriStateSelection =>
+  getTriStateSelection(id, props.includedValue, props.excludedValue);
 
-const chipTitle = (label: string, id: string): string => {
-  const state = chipState(id);
-  if (state === 'include') {
-    return `${label} included. Click to exclude.`;
-  }
-  if (state === 'exclude') {
-    return `${label} excluded. Click to clear.`;
-  }
-  return `${label} not filtered. Click to include.`;
-};
+const chipTitle = (label: string, id: string): string =>
+  getTriStateSelectionLabel(label, chipState(id));
 
-const chipClass = (id: string): string => {
-  const state = chipState(id);
-  if (state === 'include') {
-    return 'theme-choice-chip-include';
-  }
-  if (state === 'exclude') {
-    return 'theme-choice-chip-exclude';
-  }
-  return '';
-};
+const chipClass = (id: string): string => getTriStateSelectionClass(chipState(id));
 
 const toggle = (id: string): void => {
-  const nextIncluded = new Set(props.includedValue);
-  const nextExcluded = new Set(props.excludedValue);
-  const state = chipState(id);
-
-  if (state === 'include') {
-    nextIncluded.delete(id);
-    nextExcluded.add(id);
-  } else if (state === 'exclude') {
-    nextExcluded.delete(id);
-  } else {
-    nextIncluded.add(id);
-    nextExcluded.delete(id);
-  }
-
-  emit('update:includedValue', Array.from(nextIncluded));
-  emit('update:excludedValue', Array.from(nextExcluded));
+  const next = toggleTriStateSelection(id, props.includedValue, props.excludedValue);
+  emit('update:includedValue', next.included);
+  emit('update:excludedValue', next.excluded);
 };
 </script>
