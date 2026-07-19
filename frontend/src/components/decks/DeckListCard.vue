@@ -57,10 +57,6 @@
             </div>
 
             <p class="theme-section-muted text-sm">
-              Hero: {{ deck.hero_card.name }}
-            </p>
-
-            <p class="theme-section-muted text-sm">
               {{ boardSummary }}
             </p>
 
@@ -126,9 +122,10 @@
           </div>
         </div>
 
-        <div class="mt-auto flex items-end justify-between gap-3 pt-3">
+        <div class="mt-auto flex items-center justify-between gap-3 pt-3">
           <p class="theme-section-muted text-xs">
-            Updated {{ formatDate(deck.updated_at) }}
+            {{ deck.hero_card.name }}
+            <span class="text-xs"> - {{ formatDate(deck.updated_at) }}</span>
           </p>
 
           <div
