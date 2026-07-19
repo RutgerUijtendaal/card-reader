@@ -104,6 +104,7 @@ def reject_deck_tag_suggestion(*, suggestion: DeckTagSuggestion) -> DeckTagSugge
     suggestion.accepted_tag = None
     suggestion.updated_at = now_utc()
     suggestion.save(update_fields=["status", "accepted_tag", "updated_at"])
+    suggestion.deck_occurrences.filter(is_active=True).update(is_active=False, updated_at=now_utc())
     return suggestion
 
 
@@ -112,5 +113,4 @@ def reopen_deck_tag_suggestion(*, suggestion: DeckTagSuggestion) -> DeckTagSugge
     suggestion.accepted_tag = None
     suggestion.updated_at = now_utc()
     suggestion.save(update_fields=["status", "accepted_tag", "updated_at"])
-    suggestion.deck_occurrences.filter(is_active=True).update(is_active=False, updated_at=now_utc())
     return suggestion
