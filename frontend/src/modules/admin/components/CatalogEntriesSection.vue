@@ -148,6 +148,11 @@ const metadataToneForKind = (kind: CatalogKind): string => {
       return 'theme-pill-warning';
     case 'symbols':
       return 'theme-pill-symbol';
+    case 'deck-roles':
+      return 'theme-pill-accent';
+    case 'deck-types':
+    case 'suggested-deck-types':
+      return 'theme-pill-keyword';
     default:
       return 'theme-pill-neutral';
   }
@@ -155,7 +160,7 @@ const metadataToneForKind = (kind: CatalogKind): string => {
 
 const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   if (isSuggestionRecord(entry)) {
-    return [
+    const badges = [
       {
         label: String(entry.occurrence_count),
         tone: 'theme-pill-accent',
@@ -170,6 +175,13 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
               : 'theme-pill-neutral',
       },
     ];
+    if ((entry.rejected_resubmission_count ?? 0) > 0) {
+      badges.splice(1, 0, {
+        label: `${entry.rejected_resubmission_count} retried`,
+        tone: 'theme-pill-warning',
+      });
+    }
+    return badges;
   }
 
   if ('symbol_type' in entry) {
@@ -185,9 +197,16 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
     ];
   }
 
+  if ('kind' in entry && !('status' in entry)) {
+    return [
+      { label: String(entry.linked_deck_count ?? 0), tone: 'theme-pill-accent' },
+      { label: entry.kind, tone: metadataToneForKind(props.selectedKind) },
+    ];
+  }
+
   return [
     {
-      label: String(entry.linked_card_count ?? 0),
+      label: String('linked_card_count' in entry ? (entry.linked_card_count ?? 0) : 0),
       tone: 'theme-pill-accent',
     },
     {
@@ -203,7 +222,10 @@ const entryPreview = (entry: CatalogRow): string => {
       return `Accepted as ${entry.accepted_target.label}`;
     }
     if (entry.occurrences.length === 0) {
-      return 'No linked cards yet.';
+      if ((entry.linked_decks ?? []).length > 0) {
+        return (entry.linked_decks ?? []).slice(0, 2).map((deck) => deck.name).join(' · ');
+      }
+      return 'No linked items yet.';
     }
     return entry.occurrences
       .slice(0, 2)

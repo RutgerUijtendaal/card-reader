@@ -17,6 +17,9 @@ from card_reader_core.models import (
     CardVersionTag,
     CardVersionType,
     Deck,
+    DeckTag,
+    DeckTagAssignment,
+    DeckTagSuggestion,
     Keyword,
     ParseResult,
     Symbol,
@@ -32,7 +35,9 @@ from card_reader_core.services.decks import (
     DeckEntryInput,
     DeckService,
     DeckSideboardInput,
+    DeckUpdateInput,
 )
+from card_reader_core.services.deck_tags import DeckTagService
 
 _CARD_NAME_COUNTER = count()
 
@@ -2280,6 +2285,7 @@ def test_non_owner_cannot_update_or_delete_deck() -> None:
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, other_user.username, "password")
 
+    get_response = client.get(f"/my/decks/{deck.id}")
     patch_response = client.patch(
         f"/my/decks/{deck.id}",
         data={
@@ -2297,8 +2303,67 @@ def test_non_owner_cannot_update_or_delete_deck() -> None:
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
+    assert get_response.status_code == 404
     assert patch_response.status_code == 404
     assert delete_response.status_code == 404
+
+
+def test_staff_can_edit_another_users_deck_but_not_delete_it() -> None:
+    owner = _create_user("deck-staff-tag-owner", "password")
+    staff = _create_user("deck-staff-tag-manager", "password", is_staff=True)
+    hero = _create_card(name="Staff Tag Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    role = DeckTag.objects.create(kind="role", key="staff-control", label="Staff Control")
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Staff Managed Tags",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+        suggested_type_labels=["Pending Staff Type"],
+    )
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, staff.username, "password")
+
+    detail_response = client.get(f"/my/decks/{deck.id}")
+    update_response = client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "name": "Staff Renamed Deck",
+            "description": "Updated by staff",
+            "visibility": "public",
+            "hero_card_id": hero.id,
+            "entries": [{"card_id": card.id, "quantity": 4} for card in mainboard_cards],
+            "sideboards": [],
+            "tag_ids": [role.id],
+            "suggested_type_labels": [],
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    delete_response = client.delete(
+        f"/my/decks/{deck.id}",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["pending_tag_suggestions"][0]["label"] == "Pending Staff Type"
+    assert update_response.status_code == 200
+    assert update_response.json()["name"] == "Staff Renamed Deck"
+    assert update_response.json()["description"] == "Updated by staff"
+    assert update_response.json()["visibility"] == "public"
+    assert update_response.json()["tags"] == [
+        {"id": role.id, "key": role.key, "label": role.label, "kind": role.kind}
+    ]
+    assert update_response.json()["pending_tag_suggestions"] == []
+    assert delete_response.status_code == 404
+    deck.refresh_from_db()
+    assert deck.name == "Staff Renamed Deck"
+    assert deck.description == "Updated by staff"
+    assert deck.visibility == "public"
+    assert deck.tag_assignments.get().tag_id == role.id
 
 
 def test_unauthenticated_users_are_blocked_from_my_decks() -> None:
@@ -2634,3 +2699,288 @@ def test_latest_version_patch_rejects_self_applies_to_for_deck_aggregate_rules()
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Deck-building applies_to 'self' is only supported for card-specific rules."
+
+
+def test_deck_tag_catalog_defaults_and_admin_permissions() -> None:
+    public_response = Client(HTTP_HOST="localhost").get("/deck-tags")
+
+    assert public_response.status_code == 200
+    assert {row["label"] for row in public_response.json()["roles"]} >= {
+        "Damage",
+        "Healing",
+        "Control",
+        "Tank",
+        "Support",
+    }
+    assert {row["label"] for row in public_response.json()["types"]} >= {
+        "Countermagic",
+        "Armor",
+        "Team Card Draw",
+        "New Player",
+    }
+
+    non_staff = _create_user("deck-tag-catalog-user", "password")
+    staff = _create_user("deck-tag-catalog-staff", "password", is_staff=True)
+    non_staff_client = Client(HTTP_HOST="localhost")
+    staff_client = Client(HTTP_HOST="localhost")
+    non_staff_client.force_login(non_staff)
+    staff_client.force_login(staff)
+
+    assert Client(HTTP_HOST="localhost").get("/admin/deck-tags").status_code == 403
+    assert non_staff_client.get("/admin/deck-tags").status_code == 403
+    assert staff_client.get("/admin/deck-tags").status_code == 200
+
+
+def test_deck_tag_suggestions_are_owner_only_normalized_and_resolved_across_decks() -> None:
+    owner = _create_user("deck-tag-owner", "password")
+    hero = _create_card(name="Deck Tag Hero", is_hero=True)
+    cards = _build_mainboard_cards()
+    role = DeckTag.objects.get(kind="role", key="damage")
+    service = DeckService()
+
+    first_deck = service.create_owner_deck(
+        owner_id=str(owner.pk),
+        name="First Tagged Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in cards],
+        sideboards=[],
+        tag_ids=[role.id],
+        suggested_type_labels=["Tempo Burst"],
+    )
+    second_deck = service.create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Second Tagged Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in cards],
+        sideboards=[],
+        suggested_type_labels=["  tempo   burst  "],
+    )
+
+    suggestions = DeckTagSuggestion.objects.filter(normalized_value="tempo burst")
+    assert suggestions.count() == 1
+    suggestion = suggestions.get()
+    assert suggestion.deck_occurrences.count() == 2
+
+    owner_client = Client(HTTP_HOST="localhost")
+    owner_client.force_login(owner)
+    owner_payload = owner_client.get(f"/my/decks/{first_deck.id}").json()
+    public_payload = Client(HTTP_HOST="localhost").get(f"/decks/{first_deck.id}").json()
+    assert owner_payload["pending_tag_suggestions"][0]["normalized_value"] == "tempo burst"
+    assert public_payload["pending_tag_suggestions"] == []
+
+    service.update_owner_deck(
+        deck_id=first_deck.id,
+        owner_id=str(owner.pk),
+        updates=DeckUpdateInput(update_tags=True, tag_ids=[role.id]),
+    )
+    assert suggestion.deck_occurrences.filter(deck=first_deck).exists()
+
+    accepted = DeckTagService().accept_suggestion_as_new(suggestion_id=suggestion.id)
+    assert accepted is not None
+    assert accepted.accepted_tag is not None
+    assert DeckTagAssignment.objects.filter(deck=first_deck, tag=accepted.accepted_tag).exists()
+    assert DeckTagAssignment.objects.filter(deck=second_deck, tag=accepted.accepted_tag).exists()
+    assert suggestion.deck_occurrences.filter(is_active=True).count() == 0
+    assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"] == []
+
+    service.update_owner_deck(
+        deck_id=first_deck.id,
+        owner_id=str(owner.pk),
+        updates=DeckUpdateInput(
+            update_tags=True,
+            tag_ids=[role.id],
+            suggested_type_labels=["Rejected Deck Type"],
+        ),
+    )
+    service.update_owner_deck(
+        deck_id=second_deck.id,
+        owner_id=str(owner.pk),
+        updates=DeckUpdateInput(
+            update_tags=True,
+            suggested_type_labels=["Rejected Deck Type"],
+        ),
+    )
+    rejected = DeckTagSuggestion.objects.get(normalized_value="rejected deck type")
+    DeckTagService().reject_suggestion(suggestion_id=rejected.id)
+    assert rejected.deck_occurrences.filter(is_active=True).count() == 0
+    assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"] == []
+
+    resubmit_response = owner_client.patch(
+        f"/my/decks/{first_deck.id}",
+        data={
+            "tag_ids": [role.id],
+            "suggested_type_labels": ["REJECTED DECK TYPE"],
+        },
+        content_type="application/json",
+    )
+
+    assert resubmit_response.status_code == 200
+    assert resubmit_response.json()["tag_suggestion_results"] == [
+        {
+            "label": "REJECTED DECK TYPE",
+            "normalized_value": "rejected deck type",
+            "status": "rejected",
+            "message": "This tag was previously declined. Try a more specific suggestion.",
+            "suggestion_id": rejected.id,
+            "tag": None,
+        }
+    ]
+    rejected.refresh_from_db()
+    assert rejected.rejected_resubmission_count == 1
+    assert rejected.deck_occurrences.get(deck=first_deck).is_active is True
+    assert rejected.deck_occurrences.get(deck=second_deck).is_active is False
+    assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"] == []
+
+    staff = _create_user("deck-tag-reopen-staff", "password", is_staff=True)
+    staff_client = Client(HTTP_HOST="localhost")
+    staff_client.force_login(staff)
+    catalog_response = staff_client.get("/admin/deck-tags")
+    suggestion_row = next(
+        row for row in catalog_response.json()["suggested_types"] if row["id"] == rejected.id
+    )
+    assert suggestion_row["active_occurrence_count"] == 1
+    assert "linked_decks" not in suggestion_row
+
+    detail_response = staff_client.get(f"/admin/deck-tag-suggestions/{rejected.id}")
+    assert detail_response.status_code == 200
+    assert len(detail_response.json()["linked_decks"]) == 2
+
+    duplicate_reject_response = staff_client.post(f"/admin/deck-tag-suggestions/{rejected.id}/reject")
+    assert duplicate_reject_response.status_code == 400
+    assert duplicate_reject_response.json()["detail"] == "Only pending deck tag suggestions can be rejected."
+
+    reopen_response = staff_client.post(f"/admin/deck-tag-suggestions/{rejected.id}/reopen")
+
+    assert reopen_response.status_code == 200
+    assert reopen_response.json()["status"] == "pending"
+    assert reopen_response.json()["active_occurrence_count"] == 1
+    assert reopen_response.json()["rejected_resubmission_count"] == 1
+    assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"][0]["id"] == rejected.id
+    assert owner_client.get(f"/my/decks/{second_deck.id}").json()["pending_tag_suggestions"] == []
+
+    remove_response = owner_client.patch(
+        f"/my/decks/{first_deck.id}",
+        data={"tag_ids": [role.id], "suggested_type_labels": []},
+        content_type="application/json",
+    )
+    assert remove_response.status_code == 200
+    rejected_occurrence = rejected.deck_occurrences.get(deck=first_deck)
+    rejected_occurrence.refresh_from_db()
+    assert rejected_occurrence.is_active is False
+    assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"] == []
+
+
+def test_deck_tag_suggestion_resolution_is_terminal_and_target_changes_reject_it() -> None:
+    owner = _create_user("deck-tag-transition-owner", "password")
+    hero = _create_card(name="Deck Tag Transition Hero", is_hero=True)
+    cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Deck Tag Transition Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in cards],
+        sideboards=[],
+        suggested_type_labels=["Transition Type"],
+    )
+    service = DeckTagService()
+    suggestion = DeckTagSuggestion.objects.get(normalized_value="transition type")
+    accepted = service.accept_suggestion_as_new(suggestion_id=suggestion.id)
+
+    assert accepted is not None
+    assert accepted.accepted_tag is not None
+    accepted_tag = accepted.accepted_tag
+
+    for transition in (
+        lambda: service.accept_suggestion_to_existing(
+            suggestion_id=suggestion.id,
+            target_id=accepted_tag.id,
+        ),
+        lambda: service.reject_suggestion(suggestion_id=suggestion.id),
+    ):
+        try:
+            transition()
+        except ValueError as exc:
+            assert "Only pending deck tag suggestions" in str(exc)
+        else:
+            raise AssertionError("Resolved deck tag suggestions must not transition again.")
+
+    assert DeckTagAssignment.objects.filter(deck=deck, tag=accepted_tag).count() == 1
+    assert service.delete_tag(tag_id=accepted_tag.id) is True
+    suggestion.refresh_from_db()
+    assert suggestion.status == "rejected"
+    assert suggestion.accepted_tag is None
+
+    replacement_suggestion = DeckTagSuggestion.objects.create(
+        display_value="Moved Type",
+        normalized_value="moved type",
+    )
+    replacement_tag = service.create_tag(kind="type", label="Moved Type")
+    service.accept_suggestion_to_existing(
+        suggestion_id=replacement_suggestion.id,
+        target_id=replacement_tag.id,
+    )
+    service.update_tag(tag_id=replacement_tag.id, kind="role")
+    replacement_suggestion.refresh_from_db()
+    assert replacement_suggestion.status == "rejected"
+    assert replacement_suggestion.accepted_tag is None
+
+
+def test_public_and_owned_deck_lists_filter_deck_tags_with_any_and_all_matching() -> None:
+    owner = _create_user("deck-tag-filter-owner", "password")
+    hero = _create_card(name="Deck Tag Filter Hero", is_hero=True)
+    cards = _build_mainboard_cards()
+    role = DeckTag.objects.get(kind="role", key="control")
+    type_tag = DeckTagService().create_tag(kind="type", label="Filter Test Type")
+
+    both_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Both Deck Tags",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in cards],
+        sideboards=[],
+        tag_ids=[role.id, type_tag.id],
+    )
+    role_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Role Deck Tag",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in cards],
+        sideboards=[],
+        tag_ids=[role.id],
+    )
+
+    any_response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {"view": "summary", "deck_tag_ids": [role.id, type_tag.id], "deck_tag_match": "any"},
+    )
+    all_response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {"view": "summary", "deck_tag_ids": [role.id, type_tag.id], "deck_tag_match": "all"},
+    )
+    owner_client = Client(HTTP_HOST="localhost")
+    owner_client.force_login(owner)
+    owned_response = owner_client.get(
+        "/my/decks",
+        {"view": "summary", "deck_tag_ids": [type_tag.id], "deck_tag_match": "any"},
+    )
+
+    assert any_response.status_code == 200
+    assert {row["id"] for row in any_response.json()} >= {both_deck.id, role_deck.id}
+    assert [row["id"] for row in all_response.json()] == [both_deck.id]
+    assert [row["id"] for row in owned_response.json()] == [both_deck.id]
+
+    detail = DeckTagService().get_tag_detail(tag_id=type_tag.id)
+    assert detail is not None
+    assert detail["linked_deck_count"] == 1
+    assert DeckTagService().delete_tag(tag_id=type_tag.id) is True
+    assert not DeckTagAssignment.objects.filter(deck=both_deck, tag_id=type_tag.id).exists()

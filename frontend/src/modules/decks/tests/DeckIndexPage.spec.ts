@@ -8,15 +8,21 @@ const {
   authState,
   apiGetMock,
   deleteDeckMock,
+  fetchDeckTagsMock,
+  fetchMyDeckMock,
   fetchMyDeckSummariesMock,
   fetchPublicDeckSummariesMock,
   updateDeckMock,
 } = vi.hoisted(() => ({
   authState: {
     authenticated: true,
+    canAccessStaffRoutes: false,
+    user: { id: 'user-1' } as { id: string } | null,
   },
   apiGetMock: vi.fn(),
   deleteDeckMock: vi.fn(),
+  fetchDeckTagsMock: vi.fn(),
+  fetchMyDeckMock: vi.fn(),
   fetchMyDeckSummariesMock: vi.fn(),
   fetchPublicDeckSummariesMock: vi.fn(),
   updateDeckMock: vi.fn(),
@@ -34,6 +40,8 @@ vi.mock('@/modules/auth/authStore', () => ({
 
 vi.mock('@/modules/decks/api', () => ({
   deleteDeck: deleteDeckMock,
+  fetchDeckTags: fetchDeckTagsMock,
+  fetchMyDeck: fetchMyDeckMock,
   fetchMyDeckSummaries: fetchMyDeckSummariesMock,
   fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
   updateDeck: updateDeckMock,
@@ -42,6 +50,7 @@ vi.mock('@/modules/decks/api', () => ({
 vi.mock('vue-sonner', () => ({
   toast: {
     error: vi.fn(),
+    info: vi.fn(),
     success: vi.fn(),
   },
 }));
@@ -96,6 +105,31 @@ vi.mock('@/components/modals/ConfirmModal.vue', () => ({
   default: defineComponent({
     setup() {
       return () => null;
+    },
+  }),
+}));
+
+vi.mock('@/components/decks/DeckTagManagementModal.vue', () => ({
+  default: defineComponent({
+    props: {
+      open: { type: Boolean, default: false },
+      modelValue: { type: Array, default: () => [] },
+      suggestedTypeLabels: { type: Array, default: () => [] },
+    },
+    emits: ['update:modelValue', 'update:suggestedTypeLabels', 'save', 'cancel', 'retry'],
+    setup(props, { emit }) {
+      return () => props.open
+        ? h('div', { 'data-testid': 'tag-manager' }, [
+            h('button', {
+              'data-testid': 'tag-manager-change',
+              onClick: () => {
+                emit('update:modelValue', ['role-damage']);
+                emit('update:suggestedTypeLabels', ['Tempo Burst']);
+              },
+            }, 'Change Tags'),
+            h('button', { 'data-testid': 'tag-manager-save', onClick: () => emit('save') }, 'Save Tags'),
+          ])
+        : null;
     },
   }),
 }));
@@ -172,6 +206,7 @@ vi.mock('@/components/decks/DeckListCard.vue', () => ({
           [
             h('h2', (props.deck as { name: string }).name),
             slots.actions?.(),
+            props.mode === 'browse' ? slots['menu-actions']?.({ close: () => undefined }) : null,
           ],
         );
     },
@@ -216,6 +251,8 @@ const deckRecord = {
     label: 'Ready',
     issues: [],
   },
+  tags: [],
+  pending_tag_suggestions: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
 };
@@ -224,6 +261,11 @@ const filtersPayload = {
   keywords: [],
   tags: [],
   symbols: [],
+  types: [],
+};
+
+const deckTagCatalog = {
+  roles: [{ id: 'role-damage', key: 'damage', label: 'Damage', kind: 'role' as const }],
   types: [],
 };
 
@@ -294,7 +336,11 @@ const lastSearchParams = (mock: ReturnType<typeof vi.fn>): URLSearchParams => {
 describe('DeckIndexPage', () => {
   beforeEach(() => {
     authState.authenticated = true;
+    authState.canAccessStaffRoutes = false;
+    authState.user = { id: 'user-1' };
     apiGetMock.mockResolvedValue({ data: filtersPayload });
+    fetchDeckTagsMock.mockResolvedValue(deckTagCatalog);
+    fetchMyDeckMock.mockResolvedValue(deckRecord);
     fetchMyDeckSummariesMock.mockResolvedValue([deckRecord]);
     fetchPublicDeckSummariesMock.mockResolvedValue([deckRecord]);
     updateDeckMock.mockResolvedValue(deckRecord);
@@ -393,6 +439,7 @@ describe('DeckIndexPage', () => {
 
   test('hides the deck library tab selector for anonymous public browsing', async () => {
     authState.authenticated = false;
+    authState.user = null;
     const mounted = await mountPage('/decks');
     const links = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'));
 
@@ -401,6 +448,7 @@ describe('DeckIndexPage', () => {
     expect(mounted.container.textContent).toContain('Search public decks');
     expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(1);
     expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
+    expect(mounted.container.textContent).not.toContain('Manage Tags');
 
     mounted.unmount();
   });
@@ -412,8 +460,51 @@ describe('DeckIndexPage', () => {
     expect(text).toContain('Copy Share Link');
     expect(text).toContain('Copy TTS');
     expect(text).toContain('Delete');
+    expect(text).toContain('Manage Tags');
     expect(text.match(/\bEdit\b/g) ?? []).toHaveLength(1);
     expect(mounted.container.querySelector('select')).not.toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('shows public deck editing to owners and staff but not unrelated users', async () => {
+    const ownerPage = await mountPage('/decks');
+    expect(ownerPage.container.textContent).toContain('Edit Deck');
+    expect(ownerPage.container.textContent).toContain('Manage Tags');
+    ownerPage.unmount();
+
+    authState.user = { id: 'other-user' };
+    const unrelatedPage = await mountPage('/decks');
+    expect(unrelatedPage.container.textContent).not.toContain('Edit Deck');
+    expect(unrelatedPage.container.textContent).not.toContain('Manage Tags');
+    unrelatedPage.unmount();
+
+    authState.canAccessStaffRoutes = true;
+    const staffPage = await mountPage('/decks');
+    expect(staffPage.container.textContent).toContain('Edit Deck');
+    expect(staffPage.container.textContent).toContain('Manage Tags');
+    staffPage.unmount();
+  });
+
+  test('hydrates and saves deck tags through the existing deck update API', async () => {
+    const mounted = await mountPage('/decks');
+    const manageButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Manage Tags',
+    );
+    manageButton?.click();
+    await flushPage();
+
+    expect(fetchMyDeckMock).toHaveBeenCalledWith('deck-1');
+    mounted.container.querySelector<HTMLButtonElement>('[data-testid="tag-manager-change"]')?.click();
+    await nextTick();
+    mounted.container.querySelector<HTMLButtonElement>('[data-testid="tag-manager-save"]')?.click();
+    await flushPage();
+
+    expect(updateDeckMock).toHaveBeenCalledWith('deck-1', {
+      tag_ids: ['role-damage'],
+      suggested_type_labels: ['Tempo Burst'],
+    });
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(2);
 
     mounted.unmount();
   });

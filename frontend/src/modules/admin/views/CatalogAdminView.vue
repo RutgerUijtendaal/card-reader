@@ -39,8 +39,10 @@
         :detection-config-example="detectionConfigExample"
         :reference-assets-example="referenceAssetsExample"
         :kind-item-label="kindItemLabel"
-        :linked-cards="selectedKnownRow?.linked_cards ?? []"
-        :linked-card-count="selectedKnownRow?.linked_card_count ?? 0"
+        :linked-cards="selectedKnownRow && 'linked_cards' in selectedKnownRow ? selectedKnownRow.linked_cards ?? [] : []"
+        :linked-card-count="selectedKnownRow && 'linked_card_count' in selectedKnownRow ? selectedKnownRow.linked_card_count ?? 0 : 0"
+        :linked-decks="selectedKnownRow && 'linked_decks' in selectedKnownRow ? selectedKnownRow.linked_decks ?? [] : []"
+        :linked-deck-count="selectedKnownRow && 'linked_deck_count' in selectedKnownRow ? selectedKnownRow.linked_deck_count ?? 0 : 0"
         @create="createEntry"
         @save="updateSelectedEntry"
         @create-new="startCreateEntry"
@@ -58,6 +60,7 @@
         :new-label="suggestionNewLabel"
         :new-key="suggestionNewKey"
         :action-loading="suggestionActionLoading"
+        :detail-loading="suggestionDetailLoading"
         :kind-item-label="kindItemLabel"
         @update:existing-target-id="setSuggestionExistingTargetId"
         @update:new-label="setSuggestionNewLabel"
@@ -65,6 +68,7 @@
         @accept-existing="acceptSelectedSuggestionToExisting"
         @accept-new="acceptSelectedSuggestionAsNew"
         @reject="rejectSelectedSuggestion"
+        @reopen="reopenSelectedSuggestion"
       />
     </div>
   </div>
@@ -115,6 +119,7 @@ const {
   suggestionNewLabel,
   suggestionNewKey,
   suggestionActionLoading,
+  suggestionDetailLoading,
   setSuggestionExistingTargetId,
   setSuggestionNewLabel,
   setSuggestionNewKey,
@@ -139,6 +144,7 @@ const {
   acceptSelectedSuggestionToExisting,
   acceptSelectedSuggestionAsNew,
   rejectSelectedSuggestion,
+  reopenSelectedSuggestion,
 } = useCatalogAdmin();
 
 onMounted(() => {

@@ -986,6 +986,20 @@
     color: var(--color-selected-text);
   }
 
+  .theme-choice-chip-accent,
+  .theme-choice-chip-accent:hover {
+    border-color: var(--color-pill-accent-border);
+    background: var(--color-pill-accent-bg);
+    color: var(--color-pill-accent-text);
+  }
+
+  .theme-choice-chip-keyword,
+  .theme-choice-chip-keyword:hover {
+    border-color: var(--color-pill-keyword-border);
+    background: var(--color-pill-keyword-bg);
+    color: var(--color-pill-keyword-text);
+  }
+
   .theme-choice-chip-include {
     border-color: var(--color-selected-border);
     background: var(--color-selected-bg-strong);

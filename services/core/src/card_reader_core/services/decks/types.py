@@ -51,9 +51,12 @@ class DeckUpdateInput:
     hero_card_id: str | None = None
     entries: list[DeckEntryInput] | None = None
     sideboards: list[DeckSideboardInput] | None = None
+    tag_ids: list[str] | None = None
+    suggested_type_labels: list[str] | None = None
     update_name: bool = False
     update_description: bool = False
     update_visibility: bool = False
     update_hero_card_id: bool = False
     update_entries: bool = False
     update_sideboards: bool = False
+    update_tags: bool = False

@@ -7,6 +7,34 @@ export type DeckMetadataOption = {
   label: string;
 };
 
+export type DeckTagKind = 'role' | 'type';
+
+export type DeckTagOption = DeckMetadataOption & {
+  kind: DeckTagKind;
+};
+
+export type PendingDeckTagSuggestion = {
+  id: string;
+  label: string;
+  normalized_value: string;
+  kind: 'type';
+  status: 'pending';
+};
+
+export type DeckTagCatalog = {
+  roles: DeckTagOption[];
+  types: DeckTagOption[];
+};
+
+export type DeckTagSuggestionResult = {
+  label: string;
+  normalized_value: string;
+  status: 'pending' | 'resolved' | 'rejected';
+  message: string | null;
+  suggestion_id: string | null;
+  tag: DeckTagOption | null;
+};
+
 export type DeckVisibility = 'private' | 'unlisted' | 'public';
 
 export type DeckCardSummary = CardHoverTooltipModel & {
@@ -32,6 +60,9 @@ export type DeckRecord = {
   name: string;
   description: string | null;
   visibility: DeckVisibility;
+  tags?: DeckTagOption[];
+  pending_tag_suggestions?: PendingDeckTagSuggestion[];
+  tag_suggestion_results?: DeckTagSuggestionResult[];
   owner: {
     id: string;
     username: string;
@@ -69,6 +100,8 @@ export type DeckSummaryRecord = {
   name: string;
   description: string | null;
   visibility: DeckVisibility;
+  tags?: DeckTagOption[];
+  pending_tag_suggestions?: PendingDeckTagSuggestion[];
   owner: {
     id: string;
     username: string;
@@ -105,6 +138,8 @@ export type DeckUpsertRequest = {
     name: string;
     entries: DeckEntryInput[];
   }>;
+  tag_ids: string[];
+  suggested_type_labels: string[];
 };
 
 export type DeckUpdateRequest = Partial<DeckUpsertRequest>;

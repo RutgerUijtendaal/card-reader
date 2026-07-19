@@ -1,5 +1,5 @@
 import { computed, reactive, ref } from 'vue';
-import { fetchCatalog } from '@/modules/admin/api/catalog';
+import { fetchCatalog, fetchDeckTagCatalog } from '@/modules/admin/api/catalog';
 import type {
   CatalogKind,
   CatalogRow,
@@ -9,6 +9,7 @@ import type {
   SymbolRecord,
   TagRecord,
   TypeRecord,
+  DeckTagRecord,
 } from '@/modules/admin/types';
 
 export const useCatalogData = (resetNewEntryForm: () => void) => {
@@ -20,6 +21,9 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: '',
     'suggested-tags': '',
     'suggested-types': '',
+    'deck-roles': '',
+    'deck-types': '',
+    'suggested-deck-types': '',
   });
   const catalog = reactive<{
     keywords: KeywordRecord[];
@@ -28,6 +32,9 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: TypeRecord[];
     'suggested-tags': SuggestionRecord[];
     'suggested-types': SuggestionRecord[];
+    'deck-roles': DeckTagRecord[];
+    'deck-types': DeckTagRecord[];
+    'suggested-deck-types': SuggestionRecord[];
   }>({
     keywords: [],
     tags: [],
@@ -35,6 +42,9 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: [],
     'suggested-tags': [],
     'suggested-types': [],
+    'deck-roles': [],
+    'deck-types': [],
+    'suggested-deck-types': [],
   });
 
   const currentSearchTerm = computed<string>(() => searchFilters[selectedKind.value]);
@@ -58,13 +68,16 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
   };
 
   const loadCatalog = async (): Promise<void> => {
-    const data = await fetchCatalog();
+    const [data, deckTagData] = await Promise.all([fetchCatalog(), fetchDeckTagCatalog()]);
     catalog.keywords = data.known.keywords ?? [];
     catalog.tags = data.known.tags ?? [];
     catalog.symbols = data.known.symbols ?? [];
     catalog.types = data.known.types ?? [];
     catalog['suggested-tags'] = data.suggested.tags ?? [];
     catalog['suggested-types'] = data.suggested.types ?? [];
+    catalog['deck-roles'] = deckTagData.roles;
+    catalog['deck-types'] = deckTagData.types;
+    catalog['suggested-deck-types'] = deckTagData.suggestedTypes;
   };
 
   return {
@@ -98,6 +111,7 @@ const matchesCatalogSearch = (row: CatalogRow, query: string): boolean => {
       row.accepted_target?.label ?? '',
       row.accepted_target?.key ?? '',
       ...row.occurrences.map((item) => `${item.card_label} ${item.source_text}`),
+      ...(row.linked_decks ?? []).map((deck) => `${deck.name} ${deck.owner.username}`),
     );
   }
 

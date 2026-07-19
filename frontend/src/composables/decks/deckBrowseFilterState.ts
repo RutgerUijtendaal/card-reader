@@ -1,11 +1,14 @@
 import type { LocationQuery, LocationQueryRaw, LocationQueryValue } from 'vue-router';
 import type { CardFiltersResponse, SymbolFilterOption } from '@/modules/card-detail/types';
+import type { DeckTagCatalog, DeckTagOption } from '@/modules/decks/types';
 
 export type DeckBrowseFilterState = {
   query: string;
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolKeys: string[];
   affinitySymbolExcludeKeys: string[];
+  deckTagMatch: 'any' | 'all';
+  deckTagKeys: string[];
 };
 
 export type DeckBrowseFilterSelectionState = {
@@ -13,10 +16,13 @@ export type DeckBrowseFilterSelectionState = {
   affinitySymbolMatch: 'any' | 'all';
   affinitySymbolIds: string[];
   affinitySymbolExcludeIds: string[];
+  deckTagMatch: 'any' | 'all';
+  deckTagIds: string[];
 };
 
 export type DeckBrowseFilterCatalog = {
   affinitySymbols: SymbolFilterOption[];
+  deckTags: DeckTagOption[];
 };
 
 const normalizeStringValue = (value: string | number | null | undefined): string => {
@@ -55,6 +61,8 @@ export const createEmptyDeckBrowseFilterState = (): DeckBrowseFilterState => ({
   affinitySymbolMatch: 'any',
   affinitySymbolKeys: [],
   affinitySymbolExcludeKeys: [],
+  deckTagMatch: 'any',
+  deckTagKeys: [],
 });
 
 export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): DeckBrowseFilterState => ({
@@ -62,6 +70,8 @@ export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): De
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolKeys: normalizeStringArray(state.affinitySymbolKeys),
   affinitySymbolExcludeKeys: normalizeStringArray(state.affinitySymbolExcludeKeys),
+  deckTagMatch: state.deckTagMatch === 'all' ? 'all' : 'any',
+  deckTagKeys: normalizeStringArray(state.deckTagKeys),
 });
 
 export const normalizeDeckBrowseFilterSelectionState = (
@@ -71,6 +81,8 @@ export const normalizeDeckBrowseFilterSelectionState = (
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolIds: normalizeStringArray(state.affinitySymbolIds),
   affinitySymbolExcludeIds: normalizeStringArray(state.affinitySymbolExcludeIds),
+  deckTagMatch: state.deckTagMatch === 'all' ? 'all' : 'any',
+  deckTagIds: normalizeStringArray(state.deckTagIds),
 });
 
 export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrowseFilterState =>
@@ -79,6 +91,8 @@ export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrows
     affinitySymbolMatch: query.affinity_symbol_match === 'all' ? 'all' : 'any',
     affinitySymbolKeys: readQueryValues(query.affinity_symbol_keys),
     affinitySymbolExcludeKeys: readQueryValues(query.affinity_symbol_exclude_keys),
+    deckTagMatch: query.deck_tag_match === 'all' ? 'all' : 'any',
+    deckTagKeys: readQueryValues(query.deck_tag_keys),
   });
 
 export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): LocationQueryRaw => {
@@ -91,6 +105,8 @@ export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): L
   if (normalized.affinitySymbolExcludeKeys.length > 0) {
     query.affinity_symbol_exclude_keys = normalized.affinitySymbolExcludeKeys;
   }
+  if (normalized.deckTagMatch === 'all') query.deck_tag_match = 'all';
+  if (normalized.deckTagKeys.length > 0) query.deck_tag_keys = normalized.deckTagKeys;
 
   return query;
 };
@@ -118,8 +134,24 @@ export const getDeckBrowseFilterSignature = (state: DeckBrowseFilterState): stri
 export const sameDeckBrowseFilterState = (left: DeckBrowseFilterState, right: DeckBrowseFilterState): boolean =>
   getDeckBrowseFilterSignature(left) === getDeckBrowseFilterSignature(right);
 
-export const createDeckBrowseFilterCatalog = (filters: CardFiltersResponse): DeckBrowseFilterCatalog => ({
+const deckTagRouteKey = (tag: DeckTagOption): string => `${tag.kind}:${tag.key}`;
+
+const resolveDeckTagIdsFromKeys = (keys: string[], options: DeckTagOption[]): string[] => {
+  const idByKey = new Map(options.map((option) => [deckTagRouteKey(option), option.id]));
+  return keys.map((key) => idByKey.get(key)).filter((id): id is string => typeof id === 'string');
+};
+
+const resolveDeckTagKeysFromIds = (ids: string[], options: DeckTagOption[]): string[] => {
+  const keyById = new Map(options.map((option) => [option.id, deckTagRouteKey(option)]));
+  return ids.map((id) => keyById.get(id)).filter((key): key is string => typeof key === 'string');
+};
+
+export const createDeckBrowseFilterCatalog = (
+  filters: CardFiltersResponse,
+  deckTags: DeckTagCatalog = { roles: [], types: [] },
+): DeckBrowseFilterCatalog => ({
   affinitySymbols: (filters.symbols ?? []).filter((row) => row.symbol_type === 'affinity'),
+  deckTags: [...deckTags.roles, ...deckTags.types],
 });
 
 export const buildDeckBrowseFilterSelectionState = (
@@ -131,6 +163,8 @@ export const buildDeckBrowseFilterSelectionState = (
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolIds: resolveIdsFromKeys(state.affinitySymbolKeys, catalog.affinitySymbols),
     affinitySymbolExcludeIds: resolveIdsFromKeys(state.affinitySymbolExcludeKeys, catalog.affinitySymbols),
+    deckTagMatch: state.deckTagMatch,
+    deckTagIds: resolveDeckTagIdsFromKeys(state.deckTagKeys, catalog.deckTags),
   });
 
 export const buildDeckBrowseFilterStateFromSelection = (
@@ -142,6 +176,8 @@ export const buildDeckBrowseFilterStateFromSelection = (
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.affinitySymbols),
     affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.affinitySymbols),
+    deckTagMatch: state.deckTagMatch,
+    deckTagKeys: resolveDeckTagKeysFromIds(state.deckTagIds, catalog.deckTags),
   });
 
 export const buildDeckBrowseFilterApiSearchParams = (
@@ -157,6 +193,10 @@ export const buildDeckBrowseFilterApiSearchParams = (
   }
   if (normalized.affinitySymbolExcludeIds.length > 0) {
     normalized.affinitySymbolExcludeIds.forEach((id) => params.append('affinity_symbol_exclude_ids', id));
+  }
+  if (normalized.deckTagIds.length > 0) {
+    normalized.deckTagIds.forEach((id) => params.append('deck_tag_ids', id));
+    params.set('deck_tag_match', normalized.deckTagMatch);
   }
 
   return params;

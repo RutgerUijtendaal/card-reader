@@ -1,5 +1,10 @@
 import { api } from '@/api/client';
-import type { DeckRecord, DeckSummaryRecord, DeckUpdateRequest, DeckUpsertRequest } from '@/modules/decks/types';
+import type { DeckRecord, DeckSummaryRecord, DeckTagCatalog, DeckUpdateRequest, DeckUpsertRequest } from '@/modules/decks/types';
+
+export const fetchDeckTags = async (): Promise<DeckTagCatalog> => {
+  const response = await api.get<DeckTagCatalog>('/deck-tags');
+  return response.data;
+};
 
 export const fetchPublicDecks = async (params?: URLSearchParams): Promise<DeckRecord[]> => {
   const response = await api.get<DeckRecord[]>('/decks', { params });

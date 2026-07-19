@@ -3,7 +3,7 @@ import { useDebounceFn, useEventListener, useLocalStorage } from '@vueuse/core';
 import { toast } from 'vue-sonner';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import type { CardListItem } from '@/modules/card-detail/types';
-import { createDeck, fetchMyDeck, updateDeck } from '@/modules/decks/api';
+import { createDeck, fetchDeckTags, fetchMyDeck, updateDeck } from '@/modules/decks/api';
 import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { useDeckEditorFilters } from '@/modules/decks/composables/useDeckEditorFilters';
 import { useDeckEditorGallery } from '@/modules/decks/composables/useDeckEditorGallery';
@@ -12,7 +12,8 @@ import {
   buildDeckEditorReturnLocation,
   getDeckEditorReturnLabel,
 } from '@/composables/decks/deckRouteState';
-import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
+import { getDeckTagSuggestionFeedback } from '@/composables/decks/deckTagSuggestionFeedback';
+import type { DeckCardSummary, DeckRecord, DeckTagCatalog } from '@/modules/decks/types';
 import { fallbackDeckBuildingRules, fetchDeckRulesMetadata } from '@/composables/decks/deckRules';
 
 export const useDeckEditor = () => {
@@ -26,6 +27,7 @@ export const useDeckEditor = () => {
   const manualSaving = ref(false);
   const cardLookup = ref<Record<string, DeckCardSummary>>({});
   const deckBuildingRules = ref(fallbackDeckBuildingRules());
+  const deckTagCatalog = ref<DeckTagCatalog>({ roles: [], types: [] });
   const savedPayloadSignature = ref('');
   const autosyncFailedSignature = ref('');
   const discardChangesModalOpen = ref(false);
@@ -97,12 +99,40 @@ export const useDeckEditor = () => {
     }
   };
 
+  const loadDeckTags = async (): Promise<void> => {
+    try {
+      deckTagCatalog.value = await fetchDeckTags();
+    } catch {
+      deckTagCatalog.value = { roles: [], types: [] };
+    }
+  };
+
   const persistDeck = async (): Promise<DeckRecord> => {
     const payload = deck.buildPayload();
     if (deckId.value) {
       return await updateDeck(deckId.value, payload);
     }
     return await createDeck(payload);
+  };
+
+  const reconcilePersistedTagState = (record: DeckRecord, persistedSignature: string): string => {
+    if (payloadSignature.value !== persistedSignature) {
+      return persistedSignature;
+    }
+    if (record.tags !== undefined) {
+      deck.setDeckTagIds(record.tags.map((tag) => tag.id));
+    }
+    if (record.pending_tag_suggestions !== undefined) {
+      deck.setSuggestedTypeLabels(record.pending_tag_suggestions.map((suggestion) => suggestion.label));
+    }
+    return payloadSignature.value;
+  };
+
+  const showTagSuggestionFeedback = (record: DeckRecord): void => {
+    const feedback = getDeckTagSuggestionFeedback(record.tag_suggestion_results);
+    if (feedback) {
+      toast.info(feedback);
+    }
   };
 
   const payloadSignature = computed(() => JSON.stringify(deck.buildPayload()));
@@ -149,6 +179,8 @@ export const useDeckEditor = () => {
     try {
       const persistedSignature = payloadSignature.value;
       const record = await persistDeck();
+      const savedSignature = reconcilePersistedTagState(record, persistedSignature);
+      showTagSuggestionFeedback(record);
       setBuilderStep('build');
       if (!deckId.value) {
         bypassNextUnsavedPrompt = true;
@@ -158,7 +190,7 @@ export const useDeckEditor = () => {
           bypassNextUnsavedPrompt = false;
         }
       }
-      markSavedPayload(persistedSignature);
+      markSavedPayload(savedSignature);
       toast.success('Deck saved.');
       filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
     } finally {
@@ -179,6 +211,8 @@ export const useDeckEditor = () => {
     try {
       const persistedSignature = payloadSignature.value;
       const record = await persistDeck();
+      const savedSignature = reconcilePersistedTagState(record, persistedSignature);
+      showTagSuggestionFeedback(record);
       if (!deckId.value) {
         bypassNextUnsavedPrompt = true;
         try {
@@ -187,7 +221,7 @@ export const useDeckEditor = () => {
           bypassNextUnsavedPrompt = false;
         }
       }
-      markSavedPayload(persistedSignature);
+      markSavedPayload(savedSignature);
       if (!options.silent) {
         toast.success(record.status.is_valid ? 'Deck saved.' : 'Draft saved.');
       }
@@ -239,7 +273,7 @@ export const useDeckEditor = () => {
   }, 900);
 
   onMounted(async () => {
-    await Promise.all([filters.loadFilters(), loadDeckRules(), loadDeck()]);
+    await Promise.all([filters.loadFilters(), loadDeckRules(), loadDeckTags(), loadDeck()]);
     if (builderStep.value === 'build') {
       filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
     }
@@ -288,6 +322,7 @@ export const useDeckEditor = () => {
     autosyncEnabled,
     discardChangesModalOpen,
     deckBuildingRules,
+    deckTagCatalog,
     filters,
     gallery,
     deck,

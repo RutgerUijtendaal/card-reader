@@ -12,12 +12,15 @@ if TYPE_CHECKING:
     from django.db.models.manager import Manager
 
     from .card import Card
+    from .deck_tag import DeckTagAssignment, DeckTagSuggestionDeck
 
 
 class Deck(TimestampedModel):
     if TYPE_CHECKING:
         entries: Manager[DeckEntry]
         sideboards: Manager[DeckSideboard]
+        tag_assignments: Manager[DeckTagAssignment]
+        tag_suggestion_occurrences: Manager[DeckTagSuggestionDeck]
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     owner: models.ForeignKey[AbstractBaseUser, AbstractBaseUser] = models.ForeignKey(

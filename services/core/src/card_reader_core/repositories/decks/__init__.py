@@ -1,6 +1,7 @@
 from .cards import get_cards_by_ids, get_deck_card
 from .queries import (
     PUBLIC_DECK_VISIBILITIES,
+    get_deck,
     get_deck_for_viewer,
     get_owner_deck,
     get_public_deck,
@@ -18,6 +19,7 @@ __all__ = [
     "delete_deck",
     "get_cards_by_ids",
     "get_deck_card",
+    "get_deck",
     "get_deck_for_viewer",
     "get_owner_deck",
     "get_public_deck",

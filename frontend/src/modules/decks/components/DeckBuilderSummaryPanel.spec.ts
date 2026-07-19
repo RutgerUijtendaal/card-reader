@@ -132,6 +132,7 @@ const buildController = () => {
     deckId: ref('deck-1'),
     backLink: ref('/my/decks'),
     backLabel: ref('Back'),
+    deckTagCatalog: ref({ roles: [], types: [] }),
     deck: {
       isSetupStep: ref(false),
       lastBoardEntryChange: ref(null),
@@ -139,6 +140,8 @@ const buildController = () => {
         name: 'Aurora Tempo',
         description: '',
         visibility: 'private',
+        tag_ids: [],
+        suggested_type_labels: [],
       },
       selectedHero,
       validationMessages: ref<string[]>([]),
@@ -186,6 +189,8 @@ const buildController = () => {
       setDeckName: vi.fn(),
       setDeckDescription: vi.fn(),
       setDeckVisibility: vi.fn(),
+      setDeckTagIds: vi.fn(),
+      setSuggestedTypeLabels: vi.fn(),
     },
   };
 

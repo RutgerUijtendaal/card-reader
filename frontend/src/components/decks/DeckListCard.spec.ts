@@ -92,11 +92,27 @@ const buildDeck = (): DeckRecord => ({
     label: 'Ready',
     issues: [],
   },
+  tags: [
+    { id: 'role-damage', kind: 'role', key: 'damage', label: 'Damage' },
+    { id: 'type-armor', kind: 'type', key: 'armor', label: 'Armor' },
+  ],
+  pending_tag_suggestions: [
+    {
+      id: 'suggestion-tempo',
+      label: 'Tempo Burst',
+      normalized_value: 'tempo burst',
+      kind: 'type',
+      status: 'pending',
+    },
+  ],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
 });
 
-const mountDeckListCard = async (mode: 'browse' | 'owned', options: { customActions?: boolean } = {}) => {
+const mountDeckListCard = async (
+  mode: 'browse' | 'owned',
+  options: { customActions?: boolean; menuActions?: boolean } = {},
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
@@ -119,11 +135,20 @@ const mountDeckListCard = async (mode: 'browse' | 'owned', options: { customActi
         mode,
         titleTo: mode === 'browse' ? '/decks/deck-1' : '/my/decks/deck-1',
       },
-      options.customActions
-        ? {
-            actions: () => h('button', { class: 'custom-action', type: 'button' }, 'Custom Action'),
-          }
-        : undefined,
+      {
+        ...(options.customActions
+          ? { actions: () => h('button', { class: 'custom-action', type: 'button' }, 'Custom Action') }
+          : {}),
+        ...(options.menuActions
+          ? {
+              'menu-actions': ({ close }: { close: () => void }) => h(
+                'button',
+                { class: 'manage-tags-action', type: 'button', onClick: close },
+                'Manage Tags',
+              ),
+            }
+          : {}),
+      },
     ),
   });
   app.use(router);
@@ -171,6 +196,11 @@ describe('DeckListCard', () => {
     expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).toContain('{F}');
     expect(text).toContain('Pressure early, then pivot into efficient trades.');
+    expect(text).toContain('Damage');
+    expect(text).toContain('Armor');
+    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).toContain('Damage');
+    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).toContain('Armor');
+    expect(text).not.toContain('Tempo Burst');
     expect(text).not.toContain('Mainboard 40 · 24 unique · 1 sideboard');
     expect(text).toContain('Updated');
 
@@ -187,6 +217,9 @@ describe('DeckListCard', () => {
     expect(text).toContain('Hero: Azure Hero');
     expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).toContain('{F}');
+    expect(text).toContain('Damage');
+    expect(text).toContain('Armor');
+    expect(text).toContain('Tempo Burst');
     expect(text).toContain('Updated');
 
     mounted.unmount();
@@ -207,6 +240,20 @@ describe('DeckListCard', () => {
 
     expect(mounted.container.textContent).toContain('Custom Action');
     expect(mounted.container.querySelector('button[aria-label="Open deck actions"]')).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('renders injected browse menu actions with the fallback actions', async () => {
+    const mounted = await mountDeckListCard('browse', { menuActions: true });
+    const menuTrigger = mounted.container.querySelector('button[aria-label="Open deck actions"]');
+
+    menuTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+
+    expect(document.body.textContent).toContain('Manage Tags');
+    expect(document.body.textContent).toContain('Playtest');
+    expect(document.body.textContent).toContain('Copy TTS');
 
     mounted.unmount();
   });

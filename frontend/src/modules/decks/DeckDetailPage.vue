@@ -22,11 +22,17 @@
       title-class="text-xl"
     >
       <template #titleMeta>
-        <div class="theme-section-muted flex items-center gap-2 text-sm">
-          <span>By</span>
-          <span class="theme-pill theme-pill-keyword text-xs">
-            {{ deck.owner.username }}
-          </span>
+        <div class="space-y-2">
+          <div class="theme-section-muted flex items-center gap-2 text-sm">
+            <span>By</span>
+            <span class="theme-pill theme-pill-keyword text-xs">
+              {{ deck.owner.username }}
+            </span>
+          </div>
+          <DeckTagPills
+            :tags="deck.tags ?? []"
+            :pending-suggestions="canEdit ? deck.pending_tag_suggestions ?? [] : []"
+          />
         </div>
       </template>
 
@@ -305,6 +311,7 @@ import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
+import DeckTagPills from '@/components/decks/DeckTagPills.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation, isCardReturnQuery } from '@/composables/cards/cardReturnState';
 import type { CardFiltersResponse, CardListItem } from '@/modules/card-detail/types';
@@ -356,7 +363,9 @@ const groupByType = useLocalStorage('card-reader.deck-detail-group-by-type', tru
 });
 const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
-const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
+const canEdit = computed(() =>
+  deck.value?.owner.id === auth.user?.id || auth.canAccessStaffRoutes,
+);
 const canShare = computed(() => (deck.value ? canShareDeck(deck.value) : false));
 const backLink = computed(() => {
   if (isCardReturnQuery(route.query)) {

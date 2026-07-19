@@ -60,7 +60,35 @@
       class="theme-divider space-y-3 border-t pt-3"
     >
       <div
-        v-if="visibleOptions.length > 0"
+        v-if="groups.length > 0"
+        class="space-y-3"
+      >
+        <div
+          v-for="group in groups"
+          :key="group.key"
+          class="space-y-2"
+        >
+          <p class="theme-kicker text-[11px] font-semibold uppercase tracking-[0.16em]">
+            {{ group.label }}
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="option in group.options"
+              :key="option.id"
+              type="button"
+              class="theme-choice-chip min-h-10 px-3 py-2"
+              :class="selectedIds.has(option.id) ? group.selectedClass : ''"
+              :aria-pressed="selectedIds.has(option.id)"
+              @click.stop="toggle(option.id)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-else-if="visibleOptions.length > 0"
         class="flex flex-wrap gap-2"
       >
         <button
@@ -68,11 +96,7 @@
           :key="option.id"
           type="button"
           class="theme-choice-chip min-h-10 px-3 py-2"
-          :class="
-            selectedIds.has(option.id)
-              ? 'theme-choice-chip-active shadow-sm'
-              : ''
-          "
+          :class="selectedIds.has(option.id) ? 'theme-choice-chip-active shadow-sm' : ''"
           :aria-pressed="selectedIds.has(option.id)"
           @click.stop="toggle(option.id)"
         >
@@ -113,6 +137,13 @@ import { computed, ref, watch } from 'vue';
 import { ChevronDown, RotateCcw } from 'lucide-vue-next';
 import type { MetadataOption } from '@/modules/card-detail/types';
 
+export type MetadataPillOptionGroup = {
+  key: string;
+  label: string;
+  options: MetadataOption[];
+  selectedClass: string;
+};
+
 const props = withDefaults(
   defineProps<{
     label: string;
@@ -122,11 +153,13 @@ const props = withDefaults(
     defaultOpen?: boolean;
     showReset?: boolean;
     initialVisibleCount?: number;
+    groups?: MetadataPillOptionGroup[];
   }>(),
   {
     defaultOpen: false,
     showReset: true,
     initialVisibleCount: 10,
+    groups: () => [],
   },
 );
 

@@ -78,6 +78,13 @@ export const buildMyDeckEditorLocation = (deckId: string): RouteLocationRaw => (
   },
 });
 
+export const buildPublicDeckEditorLocation = (deckId: string): RouteLocationRaw => ({
+  path: `/my/decks/${deckId}/edit`,
+  query: {
+    return_to: DECKS_RETURN_TO,
+  },
+});
+
 export const buildNewDeckEditorLocation = (
   returnTo: typeof MY_DECKS_RETURN_TO | typeof DECKS_RETURN_TO = MY_DECKS_RETURN_TO,
 ): RouteLocationRaw => ({

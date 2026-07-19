@@ -4,10 +4,11 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useDeckEditor } from '@/modules/decks/composables/useDeckEditor';
 
-const { fetchMyDeckMock, updateDeckMock, toastErrorMock } = vi.hoisted(() => ({
+const { fetchMyDeckMock, updateDeckMock, toastErrorMock, toastInfoMock } = vi.hoisted(() => ({
   fetchMyDeckMock: vi.fn(),
   updateDeckMock: vi.fn(),
   toastErrorMock: vi.fn(),
+  toastInfoMock: vi.fn(),
 }));
 
 vi.mock('@/modules/decks/api', () => ({
@@ -53,6 +54,7 @@ vi.mock('@/modules/decks/composables/useDeckEditorGallery', () => ({
 vi.mock('vue-sonner', () => ({
   toast: {
     error: toastErrorMock,
+    info: toastInfoMock,
     success: vi.fn(),
   },
 }));
@@ -180,6 +182,37 @@ describe('useDeckEditor', () => {
 
     expect(updateDeckMock).toHaveBeenCalledTimes(2);
     expect(mounted.controller.changeStatusLabel.value).toBe('Saved');
+
+    mounted.unmount();
+  });
+
+  test('reconciles rejected tag suggestions after a successful save', async () => {
+    const mounted = await mountController();
+    mounted.controller.deck.setSuggestedTypeLabels(['Rejected Deck Type']);
+    updateDeckMock.mockResolvedValueOnce({
+      id: 'deck-1',
+      tags: [],
+      pending_tag_suggestions: [],
+      tag_suggestion_results: [
+        {
+          label: 'Rejected Deck Type',
+          normalized_value: 'rejected deck type',
+          status: 'rejected',
+          message: 'This tag was previously declined. Try a more specific suggestion.',
+          suggestion_id: 'suggestion-1',
+          tag: null,
+        },
+      ],
+      status: { is_valid: true },
+    });
+
+    await mounted.controller.saveDeck();
+
+    expect(mounted.controller.deck.form.suggested_type_labels).toEqual([]);
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      'This tag was previously declined. Try a more specific suggestion.',
+    );
+    expect(mounted.controller.hasUnsavedChanges.value).toBe(false);
 
     mounted.unmount();
   });
