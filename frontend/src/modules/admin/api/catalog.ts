@@ -112,7 +112,13 @@ export const fetchSuggestionDetail = async (
   id: string,
 ): Promise<SuggestionRecord> => {
   const response = await api.get<SuggestionRecord>(`${suggestionBasePath(kind)}/${id}`);
-  return response.data;
+  return {
+    ...response.data,
+    label: response.data.display_value,
+    key: response.data.normalized_value,
+    occurrences: response.data.occurrences ?? [],
+    linked_decks: response.data.linked_decks ?? [],
+  };
 };
 
 export const acceptSuggestionToExisting = async (

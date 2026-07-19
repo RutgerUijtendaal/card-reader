@@ -60,6 +60,7 @@
         :new-label="suggestionNewLabel"
         :new-key="suggestionNewKey"
         :action-loading="suggestionActionLoading"
+        :detail-loading="suggestionDetailLoading"
         :kind-item-label="kindItemLabel"
         @update:existing-target-id="setSuggestionExistingTargetId"
         @update:new-label="setSuggestionNewLabel"
@@ -118,6 +119,7 @@ const {
   suggestionNewLabel,
   suggestionNewKey,
   suggestionActionLoading,
+  suggestionDetailLoading,
   setSuggestionExistingTargetId,
   setSuggestionNewLabel,
   setSuggestionNewKey,

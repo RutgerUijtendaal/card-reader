@@ -5,6 +5,7 @@ import {
   acceptSuggestionAsNew,
   acceptSuggestionToExisting,
   fetchKnownCatalogEntryDetail,
+  fetchSuggestionDetail,
   rejectSuggestion,
   reopenSuggestion,
 } from '@/modules/admin/api/catalog';
@@ -56,16 +57,24 @@ export const useCatalogAdmin = () => {
   const suggestionNewLabel = ref('');
   const suggestionNewKey = ref('');
   const suggestionActionLoading = ref(false);
+  const suggestionDetailLoading = ref(false);
   const selectedKnownDetail = ref<KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | null>(null);
+  const selectedSuggestionDetail = ref<SuggestionRecord | null>(null);
+  let suggestionDetailRequestId = 0;
 
   const selectedRow = computed(() =>
     selectedEntryId.value
       ? catalogData.allCurrentRows.value.find((row) => row.id === selectedEntryId.value) ?? null
       : null,
   );
-  const selectedSuggestionRow = computed(() =>
-    selectedRow.value && 'status' in selectedRow.value ? (selectedRow.value as SuggestionRecord) : null,
-  );
+  const selectedSuggestionRow = computed(() => {
+    if (!selectedRow.value || !('status' in selectedRow.value)) {
+      return null;
+    }
+    return selectedSuggestionDetail.value?.id === selectedRow.value.id
+      ? selectedSuggestionDetail.value
+      : selectedRow.value as SuggestionRecord;
+  });
   const selectedKnownRow = computed(() => {
     if (!selectedRow.value || 'status' in selectedRow.value) {
       return null;
@@ -91,6 +100,7 @@ export const useCatalogAdmin = () => {
   const startCreateEntry = (): void => {
     selectedEntryId.value = null;
     selectedKnownDetail.value = null;
+    clearSuggestionDetail();
     resetEditorEntry();
     replaceAdminQuery({
       tab: 'catalog',
@@ -105,6 +115,7 @@ export const useCatalogAdmin = () => {
     selectedEntryId.value = row.id;
     if ('status' in row) {
       selectedKnownDetail.value = null;
+      clearSuggestionDetail();
       suggestionExistingTargetId.value = '';
       suggestionNewLabel.value = row.display_value;
       suggestionNewKey.value = '';
@@ -113,6 +124,9 @@ export const useCatalogAdmin = () => {
         kind: catalogData.selectedKind.value,
         entryId: row.id,
       });
+      if (catalogData.selectedKind.value === 'suggested-deck-types') {
+        await loadSuggestionDetail(row.id);
+      }
       return;
     }
     replaceAdminQuery({
@@ -127,6 +141,7 @@ export const useCatalogAdmin = () => {
     catalogData.selectKind(kind);
     selectedEntryId.value = null;
     selectedKnownDetail.value = null;
+    clearSuggestionDetail();
     resetEditorEntry();
     replaceAdminQuery({
       tab: 'catalog',
@@ -149,6 +164,7 @@ export const useCatalogAdmin = () => {
         if (selectedEntryId.value !== null) {
           selectedEntryId.value = null;
           selectedKnownDetail.value = null;
+          clearSuggestionDetail();
           resetEditorEntry();
         }
         return;
@@ -181,6 +197,8 @@ export const useCatalogAdmin = () => {
 
     if (selectedEntryId.value && isKnownCatalogKind(catalogData.selectedKind.value)) {
       await loadKnownDetail(selectedEntryId.value);
+    } else if (selectedEntryId.value && catalogData.selectedKind.value === 'suggested-deck-types') {
+      await loadSuggestionDetail(selectedEntryId.value);
     }
   };
 
@@ -194,6 +212,12 @@ export const useCatalogAdmin = () => {
   const symbolAssetUpload = useSymbolAssetUpload(editorEntry);
 
   const reloadSuggestions = async (): Promise<void> => {
+    const detailEntryId = catalogData.selectedKind.value === 'suggested-deck-types'
+      ? selectedEntryId.value
+      : null;
+    if (detailEntryId) {
+      clearSuggestionDetail();
+    }
     await loadCatalog();
     if (!selectedEntryId.value) {
       return;
@@ -201,6 +225,14 @@ export const useCatalogAdmin = () => {
     const row = catalogData.allCurrentRows.value.find((item) => item.id === selectedEntryId.value);
     if (row && 'status' in row) {
       suggestionNewLabel.value = row.display_value;
+    }
+    if (
+      detailEntryId
+      && row
+      && selectedEntryId.value === detailEntryId
+      && selectedSuggestionDetail.value?.id !== detailEntryId
+    ) {
+      await loadSuggestionDetail(detailEntryId);
     }
   };
 
@@ -269,6 +301,42 @@ export const useCatalogAdmin = () => {
     }
   };
 
+  function clearSuggestionDetail(): void {
+    suggestionDetailRequestId += 1;
+    selectedSuggestionDetail.value = null;
+    suggestionDetailLoading.value = false;
+  }
+
+  async function loadSuggestionDetail(entryId: string): Promise<void> {
+    const detailKind = catalogData.selectedKind.value;
+    if (detailKind !== 'suggested-deck-types') {
+      clearSuggestionDetail();
+      return;
+    }
+    const requestId = ++suggestionDetailRequestId;
+    suggestionDetailLoading.value = true;
+    try {
+      const detail = await fetchSuggestionDetail(detailKind, entryId);
+      if (
+        requestId !== suggestionDetailRequestId
+        || selectedEntryId.value !== entryId
+        || catalogData.selectedKind.value !== detailKind
+      ) {
+        return;
+      }
+      selectedSuggestionDetail.value = detail;
+    } catch (error) {
+      if (requestId === suggestionDetailRequestId) {
+        selectedSuggestionDetail.value = null;
+        toast.error(extractErrorMessage(error, 'Failed to load suggestion details.'));
+      }
+    } finally {
+      if (requestId === suggestionDetailRequestId) {
+        suggestionDetailLoading.value = false;
+      }
+    }
+  }
+
   const reopenSelectedSuggestion = async (): Promise<void> => {
     if (
       !selectedSuggestionRow.value
@@ -320,6 +388,7 @@ export const useCatalogAdmin = () => {
     suggestionNewLabel,
     suggestionNewKey,
     suggestionActionLoading,
+    suggestionDetailLoading,
     setSuggestionExistingTargetId,
     setSuggestionNewLabel,
     setSuggestionNewKey,

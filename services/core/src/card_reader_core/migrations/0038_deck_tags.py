@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 DEFAULT_DECK_TAGS = {
     "role": ["Damage", "Healing", "Control", "Tank", "Support"],
-    "type": ["Countermagic", "Armor", "Team Card Draw", "New Player"],
+    "type": ["Countermagic", "Armor", "Team Card Draw"],
 }
 
 

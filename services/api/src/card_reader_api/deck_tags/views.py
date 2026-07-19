@@ -13,6 +13,7 @@ from card_reader_api.deck_tags.serializers import (
     deck_tag_detail_payload,
     deck_tag_payload,
     deck_tag_suggestion_detail_payload,
+    deck_tag_suggestion_payload,
 )
 from card_reader_core.services.deck_tags import DeckTagService
 
@@ -38,11 +39,7 @@ class AdminDeckTagCatalogView(APIView):
             {
                 "roles": [deck_tag_payload(tag) for tag in catalog["roles"]],
                 "types": [deck_tag_payload(tag) for tag in catalog["types"]],
-                "suggested_types": [
-                    deck_tag_suggestion_detail_payload(detail)
-                    for suggestion in catalog["suggested_types"]
-                    if (detail := service.get_suggestion_detail(suggestion_id=suggestion.id)) is not None
-                ],
+                "suggested_types": [deck_tag_suggestion_payload(suggestion) for suggestion in catalog["suggested_types"]],
             }
         )
 
@@ -130,7 +127,10 @@ class AdminDeckTagSuggestionAcceptView(APIView):
 class AdminDeckTagSuggestionRejectView(APIView):
     def post(self, _request: Request, suggestion_id: str) -> Response:
         service = DeckTagService()
-        suggestion = service.reject_suggestion(suggestion_id=suggestion_id)
+        try:
+            suggestion = service.reject_suggestion(suggestion_id=suggestion_id)
+        except ValueError as exc:
+            return bad_request(str(exc))
         if suggestion is None:
             return not_found("Deck tag suggestion not found")
         detail = service.get_suggestion_detail(suggestion_id=suggestion.id)

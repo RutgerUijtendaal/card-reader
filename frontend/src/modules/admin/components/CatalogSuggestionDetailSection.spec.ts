@@ -85,4 +85,27 @@ describe('CatalogSuggestionDetailSection', () => {
 
     app.unmount();
   });
+
+  test('shows linked deck loading state without an empty-state flash', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const app = createApp(CatalogSuggestionDetailSection, {
+      selectedKind: 'suggested-deck-types',
+      selectedRow: rejectedSuggestion,
+      existingOptions: [],
+      existingTargetId: '',
+      newLabel: 'Tempo Burst',
+      newKey: '',
+      actionLoading: false,
+      detailLoading: true,
+      kindItemLabel: () => 'Type Tag Suggestion',
+    });
+    app.mount(container);
+    await nextTick();
+
+    expect(container.textContent).toContain('Loading linked decks...');
+    expect(container.textContent).not.toContain('No linked decks found');
+
+    app.unmount();
+  });
 });

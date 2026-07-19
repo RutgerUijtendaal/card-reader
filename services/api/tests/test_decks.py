@@ -2784,6 +2784,7 @@ def test_deck_tag_suggestions_are_owner_only_normalized_and_resolved_across_deck
     assert accepted.accepted_tag is not None
     assert DeckTagAssignment.objects.filter(deck=first_deck, tag=accepted.accepted_tag).exists()
     assert DeckTagAssignment.objects.filter(deck=second_deck, tag=accepted.accepted_tag).exists()
+    assert suggestion.deck_occurrences.filter(is_active=True).count() == 0
     assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"] == []
 
     service.update_owner_deck(
@@ -2795,8 +2796,17 @@ def test_deck_tag_suggestions_are_owner_only_normalized_and_resolved_across_deck
             suggested_type_labels=["Rejected Deck Type"],
         ),
     )
+    service.update_owner_deck(
+        deck_id=second_deck.id,
+        owner_id=str(owner.pk),
+        updates=DeckUpdateInput(
+            update_tags=True,
+            suggested_type_labels=["Rejected Deck Type"],
+        ),
+    )
     rejected = DeckTagSuggestion.objects.get(normalized_value="rejected deck type")
     DeckTagService().reject_suggestion(suggestion_id=rejected.id)
+    assert rejected.deck_occurrences.filter(is_active=True).count() == 0
     assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"] == []
 
     resubmit_response = owner_client.patch(
@@ -2822,11 +2832,27 @@ def test_deck_tag_suggestions_are_owner_only_normalized_and_resolved_across_deck
     rejected.refresh_from_db()
     assert rejected.rejected_resubmission_count == 1
     assert rejected.deck_occurrences.get(deck=first_deck).is_active is True
+    assert rejected.deck_occurrences.get(deck=second_deck).is_active is False
     assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"] == []
 
     staff = _create_user("deck-tag-reopen-staff", "password", is_staff=True)
     staff_client = Client(HTTP_HOST="localhost")
     staff_client.force_login(staff)
+    catalog_response = staff_client.get("/admin/deck-tags")
+    suggestion_row = next(
+        row for row in catalog_response.json()["suggested_types"] if row["id"] == rejected.id
+    )
+    assert suggestion_row["active_occurrence_count"] == 1
+    assert "linked_decks" not in suggestion_row
+
+    detail_response = staff_client.get(f"/admin/deck-tag-suggestions/{rejected.id}")
+    assert detail_response.status_code == 200
+    assert len(detail_response.json()["linked_decks"]) == 2
+
+    duplicate_reject_response = staff_client.post(f"/admin/deck-tag-suggestions/{rejected.id}/reject")
+    assert duplicate_reject_response.status_code == 400
+    assert duplicate_reject_response.json()["detail"] == "Only pending deck tag suggestions can be rejected."
+
     reopen_response = staff_client.post(f"/admin/deck-tag-suggestions/{rejected.id}/reopen")
 
     assert reopen_response.status_code == 200
@@ -2834,6 +2860,7 @@ def test_deck_tag_suggestions_are_owner_only_normalized_and_resolved_across_deck
     assert reopen_response.json()["active_occurrence_count"] == 1
     assert reopen_response.json()["rejected_resubmission_count"] == 1
     assert owner_client.get(f"/my/decks/{first_deck.id}").json()["pending_tag_suggestions"][0]["id"] == rejected.id
+    assert owner_client.get(f"/my/decks/{second_deck.id}").json()["pending_tag_suggestions"] == []
 
     remove_response = owner_client.patch(
         f"/my/decks/{first_deck.id}",

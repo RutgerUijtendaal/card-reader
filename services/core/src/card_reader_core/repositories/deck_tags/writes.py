@@ -85,17 +85,17 @@ def get_or_create_deck_tag_suggestion(*, normalized_value: str, display_value: s
 
 
 def accept_deck_tag_suggestion(*, suggestion: DeckTagSuggestion, tag: DeckTag) -> DeckTagSuggestion:
+    active_occurrences = suggestion.deck_occurrences.filter(is_active=True)
+    active_deck_ids = list(active_occurrences.values_list("deck_id", flat=True))
     suggestion.status = "accepted"
     suggestion.accepted_tag = tag
     suggestion.updated_at = now_utc()
     suggestion.save(update_fields=["status", "accepted_tag", "updated_at"])
     DeckTagAssignment.objects.bulk_create(
-        [
-            DeckTagAssignment(deck_id=deck_id, tag=tag)
-            for deck_id in suggestion.deck_occurrences.filter(is_active=True).values_list("deck_id", flat=True)
-        ],
+        [DeckTagAssignment(deck_id=deck_id, tag=tag) for deck_id in active_deck_ids],
         ignore_conflicts=True,
     )
+    active_occurrences.update(is_active=False, updated_at=now_utc())
     return suggestion
 
 
@@ -112,4 +112,5 @@ def reopen_deck_tag_suggestion(*, suggestion: DeckTagSuggestion) -> DeckTagSugge
     suggestion.accepted_tag = None
     suggestion.updated_at = now_utc()
     suggestion.save(update_fields=["status", "accepted_tag", "updated_at"])
+    suggestion.deck_occurrences.filter(is_active=True).update(is_active=False, updated_at=now_utc())
     return suggestion

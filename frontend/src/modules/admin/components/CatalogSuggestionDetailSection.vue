@@ -143,8 +143,14 @@
         </div>
 
         <div class="mt-4">
+          <p
+            v-if="isDeckSuggestion && detailLoading"
+            class="theme-section-muted py-4 text-sm"
+          >
+            Loading linked decks...
+          </p>
           <CatalogLinkedDecksGrid
-            v-if="isDeckSuggestion"
+            v-else-if="isDeckSuggestion"
             :decks="selectedRow.linked_decks ?? []"
             empty-message="No linked decks found for this suggestion."
           />
@@ -181,6 +187,7 @@ const props = defineProps<{
   newLabel: string;
   newKey: string;
   actionLoading: boolean;
+  detailLoading?: boolean;
   kindItemLabel: (kind: CatalogKind) => string;
 }>();
 

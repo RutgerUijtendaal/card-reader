@@ -1,23 +1,20 @@
 <template>
   <div
-    v-if="visibleTags.length > 0 || pendingSuggestions.length > 0"
+    v-if="visibleItems.length > 0"
     class="flex min-w-0 flex-wrap gap-1.5"
   >
     <span
-      v-for="tag in visibleTags"
-      :key="tag.id"
+      v-for="item in visibleItems"
+      :key="item.key"
       class="theme-pill px-2 py-1 text-xs font-semibold"
-      :class="tag.kind === 'role' ? 'theme-pill-accent' : 'theme-pill-keyword'"
+      :class="item.kind === 'role'
+        ? 'theme-pill-accent'
+        : item.kind === 'type'
+          ? 'theme-pill-keyword'
+          : 'theme-pill-neutral border border-dashed'"
+      :title="item.kind === 'pending' ? 'Awaiting review' : undefined"
     >
-      {{ tag.label }}
-    </span>
-    <span
-      v-for="suggestion in pendingSuggestions"
-      :key="suggestion.id"
-      class="theme-pill theme-pill-neutral border border-dashed px-2 py-1 text-xs font-semibold"
-      title="Awaiting review"
-    >
-      {{ suggestion.label }} · Pending
+      {{ item.label }}<template v-if="item.kind === 'pending'"> · Pending</template>
     </span>
     <span
       v-if="hiddenCount > 0"
@@ -32,6 +29,12 @@
 import { computed } from 'vue';
 import type { DeckTagOption, PendingDeckTagSuggestion } from '@/modules/decks/types';
 
+type VisibleDeckTagItem = {
+  key: string;
+  label: string;
+  kind: 'role' | 'type' | 'pending';
+};
+
 const props = withDefaults(defineProps<{
   tags: DeckTagOption[];
   pendingSuggestions?: PendingDeckTagSuggestion[];
@@ -41,8 +44,21 @@ const props = withDefaults(defineProps<{
   maxVisible: 0,
 });
 
-const visibleTags = computed(() =>
-  props.maxVisible > 0 ? props.tags.slice(0, props.maxVisible) : props.tags,
+const orderedItems = computed<VisibleDeckTagItem[]>(() => [
+  ...props.tags
+    .filter((tag) => tag.kind === 'role')
+    .map((tag) => ({ key: `tag:${tag.id}`, label: tag.label, kind: tag.kind })),
+  ...props.tags
+    .filter((tag) => tag.kind === 'type')
+    .map((tag) => ({ key: `tag:${tag.id}`, label: tag.label, kind: tag.kind })),
+  ...props.pendingSuggestions.map((suggestion) => ({
+    key: `suggestion:${suggestion.id}`,
+    label: suggestion.label,
+    kind: 'pending' as const,
+  })),
+]);
+const visibleItems = computed(() =>
+  props.maxVisible > 0 ? orderedItems.value.slice(0, props.maxVisible) : orderedItems.value,
 );
-const hiddenCount = computed(() => Math.max(0, props.tags.length - visibleTags.value.length));
+const hiddenCount = computed(() => Math.max(0, orderedItems.value.length - visibleItems.value.length));
 </script>
