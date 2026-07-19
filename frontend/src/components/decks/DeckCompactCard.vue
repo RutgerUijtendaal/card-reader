@@ -81,6 +81,7 @@ import { computed } from 'vue';
 import { TriangleAlert } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolToken from '@/components/SymbolToken.vue';
+import { formatDeckOwnerName } from '@/composables/decks/display';
 import { deckVisibilityBadgeClasses, deckVisibilityLabels } from '@/composables/decks/visibility';
 import type { DeckListRecord } from '@/modules/decks/types';
 
@@ -111,9 +112,7 @@ const boardSummary = computed(() =>
 const heroAffinitySymbols = computed(() =>
   props.deck.hero_card.symbols.filter((symbol) => symbol.symbol_type === 'affinity'),
 );
-const uppercaseFirstCharacter = (value: string): string =>
-  value.length === 0 ? value : value[0].toLocaleUpperCase() + value.slice(1);
-const ownerDisplayName = computed(() => uppercaseFirstCharacter(props.deck.owner.username));
+const ownerDisplayName = computed(() => formatDeckOwnerName(props.deck.owner.username));
 const titlePillLabel = computed(() =>
   props.mode === 'owned' ? deckVisibilityLabels[props.deck.visibility] : ownerDisplayName.value,
 );
@@ -125,10 +124,11 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
 
 <style scoped>
 .deck-compact-card {
-  --deck-compact-art-width: min(12.5rem, 45%);
+  --deck-compact-art-text-gap: 1rem;
   --deck-compact-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.96) 62%, rgba(0, 0, 0, 0.72) 76%, rgba(0, 0, 0, 0.24) 91%, transparent 100%);
   --deck-compact-art-position: 26% 12%;
   --deck-compact-content-padding-left: clamp(8.8rem, 39%, 12.75rem);
+  --deck-compact-art-width: calc(var(--deck-compact-content-padding-left) - var(--deck-compact-art-text-gap));
   position: relative;
   display: block;
   width: 100%;
@@ -289,7 +289,6 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
 
 @media (max-width: 640px) {
   .deck-compact-card {
-    --deck-compact-art-width: min(9.5rem, 58%);
     --deck-compact-content-padding-left: clamp(7rem, 41%, 9.5rem);
   }
 }

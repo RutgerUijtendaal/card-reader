@@ -22,18 +22,13 @@
       title-class="text-xl"
     >
       <template #titleMeta>
-        <div class="space-y-2">
-          <div class="theme-section-muted flex items-center gap-2 text-sm">
-            <span>By</span>
-            <span class="theme-pill theme-pill-keyword text-xs">
-              {{ deck.owner.username }}
-            </span>
-          </div>
-          <DeckTagPills
-            :tags="deck.tags ?? []"
-            :pending-suggestions="canEdit ? deck.pending_tag_suggestions ?? [] : []"
-          />
-        </div>
+        <span class="theme-pill theme-pill-keyword shrink-0 text-xs">
+          {{ formatDeckOwnerName(deck.owner.username) }}
+        </span>
+        <DeckTagPills
+          :tags="deck.tags ?? []"
+          :pending-suggestions="canEdit ? deck.pending_tag_suggestions ?? [] : []"
+        />
       </template>
 
       <template #actions>
@@ -312,6 +307,7 @@ import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import DeckTagPills from '@/components/decks/DeckTagPills.vue';
+import { formatDeckOwnerName } from '@/composables/decks/display';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation, isCardReturnQuery } from '@/composables/cards/cardReturnState';
 import type { CardFiltersResponse, CardListItem } from '@/modules/card-detail/types';

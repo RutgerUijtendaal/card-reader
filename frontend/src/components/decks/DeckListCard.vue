@@ -159,6 +159,7 @@ import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolToken from '@/components/SymbolToken.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
 import DeckTagPills from '@/components/decks/DeckTagPills.vue';
+import { formatDeckOwnerName } from '@/composables/decks/display';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
 import type { DeckListRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/composables/useDeckExport';
@@ -189,9 +190,7 @@ const sideboardSummary = computed(() => {
 });
 const boardSummary = computed(() => `Maindeck ${props.deck.mainboard.total_cards} · ${props.deck.mainboard.unique_cards} unique · ${sideboardSummary.value}`);
 const heroAffinitySymbols = computed(() => props.deck.hero_card.symbols.filter((symbol) => symbol.symbol_type === 'affinity'));
-const uppercaseFirstCharacter = (value: string): string =>
-  value.length === 0 ? value : value[0].toLocaleUpperCase() + value.slice(1);
-const ownerDisplayName = computed(() => uppercaseFirstCharacter(props.deck.owner.username));
+const ownerDisplayName = computed(() => formatDeckOwnerName(props.deck.owner.username));
 const titlePillLabel = computed(() => (isOwnedMode.value ? deckVisibilityLabels[props.deck.visibility] : ownerDisplayName.value));
 const titlePillClass = computed(() => (isOwnedMode.value ? deckVisibilityBadgeClasses[props.deck.visibility] : 'theme-pill-keyword'));
 const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_count ?? 0);
@@ -257,13 +256,14 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
 
 <style scoped>
 .deck-list-card-surface {
-  --deck-card-art-width: min(21rem, 64%);
+  --deck-card-art-text-gap: 1.5rem;
   --deck-card-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 64%, rgba(0, 0, 0, 0.72) 76%, rgba(0, 0, 0, 0.28) 88%, rgba(0, 0, 0, 0.08) 95%, transparent 100%);
-  --deck-card-art-position: 23% 10%;
-  --deck-card-art-scale: 1.2;
+  --deck-card-art-position: 23% 7%;
+  --deck-card-art-scale: 1.265;
   --deck-card-art-hover-scale: 1.27;
   --deck-card-art-hover-shift-x: 0.2rem;
-  --deck-card-content-padding-left: clamp(19.5rem, 21%, 11rem);
+  --deck-card-content-padding-left: 20rem;
+  --deck-card-art-width: calc(var(--deck-card-content-padding-left) - var(--deck-card-art-text-gap));
   position: relative;
   height: 14.5rem;
   overflow: hidden;
@@ -341,7 +341,7 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
 
 @media (max-width: 767px) {
   .deck-list-card-surface {
-    --deck-card-art-width: min(15rem, 70%);
+    --deck-card-art-text-gap: 1rem;
     --deck-card-content-padding-left: clamp(5.4rem, 24%, 7.5rem);
     height: 12rem;
   }
