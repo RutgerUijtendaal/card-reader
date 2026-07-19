@@ -191,6 +191,10 @@ const deckRecord = {
     label: 'Ready',
     issues: [],
   },
+  tags: [
+    { id: 'role-tank', key: 'tank', label: 'Tank', kind: 'role' as const },
+  ],
+  pending_tag_suggestions: [],
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
 };
@@ -275,6 +279,18 @@ describe('DeckDetailPage type grouping', () => {
     expect(readTypeGroupKeys(mounted.container)).toEqual(['spell', 'creature', 'untyped', 'mana']);
     expect(mounted.container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
     expect(mounted.container.querySelectorAll('[data-testid^="deck-card-"]')).toHaveLength(4);
+
+    mounted.unmount();
+  });
+
+  test('renders the owner and deck tags directly after the title without an author prefix', async () => {
+    const mounted = await mountPage();
+    const header = mounted.container.querySelector('header');
+
+    expect(header?.textContent).toContain('Grouped Deck');
+    expect(header?.textContent).toContain('Owner');
+    expect(header?.textContent).toContain('Tank');
+    expect(header?.textContent).not.toContain('By');
 
     mounted.unmount();
   });
