@@ -7,10 +7,10 @@ import {
 } from '@/composables/card-gallery/cardSort';
 
 type DeckTypeGroupCardLike = {
-  id: string;
-  label: string;
-  name: string;
-  types?: CardTypeMetadata[];
+  id?: string;
+  label?: string;
+  name?: string;
+  types?: Array<Pick<CardTypeMetadata, 'key'> & Partial<Pick<CardTypeMetadata, 'label'>>>;
 };
 
 export type DeckTypeGroup<TEntry> = {
@@ -30,9 +30,9 @@ const compareEntriesByCardIdentity = <TEntry extends { card: DeckTypeGroupCardLi
   left: TEntry,
   right: TEntry,
 ): number =>
-  left.card.name.localeCompare(right.card.name)
-  || left.card.label.localeCompare(right.card.label)
-  || left.card.id.localeCompare(right.card.id);
+  (left.card.name ?? '').localeCompare(right.card.name ?? '')
+  || (left.card.label ?? '').localeCompare(right.card.label ?? '')
+  || (left.card.id ?? '').localeCompare(right.card.id ?? '');
 
 const hasEntries = <TEntry>(group: DeckTypeGroup<TEntry> | undefined): group is DeckTypeGroup<TEntry> =>
   group !== undefined && group.entries.length > 0;

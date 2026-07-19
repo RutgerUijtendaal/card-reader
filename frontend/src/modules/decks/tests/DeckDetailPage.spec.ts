@@ -96,6 +96,21 @@ vi.mock('@/modules/decks/components/DeckManaCurve.vue', () => ({
   }),
 }));
 
+vi.mock('@/modules/decks/components/DeckManaDistribution.vue', () => ({
+  default: defineComponent({
+    props: {
+      entries: { type: Array, required: true },
+    },
+    setup(props) {
+      return () => h(
+        'div',
+        { 'data-testid': 'mana-distribution' },
+        (props.entries as Array<{ card: { name: string } }>).map((entry) => entry.card.name).join(', '),
+      );
+    },
+  }),
+}));
+
 vi.mock('@/modules/decks/components/DeckCardCountBadge.vue', () => ({
   default: defineComponent({
     props: {
@@ -354,6 +369,37 @@ describe('DeckDetailPage type grouping', () => {
     expect(mounted.container.textContent).toContain('Attachment Card');
     expect(mounted.container.textContent).not.toContain('Spell Card');
 
+    mounted.unmount();
+  });
+
+  test('expands mana details and follows the active board', async () => {
+    const mounted = await mountPage();
+    const detailsButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.trim() === 'Details',
+    );
+    if (!(detailsButton instanceof HTMLButtonElement)) {
+      throw new Error('expected mana details button');
+    }
+
+    expect(detailsButton.getAttribute('aria-expanded')).toBe('false');
+    expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).toBeNull();
+    detailsButton.click();
+    await nextTick();
+
+    expect(detailsButton.getAttribute('aria-expanded')).toBe('true');
+    expect(mounted.container.querySelector('.deck-detail-layout-expanded')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toContain('Spell Card');
+
+    const sideboardButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Sideboard'),
+    );
+    if (!(sideboardButton instanceof HTMLButtonElement)) {
+      throw new Error('expected sideboard tab');
+    }
+    sideboardButton.click();
+    await nextTick();
+
+    expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toBe('Attachment Card');
     mounted.unmount();
   });
 

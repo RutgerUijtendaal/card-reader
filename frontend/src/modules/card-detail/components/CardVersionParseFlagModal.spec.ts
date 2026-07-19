@@ -98,6 +98,7 @@ const mountModal = async () => {
   await nextTick();
   return {
     container,
+    modalRoot: document.body,
     submit,
     unmount: () => {
       app.unmount();
@@ -107,8 +108,8 @@ const mountModal = async () => {
 };
 
 const clickButton = async (container: HTMLElement, label: string): Promise<void> => {
-  const button = Array.from(container.querySelectorAll('button')).find(
-    (candidate) => candidate.textContent?.replace(/\s+/g, ' ').trim().includes(label),
+  const button = Array.from(container.querySelectorAll('button')).find((candidate) =>
+    candidate.textContent?.replace(/\s+/g, ' ').trim().includes(label),
   );
   expect(button).toBeInstanceOf(HTMLButtonElement);
   (button as HTMLButtonElement).click();
@@ -123,17 +124,17 @@ describe('CardVersionParseFlagModal', () => {
   test('submits multiple selected properties as separate items', async () => {
     const mounted = await mountModal();
 
-    await clickButton(mounted.container, 'Name');
+    await clickButton(mounted.modalRoot, 'Name');
 
-    const inputs = Array.from(mounted.container.querySelectorAll('input.input-base'));
+    const inputs = Array.from(mounted.modalRoot.querySelectorAll('input.input-base'));
     expect(inputs).toHaveLength(1);
     (inputs[0] as HTMLInputElement).value = 'Correct Name';
     inputs[0].dispatchEvent(new Event('input'));
     await nextTick();
 
-    await clickButton(mounted.container, 'Rules Text');
+    await clickButton(mounted.modalRoot, 'Rules Text');
 
-    await clickButton(mounted.container, 'Submit Flag');
+    await clickButton(mounted.modalRoot, 'Submit Flag');
 
     expect(mounted.submit).toHaveBeenCalledWith({
       note: '',

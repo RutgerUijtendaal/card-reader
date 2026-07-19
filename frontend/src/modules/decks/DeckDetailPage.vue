@@ -71,77 +71,115 @@
 
     <AppPageLayout
       columns="one"
-      root-class="xl:grid-cols-[22.5rem_minmax(0,1fr)]"
+      :root-class="detailsExpanded ? 'deck-detail-layout deck-detail-layout-expanded' : 'deck-detail-layout'"
     >
       <template #aside>
-        <AppStickyAside scroll-class="space-y-5">
-          <div class="space-y-4">
-            <h3 class="theme-section-title text-base font-semibold">
-              Hero
-            </h3>
-            <div class="space-y-3">
-              <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
-                <img
-                  v-if="deck.hero_card.image_url"
-                  :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
-                  :alt="deck.hero_card.name"
-                  class="h-full w-full object-cover"
-                >
-                <div
-                  v-else
-                  class="theme-kicker flex h-full items-center justify-center text-xs"
-                >
-                  No image
+        <div
+          class="deck-detail-aside-shell"
+          :class="detailsExpanded ? 'deck-detail-aside-shell-expanded' : ''"
+        >
+          <AppStickyAside
+            root-class="deck-detail-primary-aside"
+            scroll-class="space-y-5"
+          >
+            <div class="space-y-4">
+              <h3 class="theme-section-title text-base font-semibold">
+                Hero
+              </h3>
+              <div class="space-y-3">
+                <div class="theme-card-frame theme-card-image-well mx-auto aspect-[63/88] w-full max-w-[22rem] overflow-hidden rounded-2xl">
+                  <img
+                    v-if="deck.hero_card.image_url"
+                    :src="toAbsoluteApiUrl(deck.hero_card.image_url)"
+                    :alt="deck.hero_card.name"
+                    class="h-full w-full object-cover"
+                  >
+                  <div
+                    v-else
+                    class="theme-kicker flex h-full items-center justify-center text-xs"
+                  >
+                    No image
+                  </div>
                 </div>
+
+                <p class="theme-section-title text-lg font-semibold">
+                  {{ deck.hero_card.name }}
+                </p>
               </div>
-
-              <p class="theme-section-title text-lg font-semibold">
-                {{ deck.hero_card.name }}
-              </p>
             </div>
-          </div>
 
-          <DeckManaCurve
-            :entries="activeBoardEntries"
-            :empty-label="activeBoardEmptyLabel"
-          />
-
-          <div class="theme-divider border-t pt-4">
-            <label class="theme-muted-panel flex items-center gap-3 p-3 text-sm">
-              <input
-                v-model="groupByType"
-                type="checkbox"
-                class="theme-checkbox h-4 w-4"
+            <div class="space-y-3">
+              <DeckManaCurve
+                :entries="activeBoardEntries"
+                :empty-label="activeBoardEmptyLabel"
+              />
+              <button
+                class="deck-mana-details-button theme-section-muted flex w-full items-center justify-between gap-3 border-t pt-3 text-sm font-medium"
+                type="button"
+                :aria-expanded="detailsExpanded"
+                aria-controls="deck-mana-distribution-panel"
+                @click="detailsExpanded = !detailsExpanded"
               >
-              <span class="theme-section-title font-medium">Group by type</span>
-            </label>
-          </div>
-
-          <template #footer>
-            <div class="flex flex-wrap items-center gap-3">
-              <CardSortMenu
-                :sort="effectiveSort"
-                :default-sort="defaultSort"
-                :override-active="deckDetailSortOverride !== null"
-                allow-default-option
-                @update:sort="setDeckDetailSortOverride"
-                @reset="clearDeckDetailSortOverride"
-              />
-              <GalleryOptionsMenu
-                :hover-mode="effectiveHoverMode"
-                :default-hover-mode="defaultHoverMode"
-                :hover-mode-override-active="deckDetailHoverModeOverride !== null"
-                allow-hover-mode-default-option
-                :card-scale="cardScale"
-                :show-card-groups="false"
-                :show-card-groups-control="false"
-                @update:hover-mode="setDeckDetailHoverModeOverride"
-                @reset:hover-mode="clearDeckDetailHoverModeOverride"
-                @update:card-scale="cardScale = $event"
-              />
+                <span>Details</span>
+                <ChevronRight
+                  class="h-4 w-4 transition-transform duration-200"
+                  :class="detailsExpanded ? 'rotate-90' : ''"
+                />
+              </button>
             </div>
-          </template>
-        </AppStickyAside>
+
+            <div class="theme-divider border-t pt-4">
+              <label class="theme-muted-panel flex items-center gap-3 p-3 text-sm">
+                <input
+                  v-model="groupByType"
+                  type="checkbox"
+                  class="theme-checkbox h-4 w-4"
+                >
+                <span class="theme-section-title font-medium">Group by type</span>
+              </label>
+            </div>
+
+            <template #footer>
+              <div class="flex flex-wrap items-center gap-3">
+                <CardSortMenu
+                  :sort="effectiveSort"
+                  :default-sort="defaultSort"
+                  :override-active="deckDetailSortOverride !== null"
+                  allow-default-option
+                  @update:sort="setDeckDetailSortOverride"
+                  @reset="clearDeckDetailSortOverride"
+                />
+                <GalleryOptionsMenu
+                  :hover-mode="effectiveHoverMode"
+                  :default-hover-mode="defaultHoverMode"
+                  :hover-mode-override-active="deckDetailHoverModeOverride !== null"
+                  allow-hover-mode-default-option
+                  :card-scale="cardScale"
+                  :show-card-groups="false"
+                  :show-card-groups-control="false"
+                  @update:hover-mode="setDeckDetailHoverModeOverride"
+                  @reset:hover-mode="clearDeckDetailHoverModeOverride"
+                  @update:card-scale="cardScale = $event"
+                />
+              </div>
+            </template>
+          </AppStickyAside>
+
+          <Transition name="deck-mana-details">
+            <AppStickyAside
+              v-if="detailsExpanded"
+              id="deck-mana-distribution-panel"
+              root-class="deck-detail-distribution-aside"
+              scroll-class="space-y-5"
+            >
+              <DeckManaDistribution
+                :entries="activeBoardEntries"
+                :symbols="filterOptions.symbols"
+                :types="filterOptions.types"
+              />
+            </AppStickyAside>
+          </Transition>
+        </div>
       </template>
 
       <section class="space-y-4">
@@ -263,8 +301,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
-import { BookOpenText, Clipboard } from 'lucide-vue-next';
-import DeckTagPills from '@/components/decks/DeckTagPills.vue';
+import { BookOpenText, ChevronRight, Clipboard } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
@@ -274,6 +311,7 @@ import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
+import DeckTagPills from '@/components/decks/DeckTagPills.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation, isCardReturnQuery } from '@/composables/cards/cardReturnState';
 import type { CardFiltersResponse, CardListItem } from '@/modules/card-detail/types';
@@ -284,6 +322,7 @@ import { useHoverModeSurface } from '@/composables/useHoverModePreferences';
 import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';
 import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vue';
 import DeckDetailLoadingSkeleton from '@/modules/decks/components/DeckDetailLoadingSkeleton.vue';
+import DeckManaDistribution from '@/modules/decks/components/DeckManaDistribution.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
 import { buildDeckCardDetailLocation, buildDeckDetailEditorLocation } from '@/composables/decks/deckRouteState';
 import { groupDeckEntriesByType } from '@/composables/decks/deckTypeGroups';
@@ -318,6 +357,7 @@ const {
 } = useHoverModeSurface('deckDetail');
 const { exportTtsDeck } = useDeckExport();
 const activeBoardId = ref('mainboard');
+const detailsExpanded = ref(false);
 const groupByType = useLocalStorage('card-reader.deck-detail-group-by-type', true, {
   writeDefaults: true,
 });
@@ -444,3 +484,99 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+.deck-detail-aside-shell {
+  min-width: 0;
+}
+
+.deck-mana-details-button {
+  border-color: color-mix(in srgb, var(--color-border) 62%, transparent 38%);
+  transition: color 180ms ease;
+}
+
+.deck-mana-details-button:hover {
+  color: var(--color-text);
+}
+
+.deck-mana-details-enter-active,
+.deck-mana-details-leave-active {
+  overflow: hidden;
+  transition:
+    max-height 240ms ease,
+    opacity 180ms ease,
+    transform 240ms ease;
+}
+
+.deck-mana-details-enter-from,
+.deck-mana-details-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-0.5rem);
+}
+
+.deck-mana-details-enter-to,
+.deck-mana-details-leave-from {
+  max-height: 100rem;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (min-width: 1280px) {
+  :deep(.deck-detail-layout) {
+    grid-template-columns: 22.5rem minmax(0, 1fr);
+    transition: grid-template-columns 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  :deep(.deck-detail-layout-expanded) {
+    grid-template-columns: 45rem minmax(0, 1fr);
+  }
+
+  .deck-detail-aside-shell {
+    display: grid;
+    grid-template-columns: 22.5rem 0;
+    overflow: clip;
+    transition: grid-template-columns 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .deck-detail-aside-shell-expanded {
+    grid-template-columns: 22.5rem 22.5rem;
+  }
+
+  :deep(.deck-detail-primary-aside) {
+    z-index: 1;
+  }
+
+  :deep(.deck-detail-distribution-aside) {
+    min-width: 0;
+    overflow: hidden;
+    border-right-width: 1px;
+    border-left-width: 1px;
+  }
+
+  .deck-mana-details-enter-active,
+  .deck-mana-details-leave-active {
+    max-height: none;
+    transition:
+      opacity 180ms ease,
+      transform 240ms ease;
+  }
+
+  .deck-mana-details-enter-from,
+  .deck-mana-details-leave-to {
+    max-height: none;
+    transform: translateX(-0.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :deep(.deck-detail-layout),
+  .deck-detail-aside-shell,
+  .deck-mana-details-enter-active,
+  .deck-mana-details-leave-active,
+  .deck-mana-details-button,
+  .deck-mana-details-button :deep(svg) {
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
