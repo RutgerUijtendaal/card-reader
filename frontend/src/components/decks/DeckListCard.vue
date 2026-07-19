@@ -30,7 +30,7 @@
       <div class="deck-list-card-content">
         <div class="flex items-start gap-4">
           <div class="min-w-0 flex-1 space-y-3">
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="deck-list-card-title-row flex flex-wrap items-center gap-2">
               <h3 class="theme-section-title truncate text-lg font-semibold">
                 {{ deck.name }}
               </h3>
@@ -40,6 +40,12 @@
               >
                 {{ titlePillLabel }}
               </span>
+              <DeckTagPills
+                class="deck-list-card-title-tags"
+                :tags="deck.tags ?? []"
+                :pending-suggestions="isOwnedMode ? deck.pending_tag_suggestions ?? [] : []"
+                :max-visible="4"
+              />
               <span
                 v-if="deprecatedCardCount > 0"
                 class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-1 text-xs"
@@ -57,12 +63,6 @@
             <p class="theme-section-muted text-sm">
               {{ boardSummary }}
             </p>
-
-            <DeckTagPills
-              :tags="deck.tags ?? []"
-              :pending-suggestions="isOwnedMode ? deck.pending_tag_suggestions ?? [] : []"
-              :max-visible="4"
-            />
 
             <p
               v-if="deck.description"
@@ -92,6 +92,11 @@
               button-label="Open deck actions"
             >
               <template #default="{ close }">
+                <slot
+                  name="menu-actions"
+                  :close="close"
+                />
+
                 <button
                   class="btn-secondary w-full justify-center"
                   type="button"
@@ -328,6 +333,10 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.deck-list-card-title-tags {
+  align-items: center;
 }
 
 @media (max-width: 767px) {

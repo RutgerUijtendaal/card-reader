@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from card_reader_core.models import Deck, DeckTag, DeckTagSuggestion
 
@@ -26,3 +26,13 @@ class DeckTagSuggestionDetail(TypedDict):
     entry: DeckTagSuggestion
     linked_decks: list[Deck]
     occurrence_count: int
+    active_occurrence_count: int
+
+
+class DeckTagSuggestionResolution(TypedDict):
+    label: str
+    normalized_value: str
+    status: Literal["pending", "resolved", "rejected"]
+    message: str | None
+    suggestion_id: str | None
+    tag: DeckTag | None

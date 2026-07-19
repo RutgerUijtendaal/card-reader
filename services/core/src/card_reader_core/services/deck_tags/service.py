@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from django.db import transaction
 
 from card_reader_core.models import Deck, DeckTag, DeckTagKind, DeckTagSuggestion
 from card_reader_core.repositories.deck_tags import (
     accept_deck_tag_suggestion,
-    attach_pending_suggestion,
-    clear_pending_suggestion_occurrences,
+    attach_suggestion_occurrence,
     create_deck_tag,
+    deactivate_unresolved_suggestion_occurrences,
     deck_tag_key_exists,
     delete_deck_tag,
     get_deck_tag,
+    get_deck_tag_for_update,
     get_deck_tag_suggestion,
     get_deck_tag_suggestion_by_value,
+    get_deck_tag_suggestion_for_update,
     get_deck_tags_by_ids,
     get_or_create_deck_tag_suggestion,
     get_type_tag_by_key,
@@ -20,13 +24,24 @@ from card_reader_core.repositories.deck_tags import (
     list_deck_tags,
     list_decks_for_suggestion,
     list_decks_for_tag,
+    record_rejected_suggestion_resubmission,
+    reject_accepted_deck_tag_suggestions,
     reject_deck_tag_suggestion,
+    reopen_deck_tag_suggestion,
     replace_deck_tag_assignments,
     update_deck_tag,
 )
 from card_reader_core.repositories.helpers import normalize_slug_key
 
-from .types import AdminDeckTagCatalog, DeckTagCatalog, DeckTagDetail, DeckTagSuggestionDetail
+from .types import (
+    AdminDeckTagCatalog,
+    DeckTagCatalog,
+    DeckTagDetail,
+    DeckTagSuggestionDetail,
+    DeckTagSuggestionResolution,
+)
+
+REJECTED_SUGGESTION_MESSAGE = "This tag was previously declined. Try a more specific suggestion."
 
 
 class DeckTagService:
@@ -55,7 +70,12 @@ class DeckTagService:
         if suggestion is None:
             return None
         decks = list_decks_for_suggestion(suggestion_id)
-        return {"entry": suggestion, "linked_decks": decks, "occurrence_count": len(decks)}
+        return {
+            "entry": suggestion,
+            "linked_decks": decks,
+            "occurrence_count": len(decks),
+            "active_occurrence_count": int(getattr(suggestion, "active_occurrence_count", 0)),
+        }
 
     def create_tag(self, *, kind: str, label: str, key: str | None = None) -> DeckTag:
         normalized_kind = self._normalize_kind(kind)
@@ -64,6 +84,7 @@ class DeckTagService:
         self._ensure_unique_key(kind=normalized_kind, key=normalized_key)
         return create_deck_tag(kind=normalized_kind, key=normalized_key, label=normalized_label)
 
+    @transaction.atomic
     def update_tag(
         self,
         *,
@@ -72,7 +93,7 @@ class DeckTagService:
         label: str | None = None,
         key: str | None = None,
     ) -> DeckTag | None:
-        tag = get_deck_tag(tag_id)
+        tag = get_deck_tag_for_update(tag_id)
         if tag is None:
             return None
         normalized_kind = self._normalize_kind(kind or tag.kind)
@@ -82,9 +103,17 @@ class DeckTagService:
             label=normalized_label,
         )
         self._ensure_unique_key(kind=normalized_kind, key=normalized_key, exclude_id=tag.id)
-        return update_deck_tag(tag=tag, kind=normalized_kind, key=normalized_key, label=normalized_label)
+        if tag.kind == "type" and normalized_kind == "role":
+            reject_accepted_deck_tag_suggestions(tag_id=tag.id)
+        updated = update_deck_tag(tag=tag, kind=normalized_kind, key=normalized_key, label=normalized_label)
+        return get_deck_tag(updated.id) or updated
 
+    @transaction.atomic
     def delete_tag(self, *, tag_id: str) -> bool:
+        tag = get_deck_tag_for_update(tag_id)
+        if tag is None:
+            return False
+        reject_accepted_deck_tag_suggestions(tag_id=tag_id)
         return delete_deck_tag(tag_id=tag_id)
 
     @transaction.atomic
@@ -101,10 +130,8 @@ class DeckTagService:
             raise ValueError("One or more deck tags were not found.")
 
         selected_by_id = {tag.id: tag for tag in tags}
-        clear_pending_suggestion_occurrences(deck=deck)
-        for raw_label in suggested_type_labels:
-            display_value = self._normalize_label(raw_label)
-            normalized_value = self._normalize_suggestion_value(display_value)
+        deactivate_unresolved_suggestion_occurrences(deck=deck)
+        for display_value, normalized_value in self._normalize_suggestion_labels(suggested_type_labels):
             existing_tag = get_type_tag_by_key(normalize_slug_key(display_value))
             if existing_tag is not None:
                 selected_by_id[existing_tag.id] = existing_tag
@@ -117,24 +144,74 @@ class DeckTagService:
                     display_value=display_value,
                 )
             if suggestion.status == "rejected":
-                raise ValueError(f"The deck tag suggestion '{display_value}' was rejected.")
+                attach_suggestion_occurrence(deck=deck, suggestion=suggestion)
+                record_rejected_suggestion_resubmission(suggestion=suggestion)
+                continue
             if suggestion.status == "accepted":
                 if suggestion.accepted_tag is None:
                     raise ValueError(f"The accepted deck tag suggestion '{display_value}' no longer has a target.")
                 selected_by_id[suggestion.accepted_tag.id] = suggestion.accepted_tag
                 continue
-            attach_pending_suggestion(deck=deck, suggestion=suggestion)
+            attach_suggestion_occurrence(deck=deck, suggestion=suggestion)
 
         replace_deck_tag_assignments(deck=deck, tags=list(selected_by_id.values()))
 
+    def describe_suggestion_results(self, labels: list[str]) -> list[DeckTagSuggestionResolution]:
+        results: list[DeckTagSuggestionResolution] = []
+        for display_value, normalized_value in self._normalize_suggestion_labels(labels):
+            existing_tag = get_type_tag_by_key(normalize_slug_key(display_value))
+            if existing_tag is not None:
+                results.append(
+                    {
+                        "label": display_value,
+                        "normalized_value": normalized_value,
+                        "status": "resolved",
+                        "message": None,
+                        "suggestion_id": None,
+                        "tag": existing_tag,
+                    }
+                )
+                continue
+
+            suggestion = get_deck_tag_suggestion_by_value(normalized_value)
+            if suggestion is None:
+                continue
+            if suggestion.status == "accepted" and suggestion.accepted_tag is not None:
+                results.append(
+                    {
+                        "label": display_value,
+                        "normalized_value": normalized_value,
+                        "status": "resolved",
+                        "message": None,
+                        "suggestion_id": suggestion.id,
+                        "tag": suggestion.accepted_tag,
+                    }
+                )
+                continue
+            unresolved_status: Literal["pending", "rejected"] = (
+                "pending" if suggestion.status == "pending" else "rejected"
+            )
+            results.append(
+                {
+                    "label": display_value,
+                    "normalized_value": normalized_value,
+                    "status": unresolved_status,
+                    "message": REJECTED_SUGGESTION_MESSAGE if unresolved_status == "rejected" else None,
+                    "suggestion_id": suggestion.id,
+                    "tag": None,
+                }
+            )
+        return results
+
     @transaction.atomic
     def accept_suggestion_to_existing(self, *, suggestion_id: str, target_id: str) -> DeckTagSuggestion | None:
-        suggestion = get_deck_tag_suggestion(suggestion_id)
-        if suggestion is None:
-            return None
-        target = get_deck_tag(target_id)
+        target = get_deck_tag_for_update(target_id)
         if target is None or target.kind != "type":
             raise ValueError("Type tag not found.")
+        suggestion = get_deck_tag_suggestion_for_update(suggestion_id)
+        if suggestion is None:
+            return None
+        self._ensure_pending_suggestion(suggestion, action="accepted")
         return accept_deck_tag_suggestion(suggestion=suggestion, tag=target)
 
     @transaction.atomic
@@ -145,9 +222,10 @@ class DeckTagService:
         label: str | None = None,
         key: str | None = None,
     ) -> DeckTagSuggestion | None:
-        suggestion = get_deck_tag_suggestion(suggestion_id)
+        suggestion = get_deck_tag_suggestion_for_update(suggestion_id)
         if suggestion is None:
             return None
+        self._ensure_pending_suggestion(suggestion, action="accepted")
         tag = self.create_tag(
             kind="type",
             label=label or suggestion.display_value,
@@ -155,11 +233,27 @@ class DeckTagService:
         )
         return accept_deck_tag_suggestion(suggestion=suggestion, tag=tag)
 
+    @transaction.atomic
     def reject_suggestion(self, *, suggestion_id: str) -> DeckTagSuggestion | None:
-        suggestion = get_deck_tag_suggestion(suggestion_id)
+        suggestion = get_deck_tag_suggestion_for_update(suggestion_id)
         if suggestion is None:
             return None
+        self._ensure_pending_suggestion(suggestion, action="rejected")
         return reject_deck_tag_suggestion(suggestion=suggestion)
+
+    @transaction.atomic
+    def reopen_suggestion(self, *, suggestion_id: str) -> DeckTagSuggestion | None:
+        suggestion = get_deck_tag_suggestion_for_update(suggestion_id)
+        if suggestion is None:
+            return None
+        if suggestion.status != "rejected":
+            raise ValueError("Only rejected deck tag suggestions can be reopened.")
+        return reopen_deck_tag_suggestion(suggestion=suggestion)
+
+    @staticmethod
+    def _ensure_pending_suggestion(suggestion: DeckTagSuggestion, *, action: str) -> None:
+        if suggestion.status != "pending":
+            raise ValueError(f"Only pending deck tag suggestions can be {action}.")
 
     def _ensure_unique_key(self, *, kind: DeckTagKind, key: str, exclude_id: str | None = None) -> None:
         if deck_tag_key_exists(kind=kind, key=key, exclude_id=exclude_id):
@@ -189,3 +283,12 @@ class DeckTagService:
     @staticmethod
     def _normalize_suggestion_value(value: str) -> str:
         return " ".join(value.lower().split()).strip()
+
+    @classmethod
+    def _normalize_suggestion_labels(cls, labels: list[str]) -> list[tuple[str, str]]:
+        normalized: dict[str, str] = {}
+        for raw_label in labels:
+            display_value = cls._normalize_label(raw_label)
+            normalized_value = cls._normalize_suggestion_value(display_value)
+            normalized.setdefault(normalized_value, display_value)
+        return [(display_value, normalized_value) for normalized_value, display_value in normalized.items()]

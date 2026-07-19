@@ -9,6 +9,7 @@ import {
   buildMyDecksLocation,
   buildMyDecksReturnLocation,
   buildNewDeckEditorLocation,
+  buildPublicDeckEditorLocation,
   getMyDecksReturnLabel,
   getDeckEditorReturnLabel,
   isDeckReturnQuery,
@@ -85,6 +86,15 @@ describe('deckRouteState', () => {
       path: '/my/decks/deck-1/edit',
       query: {
         return_to: 'my_decks',
+      },
+    });
+  });
+
+  test('builds a public decks editor location with return context', () => {
+    expect(buildPublicDeckEditorLocation('deck-1')).toEqual({
+      path: '/my/decks/deck-1/edit',
+      query: {
+        return_to: 'decks',
       },
     });
   });

@@ -141,6 +141,10 @@ def get_public_deck(deck_id: str) -> Deck | None:
     return deck_queryset().filter(id=deck_id, visibility="public").first()
 
 
+def get_deck(deck_id: str) -> Deck | None:
+    return deck_queryset().filter(id=deck_id).first()
+
+
 def get_owner_deck(deck_id: str, owner_id: str) -> Deck | None:
     return deck_queryset().filter(id=deck_id, owner_id=owner_id).first()
 

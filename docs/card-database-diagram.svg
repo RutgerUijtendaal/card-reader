@@ -115,11 +115,11 @@
 
   <rect class="box left" x="95" y="1150" width="210" height="80"/>
   <text class="title-small" x="112" y="1182">DeckTagSuggestion</text>
-  <text class="field" x="122" y="1207">value, status, target</text>
+  <text class="field" x="112" y="1207">value/status/target/retries</text>
 
   <rect class="box left" x="360" y="1150" width="210" height="80"/>
   <text class="title-small" x="370" y="1182">DeckTagSuggestionDeck</text>
-  <text class="field" x="388" y="1207">suggestion + deck</text>
+  <text class="field" x="380" y="1207">suggestion + deck, active</text>
 
   <rect class="band" x="700" y="370" width="320" height="880"/>
   <text class="band-title" x="735" y="402">Stable identity</text>

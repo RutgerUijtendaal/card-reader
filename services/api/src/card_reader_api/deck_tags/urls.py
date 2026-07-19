@@ -6,6 +6,7 @@ from .views import (
     AdminDeckTagSuggestionAcceptView,
     AdminDeckTagSuggestionDetailView,
     AdminDeckTagSuggestionRejectView,
+    AdminDeckTagSuggestionReopenView,
     DeckTagCatalogView,
 )
 
@@ -24,5 +25,9 @@ urlpatterns = [
     path(
         "admin/deck-tag-suggestions/<str:suggestion_id>/reject",
         AdminDeckTagSuggestionRejectView.as_view(),
+    ),
+    path(
+        "admin/deck-tag-suggestions/<str:suggestion_id>/reopen",
+        AdminDeckTagSuggestionReopenView.as_view(),
     ),
 ]

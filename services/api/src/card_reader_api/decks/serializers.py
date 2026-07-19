@@ -11,6 +11,7 @@ from card_reader_core.models import Card, CardVersion, CardVersionImage, Deck, D
 from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckConstraintEntry, DeckService, effective_deck_building_rules_json, normalize_deck_building_config
+from card_reader_core.services.deck_tags import DeckTagSuggestionResolution
 
 
 class DeckListFilterParams(TypedDict):
@@ -158,6 +159,31 @@ def pending_deck_tag_suggestions_payload(deck: Deck) -> list[dict[str, object]]:
         }
         for occurrence in deck.tag_suggestion_occurrences.all()
         if occurrence.suggestion.status == "pending"
+    ]
+
+
+def deck_tag_suggestion_results_payload(
+    results: list[DeckTagSuggestionResolution],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "label": result["label"],
+            "normalized_value": result["normalized_value"],
+            "status": result["status"],
+            "message": result["message"],
+            "suggestion_id": result["suggestion_id"],
+            "tag": (
+                {
+                    "id": result["tag"].id,
+                    "key": result["tag"].key,
+                    "label": result["tag"].label,
+                    "kind": result["tag"].kind,
+                }
+                if result["tag"] is not None
+                else None
+            ),
+        }
+        for result in results
     ]
 
 

@@ -26,6 +26,15 @@ export type DeckTagCatalog = {
   types: DeckTagOption[];
 };
 
+export type DeckTagSuggestionResult = {
+  label: string;
+  normalized_value: string;
+  status: 'pending' | 'resolved' | 'rejected';
+  message: string | null;
+  suggestion_id: string | null;
+  tag: DeckTagOption | null;
+};
+
 export type DeckVisibility = 'private' | 'unlisted' | 'public';
 
 export type DeckCardSummary = CardHoverTooltipModel & {
@@ -53,6 +62,7 @@ export type DeckRecord = {
   visibility: DeckVisibility;
   tags?: DeckTagOption[];
   pending_tag_suggestions?: PendingDeckTagSuggestion[];
+  tag_suggestion_results?: DeckTagSuggestionResult[];
   owner: {
     id: string;
     username: string;

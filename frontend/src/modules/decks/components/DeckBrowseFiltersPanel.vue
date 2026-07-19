@@ -52,6 +52,7 @@
       label="Tags"
       :options="controller.filterCatalog.value.deckTags"
       :groups="deckTagGroups"
+      :default-open="true"
       @reset="controller.resetDeckTags"
     />
   </GalleryFilterSidebar>
@@ -107,13 +108,13 @@ const deckTagGroups = computed<MetadataPillOptionGroup[]>(() => [
     key: 'roles',
     label: 'Roles',
     options: props.controller.filterCatalog.value.deckTags.filter((tag) => tag.kind === 'role'),
-    selectedClass: 'theme-choice-chip-active shadow-sm',
+    selectedClass: 'theme-choice-chip-accent shadow-sm',
   },
   {
     key: 'types',
     label: 'Types',
     options: props.controller.filterCatalog.value.deckTags.filter((tag) => tag.kind === 'type'),
-    selectedClass: 'theme-pill-keyword shadow-sm',
+    selectedClass: 'theme-choice-chip-keyword shadow-sm',
   },
 ]);
 </script>

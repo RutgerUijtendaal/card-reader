@@ -1,5 +1,11 @@
 from .service import DeckTagService
-from .types import AdminDeckTagCatalog, DeckTagCatalog, DeckTagDetail, DeckTagSuggestionDetail
+from .types import (
+    AdminDeckTagCatalog,
+    DeckTagCatalog,
+    DeckTagDetail,
+    DeckTagSuggestionDetail,
+    DeckTagSuggestionResolution,
+)
 
 __all__ = [
     "AdminDeckTagCatalog",
@@ -7,4 +13,5 @@ __all__ = [
     "DeckTagDetail",
     "DeckTagService",
     "DeckTagSuggestionDetail",
+    "DeckTagSuggestionResolution",
 ]

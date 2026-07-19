@@ -5,6 +5,7 @@ import {
   createEmptyCatalogEntry,
   isKnownCatalogKind,
   isSuggestedCatalogKind,
+  kindLabel,
   normalizeCatalogResponse,
 } from './catalogAdminUtils';
 
@@ -21,6 +22,8 @@ describe('catalogAdminUtils', () => {
     expect(isKnownCatalogKind('deck-roles')).toBe(true);
     expect(isSuggestedCatalogKind('suggested-types')).toBe(true);
     expect(isSuggestedCatalogKind('suggested-deck-types')).toBe(true);
+    expect(kindLabel('suggested-tags')).toBe('Suggested tags');
+    expect(kindLabel('suggested-types')).toBe('Suggested types');
   });
 
   it('builds deck tag catalog payloads without card identifiers', () => {

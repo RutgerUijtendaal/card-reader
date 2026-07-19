@@ -4,7 +4,11 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import DeckDetailPage from '@/modules/decks/DeckDetailPage.vue';
 
-const { fetchDeckDetailMock, fetchMyDeckMock, apiGetMock, exportTtsDeckMock } = vi.hoisted(() => ({
+const { authState, fetchDeckDetailMock, fetchMyDeckMock, apiGetMock, exportTtsDeckMock } = vi.hoisted(() => ({
+  authState: {
+    canAccessStaffRoutes: false,
+    user: { id: 'user-1' } as { id: string } | null,
+  },
   fetchDeckDetailMock: vi.fn(),
   fetchMyDeckMock: vi.fn(),
   apiGetMock: vi.fn(),
@@ -19,9 +23,7 @@ vi.mock('@/api/client', () => ({
 }));
 
 vi.mock('@/modules/auth/authStore', () => ({
-  useAuthStore: () => ({
-    user: { id: 'user-1' },
-  }),
+  useAuthStore: () => authState,
 }));
 
 vi.mock('@/modules/decks/api', () => ({
@@ -238,6 +240,8 @@ const readTypeGroupKeys = (container: HTMLElement): string[] =>
 
 describe('DeckDetailPage type grouping', () => {
   beforeEach(() => {
+    authState.canAccessStaffRoutes = false;
+    authState.user = { id: 'user-1' };
     localStorage.clear();
     fetchDeckDetailMock.mockResolvedValue(deckRecord);
     fetchMyDeckMock.mockResolvedValue(deckRecord);
@@ -256,6 +260,28 @@ describe('DeckDetailPage type grouping', () => {
     expect(readTypeGroupKeys(mounted.container)).toEqual(['spell', 'creature', 'untyped', 'mana']);
     expect(mounted.container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
     expect(mounted.container.querySelectorAll('[data-testid^="deck-card-"]')).toHaveLength(4);
+
+    mounted.unmount();
+  });
+
+  test('allows staff to open the editor for another users deck', async () => {
+    authState.user = { id: 'staff-user' };
+    authState.canAccessStaffRoutes = true;
+    const mounted = await mountPage();
+    const editLink = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a')).find(
+      (link) => link.textContent?.trim() === 'Edit Deck',
+    );
+
+    expect(editLink?.getAttribute('href')).toContain('/my/decks/deck-1/edit');
+
+    mounted.unmount();
+  });
+
+  test('does not expose editing to unrelated non-staff users', async () => {
+    authState.user = { id: 'other-user' };
+    const mounted = await mountPage();
+
+    expect(mounted.container.textContent).not.toContain('Edit Deck');
 
     mounted.unmount();
   });

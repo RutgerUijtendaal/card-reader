@@ -67,6 +67,7 @@
         @accept-existing="acceptSelectedSuggestionToExisting"
         @accept-new="acceptSelectedSuggestionAsNew"
         @reject="rejectSelectedSuggestion"
+        @reopen="reopenSelectedSuggestion"
       />
     </div>
   </div>
@@ -141,6 +142,7 @@ const {
   acceptSelectedSuggestionToExisting,
   acceptSelectedSuggestionAsNew,
   rejectSelectedSuggestion,
+  reopenSelectedSuggestion,
 } = useCatalogAdmin();
 
 onMounted(() => {

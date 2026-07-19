@@ -160,7 +160,7 @@ const metadataToneForKind = (kind: CatalogKind): string => {
 
 const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
   if (isSuggestionRecord(entry)) {
-    return [
+    const badges = [
       {
         label: String(entry.occurrence_count),
         tone: 'theme-pill-accent',
@@ -175,6 +175,13 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
               : 'theme-pill-neutral',
       },
     ];
+    if ((entry.rejected_resubmission_count ?? 0) > 0) {
+      badges.splice(1, 0, {
+        label: `${entry.rejected_resubmission_count} retried`,
+        tone: 'theme-pill-warning',
+      });
+    }
+    return badges;
   }
 
   if ('symbol_type' in entry) {

@@ -14,6 +14,12 @@
         >
           {{ selectedRow.occurrence_count }} matches • {{ selectedRow.status }}
         </p>
+        <p
+          v-if="isDeckSuggestion && selectedRow?.rejected_resubmission_count"
+          class="theme-section-muted mt-1 text-sm"
+        >
+          {{ selectedRow.rejected_resubmission_count }} resubmissions after rejection
+        </p>
       </div>
 
       <div
@@ -40,7 +46,10 @@
       v-else
       class="app-scrollbar mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1"
     >
-      <div class="grid gap-5 xl:grid-cols-2">
+      <div
+        v-if="selectedRow.status === 'pending'"
+        class="grid gap-5 xl:grid-cols-2"
+      >
         <div class="theme-muted-panel">
           <div class="theme-kicker text-xs font-medium uppercase tracking-[0.16em]">
             Accept as existing
@@ -103,13 +112,30 @@
               {{ isDeckSuggestion ? 'Linked decks' : 'Linked cards' }}
             </div>
             <div class="theme-section-muted mt-1 text-sm">
-              {{ selectedRow.occurrence_count }} {{ isDeckSuggestion ? 'decks use' : 'cards contain' }} this suggestion.
+              <template v-if="isDeckSuggestion">
+                {{ activeDeckCount }} active {{ activeDeckCount === 1 ? 'deck' : 'decks' }},
+                {{ selectedRow.occurrence_count }} total
+                {{ selectedRow.occurrence_count === 1 ? 'occurrence' : 'occurrences' }}.
+              </template>
+              <template v-else>
+                {{ selectedRow.occurrence_count }} cards contain this suggestion.
+              </template>
             </div>
           </div>
           <button
+            v-if="isDeckSuggestion && selectedRow.status === 'rejected'"
+            class="btn-secondary"
+            type="button"
+            :disabled="actionLoading"
+            @click="emit('reopen')"
+          >
+            {{ actionLoading ? 'Saving...' : 'Reopen Suggestion' }}
+          </button>
+          <button
+            v-else-if="selectedRow.status === 'pending'"
             class="rounded-lg border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
-            :disabled="actionLoading || selectedRow.status === 'rejected'"
+            :disabled="actionLoading"
             @click="emit('reject')"
           >
             {{ actionLoading ? 'Saving...' : 'Reject' }}
@@ -159,6 +185,9 @@ const props = defineProps<{
 }>();
 
 const isDeckSuggestion = computed(() => props.selectedKind === 'suggested-deck-types');
+const activeDeckCount = computed(
+  () => props.selectedRow?.active_occurrence_count ?? props.selectedRow?.occurrence_count ?? 0,
+);
 
 const emit = defineEmits<{
   (e: 'update:existing-target-id', value: string): void;
@@ -167,6 +196,7 @@ const emit = defineEmits<{
   (e: 'accept-existing', targetId: string): void;
   (e: 'accept-new', payload: SuggestionAcceptNewRequest): void;
   (e: 'reject'): void;
+  (e: 'reopen'): void;
 }>();
 
 const existingTargetIdModel = computed({

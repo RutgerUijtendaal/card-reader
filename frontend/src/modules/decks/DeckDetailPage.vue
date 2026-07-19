@@ -323,7 +323,9 @@ const groupByType = useLocalStorage('card-reader.deck-detail-group-by-type', tru
 });
 const isOwnedRoute = computed(() => route.path.startsWith('/my/decks/'));
 
-const canEdit = computed(() => deck.value?.owner.id === auth.user?.id);
+const canEdit = computed(() =>
+  deck.value?.owner.id === auth.user?.id || auth.canAccessStaffRoutes,
+);
 const canShare = computed(() => (deck.value ? canShareDeck(deck.value) : false));
 const backLink = computed(() => {
   if (isCardReturnQuery(route.query)) {

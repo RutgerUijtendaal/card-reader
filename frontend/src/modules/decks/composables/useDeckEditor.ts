@@ -12,6 +12,7 @@ import {
   buildDeckEditorReturnLocation,
   getDeckEditorReturnLabel,
 } from '@/composables/decks/deckRouteState';
+import { getDeckTagSuggestionFeedback } from '@/composables/decks/deckTagSuggestionFeedback';
 import type { DeckCardSummary, DeckRecord, DeckTagCatalog } from '@/modules/decks/types';
 import { fallbackDeckBuildingRules, fetchDeckRulesMetadata } from '@/composables/decks/deckRules';
 
@@ -114,6 +115,26 @@ export const useDeckEditor = () => {
     return await createDeck(payload);
   };
 
+  const reconcilePersistedTagState = (record: DeckRecord, persistedSignature: string): string => {
+    if (payloadSignature.value !== persistedSignature) {
+      return persistedSignature;
+    }
+    if (record.tags !== undefined) {
+      deck.setDeckTagIds(record.tags.map((tag) => tag.id));
+    }
+    if (record.pending_tag_suggestions !== undefined) {
+      deck.setSuggestedTypeLabels(record.pending_tag_suggestions.map((suggestion) => suggestion.label));
+    }
+    return payloadSignature.value;
+  };
+
+  const showTagSuggestionFeedback = (record: DeckRecord): void => {
+    const feedback = getDeckTagSuggestionFeedback(record.tag_suggestion_results);
+    if (feedback) {
+      toast.info(feedback);
+    }
+  };
+
   const payloadSignature = computed(() => JSON.stringify(deck.buildPayload()));
   const hasUnsavedChanges = computed(() => savedPayloadSignature.value !== '' && payloadSignature.value !== savedPayloadSignature.value);
   const canAutosync = computed(() => builderStep.value === 'build');
@@ -158,6 +179,8 @@ export const useDeckEditor = () => {
     try {
       const persistedSignature = payloadSignature.value;
       const record = await persistDeck();
+      const savedSignature = reconcilePersistedTagState(record, persistedSignature);
+      showTagSuggestionFeedback(record);
       setBuilderStep('build');
       if (!deckId.value) {
         bypassNextUnsavedPrompt = true;
@@ -167,7 +190,7 @@ export const useDeckEditor = () => {
           bypassNextUnsavedPrompt = false;
         }
       }
-      markSavedPayload(persistedSignature);
+      markSavedPayload(savedSignature);
       toast.success('Deck saved.');
       filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
     } finally {
@@ -188,6 +211,8 @@ export const useDeckEditor = () => {
     try {
       const persistedSignature = payloadSignature.value;
       const record = await persistDeck();
+      const savedSignature = reconcilePersistedTagState(record, persistedSignature);
+      showTagSuggestionFeedback(record);
       if (!deckId.value) {
         bypassNextUnsavedPrompt = true;
         try {
@@ -196,7 +221,7 @@ export const useDeckEditor = () => {
           bypassNextUnsavedPrompt = false;
         }
       }
-      markSavedPayload(persistedSignature);
+      markSavedPayload(savedSignature);
       if (!options.silent) {
         toast.success(record.status.is_valid ? 'Deck saved.' : 'Draft saved.');
       }

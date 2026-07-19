@@ -135,6 +135,13 @@ export const rejectSuggestion = async (kind: CatalogKind, id: string): Promise<v
   await api.post(`${suggestionBasePath(kind)}/${id}/reject`);
 };
 
+export const reopenSuggestion = async (kind: CatalogKind, id: string): Promise<void> => {
+  if (kind !== 'suggested-deck-types') {
+    throw new Error('Only deck tag suggestions can be reopened.');
+  }
+  await api.post(`${suggestionBasePath(kind)}/${id}/reopen`);
+};
+
 export const uploadSymbolAsset = async (file: File): Promise<SymbolAssetUploadResponse> => {
   const formData = new FormData();
   formData.append('file', file);

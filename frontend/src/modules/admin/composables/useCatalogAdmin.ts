@@ -6,6 +6,7 @@ import {
   acceptSuggestionToExisting,
   fetchKnownCatalogEntryDetail,
   rejectSuggestion,
+  reopenSuggestion,
 } from '@/modules/admin/api/catalog';
 import type {
   KeywordRecord,
@@ -268,6 +269,24 @@ export const useCatalogAdmin = () => {
     }
   };
 
+  const reopenSelectedSuggestion = async (): Promise<void> => {
+    if (
+      !selectedSuggestionRow.value
+      || selectedSuggestionKind.value !== 'suggested-deck-types'
+      || suggestionActionLoading.value
+    ) return;
+    suggestionActionLoading.value = true;
+    try {
+      await reopenSuggestion(selectedSuggestionKind.value, selectedSuggestionRow.value.id);
+      toast.success('Suggestion reopened.');
+      await reloadSuggestions();
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Failed to reopen suggestion.'));
+    } finally {
+      suggestionActionLoading.value = false;
+    }
+  };
+
   const setSuggestionExistingTargetId = (value: string): void => {
     suggestionExistingTargetId.value = value;
   };
@@ -327,5 +346,6 @@ export const useCatalogAdmin = () => {
     acceptSelectedSuggestionToExisting,
     acceptSelectedSuggestionAsNew,
     rejectSelectedSuggestion,
+    reopenSelectedSuggestion,
   };
 };

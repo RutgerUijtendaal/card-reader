@@ -113,6 +113,7 @@ export const useDeckBrowseFilters = () => {
   return {
     filtersLoaded,
     filterCatalog,
+    deckTags,
     query,
     affinitySymbolIds,
     affinitySymbolExcludeIds,

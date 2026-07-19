@@ -137,3 +137,18 @@ class AdminDeckTagSuggestionRejectView(APIView):
         if detail is None:
             return not_found("Deck tag suggestion not found")
         return Response(deck_tag_suggestion_detail_payload(detail))
+
+
+class AdminDeckTagSuggestionReopenView(APIView):
+    def post(self, _request: Request, suggestion_id: str) -> Response:
+        service = DeckTagService()
+        try:
+            suggestion = service.reopen_suggestion(suggestion_id=suggestion_id)
+        except ValueError as exc:
+            return bad_request(str(exc))
+        if suggestion is None:
+            return not_found("Deck tag suggestion not found")
+        detail = service.get_suggestion_detail(suggestion_id=suggestion.id)
+        if detail is None:
+            return not_found("Deck tag suggestion not found")
+        return Response(deck_tag_suggestion_detail_payload(detail))

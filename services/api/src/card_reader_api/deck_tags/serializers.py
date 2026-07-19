@@ -47,6 +47,8 @@ def deck_tag_suggestion_payload(suggestion: DeckTagSuggestion) -> dict[str, obje
         "normalized_value": suggestion.normalized_value,
         "status": suggestion.status,
         "occurrence_count": int(getattr(suggestion, "occurrence_count", 0)),
+        "active_occurrence_count": int(getattr(suggestion, "active_occurrence_count", 0)),
+        "rejected_resubmission_count": suggestion.rejected_resubmission_count,
         "accepted_target": accepted_target,
     }
 
@@ -54,6 +56,7 @@ def deck_tag_suggestion_payload(suggestion: DeckTagSuggestion) -> dict[str, obje
 def deck_tag_suggestion_detail_payload(detail: DeckTagSuggestionDetail) -> dict[str, object]:
     payload = deck_tag_suggestion_payload(detail["entry"])
     payload["occurrence_count"] = detail["occurrence_count"]
+    payload["active_occurrence_count"] = detail["active_occurrence_count"]
     payload["linked_decks"] = [linked_deck_payload(deck) for deck in detail["linked_decks"]]
     return payload
 

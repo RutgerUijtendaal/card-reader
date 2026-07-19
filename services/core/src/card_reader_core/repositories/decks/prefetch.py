@@ -100,7 +100,7 @@ def deck_metadata_prefetches() -> tuple[Prefetch[str], ...]:
         Prefetch(
             "tag_suggestion_occurrences",
             queryset=DeckTagSuggestionDeck.objects.select_related("suggestion")
-            .filter(suggestion__status="pending")
+            .filter(suggestion__status="pending", is_active=True)
             .order_by("suggestion__display_value"),
         ),
     )

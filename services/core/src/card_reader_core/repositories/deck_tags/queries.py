@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from card_reader_core.models import Deck, DeckTag, DeckTagKind, DeckTagSuggestion
 from card_reader_core.repositories.decks.prefetch import deck_summary_queryset
@@ -19,6 +19,10 @@ def get_deck_tag(tag_id: str) -> DeckTag | None:
         .filter(id=tag_id)
         .first()
     )
+
+
+def get_deck_tag_for_update(tag_id: str) -> DeckTag | None:
+    return DeckTag.objects.select_for_update().filter(id=tag_id).first()
 
 
 def get_deck_tags_by_ids(tag_ids: list[str]) -> list[DeckTag]:
@@ -47,7 +51,12 @@ def list_decks_for_tag(tag_id: str) -> list[Deck]:
 
 def list_deck_tag_suggestions(*, status: str | None = None) -> list[DeckTagSuggestion]:
     query = DeckTagSuggestion.objects.select_related("accepted_tag").annotate(
-        occurrence_count=Count("deck_occurrences__deck", distinct=True)
+        occurrence_count=Count("deck_occurrences__deck", distinct=True),
+        active_occurrence_count=Count(
+            "deck_occurrences__deck",
+            filter=Q(deck_occurrences__is_active=True),
+            distinct=True,
+        ),
     )
     if status is not None:
         query = query.filter(status=status)
@@ -57,7 +66,23 @@ def list_deck_tag_suggestions(*, status: str | None = None) -> list[DeckTagSugge
 def get_deck_tag_suggestion(suggestion_id: str) -> DeckTagSuggestion | None:
     return (
         DeckTagSuggestion.objects.select_related("accepted_tag")
-        .annotate(occurrence_count=Count("deck_occurrences__deck", distinct=True))
+        .annotate(
+            occurrence_count=Count("deck_occurrences__deck", distinct=True),
+            active_occurrence_count=Count(
+                "deck_occurrences__deck",
+                filter=Q(deck_occurrences__is_active=True),
+                distinct=True,
+            ),
+        )
+        .filter(id=suggestion_id)
+        .first()
+    )
+
+
+def get_deck_tag_suggestion_for_update(suggestion_id: str) -> DeckTagSuggestion | None:
+    return (
+        DeckTagSuggestion.objects.select_for_update()
+        .select_related("accepted_tag")
         .filter(id=suggestion_id)
         .first()
     )

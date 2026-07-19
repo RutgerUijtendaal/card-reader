@@ -83,6 +83,7 @@ class DeckTagSuggestion(TimestampedModel):
         default="pending",
         db_index=True,
     )
+    rejected_resubmission_count: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(default=0)
     accepted_tag: models.ForeignKey[DeckTag | None, DeckTag | None] = models.ForeignKey(
         "DeckTag",
         on_delete=models.SET_NULL,
@@ -118,6 +119,7 @@ class DeckTagSuggestionDeck(TimestampedModel):
         related_name="tag_suggestion_occurrences",
         db_column="deck_id",
     )
+    is_active: models.BooleanField[bool, bool] = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         db_table = "deck_tag_suggestion_deck"
@@ -127,4 +129,7 @@ class DeckTagSuggestionDeck(TimestampedModel):
                 name="ux_deck_tag_suggestion_deck_pair",
             ),
         ]
-        indexes = [models.Index(fields=["deck", "suggestion"], name="ix_deck_tag_suggestion_deck")]
+        indexes = [
+            models.Index(fields=["deck", "suggestion"], name="ix_deck_tag_suggestion_deck"),
+            models.Index(fields=["suggestion", "is_active"], name="ix_deck_tag_sugg_active"),
+        ]

@@ -434,6 +434,8 @@ export type SuggestionApiRecord = {
   normalized_value: string;
   status: SuggestionStatus;
   occurrence_count: number;
+  active_occurrence_count?: number;
+  rejected_resubmission_count?: number;
   accepted_target: SuggestionAcceptedTarget | null;
   occurrences: SuggestionOccurrencePreview[];
   linked_decks?: LinkedDeckPreview[];

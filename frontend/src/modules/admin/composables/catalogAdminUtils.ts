@@ -47,7 +47,8 @@ export const kindLabel = (kind: CatalogKind): string => {
   if (kind === 'tags') return 'Tags';
   if (kind === 'symbols') return 'Symbols';
   if (kind === 'types') return 'Types';
-  if (kind === 'suggested-tags') return 'Tags';
+  if (kind === 'suggested-tags') return 'Suggested tags';
+  if (kind === 'suggested-types') return 'Suggested types';
   if (kind === 'deck-roles') return 'Roles';
   if (kind === 'deck-types') return 'Types';
   if (kind === 'suggested-deck-types') return 'Suggested types';

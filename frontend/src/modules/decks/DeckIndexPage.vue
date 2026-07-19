@@ -60,6 +60,27 @@
           :title-to="isOwnedMode ? `/my/decks/${deck.id}` : `/decks/${deck.id}`"
         >
           <template
+            v-if="!isOwnedMode && canEditDeck(deck)"
+            #menu-actions="{ close }"
+          >
+            <RouterLink
+              class="btn-secondary w-full justify-center"
+              :to="buildPublicDeckEditorLocation(deck.id)"
+              @click="close"
+            >
+              Edit Deck
+            </RouterLink>
+
+            <button
+              class="btn-secondary w-full justify-center"
+              type="button"
+              @click="openTagManager(deck, close)"
+            >
+              Manage Tags
+            </button>
+          </template>
+
+          <template
             v-if="isOwnedMode"
             #actions
           >
@@ -73,6 +94,14 @@
                 </RouterLink>
                 <ExtraActionsMenu button-label="Open deck actions">
                   <template #default="{ close }">
+                    <button
+                      class="btn-secondary w-full justify-center"
+                      type="button"
+                      @click="openTagManager(deck, close)"
+                    >
+                      Manage Tags
+                    </button>
+
                     <button
                       class="btn-secondary w-full justify-center"
                       type="button"
@@ -133,6 +162,22 @@
       @cancel="deleteTarget = null"
       @confirm="confirmDelete"
     />
+
+    <DeckTagManagementModal
+      :open="tagManagerTarget !== null"
+      :deck-name="tagManagerTarget?.name ?? ''"
+      :catalog="deckTags"
+      :model-value="tagManagerTagIds"
+      :suggested-type-labels="tagManagerSuggestedTypeLabels"
+      :loading="tagManagerLoading"
+      :saving="tagManagerSaving"
+      :error-message="tagManagerError"
+      @update:model-value="tagManagerTagIds = $event"
+      @update:suggested-type-labels="tagManagerSuggestedTypeLabels = $event"
+      @save="saveManagedDeckTags"
+      @cancel="closeTagManager"
+      @retry="loadTagManager"
+    />
   </section>
 </template>
 
@@ -148,10 +193,18 @@ import AppSelect from '@/components/app/AppSelect.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
-import { deleteDeck, fetchMyDeckSummaries, fetchPublicDeckSummaries, updateDeck } from '@/modules/decks/api';
+import {
+  deleteDeck,
+  fetchDeckTags,
+  fetchMyDeck,
+  fetchMyDeckSummaries,
+  fetchPublicDeckSummaries,
+  updateDeck,
+} from '@/modules/decks/api';
 import DeckBrowseFiltersPanel from '@/modules/decks/components/DeckBrowseFiltersPanel.vue';
 import DeckLoadingSkeleton from '@/components/decks/DeckLoadingSkeleton.vue';
 import DeckListCard from '@/components/decks/DeckListCard.vue';
+import DeckTagManagementModal from '@/components/decks/DeckTagManagementModal.vue';
 import { useDeckBrowseFilters } from '@/modules/decks/composables/useDeckBrowseFilters';
 import {
   buildDeckBrowseFilterApiSearchParams,
@@ -160,11 +213,16 @@ import {
   parseDeckBrowseFilterRouteQuery,
   sameDeckBrowseFilterState,
 } from '@/composables/decks/deckBrowseFilterState';
-import { buildMyDeckEditorLocation, buildNewDeckEditorLocation } from '@/composables/decks/deckRouteState';
+import {
+  buildMyDeckEditorLocation,
+  buildNewDeckEditorLocation,
+  buildPublicDeckEditorLocation,
+} from '@/composables/decks/deckRouteState';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
 import type { DeckSummaryRecord, DeckVisibility } from '@/modules/decks/types';
 import { useDeckExport } from '@/composables/useDeckExport';
 import { deckVisibilityLabels, deckVisibilityOptions } from '@/composables/decks/visibility';
+import { getDeckTagSuggestionFeedback } from '@/composables/decks/deckTagSuggestionFeedback';
 
 const route = useRoute();
 const router = useRouter();
@@ -174,10 +232,23 @@ const loading = ref(false);
 const deleting = ref(false);
 const deleteTarget = ref<DeckSummaryRecord | null>(null);
 const savingDeckIds = ref(new Set<string>());
+const tagManagerTarget = ref<DeckSummaryRecord | null>(null);
+const tagManagerTagIds = ref<string[]>([]);
+const tagManagerSuggestedTypeLabels = ref<string[]>([]);
+const tagManagerLoading = ref(false);
+const tagManagerSaving = ref(false);
+const tagManagerError = ref<string | null>(null);
 const visibilityOptions = deckVisibilityOptions;
 const { exportTtsDeck } = useDeckExport();
 const filterController = useDeckBrowseFilters();
-const { filtersLoaded, selectionState, readFilterState, applyRouteFilterState, loadFilters } = filterController;
+const {
+  filtersLoaded,
+  deckTags,
+  selectionState,
+  readFilterState,
+  applyRouteFilterState,
+  loadFilters,
+} = filterController;
 
 const isOwnedMode = computed(() => route.path === '/my/decks');
 const canUseOwnedDecks = computed(() => auth.authenticated || isOwnedMode.value);
@@ -209,6 +280,7 @@ const emptyLabel = computed(() => {
 const currentDeckPath = computed(() => (isOwnedMode.value ? '/my/decks' : '/decks'));
 const newDeckLocation = computed(() => buildNewDeckEditorLocation(isOwnedMode.value ? 'my_decks' : 'decks'));
 let deckLoadRequestId = 0;
+let tagManagerLoadRequestId = 0;
 
 const loadDecks = async (): Promise<void> => {
   const requestId = ++deckLoadRequestId;
@@ -267,6 +339,94 @@ watch(
 
 const promptDelete = (deck: DeckSummaryRecord): void => {
   deleteTarget.value = deck;
+};
+
+const canEditDeck = (deck: DeckSummaryRecord): boolean =>
+  isOwnedMode.value
+  || auth.user?.id === deck.owner.id
+  || auth.canAccessStaffRoutes;
+
+const loadTagManager = async (): Promise<void> => {
+  const target = tagManagerTarget.value;
+  if (!target) {
+    return;
+  }
+  const requestId = ++tagManagerLoadRequestId;
+  tagManagerLoading.value = true;
+  tagManagerError.value = null;
+  try {
+    const hasCatalog = deckTags.value.roles.length > 0 || deckTags.value.types.length > 0;
+    const [record, catalog] = await Promise.all([
+      fetchMyDeck(target.id),
+      hasCatalog ? Promise.resolve(deckTags.value) : fetchDeckTags(),
+    ]);
+    if (requestId !== tagManagerLoadRequestId || tagManagerTarget.value?.id !== target.id) {
+      return;
+    }
+    deckTags.value = catalog;
+    tagManagerTagIds.value = (record.tags ?? []).map((tag) => tag.id);
+    tagManagerSuggestedTypeLabels.value = (record.pending_tag_suggestions ?? []).map(
+      (suggestion) => suggestion.label,
+    );
+  } catch {
+    if (requestId === tagManagerLoadRequestId && tagManagerTarget.value?.id === target.id) {
+      tagManagerError.value = 'Unable to load deck tags.';
+    }
+  } finally {
+    if (requestId === tagManagerLoadRequestId) {
+      tagManagerLoading.value = false;
+    }
+  }
+};
+
+const openTagManager = (deck: DeckSummaryRecord, closeMenu: () => void): void => {
+  closeMenu();
+  tagManagerTarget.value = deck;
+  tagManagerTagIds.value = [];
+  tagManagerSuggestedTypeLabels.value = [];
+  tagManagerError.value = null;
+  void loadTagManager();
+};
+
+const closeTagManager = (force = false): void => {
+  if (tagManagerSaving.value && !force) {
+    return;
+  }
+  tagManagerLoadRequestId += 1;
+  tagManagerTarget.value = null;
+  tagManagerTagIds.value = [];
+  tagManagerSuggestedTypeLabels.value = [];
+  tagManagerError.value = null;
+  tagManagerLoading.value = false;
+};
+
+const saveManagedDeckTags = async (): Promise<void> => {
+  const target = tagManagerTarget.value;
+  if (!target || tagManagerLoading.value || tagManagerSaving.value || tagManagerError.value) {
+    return;
+  }
+  tagManagerSaving.value = true;
+  try {
+    const record = await updateDeck(target.id, {
+      tag_ids: [...tagManagerTagIds.value],
+      suggested_type_labels: [...tagManagerSuggestedTypeLabels.value],
+    });
+    const feedback = getDeckTagSuggestionFeedback(record.tag_suggestion_results);
+    if (feedback) {
+      toast.info(feedback);
+    }
+    closeTagManager(true);
+    toast.success('Deck tags updated.');
+    try {
+      await loadDecks();
+    } catch {
+      toast.error('Deck tags were updated, but the deck list could not be refreshed.');
+    }
+  } catch {
+    toast.error('Unable to update deck tags.');
+  } finally {
+    tagManagerSaving.value = false;
+  }
 };
 
 const updateDeckVisibility = async (deck: DeckSummaryRecord, visibility: DeckVisibility): Promise<void> => {
