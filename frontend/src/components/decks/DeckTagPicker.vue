@@ -65,49 +65,55 @@
       <div
         v-if="isOpen"
         ref="panelRef"
-        class="theme-popover z-50 w-80 p-3 shadow-xl"
-        :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
+        class="theme-popover z-50 flex w-80 flex-col overflow-hidden p-3 shadow-xl"
+        data-testid="deck-tag-picker-popover"
+        :style="popoverStyle"
       >
-        <div class="space-y-3">
+        <div class="flex min-h-0 flex-1 flex-col gap-3">
           <input
             v-model="searchTerm"
-            class="input-base"
+            class="input-base shrink-0"
             placeholder="Search or suggest a type..."
             autofocus
           >
 
           <div
-            v-for="group in filteredGroups"
-            :key="group.kind"
-            class="space-y-1.5"
+            class="app-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1"
+            data-testid="deck-tag-picker-options"
           >
-            <p class="theme-kicker text-[11px] font-semibold uppercase tracking-[0.16em]">
-              {{ group.label }}
-            </p>
-            <button
-              v-for="tag in group.tags"
-              :key="tag.id"
-              type="button"
-              class="theme-ghost-button flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm"
-              @click="toggleTag(tag.id)"
+            <div
+              v-for="group in filteredGroups"
+              :key="group.kind"
+              class="space-y-1.5"
             >
-              <span>{{ tag.label }}</span>
-              <Check
-                v-if="selectedIds.has(tag.id)"
-                class="h-4 w-4 text-[var(--theme-accent)]"
-              />
+              <p class="theme-kicker text-[11px] font-semibold uppercase tracking-[0.16em]">
+                {{ group.label }}
+              </p>
+              <button
+                v-for="tag in group.tags"
+                :key="tag.id"
+                type="button"
+                class="theme-ghost-button flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm"
+                @click="toggleTag(tag.id)"
+              >
+                <span>{{ tag.label }}</span>
+                <Check
+                  v-if="selectedIds.has(tag.id)"
+                  class="h-4 w-4 text-[var(--theme-accent)]"
+                />
+              </button>
+            </div>
+
+            <button
+              v-if="canSuggestSearch"
+              type="button"
+              class="theme-divider flex w-full items-center gap-2 border-t px-2 pt-3 text-left text-sm font-semibold text-[var(--theme-accent)]"
+              @click="suggestSearch"
+            >
+              <Plus class="h-4 w-4" />
+              Suggest type "{{ normalizedSearchLabel }}"
             </button>
           </div>
-
-          <button
-            v-if="canSuggestSearch"
-            type="button"
-            class="theme-divider flex w-full items-center gap-2 border-t px-2 pt-3 text-left text-sm font-semibold text-[var(--theme-accent)]"
-            @click="suggestSearch"
-          >
-            <Plus class="h-4 w-4" />
-            Suggest type "{{ normalizedSearchLabel }}"
-          </button>
         </div>
       </div>
     </Teleport>
@@ -131,8 +137,25 @@ const emit = defineEmits<{
   (e: 'update:suggestedTypeLabels', value: string[]): void;
 }>();
 
-const { isOpen, triggerRef, panelRef, x, y, toggle, close } = useFloatingPopover();
+const {
+  isOpen,
+  triggerRef,
+  panelRef,
+  x,
+  y,
+  availableHeight,
+  toggle,
+  close,
+} = useFloatingPopover({ fitAvailableHeight: true });
 const searchTerm = ref('');
+const popoverStyle = computed(() => ({
+  position: 'fixed' as const,
+  left: `${x.value}px`,
+  top: `${y.value}px`,
+  maxHeight: availableHeight.value === null
+    ? 'calc(100dvh - 1rem)'
+    : `${availableHeight.value}px`,
+}));
 const allTags = computed(() => [...props.catalog.roles, ...props.catalog.types]);
 const selectedIds = computed(() => new Set(props.modelValue));
 const selectedTags = computed(() => allTags.value.filter((tag) => selectedIds.value.has(tag.id)));
