@@ -16,6 +16,7 @@ vi.mock('@/composables/useFloatingPopover', async () => {
         panelRef: vueRef<HTMLElement | null>(null),
         x: computed(() => 0),
         y: computed(() => 0),
+        availableHeight: computed(() => 240),
         toggle: () => {
           isOpen.value = !isOpen.value;
         },
@@ -72,6 +73,12 @@ describe('DeckTagPicker', () => {
 
     container.querySelector<HTMLButtonElement>('button[aria-label="Add deck tags"]')?.click();
     await nextTick();
+    const popover = document.body.querySelector<HTMLElement>('[data-testid="deck-tag-picker-popover"]');
+    const options = document.body.querySelector<HTMLElement>('[data-testid="deck-tag-picker-options"]');
+    expect(popover?.style.maxHeight).toBe('240px');
+    expect(popover?.classList.contains('overflow-hidden')).toBe(true);
+    expect(options?.classList.contains('overflow-y-auto')).toBe(true);
+    expect(options?.classList.contains('app-scrollbar')).toBe(true);
     expect(document.body.textContent).toContain('Roles');
     expect(document.body.textContent).toContain('Types');
     const armorOption = [...document.body.querySelectorAll('button')].find(
