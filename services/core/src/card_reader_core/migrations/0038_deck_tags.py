@@ -4,7 +4,9 @@ from uuid import uuid4
 
 import card_reader_core.models.base
 import django.db.models.deletion
+from django.apps.registry import Apps
 from django.db import migrations, models
+from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 
 
 DEFAULT_DECK_TAGS = {
@@ -17,7 +19,7 @@ def _tag_key(label: str) -> str:
     return label.lower().replace(" ", "-")
 
 
-def seed_deck_tags(apps, _schema_editor) -> None:
+def seed_deck_tags(apps: Apps, _schema_editor: BaseDatabaseSchemaEditor) -> None:
     deck_tag = apps.get_model("card_reader_core", "DeckTag")
     for kind, labels in DEFAULT_DECK_TAGS.items():
         for label in labels:
@@ -28,7 +30,7 @@ def seed_deck_tags(apps, _schema_editor) -> None:
             )
 
 
-def remove_seeded_deck_tags(apps, _schema_editor) -> None:
+def remove_seeded_deck_tags(apps: Apps, _schema_editor: BaseDatabaseSchemaEditor) -> None:
     deck_tag = apps.get_model("card_reader_core", "DeckTag")
     for kind, labels in DEFAULT_DECK_TAGS.items():
         deck_tag.objects.filter(kind=kind, key__in=[_tag_key(label) for label in labels]).delete()
