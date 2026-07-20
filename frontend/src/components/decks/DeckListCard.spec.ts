@@ -190,7 +190,7 @@ describe('DeckListCard', () => {
     expect(mounted.container.querySelector('button[aria-label="Toggle deck details"]')).toBeNull();
     expect(mounted.container.querySelector('.deck-list-card-browse-details')).toBeNull();
     expect(text).toContain('Azure Tempo');
-    expect(text).toContain('Hero: Azure Hero');
+    expect(text).toContain('Azure Hero');
     expect(text).toContain('Maitys');
     expect(text).not.toContain('maitys');
     expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
@@ -202,7 +202,7 @@ describe('DeckListCard', () => {
     expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).toContain('Armor');
     expect(text).not.toContain('Tempo Burst');
     expect(text).not.toContain('Mainboard 40 · 24 unique · 1 sideboard');
-    expect(text).toContain('Updated');
+    expect(text).toContain('1/1/2025');
 
     mounted.unmount();
   });
@@ -214,13 +214,13 @@ describe('DeckListCard', () => {
     expect(mounted.container.querySelector('.deck-list-card-owned')).not.toBeNull();
     expect(text).toContain('Azure Tempo');
     expect(text).toContain('Public');
-    expect(text).toContain('Hero: Azure Hero');
+    expect(text).toContain('Azure Hero');
     expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).toContain('{F}');
     expect(text).toContain('Damage');
     expect(text).toContain('Armor');
     expect(text).toContain('Tempo Burst');
-    expect(text).toContain('Updated');
+    expect(text).toContain('1/1/2025');
 
     mounted.unmount();
   });
