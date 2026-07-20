@@ -9,6 +9,7 @@ export type DeckBrowseFilterState = {
   affinitySymbolExcludeKeys: string[];
   deckTagMatch: 'any' | 'all';
   deckTagKeys: string[];
+  deckTagExcludeKeys: string[];
 };
 
 export type DeckBrowseFilterSelectionState = {
@@ -18,6 +19,7 @@ export type DeckBrowseFilterSelectionState = {
   affinitySymbolExcludeIds: string[];
   deckTagMatch: 'any' | 'all';
   deckTagIds: string[];
+  deckTagExcludeIds: string[];
 };
 
 export type DeckBrowseFilterCatalog = {
@@ -38,7 +40,12 @@ const normalizeStringArray = (values: readonly string[]): string[] =>
   );
 
 const readQueryValues = (
-  value: LocationQueryValue | LocationQueryValue[] | readonly LocationQueryValue[] | null | undefined,
+  value:
+    | LocationQueryValue
+    | LocationQueryValue[]
+    | readonly LocationQueryValue[]
+    | null
+    | undefined,
 ): string[] => {
   if (Array.isArray(value)) {
     return value.filter((entry): entry is string => typeof entry === 'string');
@@ -63,15 +70,19 @@ export const createEmptyDeckBrowseFilterState = (): DeckBrowseFilterState => ({
   affinitySymbolExcludeKeys: [],
   deckTagMatch: 'any',
   deckTagKeys: [],
+  deckTagExcludeKeys: [],
 });
 
-export const normalizeDeckBrowseFilterState = (state: DeckBrowseFilterState): DeckBrowseFilterState => ({
+export const normalizeDeckBrowseFilterState = (
+  state: DeckBrowseFilterState,
+): DeckBrowseFilterState => ({
   query: normalizeStringValue(state.query),
   affinitySymbolMatch: state.affinitySymbolMatch === 'all' ? 'all' : 'any',
   affinitySymbolKeys: normalizeStringArray(state.affinitySymbolKeys),
   affinitySymbolExcludeKeys: normalizeStringArray(state.affinitySymbolExcludeKeys),
   deckTagMatch: state.deckTagMatch === 'all' ? 'all' : 'any',
   deckTagKeys: normalizeStringArray(state.deckTagKeys),
+  deckTagExcludeKeys: normalizeStringArray(state.deckTagExcludeKeys),
 });
 
 export const normalizeDeckBrowseFilterSelectionState = (
@@ -83,6 +94,7 @@ export const normalizeDeckBrowseFilterSelectionState = (
   affinitySymbolExcludeIds: normalizeStringArray(state.affinitySymbolExcludeIds),
   deckTagMatch: state.deckTagMatch === 'all' ? 'all' : 'any',
   deckTagIds: normalizeStringArray(state.deckTagIds),
+  deckTagExcludeIds: normalizeStringArray(state.deckTagExcludeIds),
 });
 
 export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrowseFilterState =>
@@ -93,6 +105,7 @@ export const parseDeckBrowseFilterRouteQuery = (query: LocationQuery): DeckBrows
     affinitySymbolExcludeKeys: readQueryValues(query.affinity_symbol_exclude_keys),
     deckTagMatch: query.deck_tag_match === 'all' ? 'all' : 'any',
     deckTagKeys: readQueryValues(query.deck_tag_keys),
+    deckTagExcludeKeys: readQueryValues(query.deck_tag_exclude_keys),
   });
 
 export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): LocationQueryRaw => {
@@ -101,17 +114,22 @@ export const buildDeckBrowseFilterRouteQuery = (state: DeckBrowseFilterState): L
 
   if (normalized.query) query.q = normalized.query;
   if (normalized.affinitySymbolMatch === 'all') query.affinity_symbol_match = 'all';
-  if (normalized.affinitySymbolKeys.length > 0) query.affinity_symbol_keys = normalized.affinitySymbolKeys;
+  if (normalized.affinitySymbolKeys.length > 0)
+    query.affinity_symbol_keys = normalized.affinitySymbolKeys;
   if (normalized.affinitySymbolExcludeKeys.length > 0) {
     query.affinity_symbol_exclude_keys = normalized.affinitySymbolExcludeKeys;
   }
   if (normalized.deckTagMatch === 'all') query.deck_tag_match = 'all';
   if (normalized.deckTagKeys.length > 0) query.deck_tag_keys = normalized.deckTagKeys;
+  if (normalized.deckTagExcludeKeys.length > 0)
+    query.deck_tag_exclude_keys = normalized.deckTagExcludeKeys;
 
   return query;
 };
 
-export const buildDeckBrowseFilterRouteSearchParams = (state: DeckBrowseFilterState): URLSearchParams => {
+export const buildDeckBrowseFilterRouteSearchParams = (
+  state: DeckBrowseFilterState,
+): URLSearchParams => {
   const params = new URLSearchParams();
   const query = buildDeckBrowseFilterRouteQuery(state);
 
@@ -131,8 +149,10 @@ export const buildDeckBrowseFilterRouteSearchParams = (state: DeckBrowseFilterSt
 export const getDeckBrowseFilterSignature = (state: DeckBrowseFilterState): string =>
   buildDeckBrowseFilterRouteSearchParams(state).toString();
 
-export const sameDeckBrowseFilterState = (left: DeckBrowseFilterState, right: DeckBrowseFilterState): boolean =>
-  getDeckBrowseFilterSignature(left) === getDeckBrowseFilterSignature(right);
+export const sameDeckBrowseFilterState = (
+  left: DeckBrowseFilterState,
+  right: DeckBrowseFilterState,
+): boolean => getDeckBrowseFilterSignature(left) === getDeckBrowseFilterSignature(right);
 
 const deckTagRouteKey = (tag: DeckTagOption): string => `${tag.kind}:${tag.key}`;
 
@@ -162,9 +182,13 @@ export const buildDeckBrowseFilterSelectionState = (
     query: state.query,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolIds: resolveIdsFromKeys(state.affinitySymbolKeys, catalog.affinitySymbols),
-    affinitySymbolExcludeIds: resolveIdsFromKeys(state.affinitySymbolExcludeKeys, catalog.affinitySymbols),
+    affinitySymbolExcludeIds: resolveIdsFromKeys(
+      state.affinitySymbolExcludeKeys,
+      catalog.affinitySymbols,
+    ),
     deckTagMatch: state.deckTagMatch,
     deckTagIds: resolveDeckTagIdsFromKeys(state.deckTagKeys, catalog.deckTags),
+    deckTagExcludeIds: resolveDeckTagIdsFromKeys(state.deckTagExcludeKeys, catalog.deckTags),
   });
 
 export const buildDeckBrowseFilterStateFromSelection = (
@@ -175,9 +199,13 @@ export const buildDeckBrowseFilterStateFromSelection = (
     query: state.query,
     affinitySymbolMatch: state.affinitySymbolMatch,
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.affinitySymbols),
-    affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.affinitySymbols),
+    affinitySymbolExcludeKeys: resolveKeysFromIds(
+      state.affinitySymbolExcludeIds,
+      catalog.affinitySymbols,
+    ),
     deckTagMatch: state.deckTagMatch,
     deckTagKeys: resolveDeckTagKeysFromIds(state.deckTagIds, catalog.deckTags),
+    deckTagExcludeKeys: resolveDeckTagKeysFromIds(state.deckTagExcludeIds, catalog.deckTags),
   });
 
 export const buildDeckBrowseFilterApiSearchParams = (
@@ -192,11 +220,16 @@ export const buildDeckBrowseFilterApiSearchParams = (
     params.set('affinity_symbol_match', normalized.affinitySymbolMatch);
   }
   if (normalized.affinitySymbolExcludeIds.length > 0) {
-    normalized.affinitySymbolExcludeIds.forEach((id) => params.append('affinity_symbol_exclude_ids', id));
+    normalized.affinitySymbolExcludeIds.forEach((id) =>
+      params.append('affinity_symbol_exclude_ids', id),
+    );
   }
   if (normalized.deckTagIds.length > 0) {
     normalized.deckTagIds.forEach((id) => params.append('deck_tag_ids', id));
     params.set('deck_tag_match', normalized.deckTagMatch);
+  }
+  if (normalized.deckTagExcludeIds.length > 0) {
+    normalized.deckTagExcludeIds.forEach((id) => params.append('deck_tag_exclude_ids', id));
   }
 
   return params;

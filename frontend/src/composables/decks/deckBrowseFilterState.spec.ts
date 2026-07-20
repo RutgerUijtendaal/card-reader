@@ -16,9 +16,30 @@ const filters: CardFiltersResponse = {
   tags: [],
   types: [],
   symbols: [
-    { id: 'sym-1', key: 'fire', label: 'Fire', symbol_type: 'affinity', text_token: '{AF}', asset_url: null },
-    { id: 'sym-2', key: 'water', label: 'Water', symbol_type: 'affinity', text_token: '{AW}', asset_url: null },
-    { id: 'sym-3', key: 'mana-fire', label: 'Mana Fire', symbol_type: 'mana', text_token: '{F}', asset_url: null },
+    {
+      id: 'sym-1',
+      key: 'fire',
+      label: 'Fire',
+      symbol_type: 'affinity',
+      text_token: '{AF}',
+      asset_url: null,
+    },
+    {
+      id: 'sym-2',
+      key: 'water',
+      label: 'Water',
+      symbol_type: 'affinity',
+      text_token: '{AW}',
+      asset_url: null,
+    },
+    {
+      id: 'sym-3',
+      key: 'mana-fire',
+      label: 'Mana Fire',
+      symbol_type: 'mana',
+      text_token: '{F}',
+      asset_url: null,
+    },
   ],
 };
 
@@ -36,6 +57,7 @@ describe('deckBrowseFilterState', () => {
       affinity_symbol_exclude_keys: ['fire'],
       deck_tag_match: 'all',
       deck_tag_keys: ['type:armor', 'role:damage'],
+      deck_tag_exclude_keys: ['type:armor'],
     });
 
     expect(parsed).toEqual({
@@ -45,6 +67,7 @@ describe('deckBrowseFilterState', () => {
       affinitySymbolExcludeKeys: ['fire'],
       deckTagMatch: 'all',
       deckTagKeys: ['role:damage', 'type:armor'],
+      deckTagExcludeKeys: ['type:armor'],
     });
     expect(buildDeckBrowseFilterRouteQuery(parsed)).toEqual({
       q: 'Aurora Spear',
@@ -53,6 +76,7 @@ describe('deckBrowseFilterState', () => {
       affinity_symbol_exclude_keys: ['fire'],
       deck_tag_match: 'all',
       deck_tag_keys: ['role:damage', 'type:armor'],
+      deck_tag_exclude_keys: ['type:armor'],
     });
   });
 
@@ -66,6 +90,7 @@ describe('deckBrowseFilterState', () => {
         affinitySymbolExcludeKeys: ['fire'],
         deckTagMatch: 'all',
         deckTagKeys: ['role:damage', 'type:armor'],
+        deckTagExcludeKeys: ['type:armor'],
       },
       catalog,
     );
@@ -77,6 +102,7 @@ describe('deckBrowseFilterState', () => {
       affinitySymbolExcludeIds: ['sym-1'],
       deckTagMatch: 'all',
       deckTagIds: ['role-1', 'type-1'],
+      deckTagExcludeIds: ['type-1'],
     });
     expect(buildDeckBrowseFilterStateFromSelection(selection, catalog)).toEqual({
       query: 'Aurora Spear',
@@ -85,6 +111,7 @@ describe('deckBrowseFilterState', () => {
       affinitySymbolExcludeKeys: ['fire'],
       deckTagMatch: 'all',
       deckTagKeys: ['role:damage', 'type:armor'],
+      deckTagExcludeKeys: ['type:armor'],
     });
   });
 
@@ -96,6 +123,7 @@ describe('deckBrowseFilterState', () => {
       affinitySymbolExcludeIds: ['sym-1'],
       deckTagMatch: 'all',
       deckTagIds: ['role-1', 'type-1'],
+      deckTagExcludeIds: ['type-1'],
     });
 
     expect(params.get('q')).toBe('Aurora Spear');
@@ -104,6 +132,7 @@ describe('deckBrowseFilterState', () => {
     expect(params.getAll('affinity_symbol_exclude_ids')).toEqual(['sym-1']);
     expect(params.get('deck_tag_match')).toBe('all');
     expect(params.getAll('deck_tag_ids')).toEqual(['role-1', 'type-1']);
+    expect(params.getAll('deck_tag_exclude_ids')).toEqual(['type-1']);
   });
 
   test('empty state clears text search and affinity selections', () => {
@@ -114,6 +143,7 @@ describe('deckBrowseFilterState', () => {
       affinitySymbolExcludeKeys: [],
       deckTagMatch: 'any',
       deckTagKeys: [],
+      deckTagExcludeKeys: [],
     });
   });
 });

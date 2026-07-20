@@ -40,6 +40,7 @@ export type CardFilterState = {
   otherSymbolKeys: string[];
   otherSymbolExcludeKeys: string[];
   typeKeys: string[];
+  typeExcludeKeys: string[];
 };
 
 export type CardFilterSelectionState = {
@@ -70,6 +71,7 @@ export type CardFilterSelectionState = {
   otherSymbolIds: string[];
   otherSymbolExcludeIds: string[];
   typeIds: string[];
+  typeExcludeIds: string[];
 };
 
 export type CardFilterCatalog = {
@@ -90,6 +92,7 @@ export type CardFilterApiPayload = {
   tag_ids?: string[];
   tag_match?: 'any' | 'all';
   type_ids?: string[];
+  type_exclude_ids?: string[];
   type_match?: 'any' | 'all';
   mana_symbol_ids?: string[];
   mana_symbol_exclude_ids?: string[];
@@ -140,6 +143,7 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
   otherSymbolKeys: [],
   otherSymbolExcludeKeys: [],
   typeKeys: [],
+  typeExcludeKeys: [],
 });
 
 export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState => ({
@@ -170,6 +174,7 @@ export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState 
   otherSymbolIds: [],
   otherSymbolExcludeIds: [],
   typeIds: [],
+  typeExcludeIds: [],
 });
 
 const normalizeStringValue = (value: string | number | null | undefined): string => {
@@ -185,7 +190,12 @@ const normalizeStringArray = (values: readonly string[]): string[] =>
   );
 
 const readQueryValues = (
-  value: LocationQueryValue | LocationQueryValue[] | readonly LocationQueryValue[] | null | undefined,
+  value:
+    | LocationQueryValue
+    | LocationQueryValue[]
+    | readonly LocationQueryValue[]
+    | null
+    | undefined,
 ): string[] => {
   if (Array.isArray(value)) {
     return value.filter((entry): entry is string => typeof entry === 'string');
@@ -221,6 +231,7 @@ export const normalizeCardFilterState = (state: CardFilterState): CardFilterStat
   otherSymbolKeys: normalizeStringArray(state.otherSymbolKeys),
   otherSymbolExcludeKeys: normalizeStringArray(state.otherSymbolExcludeKeys),
   typeKeys: normalizeStringArray(state.typeKeys),
+  typeExcludeKeys: normalizeStringArray(state.typeExcludeKeys),
 });
 
 export const normalizeCardFilterSelectionState = (
@@ -253,6 +264,7 @@ export const normalizeCardFilterSelectionState = (
   otherSymbolIds: normalizeStringArray(state.otherSymbolIds),
   otherSymbolExcludeIds: normalizeStringArray(state.otherSymbolExcludeIds),
   typeIds: normalizeStringArray(state.typeIds),
+  typeExcludeIds: normalizeStringArray(state.typeExcludeIds),
 });
 
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
@@ -286,6 +298,7 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
     otherSymbolKeys: readQueryValues(query.other_symbol_keys),
     otherSymbolExcludeKeys: readQueryValues(query.other_symbol_exclude_keys),
     typeKeys: readQueryValues(query.type_keys),
+    typeExcludeKeys: readQueryValues(query.type_exclude_keys),
   });
 
 export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQueryRaw => {
@@ -293,7 +306,8 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   const query: LocationQueryRaw = {};
 
   if (normalized.query) query.q = normalized.query;
-  if (normalized.lifecycleStatus !== DEFAULT_CARD_LIFECYCLE_FILTER) query.lifecycle_status = normalized.lifecycleStatus;
+  if (normalized.lifecycleStatus !== DEFAULT_CARD_LIFECYCLE_FILTER)
+    query.lifecycle_status = normalized.lifecycleStatus;
   if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
   if (normalized.tagMatch === 'all') query.tag_match = 'all';
   if (normalized.typeMatch === 'all') query.type_match = 'all';
@@ -311,18 +325,23 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   if (normalized.keywordKeys.length > 0) query.keyword_keys = normalized.keywordKeys;
   if (normalized.tagKeys.length > 0) query.tag_keys = normalized.tagKeys;
   if (normalized.manaSymbolKeys.length > 0) query.mana_symbol_keys = normalized.manaSymbolKeys;
-  if (normalized.manaSymbolExcludeKeys.length > 0) query.mana_symbol_exclude_keys = normalized.manaSymbolExcludeKeys;
-  if (normalized.affinitySymbolKeys.length > 0) query.affinity_symbol_keys = normalized.affinitySymbolKeys;
+  if (normalized.manaSymbolExcludeKeys.length > 0)
+    query.mana_symbol_exclude_keys = normalized.manaSymbolExcludeKeys;
+  if (normalized.affinitySymbolKeys.length > 0)
+    query.affinity_symbol_keys = normalized.affinitySymbolKeys;
   if (normalized.affinitySymbolExcludeKeys.length > 0) {
     query.affinity_symbol_exclude_keys = normalized.affinitySymbolExcludeKeys;
   }
-  if (normalized.devotionSymbolKeys.length > 0) query.devotion_symbol_keys = normalized.devotionSymbolKeys;
+  if (normalized.devotionSymbolKeys.length > 0)
+    query.devotion_symbol_keys = normalized.devotionSymbolKeys;
   if (normalized.devotionSymbolExcludeKeys.length > 0) {
     query.devotion_symbol_exclude_keys = normalized.devotionSymbolExcludeKeys;
   }
   if (normalized.otherSymbolKeys.length > 0) query.other_symbol_keys = normalized.otherSymbolKeys;
-  if (normalized.otherSymbolExcludeKeys.length > 0) query.other_symbol_exclude_keys = normalized.otherSymbolExcludeKeys;
+  if (normalized.otherSymbolExcludeKeys.length > 0)
+    query.other_symbol_exclude_keys = normalized.otherSymbolExcludeKeys;
   if (normalized.typeKeys.length > 0) query.type_keys = normalized.typeKeys;
+  if (normalized.typeExcludeKeys.length > 0) query.type_exclude_keys = normalized.typeExcludeKeys;
 
   return query;
 };
@@ -400,12 +419,19 @@ export const buildCardFilterSelectionState = (
     manaTypeSymbolIds: resolveIdsFromKeys(state.manaSymbolKeys, catalog.manaSymbols),
     manaTypeSymbolExcludeIds: resolveIdsFromKeys(state.manaSymbolExcludeKeys, catalog.manaSymbols),
     affinitySymbolIds: resolveIdsFromKeys(state.affinitySymbolKeys, catalog.affinitySymbols),
-    affinitySymbolExcludeIds: resolveIdsFromKeys(state.affinitySymbolExcludeKeys, catalog.affinitySymbols),
+    affinitySymbolExcludeIds: resolveIdsFromKeys(
+      state.affinitySymbolExcludeKeys,
+      catalog.affinitySymbols,
+    ),
     devotionSymbolIds: resolveIdsFromKeys(state.devotionSymbolKeys, catalog.devotionSymbols),
-    devotionSymbolExcludeIds: resolveIdsFromKeys(state.devotionSymbolExcludeKeys, catalog.devotionSymbols),
+    devotionSymbolExcludeIds: resolveIdsFromKeys(
+      state.devotionSymbolExcludeKeys,
+      catalog.devotionSymbols,
+    ),
     otherSymbolIds: resolveIdsFromKeys(state.otherSymbolKeys, catalog.otherSymbols),
     otherSymbolExcludeIds: resolveIdsFromKeys(state.otherSymbolExcludeKeys, catalog.otherSymbols),
     typeIds: resolveIdsFromKeys(state.typeKeys, catalog.types),
+    typeExcludeIds: resolveIdsFromKeys(state.typeExcludeKeys, catalog.types),
   });
 
 export const buildCardFilterStateFromSelection = (
@@ -434,12 +460,19 @@ export const buildCardFilterStateFromSelection = (
     manaSymbolKeys: resolveKeysFromIds(state.manaTypeSymbolIds, catalog.manaSymbols),
     manaSymbolExcludeKeys: resolveKeysFromIds(state.manaTypeSymbolExcludeIds, catalog.manaSymbols),
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.affinitySymbols),
-    affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.affinitySymbols),
+    affinitySymbolExcludeKeys: resolveKeysFromIds(
+      state.affinitySymbolExcludeIds,
+      catalog.affinitySymbols,
+    ),
     devotionSymbolKeys: resolveKeysFromIds(state.devotionSymbolIds, catalog.devotionSymbols),
-    devotionSymbolExcludeKeys: resolveKeysFromIds(state.devotionSymbolExcludeIds, catalog.devotionSymbols),
+    devotionSymbolExcludeKeys: resolveKeysFromIds(
+      state.devotionSymbolExcludeIds,
+      catalog.devotionSymbols,
+    ),
     otherSymbolKeys: resolveKeysFromIds(state.otherSymbolIds, catalog.otherSymbols),
     otherSymbolExcludeKeys: resolveKeysFromIds(state.otherSymbolExcludeIds, catalog.otherSymbols),
     typeKeys: resolveKeysFromIds(state.typeIds, catalog.types),
+    typeExcludeKeys: resolveKeysFromIds(state.typeExcludeIds, catalog.types),
   });
 
 export const buildCardFilterApiSearchParams = (
@@ -463,6 +496,9 @@ export const buildCardFilterApiSearchParams = (
     payload.type_ids.forEach((id) => params.append('type_ids', id));
     params.set('type_match', payload.type_match ?? normalized.typeMatch);
   }
+  if (payload.type_exclude_ids) {
+    payload.type_exclude_ids.forEach((id) => params.append('type_exclude_ids', id));
+  }
   if (payload.mana_symbol_ids) {
     payload.mana_symbol_ids.forEach((id) => params.append('mana_symbol_ids', id));
     params.set('mana_symbol_match', payload.mana_symbol_match ?? normalized.manaSymbolMatch);
@@ -472,17 +508,27 @@ export const buildCardFilterApiSearchParams = (
   }
   if (payload.affinity_symbol_ids) {
     payload.affinity_symbol_ids.forEach((id) => params.append('affinity_symbol_ids', id));
-    params.set('affinity_symbol_match', payload.affinity_symbol_match ?? normalized.affinitySymbolMatch);
+    params.set(
+      'affinity_symbol_match',
+      payload.affinity_symbol_match ?? normalized.affinitySymbolMatch,
+    );
   }
   if (payload.affinity_symbol_exclude_ids) {
-    payload.affinity_symbol_exclude_ids.forEach((id) => params.append('affinity_symbol_exclude_ids', id));
+    payload.affinity_symbol_exclude_ids.forEach((id) =>
+      params.append('affinity_symbol_exclude_ids', id),
+    );
   }
   if (payload.devotion_symbol_ids) {
     payload.devotion_symbol_ids.forEach((id) => params.append('devotion_symbol_ids', id));
-    params.set('devotion_symbol_match', payload.devotion_symbol_match ?? normalized.devotionSymbolMatch);
+    params.set(
+      'devotion_symbol_match',
+      payload.devotion_symbol_match ?? normalized.devotionSymbolMatch,
+    );
   }
   if (payload.devotion_symbol_exclude_ids) {
-    payload.devotion_symbol_exclude_ids.forEach((id) => params.append('devotion_symbol_exclude_ids', id));
+    payload.devotion_symbol_exclude_ids.forEach((id) =>
+      params.append('devotion_symbol_exclude_ids', id),
+    );
   }
   if (payload.other_symbol_ids) {
     payload.other_symbol_ids.forEach((id) => params.append('other_symbol_ids', id));
@@ -521,6 +567,9 @@ export const buildCardFilterApiPayload = (
   if (normalized.typeIds.length > 0) {
     payload.type_ids = normalized.typeIds;
     payload.type_match = normalized.typeMatch;
+  }
+  if (normalized.typeExcludeIds.length > 0) {
+    payload.type_exclude_ids = normalized.typeExcludeIds;
   }
   if (normalized.manaTypeSymbolIds.length > 0) {
     payload.mana_symbol_ids = normalized.manaTypeSymbolIds;

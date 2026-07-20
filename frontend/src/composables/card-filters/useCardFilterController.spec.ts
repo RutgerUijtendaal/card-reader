@@ -13,9 +13,13 @@ describe('useCardFilterController', () => {
     state.onUpdateManaCostMax('4');
     state.onUpdateSelectedKeywordIds(['keyword-1']);
     state.onUpdateKeywordMatch('all');
+    state.onUpdateSelectedTypeIds(['type-1']);
+    state.onUpdateExcludedTypeIds(['type-2']);
+    state.onUpdateTypeMatch('all');
 
     state.resetManaGroup();
     state.resetKeywordGroup();
+    state.resetTypeGroup();
 
     expect(controller.selectionState.value.manaTypeSymbolIds).toEqual([]);
     expect(controller.selectionState.value.manaTypeSymbolExcludeIds).toEqual([]);
@@ -24,5 +28,8 @@ describe('useCardFilterController', () => {
     expect(controller.selectionState.value.manaCostMax).toBe('');
     expect(controller.selectionState.value.keywordIds).toEqual([]);
     expect(controller.selectionState.value.keywordMatch).toBe('any');
+    expect(controller.selectionState.value.typeIds).toEqual([]);
+    expect(controller.selectionState.value.typeExcludeIds).toEqual([]);
+    expect(controller.selectionState.value.typeMatch).toBe('any');
   });
 });

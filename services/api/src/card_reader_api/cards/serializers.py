@@ -53,6 +53,7 @@ class CardFilterParams(TypedDict):
     other_symbol_match: str | None
     symbol_ids: list[str] | None
     type_ids: list[str] | None
+    type_exclude_ids: list[str] | None
     type_match: str | None
     mana_cost_min: int | None
     mana_cost_max: int | None
@@ -275,6 +276,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     other_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    type_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     type_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     mana_cost_min = serializers.IntegerField(required=False, allow_null=True)
     mana_cost_max = serializers.IntegerField(required=False, allow_null=True)
@@ -317,6 +319,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "other_symbol_match": self._string_or_none("other_symbol_match"),
             "symbol_ids": self._string_list_or_none("symbol_ids"),
             "type_ids": self._string_list_or_none("type_ids"),
+            "type_exclude_ids": self._string_list_or_none("type_exclude_ids"),
             "type_match": self._string_or_none("type_match"),
             "mana_cost_min": self._int_or_none("mana_cost_min"),
             "mana_cost_max": self._int_or_none("mana_cost_max"),

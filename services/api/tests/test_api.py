@@ -1183,6 +1183,68 @@ def test_cards_list_metadata_match_modes() -> None:
     assert card_all.id in type_all_ids
 
 
+def test_cards_list_type_exclusions_combine_with_any_and_all_inclusions() -> None:
+    types = [
+        Type.objects.create(
+            key=f"type-filter-exclude-{index}",
+            label=f"Type Filter Exclude {index}",
+            identifiers_json=[],
+        )
+        for index in range(3)
+    ]
+    card_allowed, version_allowed = _create_editable_card_version(name="Type Exclude Allowed")
+    card_excluded, version_excluded = _create_editable_card_version(name="Type Exclude Blocked")
+    card_mixed, version_mixed = _create_editable_card_version(name="Type Exclude Mixed")
+    card_all, version_all = _create_editable_card_version(name="Type Exclude All")
+    for version in (version_allowed, version_excluded, version_mixed, version_all):
+        _create_card_image(version)
+
+    replace_card_version_types(card_version_id=version_allowed.id, type_ids=[types[0].id])
+    replace_card_version_types(card_version_id=version_excluded.id, type_ids=[types[1].id])
+    replace_card_version_types(card_version_id=version_mixed.id, type_ids=[types[0].id, types[1].id])
+    replace_card_version_types(card_version_id=version_all.id, type_ids=[types[0].id, types[2].id])
+
+    client = Client(HTTP_HOST="localhost")
+    exclude_response = client.get(
+        "/cards",
+        {"type_exclude_ids": [types[1].id, types[2].id]},
+    )
+    include_any_response = client.get(
+        "/cards",
+        {
+            "type_ids": [types[0].id, types[2].id],
+            "type_match": "any",
+            "type_exclude_ids": [types[1].id],
+        },
+    )
+    include_all_response = client.get(
+        "/cards",
+        {
+            "type_ids": [types[0].id, types[2].id],
+            "type_match": "all",
+            "type_exclude_ids": [types[1].id],
+        },
+    )
+
+    assert exclude_response.status_code == 200
+    assert include_any_response.status_code == 200
+    assert include_all_response.status_code == 200
+
+    exclude_ids = {row["id"] for row in exclude_response.json()["results"]}
+    include_any_ids = {row["id"] for row in include_any_response.json()["results"]}
+    include_all_ids = {row["id"] for row in include_all_response.json()["results"]}
+
+    assert card_allowed.id in exclude_ids
+    assert card_excluded.id not in exclude_ids
+    assert card_mixed.id not in exclude_ids
+    assert card_all.id not in exclude_ids
+    assert card_allowed.id in include_any_ids
+    assert card_all.id in include_any_ids
+    assert card_mixed.id not in include_any_ids
+    assert card_all.id in include_all_ids
+    assert card_allowed.id not in include_all_ids
+
+
 def test_cards_list_symbol_group_match_modes() -> None:
     mana_symbols = list(Symbol.objects.filter(symbol_type="mana").order_by("label")[:2])
     affinity_symbols = list(Symbol.objects.filter(symbol_type="affinity").order_by("label")[:2])

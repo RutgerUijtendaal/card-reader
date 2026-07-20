@@ -23,6 +23,7 @@ class DeckListFilterParams(TypedDict):
     affinity_symbol_exclude_ids: list[str] | None
     affinity_symbol_match: str | None
     deck_tag_ids: list[str] | None
+    deck_tag_exclude_ids: list[str] | None
     deck_tag_match: str | None
 
 
@@ -334,6 +335,7 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     affinity_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     affinity_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     deck_tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    deck_tag_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     deck_tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
 
     def validated_list_filters(self) -> DeckListFilterParams:
@@ -346,6 +348,7 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
             "affinity_symbol_exclude_ids": self._string_list_or_none("affinity_symbol_exclude_ids"),
             "affinity_symbol_match": self._string_or_none("affinity_symbol_match"),
             "deck_tag_ids": self._string_list_or_none("deck_tag_ids"),
+            "deck_tag_exclude_ids": self._string_list_or_none("deck_tag_exclude_ids"),
             "deck_tag_match": self._string_or_none("deck_tag_match"),
         }
 

@@ -43,10 +43,16 @@
           <RotateCcw class="h-3.5 w-3.5" />
         </button>
         <span
-          v-if="modelValue.length > 0"
+          v-if="includedValue.length > 0"
           class="theme-pill theme-pill-accent px-2 py-0.5 text-xs font-medium"
         >
-          {{ modelValue.length }}
+          +{{ includedValue.length }}
+        </span>
+        <span
+          v-if="excludedValue.length > 0"
+          class="theme-pill theme-pill-filter-exclude px-2 py-0.5 text-xs font-medium"
+        >
+          -{{ excludedValue.length }}
         </span>
         <ChevronDown
           class="h-4 w-4 transition"
@@ -76,11 +82,19 @@
               v-for="option in group.options"
               :key="option.id"
               type="button"
-              class="theme-choice-chip min-h-10 px-3 py-2"
-              :class="selectedIds.has(option.id) ? group.selectedClass : ''"
-              :aria-pressed="selectedIds.has(option.id)"
+              class="theme-choice-chip inline-flex min-h-10 items-center gap-1 px-3 py-2"
+              :class="chipClass(option.id, group.selectedClass)"
+              :title="chipTitle(option.label, option.id)"
+              :aria-pressed="chipState(option.id) !== 'off'"
+              :aria-label="chipTitle(option.label, option.id)"
               @click.stop="toggle(option.id)"
             >
+              <span
+                v-if="chipState(option.id) !== 'off'"
+                aria-hidden="true"
+              >
+                {{ chipState(option.id) === 'include' ? '+' : '−' }}
+              </span>
               {{ option.label }}
             </button>
           </div>
@@ -95,11 +109,19 @@
           v-for="option in visibleOptions"
           :key="option.id"
           type="button"
-          class="theme-choice-chip min-h-10 px-3 py-2"
-          :class="selectedIds.has(option.id) ? 'theme-choice-chip-active shadow-sm' : ''"
-          :aria-pressed="selectedIds.has(option.id)"
+          class="theme-choice-chip inline-flex min-h-10 items-center gap-1 px-3 py-2"
+          :class="chipClass(option.id)"
+          :title="chipTitle(option.label, option.id)"
+          :aria-pressed="chipState(option.id) !== 'off'"
+          :aria-label="chipTitle(option.label, option.id)"
           @click.stop="toggle(option.id)"
         >
+          <span
+            v-if="chipState(option.id) !== 'off'"
+            aria-hidden="true"
+          >
+            {{ chipState(option.id) === 'include' ? '+' : '−' }}
+          </span>
           {{ option.label }}
         </button>
 
@@ -135,6 +157,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ChevronDown, RotateCcw } from 'lucide-vue-next';
+import {
+  getTriStateSelection,
+  getTriStateSelectionClass,
+  getTriStateSelectionLabel,
+  toggleTriStateSelection,
+  type TriStateSelection,
+} from '@/composables/card-filters/triStateSelection';
 import type { MetadataOption } from '@/modules/card-detail/types';
 
 export type MetadataPillOptionGroup = {
@@ -148,7 +177,8 @@ const props = withDefaults(
   defineProps<{
     label: string;
     options: MetadataOption[];
-    modelValue: string[];
+    includedValue: string[];
+    excludedValue: string[];
     matchMode: 'any' | 'all';
     defaultOpen?: boolean;
     showReset?: boolean;
@@ -164,14 +194,15 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: string[]): void;
+  (e: 'update:includedValue', value: string[]): void;
+  (e: 'update:excludedValue', value: string[]): void;
   (e: 'update:matchMode', value: 'any' | 'all'): void;
   (e: 'reset'): void;
 }>();
 
 const isOpen = ref(props.defaultOpen);
 const isExpanded = ref(false);
-const selectedIds = computed(() => new Set(props.modelValue));
+const activeIds = computed(() => new Set([...props.includedValue, ...props.excludedValue]));
 
 watch(isOpen, (open) => {
   if (!open) {
@@ -185,7 +216,7 @@ const visibleOptions = computed(() => {
   }
 
   const selectedOutsideTop = props.options.filter(
-    (option, index) => index >= props.initialVisibleCount && selectedIds.value.has(option.id),
+    (option, index) => index >= props.initialVisibleCount && activeIds.value.has(option.id),
   );
 
   return [...props.options.slice(0, props.initialVisibleCount), ...selectedOutsideTop];
@@ -202,13 +233,20 @@ const canCollapse = computed(
   () => isExpanded.value && props.options.length > props.initialVisibleCount,
 );
 
+const chipState = (id: string): TriStateSelection =>
+  getTriStateSelection(id, props.includedValue, props.excludedValue);
+
+const chipTitle = (label: string, id: string): string =>
+  getTriStateSelectionLabel(label, chipState(id));
+
+const chipClass = (id: string, includedClass = 'theme-choice-chip-include'): string => {
+  const state = chipState(id);
+  return state === 'include' ? includedClass : getTriStateSelectionClass(state);
+};
+
 const toggle = (id: string): void => {
-  const next = new Set(props.modelValue);
-  if (next.has(id)) {
-    next.delete(id);
-  } else {
-    next.add(id);
-  }
-  emit('update:modelValue', Array.from(next));
+  const next = toggleTriStateSelection(id, props.includedValue, props.excludedValue);
+  emit('update:includedValue', next.included);
+  emit('update:excludedValue', next.excluded);
 };
 </script>

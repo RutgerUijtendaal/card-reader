@@ -44,4 +44,17 @@ describe('useDeckBrowseFilters', () => {
     await expect(controller.loadFilters()).rejects.toThrow('temporary failure');
     expect(controller.filtersLoaded.value).toBe(true);
   });
+
+  test('resets included and excluded deck tags together', () => {
+    const controller = useDeckBrowseFilters();
+
+    controller.updateDeckTagIds(['role-1']);
+    controller.updateDeckTagExcludeIds(['type-1']);
+    controller.updateDeckTagMatch('all');
+    controller.resetDeckTags();
+
+    expect(controller.deckTagIds.value).toEqual([]);
+    expect(controller.deckTagExcludeIds.value).toEqual([]);
+    expect(controller.deckTagMatch.value).toBe('any');
+  });
 });

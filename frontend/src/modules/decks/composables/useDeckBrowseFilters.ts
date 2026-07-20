@@ -22,12 +22,15 @@ export const useDeckBrowseFilters = () => {
   const filters = ref<CardFiltersResponse>(EMPTY_FILTERS);
   const filtersLoaded = ref(false);
   const deckTags = ref<DeckTagCatalog>({ roles: [], types: [] });
-  const filterCatalog = computed(() => createDeckBrowseFilterCatalog(filters.value, deckTags.value));
+  const filterCatalog = computed(() =>
+    createDeckBrowseFilterCatalog(filters.value, deckTags.value),
+  );
   const query = ref('');
   const affinitySymbolIds = ref<string[]>([]);
   const affinitySymbolExcludeIds = ref<string[]>([]);
   const affinitySymbolMatch = ref<'any' | 'all'>('any');
   const deckTagIds = ref<string[]>([]);
+  const deckTagExcludeIds = ref<string[]>([]);
   const deckTagMatch = ref<'any' | 'all'>('any');
 
   const selectionState = computed(() =>
@@ -43,6 +46,7 @@ export const useDeckBrowseFilters = () => {
         affinitySymbolExcludeIds: affinitySymbolExcludeIds.value,
         deckTagMatch: deckTagMatch.value,
         deckTagIds: deckTagIds.value,
+        deckTagExcludeIds: deckTagExcludeIds.value,
       },
       filterCatalog.value,
     );
@@ -56,6 +60,7 @@ export const useDeckBrowseFilters = () => {
     affinitySymbolExcludeIds.value = [...normalized.affinitySymbolExcludeIds];
     deckTagMatch.value = normalized.deckTagMatch;
     deckTagIds.value = [...normalized.deckTagIds];
+    deckTagExcludeIds.value = [...normalized.deckTagExcludeIds];
   };
 
   const resetFilters = (): void => {
@@ -88,12 +93,17 @@ export const useDeckBrowseFilters = () => {
     deckTagIds.value = value;
   };
 
+  const updateDeckTagExcludeIds = (value: string[]): void => {
+    deckTagExcludeIds.value = value;
+  };
+
   const updateDeckTagMatch = (value: 'any' | 'all'): void => {
     deckTagMatch.value = value;
   };
 
   const resetDeckTags = (): void => {
     deckTagIds.value = [];
+    deckTagExcludeIds.value = [];
     deckTagMatch.value = 'any';
   };
 
@@ -119,6 +129,7 @@ export const useDeckBrowseFilters = () => {
     affinitySymbolExcludeIds,
     affinitySymbolMatch,
     deckTagIds,
+    deckTagExcludeIds,
     deckTagMatch,
     selectionState,
     readFilterState,
@@ -130,6 +141,7 @@ export const useDeckBrowseFilters = () => {
     updateAffinitySymbolMatch,
     resetAffinitySymbols,
     updateDeckTagIds,
+    updateDeckTagExcludeIds,
     updateDeckTagMatch,
     resetDeckTags,
     loadFilters,
