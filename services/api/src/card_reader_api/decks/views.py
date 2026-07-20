@@ -52,6 +52,7 @@ class PublicDeckListView(APIView):
                 "affinity_symbol_exclude_ids": request.query_params.getlist("affinity_symbol_exclude_ids"),
                 "affinity_symbol_match": request.query_params.get("affinity_symbol_match"),
                 "deck_tag_ids": request.query_params.getlist("deck_tag_ids"),
+                "deck_tag_exclude_ids": request.query_params.getlist("deck_tag_exclude_ids"),
                 "deck_tag_match": request.query_params.get("deck_tag_match"),
             }
         )
@@ -69,6 +70,7 @@ class PublicDeckListView(APIView):
             affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
             affinity_symbol_match=filters["affinity_symbol_match"],
             deck_tag_ids=filters["deck_tag_ids"],
+            deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
         if serializer.wants_summary():
@@ -103,6 +105,7 @@ class OwnerDeckListCreateView(APIView):
                 "affinity_symbol_exclude_ids": request.query_params.getlist("affinity_symbol_exclude_ids"),
                 "affinity_symbol_match": request.query_params.get("affinity_symbol_match"),
                 "deck_tag_ids": request.query_params.getlist("deck_tag_ids"),
+                "deck_tag_exclude_ids": request.query_params.getlist("deck_tag_exclude_ids"),
                 "deck_tag_match": request.query_params.get("deck_tag_match"),
             }
         )
@@ -121,6 +124,7 @@ class OwnerDeckListCreateView(APIView):
             affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
             affinity_symbol_match=filters["affinity_symbol_match"],
             deck_tag_ids=filters["deck_tag_ids"],
+            deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
         if serializer.wants_summary():

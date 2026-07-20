@@ -388,6 +388,7 @@ def test_queue_reparse_latest_versions_by_filters_targets_only_matching_cards(
             "other_symbol_match": None,
             "symbol_ids": None,
             "type_ids": None,
+            "type_exclude_ids": None,
             "type_match": None,
             "mana_cost_min": None,
             "mana_cost_max": None,

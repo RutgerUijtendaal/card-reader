@@ -12,13 +12,51 @@ import type { CardFilterSelectionState } from './cardFilterState';
 const filters: CardFiltersResponse = {
   keywords: [{ id: 'kw-1', key: 'flying', label: 'Flying' }],
   tags: [{ id: 'tag-1', key: 'rare', label: 'Rare' }],
-  types: [{ id: 'type-1', key: 'creature', label: 'Creature' }],
+  types: [
+    { id: 'type-1', key: 'creature', label: 'Creature' },
+    { id: 'type-2', key: 'spell', label: 'Spell' },
+  ],
   symbols: [
-    { id: 'sym-1', key: 'mana-fire', label: 'Fire', symbol_type: 'mana', text_token: '{F}', asset_url: null },
-    { id: 'sym-1b', key: 'colorless-mana-3', label: 'Colorless Mana 3', symbol_type: 'mana', text_token: '{3}', asset_url: null },
-    { id: 'sym-2', key: 'air', label: 'Air', symbol_type: 'affinity', text_token: '{A}', asset_url: null },
-    { id: 'sym-3', key: 'pray', label: 'Pray', symbol_type: 'devotion', text_token: '{P}', asset_url: null },
-    { id: 'sym-4', key: 'tap', label: 'Tap', symbol_type: 'other', text_token: '{T}', asset_url: null },
+    {
+      id: 'sym-1',
+      key: 'mana-fire',
+      label: 'Fire',
+      symbol_type: 'mana',
+      text_token: '{F}',
+      asset_url: null,
+    },
+    {
+      id: 'sym-1b',
+      key: 'colorless-mana-3',
+      label: 'Colorless Mana 3',
+      symbol_type: 'mana',
+      text_token: '{3}',
+      asset_url: null,
+    },
+    {
+      id: 'sym-2',
+      key: 'air',
+      label: 'Air',
+      symbol_type: 'affinity',
+      text_token: '{A}',
+      asset_url: null,
+    },
+    {
+      id: 'sym-3',
+      key: 'pray',
+      label: 'Pray',
+      symbol_type: 'devotion',
+      text_token: '{P}',
+      asset_url: null,
+    },
+    {
+      id: 'sym-4',
+      key: 'tap',
+      label: 'Tap',
+      symbol_type: 'other',
+      text_token: '{T}',
+      asset_url: null,
+    },
   ],
 };
 
@@ -52,6 +90,7 @@ describe('cardFilterState adapters', () => {
         otherSymbolKeys: ['tap'],
         otherSymbolExcludeKeys: [],
         typeKeys: ['creature'],
+        typeExcludeKeys: ['spell'],
       },
       createCardFilterCatalog(filters),
     );
@@ -74,6 +113,7 @@ describe('cardFilterState adapters', () => {
       otherSymbolIds: ['sym-4'],
       otherSymbolExcludeIds: [],
       typeIds: ['type-1'],
+      typeExcludeIds: ['type-2'],
     });
   });
 
@@ -106,6 +146,7 @@ describe('cardFilterState adapters', () => {
         otherSymbolIds: ['sym-4'],
         otherSymbolExcludeIds: ['sym-4'],
         typeIds: ['type-1'],
+        typeExcludeIds: ['type-2'],
       },
       createCardFilterCatalog(filters),
     );
@@ -128,6 +169,7 @@ describe('cardFilterState adapters', () => {
       otherSymbolKeys: ['tap'],
       otherSymbolExcludeKeys: ['tap'],
       typeKeys: ['creature'],
+      typeExcludeKeys: ['spell'],
     });
   });
 
@@ -160,6 +202,7 @@ describe('cardFilterState adapters', () => {
       otherSymbolIds: ['sym-4'],
       otherSymbolExcludeIds: ['sym-4'],
       typeIds: ['type-1'],
+      typeExcludeIds: ['type-2'],
     };
     const params = buildCardFilterApiSearchParams(selection);
     const payload = buildCardFilterApiPayload(selection);
@@ -183,6 +226,7 @@ describe('cardFilterState adapters', () => {
     expect(params.get('other_symbol_match')).toBe('any');
     expect(params.getAll('symbol_ids')).toEqual([]);
     expect(params.getAll('type_ids')).toEqual(['type-1']);
+    expect(params.getAll('type_exclude_ids')).toEqual(['type-2']);
     expect(params.get('type_match')).toBe('any');
     expect(params.get('mana_cost_min')).toBe('2');
     expect(params.get('mana_cost_max')).toBe('7');
@@ -202,6 +246,7 @@ describe('cardFilterState adapters', () => {
       other_symbol_ids: ['sym-4'],
       other_symbol_exclude_ids: ['sym-4'],
       type_ids: ['type-1'],
+      type_exclude_ids: ['type-2'],
       mana_cost_min: '2',
       mana_cost_max: '7',
     });
@@ -212,5 +257,4 @@ describe('cardFilterState adapters', () => {
 
     expect(catalog.manaSymbols.map((row) => row.key)).toEqual(['mana-fire']);
   });
-
 });

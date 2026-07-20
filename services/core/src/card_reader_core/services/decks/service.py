@@ -48,6 +48,7 @@ class DeckService:
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
         deck_tag_ids: list[str] | None = None,
+        deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return [
@@ -61,6 +62,7 @@ class DeckService:
                 affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
                 affinity_symbol_match=affinity_symbol_match,
                 deck_tag_ids=deck_tag_ids,
+                deck_tag_exclude_ids=deck_tag_exclude_ids,
                 deck_tag_match=deck_tag_match,
             )
             if self.get_deck_validation(deck).is_valid
@@ -77,6 +79,7 @@ class DeckService:
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
         deck_tag_ids: list[str] | None = None,
+        deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return list_owner_decks(
@@ -88,6 +91,7 @@ class DeckService:
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
             deck_tag_ids=deck_tag_ids,
+            deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
         )
 
@@ -102,6 +106,7 @@ class DeckService:
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
         deck_tag_ids: list[str] | None = None,
+        deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return [
@@ -115,6 +120,7 @@ class DeckService:
                 affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
                 affinity_symbol_match=affinity_symbol_match,
                 deck_tag_ids=deck_tag_ids,
+                deck_tag_exclude_ids=deck_tag_exclude_ids,
                 deck_tag_match=deck_tag_match,
             )
             if self.get_deck_validation(deck).is_valid
@@ -131,6 +137,7 @@ class DeckService:
         affinity_symbol_exclude_ids: list[str] | None = None,
         affinity_symbol_match: str | None = None,
         deck_tag_ids: list[str] | None = None,
+        deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
     ) -> list[Deck]:
         return list_owner_deck_summaries(
@@ -142,6 +149,7 @@ class DeckService:
             affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
             affinity_symbol_match=affinity_symbol_match,
             deck_tag_ids=deck_tag_ids,
+            deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
         )
 

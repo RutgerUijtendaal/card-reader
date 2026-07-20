@@ -32,6 +32,8 @@ export type CardFilterSectionsState = {
   resetManaGroup: () => void;
   selectedTypeIds: string[];
   onUpdateSelectedTypeIds: (value: string[]) => void;
+  excludedTypeIds: string[];
+  onUpdateExcludedTypeIds: (value: string[]) => void;
   typeMatch: MatchMode;
   onUpdateTypeMatch: (value: MatchMode) => void;
   typeOptions: MetadataOption[];

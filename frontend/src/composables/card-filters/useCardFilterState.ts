@@ -1,6 +1,9 @@
 import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
-import type { CardFilterCatalog, CardFilterSelectionState } from '@/composables/card-filters/cardFilterState';
+import type {
+  CardFilterCatalog,
+  CardFilterSelectionState,
+} from '@/composables/card-filters/cardFilterState';
 import {
   DEFAULT_CARD_LIFECYCLE_FILTER,
   type CardLifecycleFilterValue,
@@ -41,6 +44,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const otherSymbolIds = ref<string[]>([]);
   const otherSymbolExcludeIds = ref<string[]>([]);
   const typeIds = ref<string[]>([]);
+  const typeExcludeIds = ref<string[]>([]);
 
   const selectionState = computed<CardFilterSelectionState>(() =>
     normalizeCardFilterSelectionState({
@@ -71,6 +75,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
       otherSymbolIds: otherSymbolIds.value,
       otherSymbolExcludeIds: otherSymbolExcludeIds.value,
       typeIds: typeIds.value,
+      typeExcludeIds: typeExcludeIds.value,
     }),
   );
 
@@ -103,6 +108,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     otherSymbolIds.value = [...normalized.otherSymbolIds];
     otherSymbolExcludeIds.value = [...normalized.otherSymbolExcludeIds];
     typeIds.value = [...normalized.typeIds];
+    typeExcludeIds.value = [...normalized.typeExcludeIds];
   };
 
   const applyFilterState = (state: CardFilterState): void => {
@@ -144,6 +150,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     otherSymbolIds,
     otherSymbolExcludeIds,
     typeIds,
+    typeExcludeIds,
     selectionState,
     applySelectionState,
     applyFilterState,

@@ -35,7 +35,8 @@
 
     <MetadataPillGroup
       v-if="isSectionVisible('types')"
-      v-model="selectedTypeIds"
+      v-model:included-value="selectedTypeIds"
+      v-model:excluded-value="excludedTypeIds"
       v-model:match-mode="typeMatch"
       :default-open="isSectionOpenByDefault('types', true)"
       :initial-visible-count="7"
@@ -152,7 +153,10 @@ import { computed } from 'vue';
 import MetadataChecklistGroup from '@/components/filters/MetadataChecklistGroup.vue';
 import MetadataPillGroup from '@/components/filters/MetadataPillGroup.vue';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
-import type { CardFilterSectionKey, CardFilterSectionsState } from '@/composables/card-filters/cardFilterSectionsState';
+import type {
+  CardFilterSectionKey,
+  CardFilterSectionsState,
+} from '@/composables/card-filters/cardFilterSectionsState';
 
 const props = defineProps<{
   state: CardFilterSectionsState;
@@ -160,11 +164,11 @@ const props = defineProps<{
   defaultOpenSections?: CardFilterSectionKey[];
 }>();
 
-const visibleSections = computed(
-  () => (props.visibleSections ? new Set(props.visibleSections) : null),
+const visibleSections = computed(() =>
+  props.visibleSections ? new Set(props.visibleSections) : null,
 );
-const defaultOpenSections = computed(
-  () => (props.defaultOpenSections ? new Set(props.defaultOpenSections) : null),
+const defaultOpenSections = computed(() =>
+  props.defaultOpenSections ? new Set(props.defaultOpenSections) : null,
 );
 
 const isSectionVisible = (section: CardFilterSectionKey): boolean =>
@@ -195,6 +199,10 @@ const manaCostMax = computed({
 const selectedTypeIds = computed({
   get: () => props.state.selectedTypeIds,
   set: props.state.onUpdateSelectedTypeIds,
+});
+const excludedTypeIds = computed({
+  get: () => props.state.excludedTypeIds,
+  set: props.state.onUpdateExcludedTypeIds,
 });
 const typeMatch = computed({
   get: () => props.state.typeMatch,

@@ -25,6 +25,7 @@ def card_filter_query_data(request: Request, *, include_list_controls: bool = Fa
         "other_symbol_match": request.query_params.get("other_symbol_match"),
         "symbol_ids": request.query_params.getlist("symbol_ids"),
         "type_ids": request.query_params.getlist("type_ids"),
+        "type_exclude_ids": request.query_params.getlist("type_exclude_ids"),
         "type_match": request.query_params.get("type_match"),
         "mana_cost_min": request.query_params.get("mana_cost_min"),
         "mana_cost_max": request.query_params.get("mana_cost_max"),

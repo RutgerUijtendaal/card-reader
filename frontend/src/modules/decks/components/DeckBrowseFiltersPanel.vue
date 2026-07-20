@@ -47,7 +47,8 @@
     />
 
     <MetadataPillGroup
-      v-model="selectedDeckTagIds"
+      v-model:included-value="selectedDeckTagIds"
+      v-model:excluded-value="excludedDeckTagIds"
       v-model:match-mode="deckTagMatch"
       label="Tags"
       :options="controller.filterCatalog.value.deckTags"
@@ -63,7 +64,9 @@ import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import type { RouteLocationRaw } from 'vue-router';
 import SymbolToggleGroup from '@/components/filters/SymbolToggleGroup.vue';
-import MetadataPillGroup, { type MetadataPillOptionGroup } from '@/components/filters/MetadataPillGroup.vue';
+import MetadataPillGroup, {
+  type MetadataPillOptionGroup,
+} from '@/components/filters/MetadataPillGroup.vue';
 import GalleryFilterSidebar from '@/components/filters/GalleryFilterSidebar.vue';
 import type { DeckBrowseFiltersController } from '@/modules/decks/composables/useDeckBrowseFilters';
 
@@ -78,7 +81,9 @@ const props = defineProps<{
 }>();
 
 const description = computed(
-  () => props.description ?? 'Filter public decks by deck, hero, owner, included cards, affinity, and tags.',
+  () =>
+    props.description ??
+    'Filter public decks by deck, hero, owner, included cards, affinity, and tags.',
 );
 
 const selectedAffinitySymbolIds = computed({
@@ -98,6 +103,10 @@ const affinitySymbolMatch = computed({
 const selectedDeckTagIds = computed({
   get: () => props.controller.deckTagIds.value,
   set: props.controller.updateDeckTagIds,
+});
+const excludedDeckTagIds = computed({
+  get: () => props.controller.deckTagExcludeIds.value,
+  set: props.controller.updateDeckTagExcludeIds,
 });
 const deckTagMatch = computed({
   get: () => props.controller.deckTagMatch.value,

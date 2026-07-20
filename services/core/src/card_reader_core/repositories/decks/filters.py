@@ -16,6 +16,7 @@ def apply_deck_filters(
     affinity_symbol_exclude_ids: list[str] | None,
     affinity_symbol_match: str | None,
     deck_tag_ids: list[str] | None,
+    deck_tag_exclude_ids: list[str] | None,
     deck_tag_match: str | None,
 ) -> QuerySet[Deck]:
     filtered = queryset
@@ -81,6 +82,12 @@ def apply_deck_filters(
                 filtered = filtered.filter(tag_assignments__tag_id=tag_id)
         else:
             filtered = filtered.filter(tag_assignments__tag_id__in=normalized_deck_tag_ids)
+
+    normalized_deck_tag_exclude_ids = [
+        tag_id.strip() for tag_id in deck_tag_exclude_ids or [] if tag_id.strip()
+    ]
+    if normalized_deck_tag_exclude_ids:
+        filtered = filtered.exclude(tag_assignments__tag_id__in=normalized_deck_tag_exclude_ids)
 
     return filtered.distinct()
 

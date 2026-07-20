@@ -4,7 +4,11 @@ import type { CardFiltersResponse } from '@/modules/card-detail/types';
 import type { CardFilterCatalog } from '@/composables/card-filters/cardFilterState';
 import type { MetadataFavoriteGroup } from '@/composables/card-filters/useMetadataFilterFavorites';
 import type { ReturnTypeUseCardFilterState } from '@/composables/card-filters/useCardFilterState';
-import type { CardFilterSectionsState, LifecycleFilterValue, MatchMode } from '@/composables/card-filters/cardFilterSectionsState';
+import type {
+  CardFilterSectionsState,
+  LifecycleFilterValue,
+  MatchMode,
+} from '@/composables/card-filters/cardFilterSectionsState';
 
 const createArrayUpdater =
   (target: { value: string[] }) =>
@@ -79,6 +83,7 @@ export const useCardFilterSectionsState = (
 
   const resetTypeGroup = (): void => {
     filterState.typeIds.value = [];
+    filterState.typeExcludeIds.value = [];
     filterState.typeMatch.value = 'any';
   };
 
@@ -99,6 +104,8 @@ export const useCardFilterSectionsState = (
     resetManaGroup,
     selectedTypeIds: filterState.typeIds.value,
     onUpdateSelectedTypeIds: createArrayUpdater(filterState.typeIds),
+    excludedTypeIds: filterState.typeExcludeIds.value,
+    onUpdateExcludedTypeIds: createArrayUpdater(filterState.typeExcludeIds),
     typeMatch: filterState.typeMatch.value,
     onUpdateTypeMatch: createMatchModeUpdater(filterState.typeMatch),
     typeOptions: filters.value.types,

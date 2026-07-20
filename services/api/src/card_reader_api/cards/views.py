@@ -78,6 +78,7 @@ class CardListView(APIView):
             other_symbol_match=filters["other_symbol_match"],
             symbol_ids=filters["symbol_ids"],
             type_ids=filters["type_ids"],
+            type_exclude_ids=filters["type_exclude_ids"],
             type_match=filters["type_match"],
             mana_cost_min=filters["mana_cost_min"],
             mana_cost_max=filters["mana_cost_max"],

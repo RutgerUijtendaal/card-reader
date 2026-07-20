@@ -62,6 +62,7 @@ def list_cards(
     other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
+    type_exclude_ids: list[str] | None = None,
     type_match: str | None = None,
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
@@ -100,6 +101,7 @@ def list_cards(
         other_symbol_match=other_symbol_match,
         symbol_ids=symbol_ids,
         type_ids=type_ids,
+        type_exclude_ids=type_exclude_ids,
         type_match=type_match,
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
@@ -152,6 +154,7 @@ def list_matching_cards(
     other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
+    type_exclude_ids: list[str] | None = None,
     type_match: str | None = None,
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
@@ -186,6 +189,7 @@ def list_matching_cards(
         other_symbol_match=other_symbol_match,
         symbol_ids=symbol_ids,
         type_ids=type_ids,
+        type_exclude_ids=type_exclude_ids,
         type_match=type_match,
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
@@ -224,6 +228,7 @@ def list_matching_card_candidates(
     other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
+    type_exclude_ids: list[str] | None = None,
     type_match: str | None = None,
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
@@ -258,6 +263,7 @@ def list_matching_card_candidates(
         other_symbol_match=other_symbol_match,
         symbol_ids=symbol_ids,
         type_ids=type_ids,
+        type_exclude_ids=type_exclude_ids,
         type_match=type_match,
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
@@ -359,6 +365,7 @@ def list_filtered_latest_card_version_reparse_sources(
     other_symbol_match: str | None = None,
     symbol_ids: list[str] | None = None,
     type_ids: list[str] | None = None,
+    type_exclude_ids: list[str] | None = None,
     type_match: str | None = None,
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
@@ -393,6 +400,7 @@ def list_filtered_latest_card_version_reparse_sources(
         other_symbol_match=other_symbol_match,
         symbol_ids=symbol_ids,
         type_ids=type_ids,
+        type_exclude_ids=type_exclude_ids,
         type_match=type_match,
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
@@ -546,6 +554,7 @@ def _build_filtered_versions_queryset(
     other_symbol_match: str | None,
     symbol_ids: list[str] | None,
     type_ids: list[str] | None,
+    type_exclude_ids: list[str] | None,
     type_match: str | None,
     mana_cost_min: int | None,
     mana_cost_max: int | None,
@@ -590,6 +599,7 @@ def _build_filtered_versions_queryset(
     versions = exclude_by_links(versions, CardVersionSymbol, "symbol_id", other_symbol_exclude_ids)
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", symbol_ids)
     versions = filter_by_links(versions, CardVersionType, "type_id", type_ids, match_mode=type_match)
+    versions = exclude_by_links(versions, CardVersionType, "type_id", type_exclude_ids)
     return versions
 
 

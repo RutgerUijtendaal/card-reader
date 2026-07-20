@@ -18,6 +18,7 @@ describe('cardFilterState route adapters', () => {
       mana_symbol_keys: ['mana-fire', 'mana-water'],
       other_symbol_keys: 'tap',
       type_keys: ['creature'],
+      type_exclude_keys: ['spell'],
     });
 
     expect(state).toMatchObject({
@@ -26,6 +27,12 @@ describe('cardFilterState route adapters', () => {
       manaSymbolKeys: ['mana-fire', 'mana-water'],
       otherSymbolKeys: ['tap'],
       typeKeys: ['creature'],
+      typeExcludeKeys: ['spell'],
+    });
+
+    expect(buildCardFilterRouteQuery(state)).toMatchObject({
+      type_keys: ['creature'],
+      type_exclude_keys: ['spell'],
     });
   });
 
@@ -37,7 +44,9 @@ describe('cardFilterState route adapters', () => {
     expect(allState.lifecycleStatus).toBe('all');
     expect(buildCardFilterRouteQuery(deprecatedState)).toEqual({ lifecycle_status: 'deprecated' });
     expect(buildCardFilterRouteQuery(allState)).toEqual({ lifecycle_status: 'all' });
-    expect(buildCardFilterRouteQuery(parseCardFilterRouteQuery({ lifecycle_status: 'active' }))).toEqual({});
+    expect(
+      buildCardFilterRouteQuery(parseCardFilterRouteQuery({ lifecycle_status: 'active' })),
+    ).toEqual({});
   });
 
   test('produces a stable signature for equivalent filter selections', () => {

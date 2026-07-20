@@ -2973,11 +2973,37 @@ def test_public_and_owned_deck_lists_filter_deck_tags_with_any_and_all_matching(
         "/my/decks",
         {"view": "summary", "deck_tag_ids": [type_tag.id], "deck_tag_match": "any"},
     )
+    excluded_response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {"view": "summary", "deck_tag_exclude_ids": [type_tag.id]},
+    )
+    mixed_response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {
+            "deck_tag_ids": [role.id],
+            "deck_tag_match": "all",
+            "deck_tag_exclude_ids": [type_tag.id],
+        },
+    )
+    owned_excluded_response = owner_client.get(
+        "/my/decks",
+        {"deck_tag_exclude_ids": [type_tag.id]},
+    )
 
     assert any_response.status_code == 200
+    assert all_response.status_code == 200
+    assert owned_response.status_code == 200
+    assert excluded_response.status_code == 200
+    assert mixed_response.status_code == 200
+    assert owned_excluded_response.status_code == 200
     assert {row["id"] for row in any_response.json()} >= {both_deck.id, role_deck.id}
     assert [row["id"] for row in all_response.json()] == [both_deck.id]
     assert [row["id"] for row in owned_response.json()] == [both_deck.id]
+    assert role_deck.id in {row["id"] for row in excluded_response.json()}
+    assert both_deck.id not in {row["id"] for row in excluded_response.json()}
+    assert role_deck.id in {row["id"] for row in mixed_response.json()}
+    assert both_deck.id not in {row["id"] for row in mixed_response.json()}
+    assert [row["id"] for row in owned_excluded_response.json()] == [role_deck.id]
 
     detail = DeckTagService().get_tag_detail(tag_id=type_tag.id)
     assert detail is not None
