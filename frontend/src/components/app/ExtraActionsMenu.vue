@@ -15,7 +15,8 @@
       <div
         v-if="isOpen"
         ref="panelRef"
-        class="theme-popover z-40 w-[15rem] p-3"
+        class="theme-popover z-40 p-3"
+        :class="panelClass"
         :style="{ position: 'fixed', left: `${x}px`, top: `${y}px` }"
       >
         <div class="space-y-3">
@@ -33,9 +34,11 @@ import { useFloatingPopover } from '@/composables/useFloatingPopover';
 withDefaults(
   defineProps<{
     buttonLabel?: string;
+    panelClass?: string;
   }>(),
   {
     buttonLabel: 'Open extra actions',
+    panelClass: 'w-[15rem]',
   },
 );
 

@@ -11,7 +11,10 @@
         class="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-stretch lg:justify-between"
         :class="topRowClass"
       >
-        <div class="flex min-w-0 flex-1 items-start gap-3">
+        <div
+          class="app-page-header-primary flex min-w-0 flex-1 gap-3"
+          :class="hasSupportingContent ? 'items-start' : 'items-center'"
+        >
           <div class="theme-card-frame-muted theme-section-title flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
             <component
               :is="icon"
@@ -32,12 +35,15 @@
               <slot name="titleMeta" />
             </div>
 
-            <p
+            <div
+              v-if="hasSubtitleContent"
               class="theme-section-muted mt-1"
               :class="subtitleClass"
             >
-              {{ subtitle }}
-            </p>
+              <slot name="subtitle">
+                {{ subtitle }}
+              </slot>
+            </div>
 
             <div
               v-if="$slots.details"
@@ -53,14 +59,13 @@
           class="lg:flex lg:self-stretch lg:items-center lg:justify-end"
         >
           <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-            <RouterLink
+            <AppHeaderAction
               v-if="hasBackLink"
-              class="btn-secondary inline-flex items-center gap-2"
+              :icon="ArrowLeft"
+              :label="backLabel"
+              short-label="Back"
               :to="resolvedBackTo"
-            >
-              <ArrowLeft class="h-4 w-4" />
-              <span>{{ backLabel }}</span>
-            </RouterLink>
+            />
             <slot name="actions" />
           </div>
         </div>
@@ -95,15 +100,15 @@
 <script setup lang="ts">
 import { ArrowLeft } from 'lucide-vue-next';
 import { Comment, computed, onMounted, ref, useSlots } from 'vue';
-import { RouterLink } from 'vue-router';
 import type { Component } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 
 const props = withDefaults(
   defineProps<{
     icon: Component;
     title: string;
-    subtitle: string;
+    subtitle?: string;
     backTo?: RouteLocationRaw | null;
     backLabel?: string;
     titleTag?: 'h1' | 'h2' | 'h3';
@@ -113,6 +118,7 @@ const props = withDefaults(
   {
     titleTag: 'h1',
     titleClass: 'text-xl',
+    subtitle: '',
     subtitleClass: 'text-sm',
     backTo: null,
     backLabel: '',
@@ -121,7 +127,9 @@ const props = withDefaults(
 
 const slots = useSlots();
 const hasShellHeaderOutlet = ref(false);
-const hasRenderableSlot = (name: 'actions' | 'bottomLeft' | 'bottomRight' | 'details' | 'titleMeta'): boolean => {
+const hasRenderableSlot = (
+  name: 'actions' | 'bottomLeft' | 'bottomRight' | 'details' | 'subtitle' | 'titleMeta',
+): boolean => {
   const slot = slots[name];
   if (!slot) {
     return false;
@@ -129,6 +137,9 @@ const hasRenderableSlot = (name: 'actions' | 'bottomLeft' | 'bottomRight' | 'det
   return slot().some((node) => node.type !== Comment);
 };
 const hasBackLink = computed(() => Boolean(props.backTo && props.backLabel));
+const hasSubtitle = computed(() => props.subtitle.trim().length > 0);
+const hasSubtitleContent = computed(() => hasSubtitle.value || hasRenderableSlot('subtitle'));
+const hasSupportingContent = computed(() => hasSubtitleContent.value || hasRenderableSlot('details'));
 const hasHeaderActions = computed(() => hasBackLink.value || hasRenderableSlot('actions'));
 const hasBottomLeft = computed(() => hasRenderableSlot('bottomLeft'));
 const hasBottomRight = computed(() => hasRenderableSlot('bottomRight'));

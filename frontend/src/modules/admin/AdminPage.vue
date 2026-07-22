@@ -9,86 +9,81 @@
     >
       <template #actions>
         <div class="theme-tablist">
-          <button
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'catalog' ? 'theme-tab-active' : ''"
+          <AppHeaderAction
+            :icon="Tags"
+            label="Catalog"
+            short-label="Catalog"
+            variant="tab"
+            :active="activeTab === 'catalog'"
             @click="setActiveTab('catalog')"
-          >
-            <Tags class="h-4 w-4" />
-            <span>Catalog</span>
-          </button>
-          <button
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'templates' ? 'theme-tab-active' : ''"
+          />
+          <AppHeaderAction
+            :icon="LayoutTemplate"
+            label="Templates"
+            short-label="Templates"
+            variant="tab"
+            :active="activeTab === 'templates'"
             @click="setActiveTab('templates')"
-          >
-            <LayoutTemplate class="h-4 w-4" />
-            <span>Templates</span>
-          </button>
-          <button
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'versions' ? 'theme-tab-active' : ''"
+          />
+          <AppHeaderAction
+            :icon="History"
+            label="Versions"
+            short-label="Versions"
+            variant="tab"
+            :active="activeTab === 'versions'"
             @click="setActiveTab('versions')"
-          >
-            <History class="h-4 w-4" />
-            <span>Versions</span>
-          </button>
-          <button
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'card-backs' ? 'theme-tab-active' : ''"
+          />
+          <AppHeaderAction
+            :icon="Images"
+            label="Card backs"
+            short-label="Backs"
+            variant="tab"
+            :active="activeTab === 'card-backs'"
             @click="setActiveTab('card-backs')"
-          >
-            <Images class="h-4 w-4" />
-            <span>Card backs</span>
-          </button>
-          <button
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'card-groups' ? 'theme-tab-active' : ''"
+          />
+          <AppHeaderAction
+            :icon="Layers3"
+            label="Card groups"
+            short-label="Groups"
+            variant="tab"
+            :active="activeTab === 'card-groups'"
             @click="setActiveTab('card-groups')"
-          >
-            <Layers3 class="h-4 w-4" />
-            <span>Card groups</span>
-          </button>
-          <button
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'card-merges' ? 'theme-tab-active' : ''"
+          />
+          <AppHeaderAction
+            :icon="GitMerge"
+            label="Card merges"
+            short-label="Merges"
+            variant="tab"
+            :active="activeTab === 'card-merges'"
             @click="setActiveTab('card-merges')"
-          >
-            <GitMerge class="h-4 w-4" />
-            <span>Card merges</span>
-          </button>
-          <button
+          />
+          <AppHeaderAction
             v-if="auth.canManageUsers"
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'users' ? 'theme-tab-active' : ''"
+            :icon="Users"
+            label="Users"
+            short-label="Users"
+            variant="tab"
+            :active="activeTab === 'users'"
             @click="setActiveTab('users')"
           >
-            <Users class="h-4 w-4" />
-            <span>Users</span>
-            <span
-              v-if="pendingAccessRequestCount > 0"
-              class="theme-pill theme-pill-success ml-1 px-2 py-0.5 text-[11px] font-semibold"
-            >
-              {{ pendingAccessRequestCount }}
-            </span>
-          </button>
-          <button
+            <template #trailing>
+              <span
+                v-if="pendingAccessRequestCount > 0"
+                class="theme-pill theme-pill-success ml-1 px-2 py-0.5 text-[11px] font-semibold"
+              >
+                {{ pendingAccessRequestCount }}
+              </span>
+            </template>
+          </AppHeaderAction>
+          <AppHeaderAction
             v-if="auth.canAccessMaintenance"
-            class="theme-tab"
-            type="button"
-            :class="activeTab === 'maintenance' ? 'theme-tab-active' : ''"
+            :icon="Database"
+            label="Maintenance"
+            short-label="System"
+            variant="tab"
+            :active="activeTab === 'maintenance'"
             @click="setActiveTab('maintenance')"
-          >
-            <Database class="h-4 w-4" />
-            <span>Maintenance</span>
-          </button>
+          />
         </div>
       </template>
     </AppPageHeader>
@@ -107,6 +102,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { Database, GitMerge, History, Images, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import { useAccessRequestSummary } from '@/composables/useAccessRequestSummary';
 import { useAuthStore } from '@/modules/auth/authStore';

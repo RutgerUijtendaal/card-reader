@@ -41,12 +41,19 @@ vi.mock('@/components/app/AppPageHeader.vue', () => ({
   default: defineComponent({
     props: {
       title: { type: String, required: true },
+      subtitle: { type: String, default: undefined },
+      subtitleClass: { type: String, default: undefined },
     },
     setup(props, { slots }) {
       return () =>
         h('header', [
           h('h1', props.title),
-          slots.titleMeta?.(),
+          slots.titleMeta ? h('div', { 'data-testid': 'header-title-meta' }, slots.titleMeta()) : null,
+          slots.subtitle
+            ? h('div', { class: props.subtitleClass, 'data-testid': 'header-subtitle' }, slots.subtitle())
+            : props.subtitle
+              ? h('p', { 'data-testid': 'header-subtitle' }, props.subtitle)
+              : null,
           slots.actions?.(),
         ]);
     },
@@ -82,8 +89,27 @@ vi.mock('@/components/cards/CardSortMenu.vue', () => ({
 
 vi.mock('@/components/cards/GalleryOptionsMenu.vue', () => ({
   default: defineComponent({
-    setup() {
-      return () => h('div', { 'data-testid': 'gallery-options-menu' });
+    props: {
+      groupByType: { type: Boolean, default: false },
+      showGroupByTypeControl: { type: Boolean, default: false },
+    },
+    emits: ['update:groupByType'],
+    setup(props, { emit }) {
+      return () => h('div', { 'data-testid': 'gallery-options-menu' }, [
+        props.showGroupByTypeControl
+          ? h('label', { 'data-testid': 'group-by-type-option' }, [
+            'Group by Type',
+            h('input', {
+              type: 'checkbox',
+              checked: props.groupByType,
+              onChange: (event: Event) => emit(
+                'update:groupByType',
+                (event.target as HTMLInputElement).checked,
+              ),
+            }),
+          ])
+          : null,
+      ]);
     },
   }),
 }));
@@ -152,7 +178,7 @@ const buildCard = (
 const deckRecord = {
   id: 'deck-1',
   name: 'Grouped Deck',
-  description: null,
+  description: 'A carefully tuned deck.',
   visibility: 'public' as const,
   owner: {
     id: 'user-1',
@@ -273,24 +299,50 @@ describe('DeckDetailPage type grouping', () => {
     vi.clearAllMocks();
   });
 
-  test('renders mainboard cards grouped by type order by default', async () => {
+  test('renders mainboard cards grouped by type order by default and exposes the option in view options', async () => {
     const mounted = await mountPage();
 
     expect(readTypeGroupKeys(mounted.container)).toEqual(['spell', 'creature', 'untyped', 'mana']);
-    expect(mounted.container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
+    expect(mounted.container.querySelector('[data-testid="group-by-type-option"]')?.textContent).toContain('Group by Type');
+    expect(mounted.container.querySelector<HTMLInputElement>('[data-testid="group-by-type-option"] input')?.checked).toBe(true);
     expect(mounted.container.querySelectorAll('[data-testid^="deck-card-"]')).toHaveLength(4);
 
     mounted.unmount();
   });
 
-  test('renders the owner and deck tags directly after the title without an author prefix', async () => {
+  test('renders deck tags in the header subtitle row and the owner as side-panel text', async () => {
     const mounted = await mountPage();
     const header = mounted.container.querySelector('header');
+    const titleMeta = mounted.container.querySelector('[data-testid="header-title-meta"]');
+    const subtitle = mounted.container.querySelector('[data-testid="header-subtitle"]');
+    const owner = mounted.container.querySelector('[data-testid="deck-owner"]');
 
     expect(header?.textContent).toContain('Grouped Deck');
-    expect(header?.textContent).toContain('Owner');
-    expect(header?.textContent).toContain('Tank');
+    expect(titleMeta).toBeNull();
+    expect(subtitle?.textContent).toContain('Tank');
+    expect(subtitle?.classList.contains('!mt-4')).toBe(true);
+    expect(header?.textContent).not.toContain('Owner');
     expect(header?.textContent).not.toContain('By');
+    expect(owner?.textContent).toContain('By Owner');
+
+    mounted.unmount();
+  });
+
+  test('places the deck description below the hero and anchors mana controls above the footer', async () => {
+    const mounted = await mountPage();
+    const header = mounted.container.querySelector('header');
+    const description = mounted.container.querySelector<HTMLElement>('[data-testid="deck-description"]');
+    const manaSection = mounted.container.querySelector<HTMLElement>('[data-testid="deck-mana-section"]');
+    const viewOptions = mounted.container.querySelector<HTMLElement>('[data-testid="gallery-options-menu"]');
+
+    expect(header?.textContent).not.toContain('A carefully tuned deck.');
+    expect(description?.textContent).toContain('Description');
+    expect(description?.textContent).toContain('A carefully tuned deck.');
+    expect(manaSection?.classList.contains('!mt-auto')).toBe(true);
+    expect(description?.compareDocumentPosition(manaSection as Node) ?? 0)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(manaSection?.compareDocumentPosition(viewOptions as Node) ?? 0)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     mounted.unmount();
   });
@@ -299,9 +351,7 @@ describe('DeckDetailPage type grouping', () => {
     authState.user = { id: 'staff-user' };
     authState.canAccessStaffRoutes = true;
     const mounted = await mountPage();
-    const editLink = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a')).find(
-      (link) => link.textContent?.trim() === 'Edit Deck',
-    );
+    const editLink = mounted.container.querySelector<HTMLAnchorElement>('a[aria-label="Edit deck"]');
 
     expect(editLink?.getAttribute('href')).toContain('/my/decks/deck-1/edit');
 
@@ -312,7 +362,7 @@ describe('DeckDetailPage type grouping', () => {
     authState.user = { id: 'other-user' };
     const mounted = await mountPage();
 
-    expect(mounted.container.textContent).not.toContain('Edit Deck');
+    expect(mounted.container.querySelector('[aria-label="Edit deck"]')).toBeNull();
 
     mounted.unmount();
   });
@@ -362,8 +412,27 @@ describe('DeckDetailPage type grouping', () => {
     const mounted = await mountPage();
 
     expect(readTypeGroupKeys(mounted.container)).toEqual([]);
-    expect(mounted.container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+    expect(mounted.container.querySelector<HTMLInputElement>('[data-testid="group-by-type-option"] input')?.checked).toBe(false);
     expect(mounted.container.querySelectorAll('[data-testid^="deck-card-"]')).toHaveLength(4);
+
+    mounted.unmount();
+  });
+
+  test('updates deck grouping from the view options control', async () => {
+    const mounted = await mountPage();
+    const groupByTypeOption = mounted.container.querySelector<HTMLInputElement>(
+      '[data-testid="group-by-type-option"] input',
+    );
+    if (!(groupByTypeOption instanceof HTMLInputElement)) {
+      throw new Error('expected group-by-type view option');
+    }
+
+    groupByTypeOption.click();
+    await nextTick();
+
+    expect(readTypeGroupKeys(mounted.container)).toEqual([]);
+    expect(groupByTypeOption.checked).toBe(false);
+    expect(localStorage.getItem('card-reader.deck-detail-group-by-type')).toBe('false');
 
     mounted.unmount();
   });
@@ -419,14 +488,31 @@ describe('DeckDetailPage type grouping', () => {
     mounted.unmount();
   });
 
-  test('exports the active board to TTS with matching button copy', async () => {
+  test('renders compact labelled header actions and exports the active board to TTS', async () => {
     const mounted = await mountPage();
-    const mainboardExportButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Copy Mainboard TTS'),
+    const mainboardExportButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Copy Mainboard TTS"]',
     );
     if (!(mainboardExportButton instanceof HTMLButtonElement)) {
       throw new Error('expected mainboard export button');
     }
+
+    expect(mounted.container.querySelector('button[aria-label="Copy share link"]')).not.toBeNull();
+    expect(mounted.container.querySelector('a[aria-label="Edit deck"]')).not.toBeNull();
+    expect(mounted.container.querySelector('button[aria-label="Copy share link"]')?.textContent).toBe('Share');
+    expect(mainboardExportButton.textContent).toBe('TTS');
+    expect(mounted.container.querySelector('a[aria-label="Edit deck"]')?.textContent).toBe('Edit');
+    const playtestLink = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('header a')).find(
+      (link) => link.textContent?.trim() === 'Playtest',
+    );
+    const headerLinks = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('header a'));
+    expect(playtestLink).not.toBeNull();
+    expect(playtestLink?.getAttribute('aria-label')).toBe('Playtest deck');
+    expect(playtestLink).toBe(headerLinks[headerLinks.length - 1]);
+    const headerActions = mounted.container.querySelectorAll<HTMLElement>('.app-header-action');
+    expect(headerActions).toHaveLength(4);
+    expect(Array.from(headerActions).every((action) => action.classList.contains('h-10'))).toBe(true);
+    expect(mounted.container.querySelector('header')?.textContent).not.toContain('Copy Mainboard TTS');
 
     mainboardExportButton.click();
     await nextTick();
@@ -445,8 +531,8 @@ describe('DeckDetailPage type grouping', () => {
     sideboardButton.click();
     await nextTick();
 
-    const sideboardExportButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Copy Sideboard TTS'),
+    const sideboardExportButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Copy Sideboard TTS"]',
     );
     if (!(sideboardExportButton instanceof HTMLButtonElement)) {
       throw new Error('expected sideboard export button');

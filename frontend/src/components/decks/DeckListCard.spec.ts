@@ -143,8 +143,8 @@ const mountDeckListCard = async (
           ? {
               'menu-actions': ({ close }: { close: () => void }) => h(
                 'button',
-                { class: 'manage-tags-action', type: 'button', onClick: close },
-                'Manage Tags',
+                { class: 'manage-tags-action', type: 'button', 'aria-label': 'Manage deck tags', onClick: close },
+                [h('svg', { class: 'h-4 w-4' }), 'Tags'],
               ),
             }
           : {}),
@@ -184,25 +184,40 @@ describe('DeckListCard', () => {
   test('renders browse mode as a static horizontal card without foldout controls', async () => {
     const mounted = await mountDeckListCard('browse');
     const text = mounted.container.textContent ?? '';
+    const footerText = mounted.container.querySelector('.deck-list-card-footer-meta')?.textContent ?? '';
 
     expect(mounted.container.querySelector('.deck-list-card-browse')).not.toBeNull();
     expect(mounted.container.querySelector('.deck-list-card-description')).not.toBeNull();
+    expect(mounted.container.querySelector('.deck-list-card-footer')).not.toBeNull();
+    expect(mounted.container.querySelector('img[alt="Azure Hero"]')).not.toBeNull();
     expect(mounted.container.querySelector('button[aria-label="Toggle deck details"]')).toBeNull();
     expect(mounted.container.querySelector('.deck-list-card-browse-details')).toBeNull();
     expect(text).toContain('Azure Tempo');
-    expect(text).toContain('Azure Hero');
     expect(text).toContain('Maitys');
     expect(text).not.toContain('maitys');
-    expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
+    expect(mounted.container.querySelector('.deck-list-card-title-row')?.classList).toContain('justify-between');
+    expect(mounted.container.querySelector('.deck-list-card-title-row h3')?.classList).toContain('text-xl');
+    expect(mounted.container.querySelector('.deck-list-card-title-row h3')?.classList).toContain('truncate');
+    expect(mounted.container.querySelector('.deck-list-card-title-pill')?.classList).toContain('theme-pill-neutral');
     expect(text).toContain('{F}');
     expect(text).toContain('Pressure early, then pivot into efficient trades.');
     expect(text).toContain('Damage');
     expect(text).toContain('Armor');
-    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).toContain('Damage');
-    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).toContain('Armor');
+    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Damage');
+    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Armor');
+    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Damage');
+    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Armor');
+    expect(mounted.container.querySelector('.deck-list-card-main .deck-list-card-tags')).toBeNull();
+    expect(mounted.container.querySelector('.deck-list-card-tags-region .deck-list-card-tags')).not.toBeNull();
+    expect(mounted.container.querySelector('.deck-list-card-tags-region')?.nextElementSibling?.classList).toContain('deck-list-card-footer');
     expect(text).not.toContain('Tempo Burst');
+    expect(text).not.toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).not.toContain('Mainboard 40 · 24 unique · 1 sideboard');
-    expect(text).toContain('1/1/2025');
+    expect(footerText).not.toContain('Azure Hero');
+    expect(footerText).toContain('Maindeck 40');
+    expect(footerText).toContain('Unique 24');
+    expect(footerText).toContain('Sideboards 1');
+    expect(footerText).toContain('Updated 2025/1/1');
 
     mounted.unmount();
   });
@@ -210,17 +225,26 @@ describe('DeckListCard', () => {
   test('keeps owned deck cards on the management layout', async () => {
     const mounted = await mountDeckListCard('owned');
     const text = mounted.container.textContent ?? '';
+    const footerText = mounted.container.querySelector('.deck-list-card-footer-meta')?.textContent ?? '';
 
     expect(mounted.container.querySelector('.deck-list-card-owned')).not.toBeNull();
+    expect(mounted.container.querySelector('img[alt="Azure Hero"]')).not.toBeNull();
     expect(text).toContain('Azure Tempo');
     expect(text).toContain('Public');
-    expect(text).toContain('Azure Hero');
-    expect(text).toContain('Maindeck 40 · 24 unique · 1 sideboard');
     expect(text).toContain('{F}');
     expect(text).toContain('Damage');
     expect(text).toContain('Armor');
     expect(text).toContain('Tempo Burst');
-    expect(text).toContain('1/1/2025');
+    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Damage');
+    expect(mounted.container.querySelector('.deck-list-card-title-row')?.textContent).not.toContain('Tempo Burst');
+    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Damage');
+    expect(mounted.container.querySelector('.deck-list-card-tags')?.textContent).toContain('Tempo Burst');
+    expect(text).not.toContain('Maindeck 40 · 24 unique · 1 sideboard');
+    expect(footerText).not.toContain('Azure Hero');
+    expect(footerText).toContain('Maindeck 40');
+    expect(footerText).toContain('Unique 24');
+    expect(footerText).toContain('Sideboards 1');
+    expect(footerText).toContain('Updated 2025/1/1');
 
     mounted.unmount();
   });
@@ -251,9 +275,17 @@ describe('DeckListCard', () => {
     menuTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await nextTick();
 
-    expect(document.body.textContent).toContain('Manage Tags');
+    expect(document.body.textContent).toContain('Tags');
     expect(document.body.textContent).toContain('Playtest');
-    expect(document.body.textContent).toContain('Copy TTS');
+    expect(document.body.textContent).toContain('Share');
+    expect(document.body.textContent).toContain('TTS');
+    expect(document.body.textContent).not.toContain('Copy Share Link');
+    expect(document.body.textContent).not.toContain('Copy TTS');
+    const sharedMenuActions = Array.from(document.body.querySelectorAll('.app-menu-action'));
+    expect(sharedMenuActions).toHaveLength(3);
+    expect(sharedMenuActions.every((action) => action.classList.contains('btn-secondary'))).toBe(true);
+    expect(Array.from(document.body.querySelectorAll('.app-menu-action svg')).every((icon) =>
+      icon.classList.contains('h-4') && icon.classList.contains('w-4'))).toBe(true);
 
     mounted.unmount();
   });
@@ -287,8 +319,7 @@ describe('DeckListCard', () => {
     await nextTick();
 
     const copyButton = document.body.querySelector('button');
-    const matchingButtons = Array.from(document.body.querySelectorAll('button'));
-    const copyShareButton = matchingButtons.find((button) => button.textContent?.includes('Copy Share Link'));
+    const copyShareButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="Copy share link"]');
 
     expect(copyButton).not.toBeNull();
     expect(copyShareButton).not.toBeNull();
@@ -310,7 +341,7 @@ describe('DeckListCard', () => {
     menuTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await nextTick();
 
-    const exportButton = Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent?.includes('Copy TTS'));
+    const exportButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="Copy Mainboard TTS"]');
 
     expect(exportButton).not.toBeNull();
 

@@ -41,10 +41,19 @@ const mountPills = async (maxVisible: number) => {
 describe('DeckTagPills', () => {
   test('caps assigned and pending pills together with roles first', async () => {
     const { app, container } = await mountPills(4);
-    const labels = [...container.querySelectorAll('span')].map((pill) => pill.textContent?.trim());
+    const labels = [...container.querySelectorAll(':scope > div > *')].map((pill) => pill.textContent?.trim());
+    const expandButton = container.querySelector<HTMLButtonElement>('button[aria-label="Show all 5 deck tags"]');
 
     expect(labels).toEqual(['Control', 'Armor', 'Card Draw', 'Tempo · Pending', '+1']);
     expect(container.textContent).not.toContain('Ramp');
+    expect(expandButton?.getAttribute('aria-expanded')).toBe('false');
+
+    expandButton?.click();
+    await nextTick();
+
+    expect(container.textContent).toContain('Ramp · Pending');
+    expect(container.textContent).not.toContain('+1');
+    expect(container.querySelector('button[aria-label="Show all 5 deck tags"]')).toBeNull();
 
     app.unmount();
   });

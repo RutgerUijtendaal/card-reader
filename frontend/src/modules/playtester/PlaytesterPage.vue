@@ -13,13 +13,13 @@
       title-class="text-xl"
     >
       <template #actions>
-        <RouterLink
+        <AppHeaderAction
           v-if="!isPreSetupStage && deck"
-          class="btn-secondary"
+          :icon="BookOpenText"
+          label="View deck details"
+          short-label="Deck"
           :to="`/decks/${deck.id}`"
-        >
-          Deck Detail
-        </RouterLink>
+        />
       </template>
     </AppPageHeader>
 
@@ -252,10 +252,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useEventListener } from '@vueuse/core';
-import { Gamepad2 } from 'lucide-vue-next';
-import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { BookOpenText, Gamepad2 } from 'lucide-vue-next';
+import { useRoute, useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/api/client';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { fetchDeckDetail, fetchMyDeck } from '@/modules/decks/api';

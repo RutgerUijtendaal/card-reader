@@ -15,16 +15,13 @@
     <AppPageHeader
       :icon="BookOpenText"
       :title="deck.name"
-      :subtitle="deck.description || 'Inspect hero, boards, and included cards.'"
       :back-to="backLink"
       :back-label="backLabel"
       title-tag="h2"
       title-class="text-xl"
+      subtitle-class="!mt-4 text-sm"
     >
-      <template #titleMeta>
-        <span class="theme-pill theme-pill-keyword shrink-0 text-xs">
-          {{ formatDeckOwnerName(deck.owner.username) }}
-        </span>
+      <template #subtitle>
         <DeckTagPills
           :tags="deck.tags ?? []"
           :pending-suggestions="canEdit ? deck.pending_tag_suggestions ?? [] : []"
@@ -32,35 +29,33 @@
       </template>
 
       <template #actions>
-        <button
+        <AppHeaderAction
           v-if="canEdit && canShare"
-          class="btn-secondary"
-          type="button"
+          :icon="Share2"
+          label="Copy share link"
+          short-label="Share"
           @click="copyShareLink"
-        >
-          Copy Share Link
-        </button>
-        <button
-          class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
-          type="button"
+        />
+        <AppHeaderAction
+          :icon="TtsCopyIcon"
+          :label="ttsExportButtonLabel"
+          short-label="TTS"
           @click="handleTtsExport"
-        >
-          <Clipboard class="h-4 w-4" />
-          <span>{{ ttsExportButtonLabel }}</span>
-        </button>
-        <RouterLink
-          class="btn-primary"
-          :to="`/playtester/${deck.id}`"
-        >
-          Playtest
-        </RouterLink>
-        <RouterLink
+        />
+        <AppHeaderAction
           v-if="canEdit"
-          class="btn-secondary"
+          :icon="Pencil"
+          label="Edit deck"
+          short-label="Edit"
           :to="buildDeckDetailEditorLocation(deck.id)"
-        >
-          Edit Deck
-        </RouterLink>
+        />
+        <AppHeaderAction
+          :icon="Gamepad2"
+          label="Playtest deck"
+          short-label="Playtest"
+          variant="primary"
+          :to="`/playtester/${deck.id}`"
+        />
       </template>
     </AppPageHeader>
 
@@ -75,7 +70,7 @@
         >
           <AppStickyAside
             root-class="deck-detail-primary-aside"
-            scroll-class="space-y-5"
+            scroll-class="flex flex-col gap-5 space-y-0"
           >
             <div class="space-y-4">
               <h3 class="theme-section-title text-base font-semibold">
@@ -100,10 +95,31 @@
                 <p class="theme-section-title text-lg font-semibold">
                   {{ deck.hero_card.name }}
                 </p>
+                <p
+                  class="theme-section-muted text-sm"
+                  data-testid="deck-owner"
+                >
+                  By <span class="theme-section-title font-medium">{{ formatDeckOwnerName(deck.owner.username) }}</span>
+                </p>
               </div>
+
+              <section
+                class="theme-divider space-y-2 border-t pt-4"
+                data-testid="deck-description"
+              >
+                <h4 class="theme-section-title text-sm font-semibold">
+                  Description
+                </h4>
+                <p class="theme-section-muted text-sm leading-6">
+                  {{ deck.description || 'No description provided.' }}
+                </p>
+              </section>
             </div>
 
-            <div class="space-y-3">
+            <div
+              class="!mt-auto space-y-3"
+              data-testid="deck-mana-section"
+            >
               <DeckManaCurve
                 :entries="activeBoardEntries"
                 :empty-label="activeBoardEmptyLabel"
@@ -121,17 +137,6 @@
                   :class="detailsExpanded ? 'rotate-90' : ''"
                 />
               </button>
-            </div>
-
-            <div class="theme-divider border-t pt-4">
-              <label class="theme-muted-panel flex items-center gap-3 p-3 text-sm">
-                <input
-                  v-model="groupByType"
-                  type="checkbox"
-                  class="theme-checkbox h-4 w-4"
-                >
-                <span class="theme-section-title font-medium">Group by type</span>
-              </label>
             </div>
 
             <template #footer>
@@ -152,9 +157,12 @@
                   :card-scale="cardScale"
                   :show-card-groups="false"
                   :show-card-groups-control="false"
+                  :group-by-type="groupByType"
+                  show-group-by-type-control
                   @update:hover-mode="setDeckDetailHoverModeOverride"
                   @reset:hover-mode="clearDeckDetailHoverModeOverride"
                   @update:card-scale="cardScale = $event"
+                  @update:group-by-type="groupByType = $event"
                 />
               </div>
             </template>
@@ -296,17 +304,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
-import { BookOpenText, ChevronRight, Clipboard } from 'lucide-vue-next';
+import { BookOpenText, ChevronRight, Gamepad2, Pencil, Share2 } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
 import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import CardGalleryItem from '@/components/cards/CardGalleryItem.vue';
 import CardSortMenu from '@/components/cards/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import DeckTagPills from '@/components/decks/DeckTagPills.vue';
+import TtsCopyIcon from '@/components/icons/TtsCopyIcon.vue';
 import { formatDeckOwnerName } from '@/composables/decks/display';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation, isCardReturnQuery } from '@/composables/cards/cardReturnState';
@@ -487,6 +497,7 @@ onMounted(async () => {
 }
 
 .deck-mana-details-button {
+  overflow: clip;
   border-color: color-mix(in srgb, var(--color-border) 62%, transparent 38%);
   transition: color 180ms ease;
 }

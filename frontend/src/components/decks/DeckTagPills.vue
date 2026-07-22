@@ -16,17 +16,21 @@
     >
       {{ item.label }}<template v-if="item.kind === 'pending'"> · Pending</template>
     </span>
-    <span
+    <button
       v-if="hiddenCount > 0"
-      class="theme-pill theme-pill-neutral px-2 py-1 text-xs font-semibold"
+      class="theme-pill theme-pill-neutral cursor-pointer px-2 py-1 text-xs font-semibold transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
+      type="button"
+      :aria-label="`Show all ${orderedItems.length} deck tags`"
+      :aria-expanded="expanded"
+      @click="expanded = true"
     >
       +{{ hiddenCount }}
-    </span>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { DeckTagOption, PendingDeckTagSuggestion } from '@/modules/decks/types';
 
 type VisibleDeckTagItem = {
@@ -44,6 +48,8 @@ const props = withDefaults(defineProps<{
   maxVisible: 0,
 });
 
+const expanded = ref(false);
+
 const orderedItems = computed<VisibleDeckTagItem[]>(() => [
   ...props.tags
     .filter((tag) => tag.kind === 'role')
@@ -58,7 +64,9 @@ const orderedItems = computed<VisibleDeckTagItem[]>(() => [
   })),
 ]);
 const visibleItems = computed(() =>
-  props.maxVisible > 0 ? orderedItems.value.slice(0, props.maxVisible) : orderedItems.value,
+  props.maxVisible > 0 && !expanded.value
+    ? orderedItems.value.slice(0, props.maxVisible)
+    : orderedItems.value,
 );
 const hiddenCount = computed(() => Math.max(0, orderedItems.value.length - visibleItems.value.length));
 </script>

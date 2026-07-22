@@ -10,14 +10,14 @@
       title-class="text-xl"
     >
       <template #actions>
-        <button
+        <AppHeaderAction
           v-if="canEdit"
-          class="btn-primary"
-          type="button"
+          :icon="Pencil"
+          label="Edit card"
+          short-label="Edit"
+          variant="primary"
           @click="openEditor"
-        >
-          Edit Card
-        </button>
+        />
       </template>
     </AppPageHeader>
 
@@ -101,11 +101,12 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Layers3 } from 'lucide-vue-next';
+import { Layers3, Pencil } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api } from '@/api/client';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import { useReviewSummary } from '@/composables/useReviewSummary';

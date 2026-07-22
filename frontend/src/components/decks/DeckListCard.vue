@@ -21,44 +21,32 @@
           class="deck-list-card-art-fallback"
           aria-hidden="true"
         />
-        <div
-          class="deck-list-card-art-overlay"
-          aria-hidden="true"
-        />
       </div>
 
       <div class="deck-list-card-content">
         <div class="flex items-start gap-4">
-          <div class="min-w-0 flex-1 space-y-3">
-            <div class="deck-list-card-title-row flex flex-wrap items-center gap-2">
-              <h3 class="theme-section-title truncate text-lg font-semibold">
-                {{ deck.name }}
-              </h3>
+          <div class="deck-list-card-main min-w-0 flex-1">
+            <div class="deck-list-card-title-row flex min-w-0 items-center justify-between gap-3">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <h3 class="theme-section-title min-w-0 flex-1 truncate text-xl font-semibold">
+                  {{ deck.name }}
+                </h3>
+                <span
+                  v-if="deprecatedCardCount > 0"
+                  class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-1 text-xs"
+                  title="Deck contains deprecated cards"
+                >
+                  <TriangleAlert class="h-3.5 w-3.5" />
+                  <span>{{ deprecatedCardCount }}</span>
+                </span>
+              </div>
               <span
-                class="theme-pill shrink-0 text-xs"
+                class="deck-list-card-title-pill theme-pill shrink-0 text-xs"
                 :class="titlePillClass"
               >
                 {{ titlePillLabel }}
               </span>
-              <DeckTagPills
-                class="deck-list-card-title-tags"
-                :tags="deck.tags ?? []"
-                :pending-suggestions="isOwnedMode ? deck.pending_tag_suggestions ?? [] : []"
-                :max-visible="4"
-              />
-              <span
-                v-if="deprecatedCardCount > 0"
-                class="theme-pill theme-pill-warning inline-flex shrink-0 items-center gap-1 px-2 py-1 text-xs"
-                title="Deck contains deprecated cards"
-              >
-                <TriangleAlert class="h-3.5 w-3.5" />
-                <span>{{ deprecatedCardCount }}</span>
-              </span>
             </div>
-
-            <p class="theme-section-muted text-sm">
-              {{ boardSummary }}
-            </p>
 
             <p
               v-if="deck.description"
@@ -86,6 +74,7 @@
             <ExtraActionsMenu
               v-else-if="isBrowseMode"
               button-label="Open deck actions"
+              panel-class="w-52"
             >
               <template #default="{ close }">
                 <slot
@@ -94,39 +83,89 @@
                 />
 
                 <button
-                  class="btn-secondary w-full justify-center"
+                  class="btn-secondary app-menu-action"
                   type="button"
+                  aria-label="Playtest deck"
                   @click="playtestDeck(close)"
                 >
+                  <Gamepad2
+                    class="h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
                   Playtest
                 </button>
 
                 <button
                   v-if="canShareDeck(deck)"
-                  class="btn-secondary w-full justify-center"
+                  class="btn-secondary app-menu-action"
                   type="button"
+                  aria-label="Copy share link"
                   @click="copyShareLink(close)"
                 >
-                  Copy Share Link
+                  <Share2
+                    class="h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  Share
                 </button>
 
                 <button
-                  class="btn-secondary w-full justify-center"
+                  class="btn-secondary app-menu-action"
                   type="button"
+                  aria-label="Copy Mainboard TTS"
                   @click="exportDeck(close)"
                 >
-                  Copy TTS
+                  <TtsCopyIcon
+                    class="h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  TTS
                 </button>
               </template>
             </ExtraActionsMenu>
           </div>
         </div>
 
-        <div class="mt-auto flex items-center justify-between gap-3 pt-3">
-          <p class="theme-section-muted text-xs">
-            {{ deck.hero_card.name }}
-            <span class="text-xs"> - {{ formatDate(deck.updated_at) }}</span>
-          </p>
+        <div class="deck-list-card-tags-region">
+          <DeckTagPills
+            class="deck-list-card-tags"
+            :tags="deck.tags ?? []"
+            :pending-suggestions="isOwnedMode ? deck.pending_tag_suggestions ?? [] : []"
+            :max-visible="6"
+          />
+        </div>
+
+        <div class="deck-list-card-footer flex flex-wrap items-center justify-between gap-3">
+          <div class="deck-list-card-footer-meta theme-section-muted text-xs">
+            <span class="deck-list-card-footer-meta-item">
+              <LibraryBig
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+              <span>Maindeck {{ deck.mainboard.total_cards }}</span>
+            </span>
+            <span class="deck-list-card-footer-meta-item">
+              <Copy
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+              <span>Unique {{ deck.mainboard.unique_cards }}</span>
+            </span>
+            <span class="deck-list-card-footer-meta-item">
+              <PanelRight
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+              <span>Sideboards {{ sideboardCount }}</span>
+            </span>
+            <span class="deck-list-card-footer-meta-item">
+              <CalendarDays
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+              <span>Updated {{ formatDate(deck.updated_at) }}</span>
+            </span>
+          </div>
 
           <div
             v-if="heroAffinitySymbols.length > 0"
@@ -149,13 +188,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { TriangleAlert } from 'lucide-vue-next';
+import { CalendarDays, Copy, Gamepad2, LibraryBig, PanelRight, Share2, TriangleAlert } from 'lucide-vue-next';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolToken from '@/components/SymbolToken.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
 import DeckTagPills from '@/components/decks/DeckTagPills.vue';
+import TtsCopyIcon from '@/components/icons/TtsCopyIcon.vue';
 import { formatDeckOwnerName } from '@/composables/decks/display';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
 import type { DeckListRecord } from '@/modules/decks/types';
@@ -177,19 +217,17 @@ const isClickableCard = computed(() => Boolean(props.titleTo));
 const navigationTarget = computed(() =>
   props.titleTo ? router.resolve(props.titleTo).fullPath : undefined,
 );
-const formatDate = (value: string): string => new Date(value).toLocaleDateString();
-const sideboardSummary = computed(() => {
-  const sideboardCount = 'sideboard_count' in props.deck ? props.deck.sideboard_count : props.deck.sideboards.length;
-  if (sideboardCount === 0) {
-    return 'No sideboards';
-  }
-  return `${sideboardCount} sideboard${sideboardCount === 1 ? '' : 's'}`;
-});
-const boardSummary = computed(() => `Maindeck ${props.deck.mainboard.total_cards} · ${props.deck.mainboard.unique_cards} unique · ${sideboardSummary.value}`);
+const formatDate = (value: string): string => {
+  const date = new Date(value);
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+};
+const sideboardCount = computed(() =>
+  'sideboard_count' in props.deck ? props.deck.sideboard_count : props.deck.sideboards.length,
+);
 const heroAffinitySymbols = computed(() => props.deck.hero_card.symbols.filter((symbol) => symbol.symbol_type === 'affinity'));
 const ownerDisplayName = computed(() => formatDeckOwnerName(props.deck.owner.username));
 const titlePillLabel = computed(() => (isOwnedMode.value ? deckVisibilityLabels[props.deck.visibility] : ownerDisplayName.value));
-const titlePillClass = computed(() => (isOwnedMode.value ? deckVisibilityBadgeClasses[props.deck.visibility] : 'theme-pill-keyword'));
+const titlePillClass = computed(() => (isOwnedMode.value ? deckVisibilityBadgeClasses[props.deck.visibility] : 'theme-pill-neutral'));
 const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_count ?? 0);
 const cardClass = computed(() => [
   'deck-list-card-surface',
@@ -254,7 +292,6 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
 <style scoped>
 .deck-list-card-surface {
   --deck-card-art-text-gap: 1.5rem;
-  --deck-card-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 64%, rgba(0, 0, 0, 0.72) 76%, rgba(0, 0, 0, 0.28) 88%, rgba(0, 0, 0, 0.08) 95%, transparent 100%);
   --deck-card-art-position: 23% 7%;
   --deck-card-art-scale: 1.265;
   --deck-card-art-hover-scale: 1.27;
@@ -262,13 +299,9 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
   --deck-card-content-padding-left: 20rem;
   --deck-card-art-width: calc(var(--deck-card-content-padding-left) - var(--deck-card-art-text-gap));
   position: relative;
-  height: 14.5rem;
+  min-height: 14.5rem;
   overflow: hidden;
   padding: 0;
-}
-
-:global(html.dark) .deck-list-card-surface {
-  --deck-card-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.98) 42%, rgba(0, 0, 0, 0.72) 58%, rgba(0, 0, 0, 0.28) 74%, rgba(0, 0, 0, 0.08) 86%, transparent 100%);
 }
 
 .deck-list-card-art {
@@ -276,11 +309,11 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
   inset: 0 auto 0 0;
   width: var(--deck-card-art-width);
   overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.75rem 0 0 0.75rem;
   background:
     radial-gradient(circle at top left, rgba(148, 163, 184, 0.26), transparent 55%),
     linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
-  -webkit-mask-image: var(--deck-card-art-mask);
-  mask-image: var(--deck-card-art-mask);
 }
 
 .deck-list-card-art-image {
@@ -306,20 +339,11 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
     linear-gradient(140deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.96));
 }
 
-.deck-list-card-art-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.08) 38%, rgba(15, 23, 42, 0.22) 56%, rgba(15, 23, 42, 0.1) 70%, transparent 100%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.04));
-  pointer-events: none;
-}
-
 .deck-list-card-content {
   position: relative;
   z-index: 1;
   display: flex;
-  height: 100%;
+  min-height: inherit;
   min-width: 0;
   flex-direction: column;
   padding: 1.1rem 1.2rem 1.1rem var(--deck-card-content-padding-left);
@@ -328,19 +352,53 @@ const handleCardKeydown = (event: KeyboardEvent): void => {
 .deck-list-card-description {
   display: -webkit-box;
   overflow: hidden;
+  margin-top: 0.75rem;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.deck-list-card-title-tags {
+.deck-list-card-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.deck-list-card-tags-region {
+  display: flex;
+  flex: 1;
   align-items: center;
+  padding-block: 0.75rem;
+}
+
+.deck-list-card-tags {
+  align-items: center;
+}
+
+.deck-list-card-footer-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.35rem;
+}
+
+.deck-list-card-footer-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.deck-list-card-footer-meta-item + .deck-list-card-footer-meta-item {
+  margin-left: 0.75rem;
+  border-left: 1px solid var(--color-border-strong);
+  padding-left: 0.75rem;
 }
 
 @media (max-width: 767px) {
   .deck-list-card-surface {
     --deck-card-art-text-gap: 1rem;
     --deck-card-content-padding-left: clamp(5.4rem, 24%, 7.5rem);
-    height: 12rem;
+    min-height: 12rem;
   }
 
   .deck-list-card-content {

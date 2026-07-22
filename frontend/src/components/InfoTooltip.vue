@@ -2,14 +2,14 @@
   <span
     ref="triggerRef"
     class="inline-flex"
-    tabindex="0"
-    :aria-describedby="tooltipId"
+    :tabindex="triggerTabbable ? 0 : undefined"
+    :aria-describedby="triggerTabbable ? tooltipId : undefined"
     @mouseenter="open"
     @mouseleave="close"
     @focusin="open"
     @focusout="close"
   >
-    <slot />
+    <slot :tooltip-id="tooltipId" />
   </span>
 
   <Teleport to="body">
@@ -35,10 +35,12 @@ const props = withDefaults(
     text: string;
     placement?: Placement;
     allowFlip?: boolean;
+    triggerTabbable?: boolean;
   }>(),
   {
     placement: 'top',
     allowFlip: true,
+    triggerTabbable: true,
   },
 );
 

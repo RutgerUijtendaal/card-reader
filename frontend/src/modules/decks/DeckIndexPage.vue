@@ -8,13 +8,13 @@
       title-class="text-xl"
     >
       <template #actions>
-        <RouterLink
-          class="btn-primary inline-flex items-center gap-2"
+        <AppHeaderAction
+          :icon="Hammer"
+          label="Build a deck"
+          short-label="Build a deck"
+          variant="primary"
           :to="newDeckLocation"
-        >
-          <Hammer class="h-4 w-4" />
-          <span>Build a deck</span>
-        </RouterLink>
+        />
       </template>
     </AppPageHeader>
 
@@ -64,19 +64,29 @@
             #menu-actions="{ close }"
           >
             <RouterLink
-              class="btn-secondary w-full justify-center"
+              class="btn-secondary app-menu-action"
               :to="buildPublicDeckEditorLocation(deck.id)"
+              aria-label="Edit deck"
               @click="close"
             >
-              Edit Deck
+              <Pencil
+                class="h-4 w-4 shrink-0"
+                aria-hidden="true"
+              />
+              Edit
             </RouterLink>
 
             <button
-              class="btn-secondary w-full justify-center"
+              class="btn-secondary app-menu-action"
               type="button"
+              aria-label="Manage deck tags"
               @click="openTagManager(deck, close)"
             >
-              Manage Tags
+              <Tags
+                class="h-4 w-4 shrink-0"
+                aria-hidden="true"
+              />
+              Tags
             </button>
           </template>
 
@@ -92,46 +102,74 @@
                 >
                   Edit
                 </RouterLink>
-                <ExtraActionsMenu button-label="Open deck actions">
+                <ExtraActionsMenu
+                  button-label="Open deck actions"
+                  panel-class="w-52"
+                >
                   <template #default="{ close }">
                     <button
-                      class="btn-secondary w-full justify-center"
+                      class="btn-secondary app-menu-action"
                       type="button"
+                      aria-label="Manage deck tags"
                       @click="openTagManager(deck, close)"
                     >
-                      Manage Tags
+                      <Tags
+                        class="h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                      Tags
                     </button>
 
                     <button
-                      class="btn-secondary w-full justify-center"
+                      class="btn-secondary app-menu-action"
                       type="button"
+                      aria-label="Playtest deck"
                       @click="goToPlaytester(deck); close()"
                     >
+                      <Gamepad2
+                        class="h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      />
                       Playtest
                     </button>
 
                     <button
                       v-if="canShareDeck(deck)"
-                      class="btn-secondary w-full justify-center"
+                      class="btn-secondary app-menu-action"
                       type="button"
+                      aria-label="Copy share link"
                       @click="copyShareLink(deck); close()"
                     >
-                      Copy Share Link
+                      <Share2
+                        class="h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                      Share
                     </button>
 
                     <button
-                      class="btn-secondary w-full justify-center"
+                      class="btn-secondary app-menu-action"
                       type="button"
+                      aria-label="Copy Mainboard TTS"
                       @click="exportDeck(deck); close()"
                     >
-                      Copy TTS
+                      <TtsCopyIcon
+                        class="h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                      TTS
                     </button>
 
                     <button
-                      class="btn-danger-secondary w-full justify-center"
+                      class="btn-danger-secondary app-menu-action"
                       type="button"
+                      aria-label="Delete deck"
                       @click="promptDelete(deck); close()"
                     >
+                      <Trash2
+                        class="h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      />
                       Delete
                     </button>
                   </template>
@@ -183,14 +221,16 @@
 
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
-import { BookOpen, Folders, Hammer } from 'lucide-vue-next';
+import { BookOpen, Folders, Gamepad2, Hammer, Pencil, Share2, Tags, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import AppPageLayout from '@/components/app/AppPageLayout.vue';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import AppSelect from '@/components/app/AppSelect.vue';
 import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
+import TtsCopyIcon from '@/components/icons/TtsCopyIcon.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/modules/auth/authStore';
 import {
@@ -502,6 +542,9 @@ onMounted(() => {
 
 <style scoped>
 .deck-index-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 44rem), 1fr));
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 </style>

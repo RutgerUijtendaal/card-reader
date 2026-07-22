@@ -70,6 +70,27 @@
                 >
               </label>
 
+              <label
+                v-if="showGroupByTypeControl"
+                class="flex items-start justify-between gap-4 px-3 py-3"
+                :class="showCardGroupsControl ? 'theme-divider border-t' : ''"
+              >
+                <div class="min-w-0">
+                  <p class="theme-section-title text-sm font-semibold">
+                    Group by Type
+                  </p>
+                  <p class="theme-section-muted mt-1 text-xs">
+                    Organize cards into sections based on their type.
+                  </p>
+                </div>
+                <input
+                  :checked="groupByType"
+                  type="checkbox"
+                  class="theme-checkbox mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
+                  @change="emit('update:groupByType', ($event.target as HTMLInputElement).checked)"
+                >
+              </label>
+
               <div
                 v-if="showPageSizeControl"
                 class="theme-divider border-t px-3 py-3"
@@ -94,7 +115,7 @@
 
               <div
                 class="theme-divider border-t px-3 py-3"
-                :class="showCardGroupsControl || showPageSizeControl ? '' : 'border-t-0'"
+                :class="showCardGroupsControl || showGroupByTypeControl || showPageSizeControl ? '' : 'border-t-0'"
               >
                 <div class="flex items-center justify-between gap-3">
                   <div>
@@ -145,9 +166,11 @@ const props = withDefaults(
     allowHoverModeDefaultOption?: boolean;
     cardScale: number;
     showCardGroups: boolean;
+    groupByType?: boolean;
     pageSize?: number | null;
     pageSizeOptions?: readonly number[];
     showCardGroupsControl?: boolean;
+    showGroupByTypeControl?: boolean;
     showPageSizeControl?: boolean;
   }>(),
   {
@@ -157,6 +180,8 @@ const props = withDefaults(
     pageSize: null,
     pageSizeOptions: () => [...CARD_PAGE_SIZE_OPTIONS],
     showCardGroupsControl: true,
+    groupByType: false,
+    showGroupByTypeControl: false,
     showPageSizeControl: false,
   },
 );
@@ -166,6 +191,7 @@ const emit = defineEmits<{
   (e: 'reset:hoverMode'): void;
   (e: 'update:cardScale', value: number): void;
   (e: 'update:showCardGroups', value: boolean): void;
+  (e: 'update:groupByType', value: boolean): void;
   (e: 'update:pageSize', value: number): void;
 }>();
 

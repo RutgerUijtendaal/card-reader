@@ -337,6 +337,7 @@ describe('PlaytesterPage', () => {
     expect(fetchMyDeckMock).toHaveBeenCalledWith('deck-1');
     expect(fetchDeckDetailMock).toHaveBeenCalledWith('deck-1');
     expect(mounted.container.textContent).toContain('Playtest Deck');
+    expect(mounted.container.querySelector('a[aria-label="View deck details"]')?.textContent).toBe('Deck');
     expect(testZone(mounted.container, 'playtest-opening-setup').textContent).toContain('Starting mana');
     expect(testZone(mounted.container, 'playtest-hero-zone')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="playtest-other-zone"]')).toBeNull();

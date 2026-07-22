@@ -26,10 +26,6 @@
         class="deck-compact-card-art-fallback"
         aria-hidden="true"
       />
-      <span
-        class="deck-compact-card-art-overlay"
-        aria-hidden="true"
-      />
     </span>
 
     <span class="deck-compact-card-content">
@@ -125,7 +121,6 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
 <style scoped>
 .deck-compact-card {
   --deck-compact-art-text-gap: 1rem;
-  --deck-compact-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.96) 62%, rgba(0, 0, 0, 0.72) 76%, rgba(0, 0, 0, 0.24) 91%, transparent 100%);
   --deck-compact-art-position: 26% 12%;
   --deck-compact-content-padding-left: clamp(8.8rem, 39%, 12.75rem);
   --deck-compact-art-width: calc(var(--deck-compact-content-padding-left) - var(--deck-compact-art-text-gap));
@@ -134,7 +129,7 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
   width: 100%;
   min-height: 7.25rem;
   overflow: hidden;
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border-strong);
   border-radius: 0.7rem;
   background: color-mix(in srgb, var(--color-surface-strong) 78%, transparent);
   padding: 0;
@@ -143,11 +138,7 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
     border-color 150ms ease,
     background 150ms ease,
     transform 150ms ease,
-    box-shadow 150ms ease;
-}
-
-:global(html.dark) .deck-compact-card {
-  --deck-compact-art-mask: linear-gradient(90deg, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.96) 38%, rgba(0, 0, 0, 0.72) 56%, rgba(0, 0, 0, 0.24) 78%, transparent 100%);
+  box-shadow 150ms ease;
 }
 
 .deck-compact-card:hover,
@@ -193,22 +184,16 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
   color: var(--color-text-muted);
 }
 
-.deck-compact-card-playtester.deck-compact-card-selected .deck-compact-card-art-overlay {
-  background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.08) 42%, rgba(15, 23, 42, 0.18) 62%, rgba(15, 23, 42, 0.08) 76%, transparent 100%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.06), rgba(15, 23, 42, 0.03));
-}
-
 .deck-compact-card-art {
   position: absolute;
   inset: 0 auto 0 0;
   width: var(--deck-compact-art-width);
   overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.7rem 0 0 0.7rem;
   background:
     radial-gradient(circle at top left, rgba(148, 163, 184, 0.26), transparent 55%),
     linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
-  -webkit-mask-image: var(--deck-compact-art-mask);
-  mask-image: var(--deck-compact-art-mask);
 }
 
 .deck-compact-card-art-image {
@@ -232,15 +217,6 @@ const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_cou
     radial-gradient(circle at top left, rgba(244, 114, 182, 0.28), transparent 45%),
     radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.22), transparent 48%),
     linear-gradient(140deg, rgba(30, 41, 59, 0.86), rgba(15, 23, 42, 0.94));
-}
-
-.deck-compact-card-art-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0.12) 40%, rgba(15, 23, 42, 0.24) 58%, rgba(15, 23, 42, 0.1) 76%, transparent 100%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.04));
-  pointer-events: none;
 }
 
 .deck-compact-card-content {

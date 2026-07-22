@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardDetailPage from '@/modules/card-detail/CardDetailPage.vue';
 import CardPublicDetailPage from '@/modules/card-detail/CardPublicDetailPage.vue';
 
-const { editorState, publicState } = vi.hoisted(() => {
+const { editorState, publicState, routerPushMock } = vi.hoisted(() => {
   const refValue = <T,>(value: T) => ({ value, __v_isRef: true });
   const route = {
     params: { id: 'card-1' },
@@ -27,6 +27,7 @@ const { editorState, publicState } = vi.hoisted(() => {
     additional_symbol_ids: [],
   };
   return {
+    routerPushMock: vi.fn(),
     editorState: {
       card: refValue<unknown | null>(null),
       versions: refValue([]),
@@ -122,7 +123,7 @@ vi.mock('vue-router', () => ({
     query: {},
   }),
   useRouter: () => ({
-    push: vi.fn(),
+    push: routerPushMock,
   }),
 }));
 
@@ -238,11 +239,14 @@ const resetState = (): void => {
   editorState.isLoadingInitial.value = false;
   editorState.hasGalleryContext.value = false;
   editorState.loadCard.mockClear();
+  routerPushMock.mockClear();
   publicState.card.value = card;
   publicState.selectedVersion.value = null;
   publicState.isLoadingInitial.value = false;
   publicState.hasGalleryContext.value = false;
+  publicState.canEdit.value = false;
   publicState.loadCard.mockClear();
+  publicState.openEditor.mockClear();
 };
 
 const mountPage = async (page: typeof CardDetailPage | typeof CardPublicDetailPage) => {
@@ -327,6 +331,19 @@ describe('CardDetailPage loading state', () => {
 
     mounted.unmount();
   });
+
+  test('keeps the full Merge/Rename header label with its contextual accessible name', async () => {
+    resetState();
+
+    const mounted = await mountPage(CardDetailPage);
+    const action = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Merge or rename card"]');
+
+    expect(action?.textContent).toBe('Merge/Rename');
+    action?.click();
+    expect(routerPushMock).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
 });
 
 describe('CardPublicDetailPage loading state', () => {
@@ -384,6 +401,20 @@ describe('CardPublicDetailPage loading state', () => {
     expect(mounted.container.querySelector('[data-testid="card-version-selector"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="card-deck-references"]')).not.toBeNull();
     expect(mounted.container.textContent).not.toContain('No printings found.');
+
+    mounted.unmount();
+  });
+
+  test('renders the compact card edit action for authorized users', async () => {
+    resetState();
+    publicState.canEdit.value = true;
+
+    const mounted = await mountPage(CardPublicDetailPage);
+    const action = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Edit card"]');
+
+    expect(action?.textContent).toBe('Edit');
+    action?.click();
+    expect(publicState.openEditor).toHaveBeenCalledTimes(1);
 
     mounted.unmount();
   });

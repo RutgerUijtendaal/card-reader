@@ -81,7 +81,7 @@ vi.mock('@/components/app/AppPageLayout.vue', () => ({
 vi.mock('@/components/InfoTooltip.vue', () => ({
   default: defineComponent({
     setup(_, { slots }) {
-      return () => h('span', slots.default?.());
+      return () => h('span', slots.default?.({ tooltipId: 'mock-tooltip' }));
     },
   }),
 }));
@@ -238,14 +238,23 @@ describe('DeckEditorPage', () => {
     controller.manualSaving.value = false;
 
     const mounted = await mountPage();
-    const saveButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Save Deck'),
-    );
+    const saveButton = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Save deck"]');
 
     expect(saveButton).toBeDefined();
     expect(saveButton?.disabled).toBe(false);
-    expect(saveButton?.textContent).toContain('Save Deck');
-    expect(saveButton?.textContent).not.toContain('Saving...');
+    expect(saveButton?.textContent).toBe('Save');
+    mounted.unmount();
+  });
+
+  test('keeps the short save label while a manual save is loading', async () => {
+    controller.manualSaving.value = true;
+
+    const mounted = await mountPage();
+    const saveButton = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Saving deck"]');
+
+    expect(saveButton?.disabled).toBe(true);
+    expect(saveButton?.textContent).toBe('Save');
+    expect(saveButton?.querySelector('svg')?.classList.contains('animate-spin')).toBe(true);
     mounted.unmount();
   });
 });

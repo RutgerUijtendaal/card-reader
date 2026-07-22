@@ -360,6 +360,7 @@ describe('DeckIndexPage', () => {
     expect(mounted.container.querySelector('[data-mode="browse"]')).not.toBeNull();
     expect(mounted.container.querySelector('[data-title-to="/decks/deck-1"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Search public decks');
+    expect(mounted.container.querySelector('a[aria-label="Build a deck"]')?.textContent).toBe('Build a deck');
 
     mounted.unmount();
   });
@@ -448,7 +449,7 @@ describe('DeckIndexPage', () => {
     expect(mounted.container.textContent).toContain('Search public decks');
     expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(1);
     expect(fetchMyDeckSummariesMock).not.toHaveBeenCalled();
-    expect(mounted.container.textContent).not.toContain('Manage Tags');
+    expect(mounted.container.querySelector('[aria-label="Manage deck tags"]')).toBeNull();
 
     mounted.unmount();
   });
@@ -457,10 +458,18 @@ describe('DeckIndexPage', () => {
     const mounted = await mountPage('/my/decks');
     const text = mounted.container.textContent ?? '';
 
-    expect(text).toContain('Copy Share Link');
-    expect(text).toContain('Copy TTS');
+    expect(text).toContain('Share');
+    expect(text).toContain('TTS');
     expect(text).toContain('Delete');
-    expect(text).toContain('Manage Tags');
+    expect(text).toContain('Tags');
+    expect(text).not.toContain('Copy Share Link');
+    expect(text).not.toContain('Copy TTS');
+    expect(text).not.toContain('Manage Tags');
+    expect(mounted.container.querySelector('[aria-label="Manage deck tags"] svg')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Playtest deck"] svg')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Copy share link"] svg')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Copy Mainboard TTS"] svg')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Delete deck"] svg')).not.toBeNull();
     expect(text.match(/\bEdit\b/g) ?? []).toHaveLength(1);
     expect(mounted.container.querySelector('select')).not.toBeNull();
 
@@ -469,28 +478,26 @@ describe('DeckIndexPage', () => {
 
   test('shows public deck editing to owners and staff but not unrelated users', async () => {
     const ownerPage = await mountPage('/decks');
-    expect(ownerPage.container.textContent).toContain('Edit Deck');
-    expect(ownerPage.container.textContent).toContain('Manage Tags');
+    expect(ownerPage.container.querySelector('[aria-label="Edit deck"]')?.textContent).toContain('Edit');
+    expect(ownerPage.container.querySelector('[aria-label="Manage deck tags"]')?.textContent).toContain('Tags');
     ownerPage.unmount();
 
     authState.user = { id: 'other-user' };
     const unrelatedPage = await mountPage('/decks');
-    expect(unrelatedPage.container.textContent).not.toContain('Edit Deck');
-    expect(unrelatedPage.container.textContent).not.toContain('Manage Tags');
+    expect(unrelatedPage.container.querySelector('[aria-label="Edit deck"]')).toBeNull();
+    expect(unrelatedPage.container.querySelector('[aria-label="Manage deck tags"]')).toBeNull();
     unrelatedPage.unmount();
 
     authState.canAccessStaffRoutes = true;
     const staffPage = await mountPage('/decks');
-    expect(staffPage.container.textContent).toContain('Edit Deck');
-    expect(staffPage.container.textContent).toContain('Manage Tags');
+    expect(staffPage.container.querySelector('[aria-label="Edit deck"]')?.textContent).toContain('Edit');
+    expect(staffPage.container.querySelector('[aria-label="Manage deck tags"]')?.textContent).toContain('Tags');
     staffPage.unmount();
   });
 
   test('hydrates and saves deck tags through the existing deck update API', async () => {
     const mounted = await mountPage('/decks');
-    const manageButton = Array.from(mounted.container.querySelectorAll('button')).find(
-      (button) => button.textContent?.trim() === 'Manage Tags',
-    );
+    const manageButton = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Manage deck tags"]');
     manageButton?.click();
     await flushPage();
 

@@ -10,21 +10,16 @@
       title-class="text-xl"
     >
       <template #actions>
-        <button
+        <AppHeaderAction
           v-if="!controller.deck.isSetupStep.value"
-          class="btn-primary"
-          type="button"
+          :icon="deckSaveActionIcon"
+          :label="deckSaveActionLabel"
+          :short-label="deckSaveActionShortLabel"
+          variant="primary"
+          :icon-class="controller.manualSaving.value ? 'animate-spin' : ''"
           :disabled="controller.manualSaving.value"
           @click="() => controller.saveDeck()"
-        >
-          {{
-            controller.manualSaving.value
-              ? 'Saving...'
-              : controller.deckId.value
-                ? 'Save Deck'
-                : 'Create Deck'
-          }}
-        </button>
+        />
       </template>
     </AppPageHeader>
 
@@ -348,9 +343,12 @@ import {
   CloudUpload,
   Hammer,
   LoaderCircle,
+  Plus,
+  Save,
   TriangleAlert,
 } from 'lucide-vue-next';
 import AppPageLayout from '@/components/app/AppPageLayout.vue';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import InfoTooltip from '@/components/InfoTooltip.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
@@ -383,6 +381,19 @@ const mainboardMaxCards = computed(
 );
 const manaMinCards = computed(() => controller.deckBuildingRules.value.mana_type_count.min ?? 0);
 const hardIssueMessages = computed(() => controller.deck.validationMessages.value);
+const deckSaveActionIcon = computed(() => {
+  if (controller.manualSaving.value) {
+    return LoaderCircle;
+  }
+  return controller.deckId.value ? Save : Plus;
+});
+const deckSaveActionLabel = computed(() => {
+  if (controller.manualSaving.value) {
+    return 'Saving deck';
+  }
+  return controller.deckId.value ? 'Save deck' : 'Create deck';
+});
+const deckSaveActionShortLabel = computed(() => (controller.deckId.value ? 'Save' : 'Create'));
 const deckChangeStatusIcon = computed(() => {
   if (controller.saving.value) {
     return LoaderCircle;

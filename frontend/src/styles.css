@@ -248,7 +248,9 @@
 
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
+    border: 1px solid transparent;
     background: linear-gradient(135deg, var(--color-primary-from) 0%, var(--color-primary-to) 100%);
+    background-clip: padding-box;
   }
 
   .btn-primary:hover {
@@ -276,6 +278,10 @@
 
   .btn-danger-secondary:hover {
     background: var(--color-danger-hover);
+  }
+
+  .app-menu-action {
+    @apply h-10 w-full justify-center gap-2 px-3;
   }
 
   .theme-alert-warning {
@@ -900,7 +906,7 @@
   }
 
   .theme-tab {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-semibold transition;
     color: var(--color-text-muted);
   }
 

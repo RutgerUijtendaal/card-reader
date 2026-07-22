@@ -7,23 +7,26 @@
     <AppPageHeader
       :icon="BookOpenText"
       title="Deck name"
-      subtitle="Deck description"
       :back-to="backTo"
       :back-label="backLabel"
       title-tag="h2"
       title-class="deck-detail-loading-header-title text-xl"
-      subtitle-class="deck-detail-loading-header-subtitle text-sm"
+      subtitle-class="!mt-4 text-sm"
     >
-      <template #titleMeta>
+      <template #subtitle>
         <div class="flex items-center gap-2">
-          <span class="deck-detail-loading-line h-4 w-5" />
-          <span class="deck-detail-loading-pill h-6 w-20" />
+          <span class="deck-detail-loading-pill h-5 w-16" />
+          <span class="deck-detail-loading-pill h-5 w-20" />
         </div>
       </template>
 
       <template #actions>
-        <span class="deck-detail-loading-button h-9 w-32" />
-        <span class="deck-detail-loading-button h-9 w-28" />
+        <span
+          v-for="index in 4"
+          :key="`deck-detail-loading-action-${index}`"
+          class="deck-detail-loading-button h-10"
+          :class="['w-20', 'w-[4.5rem]', 'w-[4.25rem]', 'w-24'][index - 1]"
+        />
       </template>
     </AppPageHeader>
 
@@ -32,7 +35,7 @@
       root-class="xl:grid-cols-[22.5rem_minmax(0,1fr)]"
     >
       <template #aside>
-        <AppStickyAside scroll-class="space-y-5">
+        <AppStickyAside scroll-class="flex flex-col gap-5 space-y-0">
           <div class="space-y-4">
             <span class="deck-detail-loading-line h-5 w-20" />
             <div class="space-y-3">
@@ -40,10 +43,19 @@
                 <CardLoadingSkeleton />
               </div>
               <span class="deck-detail-loading-line h-6 w-52 max-w-full" />
+              <span class="deck-detail-loading-line h-4 w-24" />
+            </div>
+
+            <div class="theme-divider space-y-2 border-t pt-4">
+              <span class="deck-detail-loading-line h-4 w-24" />
+              <div class="space-y-2">
+                <span class="deck-detail-loading-line h-3 w-full" />
+                <span class="deck-detail-loading-line h-3 w-5/6" />
+              </div>
             </div>
           </div>
 
-          <div class="space-y-3">
+          <div class="!mt-auto space-y-3">
             <span class="deck-detail-loading-line h-4 w-28" />
             <div class="theme-muted-panel space-y-2 p-3">
               <div
@@ -57,16 +69,6 @@
                   :class="curveWidthClass(index)"
                 />
               </div>
-            </div>
-          </div>
-
-          <div class="theme-divider border-t pt-4">
-            <div class="theme-muted-panel flex items-center gap-3 p-3">
-              <span
-                class="deck-detail-loading-checkbox h-4 w-4 rounded"
-                :class="groupByType ? 'deck-detail-loading-checkbox-checked' : ''"
-              />
-              <span class="deck-detail-loading-line h-4 w-28" />
             </div>
           </div>
 
@@ -166,8 +168,7 @@ const curveWidthClass = (index: number): string => {
 <style scoped>
 .deck-detail-loading-line,
 .deck-detail-loading-button,
-.deck-detail-loading-pill,
-.deck-detail-loading-checkbox {
+.deck-detail-loading-pill {
   position: relative;
   display: block;
   overflow: hidden;
@@ -176,23 +177,19 @@ const curveWidthClass = (index: number): string => {
 
 .deck-detail-loading-line,
 .deck-detail-loading-button,
-.deck-detail-loading-pill,
-.deck-detail-loading-checkbox {
+.deck-detail-loading-pill {
   border-radius: 0.4rem;
 }
 
 .deck-detail-loading-button,
-.deck-detail-loading-pill,
-.deck-detail-loading-checkbox {
+.deck-detail-loading-pill {
   border: 1px solid var(--color-border);
 }
 
 .deck-detail-loading-line::after,
 .deck-detail-loading-button::after,
 .deck-detail-loading-pill::after,
-.deck-detail-loading-checkbox::after,
-:deep(.deck-detail-loading-header-title)::after,
-:deep(.deck-detail-loading-header-subtitle)::after {
+:deep(.deck-detail-loading-header-title)::after {
   position: absolute;
   inset: 0;
   content: '';
@@ -206,14 +203,7 @@ const curveWidthClass = (index: number): string => {
   transform: translateX(-100%);
 }
 
-.deck-detail-loading-checkbox-checked {
-  background:
-    linear-gradient(135deg, transparent 0 38%, var(--color-accent) 38% 62%, transparent 62% 100%),
-    var(--color-surface-muted);
-}
-
-:deep(.deck-detail-loading-header-title),
-:deep(.deck-detail-loading-header-subtitle) {
+:deep(.deck-detail-loading-header-title) {
   position: relative;
   display: block;
   overflow: hidden;
@@ -225,11 +215,6 @@ const curveWidthClass = (index: number): string => {
 :deep(.deck-detail-loading-header-title) {
   width: min(18rem, 64vw);
   height: 1.75rem;
-}
-
-:deep(.deck-detail-loading-header-subtitle) {
-  width: min(26rem, 72vw);
-  height: 1.25rem;
 }
 
 @keyframes deck-detail-loading-sheen {

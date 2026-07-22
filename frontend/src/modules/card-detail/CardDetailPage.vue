@@ -32,14 +32,12 @@
 
       <template #actions>
         <template v-if="card">
-          <button
-            class="btn-secondary inline-flex items-center gap-2"
-            type="button"
+          <AppHeaderAction
+            :icon="GitMerge"
+            label="Merge or rename card"
+            short-label="Merge/Rename"
             @click="openCardMerge"
-          >
-            <GitMerge class="h-4 w-4" />
-            <span>Merge/Rename</span>
-          </button>
+          />
         </template>
       </template>
     </AppPageHeader>
@@ -155,6 +153,7 @@ import { computed, onMounted } from 'vue';
 import { GitMerge, SquarePen } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import { buildAdminCardMergeSourceLocation } from '@/composables/admin/adminRouteState';
 import { buildCardReturnLocation } from '@/composables/cards/cardReturnState';
 import CardDetailLoadingSkeleton from '@/modules/card-detail/components/CardDetailLoadingSkeleton.vue';

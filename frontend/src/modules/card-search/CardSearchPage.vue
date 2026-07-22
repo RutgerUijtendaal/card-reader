@@ -8,13 +8,13 @@
       title-class="text-xl"
     >
       <template #actions>
-        <RouterLink
-          class="btn-primary inline-flex items-center gap-2"
+        <AppHeaderAction
+          :icon="Hammer"
+          label="Build a deck"
+          short-label="Build a deck"
+          variant="primary"
           :to="newDeckLocation"
-        >
-          <Hammer class="h-4 w-4" />
-          <span>Build a deck</span>
-        </RouterLink>
+        />
       </template>
     </AppPageHeader>
 
@@ -127,6 +127,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Download, Hammer, Images, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/composables/useCsvExport';
+import AppHeaderAction from '@/components/app/AppHeaderAction.vue';
 import { createLoadingShimItems } from '@/components/cards/galleryDisplayItems';
 import { useScrollContainer } from '@/composables/useScrollContainer';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
