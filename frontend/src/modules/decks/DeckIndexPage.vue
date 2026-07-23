@@ -33,7 +33,7 @@
 
       <div
         v-if="loading || !filtersLoaded"
-        class="deck-index-grid grid gap-4"
+        class="app-page-single-column deck-index-grid grid gap-4"
       >
         <DeckLoadingSkeleton
           v-for="index in loadingSkeletonCount"
@@ -50,7 +50,7 @@
 
       <div
         v-else
-        class="deck-index-grid grid gap-4"
+        class="app-page-single-column deck-index-grid grid gap-4"
       >
         <DeckListCard
           v-for="deck in decks"
@@ -542,9 +542,6 @@ onMounted(() => {
 
 <style scoped>
 .deck-index-grid {
-  width: 100%;
-  max-width: 72rem;
-  margin-inline: auto;
   grid-template-columns: minmax(0, 1fr);
 }
 </style>

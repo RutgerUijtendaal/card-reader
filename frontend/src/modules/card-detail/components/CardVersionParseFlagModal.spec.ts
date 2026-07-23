@@ -96,10 +96,16 @@ const mountModal = async () => {
   );
   app.mount(container);
   await nextTick();
+  await nextTick();
   return {
     container,
     modalRoot: document.body,
+    open,
     submit,
+    setOpen: async (value: boolean) => {
+      open.value = value;
+      await nextTick();
+    },
     unmount: () => {
       app.unmount();
       container.remove();
@@ -107,18 +113,49 @@ const mountModal = async () => {
   };
 };
 
-const clickButton = async (container: HTMLElement, label: string): Promise<void> => {
+const findButton = (container: HTMLElement, label: string): HTMLButtonElement => {
   const button = Array.from(container.querySelectorAll('button')).find((candidate) =>
     candidate.textContent?.replace(/\s+/g, ' ').trim().includes(label),
   );
   expect(button).toBeInstanceOf(HTMLButtonElement);
-  (button as HTMLButtonElement).click();
+  return button as HTMLButtonElement;
+};
+
+const clickButton = async (container: HTMLElement, label: string): Promise<void> => {
+  findButton(container, label).click();
+  await nextTick();
+};
+
+const setInputValue = async (
+  input: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+): Promise<void> => {
+  input.value = value;
+  input.dispatchEvent(new Event('input'));
   await nextTick();
 };
 
 describe('CardVersionParseFlagModal', () => {
   afterEach(() => {
     document.body.innerHTML = '';
+  });
+
+  test('opens the overall suggestion tab by default without flagging it', async () => {
+    const mounted = await mountModal();
+    const overallButton = findButton(mounted.modalRoot, 'Overall card suggestion');
+    const overallIndicator = overallButton.querySelector('[data-tab-selected-indicator]');
+
+    expect(overallButton.getAttribute('aria-pressed')).toBe('true');
+    expect(overallButton.classList).not.toContain('theme-selected-surface');
+    expect(overallIndicator?.classList).toContain('bg-[var(--color-control-accent)]');
+    expect(mounted.modalRoot.querySelector('textarea[placeholder="Required"]')).toBeInstanceOf(
+      HTMLTextAreaElement,
+    );
+    expect(document.activeElement).toBe(
+      mounted.modalRoot.querySelector('textarea[placeholder="Required"]'),
+    );
+    expect(findButton(mounted.modalRoot, 'Submit Flag').disabled).toBe(true);
+    mounted.unmount();
   });
 
   test('submits multiple selected properties as separate items', async () => {
@@ -128,11 +165,13 @@ describe('CardVersionParseFlagModal', () => {
 
     const inputs = Array.from(mounted.modalRoot.querySelectorAll('input.input-base'));
     expect(inputs).toHaveLength(1);
-    (inputs[0] as HTMLInputElement).value = 'Correct Name';
-    inputs[0].dispatchEvent(new Event('input'));
-    await nextTick();
+    await setInputValue(inputs[0] as HTMLInputElement, 'Correct Name');
 
     await clickButton(mounted.modalRoot, 'Rules Text');
+    await setInputValue(
+      mounted.modalRoot.querySelector('input.input-base') as HTMLInputElement,
+      'Correct rules',
+    );
 
     await clickButton(mounted.modalRoot, 'Submit Flag');
 
@@ -140,9 +179,105 @@ describe('CardVersionParseFlagModal', () => {
       note: '',
       items: [
         { property_key: 'name', expected_value: 'Correct Name', note: '' },
-        { property_key: 'rules_text', expected_value: '', note: '' },
+        { property_key: 'rules_text', expected_value: 'Correct rules', note: '' },
       ],
     });
+    mounted.unmount();
+  });
+
+  test('uses expected values to activate property flags while row clicks only switch tabs', async () => {
+    const mounted = await mountModal();
+
+    await clickButton(mounted.modalRoot, 'Name');
+    await nextTick();
+    expect(
+      findButton(mounted.modalRoot, 'Overall card suggestion').querySelector(
+        '[data-tab-selected-indicator]',
+      ),
+    ).toBeNull();
+    expect(
+      findButton(mounted.modalRoot, 'Name')
+        .querySelector('[data-tab-selected-indicator]')
+        ?.classList,
+    ).toContain('bg-[var(--color-control-accent)]');
+    expect(document.activeElement).toBe(mounted.modalRoot.querySelector('input.input-base'));
+    expect(findButton(mounted.modalRoot, 'Name').classList).not.toContain('theme-selected-surface');
+    expect(findButton(mounted.modalRoot, 'Submit Flag').disabled).toBe(true);
+
+    await setInputValue(
+      mounted.modalRoot.querySelector('input.input-base') as HTMLInputElement,
+      'Correct Name',
+    );
+    expect(findButton(mounted.modalRoot, 'Name').classList).toContain('theme-selected-surface');
+    expect(findButton(mounted.modalRoot, 'Name').textContent).toContain('Active');
+    expect(findButton(mounted.modalRoot, 'Submit Flag').disabled).toBe(false);
+
+    await clickButton(mounted.modalRoot, 'Rules Text');
+    expect(findButton(mounted.modalRoot, 'Name').classList).toContain('theme-selected-surface');
+    expect(findButton(mounted.modalRoot, 'Rules Text').classList).not.toContain('theme-selected-surface');
+
+    await clickButton(mounted.modalRoot, 'Name');
+    expect((mounted.modalRoot.querySelector('input.input-base') as HTMLInputElement).value).toBe(
+      'Correct Name',
+    );
+    await setInputValue(mounted.modalRoot.querySelector('input.input-base') as HTMLInputElement, '');
+    expect(findButton(mounted.modalRoot, 'Name').classList).not.toContain('theme-selected-surface');
+    expect(findButton(mounted.modalRoot, 'Submit Flag').disabled).toBe(true);
+
+    expect(mounted.modalRoot.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    mounted.unmount();
+  });
+
+  test('requires text for an overall suggestion and submits it with property issues', async () => {
+    const mounted = await mountModal();
+
+    await clickButton(mounted.modalRoot, 'Overall card suggestion');
+    expect(findButton(mounted.modalRoot, 'Submit Flag').disabled).toBe(true);
+
+    const suggestion = mounted.modalRoot.querySelector('textarea[placeholder="Required"]');
+    expect(suggestion).toBeInstanceOf(HTMLTextAreaElement);
+    await setInputValue(suggestion as HTMLTextAreaElement, 'Give this card a clearer role.');
+    expect(findButton(mounted.modalRoot, 'Overall card suggestion').classList).toContain(
+      'theme-selected-surface',
+    );
+    expect(findButton(mounted.modalRoot, 'Submit Flag').disabled).toBe(false);
+
+    await clickButton(mounted.modalRoot, 'Name');
+    await setInputValue(
+      mounted.modalRoot.querySelector('input.input-base') as HTMLInputElement,
+      'Clearer Card Name',
+    );
+    await clickButton(mounted.modalRoot, 'Submit Flag');
+
+    expect(mounted.submit).toHaveBeenCalledWith({
+      note: '',
+      items: [
+        {
+          property_key: 'overall',
+          expected_value: '',
+          note: 'Give this card a clearer role.',
+        },
+        { property_key: 'name', expected_value: 'Clearer Card Name', note: '' },
+      ],
+    });
+    mounted.unmount();
+  });
+
+  test('resets drafted flag items after closing', async () => {
+    const mounted = await mountModal();
+
+    await clickButton(mounted.modalRoot, 'Name');
+    await setInputValue(
+      mounted.modalRoot.querySelector('input.input-base') as HTMLInputElement,
+      'Correct Name',
+    );
+
+    await mounted.setOpen(false);
+    await mounted.setOpen(true);
+
+    expect(findButton(mounted.modalRoot, 'Name').classList).not.toContain('theme-selected-surface');
+    expect(findButton(mounted.modalRoot, 'Submit Flag').disabled).toBe(true);
+    expect(findButton(mounted.modalRoot, 'Overall card suggestion').getAttribute('aria-pressed')).toBe('true');
     mounted.unmount();
   });
 });

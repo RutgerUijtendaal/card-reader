@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { buildCardReturnLocation, getCardReturnLabel } from '@/composables/cards/cardReturnState';
+import {
+  buildCardReturnLocation,
+  buildReviewCardEditorLocation,
+  getCardReturnLabel,
+} from '@/composables/cards/cardReturnState';
 
 describe('cardReturnState', () => {
   test('uses admin return context when present', () => {
@@ -52,6 +56,28 @@ describe('cardReturnState', () => {
       path: '/cards',
       query: {
         q: 'dragon',
+      },
+    });
+  });
+
+  test('omits a property focus when opening an overall suggestion in the editor', () => {
+    expect(
+      buildReviewCardEditorLocation(
+        'card-1',
+        { property_key: 'name' },
+        {
+          versionId: 'version-1',
+          view: 'flags',
+          status: 'open',
+        },
+      ),
+    ).toEqual({
+      path: '/cards/card-1/edit',
+      query: {
+        return_to: 'review',
+        version_id: 'version-1',
+        review_view: 'flags',
+        review_status: 'open',
       },
     });
   });

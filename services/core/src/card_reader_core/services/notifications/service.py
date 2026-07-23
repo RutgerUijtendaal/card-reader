@@ -48,11 +48,12 @@ class NotificationService:
         card = version.card
         status_label = "resolved" if item.status == "resolved" else "dismissed"
         reviewer_name = _username(item.reviewed_by)
+        flag_item_label = _parse_flag_item_label(item.property_key)
         title = f"Flag {status_label}: {version.name or card.label}"
         message = (
-            f"{reviewer_name} {status_label} your {item.property_key.replace('_', ' ')} flag."
+            f"{reviewer_name} {status_label} your {flag_item_label}."
             if reviewer_name
-            else f"Your {item.property_key.replace('_', ' ')} flag was {status_label}."
+            else f"Your {flag_item_label} was {status_label}."
         )
         return self.notify(
             NotificationEvent(
@@ -133,3 +134,9 @@ def _username(user: AbstractUser | None) -> str:
     if user is None:
         return ""
     return user.get_username()
+
+
+def _parse_flag_item_label(property_key: str) -> str:
+    if property_key == "overall":
+        return "overall suggestion"
+    return f"{property_key.replace('_', ' ')} flag"

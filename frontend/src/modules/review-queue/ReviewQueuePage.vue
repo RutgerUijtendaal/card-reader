@@ -306,7 +306,10 @@
                         </span>
                       </div>
 
-                      <div class="mt-3 grid gap-3 md:grid-cols-2">
+                      <div
+                        v-if="item.property_key !== 'overall'"
+                        class="mt-3 grid gap-3 md:grid-cols-2"
+                      >
                         <div>
                           <p class="theme-kicker text-[11px] font-medium uppercase tracking-wide">
                             Reported Value
@@ -593,7 +596,7 @@ const updateFlagItem = async (itemId: string, status: 'resolved' | 'dismissed'):
 const editorLocation = (item: ParseFlagReviewItem, report: ParseFlagReviewReport): RouteLocationRaw =>
   buildReviewCardEditorLocation(report.card.id, route.query, {
     versionId: report.version.id,
-    propertyKey: item.property_key,
+    propertyKey: item.property_key === 'overall' ? undefined : item.property_key,
     view: 'flags',
     status: flagStatus.value,
   });

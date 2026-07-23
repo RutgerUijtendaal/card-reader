@@ -312,7 +312,7 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     submit_client.force_login(submitter)
     submit_response = submit_client.post(
         f"/cards/{card.id}/versions/{version.id}/flags",
-        data={"items": [{"property_key": "name"}]},
+        data={"items": [{"property_key": "overall", "note": "Give this card a clearer role."}]},
         content_type="application/json",
     )
     assert submit_response.status_code == 201
@@ -333,6 +333,7 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     assert notification.actor_id == reviewer.pk
     assert notification.subject_id == item_id
     assert notification.target_url == f"/cards/{card.id}"
+    assert notification.message == "notification-flag-reviewer resolved your overall suggestion."
 
 
 def test_card_update_does_not_notify_deck_owner() -> None:

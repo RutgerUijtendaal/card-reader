@@ -5,6 +5,7 @@
 @layer base {
   :root {
     color-scheme: light;
+    --app-page-single-column-max-width: 72rem;
     --app-bg-from: #f7f9fc;
     --app-bg-to: #dfe7f0;
     --color-text: #0f172a;
@@ -382,6 +383,11 @@
     padding: var(--app-page-y-inset) var(--app-page-x-inset);
   }
 
+  .app-page-single-column {
+    @apply mx-auto w-full;
+    max-width: var(--app-page-single-column-max-width);
+  }
+
   .app-page-layout-sidebar {
     grid-template-columns: 1fr;
   }
@@ -400,7 +406,7 @@
 
   .app-page-layout-standard {
     @apply mx-auto max-w-6xl;
-    --app-page-main-max-width: 52rem;
+    --app-page-main-max-width: var(--app-page-single-column-max-width);
   }
 
   .app-page-layout.app-page-layout-standard {

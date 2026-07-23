@@ -26,6 +26,10 @@ def create_card_version_parse_flag(
     invalid_keys = [item.property_key for item in items if not is_parse_flag_property_key(item.property_key)]
     if invalid_keys:
         raise ValueError("Invalid flagged property.")
+    if any(item.property_key == "overall" and not item.note.strip() for item in items):
+        raise ValueError("Overall suggestions require a note.")
+    if any(item.property_key != "overall" and not item.expected_value.strip() for item in items):
+        raise ValueError("Property flag suggestions require an expected value.")
 
     with transaction.atomic():
         flag = CardVersionParseFlag.objects.create(

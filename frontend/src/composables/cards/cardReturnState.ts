@@ -38,7 +38,7 @@ export const buildReviewCardEditorLocation = (
     status,
   }: {
     versionId: string;
-    propertyKey: string;
+    propertyKey?: string;
     view: string;
     status: string;
   },

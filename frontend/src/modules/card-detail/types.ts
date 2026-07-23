@@ -146,7 +146,7 @@ export type PaginatedCardsResponse<TCard = GalleryItem> = {
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
 export type MetadataSearchState = Record<MetadataGroupName, string>;
-export type ParseFlagPropertyKey = ScalarFieldName | MetadataGroupName | 'other';
+export type ParseFlagPropertyKey = ScalarFieldName | MetadataGroupName | 'overall' | 'other';
 
 export type ParseFlagItemDraft = {
   property_key: ParseFlagPropertyKey;
@@ -219,6 +219,7 @@ export const parseFlagPropertyLabels: Record<ParseFlagPropertyKey, string> = {
   tags: 'Tags',
   types: 'Types',
   symbols: 'Symbols',
+  overall: 'Overall card suggestion',
   other: 'Other',
 };
 

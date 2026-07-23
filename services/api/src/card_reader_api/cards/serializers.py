@@ -455,6 +455,7 @@ class CardVersionParseFlagItemSerializer(serializers.Serializer[dict[str, object
             "tags",
             "types",
             "symbols",
+            "overall",
             "other",
         ]
     )
@@ -465,6 +466,18 @@ class CardVersionParseFlagItemSerializer(serializers.Serializer[dict[str, object
 class CardVersionParseFlagCreateSerializer(serializers.Serializer[dict[str, object]]):
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     items = CardVersionParseFlagItemSerializer(many=True, allow_empty=False)
+
+    def validate_items(self, value: list[dict[str, object]]) -> list[dict[str, object]]:
+        for item in value:
+            if item.get("property_key") == "overall":
+                note = item.get("note")
+                if not isinstance(note, str) or not note.strip():
+                    raise serializers.ValidationError("Overall suggestions require a note.")
+                continue
+            expected_value = item.get("expected_value")
+            if not isinstance(expected_value, str) or not expected_value.strip():
+                raise serializers.ValidationError("Property flag suggestions require an expected value.")
+        return value
 
 
 def _validated_names(values: list[str], allowed: set[str], message: str) -> list[str]:

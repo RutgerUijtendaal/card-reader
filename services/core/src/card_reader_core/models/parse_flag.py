@@ -26,6 +26,7 @@ PARSE_FLAG_PROPERTY_KEYS = (
     "tags",
     "types",
     "symbols",
+    "overall",
     "other",
 )
 PARSE_FLAG_ITEM_OPEN = "open"

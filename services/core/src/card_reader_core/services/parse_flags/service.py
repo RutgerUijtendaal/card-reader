@@ -67,6 +67,7 @@ def _captured_values(version: CardVersion) -> dict[str, str]:
         "tags": _labels([row.label for row in get_tags_for_card_version(version.id)]),
         "types": _labels([row.label for row in get_types_for_card_version(version.id)]),
         "symbols": _labels([row.label for row in get_symbols_for_card_version(version.id)]),
+        "overall": "",
         "other": "",
     }
 

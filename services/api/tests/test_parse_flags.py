@@ -61,6 +61,71 @@ def test_anonymous_user_cannot_create_parse_flag() -> None:
     assert response.status_code in {401, 403}
 
 
+def test_authenticated_user_can_create_overall_and_property_flag_items() -> None:
+    _clear_parse_flags()
+    user = _create_user("parse-flag-overall-user", "password", is_staff=False)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    card, version = _create_card_version(name="Overall Flag Card")
+
+    response = client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={
+            "note": "Shared context.",
+            "items": [
+                {"property_key": "overall", "note": "The card should have a clearer identity."},
+                {"property_key": "name", "expected_value": "Clearer Card Name"},
+            ],
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["item_count"] == 2
+
+    review_client = Client(HTTP_HOST="localhost")
+    review_client.force_login(_create_user("parse-flag-overall-reviewer", "password", is_staff=True))
+    report = review_client.get("/review/parse-flags").json()["results"][0]
+    overall_item = next(item for item in report["items"] if item["property_key"] == "overall")
+    assert overall_item["captured_current_value"] == ""
+    assert overall_item["expected_value"] == ""
+    assert overall_item["note"] == "The card should have a clearer identity."
+
+
+def test_parse_flag_rejects_blank_overall_suggestion() -> None:
+    _clear_parse_flags()
+    user = _create_user("parse-flag-blank-overall-user", "password", is_staff=False)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    card, version = _create_card_version(name="Blank Overall Flag Card")
+
+    response = client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={"items": [{"property_key": "overall", "note": "   "}]},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert CardVersionParseFlag.objects.count() == 0
+
+
+def test_parse_flag_rejects_property_without_expected_value() -> None:
+    _clear_parse_flags()
+    user = _create_user("parse-flag-blank-property-user", "password", is_staff=False)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    card, version = _create_card_version(name="Blank Property Flag Card")
+
+    response = client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={"items": [{"property_key": "name", "note": "The name looks wrong."}]},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert CardVersionParseFlag.objects.count() == 0
+
+
 def test_parse_flag_requires_real_user() -> None:
     _clear_parse_flags()
     card, version = _create_card_version(name="Unauthenticated Flag Card")
@@ -84,7 +149,7 @@ def test_parse_flag_rejects_invalid_card_version_pairing_and_property() -> None:
 
     pairing_response = client.post(
         f"/cards/{first_card.id}/versions/{second_version.id}/flags",
-        data={"items": [{"property_key": "name"}]},
+        data={"items": [{"property_key": "name", "expected_value": "Correct name"}]},
         content_type="application/json",
     )
     property_response = client.post(
@@ -108,8 +173,12 @@ def test_staff_can_resolve_and_dismiss_parse_flag_items() -> None:
         f"/cards/{card.id}/versions/{version.id}/flags",
         data={
             "items": [
-                {"property_key": "name"},
-                {"property_key": "other", "note": "Template looks offset."},
+                {"property_key": "name", "expected_value": "Corrected name"},
+                {
+                    "property_key": "other",
+                    "expected_value": "Use the centered template",
+                    "note": "Template looks offset.",
+                },
             ],
         },
         content_type="application/json",
