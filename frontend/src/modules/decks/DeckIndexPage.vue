@@ -94,7 +94,7 @@
             v-if="isOwnedMode"
             #actions
           >
-            <div class="flex w-[10.75rem] flex-col items-stretch gap-3">
+            <div class="flex w-[10.75rem] flex-col items-stretch gap-3 sm:w-64">
               <div class="flex items-center gap-2">
                 <RouterLink
                   class="btn-secondary min-w-0 flex-1"
@@ -176,13 +176,29 @@
                 </ExtraActionsMenu>
               </div>
 
-              <AppSelect
-                wrapper-class="min-w-0 w-full"
-                :disabled="savingDeckIds.has(deck.id)"
-                :model-value="deck.visibility"
-                :options="visibilityOptions"
-                @update:model-value="handleVisibilitySelect(deck, $event)"
-              />
+              <div
+                class="grid gap-2 sm:grid-cols-2"
+                data-testid="deck-quick-metadata-controls"
+              >
+                <AppSelect
+                  wrapper-class="min-w-0 w-full"
+                  aria-label="Deck visibility"
+                  :disabled="savingDeckIds.has(deck.id)"
+                  :model-value="deck.visibility"
+                  :options="visibilityOptions"
+                  @update:model-value="handleVisibilitySelect(deck, $event)"
+                />
+                <AppSelect
+                  wrapper-class="min-w-0 w-full"
+                  aria-label="Deck difficulty"
+                  :disabled="savingDeckIds.has(deck.id)"
+                  :model-value="deck.difficulty"
+                  :options="difficultyOptions"
+                  placeholder="Difficulty"
+                  placeholder-disabled
+                  @update:model-value="handleDifficultySelect(deck, $event)"
+                />
+              </div>
             </div>
           </template>
         </DeckListCard>
@@ -258,8 +274,14 @@ import {
   buildNewDeckEditorLocation,
   buildPublicDeckEditorLocation,
 } from '@/composables/decks/deckRouteState';
+import { deckDifficultyLabels, deckDifficultyOptions } from '@/composables/decks/difficulty';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
-import type { DeckSummaryRecord, DeckVisibility } from '@/modules/decks/types';
+import type {
+  DeckDifficulty,
+  DeckSummaryRecord,
+  DeckUpdateRequest,
+  DeckVisibility,
+} from '@/modules/decks/types';
 import { useDeckExport } from '@/composables/useDeckExport';
 import { deckVisibilityLabels, deckVisibilityOptions } from '@/composables/decks/visibility';
 import { getDeckTagSuggestionFeedback } from '@/composables/decks/deckTagSuggestionFeedback';
@@ -279,6 +301,7 @@ const tagManagerLoading = ref(false);
 const tagManagerSaving = ref(false);
 const tagManagerError = ref<string | null>(null);
 const visibilityOptions = deckVisibilityOptions;
+const difficultyOptions = deckDifficultyOptions;
 const { exportTtsDeck } = useDeckExport();
 const filterController = useDeckBrowseFilters();
 const {
@@ -469,17 +492,20 @@ const saveManagedDeckTags = async (): Promise<void> => {
   }
 };
 
-const updateDeckVisibility = async (deck: DeckSummaryRecord, visibility: DeckVisibility): Promise<void> => {
-  if (deck.visibility === visibility) {
-    return;
-  }
+const updateDeckQuickMetadata = async (
+  deck: DeckSummaryRecord,
+  payload: DeckUpdateRequest,
+  successMessage: string,
+  errorMessage: string,
+): Promise<void> => {
   savingDeckIds.value = new Set(savingDeckIds.value).add(deck.id);
   try {
-    const nextDeck = await updateDeck(deck.id, { visibility });
+    const nextDeck = await updateDeck(deck.id, payload);
     decks.value = decks.value.map((entry) =>
       entry.id === nextDeck.id
         ? {
             ...entry,
+            difficulty: nextDeck.difficulty,
             visibility: nextDeck.visibility,
             status: {
               is_valid: nextDeck.status.is_valid,
@@ -490,9 +516,9 @@ const updateDeckVisibility = async (deck: DeckSummaryRecord, visibility: DeckVis
           }
         : entry,
     );
-    toast.success(`Deck is now ${deckVisibilityLabels[nextDeck.visibility].toLowerCase()}.`);
+    toast.success(successMessage);
   } catch {
-    toast.error('Unable to update deck visibility.');
+    toast.error(errorMessage);
   } finally {
     const nextSavingDeckIds = new Set(savingDeckIds.value);
     nextSavingDeckIds.delete(deck.id);
@@ -500,9 +526,39 @@ const updateDeckVisibility = async (deck: DeckSummaryRecord, visibility: DeckVis
   }
 };
 
+const updateDeckVisibility = async (deck: DeckSummaryRecord, visibility: DeckVisibility): Promise<void> => {
+  if (deck.visibility === visibility) {
+    return;
+  }
+  await updateDeckQuickMetadata(
+    deck,
+    { visibility },
+    `Deck is now ${deckVisibilityLabels[visibility].toLowerCase()}.`,
+    'Unable to update deck visibility.',
+  );
+};
+
+const updateDeckDifficulty = async (deck: DeckSummaryRecord, difficulty: DeckDifficulty): Promise<void> => {
+  if (deck.difficulty === difficulty) {
+    return;
+  }
+  await updateDeckQuickMetadata(
+    deck,
+    { difficulty },
+    `Difficulty set to ${deckDifficultyLabels[difficulty]}.`,
+    'Unable to update deck difficulty.',
+  );
+};
+
 const handleVisibilitySelect = (deck: DeckSummaryRecord, value: string | number | null): void => {
   if (value === 'private' || value === 'unlisted' || value === 'public') {
     void updateDeckVisibility(deck, value);
+  }
+};
+
+const handleDifficultySelect = (deck: DeckSummaryRecord, value: string | number | null): void => {
+  if (value === 'easy' || value === 'medium' || value === 'hard') {
+    void updateDeckDifficulty(deck, value);
   }
 };
 

@@ -81,21 +81,29 @@ vi.mock('@/components/app/AppSelect.vue', () => ({
     props: {
       modelValue: { type: String, default: null },
       options: { type: Array, default: () => [] },
+      placeholder: { type: String, default: undefined },
+      placeholderDisabled: { type: Boolean, default: false },
     },
     emits: ['update:modelValue'],
-    setup(props, { emit }) {
+    setup(props, { attrs, emit }) {
       return () =>
         h(
           'select',
           {
+            ...attrs,
             value: props.modelValue ?? '',
             onChange: (event: Event) => {
               emit('update:modelValue', (event.target as HTMLSelectElement).value);
             },
           },
-          (props.options as Array<{ value: string; label: string }>).map((option) =>
-            h('option', { value: option.value }, option.label),
-          ),
+          [
+            props.placeholder === undefined
+              ? null
+              : h('option', { value: '', disabled: props.placeholderDisabled }, props.placeholder),
+            ...(props.options as Array<{ value: string; label: string }>).map((option) =>
+              h('option', { value: option.value }, option.label),
+            ),
+          ],
         );
     },
   }),
@@ -217,6 +225,7 @@ const deckRecord = {
   id: 'deck-1',
   name: 'Starter Deck',
   description: 'A test deck',
+  difficulty: null,
   visibility: 'public' as const,
   owner: {
     id: 'user-1',
@@ -454,7 +463,7 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
-  test('owned actions keep one edit action with extra actions and visibility select', async () => {
+  test('owned actions keep one edit action with extra actions and quick metadata selects', async () => {
     const mounted = await mountPage('/my/decks');
     const text = mounted.container.textContent ?? '';
 
@@ -471,7 +480,19 @@ describe('DeckIndexPage', () => {
     expect(mounted.container.querySelector('[aria-label="Copy Mainboard TTS"] svg')).not.toBeNull();
     expect(mounted.container.querySelector('[aria-label="Delete deck"] svg')).not.toBeNull();
     expect(text.match(/\bEdit\b/g) ?? []).toHaveLength(1);
-    expect(mounted.container.querySelector('select')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Deck visibility"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="deck-quick-metadata-controls"]')?.classList)
+      .toContain('sm:grid-cols-2');
+    const difficultySelect = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck difficulty"]');
+    expect(difficultySelect).not.toBeNull();
+    expect(difficultySelect?.options[0]?.textContent).toBe('Difficulty');
+    expect(difficultySelect?.options[0]?.disabled).toBe(true);
+    expect(Array.from(difficultySelect?.options ?? []).map((option) => option.value)).toEqual([
+      '',
+      'easy',
+      'medium',
+      'hard',
+    ]);
 
     mounted.unmount();
   });
@@ -518,7 +539,7 @@ describe('DeckIndexPage', () => {
 
   test('owned visibility changes send a partial deck patch', async () => {
     const mounted = await mountPage('/my/decks');
-    const select = mounted.container.querySelector<HTMLSelectElement>('select');
+    const select = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck visibility"]');
     if (!select) {
       throw new Error('expected visibility select');
     }
@@ -528,6 +549,25 @@ describe('DeckIndexPage', () => {
     await flushPage();
 
     expect(updateDeckMock).toHaveBeenCalledWith('deck-1', { visibility: 'private' });
+
+    mounted.unmount();
+  });
+
+  test('owned difficulty changes send a partial deck patch without offering a clear option', async () => {
+    const mounted = await mountPage('/my/decks');
+    const select = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck difficulty"]');
+    if (!select) {
+      throw new Error('expected difficulty select');
+    }
+
+    expect(Array.from(select.options).some((option) => option.value === 'null')).toBe(false);
+    expect(select.options[0]?.disabled).toBe(true);
+
+    select.value = 'medium';
+    select.dispatchEvent(new Event('change'));
+    await flushPage();
+
+    expect(updateDeckMock).toHaveBeenCalledWith('deck-1', { difficulty: 'medium' });
 
     mounted.unmount();
   });
