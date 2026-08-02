@@ -95,23 +95,25 @@
                 <p class="theme-section-title text-lg font-semibold">
                   {{ deck.hero_card.name }}
                 </p>
-                <p
-                  class="theme-section-muted text-sm"
-                  data-testid="deck-owner"
-                >
-                  By <span class="theme-section-title font-medium">{{ formatDeckOwnerName(deck.owner.username) }}</span>
-                </p>
-                <p
-                  v-if="difficultyLabel"
-                  class="theme-section-muted flex items-center gap-1.5 text-sm"
-                  data-testid="deck-difficulty"
-                >
-                  <Gauge
-                    class="h-4 w-4"
-                    aria-hidden="true"
-                  />
-                  <span>Difficulty · {{ difficultyLabel }}</span>
-                </p>
+                <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+                  <p
+                    class="theme-section-muted"
+                    data-testid="deck-owner"
+                  >
+                    By <span class="theme-section-title font-medium">{{ formatDeckOwnerName(deck.owner.username) }}</span>
+                  </p>
+                  <p
+                    v-if="difficultyLabel"
+                    class="theme-section-muted flex shrink-0 items-center gap-1.5"
+                    data-testid="deck-difficulty"
+                  >
+                    <Gauge
+                      class="h-4 w-4"
+                      aria-hidden="true"
+                    />
+                    <span>Difficulty · {{ difficultyLabel }}</span>
+                  </p>
+                </div>
               </div>
 
               <section
