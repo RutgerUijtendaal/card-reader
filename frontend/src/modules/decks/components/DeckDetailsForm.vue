@@ -95,11 +95,26 @@
         {{ selectedVisibilityDescription }}
       </p>
     </section>
+
+    <div class="theme-divider flex justify-end border-t pt-6">
+      <button
+        class="btn-primary"
+        type="button"
+        @click="controller.openCards()"
+      >
+        <span>Continue to Cards</span>
+        <ArrowRight
+          class="h-4 w-4"
+          aria-hidden="true"
+        />
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ArrowRight } from 'lucide-vue-next';
 import DeckTagPicker from '@/components/decks/DeckTagPicker.vue';
 import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/composables/decks/visibility';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';

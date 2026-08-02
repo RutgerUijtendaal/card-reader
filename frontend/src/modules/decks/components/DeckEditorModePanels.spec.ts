@@ -31,6 +31,7 @@ const buildController = () => {
     isChangingHero: ref(false),
     canApplyHeroChange: ref(false),
     completeInitialHeroSelection: vi.fn(),
+    openCards: vi.fn(),
     beginHeroChange: vi.fn(),
     applyHeroChange: vi.fn(),
     cancelHeroChange: vi.fn(),
@@ -127,6 +128,22 @@ describe('deck editor mode panels', () => {
     expect(longDescription?.classList.contains('min-h-64')).toBe(true);
     expect(mounted.container.querySelector('[data-testid="tag-picker"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Visibility');
+
+    mounted.unmount();
+  });
+
+  test('continues from Details to Cards using the form navigation action', async () => {
+    const mounted = await mountComponent(DeckDetailsForm);
+    const button = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Continue to Cards',
+    );
+
+    button?.click();
+
+    expect(button).toBeDefined();
+    expect(button?.parentElement?.classList.contains('border-t')).toBe(true);
+    expect(button?.parentElement?.classList.contains('theme-divider')).toBe(true);
+    expect(mounted.controller.openCards).toHaveBeenCalledTimes(1);
 
     mounted.unmount();
   });
