@@ -101,6 +101,17 @@
                 >
                   By <span class="theme-section-title font-medium">{{ formatDeckOwnerName(deck.owner.username) }}</span>
                 </p>
+                <p
+                  v-if="difficultyLabel"
+                  class="theme-section-muted flex items-center gap-1.5 text-sm"
+                  data-testid="deck-difficulty"
+                >
+                  <Gauge
+                    class="h-4 w-4"
+                    aria-hidden="true"
+                  />
+                  <span>Difficulty · {{ difficultyLabel }}</span>
+                </p>
               </div>
 
               <section
@@ -340,7 +351,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useLocalStorage } from '@vueuse/core';
-import { BookOpenText, ChevronRight, Gamepad2, Pencil, Share2 } from 'lucide-vue-next';
+import { BookOpenText, ChevronRight, Gamepad2, Gauge, Pencil, Share2 } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
@@ -354,6 +365,7 @@ import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
 import DeckTagPills from '@/components/decks/DeckTagPills.vue';
 import TtsCopyIcon from '@/components/icons/TtsCopyIcon.vue';
 import { formatDeckOwnerName } from '@/composables/decks/display';
+import { deckDifficultyLabels } from '@/composables/decks/difficulty';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation, isCardReturnQuery } from '@/composables/cards/cardReturnState';
 import type { CardFiltersResponse, CardListItem } from '@/modules/card-detail/types';
@@ -414,6 +426,9 @@ const canEdit = computed(() =>
   deck.value?.owner.id === auth.user?.id || auth.canAccessStaffRoutes,
 );
 const canShare = computed(() => (deck.value ? canShareDeck(deck.value) : false));
+const difficultyLabel = computed(() => (
+  deck.value?.difficulty ? deckDifficultyLabels[deck.value.difficulty] : null
+));
 const backLink = computed(() => {
   if (isCardReturnQuery(route.query)) {
     return buildCardReturnLocation(route.query);

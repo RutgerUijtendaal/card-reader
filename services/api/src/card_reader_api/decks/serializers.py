@@ -7,7 +7,14 @@ from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
-from card_reader_core.models import Card, CardVersion, CardVersionImage, Deck, DeckVisibility
+from card_reader_core.models import (
+    Card,
+    CardVersion,
+    CardVersionImage,
+    Deck,
+    DeckDifficulty,
+    DeckVisibility,
+)
 from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
 from card_reader_core.services.decks import DeckConstraintEntry, DeckService, effective_deck_building_rules_json, normalize_deck_building_config
@@ -34,6 +41,7 @@ def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = Fals
         "id": deck.id,
         "name": deck.name,
         "description": deck.description,
+        "difficulty": deck.difficulty,
         "visibility": deck.visibility,
         "owner": {
             "id": str(getattr(deck.owner, "pk", "")),
@@ -78,6 +86,7 @@ def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> di
         "name": deck.name,
         "description": deck.description,
         "long_description": deck.long_description,
+        "difficulty": deck.difficulty,
         "visibility": deck.visibility,
         "owner": {
             "id": str(getattr(deck.owner, "pk", "")),
@@ -314,6 +323,11 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=True, allow_blank=False)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     long_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    difficulty = serializers.ChoiceField(
+        choices=cast(tuple[DeckDifficulty, ...], ("easy", "medium", "hard")),
+        required=False,
+        allow_null=True,
+    )
     visibility = serializers.ChoiceField(choices=cast(tuple[DeckVisibility, ...], ("private", "unlisted", "public")), required=True)
     hero_card_id = serializers.CharField(required=True)
     entries = MainboardEntryWriteSerializer(many=True, required=True, allow_empty=True)

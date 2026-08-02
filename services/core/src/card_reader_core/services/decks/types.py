@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from card_reader_core.models import DeckVisibility
+from card_reader_core.models import DeckDifficulty, DeckVisibility
 
 MAX_DECK_COPIES = 4
 MIN_MAINBOARD_CARD_COUNT = 20
@@ -48,6 +48,7 @@ class DeckUpdateInput:
     name: str | None = None
     description: str | None = None
     long_description: str | None = None
+    difficulty: DeckDifficulty | None = None
     visibility: DeckVisibility | None = None
     hero_card_id: str | None = None
     entries: list[DeckEntryInput] | None = None
@@ -57,6 +58,7 @@ class DeckUpdateInput:
     update_name: bool = False
     update_description: bool = False
     update_long_description: bool = False
+    update_difficulty: bool = False
     update_visibility: bool = False
     update_hero_card_id: bool = False
     update_entries: bool = False

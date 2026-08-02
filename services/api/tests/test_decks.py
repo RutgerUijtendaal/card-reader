@@ -1279,6 +1279,96 @@ def test_deck_patch_preserves_and_clears_long_description() -> None:
     assert Deck.objects.get(id=deck_id).long_description is None
 
 
+def test_deck_difficulty_round_trips_in_full_and_summary_payloads() -> None:
+    username = "deck-difficulty-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Difficulty Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Difficult Deck",
+            "difficulty": "hard",
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+    assert create_response.json()["difficulty"] == "hard"
+    assert Deck.objects.get(id=deck_id).difficulty == "hard"
+
+    detail_response = client.get(f"/my/decks/{deck_id}")
+    summary_response = client.get("/my/decks", {"view": "summary"})
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["difficulty"] == "hard"
+    assert summary_response.status_code == 200
+    summary = next(row for row in summary_response.json() if row["id"] == deck_id)
+    assert summary["difficulty"] == "hard"
+
+    invalid_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"difficulty": "expert"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert invalid_response.status_code == 400
+    assert Deck.objects.get(id=deck_id).difficulty == "hard"
+
+
+def test_deck_patch_preserves_and_clears_difficulty() -> None:
+    username = "deck-difficulty-patch-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Difficulty Patch Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Difficulty Patch Deck",
+            "difficulty": "medium",
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+
+    preserve_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"name": "Renamed Difficulty Deck"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    clear_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"difficulty": None},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert preserve_response.status_code == 200
+    assert preserve_response.json()["difficulty"] == "medium"
+    assert clear_response.status_code == 200
+    assert clear_response.json()["difficulty"] is None
+    assert Deck.objects.get(id=deck_id).difficulty is None
+
+
 def test_owner_deck_list_filters_owned_decks_by_card_name_without_leaking_other_users_decks() -> None:
     owner = _create_user("deck-owner-filter-user", "password")
     other_owner = _create_user("deck-owner-filter-other-user", "password")

@@ -26,6 +26,7 @@ const buildDeck = (): DeckRecord => ({
   name: 'Azure Tempo',
   description: 'Pressure early, then pivot into efficient trades.',
   long_description: null,
+  difficulty: 'hard',
   visibility: 'public',
   owner: {
     id: 'user-1',
@@ -112,7 +113,7 @@ const buildDeck = (): DeckRecord => ({
 
 const mountDeckListCard = async (
   mode: 'browse' | 'owned',
-  options: { customActions?: boolean; menuActions?: boolean } = {},
+  options: { customActions?: boolean; menuActions?: boolean; deck?: Partial<DeckRecord> } = {},
 ) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -132,7 +133,7 @@ const mountDeckListCard = async (
     render: () => h(
       DeckListCard,
       {
-        deck: buildDeck(),
+        deck: { ...buildDeck(), ...options.deck },
         mode,
         titleTo: mode === 'browse' ? '/decks/deck-1' : '/my/decks/deck-1',
       },
@@ -218,7 +219,16 @@ describe('DeckListCard', () => {
     expect(footerText).toContain('Maindeck 40');
     expect(footerText).toContain('Unique 24');
     expect(footerText).toContain('Sideboards 1');
+    expect(footerText).toContain('Difficulty · Hard');
     expect(footerText).toContain('Updated 2025/1/1');
+
+    mounted.unmount();
+  });
+
+  test('omits difficulty metadata when it is unspecified', async () => {
+    const mounted = await mountDeckListCard('browse', { deck: { difficulty: null } });
+
+    expect(mounted.container.querySelector('[data-testid="deck-difficulty"]')).toBeNull();
 
     mounted.unmount();
   });

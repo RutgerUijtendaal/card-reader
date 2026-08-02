@@ -59,7 +59,14 @@ if TYPE_CHECKING:
         CardVersionParseFlag,
         CardVersionParseFlagItem,
     )
-    from .deck import Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility
+    from .deck import (
+        Deck,
+        DeckDifficulty,
+        DeckEntry,
+        DeckSideboard,
+        DeckSideboardEntry,
+        DeckVisibility,
+    )
     from .deck_tag import (
         DECK_TAG_KINDS,
         DECK_TAG_SUGGESTION_STATUSES,
@@ -143,6 +150,7 @@ _EXPORTS = {
     "CardVersionParseFlag": ".parse_flag",
     "CardVersionParseFlagItem": ".parse_flag",
     "Deck": ".deck",
+    "DeckDifficulty": ".deck",
     "DeckVisibility": ".deck",
     "DeckEntry": ".deck",
     "DeckSideboard": ".deck",
@@ -222,6 +230,7 @@ __all__ = [
     "CardVersionParseFlag",
     "CardVersionParseFlagItem",
     "Deck",
+    "DeckDifficulty",
     "DeckVisibility",
     "DeckEntry",
     "DeckSideboard",

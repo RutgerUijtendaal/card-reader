@@ -11,8 +11,17 @@ vi.mock('@/api/client', () => ({
 
 vi.mock('@/components/decks/DeckTagPicker.vue', () => ({
   default: defineComponent({
-    setup() {
-      return () => h('div', { 'data-testid': 'tag-picker' }, 'Tags');
+    props: {
+      description: {
+        type: String,
+        default: undefined,
+      },
+    },
+    setup(props) {
+      return () => h('div', { 'data-testid': 'tag-picker' }, [
+        h('p', 'Tags'),
+        props.description ? h('p', props.description) : null,
+      ]);
     },
   }),
 }));
@@ -22,6 +31,7 @@ const buildController = () => {
     name: 'Aurora Tempo',
     description: 'A compact summary',
     long_description: 'Opening plan\n\nMatchup notes',
+    difficulty: null as 'easy' | 'medium' | 'hard' | null,
     visibility: 'private' as const,
     hero_card_id: 'hero-1',
     tag_ids: [],
@@ -53,6 +63,9 @@ const buildController = () => {
       }),
       setDeckLongDescription: vi.fn((value: string) => {
         form.long_description = value;
+      }),
+      setDeckDifficulty: vi.fn((value: 'easy' | 'medium' | 'hard' | null) => {
+        form.difficulty = value;
       }),
       setDeckVisibility: vi.fn(),
       setDeckTagIds: vi.fn(),
@@ -126,6 +139,34 @@ describe('deck editor mode panels', () => {
     expect(summary?.classList.contains('min-h-20')).toBe(true);
     expect(longDescription?.value).toBe('Opening plan\n\nMatchup notes');
     expect(longDescription?.classList.contains('min-h-64')).toBe(true);
+    const organizationHeading = Array.from(mounted.container.querySelectorAll('h2')).find(
+      (heading) => heading.textContent?.trim() === 'Organization',
+    );
+    const organizationSection = organizationHeading?.closest('section');
+    expect(organizationSection?.textContent).toContain('Difficulty');
+    expect(organizationSection?.textContent).toContain('Give players a broad sense');
+    expect(organizationSection?.textContent).toContain('Tags');
+    expect(organizationSection?.textContent).toContain('Make this deck easier to find');
+    expect(organizationSection?.textContent).toContain('Visibility');
+    expect(organizationSection?.textContent).toContain('Only you can view this deck.');
+    const organizationLabels = Array.from(organizationSection?.querySelectorAll('p, legend') ?? [])
+      .map((element) => element.textContent?.trim())
+      .filter((label) => ['Tags', 'Difficulty', 'Visibility'].includes(label ?? ''));
+    expect(organizationLabels).toEqual(['Tags', 'Difficulty', 'Visibility']);
+    expect(Array.from(mounted.container.querySelectorAll('h2')).map((heading) => heading.textContent?.trim()))
+      .toEqual(['Deck details', 'Organization']);
+    const hardButton = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === 'Hard',
+    );
+    hardButton?.click();
+    await nextTick();
+    expect(hardButton?.getAttribute('aria-pressed')).toBe('true');
+    const clearButton = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === 'Clear',
+    );
+    clearButton?.click();
+    expect(mounted.controller.deck.setDeckDifficulty).toHaveBeenNthCalledWith(1, 'hard');
+    expect(mounted.controller.deck.setDeckDifficulty).toHaveBeenNthCalledWith(2, null);
     expect(mounted.container.querySelector('[data-testid="tag-picker"]')).not.toBeNull();
     expect(mounted.container.textContent).toContain('Visibility');
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import Deck, DeckVisibility
+from card_reader_core.models import Deck, DeckDifficulty, DeckVisibility
 from card_reader_core.services.deck_tags import DeckTagService
 from card_reader_core.repositories.decks import (
     create_deck,
@@ -196,6 +196,7 @@ class DeckService:
         entries: list[DeckEntryInput],
         sideboards: list[DeckSideboardInput],
         long_description: str | None = None,
+        difficulty: DeckDifficulty | None = None,
         tag_ids: list[str] | None = None,
         suggested_type_labels: list[str] | None = None,
     ) -> Deck:
@@ -212,6 +213,7 @@ class DeckService:
             name=normalized_name,
             description=normalized_description,
             long_description=normalized_long_description,
+            difficulty=difficulty,
             visibility=visibility,
             hero_card=hero_card,
         )
@@ -257,6 +259,9 @@ class DeckService:
             existing_deck.long_description
             if not updates.update_long_description
             else updates.long_description
+        )
+        effective_difficulty = (
+            existing_deck.difficulty if not updates.update_difficulty else updates.difficulty
         )
         effective_visibility = existing_deck.visibility if not updates.update_visibility else updates.visibility
         effective_hero_card_id = existing_deck.hero_card.id if not updates.update_hero_card_id else updates.hero_card_id
@@ -308,6 +313,7 @@ class DeckService:
                 "name": normalized_name,
                 "description": normalized_description,
                 "long_description": normalized_long_description,
+                "difficulty": effective_difficulty,
                 "visibility": effective_visibility,
                 "hero_card": hero_card,
             },

@@ -57,43 +57,67 @@
           Organization
         </h2>
         <p class="theme-section-muted text-sm">
-          Tags make this deck easier to find and understand.
+          Classify your deck and control how it appears to other players.
         </p>
       </div>
       <DeckTagPicker
         :catalog="controller.deckTagCatalog.value"
         :model-value="controller.deck.form.tag_ids"
         :suggested-type-labels="controller.deck.form.suggested_type_labels"
+        description="Make this deck easier to find and understand."
         @update:model-value="controller.deck.setDeckTagIds"
         @update:suggested-type-labels="controller.deck.setSuggestedTypeLabels"
       />
-    </section>
-
-    <section class="space-y-3">
-      <div class="space-y-1">
-        <h2 class="theme-section-title text-lg font-semibold">
-          Visibility
-        </h2>
+      <fieldset class="space-y-3">
+        <legend class="theme-section-title text-sm font-medium">
+          Difficulty
+        </legend>
         <p class="theme-section-muted text-sm">
-          Control who can discover and view this deck.
+          Give players a broad sense of how demanding this deck is to play.
         </p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="option in visibilityOptions"
-          :key="option.value"
-          class="theme-pill text-sm"
-          :class="visibility === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
-          type="button"
-          :aria-pressed="visibility === option.value"
-          @click="controller.deck.setDeckVisibility(option.value)"
-        >
-          {{ option.label }}
-        </button>
-      </div>
-      <p class="theme-section-muted text-sm">
-        {{ selectedVisibilityDescription }}
-      </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-for="option in difficultyOptions"
+            :key="option.value"
+            class="theme-pill text-sm"
+            :class="difficulty === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
+            type="button"
+            :aria-pressed="difficulty === option.value"
+            @click="controller.deck.setDeckDifficulty(option.value)"
+          >
+            {{ option.label }}
+          </button>
+          <button
+            v-if="difficulty"
+            class="theme-section-muted px-2 py-1 text-sm font-medium transition hover:text-[var(--color-text)]"
+            type="button"
+            @click="controller.deck.setDeckDifficulty(null)"
+          >
+            Clear
+          </button>
+        </div>
+      </fieldset>
+      <fieldset class="space-y-3">
+        <legend class="theme-section-title text-sm font-medium">
+          Visibility
+        </legend>
+        <p class="theme-section-muted text-sm">
+          {{ selectedVisibilityDescription }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="option in visibilityOptions"
+            :key="option.value"
+            class="theme-pill text-sm"
+            :class="visibility === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
+            type="button"
+            :aria-pressed="visibility === option.value"
+            @click="controller.deck.setDeckVisibility(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </fieldset>
     </section>
 
     <div class="theme-divider flex justify-end border-t pt-6">
@@ -116,6 +140,7 @@
 import { computed } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
 import DeckTagPicker from '@/components/decks/DeckTagPicker.vue';
+import { deckDifficultyOptions } from '@/composables/decks/difficulty';
 import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/composables/decks/visibility';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 
@@ -135,6 +160,8 @@ const deckLongDescription = computed({
   get: () => props.controller.deck.form.long_description,
   set: props.controller.deck.setDeckLongDescription,
 });
+const difficultyOptions = deckDifficultyOptions;
+const difficulty = computed(() => props.controller.deck.form.difficulty);
 const visibilityOptions = deckVisibilityOptions;
 const visibility = computed(() => props.controller.deck.form.visibility);
 const selectedVisibilityDescription = computed(

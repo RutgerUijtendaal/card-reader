@@ -36,6 +36,7 @@ export type DeckTagSuggestionResult = {
 };
 
 export type DeckVisibility = 'private' | 'unlisted' | 'public';
+export type DeckDifficulty = 'easy' | 'medium' | 'hard';
 
 export type DeckCardSummary = CardHoverTooltipModel & {
   result_type: 'card';
@@ -60,6 +61,7 @@ export type DeckRecord = {
   name: string;
   description: string | null;
   long_description: string | null;
+  difficulty: DeckDifficulty | null;
   visibility: DeckVisibility;
   tags?: DeckTagOption[];
   pending_tag_suggestions?: PendingDeckTagSuggestion[];
@@ -100,6 +102,7 @@ export type DeckSummaryRecord = {
   id: string;
   name: string;
   description: string | null;
+  difficulty: DeckDifficulty | null;
   visibility: DeckVisibility;
   tags?: DeckTagOption[];
   pending_tag_suggestions?: PendingDeckTagSuggestion[];
@@ -133,6 +136,7 @@ export type DeckUpsertRequest = {
   name: string;
   description: string | null;
   long_description: string | null;
+  difficulty: DeckDifficulty | null;
   visibility: DeckVisibility;
   hero_card_id: string;
   entries: DeckEntryInput[];
