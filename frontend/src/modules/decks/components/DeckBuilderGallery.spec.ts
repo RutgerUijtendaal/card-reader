@@ -101,7 +101,12 @@ const buildController = (items: GalleryDisplayItem[]) => {
       hoverMode: ref('details'),
     },
     deck: {
-      isSetupStep: ref(false),
+      isHeroStep: ref(false),
+      isCardsStep: ref(true),
+      form: {
+        hero_card_id: '',
+      },
+      galleryActionLabel: vi.fn(() => 'Add card to deck'),
       galleryActionDisabled,
       galleryRemoveActionDisabled,
       getEntryQuantity,
@@ -111,12 +116,16 @@ const buildController = (items: GalleryDisplayItem[]) => {
   };
 };
 
-const mountGallery = async (controller: ReturnType<typeof buildController>) => {
+const mountGallery = async (
+  controller: ReturnType<typeof buildController>,
+  options: { loading?: boolean } = {},
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
   const app = createApp(DeckBuilderGallery, {
     controller,
+    loading: options.loading ?? false,
   });
   app.mount(container);
   await nextTick();
@@ -150,6 +159,16 @@ describe('DeckBuilderGallery', () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(controller.deck.handleGalleryRemoveAction).toHaveBeenCalledWith('card-1');
+
+    mounted.unmount();
+  });
+
+  test('uses the gallery loading shims when the parent layout is still initializing', async () => {
+    const controller = buildController([buildCard()]);
+    const mounted = await mountGallery(controller, { loading: true });
+
+    expect(mounted.container.querySelector('[data-testid="gallery-card-card-1"]')).toBeNull();
+    expect(mounted.container.querySelectorAll('[data-testid^="gallery-card-loading-shim-"]')).toHaveLength(2);
 
     mounted.unmount();
   });
@@ -217,6 +236,23 @@ describe('DeckBuilderGallery', () => {
 
     expect(controller.deck.handleGalleryAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'card-1' }));
     expect(controller.deck.handleGalleryRemoveAction).toHaveBeenCalledWith('card-1');
+
+    mounted.unmount();
+  });
+
+  test('highlights the selected hero candidate', async () => {
+    const controller = buildController([buildCard()]);
+    controller.deck.isHeroStep.value = true;
+    controller.deck.isCardsStep.value = false;
+    controller.deck.form.hero_card_id = 'card-1';
+    controller.deck.galleryActionLabel.mockReturnValue('Selected Hero');
+    const mounted = await mountGallery(controller);
+    const card = mounted.container.querySelector<HTMLElement>('[data-testid="gallery-card-card-1"]');
+
+    expect(card?.classList.contains('ring-2')).toBe(true);
+    expect(controller.deck.galleryActionLabel).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'card-1' }),
+    );
 
     mounted.unmount();
   });

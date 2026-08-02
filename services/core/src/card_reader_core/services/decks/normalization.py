@@ -80,6 +80,12 @@ class DeckPayloadNormalizer:
         normalized = " ".join(description.split()).strip()
         return normalized or None
 
+    def normalize_long_description(self, description: str | None) -> str | None:
+        if description is None:
+            return None
+        normalized = description.replace("\r\n", "\n").replace("\r", "\n").strip()
+        return normalized or None
+
     def normalize_sideboard_name(self, name: str) -> str:
         normalized = " ".join(name.split()).strip()
         if not normalized:

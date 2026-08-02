@@ -195,11 +195,13 @@ class DeckService:
         hero_card_id: str,
         entries: list[DeckEntryInput],
         sideboards: list[DeckSideboardInput],
+        long_description: str | None = None,
         tag_ids: list[str] | None = None,
         suggested_type_labels: list[str] | None = None,
     ) -> Deck:
         normalized_name = self._normalizer.normalize_name(name)
         normalized_description = self._normalizer.normalize_description(description)
+        normalized_long_description = self._normalizer.normalize_long_description(long_description)
         hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_payload(
             hero_card_id=hero_card_id,
             entries=entries,
@@ -209,6 +211,7 @@ class DeckService:
             owner_id=owner_id,
             name=normalized_name,
             description=normalized_description,
+            long_description=normalized_long_description,
             visibility=visibility,
             hero_card=hero_card,
         )
@@ -250,6 +253,11 @@ class DeckService:
         deck_id = existing_deck.id
         effective_name = existing_deck.name if not updates.update_name else updates.name
         effective_description = existing_deck.description if not updates.update_description else updates.description
+        effective_long_description = (
+            existing_deck.long_description
+            if not updates.update_long_description
+            else updates.long_description
+        )
         effective_visibility = existing_deck.visibility if not updates.update_visibility else updates.visibility
         effective_hero_card_id = existing_deck.hero_card.id if not updates.update_hero_card_id else updates.hero_card_id
         effective_entries = (
@@ -288,6 +296,7 @@ class DeckService:
 
         normalized_name = self._normalizer.normalize_name(effective_name)
         normalized_description = self._normalizer.normalize_description(effective_description)
+        normalized_long_description = self._normalizer.normalize_long_description(effective_long_description)
         hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_payload(
             hero_card_id=effective_hero_card_id,
             entries=effective_entries,
@@ -298,6 +307,7 @@ class DeckService:
             updates={
                 "name": normalized_name,
                 "description": normalized_description,
+                "long_description": normalized_long_description,
                 "visibility": effective_visibility,
                 "hero_card": hero_card,
             },

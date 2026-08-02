@@ -31,6 +31,7 @@ class Deck(TimestampedModel):
     )
     name: models.TextField[str, str] = models.TextField(default="")
     description: models.TextField[str | None, str | None] = models.TextField(default=None, null=True, blank=True)
+    long_description: models.TextField[str | None, str | None] = models.TextField(default=None, null=True, blank=True)
     visibility: models.CharField[str, str] = models.CharField(
         max_length=16,
         choices=[

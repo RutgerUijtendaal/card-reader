@@ -1,4 +1,4 @@
-import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/modules/decks/composables/useDeckEditorDraft';
 import { computed, ref, type Ref } from 'vue';
 import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/composables/card-filters/cardLifecycle';
 import {
@@ -18,14 +18,14 @@ import type { DeckCardSummary } from '@/modules/decks/types';
 
 type UseDeckEditorFiltersOptions = {
   deckCardIds: Ref<string[]>;
-  builderStep: Ref<BuilderStep>;
+  editorMode: Ref<DeckEditorMode>;
 };
 
 const EMPTY_DECK_SENTINEL_CARD_ID = '__deck-builder-empty__';
 const EMPTY_CARD_IDS: string[] = [];
 const EMPTY_DECK_SENTINEL_CARD_IDS = [EMPTY_DECK_SENTINEL_CARD_ID];
 
-export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditorFiltersOptions) => {
+export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorFiltersOptions) => {
   const filterController = useCardFilterController();
   const { cardScale } = useGalleryOptions();
   const currentDeckOnly = ref(false);
@@ -60,7 +60,7 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
   let previousCurrentDeckCardIds = EMPTY_CARD_IDS;
 
   const currentDeckCardIds = computed(() => {
-    if (!currentDeckOnly.value || builderStep.value !== 'build') {
+    if (!currentDeckOnly.value || editorMode.value !== 'cards') {
       previousCurrentDeckCardIdsSignature = '';
       previousCurrentDeckCardIds = EMPTY_CARD_IDS;
       return EMPTY_CARD_IDS;
@@ -105,7 +105,7 @@ export const useDeckEditorFilters = ({ deckCardIds, builderStep }: UseDeckEditor
 
   const buildDeckEditorSelectionState = (): CardFilterSelectionState => {
     const selection = filterController.selectionState.value;
-    if (builderStep.value === 'build') {
+    if (editorMode.value === 'cards') {
       return selection;
     }
 

@@ -4,15 +4,28 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useDeckEditor } from '@/modules/decks/composables/useDeckEditor';
 
-const { fetchMyDeckMock, updateDeckMock, toastErrorMock, toastInfoMock } = vi.hoisted(() => ({
+const {
+  createDeckMock,
+  fetchMyDeckMock,
+  updateDeckMock,
+  toastErrorMock,
+  toastInfoMock,
+  resetFiltersMock,
+  applyHeroAffinityManaPresetMock,
+  searchCardsMock,
+} = vi.hoisted(() => ({
+  createDeckMock: vi.fn(),
   fetchMyDeckMock: vi.fn(),
   updateDeckMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastInfoMock: vi.fn(),
+  resetFiltersMock: vi.fn(),
+  applyHeroAffinityManaPresetMock: vi.fn(),
+  searchCardsMock: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/modules/decks/api', () => ({
-  createDeck: vi.fn(),
+  createDeck: createDeckMock,
   fetchMyDeck: fetchMyDeckMock,
   updateDeck: updateDeckMock,
 }));
@@ -41,13 +54,14 @@ vi.mock('@/modules/decks/composables/useDeckEditorFilters', () => ({
     effectiveSort: { value: null },
     cardScale: { value: 'normal' },
     loadFilters: vi.fn(async () => undefined),
-    applyHeroAffinityManaPreset: vi.fn(),
+    resetFilters: resetFiltersMock,
+    applyHeroAffinityManaPreset: applyHeroAffinityManaPresetMock,
   }),
 }));
 
 vi.mock('@/modules/decks/composables/useDeckEditorGallery', () => ({
   useDeckEditorGallery: () => ({
-    searchCards: vi.fn(async () => undefined),
+    searchCards: searchCardsMock,
   }),
 }));
 
@@ -59,13 +73,51 @@ vi.mock('vue-sonner', () => ({
   },
 }));
 
-const mountController = async () => {
+const buildHero = (id: string, name: string) => ({
+  id,
+  result_type: 'card' as const,
+  key: id,
+  label: name,
+  is_hero: true,
+  template_id: '',
+  version_id: `${id}-version`,
+  version_number: 1,
+  previous_version_id: null,
+  is_latest: true,
+  name,
+  type_line: 'Hero',
+  mana_cost: '',
+  mana_value: 0,
+  mana_symbols: [],
+  attack: null,
+  health: null,
+  rules_text: '',
+  confidence: 1,
+  created_at: '',
+  updated_at: '',
+  image_url: null,
+  keywords: [],
+  tags: [],
+  symbols: [],
+  types: [],
+});
+
+const mountController = async (path = '/my/decks/deck-1/edit') => {
   let controller!: ReturnType<typeof useDeckEditor>;
   const container = document.createElement('div');
   document.body.appendChild(container);
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
+      {
+        path: '/my/decks/new',
+        component: defineComponent({
+          setup() {
+            controller = useDeckEditor();
+            return () => h('div');
+          },
+        }),
+      },
       {
         path: '/my/decks/:id/edit',
         component: defineComponent({
@@ -78,7 +130,7 @@ const mountController = async () => {
       { path: '/cards', component: { template: '<div />' } },
     ],
   });
-  await router.push('/my/decks/deck-1/edit');
+  await router.push(path);
   await router.isReady();
 
   const app = createApp({ template: '<RouterView />' });
@@ -143,6 +195,10 @@ describe('useDeckEditor', () => {
       id: 'deck-1',
       status: { is_valid: true },
     });
+    createDeckMock.mockResolvedValue({
+      id: 'deck-new',
+      status: { is_valid: true },
+    });
   });
 
   afterEach(() => {
@@ -152,9 +208,146 @@ describe('useDeckEditor', () => {
     document.body.innerHTML = '';
   });
 
+  test('opens existing decks in Details without querying the hidden gallery', async () => {
+    const mounted = await mountController();
+
+    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.canAutosync.value).toBe(false);
+    expect(searchCardsMock).not.toHaveBeenCalled();
+
+    mounted.unmount();
+  });
+
+  test('opens and keeps Edit-button Cards mode in the linkable URL', async () => {
+    const mounted = await mountController(
+      '/my/decks/deck-1/edit?editor_mode=cards&return_to=my_decks',
+    );
+    await Promise.resolve();
+    await nextTick();
+
+    expect(mounted.controller.editorMode.value).toBe('cards');
+    expect(mounted.controller.canAutosync.value).toBe(true);
+    expect(mounted.router.currentRoute.value.query).toEqual({
+      editor_mode: 'cards',
+      return_to: 'my_decks',
+    });
+
+    await mounted.router.replace(
+      '/my/decks/deck-1/edit?editor_mode=details&return_to=my_decks',
+    );
+    await nextTick();
+    expect(mounted.controller.editorMode.value).toBe('details');
+
+    mounted.unmount();
+  });
+
+  test('creates a named hero draft before opening Details for a new deck', async () => {
+    const mounted = await mountController('/my/decks/new');
+
+    expect(mounted.controller.editorMode.value).toBe('hero');
+    expect(searchCardsMock).toHaveBeenCalledTimes(1);
+
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('New Deck');
+    await mounted.controller.completeInitialHeroSelection();
+
+    expect(createDeckMock).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'New Deck',
+      hero_card_id: 'hero-new',
+    }));
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=details',
+    );
+    expect(mounted.controller.editorMode.value).toBe('details');
+
+    mounted.unmount();
+  });
+
+  test('switches Details and Cards without saving or losing draft metadata', async () => {
+    const mounted = await mountController();
+    mounted.controller.deck.setDeckLongDescription('Keep this strategy note.');
+
+    mounted.controller.openCards();
+    expect(mounted.controller.editorMode.value).toBe('cards');
+    expect(mounted.controller.canAutosync.value).toBe(true);
+    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.query.editor_mode).toBe('cards');
+    });
+
+    mounted.controller.openDetails();
+    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.deck.form.long_description).toBe('Keep this strategy note.');
+    expect(updateDeckMock).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.query.editor_mode).toBe('details');
+    });
+
+    mounted.unmount();
+  });
+
+  test('applies a replacement hero without saving and refreshes its card preset on Cards', async () => {
+    const mounted = await mountController();
+    mounted.controller.deck.setDeckDescription('Preserved summary');
+
+    mounted.controller.beginHeroChange();
+    expect(mounted.controller.editorMode.value).toBe('hero');
+    expect(mounted.controller.isChangingHero.value).toBe(true);
+    expect(resetFiltersMock).toHaveBeenCalledTimes(1);
+
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-2', 'Replacement Hero'));
+    expect(mounted.controller.canApplyHeroChange.value).toBe(true);
+    mounted.controller.applyHeroChange();
+
+    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.deck.form.hero_card_id).toBe('hero-2');
+    expect(mounted.controller.deck.form.description).toBe('Preserved summary');
+    expect(updateDeckMock).not.toHaveBeenCalled();
+
+    mounted.controller.openCards();
+    expect(applyHeroAffinityManaPresetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'hero-2' }),
+    );
+
+    mounted.unmount();
+  });
+
+  test('cancels hero replacement while preserving all other draft edits', async () => {
+    const mounted = await mountController();
+    mounted.controller.deck.setDeckLongDescription('Preserved notes');
+
+    mounted.controller.beginHeroChange();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-2', 'Replacement Hero'));
+    mounted.controller.cancelHeroChange();
+
+    expect(mounted.controller.editorMode.value).toBe('details');
+    expect(mounted.controller.deck.form.hero_card_id).toBe('hero-1');
+    expect(mounted.controller.deck.form.long_description).toBe('Preserved notes');
+    expect(updateDeckMock).not.toHaveBeenCalled();
+
+    mounted.unmount();
+  });
+
+  test('keeps autosync paused in Details and resumes it in Cards', async () => {
+    const mounted = await mountController();
+    mounted.controller.deck.setDeckName('Dirty details');
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(updateDeckMock).not.toHaveBeenCalled();
+
+    mounted.controller.openCards();
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(900);
+
+    expect(updateDeckMock).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
   test('pauses autosync retries after failure until the draft changes again', async () => {
     updateDeckMock.mockRejectedValueOnce(new Error('offline'));
     const mounted = await mountController();
+    mounted.controller.openCards();
     mounted.controller.deck.form.name = 'First dirty state';
     await nextTick();
 

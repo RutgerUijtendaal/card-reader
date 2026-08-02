@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { api } from '@/api/client';
 import { useCardCollection } from '@/composables/useCardCollection';
 
@@ -41,6 +41,7 @@ describe('useCardCollection', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -199,5 +200,72 @@ describe('useCardCollection', () => {
 
     expect(collection.isRefreshing.value).toBe(false);
     expect(collection.cards.value).toEqual([{ id: 'card-2', name: 'Refreshed Card' }]);
+  });
+
+  test('does not search or paginate while the collection is disabled', async () => {
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      enabled: ref(false),
+      pageSize: 30,
+    });
+
+    await collection.searchCards();
+    await collection.loadNextPage();
+
+    expect(mockedGet).not.toHaveBeenCalled();
+    expect(collection.hasLoadedOnce.value).toBe(false);
+  });
+
+  test('loads the collection when it becomes enabled', async () => {
+    vi.useFakeTimers();
+    mockedGet.mockResolvedValueOnce(buildResponse([{ id: 'card-1', name: 'First Card' }]));
+    const enabled = ref(false);
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      enabled,
+      pageSize: 30,
+      debounceMs: 0,
+    });
+
+    enabled.value = true;
+    await nextTick();
+    await vi.runAllTimersAsync();
+
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+    expect(collection.cards.value).toEqual([{ id: 'card-1', name: 'First Card' }]);
+  });
+
+  test('clears results and ignores pending responses when the result set changes', async () => {
+    vi.useFakeTimers();
+    mockedGet.mockResolvedValueOnce(buildResponse([{ id: 'hero-1', name: 'Hero' }]));
+    const pendingHeroRefresh = createDeferred<ReturnType<typeof buildResponse>>();
+    mockedGet.mockReturnValueOnce(pendingHeroRefresh.promise);
+    mockedGet.mockResolvedValueOnce(buildResponse([{ id: 'card-1', name: 'Card' }]));
+    const resultSetKey = ref('heroes');
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      resultSetKey,
+      pageSize: 30,
+      debounceMs: 0,
+    });
+
+    await collection.searchCards();
+    const pendingRefresh = collection.searchCards();
+    expect(collection.cards.value).toEqual([{ id: 'hero-1', name: 'Hero' }]);
+
+    resultSetKey.value = 'cards';
+    expect(collection.cards.value).toEqual([]);
+    expect(collection.hasLoadedOnce.value).toBe(false);
+
+    pendingHeroRefresh.resolve(buildResponse([{ id: 'hero-stale', name: 'Stale Hero' }]));
+    await pendingRefresh;
+    expect(collection.cards.value).not.toContainEqual({ id: 'hero-stale', name: 'Stale Hero' });
+
+    await nextTick();
+    await vi.runAllTimersAsync();
+    expect(collection.cards.value).toEqual([{ id: 'card-1', name: 'Card' }]);
   });
 });

@@ -4,7 +4,7 @@
   >
     <div
       v-if="showHeader"
-      class="flex items-start justify-between gap-3"
+      class="flex items-center justify-between gap-3"
     >
       <div
         class="min-w-0"
@@ -23,13 +23,16 @@
           - {{ totalCardsLabel }}
         </p>
       </div>
-      <span
-        v-if="curveSummary.uncostedCards > 0"
-        class="theme-pill theme-pill-warning shrink-0"
-        :class="compact ? 'px-1.5 py-0.5 text-[9px]' : 'text-[10px]'"
-      >
-        {{ curveSummary.uncostedCards }} without cost
-      </span>
+      <div class="flex shrink-0 items-center gap-2">
+        <span
+          v-if="curveSummary.uncostedCards > 0"
+          class="theme-pill theme-pill-warning shrink-0"
+          :class="compact ? 'px-1.5 py-0.5 text-[9px]' : 'text-[10px]'"
+        >
+          {{ curveSummary.uncostedCards }} without cost
+        </span>
+        <slot name="header-actions" />
+      </div>
     </div>
 
     <div

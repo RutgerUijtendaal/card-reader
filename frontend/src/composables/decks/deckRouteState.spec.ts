@@ -10,6 +10,8 @@ import {
   buildMyDecksReturnLocation,
   buildNewDeckEditorLocation,
   buildPublicDeckEditorLocation,
+  getRequestedDeckEditorMode,
+  withDeckEditorMode,
   getMyDecksReturnLabel,
   getDeckEditorReturnLabel,
   isDeckReturnQuery,
@@ -85,6 +87,7 @@ describe('deckRouteState', () => {
     expect(buildMyDeckEditorLocation('deck-1')).toEqual({
       path: '/my/decks/deck-1/edit',
       query: {
+        editor_mode: 'cards',
         return_to: 'my_decks',
       },
     });
@@ -94,6 +97,7 @@ describe('deckRouteState', () => {
     expect(buildPublicDeckEditorLocation('deck-1')).toEqual({
       path: '/my/decks/deck-1/edit',
       query: {
+        editor_mode: 'cards',
         return_to: 'decks',
       },
     });
@@ -191,8 +195,23 @@ describe('deckRouteState', () => {
       query: {
         return_to: 'deck',
         deck_id: 'deck-1',
+        editor_mode: 'cards',
       },
     });
+  });
+
+  test('preserves linkable editor modes in the query string', () => {
+    const query = {
+      editor_mode: 'cards',
+      return_to: 'my_decks',
+    };
+
+    expect(getRequestedDeckEditorMode(query)).toBe('cards');
+    expect(withDeckEditorMode(query, 'details')).toEqual({
+      editor_mode: 'details',
+      return_to: 'my_decks',
+    });
+    expect(getRequestedDeckEditorMode({ return_to: 'my_decks' })).toBe('details');
   });
 
   test('returns deck detail from the editor when deck context is present', () => {

@@ -1,132 +1,5 @@
 <template>
-  <AppStickyAside
-    v-if="controller.deck.isSetupStep.value"
-    side="right"
-  >
-    <div class="space-y-4">
-      <div class="space-y-1">
-        <h3 class="theme-section-title text-lg font-semibold">
-          Deck Setup
-        </h3>
-        <p class="theme-section-muted text-sm">
-          Enter the deck details and choose a hero.
-        </p>
-      </div>
-
-      <section class="space-y-3">
-        <p class="theme-section-title text-sm font-semibold">
-          Selected Hero
-        </p>
-        <div
-          v-if="controller.deck.selectedHero.value"
-          class="space-y-3"
-        >
-          <div
-            v-if="controller.deck.selectedHero.value.image_url"
-            class="mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
-          >
-            <img
-              :src="toAbsoluteApiUrl(controller.deck.selectedHero.value.image_url)"
-              :alt="controller.deck.selectedHero.value.name"
-              class="h-full w-full object-contain"
-            >
-          </div>
-          <div
-            v-else
-            class="theme-empty-state flex h-[34rem] items-center justify-center rounded-xl text-sm"
-          >
-            No hero image
-          </div>
-        </div>
-        <p
-          v-else
-          class="theme-card-frame mx-auto aspect-[63/88] max-h-[34rem] w-full rounded-xl"
-        >
-          <CardLoadingSkeleton :animated="false" />
-        </p>
-      </section>
-
-      <div
-        v-if="setupBlockingMessages.length > 0"
-        class="theme-muted-panel space-y-2 p-3"
-      >
-        <p class="theme-section-title text-sm font-semibold">
-          Setup Issues
-        </p>
-        <p
-          v-for="message in setupBlockingMessages"
-          :key="message"
-          class="theme-error-text text-sm"
-        >
-          {{ message }}
-        </p>
-      </div>
-
-      <label class="field-label">
-        <span>Name <span class="theme-error-text">*</span></span>
-        <input
-          ref="deckNameInputRef"
-          v-model="deckName"
-          class="input-base"
-          placeholder="Deck name"
-          required
-          @keydown.enter.prevent="continueSetup"
-        >
-      </label>
-
-      <label class="field-label">
-        Description
-        <textarea
-          v-model="deckDescription"
-          class="input-base min-h-28"
-          placeholder="Optional description"
-        />
-      </label>
-
-      <DeckTagPicker
-        :catalog="controller.deckTagCatalog.value"
-        :model-value="controller.deck.form.tag_ids"
-        :suggested-type-labels="controller.deck.form.suggested_type_labels"
-        @update:model-value="controller.deck.setDeckTagIds"
-        @update:suggested-type-labels="controller.deck.setSuggestedTypeLabels"
-      />
-
-      <div class="space-y-2">
-        <p class="theme-section-title text-sm font-semibold">
-          Visibility
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="option in visibilityOptions"
-            :key="option.value"
-            class="theme-pill text-xs"
-            :class="visibility === option.value ? 'theme-pill-accent' : 'theme-pill-neutral'"
-            type="button"
-            @click="updateDeckVisibility(option.value)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-        <p class="theme-section-muted text-xs">
-          {{ selectedVisibilityDescription }}
-        </p>
-      </div>
-    </div>
-
-    <template #footer>
-      <button
-        class="btn-primary w-full justify-center"
-        type="button"
-        :disabled="!canContinueSetup"
-        @click="continueSetup"
-      >
-        Continue
-      </button>
-    </template>
-  </AppStickyAside>
-
   <aside
-    v-else
     class="app-sticky-aside app-sticky-aside-right page-card flex min-h-0 flex-col overflow-hidden p-0"
   >
     <div
@@ -184,14 +57,6 @@
                   </span>
                 </div>
               </div>
-            </button>
-
-            <button
-              class="btn-secondary inline-flex h-8 shrink-0 items-center justify-center px-3 py-0 text-xs"
-              type="button"
-              @click="controller.setBuilderStep('setup')"
-            >
-              Change
             </button>
 
             <button
@@ -447,48 +312,17 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue
 import { ChevronDown, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/api/client';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
-import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
-import AppStickyAside from '@/components/app/AppStickyAside.vue';
 import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import DeckBuilderBoardEntryRow from '@/modules/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/modules/decks/components/DeckManaCurve.vue';
-import DeckTagPicker from '@/components/decks/DeckTagPicker.vue';
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 import type { DeckBoardMoveDestination } from '@/modules/decks/composables/useDeckEditorDraft';
-import type { DeckEntrySummary, DeckVisibility } from '@/modules/decks/types';
-import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/composables/decks/visibility';
+import type { DeckEntrySummary } from '@/modules/decks/types';
 
 const props = defineProps<{
   controller: DeckEditorController;
 }>();
 
-const deckName = computed({
-  get: () => props.controller.deck.form.name,
-  set: props.controller.deck.setDeckName,
-});
-
-const deckDescription = computed({
-  get: () => props.controller.deck.form.description,
-  set: props.controller.deck.setDeckDescription,
-});
-
-const visibilityOptions = deckVisibilityOptions;
-const visibility = computed(() => props.controller.deck.form.visibility);
-const selectedVisibilityDescription = computed(
-  () => deckVisibilityDescriptions[visibility.value] ?? '',
-);
-const setupBlockingMessages = computed(() => [
-  ...props.controller.deck.setupMessages.value,
-  ...props.controller.deck.blockingMessages.value,
-]);
-const canContinueSetup = computed(() =>
-  Boolean(
-    props.controller.deck.selectedHero.value &&
-      deckName.value.trim() &&
-      setupBlockingMessages.value.length === 0,
-  ),
-);
-const deckNameInputRef = ref<HTMLInputElement | null>(null);
 const {
   isOpen: heroDetailsExpanded,
   triggerRef: heroDetailsTriggerRef,
@@ -557,18 +391,6 @@ const sortableController = useSortable(boardEntriesSortableRef, sortableEntries,
     );
   },
 });
-
-watch(
-  () => props.controller.deck.selectedHero.value?.id ?? '',
-  async (heroId, previousHeroId) => {
-    if (!heroId || heroId === previousHeroId || !props.controller.deck.isSetupStep.value) {
-      return;
-    }
-
-    await nextTick();
-    deckNameInputRef.value?.focus({ preventScroll: true });
-  },
-);
 
 watch(
   boardListRef,
@@ -685,17 +507,6 @@ onBeforeUnmount(() => {
     window.clearTimeout(popResetTimer);
   }
 });
-
-const updateDeckVisibility = (value: DeckVisibility): void => {
-  props.controller.deck.setDeckVisibility(value);
-};
-
-const continueSetup = (): void => {
-  if (!canContinueSetup.value) {
-    return;
-  }
-  void props.controller.lockSetup();
-};
 
 const selectSideboard = (sideboardId: string): void => {
   if (editingSideboardId.value === sideboardId) {

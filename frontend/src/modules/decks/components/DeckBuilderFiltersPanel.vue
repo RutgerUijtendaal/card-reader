@@ -1,15 +1,15 @@
 <template>
   <GalleryFilterSidebar
-    :title="controller.deck.isSetupStep.value ? 'Hero Gallery' : 'Card Gallery'"
-    :description="controller.deck.isSetupStep.value ? 'Browse hero cards.' : 'Search and filter cards.'"
+    :title="controller.deck.isHeroStep.value ? 'Hero Gallery' : 'Card Gallery'"
+    :description="controller.deck.isHeroStep.value ? 'Browse hero cards.' : 'Search and filter cards.'"
     :query="controller.filters.query.value"
     :on-update-query="controller.filters.updateQuery"
-    :search-placeholder="controller.deck.isSetupStep.value ? 'Search heroes...' : 'Search cards...'"
+    :search-placeholder="controller.deck.isHeroStep.value ? 'Search heroes...' : 'Search cards...'"
     :total-count="controller.gallery.totalCount.value"
     :on-reset="controller.filters.resetFilters"
   >
     <div
-      v-if="controller.deck.isSetupStep.value"
+      v-if="controller.deck.isHeroStep.value"
       class="theme-muted-panel space-y-3 p-3"
     >
       <p class="theme-section-title text-sm font-semibold">
@@ -21,7 +21,7 @@
     </div>
 
     <label
-      v-if="!controller.deck.isSetupStep.value"
+      v-if="controller.deck.isCardsStep.value"
       class="theme-muted-panel flex items-center gap-3 p-3 text-sm"
     >
       <input
@@ -35,8 +35,8 @@
 
     <CardFilterSections
       :state="controller.filters.filterSectionsState.value"
-      :visible-sections="controller.deck.isSetupStep.value ? ['affinity'] : undefined"
-      :default-open-sections="controller.deck.isSetupStep.value ? ['affinity'] : undefined"
+      :visible-sections="controller.deck.isHeroStep.value ? ['affinity'] : undefined"
+      :default-open-sections="controller.deck.isHeroStep.value ? ['affinity'] : undefined"
     />
 
     <template #footer>

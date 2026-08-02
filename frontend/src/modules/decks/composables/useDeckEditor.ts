@@ -4,13 +4,15 @@ import { toast } from 'vue-sonner';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import type { CardListItem } from '@/modules/card-detail/types';
 import { createDeck, fetchDeckTags, fetchMyDeck, updateDeck } from '@/modules/decks/api';
-import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
+import { useDeckEditorDraft, type DeckEditorMode } from '@/modules/decks/composables/useDeckEditorDraft';
 import { useDeckEditorFilters } from '@/modules/decks/composables/useDeckEditorFilters';
 import { useDeckEditorGallery } from '@/modules/decks/composables/useDeckEditorGallery';
 import {
   buildDeckEditorLocation,
   buildDeckEditorReturnLocation,
   getDeckEditorReturnLabel,
+  getRequestedDeckEditorMode,
+  withDeckEditorMode,
 } from '@/composables/decks/deckRouteState';
 import { getDeckTagSuggestionFeedback } from '@/composables/decks/deckTagSuggestionFeedback';
 import type { DeckCardSummary, DeckRecord, DeckTagCatalog } from '@/modules/decks/types';
@@ -21,8 +23,11 @@ export const useDeckEditor = () => {
   const router = useRouter();
 
   const deckId = computed(() => (typeof route.params.id === 'string' ? route.params.id : ''));
-  const builderStep = ref<BuilderStep>(deckId.value ? 'build' : 'setup');
-  const loading = ref(false);
+  const requestedEditorMode = deckId.value ? getRequestedDeckEditorMode(route.query) : 'details';
+  const editorMode = ref<DeckEditorMode>(deckId.value ? requestedEditorMode : 'hero');
+  const originalHeroId = ref<string | null>(null);
+  const shouldApplyHeroCardPreset = ref(Boolean(deckId.value));
+  const loading = ref(Boolean(deckId.value));
   const saving = ref(false);
   const manualSaving = ref(false);
   const cardLookup = ref<Record<string, DeckCardSummary>>({});
@@ -51,14 +56,14 @@ export const useDeckEditor = () => {
   };
 
   const deck = useDeckEditorDraft({
-    builderStep,
+    editorMode,
     cardLookup,
     deckBuildingRules,
     rememberCards,
   });
   const filters = useDeckEditorFilters({
     deckCardIds: deck.allCardIds,
-    builderStep,
+    editorMode,
   });
   const gallery = useDeckEditorGallery({
     filtersLoaded: filters.filtersLoaded,
@@ -66,14 +71,64 @@ export const useDeckEditor = () => {
     selectionState: filters.selectionState,
     currentDeckOnly: filters.currentDeckOnly,
     currentDeckCardIds: filters.currentDeckCardIds,
-    builderStep,
+    editorMode,
     sort: filters.effectiveSort,
     cardScale: filters.cardScale,
     rememberCards,
   });
 
-  const setBuilderStep = (step: BuilderStep): void => {
-    builderStep.value = step;
+  const syncEditorModeRoute = (mode: 'details' | 'cards'): void => {
+    if (!deckId.value) {
+      return;
+    }
+    void router.replace({
+      path: route.path,
+      query: withDeckEditorMode(route.query, mode),
+      hash: route.hash,
+    });
+  };
+
+  const activateCards = (): void => {
+    editorMode.value = 'cards';
+    if (shouldApplyHeroCardPreset.value) {
+      filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
+      shouldApplyHeroCardPreset.value = false;
+    }
+  };
+
+  const openDetails = (): void => {
+    editorMode.value = 'details';
+    syncEditorModeRoute('details');
+  };
+
+  const openCards = (): void => {
+    activateCards();
+    syncEditorModeRoute('cards');
+  };
+
+  const beginHeroChange = (): void => {
+    originalHeroId.value = deck.form.hero_card_id;
+    filters.resetFilters();
+    editorMode.value = 'hero';
+  };
+
+  const applyHeroChange = (): void => {
+    if (originalHeroId.value === null || !deck.form.hero_card_id) {
+      return;
+    }
+    shouldApplyHeroCardPreset.value = true;
+    originalHeroId.value = null;
+    openDetails();
+  };
+
+  const cancelHeroChange = (): void => {
+    if (originalHeroId.value === null) {
+      return;
+    }
+    deck.form.hero_card_id = originalHeroId.value;
+    shouldApplyHeroCardPreset.value = true;
+    originalHeroId.value = null;
+    openDetails();
   };
 
   const hydrateFromDeck = (record: DeckRecord): void => {
@@ -82,13 +137,8 @@ export const useDeckEditor = () => {
 
   const loadDeck = async (): Promise<void> => {
     if (!deckId.value) return;
-    loading.value = true;
-    try {
-      const record = await fetchMyDeck(deckId.value);
-      hydrateFromDeck(record);
-    } finally {
-      loading.value = false;
-    }
+    const record = await fetchMyDeck(deckId.value);
+    hydrateFromDeck(record);
   };
 
   const loadDeckRules = async (): Promise<void> => {
@@ -137,7 +187,13 @@ export const useDeckEditor = () => {
 
   const payloadSignature = computed(() => JSON.stringify(deck.buildPayload()));
   const hasUnsavedChanges = computed(() => savedPayloadSignature.value !== '' && payloadSignature.value !== savedPayloadSignature.value);
-  const canAutosync = computed(() => builderStep.value === 'build');
+  const isChangingHero = computed(() => originalHeroId.value !== null);
+  const canApplyHeroChange = computed(
+    () => isChangingHero.value
+      && Boolean(deck.form.hero_card_id)
+      && deck.form.hero_card_id !== originalHeroId.value,
+  );
+  const canAutosync = computed(() => editorMode.value === 'cards');
   const changeStatusLabel = computed(() => {
     if (loading.value) {
       return 'Loading';
@@ -159,7 +215,7 @@ export const useDeckEditor = () => {
     autosyncFailedSignature.value = '';
   };
 
-  const lockSetup = async (): Promise<void> => {
+  const completeInitialHeroSelection = async (): Promise<void> => {
     if (!deck.form.hero_card_id) {
       return;
     }
@@ -181,7 +237,7 @@ export const useDeckEditor = () => {
       const record = await persistDeck();
       const savedSignature = reconcilePersistedTagState(record, persistedSignature);
       showTagSuggestionFeedback(record);
-      setBuilderStep('build');
+      openDetails();
       if (!deckId.value) {
         bypassNextUnsavedPrompt = true;
         try {
@@ -192,7 +248,7 @@ export const useDeckEditor = () => {
       }
       markSavedPayload(savedSignature);
       toast.success('Deck saved.');
-      filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
+      shouldApplyHeroCardPreset.value = true;
     } finally {
       saving.value = false;
       manualSaving.value = false;
@@ -273,13 +329,32 @@ export const useDeckEditor = () => {
   }, 900);
 
   onMounted(async () => {
-    await Promise.all([filters.loadFilters(), loadDeckRules(), loadDeckTags(), loadDeck()]);
-    if (builderStep.value === 'build') {
-      filters.applyHeroAffinityManaPreset(deck.selectedHero.value);
+    try {
+      await Promise.all([filters.loadFilters(), loadDeckRules(), loadDeckTags(), loadDeck()]);
+      markSavedPayload();
+      if (editorMode.value === 'hero') {
+        await gallery.searchCards();
+      } else if (editorMode.value === 'cards') {
+        activateCards();
+      }
+    } finally {
+      loading.value = false;
     }
-    markSavedPayload();
-    await gallery.searchCards();
   });
+
+  watch(
+    () => getRequestedDeckEditorMode(route.query),
+    (mode) => {
+      if (!deckId.value || mode === editorMode.value) {
+        return;
+      }
+      if (mode === 'cards') {
+        activateCards();
+      } else {
+        editorMode.value = 'details';
+      }
+    },
+  );
 
   watch(
     () => [autosyncEnabled.value, canAutosync.value, hasUnsavedChanges.value, saving.value, loading.value, payloadSignature.value] as const,
@@ -312,12 +387,14 @@ export const useDeckEditor = () => {
     deckId,
     backLink,
     backLabel,
-    builderStep,
+    editorMode,
     loading,
     saving,
     manualSaving,
     hasUnsavedChanges,
     canAutosync,
+    isChangingHero,
+    canApplyHeroChange,
     changeStatusLabel,
     autosyncEnabled,
     discardChangesModalOpen,
@@ -326,8 +403,12 @@ export const useDeckEditor = () => {
     filters,
     gallery,
     deck,
-    setBuilderStep,
-    lockSetup,
+    openDetails,
+    openCards,
+    beginHeroChange,
+    applyHeroChange,
+    cancelHeroChange,
+    completeInitialHeroSelection,
     saveDeck,
     confirmDiscardChanges: () => resolveDiscardChangesModal(true),
     cancelDiscardChanges: () => resolveDiscardChangesModal(false),

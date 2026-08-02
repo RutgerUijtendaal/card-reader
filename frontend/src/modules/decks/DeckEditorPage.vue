@@ -10,8 +10,29 @@
       title-class="text-xl"
     >
       <template #actions>
+        <div
+          v-if="controller.deckId.value && !controller.isChangingHero.value"
+          class="flex items-center gap-1"
+        >
+          <AppHeaderAction
+            :icon="FileText"
+            label="Open deck details"
+            short-label="Details"
+            variant="tab"
+            :active="controller.editorMode.value === 'details'"
+            @click="controller.openDetails()"
+          />
+          <AppHeaderAction
+            :icon="LayoutGrid"
+            label="Open deck cards"
+            short-label="Cards"
+            variant="tab"
+            :active="controller.editorMode.value === 'cards'"
+            @click="controller.openCards()"
+          />
+        </div>
         <AppHeaderAction
-          v-if="!controller.deck.isSetupStep.value"
+          v-if="controller.editorMode.value !== 'hero'"
           :icon="deckSaveActionIcon"
           :label="deckSaveActionLabel"
           :short-label="deckSaveActionShortLabel"
@@ -24,14 +45,84 @@
     </AppPageHeader>
 
     <AppPageLayout
-      v-if="controller.loading.value"
-      columns="three"
-      root-class="deck-builder-layout"
-      main-class="deck-builder-main-column"
-      aria-label="Loading deck builder"
+      v-if="controller.loading.value && controller.editorMode.value !== 'cards'"
+      columns="sidebar"
+      aria-label="Loading deck details"
     >
       <template #aside>
         <aside class="app-sticky-aside app-sticky-aside-left deck-builder-loading-panel">
+          <div class="app-sticky-aside-scroll space-y-5">
+            <div class="space-y-3">
+              <div class="deck-builder-loading-line h-5 w-20" />
+              <div class="deck-builder-loading-line h-4 w-full" />
+            </div>
+            <div class="deck-builder-loading-line mx-auto aspect-[63/88] w-full max-w-48 rounded-xl" />
+            <div class="deck-builder-loading-line mx-auto h-5 w-32" />
+            <div class="deck-builder-loading-line h-10 w-full" />
+          </div>
+        </aside>
+      </template>
+
+      <div
+        class="mx-auto w-full max-w-4xl space-y-8"
+        aria-hidden="true"
+      >
+        <div class="space-y-3">
+          <div class="deck-builder-loading-line h-7 w-36" />
+          <div class="deck-builder-loading-line h-4 w-80 max-w-full" />
+        </div>
+        <div class="space-y-5">
+          <div class="deck-builder-loading-line h-11 w-full" />
+          <div class="deck-builder-loading-line h-20 w-full" />
+          <div class="deck-builder-loading-line h-64 w-full" />
+        </div>
+        <div class="space-y-3">
+          <div class="deck-builder-loading-line h-6 w-32" />
+          <div class="deck-builder-loading-line h-24 w-full" />
+        </div>
+      </div>
+    </AppPageLayout>
+
+    <AppPageLayout
+      v-if="!controller.loading.value && controller.editorMode.value === 'hero'"
+      columns="three"
+      root-class="deck-builder-layout"
+      main-class="deck-builder-main-column"
+    >
+      <template #aside>
+        <DeckBuilderFiltersPanel :controller="controller" />
+      </template>
+      <div class="deck-builder-gallery-column flex min-w-0 flex-col">
+        <div class="deck-builder-gallery-scroll app-scrollbar min-h-0 flex-1">
+          <DeckBuilderGallery :controller="controller" />
+        </div>
+      </div>
+      <template #endAside>
+        <DeckHeroSelectionPanel :controller="controller" />
+      </template>
+    </AppPageLayout>
+
+    <AppPageLayout
+      v-if="!controller.loading.value && controller.editorMode.value === 'details'"
+      columns="sidebar"
+    >
+      <template #aside>
+        <DeckDetailsHeroPanel :controller="controller" />
+      </template>
+      <DeckDetailsForm :controller="controller" />
+    </AppPageLayout>
+
+    <AppPageLayout
+      v-if="controller.editorMode.value === 'cards'"
+      columns="three"
+      root-class="deck-builder-layout"
+      main-class="deck-builder-main-column"
+    >
+      <template #aside>
+        <aside
+          v-if="controller.loading.value"
+          class="app-sticky-aside app-sticky-aside-left deck-builder-loading-panel"
+        >
           <div class="app-sticky-aside-scroll space-y-6">
             <div class="space-y-3">
               <div class="deck-builder-loading-line h-4 w-28" />
@@ -48,67 +139,32 @@
             </div>
           </div>
         </aside>
+        <DeckBuilderFiltersPanel
+          v-else
+          :controller="controller"
+        />
       </template>
-
-      <div class="flex min-w-0 flex-col gap-4">
+      <div class="deck-builder-gallery-column flex min-w-0 flex-col gap-4">
         <section
-          class="deck-builder-status-bar mx-px flex flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
+          v-if="controller.loading.value"
+          class="deck-builder-status-bar mx-px flex shrink-0 items-center justify-between gap-4 px-4 py-3"
           aria-hidden="true"
         >
           <div class="flex items-center gap-3">
             <div class="deck-builder-loading-line h-4 w-4 rounded-full" />
             <div class="deck-builder-loading-line h-4 w-32" />
-            <div class="deck-builder-loading-line h-4 w-24" />
           </div>
-          <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div class="flex flex-wrap items-center justify-end gap-4">
             <div
               v-for="index in 5"
               :key="`loading-stat-${index}`"
-              class="deck-builder-loading-line h-5 w-20"
+              class="deck-builder-loading-line h-5 w-16"
             />
           </div>
         </section>
-
-        <DeckBuilderGallery :controller="controller" />
-      </div>
-
-      <template #endAside>
-        <aside class="app-sticky-aside app-sticky-aside-right deck-builder-loading-panel">
-          <div class="app-sticky-aside-scroll space-y-5">
-            <div class="space-y-3">
-              <div class="deck-builder-loading-line h-4 w-36" />
-              <div class="deck-builder-loading-line h-8 w-full" />
-            </div>
-            <div
-              v-for="sectionIndex in 3"
-              :key="`loading-board-${sectionIndex}`"
-              class="space-y-2"
-            >
-              <div class="deck-builder-loading-line h-4 w-24" />
-              <div
-                v-for="rowIndex in 4"
-                :key="`loading-board-${sectionIndex}-${rowIndex}`"
-                class="deck-builder-loading-line h-11 w-full"
-              />
-            </div>
-          </div>
-        </aside>
-      </template>
-    </AppPageLayout>
-
-    <AppPageLayout
-      v-else
-      columns="three"
-      root-class="deck-builder-layout"
-      main-class="deck-builder-main-column"
-    >
-      <template #aside>
-        <DeckBuilderFiltersPanel :controller="controller" />
-      </template>
-      <div class="flex min-w-0 flex-col gap-4">
         <section
-          v-if="!controller.deck.isSetupStep.value"
-          class="deck-builder-status-bar mx-px flex flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
+          v-else
+          class="deck-builder-status-bar mx-px flex shrink-0 flex-col gap-4 px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
           aria-label="Deck builder status"
         >
           <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -315,10 +371,41 @@
           </div>
         </section>
 
-        <DeckBuilderGallery :controller="controller" />
+        <div class="deck-builder-gallery-scroll app-scrollbar min-h-0 flex-1">
+          <DeckBuilderGallery
+            :controller="controller"
+            :loading="controller.loading.value"
+          />
+        </div>
       </div>
       <template #endAside>
-        <DeckBuilderSummaryPanel :controller="controller" />
+        <aside
+          v-if="controller.loading.value"
+          class="app-sticky-aside app-sticky-aside-right deck-builder-loading-panel"
+        >
+          <div class="app-sticky-aside-scroll space-y-5">
+            <div class="space-y-3">
+              <div class="deck-builder-loading-line h-4 w-36" />
+              <div class="deck-builder-loading-line h-8 w-full" />
+            </div>
+            <div
+              v-for="sectionIndex in 3"
+              :key="`loading-board-${sectionIndex}`"
+              class="space-y-2"
+            >
+              <div class="deck-builder-loading-line h-4 w-24" />
+              <div
+                v-for="rowIndex in 4"
+                :key="`loading-board-${sectionIndex}-${rowIndex}`"
+                class="deck-builder-loading-line h-11 w-full"
+              />
+            </div>
+          </div>
+        </aside>
+        <DeckBuilderSummaryPanel
+          v-else
+          :controller="controller"
+        />
       </template>
     </AppPageLayout>
 
@@ -341,9 +428,10 @@ import {
   CircleX,
   Cloud,
   CloudUpload,
+  FileText,
   Hammer,
+  LayoutGrid,
   LoaderCircle,
-  Plus,
   Save,
   TriangleAlert,
 } from 'lucide-vue-next';
@@ -355,6 +443,9 @@ import ConfirmModal from '@/components/modals/ConfirmModal.vue';
 import DeckBuilderFiltersPanel from '@/modules/decks/components/DeckBuilderFiltersPanel.vue';
 import DeckBuilderGallery from '@/modules/decks/components/DeckBuilderGallery.vue';
 import DeckBuilderSummaryPanel from '@/modules/decks/components/DeckBuilderSummaryPanel.vue';
+import DeckDetailsForm from '@/modules/decks/components/DeckDetailsForm.vue';
+import DeckDetailsHeroPanel from '@/modules/decks/components/DeckDetailsHeroPanel.vue';
+import DeckHeroSelectionPanel from '@/modules/decks/components/DeckHeroSelectionPanel.vue';
 import { useDeckEditor } from '@/modules/decks/composables/useDeckEditor';
 import { useFloatingPopover } from '@/composables/useFloatingPopover';
 
@@ -385,15 +476,15 @@ const deckSaveActionIcon = computed(() => {
   if (controller.manualSaving.value) {
     return LoaderCircle;
   }
-  return controller.deckId.value ? Save : Plus;
+  return Save;
 });
 const deckSaveActionLabel = computed(() => {
   if (controller.manualSaving.value) {
     return 'Saving deck';
   }
-  return controller.deckId.value ? 'Save deck' : 'Create deck';
+  return 'Save deck';
 });
-const deckSaveActionShortLabel = computed(() => (controller.deckId.value ? 'Save' : 'Create'));
+const deckSaveActionShortLabel = 'Save';
 const deckChangeStatusIcon = computed(() => {
   if (controller.saving.value) {
     return LoaderCircle;
@@ -403,11 +494,17 @@ const deckChangeStatusIcon = computed(() => {
   }
   return Cloud;
 });
-const deckEditorSubtitle = computed(() =>
-  controller.deck.isSetupStep.value
-    ? 'Select a hero and enter the deck details to continue.'
-    : `Build a mainboard with at least ${mainboardMinCards.value} cards, including ${manaMinCards.value} Mana cards.`,
-);
+const deckEditorSubtitle = computed(() => {
+  if (controller.editorMode.value === 'hero') {
+    return controller.isChangingHero.value
+      ? 'Choose a replacement hero, then apply or cancel the change.'
+      : 'Select a hero and name your deck to continue.';
+  }
+  if (controller.editorMode.value === 'details') {
+    return 'Edit the information people use to understand and discover this deck.';
+  }
+  return `Build a mainboard with at least ${mainboardMinCards.value} cards, including ${manaMinCards.value} Mana cards.`;
+});
 </script>
 
 <style scoped>
@@ -421,6 +518,31 @@ const deckEditorSubtitle = computed(() =>
   padding-top: 0;
   padding-right: 0;
   padding-left: 0;
+}
+
+@media (min-width: 1280px) {
+  :deep(.deck-builder-layout) {
+    height: calc(100dvh - var(--app-page-header-height, 0px));
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :deep(.deck-builder-main-column) {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .deck-builder-gallery-column {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .deck-builder-gallery-scroll {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 .deck-builder-status-bar {

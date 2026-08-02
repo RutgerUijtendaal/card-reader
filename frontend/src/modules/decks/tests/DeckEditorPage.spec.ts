@@ -11,6 +11,8 @@ const { controller } = vi.hoisted(() => {
       deckId: refValue('deck-1'),
       backLink: refValue('/my/decks'),
       backLabel: refValue('Back to My Decks'),
+      editorMode: refValue<'hero' | 'details' | 'cards'>('cards'),
+      isChangingHero: refValue(false),
       saving: refValue(false),
       manualSaving: refValue(false),
       loading: refValue(false),
@@ -24,10 +26,11 @@ const { controller } = vi.hoisted(() => {
         mana_type_count: { min: 10 },
       }),
       saveDeck: vi.fn(),
+      openDetails: vi.fn(),
+      openCards: vi.fn(),
       confirmDiscardChanges: vi.fn(),
       cancelDiscardChanges: vi.fn(),
       deck: {
-        isSetupStep: refValue(false),
         overallTotalCards: refValue(42),
         totalMainboardCards: refValue(40),
         totalMainboardManaTypeCards: refValue(12),
@@ -119,8 +122,14 @@ vi.mock('@/modules/decks/components/DeckBuilderFiltersPanel.vue', () => ({
 
 vi.mock('@/modules/decks/components/DeckBuilderGallery.vue', () => ({
   default: defineComponent({
-    setup() {
-      return () => h('section', { 'data-testid': 'builder-gallery' }, 'Gallery');
+    props: {
+      loading: { type: Boolean, default: false },
+    },
+    setup(props) {
+      return () => h('section', {
+        'data-testid': 'builder-gallery',
+        'data-loading': String(props.loading),
+      }, 'Gallery');
     },
   }),
 }));
@@ -129,6 +138,30 @@ vi.mock('@/modules/decks/components/DeckBuilderSummaryPanel.vue', () => ({
   default: defineComponent({
     setup() {
       return () => h('aside', 'Summary');
+    },
+  }),
+}));
+
+vi.mock('@/modules/decks/components/DeckHeroSelectionPanel.vue', () => ({
+  default: defineComponent({
+    setup() {
+      return () => h('aside', { 'data-testid': 'hero-selection-panel' }, 'Hero selection');
+    },
+  }),
+}));
+
+vi.mock('@/modules/decks/components/DeckDetailsHeroPanel.vue', () => ({
+  default: defineComponent({
+    setup() {
+      return () => h('aside', { 'data-testid': 'details-hero-panel' }, 'Deck hero');
+    },
+  }),
+}));
+
+vi.mock('@/modules/decks/components/DeckDetailsForm.vue', () => ({
+  default: defineComponent({
+    setup() {
+      return () => h('section', { 'data-testid': 'details-form' }, 'Deck details form');
     },
   }),
 }));
@@ -151,7 +184,9 @@ const mountPage = async () => {
 
 describe('DeckEditorPage', () => {
   afterEach(() => {
-    controller.deck.isSetupStep.value = false;
+    controller.deckId.value = 'deck-1';
+    controller.editorMode.value = 'cards';
+    controller.isChangingHero.value = false;
     controller.loading.value = false;
     controller.saving.value = false;
     controller.manualSaving.value = false;
@@ -184,32 +219,101 @@ describe('DeckEditorPage', () => {
     expect(statusBar?.textContent).toContain('42');
     expect(statusBar?.textContent).toContain('Ready');
     expect(autosyncCheckbox?.disabled).toBe(false);
+    expect(gallery.parentElement?.classList.contains('deck-builder-gallery-scroll')).toBe(true);
+    expect(gallery.parentElement?.classList.contains('app-scrollbar')).toBe(true);
 
     mounted.unmount();
   });
 
-  test('keeps the builder status bar hidden during setup', async () => {
-    controller.deck.isSetupStep.value = true;
+  test('renders hero browsing without the cards status or board sidebar', async () => {
+    controller.deckId.value = '';
+    controller.editorMode.value = 'hero';
 
     const mounted = await mountPage();
 
     expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).toBeNull();
-    expect(mounted.container.querySelector('[data-testid="builder-layout"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).not.toBeNull();
+    expect(
+      mounted.container
+        .querySelector('[data-testid="builder-gallery"]')
+        ?.parentElement?.classList.contains('deck-builder-gallery-scroll'),
+    ).toBe(true);
+    expect(mounted.container.querySelector('[data-testid="hero-selection-panel"]')).not.toBeNull();
+    expect(mounted.container.textContent).toContain('Filters');
+    expect(mounted.container.textContent).not.toContain('Summary');
+
+    mounted.unmount();
+    controller.deckId.value = 'deck-1';
+  });
+
+  test('renders the wide details layout without a gallery or board sidebar', async () => {
+    controller.editorMode.value = 'details';
+
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[data-testid="details-hero-panel"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="details-form"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).toBeNull();
+    expect(mounted.container.textContent).not.toContain('Filters');
+    expect(mounted.container.textContent).not.toContain('Summary');
 
     mounted.unmount();
   });
 
-  test('renders a builder-shaped loading state while the deck loads', async () => {
+  test('renders a details-shaped loading state while the deck loads', async () => {
+    controller.editorMode.value = 'details';
     controller.loading.value = true;
 
     const mounted = await mountPage();
 
     expect(mounted.container.querySelector('[data-testid="builder-layout"]')).not.toBeNull();
-    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(2);
-    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).not.toBeNull();
+    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(1);
+    expect(mounted.container.querySelector('[data-testid="builder-gallery"]')).toBeNull();
     expect(mounted.container.textContent).not.toContain('Loading deck...');
     expect(mounted.container.textContent).not.toContain('Filters');
     expect(mounted.container.textContent).not.toContain('Summary');
+
+    mounted.unmount();
+  });
+
+  test('keeps the shared gallery mounted in its loading state while Cards initializes', async () => {
+    controller.editorMode.value = 'cards';
+    controller.loading.value = true;
+
+    const mounted = await mountPage();
+    const gallery = mounted.container.querySelector('[data-testid="builder-gallery"]');
+
+    expect(mounted.container.querySelectorAll('.deck-builder-loading-panel')).toHaveLength(2);
+    expect(gallery?.getAttribute('data-loading')).toBe('true');
+    expect(mounted.container.querySelector('.deck-builder-gallery-scroll')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Deck builder status"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="details-form"]')).toBeNull();
+
+    mounted.unmount();
+  });
+
+  test('switches between Details and Cards from persistent header tabs', async () => {
+    controller.editorMode.value = 'details';
+    const mounted = await mountPage();
+    const detailsTab = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck details"]');
+    const cardsTab = mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck cards"]');
+
+    expect(detailsTab?.getAttribute('aria-pressed')).toBe('true');
+    expect(cardsTab?.getAttribute('aria-pressed')).toBe('false');
+    cardsTab?.click();
+    await nextTick();
+
+    expect(controller.openCards).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  test('hides section tabs during explicit hero replacement', async () => {
+    controller.editorMode.value = 'hero';
+    controller.isChangingHero.value = true;
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('button[aria-label="Open deck details"]')).toBeNull();
+    expect(mounted.container.querySelector('button[aria-label="Open deck cards"]')).toBeNull();
 
     mounted.unmount();
   });

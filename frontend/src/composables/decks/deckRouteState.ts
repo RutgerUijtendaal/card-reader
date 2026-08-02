@@ -1,4 +1,4 @@
-import type { LocationQuery, RouteLocationRaw } from 'vue-router';
+import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from 'vue-router';
 import { buildGalleryLocation } from '@/composables/card-gallery/galleryNavigation';
 import { addReturnToQuery, clearLocationQueryKeys, queryString } from '@/router/routeState';
 
@@ -10,6 +10,7 @@ const CARD_RETURN_TO = 'card';
 const DECK_RETURN_TO_QUERY_KEY = 'return_to';
 const DECK_ID_QUERY_KEY = 'deck_id';
 const CARD_ID_QUERY_KEY = 'card_id';
+const DECK_EDITOR_MODE_QUERY_KEY = 'editor_mode';
 const isGalleryContextPath = (path: string): boolean =>
   path === '/cards' || path.startsWith('/cards/') || path.startsWith('/card-groups/');
 
@@ -68,21 +69,32 @@ export const buildDeckEditorLocation = (
   query: LocationQuery,
 ): RouteLocationRaw => ({
   path: `/my/decks/${deckId}/edit`,
-  query,
+  query: withDeckEditorMode(query, 'details'),
+});
+
+export const getRequestedDeckEditorMode = (query: LocationQuery): 'details' | 'cards' =>
+  queryString(query[DECK_EDITOR_MODE_QUERY_KEY]) === 'cards' ? 'cards' : 'details';
+
+export const withDeckEditorMode = (
+  query: LocationQuery,
+  mode: 'details' | 'cards',
+): LocationQueryRaw => ({
+  ...query,
+  [DECK_EDITOR_MODE_QUERY_KEY]: mode,
 });
 
 export const buildMyDeckEditorLocation = (deckId: string): RouteLocationRaw => ({
   path: `/my/decks/${deckId}/edit`,
-  query: {
+  query: withDeckEditorMode({
     return_to: MY_DECKS_RETURN_TO,
-  },
+  }, 'cards'),
 });
 
 export const buildPublicDeckEditorLocation = (deckId: string): RouteLocationRaw => ({
   path: `/my/decks/${deckId}/edit`,
-  query: {
+  query: withDeckEditorMode({
     return_to: DECKS_RETURN_TO,
-  },
+  }, 'cards'),
 });
 
 export const buildNewDeckEditorLocation = (
@@ -119,17 +131,22 @@ export const buildContextualNewDeckEditorLocation = (
 
 export const buildDeckDetailEditorLocation = (deckId: string): RouteLocationRaw => ({
   path: `/my/decks/${deckId}/edit`,
-  query: {
+  query: withDeckEditorMode({
     return_to: DECK_RETURN_TO,
     deck_id: deckId,
-  },
+  }, 'cards'),
 });
 
 export const buildDeckEditorReturnLocation = (query: LocationQuery): RouteLocationRaw => {
   const returnTo = queryString(query[DECK_RETURN_TO_QUERY_KEY]);
   const deckId = queryString(query[DECK_ID_QUERY_KEY]);
   const cardId = queryString(query[CARD_ID_QUERY_KEY]);
-  const clearedQuery = clearLocationQueryKeys(query, [DECK_RETURN_TO_QUERY_KEY, DECK_ID_QUERY_KEY, CARD_ID_QUERY_KEY]);
+  const clearedQuery = clearLocationQueryKeys(query, [
+    DECK_RETURN_TO_QUERY_KEY,
+    DECK_ID_QUERY_KEY,
+    CARD_ID_QUERY_KEY,
+    DECK_EDITOR_MODE_QUERY_KEY,
+  ]);
 
   if (returnTo === DECK_RETURN_TO && deckId) {
     return {

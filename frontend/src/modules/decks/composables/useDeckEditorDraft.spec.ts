@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
-import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
+import { useDeckEditorDraft, type DeckEditorMode } from '@/modules/decks/composables/useDeckEditorDraft';
 import { resolveDeckBuildingRules } from '@/composables/decks/deckConstraints';
-import type { DeckCardSummary } from '@/modules/decks/types';
+import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
 
 const buildCard = (id: string, name: string, manaValue = 1): DeckCardSummary =>
   ({
@@ -41,14 +41,14 @@ const buildLegendaryCard = (id = 'legendary'): DeckCardSummary => ({
 
 describe('useDeckEditorDraft', () => {
   test('builds a payload with named sideboards', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 3),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -66,6 +66,7 @@ describe('useDeckEditorDraft', () => {
     expect(controller.buildPayload()).toEqual({
       name: 'Example',
       description: null,
+      long_description: null,
       visibility: 'private',
       hero_card_id: 'hero',
       tag_ids: ['role-damage', 'type-armor'],
@@ -80,8 +81,47 @@ describe('useDeckEditorDraft', () => {
     });
   });
 
+  test('hydrates and serializes a multiline long description', () => {
+    const editorMode = ref<DeckEditorMode>('cards');
+    const hero = { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' };
+    const cardLookup = ref<Record<string, DeckCardSummary>>({ hero });
+    const controller = useDeckEditorDraft({
+      editorMode,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+    const deck: DeckRecord = {
+      id: 'deck-1',
+      name: 'Example',
+      description: 'Short summary',
+      long_description: 'Opening plan\n\nSideboard notes',
+      visibility: 'private',
+      owner: { id: 'owner-1', username: 'owner' },
+      hero_card: hero,
+      mainboard: { total_cards: 0, unique_cards: 0, entries: [] },
+      sideboards: [],
+      totals: {
+        overall_total_cards: 0,
+        overall_unique_cards: 0,
+        mainboard_total_cards: 0,
+        mainboard_unique_cards: 0,
+      },
+      status: { is_valid: false, label: 'In Progress', issues: [] },
+      created_at: '',
+      updated_at: '',
+    };
+
+    controller.hydrateFromDeck(deck);
+
+    expect(controller.form.long_description).toBe('Opening plan\n\nSideboard notes');
+
+    controller.setDeckLongDescription('  Updated plan\n\nMore notes  ');
+
+    expect(controller.buildPayload().long_description).toBe('Updated plan\n\nMore notes');
+  });
+
   test('reorders mainboard entries and preserves the payload order', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
@@ -89,7 +129,7 @@ describe('useDeckEditorDraft', () => {
       cardC: buildCard('cardC', 'Card C', 4),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -117,7 +157,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('reorders sideboard entries without changing the mainboard', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
@@ -125,7 +165,7 @@ describe('useDeckEditorDraft', () => {
       cardC: buildCard('cardC', 'Card C', 4),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -154,13 +194,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('targets add/remove actions at the active board', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -177,13 +217,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('removes one gallery copy at a time and deletes the final copy', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -202,14 +242,14 @@ describe('useDeckEditorDraft', () => {
   test('keeps a final removed row visible for the board entry animation window', () => {
     vi.useFakeTimers();
     try {
-      const builderStep = ref<BuilderStep>('build');
+      const editorMode = ref<DeckEditorMode>('cards');
       const cardLookup = ref<Record<string, DeckCardSummary>>({
         hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
         cardA: buildCard('cardA', 'Card A', 2),
         cardB: buildCard('cardB', 'Card B', 3),
       });
       const controller = useDeckEditorDraft({
-        builderStep,
+        editorMode,
         cardLookup,
         rememberCards: () => undefined,
       });
@@ -239,13 +279,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('does not remove gallery cards during setup mode', () => {
-    const builderStep = ref<BuilderStep>('setup');
+    const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -258,13 +298,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('board row action increments one copy on the active board', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -277,13 +317,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('board row action respects board-specific quantity limits', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -301,14 +341,14 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('legendary cards warn without blocking actions by default', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       legendary,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -326,14 +366,14 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('set quantity allows legendary cards above soft warning limits', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       legendary,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -348,7 +388,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('reports legendary copy limit violations as warning messages by default', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const manaA = { ...buildCard('manaA', 'Mana A', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
     const manaB = { ...buildCard('manaB', 'Mana B', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] };
@@ -362,7 +402,7 @@ describe('useDeckEditorDraft', () => {
       filler: buildCard('filler', 'Filler', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -382,7 +422,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('uses hero override for mainboard copy limits', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
@@ -397,7 +437,7 @@ describe('useDeckEditorDraft', () => {
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -410,7 +450,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('uses self-targeted copy limits only for the owning card', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       selfLimited: {
@@ -424,7 +464,7 @@ describe('useDeckEditorDraft', () => {
       defaultLimited: buildCard('defaultLimited', 'Default Limited Card', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -504,7 +544,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('resolves mainboard count limits with the candidate card before adding', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const capRaiser = {
       ...buildCard('capRaiser', 'Cap Raiser', 2),
       deck_building_config: {
@@ -519,7 +559,7 @@ describe('useDeckEditorDraft', () => {
       capRaiser,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -534,7 +574,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('uses a candidate card lowering a blocking mainboard count limit before adding', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const capLowerer = {
       ...buildCard('capLowerer', 'Cap Lowerer', 2),
       deck_building_config: {
@@ -549,7 +589,7 @@ describe('useDeckEditorDraft', () => {
       capLowerer,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -564,7 +604,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('does not action-block soft mainboard card count limits', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
@@ -580,7 +620,7 @@ describe('useDeckEditorDraft', () => {
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -596,7 +636,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('blocks sideboard copies when mainboard copy limit is scoped to the whole deck', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
@@ -611,7 +651,7 @@ describe('useDeckEditorDraft', () => {
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -627,7 +667,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('applies candidate self copy limits before sideboard adds', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const candidate: DeckCardSummary = {
       ...buildCard('candidate', 'Candidate Card', 2),
       deck_building_config: {
@@ -641,7 +681,7 @@ describe('useDeckEditorDraft', () => {
       candidate,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -655,7 +695,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('uses whole-deck mainboard card count scope for mainboard add gates', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
         ...buildCard('hero', 'Hero Card', 0),
@@ -672,7 +712,7 @@ describe('useDeckEditorDraft', () => {
       candidate: buildCard('candidate', 'Candidate Card', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -689,7 +729,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('reports action-blocking messages when a selected hero lowers an existing copy limit', () => {
-    const builderStep = ref<BuilderStep>('setup');
+    const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       strictHero: {
         ...buildCard('strictHero', 'Strict Hero', 0),
@@ -704,7 +744,7 @@ describe('useDeckEditorDraft', () => {
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -720,12 +760,12 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('does not treat validity-only deck constraints as setup blockers', () => {
-    const builderStep = ref<BuilderStep>('setup');
+    const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -741,10 +781,10 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('does not show a setup issue when no hero is selected', () => {
-    const builderStep = ref<BuilderStep>('setup');
+    const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({});
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -756,12 +796,12 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('does not show a setup issue when deck name is empty', () => {
-    const builderStep = ref<BuilderStep>('setup');
+    const editorMode = ref<DeckEditorMode>('hero');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -773,7 +813,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('uses whole deck scope for hard legendary action limits', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
@@ -789,7 +829,7 @@ describe('useDeckEditorDraft', () => {
       legendary,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -802,7 +842,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('does not apply mainboard-scoped hard legendary action limits to sideboard edits', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
@@ -818,7 +858,7 @@ describe('useDeckEditorDraft', () => {
       legendary,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -832,13 +872,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('board row secondary action removes one copy without removing the entry', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -857,13 +897,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('board row actions target the active sideboard when selected', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -882,13 +922,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('moves one copy from mainboard to sideboard', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -904,7 +944,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('allows moving the only legendary copy between boards', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
@@ -920,7 +960,7 @@ describe('useDeckEditorDraft', () => {
       legendary,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -936,13 +976,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('moves one copy from sideboard to mainboard', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -958,13 +998,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('merges one moved copy into an existing destination row when valid', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -981,13 +1021,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('blocks row moves when destination limits would be exceeded', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -1004,7 +1044,7 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('blocks moving legendary cards into a board when another copy remains elsewhere', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const legendary = buildLegendaryCard();
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: {
@@ -1020,7 +1060,7 @@ describe('useDeckEditorDraft', () => {
       legendary,
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -1038,14 +1078,14 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('blocks row moves into mainboard when deck limits would be exceeded', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       filler: buildCard('filler', 'Filler', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -1068,13 +1108,13 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('returns move destinations for other boards only', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -1097,14 +1137,14 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('tracks mainboard and overall totals separately', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 4),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -1121,14 +1161,14 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('deduplicates overall unique cards across mainboard and sideboards', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       cardA: buildCard('cardA', 'Card A', 2),
       cardB: buildCard('cardB', 'Card B', 4),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -1145,14 +1185,14 @@ describe('useDeckEditorDraft', () => {
   });
 
   test('flags whether mainboard Mana cards reach the free mulligan threshold', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const cardLookup = ref<Record<string, DeckCardSummary>>({
       hero: { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' },
       manaA: { ...buildCard('manaA', 'Mana A', 0), types: [{ id: 'mana', key: 'mana', label: 'Mana' }] },
       spellA: buildCard('spellA', 'Spell A', 2),
     });
     const controller = useDeckEditorDraft({
-      builderStep,
+      editorMode,
       cardLookup,
       rememberCards: () => undefined,
     });
@@ -1171,4 +1211,3 @@ describe('useDeckEditorDraft', () => {
     expect(controller.hasFreeMulliganManaRatio.value).toBe(false);
   });
 });
-

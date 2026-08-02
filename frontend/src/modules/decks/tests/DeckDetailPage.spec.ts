@@ -116,8 +116,8 @@ vi.mock('@/components/cards/GalleryOptionsMenu.vue', () => ({
 
 vi.mock('@/modules/decks/components/DeckManaCurve.vue', () => ({
   default: defineComponent({
-    setup() {
-      return () => h('div', { 'data-testid': 'mana-curve' });
+    setup(_props, { slots }) {
+      return () => h('div', { 'data-testid': 'mana-curve' }, slots['header-actions']?.());
     },
   }),
 }));
@@ -179,6 +179,7 @@ const deckRecord = {
   id: 'deck-1',
   name: 'Grouped Deck',
   description: 'A carefully tuned deck.',
+  long_description: 'Opening plan\n\nSideboard notes',
   visibility: 'public' as const,
   owner: {
     id: 'user-1',
@@ -336,7 +337,7 @@ describe('DeckDetailPage type grouping', () => {
     const viewOptions = mounted.container.querySelector<HTMLElement>('[data-testid="gallery-options-menu"]');
 
     expect(header?.textContent).not.toContain('A carefully tuned deck.');
-    expect(description?.textContent).toContain('Description');
+    expect(description?.textContent).toContain('Summary');
     expect(description?.textContent).toContain('A carefully tuned deck.');
     expect(manaSection?.classList.contains('!mt-auto')).toBe(true);
     expect(description?.compareDocumentPosition(manaSection as Node) ?? 0)
@@ -457,22 +458,41 @@ describe('DeckDetailPage type grouping', () => {
     mounted.unmount();
   });
 
-  test('expands mana details and follows the active board', async () => {
+  test('opens summary and mana details independently and follows the active board', async () => {
     const mounted = await mountPage();
-    const detailsButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.trim() === 'Details',
+    const summaryDetailsButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-testid="deck-summary-details-button"]',
     );
-    if (!(detailsButton instanceof HTMLButtonElement)) {
-      throw new Error('expected mana details button');
+    const manaDetailsButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-testid="deck-mana-details-button"]',
+    );
+    if (!(summaryDetailsButton instanceof HTMLButtonElement) || !(manaDetailsButton instanceof HTMLButtonElement)) {
+      throw new Error('expected summary and mana details buttons');
     }
 
-    expect(detailsButton.getAttribute('aria-expanded')).toBe('false');
+    expect(summaryDetailsButton.getAttribute('aria-expanded')).toBe('false');
+    expect(manaDetailsButton.getAttribute('aria-expanded')).toBe('false');
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).toBeNull();
-    detailsButton.click();
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
+    summaryDetailsButton.click();
     await nextTick();
 
-    expect(detailsButton.getAttribute('aria-expanded')).toBe('true');
+    const longDescription = mounted.container.querySelector<HTMLElement>('[data-testid="deck-long-description"]');
+    expect(summaryDetailsButton.getAttribute('aria-expanded')).toBe('true');
+    expect(manaDetailsButton.getAttribute('aria-expanded')).toBe('false');
     expect(mounted.container.querySelector('.deck-detail-layout-expanded')).not.toBeNull();
+    expect(longDescription?.textContent).toContain('About this deck');
+    expect(longDescription?.textContent).toContain('Opening plan\n\nSideboard notes');
+    expect(longDescription?.querySelector('p')?.classList.contains('whitespace-pre-wrap')).toBe(true);
+    expect(longDescription?.querySelector('p')?.classList.contains('break-words')).toBe(true);
+    expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).toBeNull();
+
+    manaDetailsButton.click();
+    await nextTick();
+
+    expect(summaryDetailsButton.getAttribute('aria-expanded')).toBe('false');
+    expect(manaDetailsButton.getAttribute('aria-expanded')).toBe('true');
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toContain('Spell Card');
 
     const sideboardButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
@@ -485,6 +505,25 @@ describe('DeckDetailPage type grouping', () => {
     await nextTick();
 
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toBe('Attachment Card');
+    mounted.unmount();
+  });
+
+  test('keeps the details pane mana-only when no long description is present', async () => {
+    fetchDeckDetailMock.mockResolvedValueOnce({ ...deckRecord, long_description: null });
+    const mounted = await mountPage();
+    const manaDetailsButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[data-testid="deck-mana-details-button"]',
+    );
+
+    expect(mounted.container.querySelector('[data-testid="deck-summary-details-button"]')).toBeNull();
+
+    manaDetailsButton?.click();
+    await nextTick();
+
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).not.toBeNull();
+    expect(mounted.container.querySelector('.deck-detail-distribution-aside')).not.toBeNull();
+
     mounted.unmount();
   });
 
