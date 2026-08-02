@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import Card, Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility, now_utc
+from card_reader_core.models import (
+    Card,
+    Deck,
+    DeckDifficulty,
+    DeckEntry,
+    DeckSideboard,
+    DeckSideboardEntry,
+    DeckVisibility,
+    now_utc,
+)
 
 
 def create_deck(
@@ -11,6 +20,7 @@ def create_deck(
     name: str,
     description: str | None,
     long_description: str | None,
+    difficulty: DeckDifficulty | None,
     visibility: DeckVisibility,
     hero_card: Card,
 ) -> Deck:
@@ -19,6 +29,7 @@ def create_deck(
         name=name,
         description=description,
         long_description=long_description,
+        difficulty=difficulty,
         visibility=visibility,
         hero_card=hero_card,
     )

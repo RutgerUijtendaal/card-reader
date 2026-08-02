@@ -67,6 +67,7 @@ describe('useDeckEditorDraft', () => {
       name: 'Example',
       description: null,
       long_description: null,
+      difficulty: null,
       visibility: 'private',
       hero_card_id: 'hero',
       tag_ids: ['role-damage', 'type-armor'],
@@ -95,6 +96,7 @@ describe('useDeckEditorDraft', () => {
       name: 'Example',
       description: 'Short summary',
       long_description: 'Opening plan\n\nSideboard notes',
+      difficulty: 'medium',
       visibility: 'private',
       owner: { id: 'owner-1', username: 'owner' },
       hero_card: hero,
@@ -114,10 +116,13 @@ describe('useDeckEditorDraft', () => {
     controller.hydrateFromDeck(deck);
 
     expect(controller.form.long_description).toBe('Opening plan\n\nSideboard notes');
+    expect(controller.form.difficulty).toBe('medium');
 
     controller.setDeckLongDescription('  Updated plan\n\nMore notes  ');
+    controller.setDeckDifficulty('hard');
 
     expect(controller.buildPayload().long_description).toBe('Updated plan\n\nMore notes');
+    expect(controller.buildPayload().difficulty).toBe('hard');
   });
 
   test('reorders mainboard entries and preserves the payload order', () => {

@@ -16,7 +16,14 @@ import {
   type DeckConstraintScope,
 } from '@/composables/decks/deckConstraints';
 import { fallbackDeckBuildingRules } from '@/composables/decks/deckRules';
-import type { DeckCardSummary, DeckMetadataOption, DeckRecord, DeckUpsertRequest, DeckVisibility } from '@/modules/decks/types';
+import type {
+  DeckCardSummary,
+  DeckDifficulty,
+  DeckMetadataOption,
+  DeckRecord,
+  DeckUpsertRequest,
+  DeckVisibility,
+} from '@/modules/decks/types';
 
 export type DeckFormEntry = {
   card_id: string;
@@ -33,6 +40,7 @@ export type DeckForm = {
   name: string;
   description: string;
   long_description: string;
+  difficulty: DeckDifficulty | null;
   visibility: DeckVisibility;
   hero_card_id: string;
   entries: DeckFormEntry[];
@@ -88,6 +96,7 @@ export const useDeckEditorDraft = ({
     name: '',
     description: '',
     long_description: '',
+    difficulty: null,
     visibility: 'private',
     hero_card_id: '',
     entries: [],
@@ -321,6 +330,10 @@ export const useDeckEditorDraft = ({
     form.long_description = value;
   };
 
+  const setDeckDifficulty = (value: DeckDifficulty | null): void => {
+    form.difficulty = value;
+  };
+
   const setDeckVisibility = (value: DeckVisibility): void => {
     form.visibility = value;
   };
@@ -361,6 +374,7 @@ export const useDeckEditorDraft = ({
     form.name = deck.name;
     form.description = deck.description ?? '';
     form.long_description = deck.long_description ?? '';
+    form.difficulty = deck.difficulty;
     form.visibility = deck.visibility;
     form.hero_card_id = deck.hero_card.id;
     form.tag_ids = (deck.tags ?? []).map((tag) => tag.id);
@@ -395,6 +409,7 @@ export const useDeckEditorDraft = ({
     name: form.name.trim(),
     description: form.description.trim() || null,
     long_description: form.long_description.trim() || null,
+    difficulty: form.difficulty,
     visibility: form.visibility,
     hero_card_id: form.hero_card_id,
     entries: form.entries.map((entry) => ({
@@ -912,6 +927,7 @@ export const useDeckEditorDraft = ({
     setDeckName,
     setDeckDescription,
     setDeckLongDescription,
+    setDeckDifficulty,
     setDeckVisibility,
     setDeckTagIds,
     setSuggestedTypeLabels,

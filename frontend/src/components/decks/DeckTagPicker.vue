@@ -1,20 +1,28 @@
 <template>
-  <div class="space-y-2">
-    <div class="flex items-center justify-between gap-3">
-      <p class="theme-section-title text-sm font-semibold">
-        Tags
-      </p>
-      <button
-        ref="triggerRef"
-        type="button"
-        class="theme-icon-button"
-        title="Add deck tags"
-        aria-label="Add deck tags"
-        :aria-expanded="isOpen"
-        @click="toggle"
+  <div class="space-y-3">
+    <div class="space-y-1">
+      <div class="flex items-center justify-between gap-3">
+        <p class="theme-section-title text-sm font-semibold">
+          Tags
+        </p>
+        <button
+          ref="triggerRef"
+          type="button"
+          class="theme-icon-button"
+          title="Add deck tags"
+          aria-label="Add deck tags"
+          :aria-expanded="isOpen"
+          @click="toggle"
+        >
+          <Plus class="h-4 w-4" />
+        </button>
+      </div>
+      <p
+        v-if="description"
+        class="theme-section-muted text-sm"
       >
-        <Plus class="h-4 w-4" />
-      </button>
+        {{ description }}
+      </p>
     </div>
 
     <div
@@ -130,6 +138,7 @@ const props = defineProps<{
   catalog: DeckTagCatalog;
   modelValue: string[];
   suggestedTypeLabels: string[];
+  description?: string;
 }>();
 
 const emit = defineEmits<{

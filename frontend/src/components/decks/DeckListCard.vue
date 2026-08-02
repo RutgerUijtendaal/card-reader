@@ -158,6 +158,17 @@
               />
               <span>Sideboards {{ sideboardCount }}</span>
             </span>
+            <span
+              v-if="difficultyLabel"
+              class="deck-list-card-footer-meta-item"
+              data-testid="deck-difficulty"
+            >
+              <Gauge
+                class="h-4 w-4"
+                aria-hidden="true"
+              />
+              <span>Difficulty · {{ difficultyLabel }}</span>
+            </span>
             <span class="deck-list-card-footer-meta-item">
               <CalendarDays
                 class="h-4 w-4"
@@ -188,7 +199,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { CalendarDays, Copy, Gamepad2, LibraryBig, PanelRight, Share2, TriangleAlert } from 'lucide-vue-next';
+import { CalendarDays, Copy, Gamepad2, Gauge, LibraryBig, PanelRight, Share2, TriangleAlert } from 'lucide-vue-next';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/api/client';
@@ -197,6 +208,7 @@ import ExtraActionsMenu from '@/components/app/ExtraActionsMenu.vue';
 import DeckTagPills from '@/components/decks/DeckTagPills.vue';
 import TtsCopyIcon from '@/components/icons/TtsCopyIcon.vue';
 import { formatDeckOwnerName } from '@/composables/decks/display';
+import { deckDifficultyLabels } from '@/composables/decks/difficulty';
 import { buildDeckShareUrl, canShareDeck } from '@/composables/decks/share';
 import type { DeckListRecord } from '@/modules/decks/types';
 import { useDeckExport } from '@/composables/useDeckExport';
@@ -229,6 +241,9 @@ const ownerDisplayName = computed(() => formatDeckOwnerName(props.deck.owner.use
 const titlePillLabel = computed(() => (isOwnedMode.value ? deckVisibilityLabels[props.deck.visibility] : ownerDisplayName.value));
 const titlePillClass = computed(() => (isOwnedMode.value ? deckVisibilityBadgeClasses[props.deck.visibility] : 'theme-pill-neutral'));
 const deprecatedCardCount = computed(() => props.deck.status.deprecated_card_count ?? 0);
+const difficultyLabel = computed(() => (
+  props.deck.difficulty ? deckDifficultyLabels[props.deck.difficulty] : null
+));
 const cardClass = computed(() => [
   'deck-list-card-surface',
   'page-card',

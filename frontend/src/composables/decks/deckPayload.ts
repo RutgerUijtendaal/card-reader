@@ -4,6 +4,7 @@ export const buildDeckUpsertRequestFromRecord = (deck: DeckRecord): DeckUpsertRe
   name: deck.name.trim(),
   description: deck.description?.trim() || null,
   long_description: deck.long_description?.trim() || null,
+  difficulty: deck.difficulty,
   visibility: deck.visibility,
   hero_card_id: deck.hero_card.id,
   tag_ids: (deck.tags ?? []).map((tag) => tag.id),

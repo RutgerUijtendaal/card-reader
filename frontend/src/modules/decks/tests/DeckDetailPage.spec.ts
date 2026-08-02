@@ -180,6 +180,7 @@ const deckRecord = {
   name: 'Grouped Deck',
   description: 'A carefully tuned deck.',
   long_description: 'Opening plan\n\nSideboard notes',
+  difficulty: 'hard' as const,
   visibility: 'public' as const,
   owner: {
     id: 'user-1',
@@ -327,6 +328,20 @@ describe('DeckDetailPage type grouping', () => {
     expect(owner?.textContent).toContain('By Owner');
 
     mounted.unmount();
+  });
+
+  test('shows difficulty beside deck metadata only when specified', async () => {
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[data-testid="deck-difficulty"]')?.textContent)
+      .toContain('Difficulty · Hard');
+    mounted.unmount();
+
+    fetchDeckDetailMock.mockResolvedValueOnce({ ...deckRecord, difficulty: null });
+    const unspecifiedMounted = await mountPage();
+
+    expect(unspecifiedMounted.container.querySelector('[data-testid="deck-difficulty"]')).toBeNull();
+    unspecifiedMounted.unmount();
   });
 
   test('places the deck description below the hero and anchors mana controls above the footer', async () => {

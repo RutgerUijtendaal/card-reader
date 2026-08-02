@@ -32,6 +32,17 @@ class Deck(TimestampedModel):
     name: models.TextField[str, str] = models.TextField(default="")
     description: models.TextField[str | None, str | None] = models.TextField(default=None, null=True, blank=True)
     long_description: models.TextField[str | None, str | None] = models.TextField(default=None, null=True, blank=True)
+    difficulty: models.CharField[str | None, str | None] = models.CharField(
+        max_length=16,
+        choices=[
+            ("easy", "Easy"),
+            ("medium", "Medium"),
+            ("hard", "Hard"),
+        ],
+        default=None,
+        null=True,
+        blank=True,
+    )
     visibility: models.CharField[str, str] = models.CharField(
         max_length=16,
         choices=[
@@ -55,6 +66,7 @@ class Deck(TimestampedModel):
 
 
 DeckVisibility = Literal["private", "unlisted", "public"]
+DeckDifficulty = Literal["easy", "medium", "hard"]
 
 
 class DeckEntry(TimestampedModel):

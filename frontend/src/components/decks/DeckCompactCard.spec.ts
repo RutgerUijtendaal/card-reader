@@ -11,6 +11,7 @@ const buildDeck = (overrides: Partial<DeckSummaryRecord> = {}): DeckSummaryRecor
   id: 'deck-1',
   name: 'Azure Tempo',
   description: 'Pressure early.',
+  difficulty: null,
   visibility: 'public',
   owner: {
     id: 'user-1',
