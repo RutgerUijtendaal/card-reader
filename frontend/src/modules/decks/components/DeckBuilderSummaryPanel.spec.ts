@@ -226,13 +226,19 @@ const showSideboardActionsTrigger = async (container: HTMLElement): Promise<HTML
     throw new Error('expected sideboard pill');
   }
 
+  const sideboardActionsButton = container.querySelector<HTMLButtonElement>('[aria-label="Open sideboard actions for Flex"]');
+  if (!(sideboardActionsButton instanceof HTMLButtonElement)) {
+    throw new Error('expected reserved sideboard actions button');
+  }
+
+  expect(sideboardActionsButton.classList.contains('invisible')).toBe(true);
+  expect(sideboardActionsButton.tabIndex).toBe(-1);
+
   sideboardPill.parentElement?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
   await nextTick();
 
-  const sideboardActionsButton = container.querySelector<HTMLButtonElement>('[aria-label="Open sideboard actions for Flex"]');
-  if (!(sideboardActionsButton instanceof HTMLButtonElement)) {
-    throw new Error('expected sideboard actions button');
-  }
+  expect(sideboardActionsButton.classList.contains('invisible')).toBe(false);
+  expect(sideboardActionsButton.tabIndex).toBe(0);
 
   return sideboardActionsButton;
 };
@@ -445,7 +451,7 @@ describe('DeckBuilderSummaryPanel', () => {
     mounted.unmount();
   });
 
-  test('shows sideboard actions trigger only for sideboards and opening it does not select the board', async () => {
+  test('reserves sideboard actions space and opening it does not select the board', async () => {
     const mounted = await mountPanel();
     const sideboardActionsButton = await showSideboardActionsTrigger(mounted.container);
 

@@ -280,10 +280,16 @@
               </div>
 
               <button
-                v-if="shouldShowSideboardActions(sideboard.id)"
-                class="theme-card-frame-muted theme-section-title -ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full"
+                class="theme-card-frame-muted theme-section-title -ml-2 inline-flex h-7 w-7 items-center justify-center rounded-full"
+                :class="
+                  shouldShowSideboardActions(sideboard.id)
+                    ? ''
+                    : 'invisible pointer-events-none'
+                "
                 type="button"
                 :aria-label="`Open sideboard actions for ${sideboard.name}`"
+                :aria-hidden="!shouldShowSideboardActions(sideboard.id)"
+                :tabindex="shouldShowSideboardActions(sideboard.id) ? 0 : -1"
                 @click="openSideboardActions($event, sideboard.id)"
               >
                 <Ellipsis class="h-3.5 w-3.5" />
