@@ -194,7 +194,10 @@ import { computed } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
 import SymbolizedText from '@/components/SymbolizedText.vue';
 import { cardIsDeprecated } from '@/composables/card-filters/cardLifecycle';
-import { normalizeHoverPreviewScale } from '@/composables/card-gallery/hoverPreviewScale';
+import {
+  getHoverPreviewCardWidthRem,
+  normalizeHoverPreviewScale,
+} from '@/composables/card-gallery/hoverPreviewScale';
 import type { CardListItem } from '@/modules/card-detail/types';
 
 const props = defineProps<{
@@ -205,7 +208,6 @@ const props = defineProps<{
   hoverPreviewScale?: number;
 }>();
 
-const BASE_HOVER_CARD_WIDTH_REM = 28;
 const BASE_HOVER_TOOLTIP_WIDTH_REM = 64;
 
 const symbolByKey = computed(() =>
@@ -228,7 +230,7 @@ const imageUrl = computed(() => props.imageUrl ?? null);
 const imageAlt = computed(() => props.imageAlt ?? props.card.name ?? 'Card preview');
 const detailsRevealed = computed(() => props.detailsRevealed ?? true);
 const hoverPreviewScale = computed(() => normalizeHoverPreviewScale(props.hoverPreviewScale));
-const hoverCardWidthRem = computed(() => Number((BASE_HOVER_CARD_WIDTH_REM * hoverPreviewScale.value).toFixed(3)));
+const hoverCardWidthRem = computed(() => getHoverPreviewCardWidthRem(hoverPreviewScale.value));
 const hoverTooltipWidthRem = computed(() => Number((BASE_HOVER_TOOLTIP_WIDTH_REM * hoverPreviewScale.value).toFixed(3)));
 const tooltipStyle = computed(() => (imageUrl.value ? { width: `${hoverTooltipWidthRem.value}rem` } : {}));
 const contentStyle = computed(() =>
