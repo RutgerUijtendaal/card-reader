@@ -1688,13 +1688,27 @@ const openingCardActions = (instanceId: string, instance: PlaytestCardInstance):
   return zoneActions;
 };
 
+const openCardDetails = (cardId: string): void => {
+  const href = router.resolve({ path: `/cards/${encodeURIComponent(cardId)}` }).href;
+  window.open(href, '_blank', 'noopener,noreferrer');
+};
+
 const cardActions = (instanceId: string): PlaytestEntityAction[] => {
   const instance = playtest.value?.instances.find((entry) => entry.instanceId === instanceId);
   if (!instance) {
     return [];
   }
+  const showDetailsAction: PlaytestEntityAction = {
+    id: 'show-details',
+    label: 'Show details',
+    dividerBefore: true,
+    run: () => openCardDetails(instance.card.id),
+  };
   if (isOpeningPhase()) {
-    return openingCardActions(instanceId, instance);
+    const actions = openingCardActions(instanceId, instance);
+    return actions.length > 0
+      ? [...actions, showDetailsAction]
+      : [{ ...showDetailsAction, dividerBefore: false }];
   }
   const zoneActions: PlaytestEntityAction[] = [
     { id: 'move-hand', label: 'To Hand', dividerBefore: true, disabled: instance.zoneId === 'hand', run: () => moveCardToZone(instanceId, 'hand') },
@@ -1721,6 +1735,7 @@ const cardActions = (instanceId: string): PlaytestEntityAction[] => {
       run: () => deleteCards([instanceId]),
     },
     ...zoneActions,
+    showDetailsAction,
   ];
 };
 

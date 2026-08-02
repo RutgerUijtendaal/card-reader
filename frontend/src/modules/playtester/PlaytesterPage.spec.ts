@@ -2,6 +2,7 @@
 import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { __resetHoverModePreferencesForTests } from '@/composables/useHoverModePreferences';
 import PlaytesterPage from '@/modules/playtester/PlaytesterPage.vue';
 import {
   createInitialPlaytestState,
@@ -182,6 +183,7 @@ const mountPage = async (): Promise<{ container: HTMLElement; router: ReturnType
       { path: '/playtester/:deckId', component: PlaytesterPage },
       { path: '/playtester', component: PlaytesterPage },
       { path: '/decks/:id', component: { template: '<div />' } },
+      { path: '/cards/:id', component: { template: '<div />' } },
     ],
   });
   await router.push('/playtester/deck-1');
@@ -307,6 +309,7 @@ const rect = (
 describe('PlaytesterPage', () => {
   beforeEach(() => {
     localStorage.clear();
+    __resetHoverModePreferencesForTests();
     authState.authenticated = true;
     fetchMyDeckMock.mockRejectedValue(new Error('not owned'));
     fetchDeckDetailMock.mockResolvedValue(deckRecord);
@@ -848,6 +851,7 @@ describe('PlaytesterPage', () => {
     await flushPage();
 
     const cardMenuText = document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent ?? '';
+    expect(cardMenuText).toContain('Show details');
     expect(cardMenuText).not.toContain('To Hand');
     expect(cardMenuText).toContain('To Discard');
     expect(cardMenuText).toContain('To Banish');
@@ -856,6 +860,47 @@ describe('PlaytesterPage', () => {
     expect(cardMenuText).not.toContain('Copy');
     expect(cardMenuText).not.toContain('Flip');
     expect(cardMenuText).not.toContain('Delete');
+
+    mounted.unmount();
+  });
+
+  test('opens card details in a new tab from the card context menu', async () => {
+    const openWindow = vi.fn();
+    vi.stubGlobal('open', openWindow);
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const handCard = testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]');
+    handCard?.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 40,
+      clientY: 40,
+    }));
+    await flushPage();
+
+    const cardMenu = document.body.querySelector<HTMLElement>('[data-testid="playtest-context-menu"]');
+    const cardMenuActions = [...cardMenu?.querySelectorAll<HTMLButtonElement>('button') ?? []];
+    const showDetailsButton = cardMenuActions
+      .find((button) => button.textContent?.includes('Show details'));
+    expect(cardMenuActions.at(-1)).toBe(showDetailsButton);
+    expect(showDetailsButton?.classList.contains('playtest-context-menu-action-divider')).toBe(true);
+    showDetailsButton?.click();
+    await flushPage();
+
+    expect(openWindow).toHaveBeenCalledWith('/cards/card-1', '_blank', 'noopener,noreferrer');
+    expect(document.body.querySelector('[data-testid="playtest-context-menu"]')).toBeNull();
+
+    const stackContext = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 20,
+      clientY: 20,
+    });
+    testZone(mounted.container, 'playtest-hero-zone').dispatchEvent(stackContext);
+    await flushPage();
+
+    expect(document.body.querySelector('[data-testid="playtest-context-menu"]')?.textContent).not.toContain('Show details');
 
     mounted.unmount();
   });
@@ -1102,10 +1147,10 @@ describe('PlaytesterPage', () => {
     expect(playCard?.className).toContain('playtest-card-middle-zoom');
     const overlay = document.body.querySelector<HTMLElement>('[data-testid="playtest-card-zoom-overlay"]');
     expect(overlay).not.toBeNull();
-    expect(Number.parseFloat(overlay?.style.left ?? '')).toBeCloseTo(476);
-    expect(Number.parseFloat(overlay?.style.top ?? '')).toBeCloseTo(151.2);
-    expect(Number.parseFloat(overlay?.style.width ?? '')).toBeCloseTo(312);
-    expect(Number.parseFloat(overlay?.style.height ?? '')).toBeCloseTo(436.8);
+    expect(Number.parseFloat(overlay?.style.left ?? '')).toBeCloseTo(376.57);
+    expect(Number.parseFloat(overlay?.style.top ?? '')).toBeCloseTo(12);
+    expect(Number.parseFloat(overlay?.style.width ?? '')).toBeCloseTo(411.43);
+    expect(Number.parseFloat(overlay?.style.height ?? '')).toBeCloseTo(576);
 
     playCard?.dispatchEvent(playtestPointerEvent('pointerleave', { button: 1, clientX: 160, clientY: 160 }));
     await flushPage();
@@ -1116,7 +1161,7 @@ describe('PlaytesterPage', () => {
     mounted.unmount();
   });
 
-  test('middle-click zoom uses a readable fixed size for compact rotated hand cards', async () => {
+  test('middle-click zoom uses the global hover preview size for compact rotated hand cards', async () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);
 
@@ -1135,16 +1180,47 @@ describe('PlaytesterPage', () => {
 
     const overlay = document.body.querySelector<HTMLElement>('[data-testid="playtest-card-zoom-overlay"]');
     expect(overlay).not.toBeNull();
-    expect(Number.parseFloat(overlay?.style.left ?? '')).toBeCloseTo(284);
-    expect(Number.parseFloat(overlay?.style.top ?? '')).toBeCloseTo(151.2);
-    expect(Number.parseFloat(overlay?.style.width ?? '')).toBeCloseTo(312);
-    expect(Number.parseFloat(overlay?.style.height ?? '')).toBeCloseTo(436.8);
+    expect(Number.parseFloat(overlay?.style.left ?? '')).toBeCloseTo(234.29);
+    expect(Number.parseFloat(overlay?.style.top ?? '')).toBeCloseTo(12);
+    expect(Number.parseFloat(overlay?.style.width ?? '')).toBeCloseTo(411.43);
+    expect(Number.parseFloat(overlay?.style.height ?? '')).toBeCloseTo(576);
 
     handCard?.dispatchEvent(playtestPointerEvent('pointerleave', { button: 1, clientX: 360, clientY: 540 }));
     await flushPage();
 
     expect(document.body.querySelector('[data-testid="playtest-card-zoom-overlay"]')).toBeNull();
 
+    mounted.unmount();
+  });
+
+  test('keeps middle-click hover size independent from the playtester card scale', async () => {
+    localStorage.setItem('card-reader.hover-preview-scale', '1.2');
+    localStorage.setItem('card-reader.playtester.card-scale', '0.5');
+    const mounted = await mountPage();
+    await keepOpeningHand(mounted.container);
+
+    const surface = mounted.container.querySelector<HTMLElement>('.playtester-table');
+    expect(surface?.getAttribute('style')).toContain('--playtest-card-width: 4.88rem');
+
+    const handCard = testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]');
+    handCard?.click();
+    await flushPage();
+
+    const playCard = nonSetupBoardCards(testZone(mounted.container, 'playtest-board-zone'))[0];
+    vi.stubGlobal('innerWidth', 1600);
+    vi.stubGlobal('innerHeight', 1200);
+    if (playCard) {
+      vi.spyOn(playCard, 'getBoundingClientRect').mockReturnValue(rect(600, 400, 100, 140));
+    }
+    playCard?.dispatchEvent(playtestPointerEvent('pointerdown', { button: 1 }));
+    await flushPage();
+
+    const overlay = document.body.querySelector<HTMLElement>('[data-testid="playtest-card-zoom-overlay"]');
+    expect(Number.parseFloat(overlay?.style.width ?? '')).toBeCloseTo(537.6);
+    expect(Number.parseFloat(overlay?.style.height ?? '')).toBeCloseTo(752.64);
+
+    playCard?.dispatchEvent(playtestPointerEvent('pointerup', { button: 1 }));
+    await flushPage();
     mounted.unmount();
   });
 

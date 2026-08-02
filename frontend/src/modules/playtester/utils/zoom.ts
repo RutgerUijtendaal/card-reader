@@ -1,4 +1,5 @@
-export const MIDDLE_ZOOM_TARGET_WIDTH_REM = 19.5;
+import { getHoverPreviewCardWidthRem } from '@/composables/card-gallery/hoverPreviewScale';
+
 export const MIDDLE_ZOOM_VIEWPORT_MARGIN_PX = 12;
 
 const clampCenterToViewport = (
@@ -18,12 +19,13 @@ const clampCenterToViewport = (
 export const getCardZoomOverlayStyle = (
   element: HTMLElement,
   tapped: boolean,
+  hoverPreviewScale: number,
 ): Record<string, string> => {
   const rect = element.getBoundingClientRect();
   const layoutWidth = element.offsetWidth || rect.width || 1;
   const layoutHeight = element.offsetHeight || rect.height || layoutWidth * (88 / 63);
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-  const targetSourceWidth = MIDDLE_ZOOM_TARGET_WIDTH_REM * rootFontSize;
+  const targetSourceWidth = getHoverPreviewCardWidthRem(hoverPreviewScale) * rootFontSize;
   const targetSourceHeight = targetSourceWidth * (layoutHeight / layoutWidth);
   const viewport = window.visualViewport;
   const viewportLeft = viewport?.offsetLeft ?? 0;

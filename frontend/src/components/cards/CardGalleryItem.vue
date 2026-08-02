@@ -205,7 +205,7 @@ import CardLoadingSkeleton from '@/components/cards/CardLoadingSkeleton.vue';
 import { cardIsDeprecated } from '@/composables/card-filters/cardLifecycle';
 import { buildCardDetailLocation, buildGalleryItemLocation } from '@/composables/card-gallery/galleryNavigation';
 import { DEFAULT_HOVER_MODE, type HoverMode } from '@/composables/card-gallery/hoverMode';
-import { normalizeHoverPreviewScale } from '@/composables/card-gallery/hoverPreviewScale';
+import { getHoverPreviewCardWidthRem } from '@/composables/card-gallery/hoverPreviewScale';
 import { useSharedElementHover } from '@/composables/card-gallery/useSharedElementHover';
 import { useHoverModePreferences } from '@/composables/useHoverModePreferences';
 import type { CardGroupGalleryItem, CardListItem, GalleryItem } from '@/modules/card-detail/types';
@@ -235,7 +235,6 @@ const emit = defineEmits<{
 }>();
 
 const DEFAULT_CARD_ASPECT_RATIO = '63 / 88';
-const BASE_HOVER_CARD_WIDTH_REM = 28;
 const route = useRoute();
 const { hoverPreviewScale } = useHoverModePreferences();
 const hovered = ref(false);
@@ -292,7 +291,7 @@ const floating = useFloating(triggerRef, hoverPanelRef, {
 const hoverPanelX = computed(() => floating.x.value ?? 0);
 const hoverPanelY = computed(() => floating.y.value ?? 0);
 const enlargedPreviewStyle = computed(() => ({
-  width: `${Number((BASE_HOVER_CARD_WIDTH_REM * normalizeHoverPreviewScale(hoverPreviewScale.value)).toFixed(3))}rem`,
+  width: `${getHoverPreviewCardWidthRem(hoverPreviewScale.value)}rem`,
 }));
 const sharedElementHover = useSharedElementHover({
   isOpen: showHoverOverlay,

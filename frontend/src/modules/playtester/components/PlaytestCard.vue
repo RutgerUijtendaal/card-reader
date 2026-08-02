@@ -116,6 +116,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { toAbsoluteApiUrl } from '@/api/client';
+import { useHoverModePreferences } from '@/composables/useHoverModePreferences';
 import type {
   PlaytestCardInstance,
   PlaytestCardSource,
@@ -158,6 +159,7 @@ const middleZoomActive = ref(false);
 const middleZoomStyle = ref<Record<string, string>>({});
 const faceAnimationActive = ref(false);
 const canActivate = computed(() => props.interactive && props.activatable);
+const { hoverPreviewScale } = useHoverModePreferences();
 let faceAnimationTimer: number | null = null;
 
 const endMiddleZoom = (): void => {
@@ -201,7 +203,11 @@ const handlePointerDown = (event: PointerEvent): void => {
     if (!(target instanceof HTMLElement)) {
       return;
     }
-    middleZoomStyle.value = getCardZoomOverlayStyle(target, props.instance.tapped);
+    middleZoomStyle.value = getCardZoomOverlayStyle(
+      target,
+      props.instance.tapped,
+      hoverPreviewScale.value,
+    );
     target.setPointerCapture?.(event.pointerId);
     middleZoomActive.value = true;
     return;
