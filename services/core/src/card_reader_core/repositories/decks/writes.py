@@ -5,11 +5,20 @@ from django.db import transaction
 from card_reader_core.models import Card, Deck, DeckEntry, DeckSideboard, DeckSideboardEntry, DeckVisibility, now_utc
 
 
-def create_deck(*, owner_id: str, name: str, description: str | None, visibility: DeckVisibility, hero_card: Card) -> Deck:
+def create_deck(
+    *,
+    owner_id: str,
+    name: str,
+    description: str | None,
+    long_description: str | None,
+    visibility: DeckVisibility,
+    hero_card: Card,
+) -> Deck:
     return Deck.objects.create(
         owner_id=owner_id,
         name=name,
         description=description,
+        long_description=long_description,
         visibility=visibility,
         hero_card=hero_card,
     )

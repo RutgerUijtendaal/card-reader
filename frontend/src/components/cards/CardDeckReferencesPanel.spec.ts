@@ -26,6 +26,7 @@ const buildDeck = (
   id,
   name,
   description: null,
+  long_description: null,
   visibility: ownerId === 'user-1' ? 'private' : 'public',
   owner: { id: ownerId, username: ownerId === 'user-1' ? 'owner' : 'other' },
   hero_card: {

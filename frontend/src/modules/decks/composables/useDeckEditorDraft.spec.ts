@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
 import { useDeckEditorDraft, type BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
 import { resolveDeckBuildingRules } from '@/composables/decks/deckConstraints';
-import type { DeckCardSummary } from '@/modules/decks/types';
+import type { DeckCardSummary, DeckRecord } from '@/modules/decks/types';
 
 const buildCard = (id: string, name: string, manaValue = 1): DeckCardSummary =>
   ({
@@ -66,6 +66,7 @@ describe('useDeckEditorDraft', () => {
     expect(controller.buildPayload()).toEqual({
       name: 'Example',
       description: null,
+      long_description: null,
       visibility: 'private',
       hero_card_id: 'hero',
       tag_ids: ['role-damage', 'type-armor'],
@@ -78,6 +79,45 @@ describe('useDeckEditorDraft', () => {
         },
       ],
     });
+  });
+
+  test('hydrates and serializes a multiline long description', () => {
+    const builderStep = ref<BuilderStep>('build');
+    const hero = { ...buildCard('hero', 'Hero Card', 0), is_hero: true, type_line: 'Hero' };
+    const cardLookup = ref<Record<string, DeckCardSummary>>({ hero });
+    const controller = useDeckEditorDraft({
+      builderStep,
+      cardLookup,
+      rememberCards: () => undefined,
+    });
+    const deck: DeckRecord = {
+      id: 'deck-1',
+      name: 'Example',
+      description: 'Short summary',
+      long_description: 'Opening plan\n\nSideboard notes',
+      visibility: 'private',
+      owner: { id: 'owner-1', username: 'owner' },
+      hero_card: hero,
+      mainboard: { total_cards: 0, unique_cards: 0, entries: [] },
+      sideboards: [],
+      totals: {
+        overall_total_cards: 0,
+        overall_unique_cards: 0,
+        mainboard_total_cards: 0,
+        mainboard_unique_cards: 0,
+      },
+      status: { is_valid: false, label: 'In Progress', issues: [] },
+      created_at: '',
+      updated_at: '',
+    };
+
+    controller.hydrateFromDeck(deck);
+
+    expect(controller.form.long_description).toBe('Opening plan\n\nSideboard notes');
+
+    controller.setDeckLongDescription('  Updated plan\n\nMore notes  ');
+
+    expect(controller.buildPayload().long_description).toBe('Updated plan\n\nMore notes');
   });
 
   test('reorders mainboard entries and preserves the payload order', () => {
@@ -1171,4 +1211,3 @@ describe('useDeckEditorDraft', () => {
     expect(controller.hasFreeMulliganManaRatio.value).toBe(false);
   });
 });
-

@@ -59,6 +59,7 @@ export type DeckRecord = {
   id: string;
   name: string;
   description: string | null;
+  long_description: string | null;
   visibility: DeckVisibility;
   tags?: DeckTagOption[];
   pending_tag_suggestions?: PendingDeckTagSuggestion[];
@@ -131,6 +132,7 @@ export type DeckEntryInput = {
 export type DeckUpsertRequest = {
   name: string;
   description: string | null;
+  long_description: string | null;
   visibility: DeckVisibility;
   hero_card_id: string;
   entries: DeckEntryInput[];

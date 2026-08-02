@@ -137,6 +137,7 @@ const buildDeckDetail = (id: string, name: string, heroName: string, owner = 'ow
     id,
     name,
     description: null,
+    long_description: null,
     visibility: 'public' as const,
     owner: { id: `${owner}-id`, username: owner },
     hero_card: heroCard,

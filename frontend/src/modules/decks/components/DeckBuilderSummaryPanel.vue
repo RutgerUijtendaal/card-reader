@@ -75,11 +75,24 @@
       </label>
 
       <label class="field-label">
-        Description
+        Summary
         <textarea
           v-model="deckDescription"
-          class="input-base min-h-28"
-          placeholder="Optional description"
+          class="input-base min-h-20 resize-y"
+          placeholder="Optional summary"
+        />
+      </label>
+
+      <label
+        for="deck-long-description-field"
+        class="field-label"
+      >
+        Long description
+        <textarea
+          id="deck-long-description-field"
+          v-model="deckLongDescription"
+          class="input-base min-h-40 resize-y"
+          placeholder="Optional notes, strategy, or other deck information"
         />
       </label>
 
@@ -470,6 +483,11 @@ const deckName = computed({
 const deckDescription = computed({
   get: () => props.controller.deck.form.description,
   set: props.controller.deck.setDeckDescription,
+});
+
+const deckLongDescription = computed({
+  get: () => props.controller.deck.form.long_description,
+  set: props.controller.deck.setDeckLongDescription,
 });
 
 const visibilityOptions = deckVisibilityOptions;

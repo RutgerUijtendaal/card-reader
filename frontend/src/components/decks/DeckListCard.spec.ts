@@ -25,6 +25,7 @@ const buildDeck = (): DeckRecord => ({
   id: 'deck-1',
   name: 'Azure Tempo',
   description: 'Pressure early, then pivot into efficient trades.',
+  long_description: null,
   visibility: 'public',
   owner: {
     id: 'user-1',

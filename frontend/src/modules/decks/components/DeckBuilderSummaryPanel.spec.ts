@@ -139,6 +139,7 @@ const buildController = () => {
       form: {
         name: 'Aurora Tempo',
         description: '',
+        long_description: '',
         visibility: 'private',
         tag_ids: [],
         suggested_type_labels: [],
@@ -188,6 +189,7 @@ const buildController = () => {
       setupMessages: ref<string[]>([]),
       setDeckName: vi.fn(),
       setDeckDescription: vi.fn(),
+      setDeckLongDescription: vi.fn(),
       setDeckVisibility: vi.fn(),
       setDeckTagIds: vi.fn(),
       setSuggestedTypeLabels: vi.fn(),
@@ -197,11 +199,14 @@ const buildController = () => {
   return controller;
 };
 
-const mountPanel = async () => {
+const mountPanel = async (
+  configure?: (controller: ReturnType<typeof buildController>) => void,
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
   const controller = buildController();
+  configure?.(controller);
   const app = createApp(DeckBuilderSummaryPanel, {
     controller,
   });
@@ -332,6 +337,37 @@ describe('DeckBuilderSummaryPanel', () => {
     expect(mounted.container.textContent).toContain('Name *');
     expect(mounted.container.textContent).not.toContain('Deck name is required.');
     expect(continueButton?.disabled).toBe(true);
+
+    mounted.unmount();
+  });
+
+  test('uses a compact Summary textarea and always shows the long description field', async () => {
+    const mounted = await mountPanel((controller) => {
+      controller.deck.isSetupStep.value = true;
+    });
+
+    const summaryTextarea = mounted.container.querySelector<HTMLTextAreaElement>('textarea[placeholder="Optional summary"]');
+    const longDescriptionTextarea = mounted.container.querySelector<HTMLTextAreaElement>('#deck-long-description-field');
+
+    expect(summaryTextarea).not.toBeNull();
+    expect(summaryTextarea?.classList.contains('min-h-20')).toBe(true);
+    expect(longDescriptionTextarea).not.toBeNull();
+    expect(longDescriptionTextarea?.closest('label')?.classList.contains('theme-divider')).toBe(false);
+
+    mounted.unmount();
+  });
+
+  test('shows a populated long description without an expansion control', async () => {
+    const longDescription = 'Opening plan\n\nSideboard notes';
+    const mounted = await mountPanel((controller) => {
+      controller.deck.isSetupStep.value = true;
+      controller.deck.form.long_description = longDescription;
+    });
+    const textarea = mounted.container.querySelector<HTMLTextAreaElement>('#deck-long-description-field');
+
+    expect(textarea?.value).toBe(longDescription);
+    expect(mounted.container.querySelector('[aria-controls="deck-long-description-field"]')).toBeNull();
+    expect(mounted.controller.deck.form.long_description).toBe(longDescription);
 
     mounted.unmount();
   });

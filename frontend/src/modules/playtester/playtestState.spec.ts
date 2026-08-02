@@ -75,6 +75,7 @@ const buildDeck = (): DeckRecord => ({
   id: 'deck-1',
   name: 'Test Deck',
   description: null,
+  long_description: null,
   visibility: 'public',
   owner: { id: 'user-1', username: 'owner' },
   hero_card: { ...buildCard('hero', 'Hero'), is_hero: true },

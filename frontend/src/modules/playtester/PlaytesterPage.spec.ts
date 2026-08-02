@@ -121,6 +121,7 @@ const deckRecord = {
   id: 'deck-1',
   name: 'Playtest Deck',
   description: null,
+  long_description: null,
   visibility: 'public' as const,
   owner: { id: 'user-1', username: 'owner' },
   hero_card: { ...card, id: 'hero', key: 'hero', name: 'Hero', label: 'Hero', is_hero: true },

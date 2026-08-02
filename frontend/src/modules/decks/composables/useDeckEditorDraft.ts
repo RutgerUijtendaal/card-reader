@@ -32,6 +32,7 @@ export type DeckFormSideboard = {
 export type DeckForm = {
   name: string;
   description: string;
+  long_description: string;
   visibility: DeckVisibility;
   hero_card_id: string;
   entries: DeckFormEntry[];
@@ -86,6 +87,7 @@ export const useDeckEditorDraft = ({
   const form = reactive<DeckForm>({
     name: '',
     description: '',
+    long_description: '',
     visibility: 'private',
     hero_card_id: '',
     entries: [],
@@ -313,6 +315,10 @@ export const useDeckEditorDraft = ({
     form.description = value;
   };
 
+  const setDeckLongDescription = (value: string): void => {
+    form.long_description = value;
+  };
+
   const setDeckVisibility = (value: DeckVisibility): void => {
     form.visibility = value;
   };
@@ -352,6 +358,7 @@ export const useDeckEditorDraft = ({
     clearPendingRemovedEntries();
     form.name = deck.name;
     form.description = deck.description ?? '';
+    form.long_description = deck.long_description ?? '';
     form.visibility = deck.visibility;
     form.hero_card_id = deck.hero_card.id;
     form.tag_ids = (deck.tags ?? []).map((tag) => tag.id);
@@ -385,6 +392,7 @@ export const useDeckEditorDraft = ({
   const buildPayload = (): DeckUpsertRequest => ({
     name: form.name.trim(),
     description: form.description.trim() || null,
+    long_description: form.long_description.trim() || null,
     visibility: form.visibility,
     hero_card_id: form.hero_card_id,
     entries: form.entries.map((entry) => ({
@@ -899,6 +907,7 @@ export const useDeckEditorDraft = ({
     deckStatusLabel,
     setDeckName,
     setDeckDescription,
+    setDeckLongDescription,
     setDeckVisibility,
     setDeckTagIds,
     setSuggestedTypeLabels,

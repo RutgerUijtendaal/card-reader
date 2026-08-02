@@ -107,9 +107,27 @@
                 class="theme-divider space-y-2 border-t pt-4"
                 data-testid="deck-description"
               >
-                <h4 class="theme-section-title text-sm font-semibold">
-                  Description
-                </h4>
+                <div class="flex items-center justify-between gap-3">
+                  <h4 class="theme-section-title text-sm font-semibold">
+                    Summary
+                  </h4>
+                  <button
+                    v-if="deck.long_description"
+                    class="deck-detail-header-action theme-section-muted inline-flex items-center gap-1 text-xs font-medium"
+                    type="button"
+                    :aria-expanded="activeDetailPanel === 'summary'"
+                    aria-controls="deck-detail-panel"
+                    data-testid="deck-summary-details-button"
+                    @click="toggleDetailPanel('summary')"
+                  >
+                    <span>Details</span>
+                    <ChevronRight
+                      class="h-3.5 w-3.5 transition-transform duration-200"
+                      :class="activeDetailPanel === 'summary' ? 'rotate-90' : ''"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
                 <p class="theme-section-muted text-sm leading-6">
                   {{ deck.description || 'No description provided.' }}
                 </p>
@@ -123,20 +141,25 @@
               <DeckManaCurve
                 :entries="activeBoardEntries"
                 :empty-label="activeBoardEmptyLabel"
-              />
-              <button
-                class="deck-mana-details-button theme-section-muted flex w-full items-center justify-between gap-3 border-t pt-3 text-sm font-medium"
-                type="button"
-                :aria-expanded="detailsExpanded"
-                aria-controls="deck-mana-distribution-panel"
-                @click="detailsExpanded = !detailsExpanded"
               >
-                <span>Details</span>
-                <ChevronRight
-                  class="h-4 w-4 transition-transform duration-200"
-                  :class="detailsExpanded ? 'rotate-90' : ''"
-                />
-              </button>
+                <template #header-actions>
+                  <button
+                    class="deck-detail-header-action theme-section-muted inline-flex items-center gap-1 text-xs font-medium"
+                    type="button"
+                    :aria-expanded="activeDetailPanel === 'mana'"
+                    aria-controls="deck-detail-panel"
+                    data-testid="deck-mana-details-button"
+                    @click="toggleDetailPanel('mana')"
+                  >
+                    <span>Details</span>
+                    <ChevronRight
+                      class="h-3.5 w-3.5 transition-transform duration-200"
+                      :class="activeDetailPanel === 'mana' ? 'rotate-90' : ''"
+                      aria-hidden="true"
+                    />
+                  </button>
+                </template>
+              </DeckManaCurve>
             </div>
 
             <template #footer>
@@ -168,14 +191,27 @@
             </template>
           </AppStickyAside>
 
-          <Transition name="deck-mana-details">
+          <Transition name="deck-detail-panel">
             <AppStickyAside
               v-if="detailsExpanded"
-              id="deck-mana-distribution-panel"
+              id="deck-detail-panel"
               root-class="deck-detail-distribution-aside"
               scroll-class="space-y-5"
             >
+              <section
+                v-if="activeDetailPanel === 'summary' && deck.long_description"
+                class="space-y-2"
+                data-testid="deck-long-description"
+              >
+                <h3 class="theme-section-title text-base font-semibold">
+                  About this deck
+                </h3>
+                <p class="theme-section-muted whitespace-pre-wrap break-words text-sm leading-6">
+                  {{ deck.long_description }}
+                </p>
+              </section>
               <DeckManaDistribution
+                v-else-if="activeDetailPanel === 'mana'"
                 :entries="activeBoardEntries"
                 :symbols="filterOptions.symbols"
                 :types="filterOptions.types"
@@ -363,7 +399,12 @@ const {
 } = useHoverModeSurface('deckDetail');
 const { exportTtsDeck } = useDeckExport();
 const activeBoardId = ref('mainboard');
-const detailsExpanded = ref(false);
+type DeckDetailPanel = 'summary' | 'mana';
+const activeDetailPanel = ref<DeckDetailPanel | null>(null);
+const detailsExpanded = computed(() => activeDetailPanel.value !== null);
+const toggleDetailPanel = (panel: DeckDetailPanel): void => {
+  activeDetailPanel.value = activeDetailPanel.value === panel ? null : panel;
+};
 const groupByType = useLocalStorage('card-reader.deck-detail-group-by-type', true, {
   writeDefaults: true,
 });
@@ -496,18 +537,17 @@ onMounted(async () => {
   min-width: 0;
 }
 
-.deck-mana-details-button {
+.deck-detail-header-action {
   overflow: clip;
-  border-color: color-mix(in srgb, var(--color-border) 62%, transparent 38%);
   transition: color 180ms ease;
 }
 
-.deck-mana-details-button:hover {
+.deck-detail-header-action:hover {
   color: var(--color-text);
 }
 
-.deck-mana-details-enter-active,
-.deck-mana-details-leave-active {
+.deck-detail-panel-enter-active,
+.deck-detail-panel-leave-active {
   overflow: hidden;
   transition:
     max-height 240ms ease,
@@ -515,15 +555,15 @@ onMounted(async () => {
     transform 240ms ease;
 }
 
-.deck-mana-details-enter-from,
-.deck-mana-details-leave-to {
+.deck-detail-panel-enter-from,
+.deck-detail-panel-leave-to {
   max-height: 0;
   opacity: 0;
   transform: translateY(-0.5rem);
 }
 
-.deck-mana-details-enter-to,
-.deck-mana-details-leave-from {
+.deck-detail-panel-enter-to,
+.deck-detail-panel-leave-from {
   max-height: 100rem;
   opacity: 1;
   transform: translateY(0);
@@ -561,16 +601,16 @@ onMounted(async () => {
     border-left-width: 1px;
   }
 
-  .deck-mana-details-enter-active,
-  .deck-mana-details-leave-active {
+  .deck-detail-panel-enter-active,
+  .deck-detail-panel-leave-active {
     max-height: none;
     transition:
       opacity 180ms ease,
       transform 240ms ease;
   }
 
-  .deck-mana-details-enter-from,
-  .deck-mana-details-leave-to {
+  .deck-detail-panel-enter-from,
+  .deck-detail-panel-leave-to {
     max-height: none;
     transform: translateX(-0.75rem);
   }
@@ -579,10 +619,10 @@ onMounted(async () => {
 @media (prefers-reduced-motion: reduce) {
   :deep(.deck-detail-layout),
   .deck-detail-aside-shell,
-  .deck-mana-details-enter-active,
-  .deck-mana-details-leave-active,
-  .deck-mana-details-button,
-  .deck-mana-details-button :deep(svg) {
+  .deck-detail-panel-enter-active,
+  .deck-detail-panel-leave-active,
+  .deck-detail-header-action,
+  .deck-detail-header-action :deep(svg) {
     transition-duration: 0.01ms !important;
   }
 }

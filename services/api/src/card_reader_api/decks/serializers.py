@@ -77,6 +77,7 @@ def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> di
         "id": deck.id,
         "name": deck.name,
         "description": deck.description,
+        "long_description": deck.long_description,
         "visibility": deck.visibility,
         "owner": {
             "id": str(getattr(deck.owner, "pk", "")),
@@ -312,6 +313,7 @@ class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
 class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
     name = serializers.CharField(required=True, allow_blank=False)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    long_description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     visibility = serializers.ChoiceField(choices=cast(tuple[DeckVisibility, ...], ("private", "unlisted", "public")), required=True)
     hero_card_id = serializers.CharField(required=True)
     entries = MainboardEntryWriteSerializer(many=True, required=True, allow_empty=True)

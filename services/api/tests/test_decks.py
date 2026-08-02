@@ -1181,6 +1181,104 @@ def test_authenticated_owner_can_crud_decks() -> None:
     assert Deck.objects.filter(id=deck_id).count() == 0
 
 
+def test_deck_long_description_round_trips_normalizes_and_stays_out_of_summaries() -> None:
+    username = "deck-long-description-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Long Description Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Long Description Deck",
+            "description": "Concise summary",
+            "long_description": "  Opening plan\r\n\r\nSideboard notes\rFinal note  ",
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+    expected_description = "Opening plan\n\nSideboard notes\nFinal note"
+    assert create_response.json()["long_description"] == expected_description
+    assert Deck.objects.get(id=deck_id).long_description == expected_description
+
+    detail_response = client.get(f"/my/decks/{deck_id}")
+    summary_response = client.get("/my/decks", {"view": "summary"})
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["long_description"] == expected_description
+    assert summary_response.status_code == 200
+    summary = next(row for row in summary_response.json() if row["id"] == deck_id)
+    assert "long_description" not in summary
+
+
+def test_deck_patch_preserves_and_clears_long_description() -> None:
+    username = "deck-long-description-patch-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Long Description Patch Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    create_response = client.post(
+        "/my/decks",
+        data={
+            "name": "Long Description Patch Deck",
+            "long_description": "Keep this\n\nText",
+            "visibility": "private",
+            "hero_card_id": hero.id,
+            "entries": _valid_entries(mainboard_cards),
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert create_response.status_code == 201
+    deck_id = create_response.json()["id"]
+
+    preserve_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"name": "Renamed Deck"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    null_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"long_description": None},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    restore_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"long_description": "Restored"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    blank_response = client.patch(
+        f"/my/decks/{deck_id}",
+        data={"long_description": " \r\n\t "},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert preserve_response.status_code == 200
+    assert preserve_response.json()["long_description"] == "Keep this\n\nText"
+    assert null_response.status_code == 200
+    assert null_response.json()["long_description"] is None
+    assert restore_response.status_code == 200
+    assert restore_response.json()["long_description"] == "Restored"
+    assert blank_response.status_code == 200
+    assert blank_response.json()["long_description"] is None
+    assert Deck.objects.get(id=deck_id).long_description is None
+
+
 def test_owner_deck_list_filters_owned_decks_by_card_name_without_leaking_other_users_decks() -> None:
     owner = _create_user("deck-owner-filter-user", "password")
     other_owner = _create_user("deck-owner-filter-other-user", "password")
