@@ -9,6 +9,12 @@
           v-for="card in displayItems"
           :key="card.id"
           class="justify-self-center"
+          :class="{
+            'rounded-2xl ring-2 ring-[var(--color-accent)] ring-offset-2 ring-offset-[var(--color-surface)]':
+              controller.deck.isHeroStep.value
+              && card.result_type === 'card'
+              && controller.deck.form.hero_card_id === card.id,
+          }"
           :style="{
             width: `${controller.gallery.galleryTileWidthRem.value}rem`,
             maxWidth: '100%',
@@ -17,14 +23,18 @@
           :hover-mode="controller.filters.hoverMode.value"
           :card-height-rem="controller.gallery.cardHeightRem.value"
           activation-mode="emit"
-          activation-label="Add card to deck"
+          :activation-label="
+            card.result_type === 'card'
+              ? controller.deck.galleryActionLabel(card)
+              : 'Card unavailable'
+          "
           :activation-disabled="card.result_type !== 'card' || controller.deck.galleryActionDisabled(card)"
           @activate="handleActivate"
           @contextmenu="handleContextMenu($event, card)"
         >
           <template #overlay>
             <div
-              v-if="!controller.deck.isSetupStep.value && card.result_type === 'card'"
+              v-if="controller.deck.isCardsStep.value && card.result_type === 'card'"
               class="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3"
             >
               <DeckCardCountBadge
@@ -72,7 +82,7 @@
         v-if="controller.gallery.hasLoadedOnce.value && !controller.gallery.isLoadingInitial.value && !controller.gallery.isRefreshing.value && controller.gallery.galleryCards.value.length === 0"
         class="page-card theme-section-muted text-sm"
       >
-        {{ controller.deck.isSetupStep.value ? 'No hero cards found for the current search.' : 'No cards found for the current filters.' }}
+        {{ controller.deck.isHeroStep.value ? 'No hero cards found for the current search.' : 'No cards found for the current filters.' }}
       </div>
     </div>
   </div>
@@ -88,13 +98,18 @@ import DeckCardCountBadge from '@/modules/decks/components/DeckCardCountBadge.vu
 import type { DeckEditorController } from '@/modules/decks/composables/useDeckEditor';
 import { blurAfterFinePointerActivation } from '@/utils/pointerFocus';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   controller: DeckEditorController;
-}>();
+  loading?: boolean;
+}>(), {
+  loading: false,
+});
 
 const sentinelRef = ref<HTMLElement | null>(null);
 const displayItems = computed(() =>
-  (!props.controller.gallery.hasLoadedOnce.value || props.controller.gallery.isRefreshing.value)
+  (props.loading
+    || !props.controller.gallery.hasLoadedOnce.value
+    || props.controller.gallery.isRefreshing.value)
     ? createLoadingShimItems(props.controller.gallery.loadingShimCount.value)
     : props.controller.gallery.galleryCards.value,
 );

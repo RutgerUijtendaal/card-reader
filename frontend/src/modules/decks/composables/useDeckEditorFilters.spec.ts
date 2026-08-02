@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
 import { api } from '@/api/client';
 import { useDeckEditorFilters } from '@/modules/decks/composables/useDeckEditorFilters';
-import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/modules/decks/composables/useDeckEditorDraft';
 import type { CardFiltersResponse } from '@/modules/card-detail/types';
 import type { DeckCardSummary } from '@/modules/decks/types';
 
@@ -99,7 +99,7 @@ describe('useDeckEditorFilters', () => {
   test('appends current deck card ids to gallery search params when enabled', () => {
     const controller = useDeckEditorFilters({
       deckCardIds: ref(['card-b', 'card-a']),
-      builderStep: ref<BuilderStep>('build'),
+      editorMode: ref<DeckEditorMode>('cards'),
     });
 
     controller.updateQuery('mage');
@@ -114,7 +114,7 @@ describe('useDeckEditorFilters', () => {
   test('does not add lifecycle override when current deck only is inactive', () => {
     const controller = useDeckEditorFilters({
       deckCardIds: ref(['card-a']),
-      builderStep: ref<BuilderStep>('build'),
+      editorMode: ref<DeckEditorMode>('cards'),
     });
 
     expect(controller.buildSearchParams().get('lifecycle_status')).toBeNull();
@@ -123,7 +123,7 @@ describe('useDeckEditorFilters', () => {
   test('uses an empty-deck sentinel when current deck only is enabled without cards', () => {
     const controller = useDeckEditorFilters({
       deckCardIds: ref([]),
-      builderStep: ref<BuilderStep>('build'),
+      editorMode: ref<DeckEditorMode>('cards'),
     });
 
     controller.setCurrentDeckOnly(true);
@@ -135,7 +135,7 @@ describe('useDeckEditorFilters', () => {
   test('reset clears the local current deck toggle alongside shared filters', () => {
     const controller = useDeckEditorFilters({
       deckCardIds: ref(['card-a']),
-      builderStep: ref<BuilderStep>('build'),
+      editorMode: ref<DeckEditorMode>('cards'),
     });
 
     controller.updateQuery('ranger');
@@ -148,27 +148,27 @@ describe('useDeckEditorFilters', () => {
   });
 
   test('does not append current deck card ids during setup mode', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const controller = useDeckEditorFilters({
       deckCardIds: ref(['card-a']),
-      builderStep,
+      editorMode,
     });
 
     controller.setCurrentDeckOnly(true);
     expect(controller.buildSearchParams().getAll('card_ids')).toEqual(['card-a']);
     expect(controller.buildSearchParams().get('lifecycle_status')).toBe('all');
 
-    builderStep.value = 'setup';
+    editorMode.value = 'hero';
     expect(controller.buildSearchParams().get('lifecycle_status')).toBeNull();
     expect(controller.buildSearchParams().getAll('card_ids')).toEqual([]);
   });
 
   test('reuses the same current deck card id array when membership is unchanged', () => {
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const deckCardIds = ref(['card-a', 'card-b']);
     const controller = useDeckEditorFilters({
       deckCardIds,
-      builderStep,
+      editorMode,
     });
 
     controller.setCurrentDeckOnly(true);
@@ -183,7 +183,7 @@ describe('useDeckEditorFilters', () => {
     mockedGet.mockResolvedValue({ data: buildFiltersResponse() });
     const controller = useDeckEditorFilters({
       deckCardIds: ref([]),
-      builderStep: ref<BuilderStep>('build'),
+      editorMode: ref<DeckEditorMode>('cards'),
     });
 
     await controller.loadFilters();
@@ -201,15 +201,15 @@ describe('useDeckEditorFilters', () => {
 
   test('ignores hidden mana filters while selecting a hero in setup mode', async () => {
     mockedGet.mockResolvedValue({ data: buildFiltersResponse() });
-    const builderStep = ref<BuilderStep>('build');
+    const editorMode = ref<DeckEditorMode>('cards');
     const controller = useDeckEditorFilters({
       deckCardIds: ref([]),
-      builderStep,
+      editorMode,
     });
 
     await controller.loadFilters();
     controller.applyHeroAffinityManaPreset(buildHero());
-    builderStep.value = 'setup';
+    editorMode.value = 'hero';
 
     const params = controller.buildSearchParams();
     expect(params.getAll('mana_symbol_ids')).toEqual([]);

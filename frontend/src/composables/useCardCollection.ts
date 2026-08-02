@@ -12,6 +12,8 @@ type IdentifiableCard = {
 type UseCardCollectionOptions<TCard extends IdentifiableCard> = {
   buildSearchParams: () => URLSearchParams;
   filtersLoaded: Ref<boolean>;
+  enabled?: Ref<boolean>;
+  resultSetKey?: WatchSource<unknown>;
   pageSize: number | Ref<number>;
   debounceMs?: number;
   watchSource?: WatchSource<unknown> | WatchSource<unknown>[];
@@ -25,6 +27,8 @@ const readPageSize = (value: number | Ref<number>): number =>
 export const useCardCollection = <TCard extends IdentifiableCard>({
   buildSearchParams,
   filtersLoaded,
+  enabled,
+  resultSetKey,
   pageSize,
   debounceMs = 200,
   watchSource,
@@ -43,7 +47,23 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   const totalCount = computed(() => galleryState.value.count);
   const nextPage = computed(() => galleryState.value.nextPage);
 
+  const invalidatePendingLoads = (): void => {
+    latestSearchRequestId += 1;
+    isLoadingInitial.value = false;
+    isRefreshing.value = false;
+    isLoadingPage.value = false;
+  };
+
+  const resetCollection = (): void => {
+    invalidatePendingLoads();
+    galleryState.value = createEmptyGalleryPageState<TCard>();
+    hasLoadedOnce.value = false;
+  };
+
   const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
+    if (enabled && !enabled.value) {
+      return;
+    }
     const requestId = ++latestSearchRequestId;
     const params = buildSearchParams();
     params.set('page', String(page));
@@ -82,7 +102,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   };
 
   const loadNextPage = async (): Promise<void> => {
-    if (isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
+    if ((enabled && !enabled.value) || isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
       return;
     }
     await loadCardsPage(nextPage.value, 'append');
@@ -99,10 +119,35 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     void searchCards();
   }, debounceMs);
 
-  if (watchSource) {
+  if (resultSetKey) {
+    watch(resultSetKey, resetCollection, { flush: 'sync' });
+  }
+
+  if (enabled) {
     watch(
-      watchSource,
+      enabled,
+      (isEnabled) => {
+        if (!isEnabled) {
+          invalidatePendingLoads();
+        }
+      },
+      { flush: 'sync' },
+    );
+  }
+
+  const collectionWatchSource = [
+    ...(Array.isArray(watchSource) ? watchSource : watchSource ? [watchSource] : []),
+    ...(resultSetKey ? [resultSetKey] : []),
+    ...(enabled ? [enabled] : []),
+  ];
+
+  if (collectionWatchSource.length > 0) {
+    watch(
+      collectionWatchSource,
       () => {
+        if (enabled && !enabled.value) {
+          return;
+        }
         debouncedSearchCards();
       },
       { deep: true },

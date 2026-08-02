@@ -3,7 +3,7 @@ import type { CardListItem } from '@/modules/card-detail/types';
 import type { CardFilterSelectionState } from '@/composables/card-filters/cardFilterState';
 import type { CardSort } from '@/composables/card-gallery/cardSort';
 import { useCardCollection } from '@/composables/useCardCollection';
-import type { BuilderStep } from '@/modules/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/modules/decks/composables/useDeckEditorDraft';
 
 type UseDeckEditorGalleryOptions = {
   filtersLoaded: Ref<boolean>;
@@ -11,7 +11,7 @@ type UseDeckEditorGalleryOptions = {
   selectionState: Readonly<Ref<CardFilterSelectionState>>;
   currentDeckOnly: Ref<boolean>;
   currentDeckCardIds: Readonly<Ref<string[]>>;
-  builderStep: Ref<BuilderStep>;
+  editorMode: Ref<DeckEditorMode>;
   sort: Ref<CardSort>;
   cardScale: Ref<number>;
   rememberCards: (cards: CardListItem[]) => void;
@@ -23,28 +23,31 @@ export const useDeckEditorGallery = ({
   selectionState,
   currentDeckOnly,
   currentDeckCardIds,
-  builderStep,
+  editorMode,
   sort,
   cardScale,
   rememberCards,
 }: UseDeckEditorGalleryOptions) => {
-  const isSetupStep = computed(() => builderStep.value === 'setup');
+  const isHeroStep = computed(() => editorMode.value === 'hero');
+  const isGalleryVisible = computed(() => editorMode.value === 'hero' || editorMode.value === 'cards');
   const collection = useCardCollection<CardListItem>({
     buildSearchParams: () => {
       const params = buildSearchParams();
-      params.set('is_hero', isSetupStep.value ? 'true' : 'false');
+      params.set('is_hero', isHeroStep.value ? 'true' : 'false');
       return params;
     },
     filtersLoaded,
-    pageSize: computed(() => (isSetupStep.value ? 24 : 30)),
-    watchSource: [selectionState, currentDeckOnly, currentDeckCardIds, isSetupStep, sort],
+    enabled: isGalleryVisible,
+    resultSetKey: isHeroStep,
+    pageSize: computed(() => (isHeroStep.value ? 24 : 30)),
+    watchSource: [selectionState, currentDeckOnly, currentDeckCardIds, sort],
     onResults: rememberCards,
   });
 
-  const cardHeightRem = computed(() => Number(((isSetupStep.value ? 24 : 21) * cardScale.value).toFixed(2)));
+  const cardHeightRem = computed(() => Number(((isHeroStep.value ? 24 : 21) * cardScale.value).toFixed(2)));
   const cardFrameWidthRem = computed(() => Number(((cardHeightRem.value * 63) / 88).toFixed(2)));
   const galleryTileWidthRem = computed(() => Number((cardFrameWidthRem.value + 1.5).toFixed(2)));
-  const loadingShimCount = computed(() => (isSetupStep.value ? 24 : 30));
+  const loadingShimCount = computed(() => (isHeroStep.value ? 24 : 30));
   const galleryGridStyle = computed(() => ({
     gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(galleryTileWidthRem.value * 16)}px, 1fr))`,
     justifyContent: 'start',

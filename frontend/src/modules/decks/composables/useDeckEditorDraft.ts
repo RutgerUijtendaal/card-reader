@@ -41,7 +41,7 @@ export type DeckForm = {
   suggested_type_labels: string[];
 };
 
-export type BuilderStep = 'setup' | 'build';
+export type DeckEditorMode = 'hero' | 'details' | 'cards';
 export type DeckBoardMoveDestination = {
   boardId: string;
   label: string;
@@ -61,7 +61,7 @@ type PendingRemovedDeckEntry = DeckFormEntry & {
 };
 
 type UseDeckEditorDraftOptions = {
-  builderStep: Ref<BuilderStep>;
+  editorMode: Ref<DeckEditorMode>;
   cardLookup: Ref<Record<string, DeckCardSummary>>;
   deckBuildingRules?: Ref<DeckBuildingRules>;
   rememberCards: (cards: CardListItem[]) => void;
@@ -78,7 +78,7 @@ const buildLocalSideboardId = (): string => {
 };
 
 export const useDeckEditorDraft = ({
-  builderStep,
+  editorMode,
   cardLookup,
   deckBuildingRules: baseDeckBuildingRules,
   rememberCards,
@@ -153,7 +153,9 @@ export const useDeckEditorDraft = ({
     onScopeDispose(clearPendingRemovedEntries);
   }
 
-  const isSetupStep = computed(() => builderStep.value === 'setup');
+  const isHeroStep = computed(() => editorMode.value === 'hero');
+  const isDetailsStep = computed(() => editorMode.value === 'details');
+  const isCardsStep = computed(() => editorMode.value === 'cards');
   const selectedHero = computed(() => (form.hero_card_id ? cardLookup.value[form.hero_card_id] ?? null : null));
   const totalMainboardCards = computed(() => form.entries.reduce((sum, entry) => sum + entry.quantity, 0));
   const totalSideboardCards = computed(() =>
@@ -658,7 +660,7 @@ export const useDeckEditorDraft = ({
   };
 
   const galleryActionLabel = (card: CardListItem): string => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       return form.hero_card_id === card.id ? 'Selected Hero' : 'Use As Hero';
     }
 
@@ -680,7 +682,7 @@ export const useDeckEditorDraft = ({
   };
 
   const galleryActionDisabled = (card: CardListItem): boolean => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       return form.hero_card_id === card.id;
     }
 
@@ -696,14 +698,14 @@ export const useDeckEditorDraft = ({
   };
 
   const galleryRemoveActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       return true;
     }
     return getEntryQuantity(cardId, boardId) <= 0;
   };
 
   const boardRowActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       return true;
     }
 
@@ -718,7 +720,7 @@ export const useDeckEditorDraft = ({
   };
 
   const boardRowSecondaryActionDisabled = (cardId: string, boardId = activeBoardId.value): boolean => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       return true;
     }
     return getEntryQuantity(cardId, boardId) <= 1;
@@ -729,7 +731,7 @@ export const useDeckEditorDraft = ({
     destinationBoardId: string,
     sourceBoardId = activeBoardId.value,
   ): string | null => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       return 'Cards cannot be moved during setup.';
     }
     if (destinationBoardId === sourceBoardId) {
@@ -769,7 +771,7 @@ export const useDeckEditorDraft = ({
   };
 
   const getBoardMoveDestinations = (cardId: string, sourceBoardId = activeBoardId.value): DeckBoardMoveDestination[] => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       return [];
     }
 
@@ -801,7 +803,7 @@ export const useDeckEditorDraft = ({
   };
 
   const handleGalleryAction = (card: CardListItem): void => {
-    if (isSetupStep.value) {
+    if (isHeroStep.value) {
       rememberCards([card]);
       form.hero_card_id = card.id;
       return;
@@ -881,7 +883,9 @@ export const useDeckEditorDraft = ({
 
   return {
     form,
-    isSetupStep,
+    isHeroStep,
+    isDetailsStep,
+    isCardsStep,
     activeBoardId,
     lastBoardEntryChange,
     totalMainboardCards,

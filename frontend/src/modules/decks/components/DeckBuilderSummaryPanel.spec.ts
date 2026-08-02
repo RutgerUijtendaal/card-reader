@@ -84,17 +84,6 @@ vi.mock('@/components/modals/ConfirmModal.vue', () => ({
   }),
 }));
 
-vi.mock('@/components/cards/CardLoadingSkeleton.vue', () => ({
-  default: defineComponent({
-    props: {
-      animated: { type: Boolean, default: true },
-    },
-    setup(props) {
-      return () => h('div', { 'data-testid': 'card-loading-skeleton', 'data-animated': String(props.animated) });
-    },
-  }),
-}));
-
 const buildController = () => {
   const activeBoardId = ref('mainboard');
   const sideboards = ref([
@@ -125,8 +114,6 @@ const buildController = () => {
     filters: {
       hoverMode: ref('details'),
     },
-    setBuilderStep: vi.fn(),
-    lockSetup: vi.fn(),
     loading: ref(false),
     saving: ref(false),
     deckId: ref('deck-1'),
@@ -134,7 +121,6 @@ const buildController = () => {
     backLabel: ref('Back'),
     deckTagCatalog: ref({ roles: [], types: [] }),
     deck: {
-      isSetupStep: ref(false),
       lastBoardEntryChange: ref(null),
       form: {
         name: 'Aurora Tempo',
@@ -268,147 +254,6 @@ describe('DeckBuilderSummaryPanel', () => {
     expect(listSection).not.toBeNull();
     expect(mounted.container.querySelector('[data-testid="mana-curve"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="deck-summary-hero-details"]')).toBeNull();
-
-    mounted.unmount();
-  });
-
-  test('setup mode places selected hero before deck properties without an extra image frame', async () => {
-    const mounted = await mountPanel();
-    mounted.controller.deck.isSetupStep.value = true;
-    await nextTick();
-
-    const text = mounted.container.textContent ?? '';
-    const heroIndex = text.indexOf('Selected Hero');
-    const nameIndex = text.indexOf('Name');
-    const heroImage = mounted.container.querySelector<HTMLImageElement>('img[alt="Aurora Hero"]');
-
-    expect(heroIndex).toBeGreaterThanOrEqual(0);
-    expect(nameIndex).toBeGreaterThanOrEqual(0);
-    expect(heroIndex).toBeLessThan(nameIndex);
-    expect(heroImage).not.toBeNull();
-    expect(heroImage?.className).not.toContain('theme-card-frame');
-    expect(heroImage?.parentElement?.className).toContain('aspect-[63/88]');
-    expect(text).not.toContain('Aurora Hero');
-
-    mounted.unmount();
-  });
-
-  test('setup mode renders a static card placeholder when no hero is selected', async () => {
-    const mounted = await mountPanel();
-    mounted.controller.deck.isSetupStep.value = true;
-    mounted.controller.deck.selectedHero.value = null;
-    await nextTick();
-
-    const placeholder = mounted.container.querySelector('.theme-card-frame');
-    const skeleton = mounted.container.querySelector('[data-testid="card-loading-skeleton"]');
-
-    expect(placeholder).not.toBeNull();
-    expect(placeholder?.className).toContain('aspect-[63/88]');
-    expect(skeleton).not.toBeNull();
-    expect(skeleton?.getAttribute('data-animated')).toBe('false');
-
-    mounted.unmount();
-  });
-
-  test('setup mode shows setup issues below the hero area', async () => {
-    const mounted = await mountPanel();
-    mounted.controller.deck.isSetupStep.value = true;
-    mounted.controller.deck.setupMessages.value = ['Deck name is required.'];
-    await nextTick();
-
-    const text = mounted.container.textContent ?? '';
-    expect(text).not.toContain('A hero card is required.');
-    expect(text.indexOf('Setup Issues')).toBeGreaterThan(text.indexOf('Selected Hero'));
-    expect(text.indexOf('Setup Issues')).toBeLessThan(text.indexOf('Name'));
-
-    mounted.unmount();
-  });
-
-  test('setup mode marks deck name required and disables continue without a name', async () => {
-    const mounted = await mountPanel();
-    mounted.controller.deck.isSetupStep.value = true;
-    mounted.controller.deck.form.name = '';
-    await nextTick();
-
-    const continueButton = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) => button.textContent?.trim() === 'Continue',
-    );
-
-    expect(mounted.container.textContent).toContain('Name *');
-    expect(mounted.container.textContent).not.toContain('Deck name is required.');
-    expect(continueButton?.disabled).toBe(true);
-
-    mounted.unmount();
-  });
-
-  test('uses a compact Summary textarea and always shows the long description field', async () => {
-    const mounted = await mountPanel((controller) => {
-      controller.deck.isSetupStep.value = true;
-    });
-
-    const summaryTextarea = mounted.container.querySelector<HTMLTextAreaElement>('textarea[placeholder="Optional summary"]');
-    const longDescriptionTextarea = mounted.container.querySelector<HTMLTextAreaElement>('#deck-long-description-field');
-
-    expect(summaryTextarea).not.toBeNull();
-    expect(summaryTextarea?.classList.contains('min-h-20')).toBe(true);
-    expect(longDescriptionTextarea).not.toBeNull();
-    expect(longDescriptionTextarea?.closest('label')?.classList.contains('theme-divider')).toBe(false);
-
-    mounted.unmount();
-  });
-
-  test('shows a populated long description without an expansion control', async () => {
-    const longDescription = 'Opening plan\n\nSideboard notes';
-    const mounted = await mountPanel((controller) => {
-      controller.deck.isSetupStep.value = true;
-      controller.deck.form.long_description = longDescription;
-    });
-    const textarea = mounted.container.querySelector<HTMLTextAreaElement>('#deck-long-description-field');
-
-    expect(textarea?.value).toBe(longDescription);
-    expect(mounted.container.querySelector('[aria-controls="deck-long-description-field"]')).toBeNull();
-    expect(mounted.controller.deck.form.long_description).toBe(longDescription);
-
-    mounted.unmount();
-  });
-
-  test('focuses the deck name after selecting a hero during setup', async () => {
-    const mounted = await mountPanel();
-    mounted.controller.deck.isSetupStep.value = true;
-    mounted.controller.deck.selectedHero.value = null;
-    await nextTick();
-
-    mounted.controller.deck.selectedHero.value = {
-      id: 'hero-2',
-      name: 'Borealis Hero',
-      label: 'Hero',
-      image_url: '/hero-2.png',
-    };
-    await nextTick();
-    await nextTick();
-
-    expect(document.activeElement).toBe(
-      mounted.container.querySelector<HTMLInputElement>('input[placeholder="Deck name"]'),
-    );
-
-    mounted.unmount();
-  });
-
-  test('uses enter in the setup deck name field to continue when setup is complete', async () => {
-    const mounted = await mountPanel();
-    mounted.controller.deck.isSetupStep.value = true;
-    mounted.controller.deck.form.name = 'Aurora Tempo';
-    await nextTick();
-
-    const nameInput = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Deck name"]');
-    if (!(nameInput instanceof HTMLInputElement)) {
-      throw new Error('expected deck name input');
-    }
-
-    nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    await nextTick();
-
-    expect(mounted.controller.lockSetup).toHaveBeenCalledTimes(1);
 
     mounted.unmount();
   });
