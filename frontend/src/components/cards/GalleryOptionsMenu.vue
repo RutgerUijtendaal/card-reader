@@ -39,7 +39,10 @@
             @reset="handleHoverModeReset"
           />
 
-          <section class="space-y-2">
+          <section
+            v-if="showDisplayControls"
+            class="space-y-2"
+          >
             <div>
               <p class="theme-section-title text-sm font-semibold">
                 Display
@@ -164,14 +167,15 @@ const props = withDefaults(
     defaultHoverMode?: HoverMode | null;
     hoverModeOverrideActive?: boolean;
     allowHoverModeDefaultOption?: boolean;
-    cardScale: number;
-    showCardGroups: boolean;
+    cardScale?: number;
+    showCardGroups?: boolean;
     groupByType?: boolean;
     pageSize?: number | null;
     pageSizeOptions?: readonly number[];
     showCardGroupsControl?: boolean;
     showGroupByTypeControl?: boolean;
     showPageSizeControl?: boolean;
+    showDisplayControls?: boolean;
   }>(),
   {
     defaultHoverMode: null,
@@ -179,10 +183,13 @@ const props = withDefaults(
     allowHoverModeDefaultOption: false,
     pageSize: null,
     pageSizeOptions: () => [...CARD_PAGE_SIZE_OPTIONS],
+    cardScale: 1,
+    showCardGroups: true,
     showCardGroupsControl: true,
     groupByType: false,
     showGroupByTypeControl: false,
     showPageSizeControl: false,
+    showDisplayControls: true,
   },
 );
 

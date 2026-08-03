@@ -54,6 +54,7 @@ class NotificationListView(APIView):
         page = list_notifications(
             user_id,
             status=serializer.validated_data["status"],
+            event_type=serializer.validated_data.get("event_type"),
             page=serializer.validated_data["page"],
             page_size=serializer.validated_data["page_size"],
         )

@@ -8,7 +8,7 @@ import {
 } from '@/composables/card-gallery/hoverPreviewScale';
 import { GALLERY_OPTIONS_STORAGE_KEY } from '@/composables/useGalleryOptions';
 
-export type HoverModeSurface = 'gallery' | 'deckBuilder' | 'deckDetail';
+export type HoverModeSurface = 'gallery' | 'deckBuilder' | 'deckDetail' | 'notifications';
 
 type HoverModeOverrideState = Record<HoverModeSurface, HoverMode | null>;
 
@@ -28,6 +28,7 @@ const DEFAULT_OVERRIDES: HoverModeOverrideState = {
   gallery: null,
   deckBuilder: null,
   deckDetail: null,
+  notifications: null,
 };
 const HOVER_MODE_OVERRIDES_STORAGE_KEY = 'card-reader.hover-mode-overrides';
 let hoverModePreferencesState: HoverModePreferencesState | null = null;
@@ -37,6 +38,9 @@ const normalizeHoverMode = (value: unknown): HoverMode => (isHoverMode(value) ? 
 export const resolveHoverModeSurfacePath = (path: string): HoverModeSurface | null => {
   if (path === '/cards') {
     return 'gallery';
+  }
+  if (path === '/notifications') {
+    return 'notifications';
   }
   if (path === '/my/decks/new' || /^\/my\/decks\/[^/]+\/edit$/.test(path)) {
     return 'deckBuilder';

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from importlib import import_module
+
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.test import Client
 
+from card_reader_core.config import settings
 from card_reader_core.models import (
     CardVersion,
     ImportJob,
@@ -20,6 +24,10 @@ from card_reader_core.services.cards import (
 )
 from card_reader_core.repositories.notifications import NotificationInput, create_or_coalesce_notification
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
+from card_reader_core.services.notifications import (
+    DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+    NotificationService,
+)
 from card_reader_core.storage import resolve_storage_path
 from test_decks import _create_card
 from test_parse_flags import _create_card_version
@@ -84,14 +92,14 @@ def test_notifications_coalesce_and_mark_all_read() -> None:
     user = _create_user("notification-coalesce", "password")
     data = NotificationInput(
         recipient_id=str(user.pk),
-        event_type="deck.card_changed",
+        event_type="deck.card_version_changed",
         subject_type="deck_card",
         subject_id="deck-1:card-1",
         target_url="/my/decks/deck-1",
         title="Card changed in deck",
         message="First update",
         metadata={"version": 1},
-        dedupe_key="deck.card_changed:deck-1:card-1",
+        dedupe_key="deck.card_version_changed:deck-1:card-1",
     )
     first = create_or_coalesce_notification(data)
     second = create_or_coalesce_notification(
@@ -117,19 +125,49 @@ def test_notifications_coalesce_and_mark_all_read() -> None:
     assert client.get("/notifications/summary").json()["unread_count"] == 0
 
 
+def test_notification_api_filters_by_known_event_type() -> None:
+    _clear_notifications()
+    user = _create_user("notification-event-filter", "password")
+    for event_type in ["parse_flag_item.reviewed", "deck.card_version_changed"]:
+        create_or_coalesce_notification(
+            NotificationInput(
+                recipient_id=str(user.pk),
+                event_type=event_type,
+                subject_type="test",
+                subject_id=event_type,
+                target_url="/notifications",
+                title=event_type,
+                message="Filtered notification",
+                metadata={},
+            )
+        )
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+
+    filtered_response = client.get(
+        "/notifications?event_type=parse_flag_item.reviewed&page=1&page_size=25"
+    )
+    invalid_response = client.get("/notifications?event_type=unknown.event")
+
+    assert filtered_response.status_code == 200
+    assert filtered_response.json()["count"] == 1
+    assert filtered_response.json()["results"][0]["event_type"] == "parse_flag_item.reviewed"
+    assert invalid_response.status_code == 400
+
+
 def test_notification_coalesce_retry_preserves_outer_transaction(monkeypatch) -> None:
     _clear_notifications()
     user = _create_user("notification-race-user", "password")
     data = NotificationInput(
         recipient_id=str(user.pk),
-        event_type="deck.card_changed",
+        event_type="deck.card_version_changed",
         subject_type="deck_card",
         subject_id="deck-1:card-1",
         target_url="/my/decks/deck-1",
         title="Card changed in deck",
         message="First update",
         metadata={"version": 1},
-        dedupe_key="deck.card_changed:race",
+        dedupe_key="deck.card_version_changed:race",
     )
     existing = create_or_coalesce_notification(data)
 
@@ -178,14 +216,14 @@ def test_notification_coalesce_retries_when_found_row_becomes_read(monkeypatch) 
     user = _create_user("notification-stale-dedupe-user", "password")
     data = NotificationInput(
         recipient_id=str(user.pk),
-        event_type="deck.card_changed",
+        event_type="deck.card_version_changed",
         subject_type="deck_card",
         subject_id="deck-1:card-1",
         target_url="/my/decks/deck-1",
         title="Card changed in deck",
         message="First update",
         metadata={"version": 1},
-        dedupe_key="deck.card_changed:stale-row",
+        dedupe_key="deck.card_version_changed:stale-row",
     )
     stale = create_or_coalesce_notification(data)
 
@@ -247,14 +285,14 @@ def test_marking_read_deduped_notification_unread_conflicts_with_active_unread()
     user = _create_user("notification-unread-conflict", "password")
     data = NotificationInput(
         recipient_id=str(user.pk),
-        event_type="deck.card_changed",
+        event_type="deck.card_version_changed",
         subject_type="deck_card",
         subject_id="deck-1:card-1",
         target_url="/my/decks/deck-1",
         title="Card changed in deck",
         message="First update",
         metadata={"version": 1},
-        dedupe_key="deck.card_changed:unread-conflict",
+        dedupe_key="deck.card_version_changed:unread-conflict",
     )
     first = create_or_coalesce_notification(data)
     client = Client(HTTP_HOST="localhost")
@@ -303,6 +341,142 @@ def test_notifications_are_empty_for_unauthenticated_users() -> None:
     assert update_response.status_code == 403
 
 
+def test_notification_event_name_migration_preserves_rows_and_dedupe_keys() -> None:
+    _clear_notifications()
+    user = _create_user("notification-migration", "password")
+    flag_notification = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(user.pk),
+            event_type="parse_flag.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="flag-item-1",
+            target_url="/cards/card-1",
+            title="Flag reviewed",
+            message="Reviewed",
+            metadata={},
+            dedupe_key="parse_flag.reviewed:flag-item-1",
+        )
+    )
+    original_read_at = now_utc()
+    UserNotification.objects.filter(id=flag_notification.id).update(event_count=4, read_at=original_read_at)
+    deck_notification = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(user.pk),
+            event_type="deck.card_changed",
+            subject_type="deck_card",
+            subject_id="deck-1:card-1",
+            target_url="/my/decks/deck-1",
+            title="Card changed",
+            message="Changed",
+            metadata={},
+            dedupe_key="deck.card_changed:deck-1:card-1",
+        )
+    )
+    migration = import_module("card_reader_core.migrations.0043_notification_event_names")
+
+    migration.rename_notification_event_types(apps, None)
+
+    flag_notification.refresh_from_db()
+    deck_notification.refresh_from_db()
+    assert flag_notification.event_type == "parse_flag_item.reviewed"
+    assert flag_notification.dedupe_key == "parse_flag_item.reviewed:flag-item-1"
+    assert flag_notification.event_count == 4
+    assert flag_notification.read_at == original_read_at
+    assert deck_notification.event_type == "deck.card_version_changed"
+    assert deck_notification.dedupe_key == "deck.card_version_changed:deck-1:card-1"
+
+    migration.restore_notification_event_types(apps, None)
+    flag_notification.refresh_from_db()
+    deck_notification.refresh_from_db()
+    assert flag_notification.event_type == "parse_flag.reviewed"
+    assert flag_notification.dedupe_key == "parse_flag.reviewed:flag-item-1"
+    assert deck_notification.event_type == "deck.card_changed"
+    assert deck_notification.dedupe_key == "deck.card_changed:deck-1:card-1"
+
+
+def test_notification_previous_version_migration_backfills_only_safe_rows() -> None:
+    _clear_notifications()
+    user = _create_user("notification-version-migration", "password")
+    card = _create_card(name="Notification Version Migration Card", is_hero=False)
+    previous_version = card.latest_version
+    assert previous_version is not None
+    current_version = CardVersion.objects.create(
+        card=card,
+        version_number=2,
+        template=previous_version.template,
+        image_hash=f"migration-hash-{card.id}",
+        name=card.label,
+        previous_version=previous_version,
+    )
+    notification = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(user.pk),
+            event_type="deck.card_version_changed",
+            subject_type="deck_card",
+            subject_id=f"deck-1:{card.id}",
+            target_url="/my/decks/deck-1",
+            title="Card changed",
+            message="Changed",
+            metadata={
+                "card_id": card.id,
+                "card_version_id": current_version.id,
+            },
+        )
+    )
+    original_read_at = now_utc()
+    UserNotification.objects.filter(id=notification.id).update(
+        event_count=4,
+        read_at=original_read_at,
+    )
+    existing_value = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(user.pk),
+            event_type="deck.card_version_changed",
+            subject_type="deck_card",
+            subject_id=f"deck-2:{card.id}",
+            target_url="/my/decks/deck-2",
+            title="Card changed",
+            message="Changed",
+            metadata={
+                "card_id": card.id,
+                "card_version_id": current_version.id,
+                "previous_card_version_id": "already-recorded",
+            },
+        )
+    )
+    mismatched_card = _create_card(name="Mismatched Notification Card", is_hero=False)
+    mismatched = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(user.pk),
+            event_type="deck.card_version_changed",
+            subject_type="deck_card",
+            subject_id=f"deck-3:{mismatched_card.id}",
+            target_url="/my/decks/deck-3",
+            title="Card changed",
+            message="Changed",
+            metadata={
+                "card_id": mismatched_card.id,
+                "card_version_id": current_version.id,
+            },
+        )
+    )
+    migration = import_module(
+        "card_reader_core.migrations.0044_backfill_notification_previous_versions"
+    )
+
+    migration.backfill_notification_previous_versions(apps, None)
+    migration.backfill_notification_previous_versions(apps, None)
+
+    notification.refresh_from_db()
+    existing_value.refresh_from_db()
+    mismatched.refresh_from_db()
+    assert notification.metadata_json["previous_card_version_id"] == previous_version.id
+    assert notification.event_count == 4
+    assert notification.read_at == original_read_at
+    assert existing_value.metadata_json["previous_card_version_id"] == "already-recorded"
+    assert "previous_card_version_id" not in mismatched.metadata_json
+
+
 def test_parse_flag_review_creates_submitter_notification() -> None:
     _clear_notifications()
     submitter = _create_user("notification-flag-submit", "password")
@@ -312,7 +486,16 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     submit_client.force_login(submitter)
     submit_response = submit_client.post(
         f"/cards/{card.id}/versions/{version.id}/flags",
-        data={"items": [{"property_key": "overall", "note": "Give this card a clearer role."}]},
+        data={
+            "note": "The printed name does not match.",
+            "items": [
+                {
+                    "property_key": "name",
+                    "expected_value": "Corrected Notification Flag Card",
+                    "note": "The first word is difficult to read.",
+                }
+            ],
+        },
         content_type="application/json",
     )
     assert submit_response.status_code == 201
@@ -323,17 +506,61 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
 
     review_response = review_client.patch(
         f"/review/parse-flags/items/{item_id}",
-        data={"status": "resolved"},
+        data={"status": "resolved", "review_note": "Updated from a clearer source image."},
         content_type="application/json",
     )
 
     assert review_response.status_code == 200
     notification = UserNotification.objects.get(recipient_id=str(submitter.pk))
-    assert notification.event_type == "parse_flag.reviewed"
+    assert notification.event_type == "parse_flag_item.reviewed"
     assert notification.actor_id == reviewer.pk
     assert notification.subject_id == item_id
-    assert notification.target_url == f"/cards/{card.id}"
-    assert notification.message == "notification-flag-reviewer resolved your overall suggestion."
+    assert notification.target_url == f"/cards/{card.id}?version_id={version.id}"
+    assert notification.message == "notification-flag-reviewer resolved your name flag."
+    assert notification.metadata_json == {
+        "card_id": card.id,
+        "card_name": version.name,
+        "card_version_id": version.id,
+        "flag_id": flag["id"],
+        "property_key": "name",
+        "property_label": "name flag",
+        "status": "resolved",
+        "submitted_value": "Corrected Notification Flag Card",
+        "submission_note": "The first word is difficult to read.",
+        "reviewer_name": "notification-flag-reviewer",
+        "review_note": "Updated from a clearer source image.",
+    }
+    payload = submit_client.get("/notifications?status=all").json()["results"][0]
+    assert payload["event_type"] == "parse_flag_item.reviewed"
+    assert payload["metadata"] == notification.metadata_json
+
+
+def test_parse_flag_self_review_creates_notification_in_development(monkeypatch) -> None:
+    _clear_notifications()
+    monkeypatch.setattr(settings, "environment", "development")
+
+    reviewer, review_response = _submit_and_resolve_own_flag(
+        username="notification-self-review-dev",
+        card_name="Development Self Review Card",
+    )
+
+    assert review_response.status_code == 200
+    notification = UserNotification.objects.get(recipient_id=str(reviewer.pk))
+    assert notification.actor_id == reviewer.pk
+    assert notification.event_type == "parse_flag_item.reviewed"
+
+
+def test_parse_flag_self_review_stays_silent_in_production(monkeypatch) -> None:
+    _clear_notifications()
+    monkeypatch.setattr(settings, "environment", "production")
+
+    reviewer, review_response = _submit_and_resolve_own_flag(
+        username="notification-self-review-production",
+        card_name="Production Self Review Card",
+    )
+
+    assert review_response.status_code == 200
+    assert not UserNotification.objects.filter(recipient_id=str(reviewer.pk)).exists()
 
 
 def test_card_update_does_not_notify_deck_owner() -> None:
@@ -416,8 +643,58 @@ def test_card_promotion_notifies_sideboard_deck_owner() -> None:
 
     assert promoted is not None
     notification = UserNotification.objects.get(recipient_id=str(owner.pk))
+    assert notification.event_type == "deck.card_version_changed"
     assert notification.subject_id == f"{deck.id}:{card.id}"
-    assert notification.metadata_json["change_label"] == "promoted"
+    assert notification.metadata_json["change_cause"] == "version_promoted"
+    assert notification.metadata_json["card_version_id"] == promoted_version.id
+    assert notification.metadata_json["previous_card_version_id"] == current_version.id
+
+
+def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
+    _clear_notifications()
+    owner = _create_user("notification-hero-owner", "password")
+    actor = _create_user("notification-hero-actor", "password", is_staff=True)
+    hero = _create_card(name="Notification Changed Hero", is_hero=True)
+    hero_version = hero.latest_version
+    assert hero_version is not None
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Notification Hero Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[],
+        sideboards=[],
+    )
+    DeckService().create_owner_deck(
+        owner_id=str(actor.pk),
+        name="Notification Actor Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[],
+        sideboards=[],
+    )
+
+    NotificationService().notify_deck_owners_card_version_changed(
+        card_id=hero.id,
+        card_version_id=hero_version.id,
+        previous_card_version_id=None,
+        cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+        actor_id=str(actor.pk),
+    )
+    NotificationService().notify_deck_owners_card_version_changed(
+        card_id=hero.id,
+        card_version_id=hero_version.id,
+        previous_card_version_id=None,
+        cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+        actor_id=str(actor.pk),
+    )
+
+    notification = UserNotification.objects.get(recipient_id=str(owner.pk))
+    assert notification.subject_id == f"{deck.id}:{hero.id}"
+    assert notification.event_count == 2
+    assert not UserNotification.objects.filter(recipient_id=str(actor.pk)).exists()
 
 
 def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
@@ -549,10 +826,14 @@ def test_import_new_version_notifies_affected_deck_owner() -> None:
 
     assert version.id != current_version.id
     notification = UserNotification.objects.get(recipient_id=str(owner.pk))
+    assert notification.event_type == "deck.card_version_changed"
     assert notification.subject_id == f"{deck.id}:{card.id}"
-    assert notification.message == f"{card.label} was replaced by an import and appears in your deck."
-    assert notification.metadata_json["change_label"] == "replaced by an import"
-    assert notification.metadata_json["source"] == "import"
+    assert notification.message == (
+        f"A newly imported version of {card.label} is now current and appears in your deck."
+    )
+    assert notification.metadata_json["change_cause"] == "import_created"
+    assert notification.metadata_json["card_version_id"] == version.id
+    assert notification.metadata_json["previous_card_version_id"] == current_version.id
     assert notification.metadata_json["import_job_id"] == job.id
     assert notification.metadata_json["import_item_id"] == item.id
 
@@ -568,3 +849,33 @@ def _create_user(username: str, password: str, *, is_staff: bool = False):
 
 def _clear_notifications() -> None:
     UserNotification.objects.all().delete()
+
+
+def _submit_and_resolve_own_flag(*, username: str, card_name: str):
+    reviewer = _create_user(username, "password", is_staff=True)
+    card, version = _create_card_version(name=card_name)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    submit_response = client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={
+            "items": [
+                {
+                    "property_key": "name",
+                    "expected_value": f"Corrected {card_name}",
+                }
+            ]
+        },
+        content_type="application/json",
+    )
+    assert submit_response.status_code == 201
+    flag_id = submit_response.json()["id"]
+    reports = client.get("/review/parse-flags").json()["results"]
+    report = next(row for row in reports if row["id"] == flag_id)
+    item_id = report["items"][0]["id"]
+    review_response = client.patch(
+        f"/review/parse-flags/items/{item_id}",
+        data={"status": "resolved", "review_note": "Self-review test."},
+        content_type="application/json",
+    )
+    return reviewer, review_response

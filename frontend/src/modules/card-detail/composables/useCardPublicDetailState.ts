@@ -17,6 +17,17 @@ import type {
 } from '@/modules/card-detail/types';
 import { isEditableKeyboardTarget } from '@/utils/keyboard';
 
+export const resolvePublicCardVersionId = (
+  availableVersions: ReadonlyArray<Pick<CardVersionDetail, 'version_id' | 'is_latest'>>,
+  requestedVersionId: unknown,
+): string => {
+  const requestedId = typeof requestedVersionId === 'string' ? requestedVersionId : '';
+  return availableVersions.find((version) => version.version_id === requestedId)?.version_id
+    ?? availableVersions.find((version) => version.is_latest)?.version_id
+    ?? availableVersions[0]?.version_id
+    ?? '';
+};
+
 export const useCardPublicDetailState = () => {
   const route = useRoute();
   const router = useRouter();
@@ -57,10 +68,7 @@ export const useCardPublicDetailState = () => {
       symbolByKey.value = Object.fromEntries(
         (filtersResponse.data.symbols ?? []).map((row) => [row.key, row]),
       );
-      selectedVersionId.value =
-        versions.value.find((version) => version.is_latest)?.version_id ??
-        versions.value[0]?.version_id ??
-        '';
+      selectedVersionId.value = resolvePublicCardVersionId(versions.value, route.query.version_id);
     } finally {
       if (requestId === loadRequestId) {
         isLoadingInitial.value = false;
@@ -78,6 +86,14 @@ export const useCardPublicDetailState = () => {
 
   const selectVersion = (versionId: string): void => {
     selectedVersionId.value = versionId;
+    if (route.query.version_id !== versionId) {
+      void router.replace({
+        query: {
+          ...route.query,
+          version_id: versionId,
+        },
+      });
+    }
   };
 
   const formatDate = (value: string): string => {
@@ -106,6 +122,12 @@ export const useCardPublicDetailState = () => {
   });
 
   watch(() => route.params.id, loadCard);
+  watch(
+    () => route.query.version_id,
+    (versionId) => {
+      selectedVersionId.value = resolvePublicCardVersionId(versions.value, versionId);
+    },
+  );
 
   return {
     card,

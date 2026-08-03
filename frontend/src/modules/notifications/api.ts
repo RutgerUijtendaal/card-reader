@@ -2,7 +2,6 @@ import { api } from '@/api/client';
 import type {
   MarkAllNotificationsReadResponse,
   NotificationPage,
-  NotificationStatusFilter,
   NotificationSummary,
   UserNotification,
 } from '@/modules/notifications/types';
@@ -18,14 +17,16 @@ export const fetchNotifications = async (params?: URLSearchParams): Promise<Noti
 };
 
 export const buildNotificationSearchParams = (
-  status: NotificationStatusFilter,
   page: number,
   pageSize: number,
+  eventType?: string | null,
 ): URLSearchParams => {
   const params = new URLSearchParams();
-  params.set('status', status);
   params.set('page', String(page));
   params.set('page_size', String(pageSize));
+  if (eventType) {
+    params.set('event_type', eventType);
+  }
   return params;
 };
 

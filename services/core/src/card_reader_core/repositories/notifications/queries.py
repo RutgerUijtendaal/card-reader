@@ -24,6 +24,7 @@ def list_notifications(
     recipient_id: str,
     *,
     status: NotificationStatusFilter = NOTIFICATION_ALL_STATUS,
+    event_type: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> PaginatedNotifications:
@@ -36,6 +37,8 @@ def list_notifications(
         queryset = queryset.filter(read_at__isnull=True)
     elif status == NOTIFICATION_STATUS_READ:
         queryset = queryset.filter(read_at__isnull=False)
+    if event_type is not None:
+        queryset = queryset.filter(event_type=event_type)
     total_count = queryset.count()
     offset = (normalized_page - 1) * normalized_page_size
     return PaginatedNotifications(

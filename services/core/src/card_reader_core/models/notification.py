@@ -21,8 +21,8 @@ NOTIFICATION_STATUS_FILTERS = (
     NOTIFICATION_STATUS_ALL,
 )
 
-NOTIFICATION_EVENT_PARSE_FLAG_REVIEWED = "parse_flag.reviewed"
-NOTIFICATION_EVENT_DECK_CARD_CHANGED = "deck.card_changed"
+NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED = "parse_flag_item.reviewed"
+NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED = "deck.card_version_changed"
 
 
 class UserNotification(TimestampedModel):

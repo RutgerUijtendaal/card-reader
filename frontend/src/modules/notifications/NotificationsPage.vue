@@ -13,29 +13,29 @@
       root-class="app-page-layout-standard"
     >
       <template #aside>
-        <AppStickyAside>
-          <div class="mb-3 px-1">
+        <AppStickyAside scroll-class="space-y-4">
+          <div class="px-1">
             <h3 class="theme-section-title text-sm font-semibold">
-              Inbox
+              Notification filters
             </h3>
             <p class="theme-section-muted mt-1 text-xs">
-              {{ unreadNotificationCount }} unread notification{{ unreadNotificationCount === 1 ? '' : 's' }}.
+              Show the updates that matter right now. {{ unreadNotificationCount }} new.
             </p>
           </div>
 
           <nav
             class="flex flex-col gap-2"
-            aria-label="Notification views"
+            aria-label="Notification type filters"
           >
             <button
-              v-for="option in statusOptions"
+              v-for="option in typeOptions"
               :key="option.value"
               type="button"
               class="rounded-lg border px-3 py-3 text-left transition"
-              :class="statusFilter === option.value
+              :class="typeFilter === option.value
                 ? 'theme-selected-surface-strong'
                 : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
-              @click="selectStatus(option.value)"
+              @click="selectType(option.value)"
             >
               <div class="flex items-start gap-3">
                 <component
@@ -47,21 +47,29 @@
                     <span class="block truncate text-sm font-semibold">{{ option.label }}</span>
                     <span
                       class="mt-1 block truncate text-xs"
-                      :class="statusFilter === option.value ? 'theme-section-title' : 'theme-section-muted'"
+                      :class="typeFilter === option.value ? 'theme-section-title' : 'theme-section-muted'"
                     >
                       {{ option.description }}
                     </span>
-                  </span>
-                  <span
-                    v-if="option.value === 'unread' && unreadNotificationCount > 0"
-                    class="theme-pill theme-pill-warning shrink-0 px-2 py-0.5 text-[11px] font-semibold"
-                  >
-                    {{ unreadNotificationCount }}
                   </span>
                 </span>
               </div>
             </button>
           </nav>
+
+          <template #footer>
+            <GalleryOptionsMenu
+              :hover-mode="effectiveHoverMode"
+              :default-hover-mode="defaultHoverMode"
+              :hover-mode-override-active="notificationHoverModeOverride !== null"
+              allow-hover-mode-default-option
+              :card-scale="cardScale"
+              :show-card-groups-control="false"
+              @update:hover-mode="setNotificationHoverModeOverride"
+              @reset:hover-mode="clearNotificationHoverModeOverride"
+              @update:card-scale="cardScale = $event"
+            />
+          </template>
         </AppStickyAside>
       </template>
 
@@ -73,21 +81,20 @@
               aria-hidden="true"
             >
               <component
-                :is="activeStatusOption.icon"
+                :is="activeTypeOption.icon"
                 class="h-5 w-5"
               />
             </div>
             <div class="min-w-0">
               <h3 class="theme-section-title text-base font-semibold">
-                {{ activeStatusOption.label }}
+                {{ activeTypeOption.label }}
               </h3>
               <p class="theme-section-muted mt-1 text-sm">
-                {{ activeStatusOption.description }}
+                {{ notifications.length }} loaded · {{ page.count }} total
               </p>
             </div>
           </div>
           <button
-            v-if="statusFilter === 'unread'"
             type="button"
             class="btn-secondary inline-flex shrink-0 items-center gap-2"
             :disabled="unreadNotificationCount === 0 || markingAllRead"
@@ -99,7 +106,7 @@
         </div>
 
         <div
-          v-if="loading"
+          v-if="loadingInitial"
           class="theme-divider"
         >
           <article
@@ -118,7 +125,10 @@
                 <div class="h-3 w-32 animate-pulse rounded bg-[var(--color-surface-muted)]" />
               </div>
 
-              <div class="h-9 w-24 shrink-0 animate-pulse rounded-lg bg-[var(--color-surface-muted)]" />
+              <div class="flex w-full shrink-0 flex-col gap-2 sm:w-32">
+                <div class="h-9 animate-pulse rounded-lg bg-[var(--color-surface-muted)]" />
+                <div class="h-9 animate-pulse rounded-lg bg-[var(--color-surface-muted)]" />
+              </div>
             </div>
           </article>
         </div>
@@ -148,90 +158,43 @@
           v-else
           class="theme-divider"
         >
-          <article
+          <NotificationTimelineEntry
             v-for="notification in notifications"
             :key="notification.id"
-            class="notification-row theme-divider py-4"
-            :class="notification.read_at ? 'notification-row-read' : 'notification-row-unread'"
-          >
-            <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <RouterLink
-                class="min-w-0 flex-1"
-                :to="notification.target_url || '/notifications'"
-                @click="handleNotificationOpen(notification)"
-              >
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <span
-                    v-if="!notification.read_at"
-                    class="notification-unread-dot"
-                    aria-hidden="true"
-                  />
-                  <h3 class="theme-section-title min-w-0 truncate text-sm font-semibold">
-                    {{ notification.title }}
-                  </h3>
-                  <span
-                    v-if="notification.event_count > 1"
-                    class="theme-pill theme-pill-warning px-2 py-0.5 text-[11px] font-semibold"
-                  >
-                    {{ notification.event_count }}
-                  </span>
-                </div>
-                <p class="theme-section-muted mt-1 text-sm">
-                  {{ notification.message }}
-                </p>
-                <p class="theme-section-muted mt-2 text-xs">
-                  {{ formatNotificationDate(notification.last_event_at) }}
-                </p>
-              </RouterLink>
+            :notification="notification"
+            @interact="handleNotificationInteraction"
+          />
+        </div>
 
-              <button
-                type="button"
-                class="btn-secondary shrink-0"
-                :disabled="updatingIds.has(notification.id)"
-                @click="toggleReadState(notification)"
-              >
-                {{ notification.read_at ? 'Mark unread' : 'Mark read' }}
-              </button>
-            </div>
-          </article>
+        <div
+          v-if="page.next_page"
+          class="theme-divider flex justify-end border-t pt-4"
+        >
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="loadingMore"
+            @click="loadMore"
+          >
+            {{ loadingMore ? 'Loading...' : 'Load more' }}
+          </button>
         </div>
       </section>
     </AppPageLayout>
-
-    <footer
-      v-if="page.previous_page || page.next_page"
-      class="theme-divider app-page-content app-page-layout-standard flex w-full flex-wrap items-center justify-between gap-3 border-t !py-0 !pt-4"
-    >
-      <button
-        type="button"
-        class="btn-secondary"
-        :disabled="!page.previous_page || loading"
-        @click="loadPage(page.previous_page)"
-      >
-        Previous
-      </button>
-      <span class="theme-section-muted text-sm">Page {{ page.page }}</span>
-      <button
-        type="button"
-        class="btn-secondary"
-        :disabled="!page.next_page || loading"
-        @click="loadPage(page.next_page)"
-      >
-        Next
-      </button>
-    </footer>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Bell, CheckCheck, Inbox, MailOpen } from 'lucide-vue-next';
+import { Bell, CheckCheck, Flag, Inbox, RefreshCw } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import type { Component } from 'vue';
 import { toast } from 'vue-sonner';
-import { RouterLink } from 'vue-router';
 import AppPageLayout from '@/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/components/app/AppPageHeader.vue';
 import AppStickyAside from '@/components/app/AppStickyAside.vue';
+import GalleryOptionsMenu from '@/components/cards/GalleryOptionsMenu.vue';
+import { useGalleryOptions } from '@/composables/useGalleryOptions';
+import { useHoverModeSurface } from '@/composables/useHoverModePreferences';
 import { useNotificationSummary } from '@/composables/useNotificationSummary';
 import {
   buildNotificationSearchParams,
@@ -239,16 +202,42 @@ import {
   markAllNotificationsRead,
   setNotificationReadState,
 } from '@/modules/notifications/api';
-import type { NotificationPage, NotificationStatusFilter, UserNotification } from '@/modules/notifications/types';
+import NotificationTimelineEntry from '@/modules/notifications/components/NotificationTimelineEntry.vue';
+import {
+  NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
+  NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
+} from '@/modules/notifications/types';
+import type { NotificationPage, UserNotification } from '@/modules/notifications/types';
 
-const statusOptions: Array<{ value: NotificationStatusFilter; label: string; description: string; icon: Component }> = [
-  { value: 'unread', label: 'Unread', description: 'Updates that still need attention.', icon: MailOpen },
-  { value: 'all', label: 'All', description: 'Complete notification history.', icon: Inbox },
+type NotificationTypeFilter = 'all' | 'flag-review' | 'deck-card-update';
+type NotificationTypeOption = {
+  value: NotificationTypeFilter;
+  label: string;
+  description: string;
+  icon: Component;
+  eventType: string | null;
+};
+
+const typeOptions: NotificationTypeOption[] = [
+  { value: 'all', label: 'All notifications', description: 'Every inbox update.', icon: Inbox, eventType: null },
+  {
+    value: 'flag-review',
+    label: 'Flag reviews',
+    description: 'Results for submitted flags.',
+    icon: Flag,
+    eventType: NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
+  },
+  {
+    value: 'deck-card-update',
+    label: 'Deck card updates',
+    description: 'Card versions used by your decks.',
+    icon: RefreshCw,
+    eventType: NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
+  },
 ];
 const pageSize = 25;
-const statusFilter = ref<NotificationStatusFilter>('unread');
+const typeFilter = ref<NotificationTypeFilter>('all');
 const notifications = ref<UserNotification[]>([]);
-const notificationsLoaded = ref(false);
 const page = ref<NotificationPage>({
   count: 0,
   next_page: null,
@@ -257,20 +246,37 @@ const page = ref<NotificationPage>({
   page_size: pageSize,
   results: [],
 });
-const loading = ref(false);
+const loadingInitial = ref(false);
+const loadingMore = ref(false);
 const markingAllRead = ref(false);
 const errorMessage = ref('');
 const updatingIds = ref(new Set<string>());
-const { unreadNotificationCount, loadNotificationSummary, setUnreadNotificationCount } = useNotificationSummary();
-const activeStatusOption = computed(
-  () => statusOptions.find((option) => option.value === statusFilter.value) ?? statusOptions[0],
+let latestLoadRequestId = 0;
+let readStateGeneration = 0;
+const { unreadNotificationCount, setUnreadNotificationCount } = useNotificationSummary();
+const { cardScale } = useGalleryOptions();
+const {
+  defaultHoverMode,
+  overrideHoverMode: notificationHoverModeOverride,
+  effectiveHoverMode,
+  setOverrideHoverMode: setNotificationHoverModeOverride,
+  clearOverrideHoverMode: clearNotificationHoverModeOverride,
+} = useHoverModeSurface('notifications');
+const activeTypeOption = computed(
+  () => typeOptions.find((option) => option.value === typeFilter.value) ?? typeOptions[0],
 );
 
 const emptyState = computed<{ title: string; message: string }>(() => {
-  if (statusFilter.value === 'unread') {
+  if (typeFilter.value === 'flag-review') {
     return {
-      title: "You're all caught up",
-      message: 'Card changes and flag review updates will show up here when they need your attention.',
+      title: 'No flag review notifications',
+      message: 'Results for your submitted card flags will appear here.',
+    };
+  }
+  if (typeFilter.value === 'deck-card-update') {
+    return {
+      title: 'No deck card updates',
+      message: 'Changes to card versions used by your decks will appear here.',
     };
   }
   return {
@@ -279,68 +285,106 @@ const emptyState = computed<{ title: string; message: string }>(() => {
   };
 });
 
-const loadNotifications = async (nextPage = 1): Promise<void> => {
-  loading.value = true;
+const loadNotifications = async (
+  nextPage = 1,
+  mode: 'replace' | 'append' = 'replace',
+): Promise<void> => {
+  const requestId = ++latestLoadRequestId;
+  loadingInitial.value = mode === 'replace';
+  loadingMore.value = mode === 'append';
   errorMessage.value = '';
   try {
-    const response = await fetchNotifications(buildNotificationSearchParams(statusFilter.value, nextPage, pageSize));
+    const response = await fetchNotifications(
+      buildNotificationSearchParams(nextPage, pageSize, activeTypeOption.value.eventType),
+    );
+    if (requestId !== latestLoadRequestId) {
+      return;
+    }
     page.value = response;
-    notifications.value = response.results;
-  } catch {
-    errorMessage.value = 'Unable to load notifications.';
-    notifications.value = [];
-  } finally {
-    notificationsLoaded.value = true;
-    loading.value = false;
-  }
-};
-
-const selectStatus = (status: NotificationStatusFilter): void => {
-  if (statusFilter.value === status) {
-    return;
-  }
-  statusFilter.value = status;
-};
-
-const loadPage = (nextPage: number | null): void => {
-  if (!nextPage) {
-    return;
-  }
-  void loadNotifications(nextPage);
-};
-
-const toggleReadState = async (notification: UserNotification): Promise<void> => {
-  updatingIds.value = new Set(updatingIds.value).add(notification.id);
-  const nextReadState = notification.read_at === null;
-  try {
-    const updated = await setNotificationReadState(notification.id, nextReadState);
-    notifications.value = notifications.value.map((entry) => (entry.id === updated.id ? updated : entry));
-    await loadNotificationSummary();
-    if (statusFilter.value !== 'all') {
-      await loadNotifications(page.value.page);
+    if (mode === 'replace') {
+      notifications.value = response.results;
+    } else {
+      const knownIds = new Set(notifications.value.map((notification) => notification.id));
+      notifications.value = [
+        ...notifications.value,
+        ...response.results.filter((notification) => !knownIds.has(notification.id)),
+      ];
     }
   } catch {
-    toast.error('Unable to update notification.');
+    if (requestId !== latestLoadRequestId) {
+      return;
+    }
+    errorMessage.value = 'Unable to load notifications.';
+    if (mode === 'replace') {
+      notifications.value = [];
+    }
   } finally {
-    const nextUpdatingIds = new Set(updatingIds.value);
-    nextUpdatingIds.delete(notification.id);
-    updatingIds.value = nextUpdatingIds;
+    if (requestId === latestLoadRequestId) {
+      loadingInitial.value = false;
+      loadingMore.value = false;
+    }
   }
 };
 
-const handleNotificationOpen = (notification: UserNotification): void => {
-  if (notification.read_at) {
+const selectType = (type: NotificationTypeFilter): void => {
+  if (typeFilter.value === type) {
     return;
   }
-  void toggleReadState(notification);
+  typeFilter.value = type;
+};
+
+const loadMore = (): void => {
+  if (!page.value.next_page || loadingMore.value) {
+    return;
+  }
+  void loadNotifications(page.value.next_page, 'append');
+};
+
+const handleNotificationInteraction = (notification: UserNotification): void => {
+  if (notification.read_at || updatingIds.value.has(notification.id)) {
+    return;
+  }
+
+  updatingIds.value = new Set(updatingIds.value).add(notification.id);
+  const interactionGeneration = readStateGeneration;
+  const optimisticReadAt = new Date().toISOString();
+  notifications.value = notifications.value.map((entry) =>
+    entry.id === notification.id ? { ...entry, read_at: optimisticReadAt } : entry,
+  );
+  setUnreadNotificationCount(Math.max(0, unreadNotificationCount.value - 1));
+
+  void setNotificationReadState(notification.id, true)
+    .then((updated) => {
+      notifications.value = notifications.value.map((entry) => (entry.id === updated.id ? updated : entry));
+    })
+    .catch(() => {
+      if (interactionGeneration !== readStateGeneration) {
+        return;
+      }
+      notifications.value = notifications.value.map((entry) =>
+        entry.id === notification.id ? { ...entry, read_at: null } : entry,
+      );
+      setUnreadNotificationCount(unreadNotificationCount.value + 1);
+      toast.error('Unable to mark notification read.');
+    })
+    .finally(() => {
+      const nextUpdatingIds = new Set(updatingIds.value);
+      nextUpdatingIds.delete(notification.id);
+      updatingIds.value = nextUpdatingIds;
+    });
 };
 
 const handleMarkAllRead = async (): Promise<void> => {
   markingAllRead.value = true;
   try {
     const response = await markAllNotificationsRead();
+    readStateGeneration += 1;
     setUnreadNotificationCount(response.unread_count);
-    await loadNotifications(1);
+    const readAt = new Date().toISOString();
+    notifications.value = notifications.value.map((notification) => ({
+      ...notification,
+      read_at: notification.read_at ?? readAt,
+    }));
   } catch {
     toast.error('Unable to mark notifications read.');
   } finally {
@@ -348,49 +392,12 @@ const handleMarkAllRead = async (): Promise<void> => {
   }
 };
 
-const formatNotificationDate = (value: string): string =>
-  new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
-
-watch(statusFilter, () => {
+watch(typeFilter, () => {
   void loadNotifications(1);
 });
 
 onMounted(() => {
   void loadNotifications();
 });
+
 </script>
-
-<style scoped>
-.notification-row {
-  border-left: 3px solid transparent;
-  padding-left: 0.75rem;
-}
-
-.notification-row + .notification-row {
-  border-top-width: 1px;
-}
-
-.notification-row-unread {
-  border-left-color: var(--color-warning-text);
-}
-
-.notification-row-read {
-  opacity: 0.82;
-}
-
-.notification-unread-dot {
-  height: 0.5rem;
-  width: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--color-warning-text);
-}
-
-.notification-scroll-area {
-  scrollbar-gutter: auto;
-}
-
-</style>

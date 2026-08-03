@@ -2,11 +2,22 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from card_reader_core.models import UserNotification
+from card_reader_core.models import (
+    NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
+    NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
+    UserNotification,
+)
 
 
 class NotificationQuerySerializer(serializers.Serializer[dict[str, object]]):
     status = serializers.ChoiceField(choices=["unread", "read", "all"], required=False, default="all")
+    event_type = serializers.ChoiceField(
+        choices=[
+            NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
+            NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
+        ],
+        required=False,
+    )
     page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(required=False, min_value=1, default=50)
 

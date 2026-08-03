@@ -167,6 +167,7 @@ describe('useHoverModePreferences', () => {
     expect(resolveHoverModeSurfacePath('/my/decks/deck-1')).toBe('deckDetail');
     expect(resolveHoverModeSurfacePath('/my/decks/new')).toBe('deckBuilder');
     expect(resolveHoverModeSurfacePath('/my/decks/deck-1/edit')).toBe('deckBuilder');
+    expect(resolveHoverModeSurfacePath('/notifications')).toBe('notifications');
     expect(resolveHoverModeSurfacePath('/cards/card-1')).toBeNull();
     expect(resolveHoverModeSurfacePath('/settings')).toBeNull();
   });
