@@ -297,8 +297,22 @@ const readTypeGroupKeys = (container: HTMLElement): string[] =>
     (element) => element.getAttribute('data-type-group-key') ?? '',
   );
 
+const stubDesktopViewport = (matches: boolean): void => {
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }) as MediaQueryList));
+};
+
 describe('DeckDetailPage type grouping', () => {
   beforeEach(() => {
+    stubDesktopViewport(true);
     authState.canAccessStaffRoutes = false;
     authState.user = { id: 'user-1' };
     localStorage.clear();
@@ -310,6 +324,7 @@ describe('DeckDetailPage type grouping', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
@@ -493,42 +508,44 @@ describe('DeckDetailPage type grouping', () => {
     mounted.unmount();
   });
 
-  test('opens summary and mana details independently and follows the active board', async () => {
+  test('opens long descriptions by default and toggles details from the full summary and mana surfaces', async () => {
     const mounted = await mountPage();
-    const summaryDetailsButton = mounted.container.querySelector<HTMLButtonElement>(
-      '[data-testid="deck-summary-details-button"]',
-    );
-    const manaDetailsButton = mounted.container.querySelector<HTMLButtonElement>(
+    const summarySection = mounted.container.querySelector<HTMLElement>('[data-testid="deck-description"]');
+    const manaSection = mounted.container.querySelector<HTMLElement>(
       '[data-testid="deck-mana-details-button"]',
     );
-    if (!(summaryDetailsButton instanceof HTMLButtonElement) || !(manaDetailsButton instanceof HTMLButtonElement)) {
-      throw new Error('expected summary and mana details buttons');
+    if (!(summarySection instanceof HTMLElement) || !(manaSection instanceof HTMLElement)) {
+      throw new Error('expected interactive summary and mana sections');
     }
 
-    expect(summaryDetailsButton.getAttribute('aria-expanded')).toBe('false');
-    expect(manaDetailsButton.getAttribute('aria-expanded')).toBe('false');
-    expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).toBeNull();
-    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
-    summaryDetailsButton.click();
-    await nextTick();
-
+    expect(window.matchMedia).toHaveBeenCalledWith('(min-width: 1536px)');
     const longDescription = mounted.container.querySelector<HTMLElement>('[data-testid="deck-long-description"]');
-    expect(summaryDetailsButton.getAttribute('aria-expanded')).toBe('true');
-    expect(manaDetailsButton.getAttribute('aria-expanded')).toBe('false');
+    expect(summarySection.getAttribute('aria-expanded')).toBe('true');
+    expect(manaSection.getAttribute('aria-expanded')).toBe('false');
     expect(mounted.container.querySelector('.deck-detail-layout-expanded')).not.toBeNull();
     expect(longDescription?.textContent).toContain('About this deck');
     expect(longDescription?.textContent).toContain('Opening plan\n\nSideboard notes');
     expect(longDescription?.querySelector('p')?.classList.contains('whitespace-pre-wrap')).toBe(true);
     expect(longDescription?.querySelector('p')?.classList.contains('break-words')).toBe(true);
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="deck-detail-close-button"]')).not.toBeNull();
 
-    manaDetailsButton.click();
+    summarySection.querySelector('p')?.click();
     await nextTick();
 
-    expect(summaryDetailsButton.getAttribute('aria-expanded')).toBe('false');
-    expect(manaDetailsButton.getAttribute('aria-expanded')).toBe('true');
+    expect(summarySection.getAttribute('aria-expanded')).toBe('false');
+
+    summarySection.querySelector('p')?.click();
+    await nextTick();
+
+    manaSection.querySelector('[data-testid="mana-curve"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+
+    expect(summarySection.getAttribute('aria-expanded')).toBe('false');
+    expect(manaSection.getAttribute('aria-expanded')).toBe('true');
     expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toContain('Spell Card');
+    expect(mounted.container.querySelector('[data-testid="deck-detail-close-button"]')).not.toBeNull();
 
     const sideboardButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Sideboard'),
@@ -540,17 +557,43 @@ describe('DeckDetailPage type grouping', () => {
     await nextTick();
 
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')?.textContent).toBe('Attachment Card');
+
+    mounted.container.querySelector<HTMLButtonElement>('[data-testid="deck-detail-close-button"]')?.click();
+    await nextTick();
+
+    expect(manaSection.getAttribute('aria-expanded')).toBe('false');
+    expect(mounted.container.querySelector('.deck-detail-layout-expanded')).toBeNull();
+    mounted.unmount();
+  });
+
+  test('keeps long descriptions collapsed initially below the auto-expand breakpoint', async () => {
+    stubDesktopViewport(false);
+    const mounted = await mountPage();
+    const summarySection = mounted.container.querySelector<HTMLElement>('[data-testid="deck-description"]');
+
+    expect(summarySection?.getAttribute('aria-expanded')).toBe('false');
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
+    expect(mounted.container.querySelector('.deck-detail-layout-expanded')).toBeNull();
+
+    summarySection?.click();
+    await nextTick();
+
+    expect(summarySection?.getAttribute('aria-expanded')).toBe('true');
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).not.toBeNull();
+
     mounted.unmount();
   });
 
   test('keeps the details pane mana-only when no long description is present', async () => {
     fetchDeckDetailMock.mockResolvedValueOnce({ ...deckRecord, long_description: null });
     const mounted = await mountPage();
-    const manaDetailsButton = mounted.container.querySelector<HTMLButtonElement>(
+    const manaDetailsButton = mounted.container.querySelector<HTMLElement>(
       '[data-testid="deck-mana-details-button"]',
     );
 
     expect(mounted.container.querySelector('[data-testid="deck-summary-details-button"]')).toBeNull();
+    expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
+    expect(mounted.container.querySelector('.deck-detail-distribution-aside')).toBeNull();
 
     manaDetailsButton?.click();
     await nextTick();
@@ -558,6 +601,7 @@ describe('DeckDetailPage type grouping', () => {
     expect(mounted.container.querySelector('[data-testid="deck-long-description"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="mana-distribution"]')).not.toBeNull();
     expect(mounted.container.querySelector('.deck-detail-distribution-aside')).not.toBeNull();
+    expect(mounted.container.querySelector('[data-testid="deck-detail-close-button"]')).not.toBeNull();
 
     mounted.unmount();
   });

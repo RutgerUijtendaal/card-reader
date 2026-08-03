@@ -118,20 +118,24 @@
 
               <section
                 class="theme-divider space-y-2 border-t pt-4"
+                :class="deck.long_description ? 'deck-detail-panel-trigger' : ''"
+                :role="deck.long_description ? 'button' : undefined"
+                :tabindex="deck.long_description ? 0 : undefined"
+                :aria-expanded="deck.long_description ? activeDetailPanel === 'summary' : undefined"
+                :aria-controls="deck.long_description ? 'deck-detail-panel' : undefined"
                 data-testid="deck-description"
+                @click="deck.long_description && toggleDetailPanel('summary')"
+                @keydown.enter="deck.long_description && toggleDetailPanel('summary')"
+                @keydown.space.prevent="deck.long_description && toggleDetailPanel('summary')"
               >
                 <div class="flex items-center justify-between gap-3">
                   <h4 class="theme-section-title text-sm font-semibold">
                     Summary
                   </h4>
-                  <button
+                  <span
                     v-if="deck.long_description"
                     class="deck-detail-header-action theme-section-muted inline-flex items-center gap-1 text-xs font-medium"
-                    type="button"
-                    :aria-expanded="activeDetailPanel === 'summary'"
-                    aria-controls="deck-detail-panel"
                     data-testid="deck-summary-details-button"
-                    @click="toggleDetailPanel('summary')"
                   >
                     <span>Details</span>
                     <ChevronRight
@@ -139,7 +143,7 @@
                       :class="activeDetailPanel === 'summary' ? 'rotate-90' : ''"
                       aria-hidden="true"
                     />
-                  </button>
+                  </span>
                 </div>
                 <p class="theme-section-muted text-sm leading-6">
                   {{ deck.description || 'No description provided.' }}
@@ -151,28 +155,33 @@
               class="!mt-auto space-y-3"
               data-testid="deck-mana-section"
             >
-              <DeckManaCurve
-                :entries="activeBoardEntries"
-                :empty-label="activeBoardEmptyLabel"
+              <div
+                class="deck-detail-panel-trigger"
+                role="button"
+                tabindex="0"
+                :aria-expanded="activeDetailPanel === 'mana'"
+                aria-controls="deck-detail-panel"
+                data-testid="deck-mana-details-button"
+                @click="toggleDetailPanel('mana')"
+                @keydown.enter="toggleDetailPanel('mana')"
+                @keydown.space.prevent="toggleDetailPanel('mana')"
               >
-                <template #header-actions>
-                  <button
-                    class="deck-detail-header-action theme-section-muted inline-flex items-center gap-1 text-xs font-medium"
-                    type="button"
-                    :aria-expanded="activeDetailPanel === 'mana'"
-                    aria-controls="deck-detail-panel"
-                    data-testid="deck-mana-details-button"
-                    @click="toggleDetailPanel('mana')"
-                  >
-                    <span>Details</span>
-                    <ChevronRight
-                      class="h-3.5 w-3.5 transition-transform duration-200"
-                      :class="activeDetailPanel === 'mana' ? 'rotate-90' : ''"
-                      aria-hidden="true"
-                    />
-                  </button>
-                </template>
-              </DeckManaCurve>
+                <DeckManaCurve
+                  :entries="activeBoardEntries"
+                  :empty-label="activeBoardEmptyLabel"
+                >
+                  <template #header-actions>
+                    <span class="deck-detail-header-action theme-section-muted inline-flex items-center gap-1 text-xs font-medium">
+                      <span>Details</span>
+                      <ChevronRight
+                        class="h-3.5 w-3.5 transition-transform duration-200"
+                        :class="activeDetailPanel === 'mana' ? 'rotate-90' : ''"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </template>
+                </DeckManaCurve>
+              </div>
             </div>
 
             <template #footer>
@@ -229,6 +238,21 @@
                 :symbols="filterOptions.symbols"
                 :types="filterOptions.types"
               />
+
+              <template #footer>
+                <button
+                  class="theme-ghost-button flex w-full items-center justify-center gap-2 px-3 py-2 text-sm font-semibold"
+                  type="button"
+                  data-testid="deck-detail-close-button"
+                  @click="closeDetailPanel"
+                >
+                  <X
+                    class="h-4 w-4"
+                    aria-hidden="true"
+                  />
+                  Close details
+                </button>
+              </template>
             </AppStickyAside>
           </Transition>
         </div>
@@ -352,8 +376,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useLocalStorage } from '@vueuse/core';
-import { BookOpenText, ChevronRight, Gamepad2, Gauge, Pencil, Share2 } from 'lucide-vue-next';
+import { useLocalStorage, useMediaQuery } from '@vueuse/core';
+import { BookOpenText, ChevronRight, Gamepad2, Gauge, Pencil, Share2, X } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { api, toAbsoluteApiUrl } from '@/api/client';
@@ -420,8 +444,12 @@ const activeBoardId = ref('mainboard');
 type DeckDetailPanel = 'summary' | 'mana';
 const activeDetailPanel = ref<DeckDetailPanel | null>(null);
 const detailsExpanded = computed(() => activeDetailPanel.value !== null);
+const canAutoExpandDetails = useMediaQuery('(min-width: 1536px)');
 const toggleDetailPanel = (panel: DeckDetailPanel): void => {
   activeDetailPanel.value = activeDetailPanel.value === panel ? null : panel;
+};
+const closeDetailPanel = (): void => {
+  activeDetailPanel.value = null;
 };
 const groupByType = useLocalStorage('card-reader.deck-detail-group-by-type', true, {
   writeDefaults: true,
@@ -519,6 +547,7 @@ const toGalleryCard = (card: DeckCardSummary): CardListItem => ({
 const loadDeck = async (): Promise<void> => {
   deck.value = isOwnedRoute.value ? await fetchMyDeck(String(route.params.id)) : await fetchDeckDetail(String(route.params.id));
   activeBoardId.value = 'mainboard';
+  activeDetailPanel.value = deck.value.long_description && canAutoExpandDetails.value ? 'summary' : null;
 };
 
 const loadFilterOptions = async (): Promise<void> => {
@@ -573,6 +602,22 @@ onMounted(async () => {
   color: var(--color-text);
 }
 
+.deck-detail-panel-trigger {
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.deck-detail-panel-trigger:hover {
+  background: color-mix(in srgb, var(--theme-accent) 7%, transparent);
+}
+
+.deck-detail-panel-trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--theme-accent);
+}
+
 .deck-detail-panel-enter-active,
 .deck-detail-panel-leave-active {
   overflow: hidden;
@@ -603,7 +648,7 @@ onMounted(async () => {
   }
 
   :deep(.deck-detail-layout-expanded) {
-    grid-template-columns: 45rem minmax(0, 1fr);
+    grid-template-columns: 47.5rem minmax(0, 1fr);
   }
 
   .deck-detail-aside-shell {
@@ -614,7 +659,7 @@ onMounted(async () => {
   }
 
   .deck-detail-aside-shell-expanded {
-    grid-template-columns: 22.5rem 22.5rem;
+    grid-template-columns: 22.5rem 25rem;
   }
 
   :deep(.deck-detail-primary-aside) {
@@ -649,6 +694,7 @@ onMounted(async () => {
   .deck-detail-panel-enter-active,
   .deck-detail-panel-leave-active,
   .deck-detail-header-action,
+  .deck-detail-panel-trigger,
   .deck-detail-header-action :deep(svg) {
     transition-duration: 0.01ms !important;
   }
