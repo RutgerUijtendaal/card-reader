@@ -1,5 +1,37 @@
 export type NotificationStatusFilter = 'unread' | 'read' | 'all';
 
+export const NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED = 'parse_flag_item.reviewed';
+export const NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED = 'deck.card_version_changed';
+
+export type ParseFlagReviewStatus = 'resolved' | 'dismissed';
+export type DeckCardVersionChangeCause = 'import_created' | 'version_promoted';
+
+export type ParseFlagItemReviewedMetadata = {
+  card_id: string;
+  card_name: string;
+  card_version_id: string;
+  flag_id: string;
+  property_key: string;
+  property_label: string;
+  status: ParseFlagReviewStatus;
+  submitted_value: string;
+  submission_note: string;
+  reviewer_name: string;
+  review_note: string;
+};
+
+export type DeckCardVersionChangedMetadata = {
+  deck_id: string;
+  deck_name: string;
+  card_id: string;
+  card_name: string;
+  card_version_id: string;
+  previous_card_version_id?: string;
+  change_cause: DeckCardVersionChangeCause;
+  import_job_id?: string;
+  import_item_id?: string;
+};
+
 export type NotificationActor = {
   id: string;
   username: string;

@@ -370,6 +370,10 @@ import { formatDeckOwnerName } from '@/composables/decks/display';
 import { deckDifficultyLabels } from '@/composables/decks/difficulty';
 import { useAuthStore } from '@/modules/auth/authStore';
 import { buildCardReturnLocation, isCardReturnQuery } from '@/composables/cards/cardReturnState';
+import {
+  buildNotificationsReturnLocation,
+  isNotificationsReturnQuery,
+} from '@/composables/notifications/notificationRouteState';
 import type { CardFiltersResponse, CardListItem } from '@/modules/card-detail/types';
 import { buildTypeSortLookup, compareCardSort } from '@/composables/card-gallery/cardSort';
 import { useCardSortSurface } from '@/composables/useCardSortPreferences';
@@ -432,12 +436,18 @@ const difficultyLabel = computed(() => (
   deck.value?.difficulty ? deckDifficultyLabels[deck.value.difficulty] : null
 ));
 const backLink = computed(() => {
+  if (isNotificationsReturnQuery(route.query)) {
+    return buildNotificationsReturnLocation();
+  }
   if (isCardReturnQuery(route.query)) {
     return buildCardReturnLocation(route.query);
   }
   return isOwnedRoute.value ? '/my/decks' : '/decks';
 });
 const backLabel = computed(() => {
+  if (isNotificationsReturnQuery(route.query)) {
+    return 'Back to Notifications';
+  }
   if (isCardReturnQuery(route.query)) {
     return 'Back to Card';
   }

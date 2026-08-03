@@ -2,6 +2,10 @@ import type { LocationQuery, RouteLocationRaw } from 'vue-router';
 import { buildGalleryLocation } from '@/composables/card-gallery/galleryNavigation';
 import { buildAdminReturnLocation, isAdminReturnQuery } from '@/composables/admin/adminRouteState';
 import { buildDeckReturnLocation, isDeckReturnQuery } from '@/composables/decks/deckRouteState';
+import {
+  buildNotificationsReturnLocation,
+  isNotificationsReturnQuery,
+} from '@/composables/notifications/notificationRouteState';
 import { addReturnToQuery, clearLocationQueryKeys, queryString } from '@/router/routeState';
 
 const CARD_RETURN_TO = 'card';
@@ -81,6 +85,9 @@ const buildReviewReturnLocation = (query: LocationQuery): RouteLocationRaw => ({
 });
 
 export const buildCardReturnLocation = (query: LocationQuery): RouteLocationRaw => {
+  if (isNotificationsReturnQuery(query)) {
+    return buildNotificationsReturnLocation();
+  }
   if (isCardReturnQuery(query)) {
     return buildPreviousCardLocation(query);
   }
@@ -96,7 +103,12 @@ export const buildCardReturnLocation = (query: LocationQuery): RouteLocationRaw 
   return buildGalleryLocation(query);
 };
 
-export const getCardReturnLabel = (query: LocationQuery): 'Gallery' | 'Admin' | 'Deck' | 'Card' | 'Review' => {
+export const getCardReturnLabel = (
+  query: LocationQuery,
+): 'Gallery' | 'Admin' | 'Deck' | 'Card' | 'Review' | 'Notifications' => {
+  if (isNotificationsReturnQuery(query)) {
+    return 'Notifications';
+  }
   if (isCardReturnQuery(query)) {
     return 'Card';
   }

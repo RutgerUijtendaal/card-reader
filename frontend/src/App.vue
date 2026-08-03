@@ -133,6 +133,7 @@ const hoverModeOverrides = {
   gallery: hoverModePreferences.getOverrideHoverMode('gallery'),
   deckBuilder: hoverModePreferences.getOverrideHoverMode('deckBuilder'),
   deckDetail: hoverModePreferences.getOverrideHoverMode('deckDetail'),
+  notifications: hoverModePreferences.getOverrideHoverMode('notifications'),
 } satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
 const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
 const hoverModeHotkeyActions = computed(() => {

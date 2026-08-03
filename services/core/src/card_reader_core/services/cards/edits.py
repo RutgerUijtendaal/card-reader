@@ -7,7 +7,10 @@ from card_reader_core.repositories.cards import (
     promote_card_version,
     update_latest_card_version,
 )
-from card_reader_core.services.notifications import NotificationService
+from card_reader_core.services.notifications import (
+    DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+    NotificationService,
+)
 
 
 def update_latest_card_version_with_notifications(
@@ -36,21 +39,21 @@ def promote_card_version_with_notifications(
     version_id: str,
     actor_id: str | None = None,
 ) -> tuple[Card, CardVersion] | None:
-    target_was_current_latest = CardVersion.objects.filter(
-        id=version_id,
-        card_id=card_id,
-        is_latest=True,
-        card__latest_version_id=version_id,
-    ).exists()
+    previous_card_version_id = (
+        Card.objects.filter(id=card_id).values_list("latest_version_id", flat=True).first()
+    )
+    target_was_current_latest = previous_card_version_id == version_id
     promoted = promote_card_version(card_id=card_id, version_id=version_id)
     if promoted is not None and not target_was_current_latest:
-        card, _version = promoted
+        card, version = promoted
 
         transaction.on_commit(
-            lambda: NotificationService().notify_deck_owners_card_changed(
+            lambda: NotificationService().notify_deck_owners_card_version_changed(
                 card_id=card.id,
+                card_version_id=version.id,
+                previous_card_version_id=previous_card_version_id,
+                cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
                 actor_id=actor_id,
-                change_label="promoted",
             )
         )
     return promoted

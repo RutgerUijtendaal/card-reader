@@ -43,11 +43,21 @@ vi.mock('@/components/app/AppPageHeader.vue', () => ({
       title: { type: String, required: true },
       subtitle: { type: String, default: undefined },
       subtitleClass: { type: String, default: undefined },
+      backTo: { type: [String, Object], default: undefined },
+      backLabel: { type: String, default: undefined },
     },
     setup(props, { slots }) {
       return () =>
         h('header', [
           h('h1', props.title),
+          props.backTo && props.backLabel
+            ? h('a', {
+              href: typeof props.backTo === 'string'
+                ? props.backTo
+                : (props.backTo as { path?: string }).path,
+              'aria-label': props.backLabel,
+            }, 'Back')
+            : null,
           slots.titleMeta ? h('div', { 'data-testid': 'header-title-meta' }, slots.titleMeta()) : null,
           slots.subtitle
             ? h('div', { class: props.subtitleClass, 'data-testid': 'header-subtitle' }, slots.subtitle())
@@ -247,7 +257,7 @@ const createDeferred = <T,>() => {
   return { promise, resolve };
 };
 
-const mountPage = async () => {
+const mountPage = async (path = '/decks/deck-1') => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
@@ -258,10 +268,12 @@ const mountPage = async () => {
       { path: '/cards/:id', component: { template: '<div />' } },
       { path: '/decks', component: { template: '<div />' } },
       { path: '/my/decks', component: { template: '<div />' } },
+      { path: '/my/decks/:id', component: { template: '<div />' } },
       { path: '/my/decks/:id/edit', component: { template: '<div />' } },
+      { path: '/notifications', component: { template: '<div />' } },
     ],
   });
-  await router.push('/decks/deck-1');
+  await router.push(path);
   await router.isReady();
 
   const app = createApp(DeckDetailPage);
@@ -327,6 +339,14 @@ describe('DeckDetailPage type grouping', () => {
     expect(header?.textContent).not.toContain('By');
     expect(owner?.textContent).toContain('By Owner');
 
+    mounted.unmount();
+  });
+
+  test('returns to notifications when opened from a notification action', async () => {
+    const mounted = await mountPage('/my/decks/deck-1?return_to=notifications');
+
+    const backLink = mounted.container.querySelector('a[aria-label="Back to Notifications"]');
+    expect(backLink?.getAttribute('href')).toBe('/notifications');
     mounted.unmount();
   });
 

@@ -34,6 +34,18 @@ describe('cardReturnState', () => {
     });
   });
 
+  test('uses notification return context when present', () => {
+    const query = {
+      return_to: 'notifications',
+      version_id: 'version-2',
+    };
+
+    expect(getCardReturnLabel(query)).toBe('Notifications');
+    expect(buildCardReturnLocation(query)).toEqual({
+      path: '/notifications',
+    });
+  });
+
   test('uses card return context when present', () => {
     const query = {
       card_id: 'card-1',
