@@ -1123,13 +1123,51 @@
 
   .theme-hotkeys-panel {
     @apply flex w-full flex-col gap-3 rounded-2xl border px-3 py-3 text-left;
+    min-height: 11.5rem;
     border-color: var(--color-border);
     background: var(--color-surface-soft);
     color: var(--color-text);
   }
 
+  .theme-hotkeys-panel-button {
+    @apply transition;
+  }
+
+  .theme-hotkeys-panel-button:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-strong);
+  }
+
+  .theme-hotkeys-panel-button:focus-visible,
+  .theme-hotkeys-button-compact:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-input-ring);
+  }
+
+  .theme-hotkeys-more-link {
+    color: var(--color-text-muted);
+  }
+
+  .theme-hotkeys-button-compact {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition;
+    border-color: var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-text);
+  }
+
+  .theme-hotkeys-button-compact:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-strong);
+  }
+
   .theme-hotkeys-icon-wrap {
     @apply inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(148, 163, 184, 0.22) 100%);
+    color: var(--color-text);
+  }
+
+  .theme-hotkeys-icon-wrap-compact {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full;
     background: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(148, 163, 184, 0.22) 100%);
     color: var(--color-text);
   }
@@ -1231,7 +1269,29 @@
     color: var(--color-sidebar-text);
   }
 
+  .app-sidebar .theme-hotkeys-panel-button:hover,
+  .app-sidebar .theme-hotkeys-button-compact:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-sidebar-surface-hover);
+  }
+
+  .app-sidebar .theme-hotkeys-more-link {
+    color: var(--color-sidebar-text);
+    opacity: 0.75;
+  }
+
+  .app-sidebar .theme-hotkeys-button-compact {
+    border-color: var(--color-sidebar-border);
+    background: var(--color-sidebar-surface);
+    color: var(--color-sidebar-text);
+  }
+
   .app-sidebar .theme-hotkeys-icon-wrap {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(148, 163, 184, 0.2) 100%);
+    color: var(--color-sidebar-text);
+  }
+
+  .app-sidebar .theme-hotkeys-icon-wrap-compact {
     background: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(148, 163, 184, 0.2) 100%);
     color: var(--color-sidebar-text);
   }
