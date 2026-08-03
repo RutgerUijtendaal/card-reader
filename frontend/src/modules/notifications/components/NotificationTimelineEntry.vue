@@ -3,12 +3,7 @@
     class="notification-row theme-divider py-5"
     :class="notification.read_at ? 'notification-row-read' : 'notification-row-unread'"
     :data-notification-id="notification.id"
-    :aria-expanded="hasExpandableContent ? detailsOpen : undefined"
-    role="button"
-    tabindex="0"
     @click="handleRowInteraction"
-    @keydown.enter.self.prevent="handleRowInteraction"
-    @keydown.space.self.prevent="handleRowInteraction"
   >
     <div class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div class="flex min-w-0 flex-1 items-start gap-3">
@@ -60,16 +55,21 @@
             {{ presentation.occurrenceLabel }}
           </p>
 
-          <div
+          <button
             v-if="hasExpandableContent"
-            class="theme-link mt-3 inline-flex items-center gap-1 text-sm font-semibold"
+            class="notification-details-trigger theme-link mt-3 inline-flex items-center gap-1 text-sm font-semibold"
+            type="button"
+            :aria-expanded="detailsOpen"
+            :aria-controls="detailsId"
+            data-testid="notification-details-trigger"
+            @click.stop="handleRowInteraction"
           >
             {{ presentation.detailsLabel }}
             <ChevronDown
               class="notification-details-chevron h-4 w-4"
               :class="detailsOpen ? 'notification-details-chevron-open' : ''"
             />
-          </div>
+          </button>
         </div>
       </div>
 
@@ -104,6 +104,7 @@
 
     <div
       v-if="detailsOpen && hasExpandableContent"
+      :id="detailsId"
       class="notification-details theme-divider ml-12 mt-3 border-t pt-3"
       data-testid="notification-details"
     >
@@ -161,6 +162,7 @@ const presentation = computed(() => presentNotification(props.notification));
 const hasExpandableContent = computed(() =>
   presentation.value.details.length > 0 || presentation.value.cardVersionComparison !== null,
 );
+const detailsId = computed(() => `notification-details-${props.notification.id}`);
 const eventIcon = computed(() => {
   if (presentation.value.kind === 'flag-review') {
     return Flag;
@@ -222,12 +224,11 @@ const openComparedCard = (versionId: string): void => {
 }
 
 .notification-row:hover,
-.notification-row:focus-visible,
 .notification-row:focus-within {
   background: color-mix(in srgb, var(--color-surface-soft) 38%, transparent);
 }
 
-.notification-row:focus-visible {
+.notification-details-trigger:focus-visible {
   outline: 2px solid var(--theme-accent);
   outline-offset: 2px;
 }

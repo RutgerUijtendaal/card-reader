@@ -1,6 +1,9 @@
 import { effectScope } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { useCardPublicDetailState } from '@/modules/card-detail/composables/useCardPublicDetailState';
+import {
+  resolvePublicCardVersionId,
+  useCardPublicDetailState,
+} from '@/modules/card-detail/composables/useCardPublicDetailState';
 
 const { apiGet, replaceRoute, route } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -79,5 +82,15 @@ describe('useCardPublicDetailState version navigation', () => {
       },
     });
     scope.stop();
+  });
+
+  test('falls back to the latest version when the requested version is cleared or invalid', () => {
+    const versions = [
+      { version_id: 'version-1', is_latest: true },
+      { version_id: 'version-2', is_latest: false },
+    ];
+
+    expect(resolvePublicCardVersionId(versions, undefined)).toBe('version-1');
+    expect(resolvePublicCardVersionId(versions, 'missing-version')).toBe('version-1');
   });
 });

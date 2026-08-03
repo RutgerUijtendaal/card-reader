@@ -252,6 +252,7 @@ const markingAllRead = ref(false);
 const errorMessage = ref('');
 const updatingIds = ref(new Set<string>());
 let latestLoadRequestId = 0;
+let readStateGeneration = 0;
 const { unreadNotificationCount, setUnreadNotificationCount } = useNotificationSummary();
 const { cardScale } = useGalleryOptions();
 const {
@@ -345,6 +346,7 @@ const handleNotificationInteraction = (notification: UserNotification): void => 
   }
 
   updatingIds.value = new Set(updatingIds.value).add(notification.id);
+  const interactionGeneration = readStateGeneration;
   const optimisticReadAt = new Date().toISOString();
   notifications.value = notifications.value.map((entry) =>
     entry.id === notification.id ? { ...entry, read_at: optimisticReadAt } : entry,
@@ -356,6 +358,9 @@ const handleNotificationInteraction = (notification: UserNotification): void => 
       notifications.value = notifications.value.map((entry) => (entry.id === updated.id ? updated : entry));
     })
     .catch(() => {
+      if (interactionGeneration !== readStateGeneration) {
+        return;
+      }
       notifications.value = notifications.value.map((entry) =>
         entry.id === notification.id ? { ...entry, read_at: null } : entry,
       );
@@ -373,6 +378,7 @@ const handleMarkAllRead = async (): Promise<void> => {
   markingAllRead.value = true;
   try {
     const response = await markAllNotificationsRead();
+    readStateGeneration += 1;
     setUnreadNotificationCount(response.unread_count);
     const readAt = new Date().toISOString();
     notifications.value = notifications.value.map((notification) => ({

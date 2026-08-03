@@ -88,10 +88,12 @@ const flushPromises = async (): Promise<void> => {
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
     resolve = promiseResolve;
+    reject = promiseReject;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 };
 
 const mountView = async () => {
@@ -150,7 +152,9 @@ describe('NotificationsPage', () => {
     expect(setNotificationReadState).toHaveBeenCalledWith('notification-1', true);
     expect(fetchNotifications).toHaveBeenCalledTimes(1);
     expect(mounted.container.querySelector('[data-notification-id="notification-1"]')).not.toBeNull();
-    expect(notificationRow?.getAttribute('aria-expanded')).toBe('true');
+    expect(notificationRow?.getAttribute('role')).toBeNull();
+    const detailsTrigger = notificationRow?.querySelector<HTMLButtonElement>('[data-testid="notification-details-trigger"]');
+    expect(detailsTrigger?.getAttribute('aria-expanded')).toBe('true');
     const actions = mounted.container.querySelector('[data-testid="notification-actions"]');
     expect(actions?.querySelectorAll('a')).toHaveLength(2);
     expect(actions?.textContent?.trim()).toBe('');
@@ -160,10 +164,10 @@ describe('NotificationsPage', () => {
     expect(notificationDetails?.parentElement).toBe(notificationRow);
     expect(notificationDetails?.classList.contains('ml-12')).toBe(true);
 
-    notificationRow?.click();
+    detailsTrigger?.click();
     await nextTick();
 
-    expect(notificationRow?.getAttribute('aria-expanded')).toBe('false');
+    expect(detailsTrigger?.getAttribute('aria-expanded')).toBe('false');
     expect(mounted.container.textContent).not.toContain('Version comparison');
     expect(setNotificationReadState).toHaveBeenCalledTimes(1);
     mounted.unmount();
@@ -250,6 +254,34 @@ describe('NotificationsPage', () => {
     expect(unreadNotificationCount.value).toBe(0);
     expect(fetchNotifications).toHaveBeenCalledTimes(1);
     expect(mounted.container.querySelector('.notification-row-read')).not.toBeNull();
+    mounted.unmount();
+  });
+
+  test('does not roll back a successful mark-all update when a pending row update fails', async () => {
+    unreadNotificationCount.value = 2;
+    const rowUpdate = deferred<UserNotification>();
+    fetchNotifications.mockResolvedValue(pagePayload([notification()]));
+    setNotificationReadState.mockReturnValue(rowUpdate.promise);
+    markAllNotificationsRead.mockResolvedValue({ updated_count: 2, unread_count: 0 });
+
+    const mounted = await mountView();
+    const notificationRow = mounted.container.querySelector<HTMLElement>('[data-notification-id="notification-1"]');
+    notificationRow?.click();
+    await nextTick();
+
+    const markAllButton = Array.from(mounted.container.querySelectorAll('button')).find((entry) =>
+      entry.textContent?.includes('Mark all read'),
+    );
+    markAllButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushPromises();
+    await nextTick();
+
+    rowUpdate.reject(new Error('Row update failed'));
+    await flushPromises();
+    await nextTick();
+
+    expect(unreadNotificationCount.value).toBe(0);
+    expect(notificationRow?.classList.contains('notification-row-read')).toBe(true);
     mounted.unmount();
   });
 
