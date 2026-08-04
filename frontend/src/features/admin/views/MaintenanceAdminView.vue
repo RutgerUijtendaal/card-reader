@@ -163,14 +163,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
-import { api } from '@/shared/api/client';
+import { getApiErrorMessageWithCause as extractErrorMessage } from '@/shared/api/errors';
 import { fetchCards } from '@/domain/cards/api';
 import CardFilterSections from '@/domain/cards/components/filters/CardFilterSections.vue';
-import type { MaintenanceActionResponse } from '@/domain/maintenance/types';
+import {
+  backfillMetadataSuggestions as requestMetadataSuggestionBackfill,
+  convertCardImagesToWebp as requestCardImageConversion,
+  queueFilteredLatestReparse as requestFilteredLatestReparse,
+  queueLatestReparse as requestLatestReparse,
+} from '@/features/admin/api/maintenance';
 import {
   buildCardFilterApiPayload,
   buildCardFilterApiSearchParams,
-} from '@/domain/cards/utils/filters/cardFilterState';
+} from '@/domain/cards/utils/filters/cardFilterRequest';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
 
 const runningBackfillSuggestions = ref(false);
@@ -252,11 +257,8 @@ const queueFilteredReparse = async (): Promise<void> => {
   if (runningQueueFilteredReparse.value || !hasActiveReparseFilters.value) return;
   runningQueueFilteredReparse.value = true;
   try {
-    const response = await api.post<MaintenanceActionResponse>(
-      '/admin/maintenance/queue-filtered-latest-reparse',
-      buildCardFilterApiPayload(selectionState.value),
-    );
-    toast.success(response.data.message);
+    const response = await requestFilteredLatestReparse(buildCardFilterApiPayload(selectionState.value));
+    toast.success(response.message);
   } catch (error) {
     console.error('Queue filtered latest reparse failed', error);
     toast.error(extractErrorMessage(error, 'Failed to queue filtered reparses.'));
@@ -274,10 +276,8 @@ const queueLatestReparse = async (): Promise<void> => {
   if (runningQueueReparse.value) return;
   runningQueueReparse.value = true;
   try {
-    const response = await api.post<MaintenanceActionResponse>(
-      '/admin/maintenance/queue-latest-reparse',
-    );
-    toast.success(response.data.message);
+    const response = await requestLatestReparse();
+    toast.success(response.message);
   } catch (error) {
     console.error('Queue latest reparse failed', error);
     toast.error(extractErrorMessage(error, 'Failed to queue latest reparses.'));
@@ -290,10 +290,8 @@ const backfillMetadataSuggestions = async (): Promise<void> => {
   if (runningBackfillSuggestions.value) return;
   runningBackfillSuggestions.value = true;
   try {
-    const response = await api.post<MaintenanceActionResponse>(
-      '/admin/maintenance/backfill-metadata-suggestions',
-    );
-    toast.success(response.data.message);
+    const response = await requestMetadataSuggestionBackfill();
+    toast.success(response.message);
   } catch (error) {
     console.error('Backfill metadata suggestions failed', error);
     toast.error(extractErrorMessage(error, 'Failed to backfill metadata suggestions.'));
@@ -306,28 +304,14 @@ const convertCardImagesToWebp = async (): Promise<void> => {
   if (runningConvertCardImages.value) return;
   runningConvertCardImages.value = true;
   try {
-    const response = await api.post<MaintenanceActionResponse>(
-      '/admin/maintenance/convert-card-images-to-webp',
-    );
-    toast.success(response.data.message);
+    const response = await requestCardImageConversion();
+    toast.success(response.message);
   } catch (error) {
     console.error('Convert card images to WebP failed', error);
     toast.error(extractErrorMessage(error, 'Failed to convert card images to WebP.'));
   } finally {
     runningConvertCardImages.value = false;
   }
-};
-
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
-    const detail = maybeResponse?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) return detail;
-  }
-  if (typeof error === 'object' && error && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return fallback;
 };
 
 onMounted(() => {

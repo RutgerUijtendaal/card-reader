@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
 import { api } from '@/shared/api/client';
 import { useDeckEditorFilters } from '@/features/decks/composables/useDeckEditorFilters';
-import type { DeckEditorMode } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/features/decks/composables/deckEditorDraftTypes';
 import type { CardFiltersResponse } from '@/domain/cards/types';
 import type { DeckCardSummary } from '@/domain/decks/types';
 

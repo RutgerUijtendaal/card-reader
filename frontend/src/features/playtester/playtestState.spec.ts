@@ -1,40 +1,46 @@
 import { describe, expect, test } from 'vitest';
 import {
   addInstanceToVisualPile,
-  acceptOpeningSetup,
   cloneCardInstance,
   cloneCardInstances,
   cloneCardInstanceSnapshots,
-  countZone,
-  createInitialPlaytestState,
   deleteCardInstances,
-  drawOpeningHand,
   drawCards,
-  getOpeningManaInstances,
-  getOpeningSetupInstances,
-  getZoneInstances,
   groupInstancesIntoVisualPile,
-  isManaCardInstance,
-  isSetupCardInstance,
-  isStoredDraftStale,
   moveBoardInstancesByDelta,
   moveInstanceToZone,
-  mulliganOpeningHand,
   placeInstanceOnBoard,
   removeInstanceFromVisualPile,
-  resetToSetup,
-  serializePlaytestDraft,
-  setOpeningHandSize,
-  setOpeningStep,
-  stageOpeningSetupCardForPlay,
   shuffleZone,
   startNextTurn,
   toggleCardFace,
   toggleCardsFace,
-  toggleOpeningSetupHandled,
   toggleTapped,
+} from '@/features/playtester/playtestBoardState';
+import {
+  countZone,
+  createInitialPlaytestState,
+  getZoneInstances,
+  isManaCardInstance,
+  isSetupCardInstance,
+} from '@/features/playtester/playtestStateCore';
+import {
+  acceptOpeningSetup,
+  drawOpeningHand,
+  getOpeningManaInstances,
+  getOpeningSetupInstances,
+  mulliganOpeningHand,
+  resetToSetup,
+  setOpeningHandSize,
+  setOpeningStep,
+  stageOpeningSetupCardForPlay,
   toggleOpeningManaSelection,
-} from '@/features/playtester/playtestState';
+  toggleOpeningSetupHandled,
+} from '@/features/playtester/playtestOpeningState';
+import {
+  isStoredDraftStale,
+  serializePlaytestDraft,
+} from '@/features/playtester/playtestDraftPersistence';
 import type { DeckCardSummary, DeckMetadataOption, DeckRecord } from '@/domain/decks/types';
 
 const buildCard = (

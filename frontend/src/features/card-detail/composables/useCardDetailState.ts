@@ -1,7 +1,7 @@
 import { onKeyStroke } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api, toAbsoluteApiUrl } from '@/shared/api/client';
+import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { buildCardReturnLocation, getCardReturnLabel } from '@/domain/card-navigation/cardReturnState';
 import { fetchCard, fetchCardFilters, fetchCardVersions } from '@/domain/cards/api';
 import { buildEffectiveSymbolIds, getRuleTextSymbolState } from '@/domain/cards/utils/cards/ruleTextSymbols';
@@ -29,13 +29,18 @@ import type {
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 import { isEditableKeyboardTarget } from '@/shared/utils/keyboard';
 import { fetchTemplates } from '@/domain/templates/api';
+import { fetchDeckRulesMetadata } from '@/domain/decks/api';
 import {
   fallbackDeckBuildingDefaultConfig,
   fallbackDeckBuildingConfigExample,
-  fetchDeckRulesMetadata,
   formatDeckBuildingConfigJson,
 } from '@/domain/decks/utils/deckRules';
 import { queryString } from '@/shared/router/routeState';
+import {
+  patchLatestCardVersion,
+  promoteCardVersion,
+  queueCardReparse,
+} from '@/features/card-detail/api';
 
 export const useCardDetailState = () => {
   const route = useRoute();
@@ -219,8 +224,8 @@ export const useCardDetailState = () => {
     isSaving.value = true;
     saveMessage.value = '';
     try {
-      const response = await api.patch<CardVersionDetail>(`/cards/${version.id}/latest-version`, payload);
-      applyUpdatedVersion(response.data);
+      const updatedVersion = await patchLatestCardVersion(version.id, payload);
+      applyUpdatedVersion(updatedVersion);
       saveMessage.value = successMessage;
     } finally {
       isSaving.value = false;
@@ -303,10 +308,7 @@ export const useCardDetailState = () => {
     isQueuingReparse.value = true;
     saveMessage.value = '';
     try {
-      const response = await api.post<{ message: string }>(`/cards/${version.id}/reparse`, {
-        template_id: templateId,
-      });
-      saveMessage.value = response.data.message;
+      saveMessage.value = await queueCardReparse(version.id, templateId);
     } finally {
       isQueuingReparse.value = false;
     }
@@ -322,10 +324,7 @@ export const useCardDetailState = () => {
     promotingVersionId.value = versionId;
     saveMessage.value = '';
     try {
-      const response = await api.post<CardVersionDetail>(
-        `/cards/${targetCard.id}/versions/${versionId}/promote`,
-      );
-      const promotedVersion = response.data;
+      const promotedVersion = await promoteCardVersion(targetCard.id, versionId);
       versions.value = versions.value.map((item) =>
         item.version_id === promotedVersion.version_id
           ? promotedVersion

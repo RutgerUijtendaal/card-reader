@@ -104,7 +104,7 @@ import { onMounted, ref } from 'vue';
 import { Layers3, Pencil } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { toast } from 'vue-sonner';
-import { api } from '@/shared/api/client';
+import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import { useAuthStore } from '@/domain/session/store';
@@ -118,6 +118,7 @@ import CardVersionSelectorGrid from '@/features/card-detail/components/CardVersi
 import CardVersionOverviewPane from '@/domain/cards/components/CardVersionOverviewPane.vue';
 import { useCardPublicDetailState } from '@/features/card-detail/composables/useCardPublicDetailState';
 import type { ParseFlagCreatePayload } from '@/domain/review/types';
+import { submitCardParseFlag } from '@/features/card-detail/api';
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -162,7 +163,7 @@ const submitParseFlag = async (payload: ParseFlagCreatePayload): Promise<void> =
   flagSubmitting.value = true;
   flagError.value = '';
   try {
-    await api.post(`/cards/${version.id}/versions/${version.version_id}/flags`, payload);
+    await submitCardParseFlag(version.id, version.version_id, payload);
     if (auth.canAccessStaffRoutes) {
       incrementOpenParseFlagItemCount(payload.items.length);
     }
@@ -173,12 +174,6 @@ const submitParseFlag = async (payload: ParseFlagCreatePayload): Promise<void> =
   } finally {
     flagSubmitting.value = false;
   }
-};
-
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  const maybeResponse = error as { response?: { data?: { detail?: unknown } } };
-  const detail = maybeResponse.response?.data?.detail;
-  return typeof detail === 'string' && detail.trim() ? detail : fallback;
 };
 
 onMounted(loadCard);

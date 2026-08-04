@@ -6,6 +6,7 @@ import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 
 const {
   createDeckMock,
+  fetchDeckRulesMetadataMock,
   fetchMyDeckMock,
   updateDeckMock,
   toastErrorMock,
@@ -15,6 +16,12 @@ const {
   searchCardsMock,
 } = vi.hoisted(() => ({
   createDeckMock: vi.fn(),
+  fetchDeckRulesMetadataMock: vi.fn(async () => ({
+    default_rules: {
+      mainboard_card_count: { min: 0, max: 60 },
+      mana_type_count: { min: 0 },
+    },
+  })),
   fetchMyDeckMock: vi.fn(),
   updateDeckMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -26,6 +33,7 @@ const {
 
 vi.mock('@/domain/decks/api', () => ({
   createDeck: createDeckMock,
+  fetchDeckRulesMetadata: fetchDeckRulesMetadataMock,
   fetchMyDeck: fetchMyDeckMock,
   updateDeck: updateDeckMock,
 }));
@@ -35,12 +43,6 @@ vi.mock('@/domain/decks/utils/deckRules', () => ({
     mainboard_card_count: { min: 0, max: 60 },
     mana_type_count: { min: 0 },
   }),
-  fetchDeckRulesMetadata: vi.fn(async () => ({
-    default_rules: {
-      mainboard_card_count: { min: 0, max: 60 },
-      mana_type_count: { min: 0 },
-    },
-  })),
 }));
 
 vi.mock('@/features/decks/composables/useDeckEditorFilters', () => ({

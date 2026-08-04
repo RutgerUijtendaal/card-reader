@@ -243,15 +243,17 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
-import { api, toAbsoluteApiUrl } from '@/shared/api/client';
+import { toAbsoluteApiUrl } from '@/shared/api/client';
+import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 import { fetchCard } from '@/domain/cards/api';
 import CardLoadingSkeleton from '@/domain/cards/components/CardLoadingSkeleton.vue';
 import CardSearchSelect from '@/domain/cards/components/CardSearchSelect.vue';
 import { cardIsDeprecated } from '@/domain/cards/utils/filters/cardLifecycle';
 import { parseAdminMergeSourceId, parseAdminMergeTargetId } from '@/features/admin/routeState';
-import type { CardMergeApplyResponse, CardMergePreview } from '@/features/admin/types';
+import type { CardMergePreview } from '@/features/admin/types';
 import type { CardListItem } from '@/domain/cards/types';
 import { useAdminRouteSync } from '@/features/admin/composables/useAdminRouteSync';
+import { applyCardMerge, previewCardMerge } from '@/features/admin/api/cardMerges';
 
 const { route } = useAdminRouteSync();
 const targetCard = ref<CardListItem | null>(null);
@@ -292,11 +294,10 @@ const previewMerge = async (): Promise<void> => {
   if (!targetCard.value || !sourceCard.value) return;
   previewing.value = true;
   try {
-    const response = await api.post<CardMergePreview>('/admin/card-merges/preview', {
+    preview.value = await previewCardMerge({
       target_card_id: targetCard.value.id,
       source_card_ids: [sourceCard.value.id],
     });
-    preview.value = response.data;
   } catch (error) {
     toast.error(extractErrorMessage(error, 'Failed to preview card merge.'));
   } finally {
@@ -308,12 +309,12 @@ const applyMerge = async (): Promise<void> => {
   if (!targetCard.value || !sourceCard.value || !preview.value?.can_apply) return;
   applying.value = true;
   try {
-    const response = await api.post<CardMergeApplyResponse>('/admin/card-merges/apply', {
+    const response = await applyCardMerge({
       target_card_id: targetCard.value.id,
       source_card_ids: [sourceCard.value.id],
     });
-    toast.success(response.data.message);
-    preview.value = response.data.preview;
+    toast.success(response.message);
+    preview.value = response.preview;
     sourceCard.value = null;
   } catch (error) {
     toast.error(extractErrorMessage(error, 'Failed to apply card merge.'));
@@ -345,15 +346,6 @@ const loadPrefilledSource = async (): Promise<void> => {
 const loadPrefilledCards = async (): Promise<void> => {
   await loadPrefilledTarget();
   await loadPrefilledSource();
-};
-
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
-    const detail = maybeResponse?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) return detail;
-  }
-  return fallback;
 };
 
 onMounted(loadPrefilledCards);

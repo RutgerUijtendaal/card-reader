@@ -1,11 +1,7 @@
 import { ref } from 'vue';
-import { api } from '@/shared/api/client';
+import { fetchReviewSummary } from '@/domain/review/api';
 import { useAuthStore } from '@/domain/session/store';
 import { usePollingSummary } from '@/shared/composables/usePollingSummary';
-
-type ReviewSummaryResponse = {
-  open_parse_flag_item_count: number;
-};
 
 const openParseFlagItemCount = ref(0);
 
@@ -17,8 +13,8 @@ export function useReviewSummary() {
       openParseFlagItemCount.value = 0;
     },
     load: async () => {
-      const response = await api.get<ReviewSummaryResponse>('/review/summary');
-      openParseFlagItemCount.value = response.data.open_parse_flag_item_count;
+      const response = await fetchReviewSummary();
+      openParseFlagItemCount.value = response.open_parse_flag_item_count;
     },
   });
 

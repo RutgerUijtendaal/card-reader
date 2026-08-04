@@ -273,48 +273,45 @@ import PlaytestTableSurface from '@/features/playtester/components/PlaytestTable
 import { usePlaytestDeckSelection } from '@/features/playtester/composables/usePlaytestDeckSelection';
 import { usePlaytestHistory } from '@/features/playtester/composables/usePlaytestHistory';
 import { usePlaytestHotkeys } from '@/features/playtester/composables/usePlaytestHotkeys';
+import { usePlaytestOpeningFlow } from '@/features/playtester/composables/usePlaytestOpeningFlow';
 import { createLocalPlaytestStorage } from '@/features/playtester/localPlaytestStorage';
 import {
-  acceptOpeningSetup,
   addInstanceToVisualPile,
   cloneCardInstanceSnapshots,
-  countZone,
-  createInitialPlaytestState,
   deleteCardInstances,
-  drawOpeningHand,
   drawCards,
-  getOpeningManaInstances,
-  getOpeningSetupInstances,
-  getZoneInstances,
   groupInstancesIntoVisualPile,
-  isStoredDraftStale,
   moveInstanceToZone,
   moveBoardInstancesByDelta,
-  mulliganOpeningHand,
   placeInstanceOnBoard,
   removeInstanceFromVisualPile,
-  resetToSetup,
-  serializePlaytestDraft,
-  setOpeningHandSize,
-  setOpeningStep,
-  stageOpeningSetupCardForPlay,
   shuffleZone,
-  STARTING_MANA_REQUIRED,
   startNextTurn,
   untapAllBoardCards,
   toggleCardFace,
   toggleCardsFace,
-  toggleOpeningSetupHandled,
   toggleTapped,
-  toggleOpeningManaSelection,
-} from '@/features/playtester/playtestState';
+} from '@/features/playtester/playtestBoardState';
+import {
+  countZone,
+  createInitialPlaytestState,
+  getZoneInstances,
+} from '@/features/playtester/playtestStateCore';
+import {
+  getOpeningManaInstances,
+  getOpeningSetupInstances,
+  resetToSetup,
+} from '@/features/playtester/playtestOpeningState';
+import {
+  isStoredDraftStale,
+  serializePlaytestDraft,
+} from '@/features/playtester/playtestDraftPersistence';
 import type {
   PlaytestCardInstance,
   PlaytestCardSource,
   PlaytestDraggedCard,
   PlaytestEntityAction,
   PlaytestHoverTarget,
-  PlaytestOpeningStep,
   PlaytestState,
   PlaytestZoneId,
   StoredPlaytestDraft,
@@ -1481,98 +1478,6 @@ onBeforeUnmount(() => {
   }
 });
 
-const updateOpeningHandSize = (handSize: number): void => {
-  if (!playtest.value) {
-    return;
-  }
-  applyState(setOpeningHandSize(playtest.value, handSize), { recordHistory: false });
-};
-
-const toggleOpeningMana = (instanceId: string, selected: boolean): void => {
-  if (!playtest.value) {
-    return;
-  }
-  applyState(toggleOpeningManaSelection(playtest.value, instanceId, selected), { recordHistory: false });
-};
-
-const toggleOpeningSetupCardHandled = (cardId: string, handled: boolean): void => {
-  if (!playtest.value) {
-    return;
-  }
-  applyState(toggleOpeningSetupHandled(playtest.value, cardId, handled), { recordHistory: false });
-};
-
-const continueOpeningMana = (): void => {
-  if (!playtest.value || playtest.value.openingSetup.selectedManaInstanceIds.length !== STARTING_MANA_REQUIRED) {
-    return;
-  }
-  closeStack();
-  applyState(setOpeningStep(playtest.value, 'setup'), { recordHistory: false });
-};
-
-const continueOpeningSetup = (): void => {
-  if (!playtest.value) {
-    return;
-  }
-  closeStack();
-  applyState(drawOpeningHand(playtest.value), { recordHistory: false });
-};
-
-const previousOpeningStep = (): void => {
-  if (!playtest.value) {
-    return;
-  }
-  if (playtest.value.openingSetup.step === 'setup') {
-    applyState(setOpeningStep(playtest.value, 'mana'), { recordHistory: false });
-    return;
-  }
-  if (playtest.value.openingSetup.step === 'hand') {
-    applyState(setOpeningStep(playtest.value, 'setup'), {
-      recordHistory: false,
-    });
-  }
-};
-
-const selectOpeningStep = (targetStep: PlaytestOpeningStep): void => {
-  if (!playtest.value || playtest.value.phase !== 'opening') {
-    return;
-  }
-  const visibleSteps: PlaytestOpeningStep[] = ['mana', 'setup', 'hand'];
-  const currentIndex = visibleSteps.indexOf(playtest.value.openingSetup.step);
-  const targetIndex = visibleSteps.indexOf(targetStep);
-  if (targetIndex < 0 || currentIndex < 0 || targetIndex >= currentIndex) {
-    return;
-  }
-  closeStack();
-  applyState(setOpeningStep(playtest.value, targetStep), { recordHistory: false });
-};
-
-const moveOpeningSetupCard = (instanceId: string, zoneId: PlaytestZoneId): void => {
-  if (!playtest.value) {
-    return;
-  }
-  if (zoneId === 'play') {
-    applyState(stageOpeningSetupCardForPlay(playtest.value, instanceId));
-    return;
-  }
-  applyState(moveOpeningTransferCard(playtest.value, instanceId, zoneId));
-};
-
-const mulliganOpeningSetup = (): void => {
-  if (!playtest.value || playtest.value.openingSetup.step !== 'hand') {
-    return;
-  }
-  applyState(mulliganOpeningHand(playtest.value), { recordHistory: false });
-};
-
-const keepOpeningSetup = (): void => {
-  if (!playtest.value || playtest.value.openingSetup.step !== 'hand') {
-    return;
-  }
-  clearHistory();
-  applyState(acceptOpeningSetup(playtest.value), { recordHistory: false });
-};
-
 const hasTappedBoardCards = (state: PlaytestState): boolean =>
   state.instances.some((instance) => instance.zoneId === 'play' && instance.tapped);
 
@@ -1670,6 +1575,25 @@ const moveOpeningTransferCard = (
     ),
   };
 };
+
+const {
+  continueOpeningMana,
+  continueOpeningSetup,
+  keepOpeningSetup,
+  moveOpeningSetupCard,
+  mulliganOpeningSetup,
+  previousOpeningStep,
+  selectOpeningStep,
+  toggleOpeningMana,
+  toggleOpeningSetupCardHandled,
+  updateOpeningHandSize,
+} = usePlaytestOpeningFlow({
+  playtest,
+  applyState,
+  clearHistory,
+  closeStack,
+  moveOpeningTransferCard,
+});
 
 const openingCardActions = (instanceId: string, instance: PlaytestCardInstance): PlaytestEntityAction[] => {
   if (!playtest.value || playtest.value.openingSetup.step !== 'setup' || !isOpeningTransferSource(playtest.value, instance)) {

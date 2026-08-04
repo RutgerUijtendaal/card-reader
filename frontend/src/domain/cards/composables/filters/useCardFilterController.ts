@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue';
 import { fetchCardFilters } from '@/domain/cards/api';
 import type { CardFiltersResponse } from '@/domain/cards/types';
-import { createCardFilterCatalog, type CardFilterState } from '@/domain/cards/utils/filters/cardFilterState';
+import type { CardFilterState } from '@/domain/cards/utils/filters/cardFilterState';
+import { createCardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
 import { useCardFilterSectionsState } from '@/domain/cards/composables/filters/useCardFilterSectionsState';
 import { useCardFilterState } from '@/domain/cards/composables/filters/useCardFilterState';
 import { useMetadataFilterFavorites } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';

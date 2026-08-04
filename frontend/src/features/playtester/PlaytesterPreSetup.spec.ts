@@ -3,7 +3,8 @@ import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import PlaytesterPage from '@/features/playtester/PlaytesterPage.vue';
-import { createInitialPlaytestState, getZoneInstances, serializePlaytestDraft } from '@/features/playtester/playtestState';
+import { createInitialPlaytestState, getZoneInstances } from '@/features/playtester/playtestStateCore';
+import { serializePlaytestDraft } from '@/features/playtester/playtestDraftPersistence';
 
 const {
   authState,

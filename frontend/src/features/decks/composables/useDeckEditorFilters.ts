@@ -1,12 +1,12 @@
-import type { DeckEditorMode } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/features/decks/composables/deckEditorDraftTypes';
 import { computed, ref, type Ref } from 'vue';
 import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/domain/cards/utils/filters/cardLifecycle';
 import {
-  buildCardFilterApiSearchParams,
   createEmptyCardFilterSelectionState,
   createEmptyCardFilterState,
   type CardFilterSelectionState,
 } from '@/domain/cards/utils/filters/cardFilterState';
+import { buildCardFilterApiSearchParams } from '@/domain/cards/utils/filters/cardFilterRequest';
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
 import { appendCardSortSearchParam } from '@/domain/cards/utils/gallery/cardSort';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';

@@ -21,6 +21,7 @@ import type {
   TypeUpsertRequest,
 } from '@/features/admin/types';
 import type { JsonObject, JsonValue } from '@/shared/types/json';
+import { getApiErrorMessageWithCause } from '@/shared/api/errors';
 
 export const KNOWN_CATALOG_KINDS: KnownCatalogKind[] = ['keywords', 'tags', 'symbols', 'types', 'deck-roles', 'deck-types'];
 export const SUGGESTED_CATALOG_KINDS: SuggestedCatalogKind[] = ['suggested-tags', 'suggested-types', 'suggested-deck-types'];
@@ -433,14 +434,4 @@ export const normalizeCatalogResponse = (data: CatalogApiResponse): CatalogRespo
   },
 });
 
-export const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
-    const detail = maybeResponse?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) return detail;
-  }
-  if (typeof error === 'object' && error && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return fallback;
-};
+export const extractErrorMessage = getApiErrorMessageWithCause;

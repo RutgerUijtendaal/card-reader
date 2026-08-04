@@ -4,11 +4,13 @@ import { fetchDeckDetail, fetchMyDeck, fetchMyDeckSummaries, fetchPublicDeckSumm
 import type { DeckRecord, DeckSummaryRecord } from '@/domain/decks/types';
 import {
   createInitialPlaytestState,
-  createOpeningHandPreviewState,
   getZoneInstances,
+} from '@/features/playtester/playtestStateCore';
+import { createOpeningHandPreviewState } from '@/features/playtester/playtestOpeningState';
+import {
   isStoredDraftStale,
   serializePlaytestDraft,
-} from '@/features/playtester/playtestState';
+} from '@/features/playtester/playtestDraftPersistence';
 import type {
   PlaytestDeckSuggestion,
   PlaytestStorageAdapter,

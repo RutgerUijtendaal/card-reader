@@ -11,12 +11,13 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 
 - Preserve the Vue 3 + TypeScript + Vite behavior while using the four frontend layers: `app`, `features`, `domain`, and `shared`.
 - Classify by ownership before adding a file: global orchestration goes in `app`; one-workflow business code in `features/<name>`; cross-workflow business code in `domain/<name>`; domain-agnostic reuse in `shared`.
-- Respect the enforced dependency direction: `app` may depend on every layer; a feature may depend on itself, domain, and shared; domain may depend on domain and shared; shared may depend only on shared. Never import from another feature.
+- Respect the enforced dependency direction: `app` may depend on every layer; a feature may depend on itself, domain, and shared; a domain may depend on shared and only the domain slices allowlisted in `frontend/eslint.config.js`; shared may depend only on shared. Never import from another feature or create a domain cycle.
 - Use direct file imports. Do not add barrel files or transitional re-exports to mask ownership.
 - Keep reusable card queries, filters, gallery behavior, sorting, symbols, preferences, and card UI in `frontend/src/domain/cards`.
 - Keep reusable deck contracts, clients, constraints, calculations, exports, route helpers, tags, and deck UI in `frontend/src/domain/decks`; use `frontend/src/domain/deck-building` for contracts shared with cards.
 - Keep app bootstrap, routing, shell navigation/hotkeys, theme orchestration, and global styles in `frontend/src/app`.
 - Keep generic API infrastructure, form/modal/layout controls, floating UI, keyboard/pointer helpers, and generic composables in `frontend/src/shared`.
+- Keep Axios calls in the focused `api.ts` or `api/*` client owned by the relevant feature or domain. Pages, components, stores, and workflow composables consume typed client functions instead of the shared Axios instance.
 - Co-locate unit and component specs with their source. Use a feature `tests/` directory only for scenarios spanning several source files.
 - Use shared deck list components and `DeckListRecord`-compatible props for deck listing surfaces that can consume either full or summary deck records.
 - Prefer deck summary endpoints and `DeckSummaryRecord` for list/selector views that do not need full card entries; fetch full `DeckRecord` only for detail/editor/export/playtest flows that need complete deck contents.
@@ -29,7 +30,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Primary page lists and content should use the shell page scroll; avoid max-height primary list containers that trap content.
 - Desktop asides should behave as edge-attached side panels below the lifted shell header, use the shared aside width, keep bounded inner scrolling only inside the aside, and place persistent footer controls in the shared footer slot so they anchor at the bottom.
 - Mobile page layouts should stack aside content above main content in natural page flow.
-- Preserve and extend the shared theme/token system in `frontend/src/app/styles.css` and `frontend/src/shared/composables/useTheme.ts`.
+- Preserve and extend the shared theme/token system in the ordered `frontend/src/app/styles.css` entrypoint, its `styles/base.css`, `styles/components.css`, and `styles/utilities.css` layer files, and `frontend/src/shared/composables/useTheme.ts`.
 - Prefer semantic theme primitives and shared classes over ad hoc color styling.
 - Avoid overusing containers and card shells. Prefer letting controls and content float on the app background when hierarchy remains clear, using dividers, spacing, accent lines, and selected states for visual separation between sections.
 - Keep user-facing page and section descriptions focused on the enduring purpose and end result of the screen; avoid copy that calls out specific implementation details, temporary workflow mechanics, or design decisions that may look out of place as the page grows.
@@ -44,7 +45,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 5. Promote business code to a domain only when multiple workflows consume it; keep generic-looking one-off code feature-local until reuse exists.
 6. When a second workflow needs feature-owned code, move it atomically to the right domain or shared owner and update all consumers; never import feature-to-feature.
 7. If the change touches deck list or selector pages, decide explicitly whether summary records are sufficient before requesting full deck records.
-8. If the change touches card filters or gallery state, inspect `frontend/src/domain/cards` first and extend the focused client/logic there instead of cloning requests or parsing in a feature.
+8. If the change touches card filters or gallery state, inspect `frontend/src/domain/cards` first. Keep normalization in `cardFilterState.ts`, route serialization in `cardFilterRouteState.ts`, catalog/id translation in `cardFilterSelection.ts`, and API payloads in `cardFilterRequest.ts`.
 9. If the change touches deck-building constraints, load defaults/examples from the backend metadata endpoint and keep frontend fallbacks covered by tests.
 10. If the change touches a routed page with initial data fetching, preserve or add a page-shaped skeleton that matches the loaded layout.
 11. If the change touches visible UI, preserve token-backed theme behavior and verify both light and dark modes.
@@ -59,8 +60,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Card/filter API reads or filter logic duplicated outside `frontend/src/domain/cards`
 - New helpers added when an existing composable or shared utility already fit
 - Feature pages taking on reusable domain state, API, or parsing responsibilities
+- Direct Axios calls outside focused feature/domain API clients or shared API infrastructure
 - Specs separated from their source without being a genuine multi-file scenario
 - Card/deck or other circular domain ownership
+- Domain imports not represented in the validated acyclic allowlist in `frontend/eslint.config.js`
 - Page layouts that reintroduce max-height primary list containers instead of using shell page scroll with sticky/bounded asides
 - Routed pages that show empty states, partial controls, or text-only loading while initial page data is still loading
 - Theme drift from raw colors, light-only assumptions, or component-local styling systems
@@ -74,6 +77,9 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - `frontend/src/app`
 - `frontend/src/app/router`
 - `frontend/src/app/styles.css`
+- `frontend/src/app/styles/base.css`
+- `frontend/src/app/styles/components.css`
+- `frontend/src/app/styles/utilities.css`
 - `frontend/src/features`
 - `frontend/src/domain/cards`
 - `frontend/src/domain/decks`
@@ -85,6 +91,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 ## Avoid
 
 - Re-implementing card/filter API reads, parsing, or filter-param building outside `frontend/src/domain/cards`
+- Calling the shared Axios instance directly from a page, component, store, or workflow composable
 - Importing from another feature; extract the genuinely shared responsibility to a domain or shared owner
 - Letting feature roots accumulate helpers or implementation details that belong in their private subfolders
 - Adding re-export shims, barrels, or aliases that preserve obsolete paths

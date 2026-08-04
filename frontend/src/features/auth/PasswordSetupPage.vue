@@ -78,6 +78,7 @@ import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { toast } from 'vue-sonner';
 import { submitPasswordSetup, validatePasswordSetupLink } from '@/domain/session/api';
+import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 
 const route = useRoute();
 const router = useRouter();
@@ -142,13 +143,4 @@ onMounted(() => {
   void load();
 });
 
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const detail = (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) {
-      return detail;
-    }
-  }
-  return fallback;
-};
 </script>

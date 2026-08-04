@@ -7,9 +7,9 @@ import PlaytesterPage from '@/features/playtester/PlaytesterPage.vue';
 import {
   createInitialPlaytestState,
   getZoneInstances,
-  moveInstanceToZone,
-  serializePlaytestDraft,
-} from '@/features/playtester/playtestState';
+} from '@/features/playtester/playtestStateCore';
+import { moveInstanceToZone } from '@/features/playtester/playtestBoardState';
+import { serializePlaytestDraft } from '@/features/playtester/playtestDraftPersistence';
 
 const {
   authState,

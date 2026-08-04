@@ -67,255 +67,37 @@
     </header>
 
     <div class="playtest-opening-main">
-      <section
+      <PlaytestOpeningManaStep
         v-if="openingStep === 'mana'"
-        key="mana"
-        class="playtest-opening-panel playtest-opening-mana"
-        data-testid="playtest-opening-mana"
-      >
-        <div class="playtest-opening-panel-heading">
-          <div>
-            <h3>Starting mana</h3>
-            <p>Select exactly 3 mana copies that should begin in play.</p>
-          </div>
-        </div>
-
-        <div class="playtest-opening-mana-grid app-scrollbar">
-          <article
-            v-for="group in manaGroups"
-            :key="group.cardId"
-            class="playtest-opening-mana-card"
-            role="button"
-            tabindex="0"
-            @click="selectManaFromGroup(group)"
-            @keydown.enter.prevent="selectManaFromGroup(group)"
-            @keydown.space.prevent="selectManaFromGroup(group)"
-            @contextmenu.prevent="deselectManaFromGroup(group)"
-          >
-            <PlaytestCard
-              :instance="group.instances[0]"
-              :interactive="false"
-            />
-            <div class="playtest-opening-card-copy-actions">
-              <button
-                v-for="(instance, index) in group.instances"
-                :key="instance.instanceId"
-                class="playtest-opening-copy-button"
-                :class="selectedManaSet.has(instance.instanceId) ? 'playtest-opening-copy-button-selected' : ''"
-                type="button"
-                :aria-pressed="selectedManaSet.has(instance.instanceId)"
-                @click.stop="emit('toggle-mana', instance.instanceId, !selectedManaSet.has(instance.instanceId))"
-                @contextmenu.prevent.stop="emit('toggle-mana', instance.instanceId, !selectedManaSet.has(instance.instanceId))"
-              >
-                {{ index + 1 }}
-              </button>
-            </div>
-          </article>
-        </div>
-
-        <div class="playtest-opening-mana-actions">
-          <button
-            :class="hasSetupCards ? 'btn-primary' : 'btn-secondary'"
-            type="button"
-            :disabled="selectedManaIds.length !== STARTING_MANA_REQUIRED"
-            @click="emit('continue-mana')"
-          >
-            Setup board
-          </button>
-          <button
-            v-if="!hasSetupCards"
-            class="btn-primary"
-            type="button"
-            :disabled="selectedManaIds.length !== STARTING_MANA_REQUIRED"
-            @click="emit('draw-hand')"
-          >
-            Draw hand
-          </button>
-        </div>
-      </section>
-
-      <section
+        :mana-instances="manaInstances"
+        :selected-mana-ids="selectedManaIds"
+        :has-setup-cards="hasSetupCards"
+        @continue-mana="emit('continue-mana')"
+        @draw-hand="emit('draw-hand')"
+        @toggle-mana="forwardManaToggle"
+      />
+      <PlaytestOpeningSetupStep
         v-else-if="openingStep === 'setup'"
-        key="setup"
-        class="playtest-opening-setup-stage"
-        :class="hasSetupCards ? '' : 'playtest-opening-setup-stage-library-only'"
-      >
-        <section
-          v-if="hasSetupCards"
-          class="playtest-opening-panel playtest-opening-setup-guide"
-          data-testid="playtest-opening-setup-cards"
-        >
-          <div class="playtest-opening-panel-heading">
-            <div>
-              <h3>Setup instructions</h3>
-              <p>Ready your board state here: move cards between zones before drawing your hand.</p>
-            </div>
-            <span>{{ setupGroups.length }} found</span>
-          </div>
-
-          <div class="playtest-opening-setup-list app-scrollbar">
-            <article
-              v-for="group in setupGroups"
-              :key="group.cardId"
-              class="playtest-opening-setup-card"
-              :class="handledSetupCardSet.has(group.cardId) ? 'playtest-opening-setup-card-handled' : ''"
-              role="checkbox"
-              tabindex="0"
-              :aria-checked="handledSetupCardSet.has(group.cardId)"
-              @click="toggleSetupHandled(group.cardId)"
-              @keydown.enter.prevent="toggleSetupHandled(group.cardId)"
-              @keydown.space.prevent="toggleSetupHandled(group.cardId)"
-            >
-              <div class="playtest-opening-setup-card-preview">
-                <PlaytestCard
-                  :instance="group.instances[0]"
-                  :interactive="false"
-                />
-              </div>
-              <div class="playtest-opening-setup-card-main">
-                <div class="playtest-opening-setup-card-title">
-                  <strong>{{ group.card.name }}</strong>
-                  <span>{{ group.instances.length }} {{ group.instances.length === 1 ? 'copy' : 'copies' }}</span>
-                </div>
-                <p class="playtest-opening-setup-rule-text">
-                  {{ group.card.rules_text || 'Resolve this setup effect before drawing your opening hand.' }}
-                </p>
-                <label
-                  class="playtest-opening-setup-check"
-                  @click.stop
-                >
-                  <input
-                    type="checkbox"
-                    :checked="handledSetupCardSet.has(group.cardId)"
-                    @change="emitSetupHandled(group.cardId, $event)"
-                  >
-                  <span>Handled</span>
-                </label>
-              </div>
-            </article>
-          </div>
-
-          <div class="playtest-opening-setup-footer">
-            <button
-              class="btn-primary"
-              type="button"
-              @click="emit('continue-setup')"
-            >
-              Draw hand
-            </button>
-          </div>
-        </section>
-
-        <div class="playtest-opening-setup-library-area">
-          <PlaytestStackBrowser
-            title="Library"
-            subtitle="Set up the starting board state before drawing your hand."
-            :instances="libraryInstances"
-            :card-interactive="true"
-            :dragging-instance-ids="draggingInstanceIds"
-            drop-zone-id="library"
-            search-placeholder="Search library"
-            test-id="playtest-opening-library-browser"
-            @pointer-card="handleCardPointer"
-            @context-card="handleCardContextMenu"
-            @hover="emit('hover', $event)"
-          >
-            <template #actions="{ group }">
-              <button
-                class="btn-primary"
-                type="button"
-                @click="emit('move-setup-card', group.instances[0].instanceId, 'banish')"
-              >
-                Banish
-              </button>
-              <button
-                class="btn-secondary"
-                type="button"
-                @click="emit('move-setup-card', group.instances[0].instanceId, 'discard')"
-              >
-                Discard
-              </button>
-              <button
-                class="btn-secondary"
-                type="button"
-                @click="emit('move-setup-card', group.instances[0].instanceId, 'play')"
-              >
-                Play
-              </button>
-            </template>
-
-            <template
-              v-if="!hasSetupCards"
-              #footer
-            >
-              <button
-                class="btn-primary"
-                type="button"
-                @click="emit('continue-setup')"
-              >
-                Draw hand
-              </button>
-            </template>
-          </PlaytestStackBrowser>
-        </div>
-      </section>
-
-      <section
+        :setup-instances="setupInstances"
+        :library-instances="libraryInstances"
+        :handled-setup-card-ids="handledSetupCardIds"
+        :dragging-instance-ids="draggingInstanceIds"
+        @continue-setup="emit('continue-setup')"
+        @toggle-setup-handled="forwardSetupHandled"
+        @move-setup-card="forwardSetupMove"
+        @pointer-card="handleCardPointer"
+        @context-card="handleCardContextMenu"
+        @hover="emit('hover', $event)"
+      />
+      <PlaytestOpeningHandStep
         v-else
-        key="hand"
-        class="playtest-opening-hand-stage"
-        data-testid="playtest-opening-hand"
-      >
-        <h3>Opening hand</h3>
-        <div class="playtest-opening-hand">
-          <div
-            v-for="(instance, index) in handInstances"
-            :key="instance.instanceId"
-            class="playtest-opening-hand-card"
-            :style="openingHandCardStyle(index, handInstances.length)"
-          >
-            <PlaytestCard
-              :instance="instance"
-              :interactive="false"
-            />
-          </div>
-          <div
-            v-if="handInstances.length === 0"
-            key="opening-hand-empty"
-            class="playtest-opening-empty"
-          >
-            No cards available.
-          </div>
-        </div>
-
-        <div class="playtest-opening-hand-actions">
-          <label class="playtest-opening-hand-size">
-            Hand
-            <input
-              class="input-base h-9 w-20 px-3 py-1"
-              type="number"
-              min="0"
-              max="99"
-              :value="handSize"
-              @input="emitHandSize"
-            >
-          </label>
-          <button
-            class="btn-primary"
-            type="button"
-            @click="emit('keep')"
-          >
-            Keep this
-          </button>
-          <button
-            class="btn-secondary"
-            type="button"
-            @click="emit('mulligan')"
-          >
-            Mulligan [{{ mulliganCount }}]
-          </button>
-        </div>
-      </section>
+        :hand-instances="handInstances"
+        :hand-size="handSize"
+        :mulligan-count="mulliganCount"
+        @keep="emit('keep')"
+        @mulligan="emit('mulligan')"
+        @update-hand-size="emit('update-hand-size', $event)"
+      />
     </div>
 
     <div
@@ -368,8 +150,10 @@ import { computed, ref } from 'vue';
 import { useResizeObserver } from '@vueuse/core';
 import { ArrowLeft, ArrowRight } from 'lucide-vue-next';
 import PlaytestCard from '@/features/playtester/components/PlaytestCard.vue';
-import PlaytestStackBrowser from '@/features/playtester/components/PlaytestStackBrowser.vue';
-import { STARTING_MANA_REQUIRED } from '@/features/playtester/playtestState';
+import PlaytestOpeningManaStep from '@/features/playtester/components/PlaytestOpeningManaStep.vue';
+import PlaytestOpeningSetupStep from '@/features/playtester/components/PlaytestOpeningSetupStep.vue';
+import PlaytestOpeningHandStep from '@/features/playtester/components/PlaytestOpeningHandStep.vue';
+import { STARTING_MANA_REQUIRED } from '@/features/playtester/playtestStateCore';
 import type {
   PlaytestCardInstance,
   PlaytestCardSource,
@@ -377,12 +161,6 @@ import type {
   PlaytestOpeningStep,
   PlaytestZoneId,
 } from '@/features/playtester/types';
-
-type CardInstanceGroup = {
-  cardId: string;
-  card: PlaytestCardInstance['card'];
-  instances: PlaytestCardInstance[];
-};
 
 const props = defineProps<{
   openingStep: PlaytestOpeningStep;
@@ -420,34 +198,7 @@ const emit = defineEmits<{
 }>();
 
 const bottomRef = ref<HTMLElement | null>(null);
-const selectedManaSet = computed(() => new Set(props.selectedManaIds));
-const handledSetupCardSet = computed(() => new Set(props.handledSetupCardIds));
-
-const groupInstancesByCard = (instances: PlaytestCardInstance[]): CardInstanceGroup[] => {
-  const groups = new Map<string, CardInstanceGroup>();
-  for (const instance of instances) {
-    const group = groups.get(instance.cardId);
-    if (group) {
-      group.instances = [...group.instances, instance];
-    } else {
-      groups.set(instance.cardId, {
-        cardId: instance.cardId,
-        card: instance.card,
-        instances: [instance],
-      });
-    }
-  }
-  return [...groups.values()]
-    .map((group) => ({
-      ...group,
-      instances: [...group.instances].sort((left, right) => left.order - right.order || left.instanceId.localeCompare(right.instanceId)),
-    }))
-    .sort((left, right) => left.card.name.localeCompare(right.card.name) || left.cardId.localeCompare(right.cardId));
-};
-
-const manaGroups = computed(() => groupInstancesByCard(props.manaInstances));
-const setupGroups = computed(() => groupInstancesByCard(props.setupInstances));
-const hasSetupCards = computed(() => setupGroups.value.length > 0);
+const hasSetupCards = computed(() => props.setupInstances.length > 0);
 const selectedManaInstances = computed(() => {
   const selectedIds = new Set(props.selectedManaIds);
   return props.manaInstances.filter((instance) => selectedIds.has(instance.instanceId));
@@ -491,6 +242,12 @@ const handleCardPointer = (
 const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
   emit('context-card', instanceId, event);
 };
+const forwardManaToggle = (instanceId: string, selected: boolean): void =>
+  emit('toggle-mana', instanceId, selected);
+const forwardSetupHandled = (cardId: string, handled: boolean): void =>
+  emit('toggle-setup-handled', cardId, handled);
+const forwardSetupMove = (instanceId: string, zoneId: PlaytestZoneId): void =>
+  emit('move-setup-card', instanceId, zoneId);
 const visibleSteps = computed(() => {
   const steps: Array<{ id: PlaytestOpeningStep; label: string }> = [
     { id: 'mana', label: 'Mana' },
@@ -531,32 +288,6 @@ const selectStep = (step: PlaytestOpeningStep): void => {
   }
 };
 
-const selectManaFromGroup = (group: CardInstanceGroup): void => {
-  const instance = group.instances.find((entry) => !selectedManaSet.value.has(entry.instanceId));
-  if (instance) {
-    emit('toggle-mana', instance.instanceId, true);
-  }
-};
-
-const deselectManaFromGroup = (group: CardInstanceGroup): void => {
-  const instance = [...group.instances].reverse().find((entry) => selectedManaSet.value.has(entry.instanceId));
-  if (instance) {
-    emit('toggle-mana', instance.instanceId, false);
-  }
-};
-
-const emitSetupHandled = (cardId: string, event: Event): void => {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
-  }
-  emit('toggle-setup-handled', cardId, target.checked);
-};
-
-const toggleSetupHandled = (cardId: string): void => {
-  emit('toggle-setup-handled', cardId, !handledSetupCardSet.value.has(cardId));
-};
-
 const goNext = (): void => {
   if (!canGoNext.value) {
     return;
@@ -572,28 +303,6 @@ useResizeObserver(bottomRef, ([entry]) => {
   emit('bottom-resize', entry?.contentRect.width ?? 0, entry?.contentRect.height ?? 0);
 });
 
-const emitHandSize = (event: Event): void => {
-  const value = (event.target as HTMLInputElement).value;
-  if (value.trim() === '') {
-    return;
-  }
-  const handSize = Number(value);
-  if (!Number.isFinite(handSize)) {
-    return;
-  }
-  emit('update-hand-size', handSize);
-};
-
-const openingHandCardStyle = (index: number, total: number): Record<string, string | number> => {
-  const center = index - (total - 1) / 2;
-  return {
-    marginLeft: index === 0 ? '0' : 'calc(var(--playtest-card-width) * -0.34)',
-    transform: `translateY(${center * center * 0.3}rem) rotate(${center * 5.2}deg)`,
-    transformOrigin: '50% 112%',
-    zIndex: 30 + index,
-  };
-};
-
 const bottomFanCardStyle = (index: number, total: number): Record<string, string | number> => {
   const center = index - (total - 1) / 2;
   return {
@@ -604,7 +313,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
 };
 </script>
 
-<style scoped>
+<style>
 .playtest-opening {
   position: relative;
   display: grid;

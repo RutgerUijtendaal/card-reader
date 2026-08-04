@@ -123,6 +123,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { LogIn, UserPlus } from 'lucide-vue-next';
 import { submitAccessRequest } from '@/domain/session/api';
 import { useAuthStore } from '@/domain/session/store';
+import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -186,15 +187,6 @@ const submitRequest = async (): Promise<void> => {
   }
 };
 
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const detail = (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) {
-      return detail;
-    }
-  }
-  return fallback;
-};
 </script>
 
 <style scoped>

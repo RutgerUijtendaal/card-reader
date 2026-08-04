@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { ref } from 'vue';
-import { useDeckEditorDraft, type DeckEditorMode } from '@/features/decks/composables/useDeckEditorDraft';
+import { useDeckEditorDraft } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/features/decks/composables/deckEditorDraftTypes';
 import { resolveDeckBuildingRules } from '@/domain/decks/utils/deckConstraints';
 import type { DeckCardSummary, DeckRecord } from '@/domain/decks/types';
 

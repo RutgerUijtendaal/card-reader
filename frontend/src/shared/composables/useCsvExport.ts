@@ -1,5 +1,5 @@
 import { toast } from 'vue-sonner';
-import { api } from '@/shared/api/client';
+import { fetchBlob } from '@/shared/api/downloads';
 
 export type UseCsvExportResult = {
   exportCardsCsv: (params: URLSearchParams) => Promise<void>;
@@ -10,9 +10,9 @@ export const useCsvExport = (): UseCsvExportResult => {
     try {
       const query = params.toString();
       const path = query ? `/exports/csv?${query}` : '/exports/csv';
-      const response = await api.get<Blob>(path, { responseType: 'blob' });
+      const blob = await fetchBlob(path);
 
-      const url = URL.createObjectURL(response.data);
+      const url = URL.createObjectURL(blob);
       try {
         const anchor = document.createElement('a');
         anchor.href = url;

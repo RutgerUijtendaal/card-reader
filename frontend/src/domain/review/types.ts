@@ -1,5 +1,9 @@
 import type { MetadataGroupName, ScalarFieldName } from '@/domain/cards/types';
 
+export type ReviewSummaryResponse = {
+  open_parse_flag_item_count: number;
+};
+
 export type ParseFlagPropertyKey = ScalarFieldName | MetadataGroupName | 'overall' | 'other';
 
 export type ParseFlagItemDraft = {
