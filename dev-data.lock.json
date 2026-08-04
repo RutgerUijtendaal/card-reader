@@ -1,6 +1,6 @@
 {
   "api_base_url": "https://maityscardgame.com/api",
-  "bundle_version": "dev-2026.08.04.1",
+  "bundle_version": "dev-2026.08.04-221449-84392d",
   "format_version": 1,
-  "sha256": "ecaf971e360138f076830357b14cc28e48303041fcbc31fccb108333876cb87a"
+  "sha256": "65ac7d4099781fc09fb0eeeab5e84adf4c9b2bca5bd605f5b5aab315658b9cf8"
 }
