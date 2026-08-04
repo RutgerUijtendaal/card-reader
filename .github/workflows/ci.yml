@@ -66,9 +66,7 @@ jobs:
         run: |
           cp .env.example .env
           docker compose config --quiet
-          CARD_READER_HOST_APP_DATA_DIR=./.tmp/ci/app-data \
-          CARD_READER_HOST_PUBLIC_APP_DATA_DIR=./.tmp/ci/public \
-            docker compose -f docker-compose.yml -f docker-compose.bind.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
       - uses: docker/setup-buildx-action@v3
       - name: Build linux/amd64 parser image
         uses: docker/build-push-action@v6
