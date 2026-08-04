@@ -109,20 +109,20 @@
   <text class="field" x="388" y="991">old card -> target</text>
 
   <rect class="box left" x="95" y="1040" width="210" height="80"/>
-  <text class="title" x="157" y="1072">DeckTag</text>
-  <text class="field" x="122" y="1097">kind, key, label</text>
+  <text class="title-small" x="117" y="1072">DeckTagAssignment</text>
+  <text class="field" x="123" y="1097">deck + tag</text>
 
   <rect class="box left" x="360" y="1040" width="210" height="80"/>
-  <text class="title-small" x="382" y="1072">DeckTagAssignment</text>
-  <text class="field" x="388" y="1097">deck + tag</text>
+  <text class="title" x="422" y="1072">DeckTag</text>
+  <text class="field" x="387" y="1097">kind, key, label</text>
 
   <rect class="box left" x="95" y="1150" width="210" height="80"/>
-  <text class="title-small" x="112" y="1182">DeckTagSuggestion</text>
-  <text class="field" x="112" y="1207">value/status/target/retries</text>
+  <text class="title-small" x="105" y="1182">DeckTagSuggestionDeck</text>
+  <text class="field" x="115" y="1207">suggestion + deck, active</text>
 
   <rect class="box left" x="360" y="1150" width="210" height="80"/>
-  <text class="title-small" x="370" y="1182">DeckTagSuggestionDeck</text>
-  <text class="field" x="380" y="1207">suggestion + deck, active</text>
+  <text class="title-small" x="377" y="1182">DeckTagSuggestion</text>
+  <text class="field" x="377" y="1207">value/status/target/retries</text>
 
   <rect class="band" x="700" y="370" width="320" height="880"/>
   <text class="band-title" x="735" y="402">Stable identity</text>
@@ -234,12 +234,12 @@
   <path class="line" d="M305 662 L360 662"/>
   <path class="line" d="M305 803 L360 803"/>
   <path class="line" d="M305 973 L360 973"/>
-  <path class="line" d="M305 1080 L360 1080"/>
-  <path class="line" d="M305 1190 L360 1190"/>
+  <path class="line" d="M360 1080 L305 1080"/>
+  <path class="line" d="M360 1190 L305 1190"/>
 
-  <path class="thin" d="M95 493 C70 493, 70 1028, 465 1028 L465 1040"/>
+  <path class="thin" d="M95 493 C70 493, 70 1080, 95 1080"/>
   <text class="label" x="75" y="1020">deck assignments</text>
-  <path class="thin" d="M95 515 C58 515, 58 1138, 465 1138 L465 1150"/>
+  <path class="thin" d="M95 515 C58 515, 58 1190, 95 1190"/>
   <text class="label" x="75" y="1132">deck suggestions</text>
 
   <path class="line" d="M570 493 C635 500, 700 560, 745 625"/>

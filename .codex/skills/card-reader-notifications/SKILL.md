@@ -28,8 +28,9 @@ Follow `AGENTS.md` first. Use this skill with `card-reader-api` and `card-reader
 ## API And Frontend
 
 - Keep notification API views transport-only: validate request data, enforce current-user ownership, and delegate to core repositories/services.
-- Keep frontend notification API contracts in `frontend/src/modules/notifications`.
-- Keep shared unread-count behavior in `frontend/src/composables/useNotificationSummary`.
+- Keep reusable frontend notification contracts, API access, route state, and unread-summary state in `frontend/src/domain/notifications`.
+- Keep notification inbox pages, timeline presentation, and inbox-only components in `frontend/src/features/notifications`.
+- Keep shared unread-count behavior in `frontend/src/domain/notifications/composables/useNotificationSummary.ts`.
 - Keep the sidenav badge backed by `GET /notifications/summary`; do not duplicate unread-count state in page-only code.
 
 ## Future Delivery Channels

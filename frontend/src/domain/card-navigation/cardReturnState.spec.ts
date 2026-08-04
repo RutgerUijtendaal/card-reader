@@ -1,0 +1,59 @@
+import { describe, expect, test } from 'vitest';
+import {
+  buildCardReturnLocation,
+  buildReviewCardEditorLocation,
+  getCardReturnLabel,
+} from '@/domain/card-navigation/cardReturnState';
+
+describe('cardReturnState', () => {
+  test('uses admin return context when present', () => {
+    const query = { admin_tab: 'catalog', return_to: 'admin' };
+
+    expect(getCardReturnLabel(query)).toBe('Admin');
+    expect(buildCardReturnLocation(query)).toEqual({ path: '/admin', query: { admin_tab: 'catalog' } });
+  });
+
+  test('uses deck return context when present', () => {
+    const query = { deck_id: 'deck-1', return_to: 'deck' };
+
+    expect(getCardReturnLabel(query)).toBe('Deck');
+    expect(buildCardReturnLocation(query)).toEqual({ path: '/decks/deck-1', query: {} });
+  });
+
+  test('uses notification return context when present', () => {
+    const query = { return_to: 'notifications', version_id: 'version-2' };
+
+    expect(getCardReturnLabel(query)).toBe('Notifications');
+    expect(buildCardReturnLocation(query)).toEqual({ path: '/notifications' });
+  });
+
+  test('uses card return context when present', () => {
+    const query = { card_id: 'card-1', return_to: 'card', q: 'dragon' };
+
+    expect(getCardReturnLabel(query)).toBe('Card');
+    expect(buildCardReturnLocation(query)).toEqual({ path: '/cards/card-1', query: { q: 'dragon' } });
+  });
+
+  test('falls back to the gallery when no explicit return context exists', () => {
+    expect(getCardReturnLabel({ q: 'dragon' })).toBe('Gallery');
+    expect(buildCardReturnLocation({ q: 'dragon' })).toEqual({ path: '/cards', query: { q: 'dragon' } });
+  });
+
+  test('omits a property focus when opening an overall suggestion in the editor', () => {
+    expect(
+      buildReviewCardEditorLocation(
+        'card-1',
+        { property_key: 'name' },
+        { versionId: 'version-1', view: 'flags', status: 'open' },
+      ),
+    ).toEqual({
+      path: '/cards/card-1/edit',
+      query: {
+        return_to: 'review',
+        version_id: 'version-1',
+        review_view: 'flags',
+        review_status: 'open',
+      },
+    });
+  });
+});
