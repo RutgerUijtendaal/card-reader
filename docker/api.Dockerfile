@@ -20,6 +20,7 @@ RUN uv sync --frozen --package card-reader-api --no-dev --no-install-workspace
 COPY services/core/src ./services/core/src
 COPY services/api/src ./services/api/src
 COPY services/api/manage.py ./services/api/manage.py
+COPY dev-data/selection.json ./dev-data/selection.json
 
 RUN uv sync --frozen --package card-reader-api --no-dev
 

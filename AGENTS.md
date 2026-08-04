@@ -102,6 +102,7 @@ Core stack:
   - Keep Playtester state responsibilities separated: initialization/normalization in `playtestStateCore.ts`, board mutations in `playtestBoardState.ts`, opening setup in `playtestOpeningState.ts`, and storage migration/serialization in `playtestDraftPersistence.ts`. Import the owning file directly.
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
+- When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.
@@ -143,6 +144,11 @@ Core stack:
 - Card gallery and card assets are public.
 - Import jobs, review, admin, catalog, templates, and exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
+- Developer-data metadata, browser downloads, and bootstrap-code creation require an active
+  authenticated user who is either staff or has the Developer role. Code exchange is
+  unauthenticated, but exchange and download-token authorization must re-check that the issuing
+  user remains active and still has developer-data access. Bundle creation and build history are
+  staff-only.
 - The Vue app uses Django session auth with CSRF protection.
 - `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.
 
@@ -157,6 +163,21 @@ Core stack:
 - Local development users live in:
   - `services/api/src/card_reader_api/seeds/seed-users.local.json`
 - `seed-users.local.json` is gitignored.
+
+## Developer Data
+- `dev-data/selection.json` owns the reviewed public selection keys and coverage requirements;
+  `dev-data.lock.json` pins the immutable bundle version, format, SHA-256, and website API URL.
+- Developer-data bundles may contain catalogs, templates, deck tags, symbol assets, the current card
+  back, and curated cards with their versions, images, aliases, groups, metadata, content versions,
+  lifecycle state, and deck-building overrides.
+- Bundles must exclude users, decks, notifications, activity/access records, import jobs, uploads,
+  raw OCR, parse flags, suggestions, logs, debug crops, credentials, and source/server paths.
+- Production bundles live outside `maintenance/`, under `/var/lib/card-reader/dev-data` by default.
+  Published versions are immutable and retained for older pinned branches.
+- Django owns authorization and returns `X-Accel-Redirect` in production; Nginx owns transfer and
+  ranges. Never expose the internal filesystem path or make the internal URI externally accessible.
+- `publish_dev_data` is production-only and must validate through an isolated temporary import.
+  Production startup must never import a developer bundle automatically.
 
 ## Docker And Runtime
 - `api` and `parser` share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
@@ -177,6 +198,8 @@ From repo root:
 - Lint all: `pnpm lint`
 - Typecheck all: `pnpm typecheck`
 - Test all: `pnpm test`
+- Bootstrap a clean development checkout: `pnpm bootstrap:dev`
+- Reset with a local safety backup and bootstrap: `pnpm bootstrap:dev:reset`
 
 Targeted commands:
 - API: `pnpm --filter @card-reader/api dev`
@@ -222,6 +245,10 @@ Local app URL:
 - `GET /notifications/summary`
 - `PATCH /notifications/{notification_id}`
 - `POST /notifications/mark-all-read`
+- `GET /developer-data/current`
+- `POST /developer-data/grants`
+- `POST /developer-data/grants/exchange`
+- `GET /developer-data/bundles/{version}/download`
 - `GET/POST/PATCH/DELETE /settings/*`
 - `POST /auth/login`
 - `POST /auth/logout`

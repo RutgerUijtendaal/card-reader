@@ -158,6 +158,12 @@
                   >
                     {{ user.is_active ? 'Active' : 'Archived' }}
                   </span>
+                  <span
+                    v-if="user.is_developer"
+                    class="theme-pill theme-pill-accent text-nowrap"
+                  >
+                    Developer
+                  </span>
                 </div>
                 <p class="theme-section-muted mt-1 text-xs">
                   Joined {{ formatDate(user.date_joined) }}.
@@ -168,6 +174,14 @@
               </div>
 
               <div class="flex flex-wrap gap-2">
+                <button
+                  class="btn-secondary px-3 py-2 text-xs"
+                  :disabled="updatingDeveloperUserId === user.id"
+                  type="button"
+                  @click="toggleDeveloperAccess(user)"
+                >
+                  {{ user.is_developer ? 'Remove developer access' : 'Grant developer access' }}
+                </button>
                 <button
                   class="btn-secondary px-3 py-2 text-xs"
                   type="button"
@@ -371,6 +385,7 @@ const {
   deactivateUser,
   restoreUser,
   resetPassword,
+  setDeveloperAccess,
   approveRequest,
   declineRequest,
 } = useManagedUsers();
@@ -379,6 +394,7 @@ const auth = useAuthStore();
 const newUsername = ref('');
 const creating = ref(false);
 const resolvingRequestId = ref<string | null>(null);
+const updatingDeveloperUserId = ref<string | null>(null);
 const approvalUsernames = ref<Record<string, string>>({});
 type UserSection = 'managed' | 'pending' | 'unmanaged';
 const activeSection = ref<UserSection>('managed');
@@ -422,7 +438,7 @@ const activeSectionDescription = computed(() => {
   if (activeSection.value === 'unmanaged') {
     return 'Staff and admin accounts are visible here but cannot be changed from this screen.';
   }
-  return 'Create regular users, deactivate access, and issue setup links.';
+  return 'Create regular users, manage developer access, deactivate accounts, and issue setup links.';
 });
 
 const submitCreate = async (): Promise<void> => {
@@ -467,6 +483,19 @@ const issueReset = async (userId: string): Promise<void> => {
     toast.success('Password setup link generated.');
   } catch (error) {
     toast.error(extractErrorMessage(error, 'Failed to generate password setup link.'));
+  }
+};
+
+const toggleDeveloperAccess = async (user: { id: string; is_developer: boolean }): Promise<void> => {
+  updatingDeveloperUserId.value = user.id;
+  const enabled = !user.is_developer;
+  try {
+    await setDeveloperAccess(user.id, enabled);
+    toast.success(enabled ? 'Developer access granted.' : 'Developer access removed.');
+  } catch (error) {
+    toast.error(extractErrorMessage(error, 'Failed to update developer access.'));
+  } finally {
+    updatingDeveloperUserId.value = null;
   }
 };
 

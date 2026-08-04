@@ -11,6 +11,7 @@ from card_reader_api.common.responses import bad_request, not_found, serializer_
 from card_reader_api.users.serializers import (
     ManagedUserCreateSerializer,
     ManagedUserListQuerySerializer,
+    ManagedUserUpdateSerializer,
     managed_user_payload,
     password_setup_payload,
 )
@@ -73,6 +74,18 @@ class ManagedUserListCreateView(APIView):
 
 class ManagedUserDetailView(APIView):
     permission_classes = [UserManagementAllowed]
+
+    def patch(self, request: Request, user_id: str) -> Response:
+        serializer = ManagedUserUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        user = ManagedUserService().update_developer_role(
+            user_id=user_id,
+            enabled=serializer.validated_data["is_developer"],
+        )
+        if user is None:
+            return not_found("Managed user not found.")
+        return Response(managed_user_payload(user))
 
     def delete(self, _request: Request, user_id: str) -> Response:
         user = ManagedUserService().deactivate_user(user_id=user_id)

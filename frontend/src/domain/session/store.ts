@@ -17,6 +17,8 @@ export const useAuthStore = defineStore('auth', () => {
   const canAccessStaffRoutes = computed(() => user.value?.can_access_admin === true);
   const canManageUsers = computed(() => user.value?.can_manage_users === true);
   const canAccessMaintenance = computed(() => user.value?.can_access_maintenance === true);
+  const canDownloadDeveloperData = computed(() => user.value?.can_download_developer_data === true);
+  const canManageDeveloperData = computed(() => user.value?.can_manage_developer_data === true);
 
   const fetchCurrentUser = async (): Promise<CurrentUser> => {
     loading.value = true;
@@ -62,6 +64,8 @@ export const useAuthStore = defineStore('auth', () => {
     canAccessStaffRoutes,
     canManageUsers,
     canAccessMaintenance,
+    canDownloadDeveloperData,
+    canManageDeveloperData,
     fetchCurrentUser,
     login,
     logout,

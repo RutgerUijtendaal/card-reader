@@ -13,6 +13,7 @@ from card_reader_core.models import (
     UserAccessRequest,
     UserActivity,
 )
+from card_reader_core.services.user_roles import has_developer_role
 
 
 def test_current_user_payload_includes_capabilities() -> None:
@@ -61,6 +62,21 @@ def test_staff_can_create_list_archive_restore_and_reset_managed_users() -> None
     assert list_response.status_code == 200
     listed_ids = {row["id"] for row in list_response.json()["managed_results"]}
     assert str(created_user.id) in listed_ids
+    listed_user = next(
+        row for row in list_response.json()["managed_results"] if row["id"] == str(created_user.id)
+    )
+    assert listed_user["is_developer"] is False
+
+    developer_response = client.patch(
+        f"/admin/users/{created_user.id}",
+        data={"is_developer": True},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert developer_response.status_code == 200
+    assert developer_response.json()["is_developer"] is True
+    created_user.refresh_from_db()
+    assert has_developer_role(created_user) is True
 
     reset_response = client.post(
         f"/admin/users/{created_user.id}/reset-password",
@@ -101,13 +117,20 @@ def test_staff_can_create_list_archive_restore_and_reset_managed_users() -> None
 def test_non_staff_cannot_access_user_management_endpoints() -> None:
     username = "regular-user-manager"
     password = "password123!"
-    _create_user(username, password, is_staff=False)
+    user = _create_user(username, password, is_staff=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
     response = client.get("/admin/users", HTTP_X_CSRFTOKEN=csrf_token)
+    update_response = client.patch(
+        f"/admin/users/{user.id}",
+        data={"is_developer": True},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
 
     assert response.status_code == 403
+    assert update_response.status_code == 403
 
 
 def test_staff_cannot_manage_privileged_accounts_through_managed_users_surface() -> None:
@@ -133,8 +156,15 @@ def test_staff_cannot_manage_privileged_accounts_through_managed_users_surface()
         f"/admin/users/{privileged_user.id}",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
+    update_response = client.patch(
+        f"/admin/users/{privileged_user.id}",
+        data={"is_developer": True},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
 
     assert delete_response.status_code == 404
+    assert update_response.status_code == 404
     privileged_user.refresh_from_db()
     assert privileged_user.is_active is True
 

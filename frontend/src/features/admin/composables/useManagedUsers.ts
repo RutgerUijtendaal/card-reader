@@ -11,6 +11,7 @@ import {
   fetchManagedUsers,
   resetManagedUserPassword,
   restoreManagedUser,
+  updateManagedUser,
 } from '@/features/admin/api/users';
 import type { AccessRequestRecord, ManagedUserRecord, PasswordSetupResponse } from '@/features/admin/types';
 
@@ -73,6 +74,14 @@ export const useManagedUsers = () => {
     setupResponse.value = await resetManagedUserPassword(userId);
   };
 
+  const setDeveloperAccess = async (userId: string, enabled: boolean): Promise<void> => {
+    const updated = await updateManagedUser(userId, { is_developer: enabled });
+    const index = users.value.findIndex((user) => user.id === userId);
+    if (index >= 0) {
+      users.value[index] = updated;
+    }
+  };
+
   const approveRequest = async (accessRequestId: string, username: string): Promise<void> => {
     const response = await approveAccessRequest(accessRequestId, username);
     setupResponse.value = response.password_setup;
@@ -107,6 +116,7 @@ export const useManagedUsers = () => {
     deactivateUser,
     restoreUser,
     resetPassword,
+    setDeveloperAccess,
     approveRequest,
     declineRequest,
   };

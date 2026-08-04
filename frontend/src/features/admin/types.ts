@@ -81,6 +81,7 @@ export type ManagedUserRecord = {
   is_active: boolean;
   is_staff: boolean;
   is_superuser: boolean;
+  is_developer: boolean;
   date_joined: string | null;
   last_login: string | null;
   last_active_at: string | null;
@@ -93,6 +94,10 @@ export type ManagedUserListResponse = {
 
 export type CreateManagedUserRequest = {
   username: string;
+};
+
+export type UpdateManagedUserRequest = {
+  is_developer: boolean;
 };
 
 export type PasswordSetupResponse = {

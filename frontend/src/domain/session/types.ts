@@ -8,6 +8,8 @@ export type CurrentUser = {
   can_access_admin?: boolean;
   can_manage_users?: boolean;
   can_access_maintenance?: boolean;
+  can_download_developer_data?: boolean;
+  can_manage_developer_data?: boolean;
 };
 
 export type LoginCredentials = {

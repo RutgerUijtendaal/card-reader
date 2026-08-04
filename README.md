@@ -15,7 +15,7 @@ https://trello.com/b/sCM4JM5V/cards
 - `services/api`: Django + DRF API service
 - `services/parser`: background OCR/parser worker
 - `services/integration`: integration tests across API, parser, and core
-- `scripts`: project-specific backup, restore, and development automation
+- `scripts`: project-specific maintenance and development automation
 
 ## Stack
 
@@ -36,11 +36,19 @@ https://trello.com/b/sCM4JM5V/cards
 
 ## Quick Start
 
-Install dependencies:
+For a new checkout, sign in with a staff account or an account assigned the Developer role, open
+**Settings → Developer Data**, generate a bootstrap code, then run:
 
 ```bash
-pnpm setup
+pnpm bootstrap:dev
 ```
+
+The command installs dependencies, migrates an empty local database, downloads and verifies the
+bundle pinned by `dev-data.lock.json`, imports its records and media, prompts for local admin
+credentials, and runs a readiness check.
+
+Offline onboarding, reset behavior, and staff publication are documented in
+[Developer data](docs/developer-data.md).
 
 Start the default development stack:
 
@@ -52,6 +60,7 @@ That starts:
 
 - the API
 - the parser worker
+- the developer-data builder worker
 - the web app
 
 ## Local Development
@@ -60,6 +69,8 @@ Useful commands from the repo root:
 
 ```bash
 pnpm setup
+pnpm bootstrap:dev
+pnpm bootstrap:dev:reset
 pnpm deps:js
 pnpm deps:py
 pnpm dev
@@ -94,6 +105,11 @@ uv run --project . --package card-reader-api python manage.py check
 uv run --project . --package card-reader-parser python -m card_reader_parser.main
 ```
 
+## Documentation
+
+Feature guides, operational documentation, and technical references are indexed in
+[docs/README.md](docs/README.md).
+
 ## Configuration
 
 Runtime configuration is provided through `CARD_READER_*` environment variables.
@@ -119,7 +135,9 @@ Auth is always enabled.
 
 - Card gallery and card assets are public
 - Public deck detail and deck TTS export are available to any viewer who can access the deck
-- Import jobs, review, settings, catalog, templates, and CSV exports require a staff user
+- Import jobs, review, administrative settings APIs, catalog, templates, and CSV exports require a staff user
+- Developer-data metadata, direct downloads, and bootstrap-code creation require an active staff
+  account or an active account assigned the Developer role
 - Maintenance endpoints require a superuser
 
 Local user seed data lives at:
@@ -142,6 +160,7 @@ Current container behavior:
 
 - `api`: runs migrations, seeds users/default data, then starts Gunicorn
 - `parser`: starts the background parser and waits for the API health check
+- `developer-data-builder`: processes queued staff builds outside Gunicorn
 
 The API and parser share a Docker volume mounted at `/var/lib/card-reader`.
 
@@ -159,26 +178,3 @@ Default storage locations:
 - Docker: `/var/lib/card-reader`
 
 Set `CARD_READER_APP_DATA_DIR` to override the storage root.
-
-## Backups
-
-Card Reader backup and restore are repo-owned scripts that operate on the deployed
-runtime paths and are intended to be scheduled by server automation.
-
-Create a backup archive:
-
-```bash
-uv run --project . python scripts/create-backup.py --backup-root /mnt/strawberry_volume/backups/card-reader
-```
-
-Restore an archive:
-
-```bash
-uv run --project . python scripts/restore-backup.py /mnt/strawberry_volume/backups/card-reader/card-reader-YYYYMMDD-HHMMSS.tar.gz
-```
-
-Runtime paths are resolved from the deployed environment:
-
-- `CARD_READER_APP_DATA_DIR`
-- `CARD_READER_PUBLIC_APP_DATA_DIR`
-- `CARD_READER_DATABASE_PATH`

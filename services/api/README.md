@@ -6,6 +6,7 @@
 
 - REST API compatibility for the Vue app
 - Session login/logout/current-user endpoints
+- Authenticated developer-data discovery, grants, protected downloads, and staff build management
 - Staff-protected import, review, settings, catalog, template, and CSV export endpoints
 - Superuser-protected maintenance endpoints
 - Docker API entrypoint and health endpoint
@@ -46,6 +47,7 @@ pnpm --filter @card-reader/api dev
 pnpm --filter @card-reader/api test
 pnpm --filter @card-reader/api lint
 pnpm --filter @card-reader/api typecheck
+pnpm --filter @card-reader/api dev-data:doctor
 ```
 
 ## Auth
@@ -54,8 +56,13 @@ Auth is always enabled.
 
 - `/cards`, `/cards/filters`, card image endpoints, symbol assets, `/health`, and `/auth/*` are public.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck.
-- Import jobs, review, settings, catalog, templates, and CSV exports require `is_staff=true`.
+- Import jobs, review, administrative settings APIs, catalog, templates, and CSV exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
+- Developer-data metadata, browser downloads, and code creation require an active staff user or an
+  active user assigned the Developer role through the managed-users API.
+- Developer-data build creation, history, and lock-file downloads require `is_staff=true`.
+- Bootstrap-code exchange is public by design; codes are single-use, expire after 10 minutes, and
+  yield a hashed bearer token that can retry the pinned download for 30 minutes.
 
 The Vue app uses Django session auth with CSRF protection. `/auth/me` and `/auth/login` return the
 current user payload and a CSRF token used by the browser client for unsafe requests.
@@ -89,6 +96,21 @@ User seed format:
 }
 ```
 
+## Developer data
+
+The API owns authenticated bundle discovery, bootstrap grants, protected downloads, staff build
+management, and the worker management commands. See [Developer data](../../docs/developer-data.md)
+for the feature lifecycle, access model, onboarding flow, and publishing behavior.
+
+HTTP surface:
+
+- `GET /developer-data/current`
+- `GET/POST /developer-data/builds`
+- `GET /developer-data/builds/{build_id}/lock`
+- `POST /developer-data/grants`
+- `POST /developer-data/grants/exchange`
+- `GET /developer-data/bundles/{version}/download`
+
 ## Docker
 
 The API container runs:
@@ -99,4 +121,5 @@ python manage.py seed_users
 gunicorn card_reader_api.project.wsgi:application --pythonpath src --bind 0.0.0.0:8000
 ```
 
-The parser container waits for the API health check and shares the same data volume.
+The parser and developer-data builder containers wait for the API health check and share the same
+data volume. The builder processes queued staff requests; it does not import bundles into production.

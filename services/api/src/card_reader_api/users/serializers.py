@@ -7,6 +7,7 @@ from django.contrib.auth.models import AbstractBaseUser
 from rest_framework import serializers
 
 from card_reader_api.auth.password_flow import PasswordSetupLink
+from card_reader_core.services.user_roles import has_developer_role
 
 
 class ManagedUserListQuerySerializer(serializers.Serializer[dict[str, Any]]):
@@ -15,6 +16,10 @@ class ManagedUserListQuerySerializer(serializers.Serializer[dict[str, Any]]):
 
 class ManagedUserCreateSerializer(serializers.Serializer[dict[str, Any]]):
     username = serializers.CharField(required=True, allow_blank=False, max_length=150, trim_whitespace=True)
+
+
+class ManagedUserUpdateSerializer(serializers.Serializer[dict[str, Any]]):
+    is_developer = serializers.BooleanField(required=True)
 
 
 def managed_user_payload(
@@ -30,6 +35,7 @@ def managed_user_payload(
         "is_active": bool(getattr(user, "is_active", False)),
         "is_staff": bool(getattr(user, "is_staff", False)),
         "is_superuser": bool(getattr(user, "is_superuser", False)),
+        "is_developer": has_developer_role(user),
         "date_joined": _isoformat(getattr(user, "date_joined", None)),
         "last_login": _isoformat(getattr(user, "last_login", None)) if include_last_login else None,
         "last_active_at": _isoformat(last_active_at) if include_last_active else None,
