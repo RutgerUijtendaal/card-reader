@@ -11,6 +11,7 @@ import shutil
 import sqlite3
 import subprocess
 import tarfile
+import tempfile
 import time
 from typing import Any
 from urllib.error import URLError
@@ -132,7 +133,7 @@ def create_backup_archive(
 
 
 def validate_backup_archive(archive_path: Path) -> dict[str, Any]:
-    extraction_root = _make_work_dir(archive_path.resolve().parent, "card-reader-validate")
+    extraction_root = _make_work_dir(Path(tempfile.gettempdir()), "card-reader-validate")
     try:
         _extract_archive(archive_path, extraction_root)
         validated = _validate_extracted_backup(extraction_root)
@@ -152,7 +153,10 @@ def restore_backup_archive(
     healthcheck_attempts: int = 10,
     healthcheck_delay_seconds: float = 2.0,
 ) -> Path | None:
-    extraction_root = _make_work_dir(archive_path.resolve().parent, "card-reader-restore")
+    extraction_parent = (
+        backup_root.resolve() if backup_root is not None else Path(tempfile.gettempdir())
+    )
+    extraction_root = _make_work_dir(extraction_parent, "card-reader-restore")
     try:
         _extract_archive(archive_path, extraction_root)
         validated = _validate_extracted_backup(extraction_root)

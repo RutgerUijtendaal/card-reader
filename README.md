@@ -45,6 +45,8 @@ Native full-workspace development is supported on Windows x86_64, Linux x86_64, 
 macOS. PaddlePaddle does not provide every OS/architecture combination used by the parser. On Intel
 macOS or ARM Linux, run the Python services with Docker Compose and the frontend separately instead
 of using `pnpm setup` and `pnpm dev`; ARM Linux hosts must have amd64 container emulation enabled.
+On those platforms, `pnpm preflight` requires Docker and Docker Compose and prints the supported
+split-development workflow instead of directing you to the unsupported native bootstrap.
 
 ## Quick Start
 
@@ -138,6 +140,8 @@ Important settings in `./.env.example`:
 - `CARD_READER_ALLOWED_HOSTS`
 - `CARD_READER_CSRF_TRUSTED_ORIGINS`
 - `CARD_READER_CORS_ORIGINS`
+- `CARD_READER_APP_DATA_DIR`
+- `CARD_READER_PUBLIC_APP_DATA_DIR`
 - `CARD_READER_DATABASE_PATH`
 - `CARD_READER_PARSER_PLATFORM`
 
@@ -174,16 +178,21 @@ Current container behavior:
 - `parser`: starts the background parser and waits for the API health check
 - `developer-data-builder`: processes queued staff builds outside Gunicorn
 
-The API and parser share a Docker volume mounted at `/var/lib/card-reader`.
+The API, parser, and developer-data builder share bind-mounted deployment storage at
+`/var/lib/card-reader`.
 The parser defaults to a `linux/amd64` container so the same locked PaddlePaddle build works on
 x86_64 hosts and through Docker Desktop emulation on Apple Silicon.
 
-The default Compose file uses the Docker-managed `card_reader_data` volume. Deployments that need
-explicit host storage can add the bind-mount override after setting
-`CARD_READER_HOST_APP_DATA_DIR` and `CARD_READER_HOST_PUBLIC_APP_DATA_DIR`:
+The default Compose file preserves the deployment contract: `CARD_READER_APP_DATA_DIR` and
+`CARD_READER_PUBLIC_APP_DATA_DIR` select the host directories that are bind-mounted into the
+containers. Existing deployments can continue using the normal command unchanged.
+
+For a local Docker Desktop run where host paths should not be configured, use the local override.
+It replaces the bind mounts with the Docker-managed `card_reader_data` volume and requires Docker
+Compose 2.24.4 or newer:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.bind.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
 Health check:
@@ -197,8 +206,9 @@ curl http://127.0.0.1:8000/health
 Default storage locations:
 
 - local development: `storage/`
-- Docker: the `card_reader_data` volume mounted at `/var/lib/card-reader`
+- default Docker deployment: the host paths configured through `CARD_READER_APP_DATA_DIR` and
+  `CARD_READER_PUBLIC_APP_DATA_DIR`
+- local Docker override: the `card_reader_data` volume mounted at `/var/lib/card-reader`
 
-Containers use `/var/lib/card-reader` consistently. `CARD_READER_APP_DATA_DIR` remains available to
-native processes that need a custom storage root. Use the explicit bind-mount override when
-container data must live at a known host path.
+Containers use `/var/lib/card-reader` consistently. The host-path settings affect bind-mount
+sources; native processes can also use `CARD_READER_APP_DATA_DIR` to select their storage root.

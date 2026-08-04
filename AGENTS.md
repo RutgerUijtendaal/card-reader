@@ -180,13 +180,15 @@ Core stack:
   Production startup must never import a developer bundle automatically.
 
 ## Docker And Runtime
-- `api` and `parser` share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
+- `api`, `parser`, and `developer-data-builder` share runtime data at `/var/lib/card-reader`.
+- The default `docker-compose.yml` preserves the deployment storage contract by bind-mounting the
+  host paths selected by `CARD_READER_APP_DATA_DIR` and `CARD_READER_PUBLIC_APP_DATA_DIR`.
+- Use `docker-compose.local.yml` when local Docker development should replace those bind mounts with
+  the Docker-managed `card_reader_data` volume.
 - The parser container defaults to `linux/amd64` because the locked PaddlePaddle release has no
   Linux ARM64 wheel. Docker Desktop provides emulation on Apple Silicon.
 - Native full-workspace development supports Windows x86_64, Linux x86_64, and macOS ARM64 on
   Python 3.12 or 3.13; `.python-version` pins the default environment to Python 3.12.
-- Use `docker-compose.bind.yml` with explicit `CARD_READER_HOST_*` paths when deployment storage
-  must be bind-mounted from the host; the default Compose file uses a Docker-managed volume.
 - API container startup runs migrations, user seeds, default seeds, then Gunicorn.
 - Parser container waits for the API health check and assumes the schema is ready.
 - Parser container uses `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`.

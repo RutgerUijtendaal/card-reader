@@ -1,6 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
+import {
+  getNativePlatformSupport,
+  unsupportedNativePlatformMessage,
+} from './native-platform-support.mjs';
+
 const links = {
   docker: 'https://docs.docker.com/get-started/get-docker/',
   node: 'https://nodejs.org/en/download',
@@ -82,44 +87,74 @@ if (pnpmResult.ok && pnpmVersion && pnpmVersion.major >= 10) {
   fail('pnpm', `10+ is required. Install or upgrade: ${links.pnpm}`);
 }
 
-const uvResult = runTool('uv', ['--version']);
-if (uvResult.ok) {
-  pass('uv', uvResult.output.split(/\r?\n/, 1)[0]);
-} else {
-  fail('uv', `not found. Install it before bootstrapping: ${links.uv}`);
-}
+const nativePlatform = getNativePlatformSupport();
+if (nativePlatform.supported) {
+  pass('Native Python', `${nativePlatform.key} is supported`);
 
-if (uvResult.ok) {
-  const pythonPathResult = runTool('uv', ['python', 'find']);
-  const pythonPath = pythonPathResult.output.split(/\r?\n/).filter(Boolean).at(-1) ?? '';
-  const pythonResult =
-    pythonPathResult.ok && pythonPath
-      ? runExecutable(pythonPath, ['--version'])
-      : { ok: false, output: '' };
-  const pythonVersion = parseVersion(pythonResult.output);
-  if (
-    pythonResult.ok &&
-    pythonVersion &&
-    pythonVersion.major === 3 &&
-    [12, 13].includes(pythonVersion.minor)
-  ) {
-    pass('Python', `${pythonVersion.text} selected by uv`);
+  const uvResult = runTool('uv', ['--version']);
+  if (uvResult.ok) {
+    pass('uv', uvResult.output.split(/\r?\n/, 1)[0]);
   } else {
-    fail(
-      'Python',
-      '3.12 or 3.13 is required. Install the pinned version with: uv python install 3.12',
-    );
+    fail('uv', `not found. Install it before bootstrapping: ${links.uv}`);
   }
+
+  if (uvResult.ok) {
+    const pythonPathResult = runTool('uv', ['python', 'find']);
+    const pythonPath = pythonPathResult.output.split(/\r?\n/).filter(Boolean).at(-1) ?? '';
+    const pythonResult =
+      pythonPathResult.ok && pythonPath
+        ? runExecutable(pythonPath, ['--version'])
+        : { ok: false, output: '' };
+    const pythonVersion = parseVersion(pythonResult.output);
+    if (
+      pythonResult.ok &&
+      pythonVersion &&
+      pythonVersion.major === 3 &&
+      [12, 13].includes(pythonVersion.minor)
+    ) {
+      pass('Python', `${pythonVersion.text} selected by uv`);
+    } else {
+      fail(
+        'Python',
+        '3.12 or 3.13 is required. Install the pinned version with: uv python install 3.12',
+      );
+    }
+  }
+} else {
+  warn('Native Python', unsupportedNativePlatformMessage(nativePlatform.key));
 }
 
 const dockerResult = runTool('docker', ['--version']);
 if (dockerResult.ok) {
-  pass('Docker', `${dockerResult.output.split(/\r?\n/, 1)[0]} (optional)`);
+  const requirement = nativePlatform.supported ? 'optional' : 'required for this platform';
+  pass('Docker', `${dockerResult.output.split(/\r?\n/, 1)[0]} (${requirement})`);
 } else {
-  warn(
-    'Docker',
-    `optional for native development; install it for container workflows: ${links.docker}`,
-  );
+  const detail = nativePlatform.supported
+    ? `optional for native development; install it for container workflows: ${links.docker}`
+    : `required for ${nativePlatform.key}: ${links.docker}`;
+  if (nativePlatform.supported) {
+    warn('Docker', detail);
+  } else {
+    fail('Docker', detail);
+  }
+}
+
+if (!nativePlatform.supported && dockerResult.ok) {
+  const composeResult = runTool('docker', ['compose', 'version']);
+  const composeVersion = parseVersion(composeResult.output);
+  const supportsVolumeOverride =
+    composeVersion &&
+    (composeVersion.major > 2 ||
+      (composeVersion.major === 2 &&
+        (composeVersion.minor > 24 || (composeVersion.minor === 24 && composeVersion.patch >= 4))));
+  if (composeResult.ok && supportsVolumeOverride) {
+    pass('Docker Compose', `${composeResult.output.split(/\r?\n/, 1)[0]} (requires 2.24.4+)`);
+  } else {
+    fail(
+      'Docker Compose',
+      `version 2.24.4+ is required for the local volume override: ${links.docker}`,
+    );
+  }
 }
 
 if (failureCount > 0) {
@@ -127,6 +162,16 @@ if (failureCount > 0) {
   process.exit(1);
 }
 
-console.log(
-  '\nRequired system tools are ready. Run pnpm bootstrap:dev to install project dependencies.',
-);
+if (nativePlatform.supported) {
+  console.log(
+    '\nRequired system tools are ready. Run pnpm bootstrap:dev to install project dependencies.',
+  );
+} else {
+  console.log(
+    [
+      '\nFrontend and container prerequisites are ready.',
+      'Run pnpm deps:js, start the Python services with the local Docker Compose override,',
+      'then run the frontend separately with pnpm --filter @card-reader/web dev.',
+    ].join('\n'),
+  );
+}

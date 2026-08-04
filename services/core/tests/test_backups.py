@@ -7,6 +7,7 @@ import tarfile
 
 import pytest
 
+from card_reader_core.operations import backups
 from card_reader_core.operations.backups import (
     BackupError,
     ComposeConfig,
@@ -86,6 +87,38 @@ def test_restore_backup_archive_restores_runtime_state(tmp_path: Path) -> None:
     assert (target_runtime.app_data_dir / "uploads" / "upload.txt").read_text(encoding="utf-8") == "upload"
     assert (target_runtime.public_app_data_dir / "images" / "card.png").read_text(encoding="utf-8") == "image"
     assert (target_runtime.public_app_data_dir / "symbols" / "symbol.svg").read_text(encoding="utf-8") == "symbol"
+
+
+def test_restore_backup_archive_extracts_under_writable_backup_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_runtime = _build_runtime(tmp_path / "source-runtime")
+    archive = create_backup_archive(
+        runtime_paths=source_runtime,
+        backup_root=tmp_path / "read-only-archive-mount",
+    ).archive_path
+    backup_root = tmp_path / "writable-backup-output"
+    observed_extraction_parent: Path | None = None
+
+    make_work_dir = backups._make_work_dir
+
+    def track_work_dir(parent_dir: Path, prefix: str) -> Path:
+        nonlocal observed_extraction_parent
+        if prefix == "card-reader-restore":
+            observed_extraction_parent = parent_dir
+        return make_work_dir(parent_dir, prefix)
+
+    monkeypatch.setattr(backups, "_make_work_dir", track_work_dir)
+
+    restore_backup_archive(
+        archive_path=archive,
+        runtime_paths=_build_runtime(tmp_path / "target-runtime"),
+        backup_root=backup_root,
+        compose_config=None,
+        healthcheck_url=None,
+    )
+
+    assert observed_extraction_parent == backup_root.resolve()
 
 
 def test_restore_backup_archive_recovers_when_safety_backup_fails(tmp_path: Path) -> None:
