@@ -7,6 +7,8 @@ from card_reader_api.common.auth_access import (
     can_access_authenticated_features,
     can_access_admin,
     can_access_maintenance,
+    can_download_developer_data,
+    can_manage_developer_data,
     can_manage_users,
 )
 
@@ -29,3 +31,13 @@ class AuthenticatedAllowed(BasePermission):
 class UserManagementAllowed(BasePermission):
     def has_permission(self, request: Request, view: object) -> bool:
         return can_manage_users(request.user)
+
+
+class DeveloperDataAllowed(BasePermission):
+    def has_permission(self, request: Request, view: object) -> bool:
+        return can_download_developer_data(request.user)
+
+
+class DeveloperDataManagementAllowed(BasePermission):
+    def has_permission(self, request: Request, view: object) -> bool:
+        return can_manage_developer_data(request.user)

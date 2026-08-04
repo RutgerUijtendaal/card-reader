@@ -24,4 +24,5 @@ urlpatterns = [
     path("", include("card_reader_api.users.urls")),
     path("", include("card_reader_api.exports.urls")),
     path("", include("card_reader_api.maintenance.urls")),
+    path("", include("card_reader_api.developer_data.urls")),
 ]

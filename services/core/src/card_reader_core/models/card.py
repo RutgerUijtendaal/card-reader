@@ -47,6 +47,7 @@ class Card(TimestampedModel):
         hero_decks: Manager[Deck]
         deck_entries: Manager[DeckEntry]
         deck_sideboard_entries: Manager[DeckSideboardEntry]
+        versions: Manager[CardVersion]
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)

@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
+from card_reader_core.services.user_roles import set_developer_role
+
 
 class ManagedUserService:
     def list_users(self, *, include_inactive: bool = False) -> tuple[list[User], list[User]]:
@@ -57,6 +59,13 @@ class ManagedUserService:
     def get_managed_user(self, *, user_id: str) -> User | None:
         return self._managed_user_by_id(user_id)
 
+    def update_developer_role(self, *, user_id: str, enabled: bool) -> User | None:
+        user = self._managed_user_by_id(user_id)
+        if user is None:
+            return None
+        set_developer_role(user, enabled=enabled)
+        return user
+
     def _managed_user_by_id(self, user_id: str) -> User | None:
         try:
             return self._managed_user_queryset().get(pk=user_id)
@@ -64,12 +73,13 @@ class ManagedUserService:
             return None
 
     def _managed_user_queryset(self) -> QuerySet[User]:
-        return self._user_model().objects.filter(is_staff=False, is_superuser=False)
+        return self._user_model().objects.filter(is_staff=False, is_superuser=False).prefetch_related("groups")
 
     def _unmanaged_user_queryset(self) -> QuerySet[User]:
-        return self._user_model().objects.filter(is_staff=True) | self._user_model().objects.filter(
-            is_superuser=True
-        )
+        return (
+            self._user_model().objects.filter(is_staff=True)
+            | self._user_model().objects.filter(is_superuser=True)
+        ).prefetch_related("groups")
 
     def _user_model(self) -> type[User]:
         return cast(type[User], get_user_model())

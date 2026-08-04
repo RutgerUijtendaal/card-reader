@@ -7,6 +7,7 @@ import type {
   ManagedUserListResponse,
   ManagedUserRecord,
   PasswordSetupResponse,
+  UpdateManagedUserRequest,
 } from '@/features/admin/types';
 
 export const fetchManagedUsers = async (
@@ -27,6 +28,14 @@ export const createManagedUser = async (
 
 export const deactivateManagedUser = async (userId: string): Promise<void> => {
   await api.delete(`/admin/users/${userId}`);
+};
+
+export const updateManagedUser = async (
+  userId: string,
+  payload: UpdateManagedUserRequest,
+): Promise<ManagedUserRecord> => {
+  const response = await api.patch<ManagedUserRecord>(`/admin/users/${userId}`, payload);
+  return response.data;
 };
 
 export const restoreManagedUser = async (userId: string): Promise<ManagedUserRecord> => {

@@ -16,10 +16,10 @@
         <AppStickyAside>
           <div class="mb-3 px-1">
             <h3 class="theme-section-title text-sm font-semibold">
-              Card Browsing
+              Preferences
             </h3>
             <p class="theme-section-muted mt-1 text-xs">
-              Defaults for shared card list preferences.
+              Personal preferences and developer tools.
             </p>
           </div>
 
@@ -186,7 +186,7 @@
         </section>
 
         <section
-          v-else
+          v-else-if="activeSection === 'hover'"
           class="space-y-3"
         >
           <div class="space-y-1">
@@ -252,19 +252,26 @@
             >
           </div>
         </section>
+
+        <DeveloperDataSettingsSection
+          v-else-if="activeSection === 'developer-data' && auth.canDownloadDeveloperData"
+          :can-manage="auth.canManageDeveloperData"
+        />
       </section>
     </AppPageLayout>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { ArrowUpDown, Eye, MousePointer2, SlidersHorizontal } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
+import { ArrowUpDown, Database, Eye, MousePointer2, SlidersHorizontal } from 'lucide-vue-next';
 import type { Component } from 'vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
+import { useAuthStore } from '@/domain/session/store';
+import DeveloperDataSettingsSection from './components/DeveloperDataSettingsSection.vue';
 import type { PopoverOptionItem } from '@/domain/cards/components/PopoverOptionList.vue';
 import type { CardSort } from '@/domain/cards/utils/gallery/cardSort';
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
@@ -281,7 +288,7 @@ import {
 import { useHoverModePreferences } from '@/domain/cards/composables/useHoverModePreferences';
 import { useCardSortPreferences } from '@/domain/cards/composables/useCardSortPreferences';
 
-type SettingsSectionId = 'display' | 'sort' | 'hover';
+type SettingsSectionId = 'display' | 'sort' | 'hover' | 'developer-data';
 
 type SettingsSection = {
   id: SettingsSectionId;
@@ -292,10 +299,11 @@ type SettingsSection = {
 };
 
 const { defaultSort } = useCardSortPreferences();
+const auth = useAuthStore();
 const { defaultHoverMode, hoverPreviewScale } = useHoverModePreferences();
 const { cardScale, showCardGroups, pageSize } = useGalleryOptions();
 const activeSection = ref<SettingsSectionId>('display');
-const settingsSections: SettingsSection[] = [
+const preferenceSections: SettingsSection[] = [
   {
     id: 'display',
     label: 'Display',
@@ -318,6 +326,18 @@ const settingsSections: SettingsSection[] = [
     icon: MousePointer2,
   },
 ];
+const developerDataSection: SettingsSection = {
+  id: 'developer-data',
+  label: 'Developer Data',
+  summary: 'Bootstrap a checkout',
+  description: 'Download the reviewed dataset, create a bootstrap code, or publish a new staff build.',
+  icon: Database,
+};
+const settingsSections = computed<SettingsSection[]>(() =>
+  auth.canDownloadDeveloperData
+    ? [...preferenceSections, developerDataSection]
+    : preferenceSections,
+);
 const hoverModeOptions = HOVER_MODE_OPTIONS;
 const cardSortMenuOptions = computed<PopoverOptionItem[]>(() =>
   cardSortOptions.map((option) => ({
@@ -343,7 +363,16 @@ const cardPageSizeSelectOptions = computed(() =>
 const percentLabel = computed(() => `${Math.round(cardScale.value * 100)}%`);
 const hoverPreviewScaleLabel = computed(() => `${Math.round(hoverPreviewScale.value * 100)}%`);
 const activeSectionDetails = computed(
-  () => settingsSections.find((section) => section.id === activeSection.value) ?? settingsSections[0],
+  () => settingsSections.value.find((section) => section.id === activeSection.value) ?? settingsSections.value[0]!,
+);
+
+watch(
+  () => auth.canDownloadDeveloperData,
+  (allowed) => {
+    if (!allowed && activeSection.value === 'developer-data') {
+      activeSection.value = 'display';
+    }
+  },
 );
 
 const handleDefaultHoverModeSelect = (value: string): void => {

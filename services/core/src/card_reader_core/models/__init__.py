@@ -15,6 +15,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".parse_flag", __name__),
     import_module(".deck", __name__),
     import_module(".deck_tag", __name__),
+    import_module(".developer_data", __name__),
     import_module(".notification", __name__),
     import_module(".user_access_request", __name__),
     import_module(".user_activity", __name__),
@@ -76,6 +77,11 @@ if TYPE_CHECKING:
         DeckTagSuggestion,
         DeckTagSuggestionDeck,
         DeckTagSuggestionStatus,
+    )
+    from .developer_data import (
+        DeveloperDataBuild,
+        DeveloperDataBuildStatus,
+        DeveloperDataDownloadGrant,
     )
     from .notification import (
         NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
@@ -163,6 +169,9 @@ _EXPORTS = {
     "DeckTagSuggestion": ".deck_tag",
     "DeckTagSuggestionDeck": ".deck_tag",
     "DeckTagSuggestionStatus": ".deck_tag",
+    "DeveloperDataDownloadGrant": ".developer_data",
+    "DeveloperDataBuild": ".developer_data",
+    "DeveloperDataBuildStatus": ".developer_data",
     "UserNotification": ".notification",
     "NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED": ".notification",
     "NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED": ".notification",
@@ -243,6 +252,9 @@ __all__ = [
     "DeckTagSuggestion",
     "DeckTagSuggestionDeck",
     "DeckTagSuggestionStatus",
+    "DeveloperDataDownloadGrant",
+    "DeveloperDataBuild",
+    "DeveloperDataBuildStatus",
     "UserNotification",
     "NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED",
     "NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED",

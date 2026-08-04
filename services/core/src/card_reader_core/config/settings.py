@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     app_data_dir: Path | None = None
     low_confidence_threshold: float = 0.8
     save_debug_crops: bool = True
+    developer_data_dir: Path | None = None
+    developer_data_accel_redirect_prefix: str = ""
+    developer_data_selection_file: Path | None = None
+    developer_data_public_api_base_url: str = "https://maityscardgame.com/api"
 
     @model_validator(mode="after")
     def _merge_default_cors_origins(self) -> "Settings":
@@ -69,6 +73,16 @@ class Settings(BaseSettings):
     @property
     def debug_crops_dir(self) -> Path:
         return self.storage_root_dir / "debug-crops"
+
+    @property
+    def developer_data_root_dir(self) -> Path:
+        if self.developer_data_dir is not None:
+            return self.developer_data_dir
+        return self.storage_root_dir / "dev-data"
+
+    @property
+    def developer_data_selection_path(self) -> Path:
+        return self.developer_data_selection_file or REPO_ROOT / "dev-data" / "selection.json"
 
 
 settings = Settings()

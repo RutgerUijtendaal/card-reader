@@ -13,6 +13,7 @@ export const domainDependencies = {
   cards: ['deck-building'],
   'deck-building': [],
   decks: ['cards', 'deck-building'],
+  'developer-data': [],
   maintenance: [],
   notifications: ['session'],
   review: ['cards', 'session'],

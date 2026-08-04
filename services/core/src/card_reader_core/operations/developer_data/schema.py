@@ -1,0 +1,183 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+DEVELOPER_DATA_FORMAT_VERSION = 1
+
+
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class CoverageRequirements(StrictModel):
+    min_cards: int = Field(default=1, ge=0)
+    min_heroes: int = Field(default=1, ge=0)
+    min_deprecated_cards: int = Field(default=1, ge=0)
+    min_card_groups: int = Field(default=1, ge=0)
+    min_cards_with_multiple_versions: int = Field(default=1, ge=0)
+    required_template_keys: list[str] = Field(default_factory=list)
+
+
+class DeveloperDataSelection(StrictModel):
+    bundle_version: str = Field(min_length=1)
+    card_keys: list[str] = Field(default_factory=list)
+    card_group_keys: list[str] = Field(default_factory=list)
+    coverage: CoverageRequirements = Field(default_factory=CoverageRequirements)
+
+
+class CatalogRecord(StrictModel):
+    key: str
+    label: str
+    identifiers: list[str]
+
+
+class SymbolRecord(StrictModel):
+    key: str
+    label: str
+    symbol_type: str
+    detector_type: str
+    detection_config: dict[str, Any]
+    text_enrichment: dict[str, Any]
+    reference_assets: list[str]
+    text_token: str
+    enabled: bool
+
+
+class TemplateRecord(StrictModel):
+    key: str
+    label: str
+    definition: dict[str, Any]
+
+
+class DeckTagRecord(StrictModel):
+    kind: str
+    key: str
+    label: str
+
+
+class ContentVersionRecord(StrictModel):
+    version_number: str
+    base_version: str
+    major: int
+    minor: int
+    patch: int
+    description: str
+
+
+class CardImageRecord(StrictModel):
+    stored_path: str
+    width: int
+    height: int
+    checksum: str
+
+
+class CardVersionRecord(StrictModel):
+    version_number: int
+    template_key: str
+    image_hash: str
+    name: str
+    type_line: str
+    mana_cost: str
+    mana_symbols: list[Any]
+    mana_value: int | None
+    attack: int | None
+    health: int | None
+    rules_text_raw: str
+    rules_text_enriched: str
+    rules_text: str
+    confidence: float
+    field_sources: dict[str, Any]
+    parsed_snapshot: dict[str, Any]
+    is_latest: bool
+    previous_version_number: int | None
+    content_version_number: str | None
+    keyword_keys: list[str]
+    tag_keys: list[str]
+    symbol_keys: list[str]
+    type_keys: list[str]
+    images: list[CardImageRecord]
+
+
+class CardAliasRecord(StrictModel):
+    key: str
+    label: str
+
+
+class CardRecord(StrictModel):
+    key: str
+    label: str
+    is_hero: bool
+    deck_building_config: dict[str, Any]
+    lifecycle_status: str
+    latest_version_number: int | None
+    aliases: list[CardAliasRecord]
+    versions: list[CardVersionRecord]
+
+
+class CardGroupMemberRecord(StrictModel):
+    card_key: str
+    position: int
+
+
+class CardGroupRecord(StrictModel):
+    key: str
+    name: str
+    anchor_card_key: str
+    members: list[CardGroupMemberRecord]
+
+
+class CardBackRecord(StrictModel):
+    label: str
+    stored_path: str
+    width: int
+    height: int
+    checksum: str
+
+
+class DeveloperDataPayload(StrictModel):
+    keywords: list[CatalogRecord]
+    tags: list[CatalogRecord]
+    types: list[CatalogRecord]
+    symbols: list[SymbolRecord]
+    templates: list[TemplateRecord]
+    deck_tags: list[DeckTagRecord]
+    content_versions: list[ContentVersionRecord]
+    cards: list[CardRecord]
+    card_groups: list[CardGroupRecord]
+    current_card_back: CardBackRecord | None
+
+
+class BundleFileRecord(StrictModel):
+    path: str
+    sha256: str
+    size_bytes: int
+
+
+class DeveloperDataManifest(StrictModel):
+    format_version: int
+    bundle_version: str
+    created_at: datetime
+    source_revision: str
+    source_migration: str
+    selection_sha256: str
+    counts: dict[str, int]
+    files: list[BundleFileRecord]
+
+
+class PublishedBundle(StrictModel):
+    bundle_version: str
+    format_version: int
+    filename: str
+    sha256: str
+    size_bytes: int
+    created_at: datetime
+
+
+class DeveloperDataLock(StrictModel):
+    bundle_version: str
+    format_version: int
+    sha256: str
+    api_base_url: str
