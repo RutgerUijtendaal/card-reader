@@ -67,255 +67,37 @@
     </header>
 
     <div class="playtest-opening-main">
-      <section
+      <PlaytestOpeningManaStep
         v-if="openingStep === 'mana'"
-        key="mana"
-        class="playtest-opening-panel playtest-opening-mana"
-        data-testid="playtest-opening-mana"
-      >
-        <div class="playtest-opening-panel-heading">
-          <div>
-            <h3>Starting mana</h3>
-            <p>Select exactly 3 mana copies that should begin in play.</p>
-          </div>
-        </div>
-
-        <div class="playtest-opening-mana-grid app-scrollbar">
-          <article
-            v-for="group in manaGroups"
-            :key="group.cardId"
-            class="playtest-opening-mana-card"
-            role="button"
-            tabindex="0"
-            @click="selectManaFromGroup(group)"
-            @keydown.enter.prevent="selectManaFromGroup(group)"
-            @keydown.space.prevent="selectManaFromGroup(group)"
-            @contextmenu.prevent="deselectManaFromGroup(group)"
-          >
-            <PlaytestCard
-              :instance="group.instances[0]"
-              :interactive="false"
-            />
-            <div class="playtest-opening-card-copy-actions">
-              <button
-                v-for="(instance, index) in group.instances"
-                :key="instance.instanceId"
-                class="playtest-opening-copy-button"
-                :class="selectedManaSet.has(instance.instanceId) ? 'playtest-opening-copy-button-selected' : ''"
-                type="button"
-                :aria-pressed="selectedManaSet.has(instance.instanceId)"
-                @click.stop="emit('toggle-mana', instance.instanceId, !selectedManaSet.has(instance.instanceId))"
-                @contextmenu.prevent.stop="emit('toggle-mana', instance.instanceId, !selectedManaSet.has(instance.instanceId))"
-              >
-                {{ index + 1 }}
-              </button>
-            </div>
-          </article>
-        </div>
-
-        <div class="playtest-opening-mana-actions">
-          <button
-            :class="hasSetupCards ? 'btn-primary' : 'btn-secondary'"
-            type="button"
-            :disabled="selectedManaIds.length !== STARTING_MANA_REQUIRED"
-            @click="emit('continue-mana')"
-          >
-            Setup board
-          </button>
-          <button
-            v-if="!hasSetupCards"
-            class="btn-primary"
-            type="button"
-            :disabled="selectedManaIds.length !== STARTING_MANA_REQUIRED"
-            @click="emit('draw-hand')"
-          >
-            Draw hand
-          </button>
-        </div>
-      </section>
-
-      <section
+        :mana-instances="manaInstances"
+        :selected-mana-ids="selectedManaIds"
+        :has-setup-cards="hasSetupCards"
+        @continue-mana="emit('continue-mana')"
+        @draw-hand="emit('draw-hand')"
+        @toggle-mana="forwardManaToggle"
+      />
+      <PlaytestOpeningSetupStep
         v-else-if="openingStep === 'setup'"
-        key="setup"
-        class="playtest-opening-setup-stage"
-        :class="hasSetupCards ? '' : 'playtest-opening-setup-stage-library-only'"
-      >
-        <section
-          v-if="hasSetupCards"
-          class="playtest-opening-panel playtest-opening-setup-guide"
-          data-testid="playtest-opening-setup-cards"
-        >
-          <div class="playtest-opening-panel-heading">
-            <div>
-              <h3>Setup instructions</h3>
-              <p>Ready your board state here: move cards between zones before drawing your hand.</p>
-            </div>
-            <span>{{ setupGroups.length }} found</span>
-          </div>
-
-          <div class="playtest-opening-setup-list app-scrollbar">
-            <article
-              v-for="group in setupGroups"
-              :key="group.cardId"
-              class="playtest-opening-setup-card"
-              :class="handledSetupCardSet.has(group.cardId) ? 'playtest-opening-setup-card-handled' : ''"
-              role="checkbox"
-              tabindex="0"
-              :aria-checked="handledSetupCardSet.has(group.cardId)"
-              @click="toggleSetupHandled(group.cardId)"
-              @keydown.enter.prevent="toggleSetupHandled(group.cardId)"
-              @keydown.space.prevent="toggleSetupHandled(group.cardId)"
-            >
-              <div class="playtest-opening-setup-card-preview">
-                <PlaytestCard
-                  :instance="group.instances[0]"
-                  :interactive="false"
-                />
-              </div>
-              <div class="playtest-opening-setup-card-main">
-                <div class="playtest-opening-setup-card-title">
-                  <strong>{{ group.card.name }}</strong>
-                  <span>{{ group.instances.length }} {{ group.instances.length === 1 ? 'copy' : 'copies' }}</span>
-                </div>
-                <p class="playtest-opening-setup-rule-text">
-                  {{ group.card.rules_text || 'Resolve this setup effect before drawing your opening hand.' }}
-                </p>
-                <label
-                  class="playtest-opening-setup-check"
-                  @click.stop
-                >
-                  <input
-                    type="checkbox"
-                    :checked="handledSetupCardSet.has(group.cardId)"
-                    @change="emitSetupHandled(group.cardId, $event)"
-                  >
-                  <span>Handled</span>
-                </label>
-              </div>
-            </article>
-          </div>
-
-          <div class="playtest-opening-setup-footer">
-            <button
-              class="btn-primary"
-              type="button"
-              @click="emit('continue-setup')"
-            >
-              Draw hand
-            </button>
-          </div>
-        </section>
-
-        <div class="playtest-opening-setup-library-area">
-          <PlaytestStackBrowser
-            title="Library"
-            subtitle="Set up the starting board state before drawing your hand."
-            :instances="libraryInstances"
-            :card-interactive="true"
-            :dragging-instance-ids="draggingInstanceIds"
-            drop-zone-id="library"
-            search-placeholder="Search library"
-            test-id="playtest-opening-library-browser"
-            @pointer-card="handleCardPointer"
-            @context-card="handleCardContextMenu"
-            @hover="emit('hover', $event)"
-          >
-            <template #actions="{ group }">
-              <button
-                class="btn-primary"
-                type="button"
-                @click="emit('move-setup-card', group.instances[0].instanceId, 'banish')"
-              >
-                Banish
-              </button>
-              <button
-                class="btn-secondary"
-                type="button"
-                @click="emit('move-setup-card', group.instances[0].instanceId, 'discard')"
-              >
-                Discard
-              </button>
-              <button
-                class="btn-secondary"
-                type="button"
-                @click="emit('move-setup-card', group.instances[0].instanceId, 'play')"
-              >
-                Play
-              </button>
-            </template>
-
-            <template
-              v-if="!hasSetupCards"
-              #footer
-            >
-              <button
-                class="btn-primary"
-                type="button"
-                @click="emit('continue-setup')"
-              >
-                Draw hand
-              </button>
-            </template>
-          </PlaytestStackBrowser>
-        </div>
-      </section>
-
-      <section
+        :setup-instances="setupInstances"
+        :library-instances="libraryInstances"
+        :handled-setup-card-ids="handledSetupCardIds"
+        :dragging-instance-ids="draggingInstanceIds"
+        @continue-setup="emit('continue-setup')"
+        @toggle-setup-handled="forwardSetupHandled"
+        @move-setup-card="forwardSetupMove"
+        @pointer-card="handleCardPointer"
+        @context-card="handleCardContextMenu"
+        @hover="emit('hover', $event)"
+      />
+      <PlaytestOpeningHandStep
         v-else
-        key="hand"
-        class="playtest-opening-hand-stage"
-        data-testid="playtest-opening-hand"
-      >
-        <h3>Opening hand</h3>
-        <div class="playtest-opening-hand">
-          <div
-            v-for="(instance, index) in handInstances"
-            :key="instance.instanceId"
-            class="playtest-opening-hand-card"
-            :style="openingHandCardStyle(index, handInstances.length)"
-          >
-            <PlaytestCard
-              :instance="instance"
-              :interactive="false"
-            />
-          </div>
-          <div
-            v-if="handInstances.length === 0"
-            key="opening-hand-empty"
-            class="playtest-opening-empty"
-          >
-            No cards available.
-          </div>
-        </div>
-
-        <div class="playtest-opening-hand-actions">
-          <label class="playtest-opening-hand-size">
-            Hand
-            <input
-              class="input-base h-9 w-20 px-3 py-1"
-              type="number"
-              min="0"
-              max="99"
-              :value="handSize"
-              @input="emitHandSize"
-            >
-          </label>
-          <button
-            class="btn-primary"
-            type="button"
-            @click="emit('keep')"
-          >
-            Keep this
-          </button>
-          <button
-            class="btn-secondary"
-            type="button"
-            @click="emit('mulligan')"
-          >
-            Mulligan [{{ mulliganCount }}]
-          </button>
-        </div>
-      </section>
+        :hand-instances="handInstances"
+        :hand-size="handSize"
+        :mulligan-count="mulliganCount"
+        @keep="emit('keep')"
+        @mulligan="emit('mulligan')"
+        @update-hand-size="emit('update-hand-size', $event)"
+      />
     </div>
 
     <div
@@ -368,8 +150,10 @@ import { computed, ref } from 'vue';
 import { useResizeObserver } from '@vueuse/core';
 import { ArrowLeft, ArrowRight } from 'lucide-vue-next';
 import PlaytestCard from '@/features/playtester/components/PlaytestCard.vue';
-import PlaytestStackBrowser from '@/features/playtester/components/PlaytestStackBrowser.vue';
-import { STARTING_MANA_REQUIRED } from '@/features/playtester/playtestState';
+import PlaytestOpeningManaStep from '@/features/playtester/components/PlaytestOpeningManaStep.vue';
+import PlaytestOpeningSetupStep from '@/features/playtester/components/PlaytestOpeningSetupStep.vue';
+import PlaytestOpeningHandStep from '@/features/playtester/components/PlaytestOpeningHandStep.vue';
+import { STARTING_MANA_REQUIRED } from '@/features/playtester/playtestStateCore';
 import type {
   PlaytestCardInstance,
   PlaytestCardSource,
@@ -377,12 +161,6 @@ import type {
   PlaytestOpeningStep,
   PlaytestZoneId,
 } from '@/features/playtester/types';
-
-type CardInstanceGroup = {
-  cardId: string;
-  card: PlaytestCardInstance['card'];
-  instances: PlaytestCardInstance[];
-};
 
 const props = defineProps<{
   openingStep: PlaytestOpeningStep;
@@ -420,34 +198,7 @@ const emit = defineEmits<{
 }>();
 
 const bottomRef = ref<HTMLElement | null>(null);
-const selectedManaSet = computed(() => new Set(props.selectedManaIds));
-const handledSetupCardSet = computed(() => new Set(props.handledSetupCardIds));
-
-const groupInstancesByCard = (instances: PlaytestCardInstance[]): CardInstanceGroup[] => {
-  const groups = new Map<string, CardInstanceGroup>();
-  for (const instance of instances) {
-    const group = groups.get(instance.cardId);
-    if (group) {
-      group.instances = [...group.instances, instance];
-    } else {
-      groups.set(instance.cardId, {
-        cardId: instance.cardId,
-        card: instance.card,
-        instances: [instance],
-      });
-    }
-  }
-  return [...groups.values()]
-    .map((group) => ({
-      ...group,
-      instances: [...group.instances].sort((left, right) => left.order - right.order || left.instanceId.localeCompare(right.instanceId)),
-    }))
-    .sort((left, right) => left.card.name.localeCompare(right.card.name) || left.cardId.localeCompare(right.cardId));
-};
-
-const manaGroups = computed(() => groupInstancesByCard(props.manaInstances));
-const setupGroups = computed(() => groupInstancesByCard(props.setupInstances));
-const hasSetupCards = computed(() => setupGroups.value.length > 0);
+const hasSetupCards = computed(() => props.setupInstances.length > 0);
 const selectedManaInstances = computed(() => {
   const selectedIds = new Set(props.selectedManaIds);
   return props.manaInstances.filter((instance) => selectedIds.has(instance.instanceId));
@@ -491,6 +242,12 @@ const handleCardPointer = (
 const handleCardContextMenu = (instanceId: string, event: MouseEvent): void => {
   emit('context-card', instanceId, event);
 };
+const forwardManaToggle = (instanceId: string, selected: boolean): void =>
+  emit('toggle-mana', instanceId, selected);
+const forwardSetupHandled = (cardId: string, handled: boolean): void =>
+  emit('toggle-setup-handled', cardId, handled);
+const forwardSetupMove = (instanceId: string, zoneId: PlaytestZoneId): void =>
+  emit('move-setup-card', instanceId, zoneId);
 const visibleSteps = computed(() => {
   const steps: Array<{ id: PlaytestOpeningStep; label: string }> = [
     { id: 'mana', label: 'Mana' },
@@ -531,32 +288,6 @@ const selectStep = (step: PlaytestOpeningStep): void => {
   }
 };
 
-const selectManaFromGroup = (group: CardInstanceGroup): void => {
-  const instance = group.instances.find((entry) => !selectedManaSet.value.has(entry.instanceId));
-  if (instance) {
-    emit('toggle-mana', instance.instanceId, true);
-  }
-};
-
-const deselectManaFromGroup = (group: CardInstanceGroup): void => {
-  const instance = [...group.instances].reverse().find((entry) => selectedManaSet.value.has(entry.instanceId));
-  if (instance) {
-    emit('toggle-mana', instance.instanceId, false);
-  }
-};
-
-const emitSetupHandled = (cardId: string, event: Event): void => {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
-  }
-  emit('toggle-setup-handled', cardId, target.checked);
-};
-
-const toggleSetupHandled = (cardId: string): void => {
-  emit('toggle-setup-handled', cardId, !handledSetupCardSet.value.has(cardId));
-};
-
 const goNext = (): void => {
   if (!canGoNext.value) {
     return;
@@ -571,28 +302,6 @@ const goNext = (): void => {
 useResizeObserver(bottomRef, ([entry]) => {
   emit('bottom-resize', entry?.contentRect.width ?? 0, entry?.contentRect.height ?? 0);
 });
-
-const emitHandSize = (event: Event): void => {
-  const value = (event.target as HTMLInputElement).value;
-  if (value.trim() === '') {
-    return;
-  }
-  const handSize = Number(value);
-  if (!Number.isFinite(handSize)) {
-    return;
-  }
-  emit('update-hand-size', handSize);
-};
-
-const openingHandCardStyle = (index: number, total: number): Record<string, string | number> => {
-  const center = index - (total - 1) / 2;
-  return {
-    marginLeft: index === 0 ? '0' : 'calc(var(--playtest-card-width) * -0.34)',
-    transform: `translateY(${center * center * 0.3}rem) rotate(${center * 5.2}deg)`,
-    transformOrigin: '50% 112%',
-    zIndex: 30 + index,
-  };
-};
 
 const bottomFanCardStyle = (index: number, total: number): Record<string, string | number> => {
   const center = index - (total - 1) / 2;
@@ -753,27 +462,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   transform: translateY(-0.08rem);
 }
 
-.playtest-opening-stage-enter-active,
-.playtest-opening-stage-leave-active {
-  transition:
-    opacity 180ms ease,
-    transform 180ms ease,
-    filter 180ms ease;
-}
-
-.playtest-opening-stage-enter-from {
-  opacity: 0;
-  filter: blur(0.2rem);
-  transform: translateY(0.6rem) scale(0.992);
-}
-
-.playtest-opening-stage-leave-to {
-  opacity: 0;
-  filter: blur(0.16rem);
-  transform: translateY(-0.45rem) scale(0.996);
-}
-
-.playtest-opening-hand-actions {
+:deep(.playtest-opening-hand-actions) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -781,13 +470,13 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   gap: 0.5rem;
 }
 
-.playtest-opening-hand-size {
+:deep(.playtest-opening-hand-size) {
   color: var(--playtest-text-muted);
   font-size: 0.85rem;
   font-weight: 800;
 }
 
-.playtest-opening-hand-size {
+:deep(.playtest-opening-hand-size) {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -803,12 +492,12 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 0.75rem 1rem 1rem;
 }
 
-.playtest-opening-panel {
+:deep(.playtest-opening-panel) {
   min-height: 0;
   overflow: hidden;
 }
 
-.playtest-opening-mana {
+:deep(.playtest-opening-mana) {
   display: grid;
   min-height: 0;
   align-content: center;
@@ -817,7 +506,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   overflow: visible;
 }
 
-.playtest-opening-panel-heading {
+:deep(.playtest-opening-panel-heading) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -825,35 +514,35 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 0.2rem 0.2rem 0.65rem;
 }
 
-.playtest-opening-panel-heading h3,
-.playtest-opening-hand-stage h3 {
+:deep(.playtest-opening-panel-heading h3),
+:deep(.playtest-opening-hand-stage h3) {
   color: var(--playtest-text);
   font-size: 1rem;
   font-weight: 900;
 }
 
-.playtest-opening-panel-heading p,
-.playtest-opening-panel-heading span,
-.playtest-opening-empty {
+:deep(.playtest-opening-panel-heading p),
+:deep(.playtest-opening-panel-heading span),
+:deep(.playtest-opening-empty) {
   color: var(--playtest-text-soft);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.playtest-opening-mana .playtest-opening-panel-heading {
+:deep(.playtest-opening-mana .playtest-opening-panel-heading) {
   width: min(100%, 72rem);
   align-items: center;
   padding-bottom: 0;
   text-align: center;
 }
 
-.playtest-opening-mana .playtest-opening-panel-heading > div {
+:deep(.playtest-opening-mana .playtest-opening-panel-heading > div) {
   display: grid;
   flex: 1 1 auto;
   justify-items: center;
 }
 
-.playtest-opening-mana-grid {
+:deep(.playtest-opening-mana-grid) {
   display: flex;
   width: min(100%, 78rem);
   max-height: min(34rem, 58vh);
@@ -865,14 +554,14 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 0.25rem max(0.5rem, 2vw) 0.75rem;
 }
 
-.playtest-opening-mana-card,
-.playtest-opening-setup-card {
+:deep(.playtest-opening-mana-card),
+:deep(.playtest-opening-setup-card) {
   display: flex;
   gap: 0.7rem;
   min-width: 0;
 }
 
-.playtest-opening-mana-card {
+:deep(.playtest-opening-mana-card) {
   flex: 0 0 var(--playtest-card-width, 9.75rem);
   flex-direction: column;
   align-items: center;
@@ -883,20 +572,20 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     filter 170ms ease;
 }
 
-.playtest-opening-mana-card:hover,
-.playtest-opening-mana-card:focus-visible {
+:deep(.playtest-opening-mana-card:hover),
+:deep(.playtest-opening-mana-card:focus-visible) {
   filter: brightness(1.05);
   transform: translateY(-0.18rem);
 }
 
-.playtest-opening-card-copy-actions {
+:deep(.playtest-opening-card-copy-actions) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.35rem;
 }
 
-.playtest-opening-copy-button {
+:deep(.playtest-opening-copy-button) {
   display: grid;
   width: 1.8rem;
   height: 1.8rem;
@@ -914,25 +603,25 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     transform 140ms ease;
 }
 
-.playtest-opening-copy-button-selected {
+:deep(.playtest-opening-copy-button-selected) {
   border-color: color-mix(in srgb, var(--color-accent) 70%, var(--playtest-border));
   background: color-mix(in srgb, var(--color-accent) 26%, transparent);
   color: var(--playtest-text);
   transform: translateY(-0.08rem);
 }
 
-.playtest-opening-mana-actions {
+:deep(.playtest-opening-mana-actions) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.55rem;
 }
 
-.playtest-opening-mana-actions > button {
+:deep(.playtest-opening-mana-actions > button) {
   min-width: 8rem;
 }
 
-.playtest-opening-setup-stage {
+:deep(.playtest-opening-setup-stage) {
   display: grid;
   width: min(100%, 96rem);
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -943,31 +632,31 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   justify-self: center;
 }
 
-.playtest-opening-setup-stage-library-only {
+:deep(.playtest-opening-setup-stage-library-only) {
   width: min(100%, 54rem);
   grid-template-columns: minmax(0, 1fr);
 }
 
-.playtest-opening-setup-guide {
+:deep(.playtest-opening-setup-guide) {
   min-height: 0;
 }
 
-.playtest-opening-setup-guide {
+:deep(.playtest-opening-setup-guide) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: stretch;
 }
 
-.playtest-opening-setup-library-area {
+:deep(.playtest-opening-setup-library-area) {
   display: grid;
   min-height: 0;
 }
 
-.playtest-opening-setup-stage-library-only .playtest-opening-setup-library-area {
+:deep(.playtest-opening-setup-stage-library-only .playtest-opening-setup-library-area) {
   grid-template-rows: minmax(0, 1fr);
 }
 
-.playtest-opening-setup-list {
+:deep(.playtest-opening-setup-list) {
   display: grid;
   gap: 0.75rem;
   overflow: auto;
@@ -975,20 +664,20 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 1rem 0.35rem 0.5rem 0.2rem;
 }
 
-.playtest-opening-setup-footer {
+:deep(.playtest-opening-setup-footer) {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid color-mix(in srgb, var(--playtest-border) 72%, transparent);
   padding: 0.85rem 0.2rem 0;
 }
 
-.playtest-opening-setup-card {
+:deep(.playtest-opening-setup-card) {
   align-items: flex-start;
   border-top: 1px solid color-mix(in srgb, var(--playtest-border) 72%, transparent);
   padding-top: 0.75rem;
 }
 
-.playtest-opening-setup-card {
+:deep(.playtest-opening-setup-card) {
   display: grid;
   grid-template-columns: var(--playtest-card-width, 9.75rem) minmax(0, 1fr);
   gap: 1rem;
@@ -1000,29 +689,29 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     transform 160ms ease;
 }
 
-.playtest-opening-setup-card:hover,
-.playtest-opening-setup-card:focus-visible {
+:deep(.playtest-opening-setup-card:hover),
+:deep(.playtest-opening-setup-card:focus-visible) {
   border-top-color: color-mix(in srgb, var(--color-accent) 54%, var(--playtest-border));
   transform: translateX(0.16rem);
 }
 
-.playtest-opening-setup-card-handled {
+:deep(.playtest-opening-setup-card-handled) {
   opacity: 0.72;
 }
 
-.playtest-opening-setup-card-preview {
+:deep(.playtest-opening-setup-card-preview) {
   width: var(--playtest-card-width, 9.75rem);
   min-width: var(--playtest-card-width, 9.75rem);
 }
 
-.playtest-opening-setup-card-main {
+:deep(.playtest-opening-setup-card-main) {
   display: grid;
   min-width: 0;
   align-content: start;
   gap: 0.55rem;
 }
 
-.playtest-opening-setup-card-title {
+:deep(.playtest-opening-setup-card-title) {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1033,7 +722,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   font-weight: 900;
 }
 
-.playtest-opening-setup-rule-text {
+:deep(.playtest-opening-setup-rule-text) {
   border: 1px solid color-mix(in srgb, var(--playtest-border) 76%, transparent);
   border-radius: 0.65rem;
   background: color-mix(in srgb, var(--playtest-panel-strong) 62%, transparent);
@@ -1048,12 +737,12 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     border-color 160ms ease;
 }
 
-.playtest-opening-setup-card-handled .playtest-opening-setup-rule-text {
+:deep(.playtest-opening-setup-card-handled .playtest-opening-setup-rule-text) {
   border-color: color-mix(in srgb, var(--color-accent) 44%, var(--playtest-border));
   background: color-mix(in srgb, var(--color-accent) 10%, var(--playtest-panel-strong));
 }
 
-.playtest-opening-setup-check {
+:deep(.playtest-opening-setup-check) {
   display: inline-flex;
   width: max-content;
   align-items: center;
@@ -1063,13 +752,13 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   font-weight: 900;
 }
 
-.playtest-opening-setup-check input {
+:deep(.playtest-opening-setup-check input) {
   width: 1rem;
   height: 1rem;
   accent-color: var(--color-accent);
 }
 
-.playtest-opening-hand-stage {
+:deep(.playtest-opening-hand-stage) {
   display: grid;
   align-content: center;
   justify-items: center;
@@ -1077,7 +766,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   gap: 1rem;
 }
 
-.playtest-opening-hand {
+:deep(.playtest-opening-hand) {
   --playtest-opening-hand-card-width: clamp(10.75rem, 13vw, 13rem);
   position: relative;
   display: flex;
@@ -1089,11 +778,11 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 1.4rem 2rem 2.1rem;
 }
 
-.playtest-opening-hand-actions {
+:deep(.playtest-opening-hand-actions) {
   width: min(100%, 78rem);
 }
 
-.playtest-opening-hand-card {
+:deep(.playtest-opening-hand-card) {
   --playtest-card-width: var(--playtest-opening-hand-card-width);
   flex: 0 0 auto;
   transform-origin: 50% 112%;
@@ -1169,44 +858,6 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     filter 160ms ease;
 }
 
-.playtest-card-list-enter-active,
-.playtest-card-list-leave-active {
-  transition:
-    opacity 170ms ease,
-    transform 170ms ease,
-    filter 170ms ease;
-}
-
-.playtest-card-list-enter-from,
-.playtest-card-list-leave-to {
-  opacity: 0;
-  filter: blur(0.12rem);
-  transform: translateY(0.35rem) scale(0.98);
-}
-
-.playtest-card-list-move {
-  transition: transform 180ms ease;
-}
-
-.playtest-hand-fan-enter-active,
-.playtest-hand-fan-leave-active {
-  transition:
-    opacity 170ms ease,
-    filter 170ms ease;
-}
-
-.playtest-hand-fan-enter-from,
-.playtest-hand-fan-leave-to {
-  opacity: 0;
-  filter: blur(0.12rem);
-}
-
-.playtest-hand-fan-move {
-  transition:
-    transform 190ms ease,
-    margin 190ms ease;
-}
-
 .playtest-opening-stacks {
   display: flex;
   flex: 0 1 auto;
@@ -1222,7 +873,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     overflow: auto;
   }
 
-  .playtest-opening-hand-actions {
+  :deep(.playtest-opening-hand-actions) {
     align-items: stretch;
     flex-direction: column;
   }
@@ -1250,15 +901,15 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     grid-template-columns: 1fr;
   }
 
-  .playtest-opening-setup-stage {
+  :deep(.playtest-opening-setup-stage) {
     grid-template-columns: 1fr;
   }
 
-  .playtest-opening-setup-card {
+  :deep(.playtest-opening-setup-card) {
     grid-template-columns: var(--playtest-card-width, 9.75rem) minmax(0, 1fr);
   }
 
-  .playtest-opening-hand {
+  :deep(.playtest-opening-hand) {
     --playtest-opening-hand-card-width: clamp(9rem, 28vw, 11rem);
   }
 
@@ -1270,15 +921,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .playtest-opening *,
-  .playtest-opening-stage-enter-active,
-  .playtest-opening-stage-leave-active,
-  .playtest-card-list-enter-active,
-  .playtest-card-list-leave-active,
-  .playtest-card-list-move,
-  .playtest-hand-fan-enter-active,
-  .playtest-hand-fan-leave-active,
-  .playtest-hand-fan-move {
+  .playtest-opening :deep(*) {
     animation-duration: 1ms !important;
     transition-duration: 1ms !important;
   }

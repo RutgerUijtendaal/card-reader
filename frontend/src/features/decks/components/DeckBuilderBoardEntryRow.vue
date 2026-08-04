@@ -189,7 +189,7 @@ import { getHoverPreviewCardWidthRem } from '@/domain/cards/utils/gallery/hoverP
 import { useSharedElementHover } from '@/domain/cards/composables/useSharedElementHover';
 import { useHoverModePreferences } from '@/domain/cards/composables/useHoverModePreferences';
 import type { DeckEntrySummary } from '@/domain/decks/types';
-import type { DeckBoardMoveDestination } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckBoardMoveDestination } from '@/features/decks/composables/deckEditorDraftTypes';
 import { blurAfterFinePointerActivation, blurFocusedDescendantAfterFinePointerLeave } from '@/shared/utils/pointerFocus';
 
 const props = defineProps<{

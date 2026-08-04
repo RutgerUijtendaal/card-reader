@@ -178,6 +178,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
+import { getApiErrorMessageWithCause as extractErrorMessage } from '@/shared/api/errors';
 import { activateCardBack, fetchCardBacks, uploadCardBack } from '@/domain/card-backs/api';
 import type { CardBackRecord } from '@/domain/card-backs/types';
 
@@ -265,18 +266,6 @@ const formatDate = (value: string): string => {
     month: 'short',
     day: 'numeric',
   });
-};
-
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
-    const detail = maybeResponse?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) return detail;
-  }
-  if (typeof error === 'object' && error && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return fallback;
 };
 
 onMounted(() => {

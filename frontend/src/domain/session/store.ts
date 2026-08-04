@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { api } from '@/shared/api/client';
+import {
+  applySessionCsrfToken,
+  fetchCurrentUser as fetchCurrentUserRequest,
+  loginUser,
+  logoutUser,
+} from '@/domain/session/api';
 import type { CurrentUser, LoginCredentials } from './types';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -13,20 +18,13 @@ export const useAuthStore = defineStore('auth', () => {
   const canManageUsers = computed(() => user.value?.can_manage_users === true);
   const canAccessMaintenance = computed(() => user.value?.can_access_maintenance === true);
 
-  const applyCsrfToken = (currentUser: CurrentUser): void => {
-    const token = currentUser.csrf_token;
-    if (token) {
-      api.defaults.headers.common['X-CSRFToken'] = token;
-    }
-  };
-
   const fetchCurrentUser = async (): Promise<CurrentUser> => {
     loading.value = true;
     try {
-      const response = await api.get<CurrentUser>('/auth/me');
-      user.value = response.data;
-      applyCsrfToken(response.data);
-      return response.data;
+      const currentUser = await fetchCurrentUserRequest();
+      user.value = currentUser;
+      applySessionCsrfToken(currentUser);
+      return currentUser;
     } catch {
       const fallback = { authenticated: false };
       user.value = fallback;
@@ -40,18 +38,18 @@ export const useAuthStore = defineStore('auth', () => {
   const login = async (credentials: LoginCredentials): Promise<CurrentUser> => {
     loading.value = true;
     try {
-      const response = await api.post<CurrentUser>('/auth/login', credentials);
-      user.value = response.data;
-      applyCsrfToken(response.data);
+      const currentUser = await loginUser(credentials);
+      user.value = currentUser;
+      applySessionCsrfToken(currentUser);
       initialized.value = true;
-      return response.data;
+      return currentUser;
     } finally {
       loading.value = false;
     }
   };
 
   const logout = async (): Promise<void> => {
-    await api.post('/auth/logout');
+    await logoutUser();
     user.value = { authenticated: false };
     initialized.value = true;
   };

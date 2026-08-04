@@ -1,20 +1,22 @@
 import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
 import type {
-  CardFilterCatalog,
   CardFilterSelectionState,
 } from '@/domain/cards/utils/filters/cardFilterState';
+import type { CardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
 import {
   DEFAULT_CARD_LIFECYCLE_FILTER,
   type CardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import {
-  buildCardFilterSelectionState,
-  buildCardFilterStateFromSelection,
   createEmptyCardFilterSelectionState,
   normalizeCardFilterSelectionState,
   type CardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterState';
+import {
+  buildCardFilterSelectionState,
+  buildCardFilterStateFromSelection,
+} from '@/domain/cards/utils/filters/cardFilterSelection';
 
 export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const query = ref('');

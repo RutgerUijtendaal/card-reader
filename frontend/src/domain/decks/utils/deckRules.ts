@@ -1,4 +1,3 @@
-import { api } from '@/shared/api/client';
 import {
   MAX_DECK_COPIES,
   MAX_MAINBOARD_CARD_COUNT,
@@ -7,16 +6,6 @@ import {
   MIN_MAINBOARD_MANA_TYPE_COUNT,
 } from '@/domain/decks/utils/constants';
 import type { DeckBuildingRules } from '@/domain/deck-building/types';
-
-export type DeckRulesMetadata = {
-  supported_rule_ids: string[];
-  allowed_severities: Array<'hard' | 'soft'>;
-  allowed_scopes: Array<'mainboard' | 'whole_deck'>;
-  allowed_applications: Array<'deck' | 'self'>;
-  default_config: { overrides: Record<string, unknown> };
-  default_rules: DeckBuildingRules;
-  example_config: { overrides: Record<string, unknown> };
-};
 
 export const fallbackDeckBuildingDefaultConfig = {
   overrides: {},
@@ -82,8 +71,3 @@ export const fallbackDeckBuildingConfigExample = {
 
 export const formatDeckBuildingConfigJson = (value: unknown): string =>
   JSON.stringify(value, null, 2);
-
-export const fetchDeckRulesMetadata = async (): Promise<DeckRulesMetadata> => {
-  const response = await api.get<DeckRulesMetadata>('/decks/rules');
-  return response.data;
-};

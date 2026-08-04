@@ -1,11 +1,7 @@
 import { ref } from 'vue';
-import { api } from '@/shared/api/client';
+import { fetchAccessRequestSummary } from '@/domain/access-requests/api';
 import { usePollingSummary } from '@/shared/composables/usePollingSummary';
 import { useAuthStore } from '@/domain/session/store';
-
-type AccessRequestSummaryResponse = {
-  pending_access_request_count: number;
-};
 
 const pendingAccessRequestCount = ref(0);
 
@@ -17,8 +13,8 @@ export function useAccessRequestSummary() {
       pendingAccessRequestCount.value = 0;
     },
     load: async () => {
-      const response = await api.get<AccessRequestSummaryResponse>('/admin/access-requests/summary');
-      pendingAccessRequestCount.value = response.data.pending_access_request_count;
+      const response = await fetchAccessRequestSummary();
+      pendingAccessRequestCount.value = response.pending_access_request_count;
     },
   });
 

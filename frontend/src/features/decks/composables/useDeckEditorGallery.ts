@@ -3,7 +3,7 @@ import type { CardListItem } from '@/domain/cards/types';
 import type { CardFilterSelectionState } from '@/domain/cards/utils/filters/cardFilterState';
 import type { CardSort } from '@/domain/cards/utils/gallery/cardSort';
 import { useCardCollection } from '@/domain/cards/composables/useCardCollection';
-import type { DeckEditorMode } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/features/decks/composables/deckEditorDraftTypes';
 
 type UseDeckEditorGalleryOptions = {
   filtersLoaded: Ref<boolean>;

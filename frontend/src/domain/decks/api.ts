@@ -1,8 +1,20 @@
 import { api } from '@/shared/api/client';
-import type { DeckRecord, DeckSummaryRecord, DeckTagCatalog, DeckUpdateRequest, DeckUpsertRequest } from '@/domain/decks/types';
+import type {
+  DeckRecord,
+  DeckRulesMetadata,
+  DeckSummaryRecord,
+  DeckTagCatalog,
+  DeckUpdateRequest,
+  DeckUpsertRequest,
+} from '@/domain/decks/types';
 
 export const fetchDeckTags = async (): Promise<DeckTagCatalog> => {
   const response = await api.get<DeckTagCatalog>('/deck-tags');
+  return response.data;
+};
+
+export const fetchDeckRulesMetadata = async (): Promise<DeckRulesMetadata> => {
+  const response = await api.get<DeckRulesMetadata>('/decks/rules');
   return response.data;
 };
 

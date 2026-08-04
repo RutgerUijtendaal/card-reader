@@ -78,8 +78,9 @@ Core stack:
 - Frontend dependency directions are enforced by ESLint boundaries:
   - `app` may import app, features, domain, and shared.
   - `features` may import only the same feature, domain, and shared. Feature-to-feature imports are forbidden.
-  - `domain` may import domain and shared. Keep domain dependencies acyclic.
+  - `domain` may import shared and only explicitly allowlisted domain slices. The allowlist in `frontend/eslint.config.js` is validated as an acyclic graph when ESLint loads; update it intentionally when adding a real cross-domain dependency.
   - `shared` may import shared only.
+- Keep HTTP transport calls in focused `api.ts` or `api/*` clients owned by the relevant domain or feature. Components, pages, stores, and workflow composables consume those clients instead of calling the shared Axios instance directly.
 - Use direct frontend file imports; do not add barrel or transitional re-export files solely to hide ownership.
 - Co-locate frontend unit and component specs with their source. Reserve `tests/` directories for scenarios spanning several source files.
 - Shared card queries, filters, gallery behavior, sorting, symbols, preferences, and reusable card UI belong in `frontend/src/domain/cards`.
@@ -96,8 +97,9 @@ Core stack:
   - The selector may build a read-only opening-hand preview from real playtest state and save that preview as the starting draft when starting a new playtest.
   - Board interactions use the custom pointer drag layer, right-click context menus, stacks, card-level visual piles, drag-box group selection, active play hotkeys, and hold-only middle-click zoom.
   - Playtester card scale is a local preference shared by the selector and active play surface; keep scale math in the playtester card-scale utility.
-  - Reuse playtester module components such as `PlaytestTableSurface`, `PlaytestLowerBar`, `PlaytestStack`, and `PlaytestStackPopover` before duplicating hand, stack, or table-surface UI.
+  - Reuse Playtester feature components such as `PlaytestTableSurface`, `PlaytestLowerBar`, `PlaytestStack`, and `PlaytestStackPopover` before duplicating hand, stack, or table-surface UI.
   - Keep Playtester implementation details under `frontend/src/features/playtester/components`, `utils`, or `composables`; reusable deck/card business code belongs in its domain slice and domain-agnostic helpers belong in shared.
+  - Keep Playtester state responsibilities separated: initialization/normalization in `playtestStateCore.ts`, board mutations in `playtestBoardState.ts`, opening setup in `playtestOpeningState.ts`, and storage migration/serialization in `playtestDraftPersistence.ts`. Import the owning file directly.
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
@@ -197,9 +199,9 @@ Local app URL:
   - format: `prettier`
   - typecheck: `vue-tsc`
   - tests: `vitest`
-  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility in `frontend/src/app/styles.css`
+  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility from `frontend/src/app/styles/utilities.css`
   - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
-  - preserve and extend the shared light/dark theme system in `frontend/src/app/styles.css` and `frontend/src/shared/composables/useTheme.ts`
+  - preserve and extend the shared light/dark theme system in `frontend/src/app/styles/base.css`, `frontend/src/app/styles/components.css`, `frontend/src/app/styles/utilities.css`, and `frontend/src/shared/composables/useTheme.ts`; `frontend/src/app/styles.css` is the ordered Tailwind/import entrypoint
   - prefer semantic theme primitives and token-backed shared classes over scattering raw light-only or dark-only color utilities across components
   - when adding or changing visible UI, verify both light and dark appearances instead of treating dark mode as optional follow-up polish
 

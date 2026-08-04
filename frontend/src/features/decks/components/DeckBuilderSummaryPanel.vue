@@ -316,7 +316,7 @@ import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import DeckBuilderBoardEntryRow from '@/features/decks/components/DeckBuilderBoardEntryRow.vue';
 import DeckManaCurve from '@/features/decks/components/DeckManaCurve.vue';
 import type { DeckEditorController } from '@/features/decks/composables/useDeckEditor';
-import type { DeckBoardMoveDestination } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckBoardMoveDestination } from '@/features/decks/composables/deckEditorDraftTypes';
 import type { DeckEntrySummary } from '@/domain/decks/types';
 
 const props = defineProps<{

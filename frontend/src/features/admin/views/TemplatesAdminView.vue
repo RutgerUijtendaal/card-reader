@@ -168,6 +168,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { getApiErrorMessageWithCause as extractErrorMessage } from '@/shared/api/errors';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import JsonEditorField from '@/shared/components/forms/JsonEditorField.vue';
@@ -469,18 +470,6 @@ const formatJsonForEditor = (raw: string): string => {
   } catch {
     return raw;
   }
-};
-
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
-    const detail = maybeResponse?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) return detail;
-  }
-  if (typeof error === 'object' && error && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return fallback;
 };
 
 onMounted(() => {

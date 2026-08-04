@@ -300,12 +300,20 @@ import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { toast } from 'vue-sonner';
-import { api, toAbsoluteApiUrl } from '@/shared/api/client';
+import { toAbsoluteApiUrl } from '@/shared/api/client';
+import { getApiErrorMessageWithCause as extractErrorMessage } from '@/shared/api/errors';
 import { fetchCards } from '@/domain/cards/api';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/features/admin/types';
+import {
+  createManagedCardGroup,
+  deleteManagedCardGroup,
+  fetchManagedCardGroups,
+  updateManagedCardGroup,
+} from '@/features/admin/api/cardGroups';
+import type { CardGroupWritePayload } from '@/features/admin/api/cardGroups';
 
 type CardGroupEditor = {
   id: string | null;
@@ -338,8 +346,7 @@ const memberIds = computed(() => new Set(editor.value?.members.map((member) => m
 
 const loadGroups = async (): Promise<void> => {
   try {
-    const response = await api.get<CardGroupRecord[]>('/admin/card-groups');
-    groups.value = response.data;
+    groups.value = await fetchManagedCardGroups();
     if (selectedGroupId.value) {
       const next = groups.value.find((group) => group.id === selectedGroupId.value);
       if (next) {
@@ -489,7 +496,7 @@ const normalizeEditor = (): void => {
   }));
 };
 
-const buildPayload = (): Record<string, unknown> | null => {
+const buildPayload = (): CardGroupWritePayload | null => {
   if (!editor.value) {
     return null;
   }
@@ -522,12 +529,10 @@ const saveGroup = async (): Promise<void> => {
   try {
     let savedGroup: CardGroupRecord;
     if (editor.value.id) {
-      const response = await api.patch<CardGroupRecord>(`/admin/card-groups/${editor.value.id}`, payload);
-      savedGroup = response.data;
+      savedGroup = await updateManagedCardGroup(editor.value.id, payload);
       toast.success('Card group updated.');
     } else {
-      const response = await api.post<CardGroupRecord>('/admin/card-groups', payload);
-      savedGroup = response.data;
+      savedGroup = await createManagedCardGroup(payload);
       toast.success('Card group created.');
     }
     await loadGroups();
@@ -547,7 +552,7 @@ const deleteGroup = async (): Promise<void> => {
     return;
   }
   try {
-    await api.delete(`/admin/card-groups/${editor.value.id}`);
+    await deleteManagedCardGroup(editor.value.id);
     toast.success('Card group deleted.');
     startCreate();
     await loadGroups();
@@ -601,17 +606,4 @@ watch(
   },
 );
 
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const maybeResponse = (error as { response?: { data?: { detail?: unknown } } }).response;
-    const detail = maybeResponse?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) {
-      return detail;
-    }
-  }
-  if (typeof error === 'object' && error && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return fallback;
-};
 </script>

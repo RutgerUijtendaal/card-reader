@@ -92,7 +92,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { Layers3 } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
-import { api, toAbsoluteApiUrl } from '@/shared/api/client';
+import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { fetchCardFilters } from '@/domain/cards/api';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import CardDeckReferencesPanel from '@/domain/card-deck-references/components/CardDeckReferencesPanel.vue';
@@ -107,6 +107,7 @@ import { useAuthStore } from '@/domain/session/store';
 import CardGroupDetailLoadingSkeleton from '@/features/card-groups/components/CardGroupDetailLoadingSkeleton.vue';
 import type { SymbolLookupMap } from '@/domain/cards/types';
 import type { CardGroupDetail } from '@/features/card-groups/types';
+import { fetchCardGroupDetail } from '@/features/card-groups/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -127,14 +128,11 @@ const loadGroup = async (): Promise<void> => {
   const groupId = String(route.params.id);
   try {
     const [groupResponse, filtersResponse] = await Promise.all([
-      api.get<CardGroupDetail>(
-        `/card-groups/${groupId}`,
-        groupRequestParams.value ? { params: groupRequestParams.value } : undefined,
-      ),
+      fetchCardGroupDetail(groupId, groupRequestParams.value),
       fetchCardFilters(),
     ]);
     if (requestId !== groupRequestId) return;
-    group.value = groupResponse.data;
+    group.value = groupResponse;
     symbolByKey.value = Object.fromEntries(
       (filtersResponse.symbols ?? []).map((row) => [row.key, row]),
     );

@@ -138,13 +138,15 @@ import GalleryOptionsMenu from '@/domain/cards/components/GalleryOptionsMenu.vue
 import { useAuthStore } from '@/domain/session/store';
 import type { GalleryItem } from '@/domain/cards/types';
 import {
-  buildCardFilterApiSearchParams,
-  buildCardFilterRouteQuery,
   createEmptyCardFilterState,
+} from '@/domain/cards/utils/filters/cardFilterState';
+import { buildCardFilterApiSearchParams } from '@/domain/cards/utils/filters/cardFilterRequest';
+import {
+  buildCardFilterRouteQuery,
   getCardFilterSignature,
   parseCardFilterRouteQuery,
   sameCardFilterState,
-} from '@/domain/cards/utils/filters/cardFilterState';
+} from '@/domain/cards/utils/filters/cardFilterRouteState';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
 import {
   getGallerySnapshot,

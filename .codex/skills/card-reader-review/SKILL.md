@@ -13,11 +13,13 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Schema ownership mistakes outside `services/core`
 - Core layering drift: transport logic in repositories, Django query/write details in services, or domain workflows in API views
 - New one-off modules in `card_reader_core` root or legacy `*_repository.py` files instead of feature packages
-- Frontend dependency drift against the enforced `app -> features -> domain -> shared` direction, especially feature-to-feature imports and shared/domain upward imports
-- Card filter and gallery logic drift outside `frontend/src/domain/cards`, including duplicated card/filter API reads
+- Frontend dependency drift against the enforced layers and validated domain allowlist, especially feature-to-feature imports, shared/domain upward imports, unapproved cross-domain edges, or cycles
+- Card filter and gallery logic drift outside `frontend/src/domain/cards`, including duplicated API reads or route/request/id-translation logic placed in the wrong focused filter file
+- Direct Axios calls from pages, components, stores, or workflow composables instead of focused feature/domain API clients
 - Circular ownership between frontend domains, especially cards and decks
 - Deck list/query regressions where list surfaces fetch full deck records instead of summary records without needing full entries
 - Playtester route regressions around `/playtester` versus `/playtester/:deckId`, local draft preservation, preview-start behavior, card scale preference, or hotkey/help alignment
+- Playtester state ownership regressions that blur core, board, opening, and draft-persistence modules or reintroduce an aggregate façade
 - Theme/token drift or light/dark regressions in visible frontend changes
 - Auth regressions around public vs staff/superuser behavior
 - Import pipeline regressions in async job creation, claiming, and persistence

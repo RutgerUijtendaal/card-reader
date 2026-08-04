@@ -19,6 +19,7 @@ Follow `AGENTS.md` and `card-reader-frontend` first. Use this skill when changin
 - Authenticated deck detail fetches should try owned deck detail first, then public deck detail. Anonymous playtests should use public deck detail only.
 - Sideboards are reference-only and must not enter the shuffled library.
 - Drafts are local-storage only, keyed per deck plus `deck.updated_at`. Preserve existing draft migration support, but do not add extra branch-era migration code unless explicitly requested.
+- Import Playtester state from its direct owner: `playtestStateCore.ts` for initialization/normalization, `playtestBoardState.ts` for board and zone mutations, `playtestOpeningState.ts` for opening setup, and `playtestDraftPersistence.ts` for draft serialization/migration. Do not recreate an aggregate state façade.
 
 ## State Rules
 
@@ -57,6 +58,7 @@ Follow `AGENTS.md` and `card-reader-frontend` first. Use this skill when changin
 - Reuse `PlaytestCard` for board, hand, opening setup, stack popovers, dragged overlays, and pile members unless there is a concrete rendering reason not to.
 - Reuse `PlaytestTableSurface`, `PlaytestLowerBar`, `PlaytestStack`, and `PlaytestStackPopover` for selector and active-play hand/stack/table UI before duplicating local markup.
 - Opening setup should focus on large cards, not text labels; starting mana/setup selection uses a clear border state without extra selected text.
+- Keep the opening shell in `PlaytestOpeningSetup.vue` and the step bodies in `PlaytestOpeningManaStep.vue`, `PlaytestOpeningSetupStep.vue`, and `PlaytestOpeningHandStep.vue`; preserve the shell's public props/events when changing an individual step.
 
 ## Checks
 

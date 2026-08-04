@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
+import { createEmptyCardFilterState } from '@/domain/cards/utils/filters/cardFilterState';
 import {
   buildCardFilterRouteQuery,
-  createEmptyCardFilterState,
   getCardFilterSignature,
   parseCardFilterRouteQuery,
-} from '@/domain/cards/utils/filters/cardFilterState';
+} from '@/domain/cards/utils/filters/cardFilterRouteState';
 
-describe('cardFilterState route adapters', () => {
+describe('cardFilterRouteState', () => {
   test('parses an empty route query into empty filter state', () => {
     expect(parseCardFilterRouteQuery({})).toEqual(createEmptyCardFilterState());
   });

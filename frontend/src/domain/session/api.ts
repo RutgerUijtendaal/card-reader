@@ -1,9 +1,31 @@
 import { api } from '@/shared/api/client';
 import type {
   AccessRequestSubmission,
+  CurrentUser,
+  LoginCredentials,
   PasswordSetupRequest,
   PasswordSetupValidationResponse,
 } from './types';
+
+export const applySessionCsrfToken = (currentUser: CurrentUser): void => {
+  if (currentUser.csrf_token) {
+    api.defaults.headers.common['X-CSRFToken'] = currentUser.csrf_token;
+  }
+};
+
+export const fetchCurrentUser = async (): Promise<CurrentUser> => {
+  const response = await api.get<CurrentUser>('/auth/me');
+  return response.data;
+};
+
+export const loginUser = async (credentials: LoginCredentials): Promise<CurrentUser> => {
+  const response = await api.post<CurrentUser>('/auth/login', credentials);
+  return response.data;
+};
+
+export const logoutUser = async (): Promise<void> => {
+  await api.post('/auth/logout');
+};
 
 export const validatePasswordSetupLink = async (
   uid: string,

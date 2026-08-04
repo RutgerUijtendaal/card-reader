@@ -10,7 +10,7 @@ import { fetchCards } from '@/domain/cards/api';
 import {
   buildCardFilterRouteQuery,
   parseCardFilterRouteQuery,
-} from '@/domain/cards/utils/filters/cardFilterState';
+} from '@/domain/cards/utils/filters/cardFilterRouteState';
 import type { GalleryPageState } from '@/domain/cards/utils/gallery/galleryState';
 import { DEFAULT_CARD_PAGE_SIZE } from '@/domain/cards/utils/gallery/pageSize';
 import type { GalleryItem } from '@/domain/cards/types';

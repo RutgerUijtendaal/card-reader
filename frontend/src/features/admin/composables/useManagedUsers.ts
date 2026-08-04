@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useAccessRequestSummary } from '@/domain/access-requests/composables/useAccessRequestSummary';
+import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 import {
   approveAccessRequest,
   createManagedUser,
@@ -109,14 +110,4 @@ export const useManagedUsers = () => {
     approveRequest,
     declineRequest,
   };
-};
-
-const extractErrorMessage = (error: unknown, fallback: string): string => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const detail = (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) {
-      return detail;
-    }
-  }
-  return fallback;
 };

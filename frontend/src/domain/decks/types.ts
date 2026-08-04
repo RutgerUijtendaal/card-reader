@@ -149,3 +149,13 @@ export type DeckUpsertRequest = {
 };
 
 export type DeckUpdateRequest = Partial<DeckUpsertRequest>;
+
+export type DeckRulesMetadata = {
+  supported_rule_ids: string[];
+  allowed_severities: Array<'hard' | 'soft'>;
+  allowed_scopes: Array<'mainboard' | 'whole_deck'>;
+  allowed_applications: Array<'deck' | 'self'>;
+  default_config: { overrides: Record<string, unknown> };
+  default_rules: DeckBuildingRules;
+  example_config: { overrides: Record<string, unknown> };
+};

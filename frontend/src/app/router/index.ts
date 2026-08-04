@@ -3,7 +3,7 @@ import { useAuthStore } from '@/domain/session/store';
 import LoginPage from '@/features/auth/LoginPage.vue';
 import PasswordSetupPage from '@/features/auth/PasswordSetupPage.vue';
 import ImportJobsPage from '@/features/import-jobs/ImportJobsPage.vue';
-import CardSearchPage from '@/features/card-search/CardSearchPage.vue';
+import CardGalleryPage from '@/features/card-gallery/CardGalleryPage.vue';
 import CardGroupDetailPage from '@/features/card-groups/CardGroupDetailPage.vue';
 import CardDetailPage from '@/features/card-detail/CardDetailPage.vue';
 import CardPublicDetailPage from '@/features/card-detail/CardPublicDetailPage.vue';
@@ -23,7 +23,7 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/cards' },
-    { path: '/cards', component: CardSearchPage, meta: { title: 'Gallery' } },
+    { path: '/cards', component: CardGalleryPage, meta: { title: 'Gallery' } },
     { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { title: 'Card' } },
     { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { title: 'Card Group' } },
     { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks' } },

@@ -1,0 +1,47 @@
+@layer utilities {
+  @keyframes card-loading-shim-sheen {
+    0% {
+      transform: translateX(-120%);
+    }
+
+    100% {
+      transform: translateX(120%);
+    }
+  }
+
+  .app-scrollbar {
+    scrollbar-gutter: auto;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--scrollbar-thumb) 55%, transparent) transparent;
+  }
+
+  .app-main-scroll {
+    scrollbar-gutter: stable;
+  }
+
+  .app-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    background-color: color-mix(in srgb, var(--scrollbar-thumb) 55%, transparent);
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-card-loading-shim::after {
+    animation: none;
+  }
+}

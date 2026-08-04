@@ -3,8 +3,15 @@ import { useDebounceFn, useEventListener, useLocalStorage } from '@vueuse/core';
 import { toast } from 'vue-sonner';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import type { CardListItem } from '@/domain/cards/types';
-import { createDeck, fetchDeckTags, fetchMyDeck, updateDeck } from '@/domain/decks/api';
-import { useDeckEditorDraft, type DeckEditorMode } from '@/features/decks/composables/useDeckEditorDraft';
+import {
+  createDeck,
+  fetchDeckRulesMetadata,
+  fetchDeckTags,
+  fetchMyDeck,
+  updateDeck,
+} from '@/domain/decks/api';
+import { useDeckEditorDraft } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckEditorMode } from '@/features/decks/composables/deckEditorDraftTypes';
 import { useDeckEditorFilters } from '@/features/decks/composables/useDeckEditorFilters';
 import { useDeckEditorGallery } from '@/features/decks/composables/useDeckEditorGallery';
 import {
@@ -16,7 +23,7 @@ import {
 } from '@/domain/decks/utils/deckRouteState';
 import { getDeckTagSuggestionFeedback } from '@/domain/decks/utils/deckTagSuggestionFeedback';
 import type { DeckCardSummary, DeckRecord, DeckTagCatalog } from '@/domain/decks/types';
-import { fallbackDeckBuildingRules, fetchDeckRulesMetadata } from '@/domain/decks/utils/deckRules';
+import { fallbackDeckBuildingRules } from '@/domain/decks/utils/deckRules';
 
 export const useDeckEditor = () => {
   const route = useRoute();

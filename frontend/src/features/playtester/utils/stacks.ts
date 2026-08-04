@@ -1,4 +1,4 @@
-import { DEFAULT_PLAYTEST_STACK_FACES } from '@/features/playtester/playtestState';
+import { DEFAULT_PLAYTEST_STACK_FACES } from '@/features/playtester/playtestStateCore';
 import type {
   PlaytestStackDefinition,
   PlaytestStackFace,

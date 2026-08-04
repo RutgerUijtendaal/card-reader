@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import type { ComputedRef, Ref } from 'vue';
 import type { CardFiltersResponse } from '@/domain/cards/types';
-import type { CardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterState';
+import type { CardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
 import type { MetadataFavoriteGroup } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';
 import type { ReturnTypeUseCardFilterState } from '@/domain/cards/composables/filters/useCardFilterState';
 import type {

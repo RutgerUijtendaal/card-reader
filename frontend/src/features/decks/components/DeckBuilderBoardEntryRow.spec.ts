@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file */
 import { createApp, defineComponent, h, nextTick } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { DeckBoardMoveDestination } from '@/features/decks/composables/useDeckEditorDraft';
+import type { DeckBoardMoveDestination } from '@/features/decks/composables/deckEditorDraftTypes';
 import type { DeckEntrySummary } from '@/domain/decks/types';
 import DeckBuilderBoardEntryRow from '@/features/decks/components/DeckBuilderBoardEntryRow.vue';
 

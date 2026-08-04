@@ -1,7 +1,7 @@
 import type {
   PlaytestStorageAdapter,
 } from '@/features/playtester/types';
-import { migrateStoredPlaytestDraft } from '@/features/playtester/playtestState';
+import { migrateStoredPlaytestDraft } from '@/features/playtester/playtestDraftPersistence';
 
 const STORAGE_PREFIX = 'card-reader.playtester.';
 
