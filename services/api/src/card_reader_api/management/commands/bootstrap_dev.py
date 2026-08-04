@@ -29,7 +29,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument("--archive", help="Use an already-downloaded bundle instead of a website code.")
-        parser.add_argument("--code", help="Bootstrap code; omit to enter it without terminal echo.")
+        parser.add_argument("--code", help="Bootstrap code; omit to enter it interactively.")
         parser.add_argument("--admin-username")
         parser.add_argument("--admin-password")
 
@@ -42,9 +42,7 @@ class Command(BaseCommand):
         if archive_path is None:
             archive_path = _verified_cached_bundle(lock)
             if archive_path is None:
-                code = _optional_string(options.get("code")) or getpass.getpass(
-                    "Website bootstrap code: "
-                )
+                code = _optional_string(options.get("code")) or input("Website bootstrap code: ").strip()
                 archive_path = _download_bundle(lock=lock, code=code, stdout=self.stdout)
             else:
                 self.stdout.write(

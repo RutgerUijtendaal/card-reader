@@ -7,6 +7,8 @@ from pathlib import Path
 import shutil
 import tarfile
 
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 import pytest
 
@@ -244,6 +246,103 @@ def test_export_rejects_arbitrary_absolute_posix_paths(
         transaction.set_rollback(True)
 
 
+@pytest.mark.parametrize(
+    "credential_key",
+    [
+        "api_key",
+        "database_password",
+        "client_secret",
+        "access_token",
+    ],
+)
+def test_export_rejects_credential_shaped_fields(
+    credential_key: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "synthetic-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        template = Template.objects.get(key="synthetic-template")
+        template.definition_json = {
+            **template.definition_json,
+            credential_key: "must-not-be-published",
+        }
+        template.save(update_fields=["definition_json"])
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(DeveloperDataError, match="Forbidden credential field"):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="credential-field-test-revision",
+            )
+        transaction.set_rollback(True)
+
+
+def test_import_rejects_unreferenced_manifest_assets(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    target_storage = tmp_path / "target-storage"
+    archive_path = tmp_path / "synthetic-dev-data.tar.gz"
+    unsafe_archive_path = tmp_path / "unsafe-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="unreferenced-asset-test-revision",
+        )
+        _build_archive_with_unreferenced_asset(
+            archive_path,
+            unsafe_archive_path,
+            tmp_path / "unreferenced-asset",
+        )
+
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", target_storage)
+        with pytest.raises(DeveloperDataError, match="manifest contains unreferenced assets"):
+            import_developer_data(archive_path=unsafe_archive_path)
+        assert not target_storage.exists()
+        transaction.set_rollback(True)
+
+
+def test_doctor_resolves_symbol_assets_under_symbols_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        _build_synthetic_source(source_storage)
+        for index in range(14):
+            Card.objects.create(
+                key=f"doctor-mainboard-{index}",
+                label=f"Doctor Mainboard {index}",
+            )
+        get_user_model().objects.create_superuser(
+            username="doctor-admin",
+            password="doctor-test-password",
+        )
+
+        call_command("doctor_dev_data")
+        transaction.set_rollback(True)
+
+
 def test_archive_validation_rejects_unsafe_paths(tmp_path: Path) -> None:
     archive_path = tmp_path / "unsafe.tar.gz"
     with tarfile.open(archive_path, "w:gz") as archive:
@@ -283,6 +382,33 @@ def _build_corrupt_asset_archive(source: Path, target: Path, extraction_root: Pa
         archive.extractall(extraction_root, filter="data")
     asset_path = next((extraction_root / "assets").rglob("*.*"))
     asset_path.write_bytes(b"corrupted")
+    with tarfile.open(target, "w:gz") as archive:
+        for path in sorted(extraction_root.rglob("*")):
+            archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
+
+
+def _build_archive_with_unreferenced_asset(
+    source: Path,
+    target: Path,
+    extraction_root: Path,
+) -> None:
+    extraction_root.mkdir()
+    with tarfile.open(source, "r:gz") as archive:
+        archive.extractall(extraction_root, filter="data")
+    asset_path = extraction_root / "assets" / "uploads" / "private.txt"
+    asset_path.parent.mkdir(parents=True)
+    content = b"not part of the public bundle"
+    asset_path.write_bytes(content)
+    manifest_path = extraction_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"].append(
+        {
+            "path": "assets/uploads/private.txt",
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "size_bytes": len(content),
+        }
+    )
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     with tarfile.open(target, "w:gz") as archive:
         for path in sorted(extraction_root.rglob("*")):
             archive.add(path, arcname=path.relative_to(extraction_root).as_posix())

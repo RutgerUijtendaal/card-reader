@@ -336,6 +336,19 @@ _FORBIDDEN_DATA_KEYS = {
     "source_path",
     "upload_path",
 }
+_FORBIDDEN_CREDENTIAL_KEYS = {
+    "api_key",
+    "credential",
+    "credentials",
+    "password",
+    "private_key",
+    "secret",
+    "token",
+}
+_FORBIDDEN_CREDENTIAL_KEY_SUFFIXES = tuple(
+    f"_{key}" for key in _FORBIDDEN_CREDENTIAL_KEYS
+)
+_ALLOWED_PUBLIC_CREDENTIAL_LIKE_KEYS = {"text_token"}
 _WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
 
 
@@ -349,6 +362,8 @@ def _validate_public_json(value: object, *, context: str) -> None:
             normalized_key = str(key).strip().lower().replace("-", "_")
             if normalized_key in _FORBIDDEN_DATA_KEYS:
                 raise DeveloperDataError(f"Forbidden private field in {context}: {key}")
+            if _is_credential_key(normalized_key):
+                raise DeveloperDataError(f"Forbidden credential field in {context}: {key}")
             _validate_public_json(nested, context=f"{context}.{key}")
         return
     if isinstance(value, list):
@@ -360,6 +375,15 @@ def _validate_public_json(value: object, *, context: str) -> None:
         or value.startswith(("/", "\\\\"))
     ):
         raise DeveloperDataError(f"Forbidden absolute filesystem path in {context}.")
+
+
+def _is_credential_key(normalized_key: str) -> bool:
+    if normalized_key in _ALLOWED_PUBLIC_CREDENTIAL_LIKE_KEYS:
+        return False
+    return (
+        normalized_key in _FORBIDDEN_CREDENTIAL_KEYS
+        or normalized_key.endswith(_FORBIDDEN_CREDENTIAL_KEY_SUFFIXES)
+    )
 
 
 def _copy_payload_assets(payload: DeveloperDataPayload, *, staging_root: Path) -> None:

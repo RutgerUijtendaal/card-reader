@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 from typing import Any
 
@@ -59,9 +59,13 @@ def import_developer_data(
                 f"Expected developer-data bundle {expected_bundle_version}, found {manifest.bundle_version}."
             )
         _validate_payload_references(payload)
-        _validate_payload_assets(payload=payload, manifest=manifest)
+        asset_paths = _validate_payload_assets(payload=payload, manifest=manifest)
         _ensure_domain_is_empty(payload)
-        with _copied_assets(extraction_root=extraction_root, manifest=manifest) as created_assets:
+        with _copied_assets(
+            extraction_root=extraction_root,
+            manifest=manifest,
+            asset_paths=asset_paths,
+        ) as created_assets:
             with transaction.atomic():
                 _import_payload(payload)
     return DeveloperDataImportResult(
@@ -131,12 +135,14 @@ def _copied_assets(
     *,
     extraction_root: Path,
     manifest: DeveloperDataManifest,
+    asset_paths: set[str],
 ) -> Iterator[list[Path]]:
     created: list[Path] = []
     try:
         _copy_assets(
             extraction_root=extraction_root,
             manifest=manifest,
+            asset_paths=asset_paths,
             created=created,
         )
         yield created
@@ -150,14 +156,14 @@ def _copy_assets(
     *,
     extraction_root: Path,
     manifest: DeveloperDataManifest,
+    asset_paths: set[str],
     created: list[Path],
 ) -> None:
     storage_root = settings.storage_root_dir.resolve()
     entries = {entry.path: entry for entry in manifest.files}
-    for entry_path, entry in sorted(entries.items()):
-        if not entry_path.startswith("assets/"):
-            continue
-        relative_storage_path = entry_path.removeprefix("assets/")
+    for relative_storage_path in sorted(asset_paths):
+        entry_path = f"assets/{relative_storage_path}"
+        entry = entries[entry_path]
         source = extraction_root / Path(entry_path)
         target = (storage_root / Path(relative_storage_path)).resolve()
         try:
@@ -395,25 +401,54 @@ def _validate_payload_assets(
     *,
     payload: DeveloperDataPayload,
     manifest: DeveloperDataManifest,
-) -> None:
+) -> set[str]:
     asset_checksums = {
         entry.path.removeprefix("assets/"): entry.sha256
         for entry in manifest.files
         if entry.path.startswith("assets/")
     }
-    referenced_assets = {
+    image_assets = {
         image.stored_path
         for card in payload.cards
         for version in card.versions
         for image in version.images
     }
     if payload.current_card_back is not None:
-        referenced_assets.add(payload.current_card_back.stored_path)
-    referenced_assets.update(
-        asset for symbol in payload.symbols for asset in symbol.reference_assets
+        image_assets.add(payload.current_card_back.stored_path)
+    symbol_assets = {asset for symbol in payload.symbols for asset in symbol.reference_assets}
+    invalid_roots = sorted(
+        path for path in image_assets if not _is_asset_under_root(path, expected_root="images")
     )
+    invalid_roots.extend(
+        sorted(
+            path
+            for path in symbol_assets
+            if not _is_asset_under_root(path, expected_root="symbols")
+        )
+    )
+    if invalid_roots:
+        raise DeveloperDataError(
+            "Developer-data payload references assets outside public storage roots: "
+            + ", ".join(invalid_roots)
+        )
+    referenced_assets = image_assets | symbol_assets
     missing = sorted(referenced_assets - set(asset_checksums))
     if missing:
         raise DeveloperDataError(
             "Developer-data payload references assets missing from the manifest: " + ", ".join(missing)
         )
+    unreferenced = sorted(set(asset_checksums) - referenced_assets)
+    if unreferenced:
+        raise DeveloperDataError(
+            "Developer-data manifest contains unreferenced assets: " + ", ".join(unreferenced)
+        )
+    return referenced_assets
+
+
+def _is_asset_under_root(stored_path: str, *, expected_root: str) -> bool:
+    parts = PurePosixPath(stored_path).parts
+    return (
+        len(parts) > 1
+        and parts[0] == expected_root
+        and all(part not in {".", ".."} for part in parts)
+    )

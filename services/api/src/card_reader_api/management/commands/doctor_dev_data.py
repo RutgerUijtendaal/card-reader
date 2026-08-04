@@ -18,7 +18,7 @@ from card_reader_core.models import (
     Template,
     Type,
 )
-from card_reader_core.storage import resolve_storage_path
+from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 
 class Command(BaseCommand):
@@ -62,8 +62,10 @@ class Command(BaseCommand):
         missing_symbol_assets = 0
         for reference_assets in Symbol.objects.values_list("reference_assets_json", flat=True).iterator():
             for stored_path in reference_assets:
-                if stored_path and not resolve_storage_path(stored_path).is_file():
-                    missing_symbol_assets += 1
+                if stored_path:
+                    symbol_asset_path = build_storage_relative_path("symbols", stored_path)
+                    if not resolve_storage_path(symbol_asset_path).is_file():
+                        missing_symbol_assets += 1
         if missing_symbol_assets:
             issues.append(f"{missing_symbol_assets} symbol reference assets are missing")
         if issues:
