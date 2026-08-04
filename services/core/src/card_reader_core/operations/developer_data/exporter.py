@@ -104,8 +104,11 @@ def _resolve_selection(
     selection: DeveloperDataSelection,
 ) -> tuple[list[Card], list[CardGroup]]:
     selected_keys = set(selection.card_keys)
+    group_queryset = CardGroup.objects.all()
+    if not selection.include_all_card_groups:
+        group_queryset = group_queryset.filter(key__in=selection.card_group_keys)
     groups = list(
-        CardGroup.objects.filter(key__in=selection.card_group_keys)
+        group_queryset
         .select_related("anchor_card")
         .prefetch_related("members__card")
         .order_by("key")
@@ -117,8 +120,11 @@ def _resolve_selection(
         selected_keys.add(group.anchor_card.key)
         selected_keys.update(member.card.key for member in group.members.all())
 
+    card_queryset = Card.objects.all()
+    if not selection.include_all_cards:
+        card_queryset = card_queryset.filter(key__in=selected_keys)
     cards = list(
-        Card.objects.filter(key__in=selected_keys)
+        card_queryset
         .prefetch_related(
             "aliases",
             "versions__template",
@@ -351,7 +357,7 @@ def _validate_public_json(value: object, *, context: str) -> None:
         return
     if isinstance(value, str) and (
         _WINDOWS_ABSOLUTE_PATH.match(value)
-        or value.startswith(("/home/", "/Users/", "/var/", "\\\\"))
+        or value.startswith(("/", "\\\\"))
     ):
         raise DeveloperDataError(f"Forbidden absolute filesystem path in {context}.")
 

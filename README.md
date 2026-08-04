@@ -107,10 +107,8 @@ uv run --project . --package card-reader-parser python -m card_reader_parser.mai
 
 ## Documentation
 
-- [Developer data](docs/developer-data.md): onboarding bundles, access, publishing, and local reset
-- [Backup and restore](docs/backups.md): runtime recovery archives and operational behavior
-- [Notifications](docs/notifications.md): durable notification design and extension points
-- [Card database diagram](docs/card-database-diagram.svg): card-domain model relationships
+Feature guides, operational documentation, and technical references are indexed in
+[docs/README.md](docs/README.md).
 
 ## Configuration
 

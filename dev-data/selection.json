@@ -1,5 +1,7 @@
 {
-  "bundle_version": "dev-2026.08.04.1",
+  "bundle_version": "dev-2026.08.04.2",
+  "include_all_cards": true,
+  "include_all_card_groups": true,
   "card_keys": [
     "alabaster-light-in-the-dark",
     "alice-kaleth-disciple-of-st-caela",
@@ -87,14 +89,17 @@
   ],
   "card_group_keys": [
     "cain",
-    "chungi"
+    "chungi",
+    "foxxxy",
+    "nakak",
+    "octagram"
   ],
   "coverage": {
-    "min_cards": 80,
-    "min_heroes": 8,
+    "min_cards": 750,
+    "min_heroes": 70,
     "min_deprecated_cards": 3,
-    "min_card_groups": 2,
-    "min_cards_with_multiple_versions": 5,
+    "min_card_groups": 5,
+    "min_cards_with_multiple_versions": 160,
     "required_template_keys": [
       "basic-mana",
       "mtg-like-v1"

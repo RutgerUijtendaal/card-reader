@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import shutil
@@ -59,14 +61,9 @@ def import_developer_data(
         _validate_payload_references(payload)
         _validate_payload_assets(payload=payload, manifest=manifest)
         _ensure_domain_is_empty(payload)
-        created_assets = _copy_assets(extraction_root=extraction_root, manifest=manifest)
-        try:
+        with _copied_assets(extraction_root=extraction_root, manifest=manifest) as created_assets:
             with transaction.atomic():
                 _import_payload(payload)
-        except Exception:
-            for asset_path in reversed(created_assets):
-                asset_path.unlink(missing_ok=True)
-            raise
     return DeveloperDataImportResult(
         bundle_version=manifest.bundle_version,
         counts=manifest.counts,
@@ -129,13 +126,33 @@ def _ensure_domain_is_empty(payload: DeveloperDataPayload) -> None:
         )
 
 
+@contextmanager
+def _copied_assets(
+    *,
+    extraction_root: Path,
+    manifest: DeveloperDataManifest,
+) -> Iterator[list[Path]]:
+    created: list[Path] = []
+    try:
+        _copy_assets(
+            extraction_root=extraction_root,
+            manifest=manifest,
+            created=created,
+        )
+        yield created
+    except BaseException:
+        for asset_path in reversed(created):
+            asset_path.unlink(missing_ok=True)
+        raise
+
+
 def _copy_assets(
     *,
     extraction_root: Path,
     manifest: DeveloperDataManifest,
-) -> list[Path]:
+    created: list[Path],
+) -> None:
     storage_root = settings.storage_root_dir.resolve()
-    created: list[Path] = []
     entries = {entry.path: entry for entry in manifest.files}
     for entry_path, entry in sorted(entries.items()):
         if not entry_path.startswith("assets/"):
@@ -154,7 +171,6 @@ def _copy_assets(
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
         created.append(target)
-    return created
 
 
 def _import_payload(payload: DeveloperDataPayload) -> None:
@@ -169,7 +185,10 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             detector_type=row.detector_type,
             detection_config_json=row.detection_config,
             text_enrichment_json=row.text_enrichment,
-            reference_assets_json=row.reference_assets,
+            reference_assets_json=[
+                _symbol_reference_asset_path(asset_path)
+                for asset_path in row.reference_assets
+            ],
             text_token=row.text_token,
             enabled=row.enabled,
         )
@@ -313,6 +332,15 @@ def _create_catalog_rows(model: Any, rows: list[Any]) -> dict[str, Any]:
     }
 
 
+def _symbol_reference_asset_path(stored_path: str) -> str:
+    prefix = "symbols/"
+    if not stored_path.startswith(prefix) or stored_path == prefix:
+        raise DeveloperDataError(
+            f"Developer-data symbol asset must be stored under symbols/: {stored_path}"
+        )
+    return stored_path.removeprefix(prefix)
+
+
 def _validate_payload_references(payload: DeveloperDataPayload) -> None:
     issues = validate_import_readiness(payload)
     keyword_keys = {row.key for row in payload.keywords}
@@ -324,6 +352,9 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
     card_keys = {row.key for row in payload.cards}
     if len(card_keys) != len(payload.cards):
         issues.append("card keys are not unique")
+    for symbol in payload.symbols:
+        for asset_path in symbol.reference_assets:
+            _symbol_reference_asset_path(asset_path)
     for card in payload.cards:
         version_numbers = {version.version_number for version in card.versions}
         if card.latest_version_number not in version_numbers:

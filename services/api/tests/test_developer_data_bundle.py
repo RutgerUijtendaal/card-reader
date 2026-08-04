@@ -127,11 +127,120 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert latest.card_version_tags.filter(tag__key="synthetic").exists()
         assert latest.card_version_symbols.filter(symbol__key="arcane-mana").exists()
         assert latest.card_version_types.filter(type__key="creature").exists()
+        assert Symbol.objects.get(key="arcane-mana").reference_assets_json == [
+            "defaults/arcane.webp"
+        ]
         assert (target_storage / "images" / "hero-v2.webp").read_bytes() == b"hero-v2"
         assert (target_storage / "symbols" / "defaults" / "arcane.webp").read_bytes() == b"symbol"
 
         with pytest.raises(DeveloperDataError, match="requires an empty domain database"):
             import_developer_data(archive_path=archive_path)
+        transaction.set_rollback(True)
+
+
+def test_bundle_selection_can_include_complete_card_and_group_catalogs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "complete-catalog-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        Card.objects.create(key="additional-public-card", label="Additional Public Card")
+        selection.update(
+            {
+                "include_all_cards": True,
+                "include_all_card_groups": True,
+                "card_keys": [],
+                "card_group_keys": [],
+            }
+        )
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        manifest = export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="complete-catalog-test-revision",
+        )
+
+        assert manifest.counts["cards"] == 4
+        assert manifest.counts["card_groups"] == 1
+        transaction.set_rollback(True)
+
+
+def test_import_removes_assets_copied_before_asset_conflict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    target_storage = tmp_path / "target-storage"
+    archive_path = tmp_path / "synthetic-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="asset-cleanup-test-revision",
+        )
+
+        _clear_domain_data()
+        conflicting_asset = target_storage / "images" / "deprecated.webp"
+        conflicting_asset.parent.mkdir(parents=True)
+        conflicting_asset.write_bytes(b"conflicting-local-content")
+        monkeypatch.setattr(settings, "app_data_dir", target_storage)
+
+        with pytest.raises(DeveloperDataError, match="Conflicting local asset already exists"):
+            import_developer_data(archive_path=archive_path)
+
+        assert conflicting_asset.read_bytes() == b"conflicting-local-content"
+        assert not (target_storage / "images" / "card-back.webp").exists()
+        assert not Card.objects.exists()
+        transaction.set_rollback(True)
+
+
+@pytest.mark.parametrize(
+    "absolute_path",
+    [
+        "/srv/card-reader/models/symbol-detector.bin",
+        "/opt/card-reader/templates/basic-mana.json",
+    ],
+)
+def test_export_rejects_arbitrary_absolute_posix_paths(
+    absolute_path: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "synthetic-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        template = Template.objects.get(key="synthetic-template")
+        template.definition_json = {
+            **template.definition_json,
+            "model_location": absolute_path,
+        }
+        template.save(update_fields=["definition_json"])
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(DeveloperDataError, match="Forbidden absolute filesystem path"):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="absolute-path-test-revision",
+            )
         transaction.set_rollback(True)
 
 

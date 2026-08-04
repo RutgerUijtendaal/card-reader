@@ -102,6 +102,7 @@ Core stack:
   - Keep Playtester state responsibilities separated: initialization/normalization in `playtestStateCore.ts`, board mutations in `playtestBoardState.ts`, opening setup in `playtestOpeningState.ts`, and storage migration/serialization in `playtestDraftPersistence.ts`. Import the owning file directly.
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
+- When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.
@@ -143,9 +144,11 @@ Core stack:
 - Card gallery and card assets are public.
 - Import jobs, review, admin, catalog, templates, and exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
-- Developer-data metadata, browser downloads, and bootstrap-code creation require any active
-  authenticated user; code exchange is unauthenticated and download tokens must re-check that the
-  issuing user remains active.
+- Developer-data metadata, browser downloads, and bootstrap-code creation require an active
+  authenticated user who is either staff or has the Developer role. Code exchange is
+  unauthenticated, but exchange and download-token authorization must re-check that the issuing
+  user remains active and still has developer-data access. Bundle creation and build history are
+  staff-only.
 - The Vue app uses Django session auth with CSRF protection.
 - `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.
 

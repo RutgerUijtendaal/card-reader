@@ -27,15 +27,14 @@
             class="flex flex-col gap-2"
             aria-label="Settings sections"
           >
-            <button
+            <RouterLink
               v-for="section in settingsSections"
               :key="section.id"
-              type="button"
+              :to="settingsSectionLocation(section.id)"
               class="rounded-lg border px-3 py-3 text-left transition"
               :class="activeSection === section.id
                 ? 'theme-selected-surface-strong'
                 : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
-              @click="activeSection = section.id"
             >
               <div class="flex items-start gap-3">
                 <component
@@ -52,7 +51,7 @@
                   </span>
                 </span>
               </div>
-            </button>
+            </RouterLink>
           </nav>
         </AppStickyAside>
       </template>
@@ -263,9 +262,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { ArrowUpDown, Database, Eye, MousePointer2, SlidersHorizontal } from 'lucide-vue-next';
 import type { Component } from 'vue';
+import { useRoute } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
@@ -287,8 +287,13 @@ import {
 } from '@/domain/cards/composables/useGalleryOptions';
 import { useHoverModePreferences } from '@/domain/cards/composables/useHoverModePreferences';
 import { useCardSortPreferences } from '@/domain/cards/composables/useCardSortPreferences';
+import {
+  buildSettingsTabLocation,
+  parseSettingsTab,
+  type SettingsTab,
+} from './routeState';
 
-type SettingsSectionId = 'display' | 'sort' | 'hover' | 'developer-data';
+type SettingsSectionId = SettingsTab;
 
 type SettingsSection = {
   id: SettingsSectionId;
@@ -299,10 +304,10 @@ type SettingsSection = {
 };
 
 const { defaultSort } = useCardSortPreferences();
+const route = useRoute();
 const auth = useAuthStore();
 const { defaultHoverMode, hoverPreviewScale } = useHoverModePreferences();
 const { cardScale, showCardGroups, pageSize } = useGalleryOptions();
-const activeSection = ref<SettingsSectionId>('display');
 const preferenceSections: SettingsSection[] = [
   {
     id: 'display',
@@ -338,6 +343,11 @@ const settingsSections = computed<SettingsSection[]>(() =>
     ? [...preferenceSections, developerDataSection]
     : preferenceSections,
 );
+const activeSection = computed<SettingsSectionId>(() =>
+  parseSettingsTab(route.query, {
+    allowDeveloperData: auth.canDownloadDeveloperData,
+  }),
+);
 const hoverModeOptions = HOVER_MODE_OPTIONS;
 const cardSortMenuOptions = computed<PopoverOptionItem[]>(() =>
   cardSortOptions.map((option) => ({
@@ -365,15 +375,8 @@ const hoverPreviewScaleLabel = computed(() => `${Math.round(hoverPreviewScale.va
 const activeSectionDetails = computed(
   () => settingsSections.value.find((section) => section.id === activeSection.value) ?? settingsSections.value[0]!,
 );
-
-watch(
-  () => auth.canDownloadDeveloperData,
-  (allowed) => {
-    if (!allowed && activeSection.value === 'developer-data') {
-      activeSection.value = 'display';
-    }
-  },
-);
+const settingsSectionLocation = (sectionId: SettingsSectionId) =>
+  buildSettingsTabLocation(sectionId, route.query);
 
 const handleDefaultHoverModeSelect = (value: string): void => {
   defaultHoverMode.value = value as HoverMode;

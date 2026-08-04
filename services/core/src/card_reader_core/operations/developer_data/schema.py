@@ -23,6 +23,8 @@ class CoverageRequirements(StrictModel):
 
 class DeveloperDataSelection(StrictModel):
     bundle_version: str = Field(min_length=1)
+    include_all_cards: bool = False
+    include_all_card_groups: bool = False
     card_keys: list[str] = Field(default_factory=list)
     card_group_keys: list[str] = Field(default_factory=list)
     coverage: CoverageRequirements = Field(default_factory=CoverageRequirements)

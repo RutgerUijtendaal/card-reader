@@ -6,13 +6,14 @@ website.
 
 ## Contents and exclusions
 
-The reviewed `dev-data/selection.json` contains stable selection keys and coverage requirements.
-The committed `dev-data.lock.json` pins the required bundle version, format, checksum, and website
-API.
+The reviewed `dev-data/selection.json` contains stable must-include keys, inclusion policy, and
+coverage requirements. The current policy includes the complete card and card-group catalog at
+build time; the explicit keys remain regression anchors that must still exist. The committed
+`dev-data.lock.json` pins the required bundle version, format, checksum, and website API.
 
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
-curated cards with the public relationships needed for gallery, history, metadata, deck building,
-and Playtester workflows.
+cards with the public relationships needed for gallery, history, metadata, deck building, and
+Playtester workflows.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.
