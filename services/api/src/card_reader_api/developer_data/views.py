@@ -8,6 +8,7 @@ from django.http import FileResponse, HttpResponse
 from django.http.response import HttpResponseBase
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from rest_framework.renderers import BaseRenderer
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -146,6 +147,16 @@ class DeveloperDataGrantExchangeView(APIView):
 
 class DeveloperDataBundleDownloadView(APIView):
     permission_classes = [AllowAny]
+
+    def perform_content_negotiation(
+        self,
+        request: Request,
+        force: bool = False,
+    ) -> tuple[BaseRenderer, str]:
+        # Successful downloads return a raw Django response, so DRF's selected
+        # renderer is only used for JSON error responses. Do not reject the
+        # archive media type requested by the bootstrap client.
+        return super().perform_content_negotiation(request, force=True)
 
     def get(self, request: Request, bundle_version: str) -> HttpResponseBase | Response:
         if not can_download_developer_data(request.user):

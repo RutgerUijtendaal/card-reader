@@ -195,6 +195,7 @@ def test_download_rechecks_user_activity_and_uses_internal_redirect(monkeypatch:
     response = anonymous.get(
         "/developer-data/bundles/internal-redirect/download",
         HTTP_AUTHORIZATION=f"DevData {token}",
+        HTTP_ACCEPT="application/gzip",
     )
 
     assert response.status_code == 200
