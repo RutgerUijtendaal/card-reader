@@ -13,7 +13,9 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Schema ownership mistakes outside `services/core`
 - Core layering drift: transport logic in repositories, Django query/write details in services, or domain workflows in API views
 - New one-off modules in `card_reader_core` root or legacy `*_repository.py` files instead of feature packages
-- Filter logic drift outside `frontend/src/composables/card-filters`
+- Frontend dependency drift against the enforced `app -> features -> domain -> shared` direction, especially feature-to-feature imports and shared/domain upward imports
+- Card filter and gallery logic drift outside `frontend/src/domain/cards`, including duplicated card/filter API reads
+- Circular ownership between frontend domains, especially cards and decks
 - Deck list/query regressions where list surfaces fetch full deck records instead of summary records without needing full entries
 - Playtester route regressions around `/playtester` versus `/playtester/:deckId`, local draft preservation, preview-start behavior, card scale preference, or hotkey/help alignment
 - Theme/token drift or light/dark regressions in visible frontend changes

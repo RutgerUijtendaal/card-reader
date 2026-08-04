@@ -5,11 +5,13 @@ description: "Work on Card Reader's Playtester feature: deck selection, opening 
 
 # Card Reader Playtester
 
-Follow `AGENTS.md` and `card-reader-frontend` first. Use this skill when changing `frontend/src/modules/playtester` or deck-list actions that route into playtesting.
+Follow `AGENTS.md` and `card-reader-frontend` first. Use this skill when changing `frontend/src/features/playtester` or deck-list actions that route into playtesting.
 
 ## Feature Shape
 
 - Keep Playtester state and gameplay frontend-only unless the user explicitly asks for backend persistence.
+- Keep workflow implementation in `frontend/src/features/playtester`; reuse card and deck contracts, clients, and UI from `frontend/src/domain/cards` and `frontend/src/domain/decks` without moving Playtester-only state into those domains.
+- Use the canonical card-back client and contracts in `frontend/src/domain/card-backs`; do not recreate a Playtester-owned card-back API.
 - `/playtester` is part of the playtester surface. It should reuse existing deck list UI patterns, compact deck cards, and summary deck endpoints, and keep owned suggestions before public suggestions.
 - `/playtester/:deckId` is a full-screen manual sandbox, not a data page. Preserve the board-like surface and avoid table/card-gallery layouts inside the active play area.
 - Selector search/listing may use existing query-backed deck summary endpoints. Avoid adding new backend search or persistence contracts unless explicitly requested.

@@ -1,3 +1,4 @@
-display_name: Card Reader Notifications
-short_description: Add and maintain Card Reader notifications.
-default_prompt: Use this skill when adding or changing Card Reader notification types, inbox behavior, or future notification delivery channels.
+interface:
+  display_name: "Card Reader Notifications"
+  short_description: "Maintain Card Reader notification flows"
+  default_prompt: "Use $card-reader-notifications to add or change notification types, inbox behavior, or future delivery channels."

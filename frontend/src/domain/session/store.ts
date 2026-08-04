@@ -1,0 +1,71 @@
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
+import { api } from '@/shared/api/client';
+import type { CurrentUser, LoginCredentials } from './types';
+
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref<CurrentUser | null>(null);
+  const initialized = ref(false);
+  const loading = ref(false);
+
+  const authenticated = computed(() => user.value?.authenticated ?? false);
+  const canAccessStaffRoutes = computed(() => user.value?.can_access_admin === true);
+  const canManageUsers = computed(() => user.value?.can_manage_users === true);
+  const canAccessMaintenance = computed(() => user.value?.can_access_maintenance === true);
+
+  const applyCsrfToken = (currentUser: CurrentUser): void => {
+    const token = currentUser.csrf_token;
+    if (token) {
+      api.defaults.headers.common['X-CSRFToken'] = token;
+    }
+  };
+
+  const fetchCurrentUser = async (): Promise<CurrentUser> => {
+    loading.value = true;
+    try {
+      const response = await api.get<CurrentUser>('/auth/me');
+      user.value = response.data;
+      applyCsrfToken(response.data);
+      return response.data;
+    } catch {
+      const fallback = { authenticated: false };
+      user.value = fallback;
+      return fallback;
+    } finally {
+      initialized.value = true;
+      loading.value = false;
+    }
+  };
+
+  const login = async (credentials: LoginCredentials): Promise<CurrentUser> => {
+    loading.value = true;
+    try {
+      const response = await api.post<CurrentUser>('/auth/login', credentials);
+      user.value = response.data;
+      applyCsrfToken(response.data);
+      initialized.value = true;
+      return response.data;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    await api.post('/auth/logout');
+    user.value = { authenticated: false };
+    initialized.value = true;
+  };
+
+  return {
+    user,
+    initialized,
+    loading,
+    authenticated,
+    canAccessStaffRoutes,
+    canManageUsers,
+    canAccessMaintenance,
+    fetchCurrentUser,
+    login,
+    logout,
+  };
+});

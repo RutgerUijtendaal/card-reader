@@ -69,18 +69,22 @@ Core stack:
   - `notifications` owns user notification persistence, unread counts, list queries, read-state updates, and coalescing writes.
   - Shared repository helpers belong in `repositories/helpers.py`; avoid recreating legacy `*_repository.py` modules.
 - Prefer importing from package public APIs, such as `card_reader_core.repositories.cards` or `card_reader_core.services.decks`, rather than deep module paths unless the caller is inside the same package.
-- Keep shared frontend logic in `frontend/src/composables`.
-  - Use domain subfolders such as `card-filters`, `card-gallery`, `decks`, `cards`, and `admin` when shared logic belongs to a real domain concept.
-  - Shared card filtering logic belongs in `frontend/src/composables/card-filters`: route/query parsing, stable key-based filter state, key/id translation, API filter param building, lifecycle helpers, and filter controller composables.
-  - Shared gallery/search behavior belongs in `frontend/src/composables/card-gallery` or root composables such as `useCardCollection`, `useGalleryOptions`, and preference composables.
-  - Page modules such as gallery/review/pickers should only own page-specific behavior like pagination, navigation context, and scroll restoration.
-- Keep shared Vue components in `frontend/src/components`.
-  - Use domain subfolders such as `app`, `cards`, `decks`, `filters`, `forms`, and `modals`.
-  - If a component is consumed by more than one module, move it to `frontend/src/components` instead of importing across module component folders.
-- Keep frontend module roots focused on module entrypoints and core module files.
-  - Acceptable module-root files are pages/views, `api.ts`, `types.ts`, stores, and other true module entrypoints.
-  - Place module-owned implementation details under `components`, `composables`, `utils`, or `tests`.
-  - Do not import from another module's `components`, `composables`, or `utils` folders; promote genuinely shared code to root `frontend/src/components` or `frontend/src/composables`.
+- The frontend uses four explicit layers under `frontend/src`:
+  - `app`: bootstrap, router, shell, global orchestration, and global styles.
+  - `features/<name>`: route and workflow slices. Keep private implementation details under the feature's `components`, `composables`, `utils`, and API files.
+  - `domain/<name>`: reusable business contracts, API clients, state, UI, and logic consumed by multiple workflows.
+  - `shared`: domain-agnostic API infrastructure, components, composables, router helpers, types, and utilities.
+- Classify frontend code by ownership: app-wide orchestration belongs in `app`; business-specific code used by multiple workflows belongs in `domain`; business-specific code used by one workflow belongs in its `feature`; domain-agnostic reusable code belongs in `shared`.
+- Frontend dependency directions are enforced by ESLint boundaries:
+  - `app` may import app, features, domain, and shared.
+  - `features` may import only the same feature, domain, and shared. Feature-to-feature imports are forbidden.
+  - `domain` may import domain and shared. Keep domain dependencies acyclic.
+  - `shared` may import shared only.
+- Use direct frontend file imports; do not add barrel or transitional re-export files solely to hide ownership.
+- Co-locate frontend unit and component specs with their source. Reserve `tests/` directories for scenarios spanning several source files.
+- Shared card queries, filters, gallery behavior, sorting, symbols, preferences, and reusable card UI belong in `frontend/src/domain/cards`.
+- Shared deck contracts, clients, constraints, calculations, exports, route helpers, tags, and reusable deck UI belong in `frontend/src/domain/decks`; deck-building contracts live in `frontend/src/domain/deck-building` to keep card/deck ownership acyclic.
+- Reusable auth/session, notification, template, card-back, review, and access-request contracts and state belong in their matching `frontend/src/domain` slices.
 - Playtester is a frontend-only manual deck sandbox.
   - Deck selection lives at `/playtester` and should reuse existing deck list UI patterns, compact deck cards, summary deck records, and the shared playtest table/lower-bar surface; active play lives at `/playtester/:deckId`.
   - Treat `/playtester` and `/playtester/:deckId` as the playtester surface for route-scoped UI such as hotkey help and global-navigation hotkey suppression.
@@ -93,7 +97,7 @@ Core stack:
   - Board interactions use the custom pointer drag layer, right-click context menus, stacks, card-level visual piles, drag-box group selection, active play hotkeys, and hold-only middle-click zoom.
   - Playtester card scale is a local preference shared by the selector and active play surface; keep scale math in the playtester card-scale utility.
   - Reuse playtester module components such as `PlaytestTableSurface`, `PlaytestLowerBar`, `PlaytestStack`, and `PlaytestStackPopover` before duplicating hand, stack, or table-surface UI.
-  - Keep Playtester implementation details under `frontend/src/modules/playtester/components`, `utils`, or future `composables`; reusable cross-module pieces still belong in shared frontend folders.
+  - Keep Playtester implementation details under `frontend/src/features/playtester/components`, `utils`, or `composables`; reusable deck/card business code belongs in its domain slice and domain-agnostic helpers belong in shared.
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
@@ -193,9 +197,9 @@ Local app URL:
   - format: `prettier`
   - typecheck: `vue-tsc`
   - tests: `vitest`
-  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility in `frontend/src/styles.css`
+  - prefer shared UI utilities over duplicating component-local styling; for custom scroll areas, use the shared `.app-scrollbar` utility in `frontend/src/app/styles.css`
   - prefer VueUse composables when they fit cleanly and reduce custom reactive glue
-  - preserve and extend the shared light/dark theme system in `frontend/src/styles.css` and `frontend/src/composables/useTheme.ts`
+  - preserve and extend the shared light/dark theme system in `frontend/src/app/styles.css` and `frontend/src/shared/composables/useTheme.ts`
   - prefer semantic theme primitives and token-backed shared classes over scattering raw light-only or dark-only color utilities across components
   - when adding or changing visible UI, verify both light and dark appearances instead of treating dark mode as optional follow-up polish
 
