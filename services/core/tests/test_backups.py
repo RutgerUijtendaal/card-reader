@@ -37,7 +37,6 @@ def test_create_backup_archive_captures_expected_runtime(tmp_path: Path) -> None
         member = archive.extractfile("manifest.json")
         assert member is not None
         saved_manifest = json.loads(member.read().decode("utf-8"))
-    assert saved_manifest["app_version"] is not None
     assert saved_manifest["include_logs"] is False
 
 

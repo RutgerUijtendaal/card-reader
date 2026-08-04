@@ -292,7 +292,6 @@ def _build_manifest(
         "archive_version": ARCHIVE_VERSION,
         "backup_id": backup_id,
         "created_at": created_at.isoformat(),
-        "app_version": _read_app_version(),
         "include_logs": include_logs,
         "source_paths": {
             "app_data_dir": str(runtime_paths.app_data_dir),
@@ -301,15 +300,6 @@ def _build_manifest(
         },
         "files": files,
     }
-
-
-def _read_app_version() -> str | None:
-    version_path = REPO_ROOT / "VERSION"
-    if not version_path.exists():
-        return None
-    version = version_path.read_text(encoding="utf-8").strip()
-    return version or None
-
 
 def _write_archive(staging_root: Path, archive_path: Path) -> None:
     with tarfile.open(archive_path, "w:gz") as archive:

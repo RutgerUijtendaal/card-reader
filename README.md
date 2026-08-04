@@ -15,7 +15,7 @@ https://trello.com/b/sCM4JM5V/cards
 - `services/api`: Django + DRF API service
 - `services/parser`: background OCR/parser worker
 - `services/integration`: integration tests across API, parser, and core
-- `scripts`: project-specific automation for repo versioning
+- `scripts`: project-specific backup, restore, and development automation
 
 ## Stack
 
@@ -182,21 +182,3 @@ Runtime paths are resolved from the deployed environment:
 - `CARD_READER_APP_DATA_DIR`
 - `CARD_READER_PUBLIC_APP_DATA_DIR`
 - `CARD_READER_DATABASE_PATH`
-
-## Versioning
-
-The root `VERSION` file is the single source of truth for repo versioning.
-
-Update every tracked manifest version together:
-
-```bash
-pnpm version:repo 0.1.8
-```
-
-Verify that all manifests match:
-
-```bash
-pnpm version:check
-```
-
-Release tags should use the `vX.Y.Z` format and match `VERSION`.

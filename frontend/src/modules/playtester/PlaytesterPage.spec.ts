@@ -872,7 +872,9 @@ describe('PlaytesterPage', () => {
     const mounted = await mountPage();
     await keepOpeningHand(mounted.container);
 
-    const handCard = testZone(mounted.container, 'playtest-hand-zone').querySelector<HTMLElement>('[data-instance-id]');
+    const handCard = testZone(mounted.container, 'playtest-hand-zone')
+      .querySelector<HTMLElement>('[data-instance-id^="card-1:main:"]');
+    expect(handCard).not.toBeNull();
     handCard?.dispatchEvent(new MouseEvent('contextmenu', {
       bubbles: true,
       cancelable: true,
