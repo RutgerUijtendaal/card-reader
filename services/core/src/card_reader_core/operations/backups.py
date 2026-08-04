@@ -211,7 +211,7 @@ def restore_backup_archive(
 
 def default_compose_config() -> ComposeConfig:
     return ComposeConfig(
-        command=os.getenv("CARD_READER_COMPOSE_CMD", "docker-compose"),
+        command=os.getenv("CARD_READER_COMPOSE_CMD", "docker compose"),
         compose_file=Path(
             os.getenv("CARD_READER_COMPOSE_FILE", str(REPO_ROOT / "docker-compose.yml"))
         ).resolve(),

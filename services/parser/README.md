@@ -36,3 +36,7 @@ pnpm --filter @card-reader/parser typecheck
 
 The parser container shares the API data volume and starts after the API health check passes. The API
 container owns migration and seed startup. The parser assumes the database schema is ready.
+
+The locked PaddlePaddle build supports native parser development on Windows x86_64, Linux x86_64,
+and macOS ARM64 with Python 3.12 or 3.13. The container defaults to `linux/amd64`, including on
+Apple Silicon through Docker Desktop emulation.

@@ -22,6 +22,8 @@ jobs:
         run: pnpm install
       - name: Setup uv
         uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
       - name: Sync Python workspace
         run: uv --cache-dir ./.uv-cache sync --project . --all-packages --all-groups --locked
       - name: Lint
@@ -30,3 +32,50 @@ jobs:
         run: pnpm typecheck
       - name: Unit tests
         run: pnpm test
+
+  macos-dependencies:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - name: Sync Python workspace on macOS ARM64
+        run: pnpm deps:py
+      - name: Import PaddlePaddle
+        run: uv run --project . --package card-reader-parser python -c "import paddle; print(paddle.__version__)"
+
+  portability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check Unix script metadata and syntax
+        run: |
+          test -x scripts/create-backup.sh
+          test -x scripts/restore-backup.sh
+          bash -n scripts/create-backup.sh scripts/restore-backup.sh
+      - name: Validate Compose configurations
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          CARD_READER_HOST_APP_DATA_DIR=./.tmp/ci/app-data \
+          CARD_READER_HOST_PUBLIC_APP_DATA_DIR=./.tmp/ci/public \
+            docker compose -f docker-compose.yml -f docker-compose.bind.yml config --quiet
+      - uses: docker/setup-buildx-action@v3
+      - name: Build linux/amd64 parser image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/parser.Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=parser-amd64
+          cache-to: type=gha,mode=max,scope=parser-amd64

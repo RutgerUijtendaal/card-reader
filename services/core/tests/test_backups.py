@@ -13,6 +13,7 @@ from card_reader_core.operations.backups import (
     RuntimePaths,
     _run_compose,
     create_backup_archive,
+    default_compose_config,
     restore_backup_archive,
     validate_backup_archive,
 )
@@ -185,6 +186,14 @@ def test_run_compose_supports_two_word_compose_command(
     assert captured["command"] == ["docker", "compose", "-f", str(compose_config.compose_file), "down"]
     assert captured["cwd"] == tmp_path
     assert captured["check"] is True
+
+
+def test_default_compose_config_uses_compose_plugin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CARD_READER_COMPOSE_CMD", raising=False)
+
+    compose_config = default_compose_config()
+
+    assert compose_config.command == "docker compose"
 
 
 def _build_runtime(root: Path) -> RuntimePaths:

@@ -3,8 +3,9 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
+    "preflight": "node scripts/check-prerequisites.mjs",
     "deps:js": "pnpm install",
-    "deps:py": "uv sync --project . --all-packages --all-groups --locked",
+    "deps:py": "node scripts/check-native-platform.mjs && uv sync --project . --all-packages --all-groups --locked",
     "setup": "pnpm deps:js && pnpm deps:py",
     "bootstrap:dev": "pnpm setup && uv run --project . --package card-reader-api python scripts/bootstrap-dev.py",
     "bootstrap:dev:reset": "pnpm setup && uv run --project . --package card-reader-api python scripts/bootstrap-dev.py --reset",

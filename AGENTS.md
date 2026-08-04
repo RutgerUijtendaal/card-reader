@@ -181,6 +181,12 @@ Core stack:
 
 ## Docker And Runtime
 - `api` and `parser` share the `card_reader_data` Docker volume at `/var/lib/card-reader`.
+- The parser container defaults to `linux/amd64` because the locked PaddlePaddle release has no
+  Linux ARM64 wheel. Docker Desktop provides emulation on Apple Silicon.
+- Native full-workspace development supports Windows x86_64, Linux x86_64, and macOS ARM64 on
+  Python 3.12 or 3.13; `.python-version` pins the default environment to Python 3.12.
+- Use `docker-compose.bind.yml` with explicit `CARD_READER_HOST_*` paths when deployment storage
+  must be bind-mounted from the host; the default Compose file uses a Docker-managed volume.
 - API container startup runs migrations, user seeds, default seeds, then Gunicorn.
 - Parser container waits for the API health check and assumes the schema is ready.
 - Parser container uses `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`.
@@ -267,6 +273,6 @@ Local app URL:
 When running ad hoc checks in this repo, prefer the helper below so temporary
 files, UV cache data, and pytest scratch paths stay inside `.tmp/codex/`:
 
-```powershell
-pwsh -ExecutionPolicy Bypass -File scripts/run-in-agent-env.ps1 -TaskName lint uv run --project . ruff check services/core/src
+```bash
+uv run --no-project python scripts/run-in-agent-env.py --task-name lint -- uv run --project . ruff check services/core/src
 ```
