@@ -313,7 +313,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
 };
 </script>
 
-<style>
+<style scoped>
 .playtest-opening {
   position: relative;
   display: grid;
@@ -462,27 +462,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   transform: translateY(-0.08rem);
 }
 
-.playtest-opening-stage-enter-active,
-.playtest-opening-stage-leave-active {
-  transition:
-    opacity 180ms ease,
-    transform 180ms ease,
-    filter 180ms ease;
-}
-
-.playtest-opening-stage-enter-from {
-  opacity: 0;
-  filter: blur(0.2rem);
-  transform: translateY(0.6rem) scale(0.992);
-}
-
-.playtest-opening-stage-leave-to {
-  opacity: 0;
-  filter: blur(0.16rem);
-  transform: translateY(-0.45rem) scale(0.996);
-}
-
-.playtest-opening-hand-actions {
+:deep(.playtest-opening-hand-actions) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -490,13 +470,13 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   gap: 0.5rem;
 }
 
-.playtest-opening-hand-size {
+:deep(.playtest-opening-hand-size) {
   color: var(--playtest-text-muted);
   font-size: 0.85rem;
   font-weight: 800;
 }
 
-.playtest-opening-hand-size {
+:deep(.playtest-opening-hand-size) {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -512,12 +492,12 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 0.75rem 1rem 1rem;
 }
 
-.playtest-opening-panel {
+:deep(.playtest-opening-panel) {
   min-height: 0;
   overflow: hidden;
 }
 
-.playtest-opening-mana {
+:deep(.playtest-opening-mana) {
   display: grid;
   min-height: 0;
   align-content: center;
@@ -526,7 +506,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   overflow: visible;
 }
 
-.playtest-opening-panel-heading {
+:deep(.playtest-opening-panel-heading) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -534,35 +514,35 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 0.2rem 0.2rem 0.65rem;
 }
 
-.playtest-opening-panel-heading h3,
-.playtest-opening-hand-stage h3 {
+:deep(.playtest-opening-panel-heading h3),
+:deep(.playtest-opening-hand-stage h3) {
   color: var(--playtest-text);
   font-size: 1rem;
   font-weight: 900;
 }
 
-.playtest-opening-panel-heading p,
-.playtest-opening-panel-heading span,
-.playtest-opening-empty {
+:deep(.playtest-opening-panel-heading p),
+:deep(.playtest-opening-panel-heading span),
+:deep(.playtest-opening-empty) {
   color: var(--playtest-text-soft);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.playtest-opening-mana .playtest-opening-panel-heading {
+:deep(.playtest-opening-mana .playtest-opening-panel-heading) {
   width: min(100%, 72rem);
   align-items: center;
   padding-bottom: 0;
   text-align: center;
 }
 
-.playtest-opening-mana .playtest-opening-panel-heading > div {
+:deep(.playtest-opening-mana .playtest-opening-panel-heading > div) {
   display: grid;
   flex: 1 1 auto;
   justify-items: center;
 }
 
-.playtest-opening-mana-grid {
+:deep(.playtest-opening-mana-grid) {
   display: flex;
   width: min(100%, 78rem);
   max-height: min(34rem, 58vh);
@@ -574,14 +554,14 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 0.25rem max(0.5rem, 2vw) 0.75rem;
 }
 
-.playtest-opening-mana-card,
-.playtest-opening-setup-card {
+:deep(.playtest-opening-mana-card),
+:deep(.playtest-opening-setup-card) {
   display: flex;
   gap: 0.7rem;
   min-width: 0;
 }
 
-.playtest-opening-mana-card {
+:deep(.playtest-opening-mana-card) {
   flex: 0 0 var(--playtest-card-width, 9.75rem);
   flex-direction: column;
   align-items: center;
@@ -592,20 +572,20 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     filter 170ms ease;
 }
 
-.playtest-opening-mana-card:hover,
-.playtest-opening-mana-card:focus-visible {
+:deep(.playtest-opening-mana-card:hover),
+:deep(.playtest-opening-mana-card:focus-visible) {
   filter: brightness(1.05);
   transform: translateY(-0.18rem);
 }
 
-.playtest-opening-card-copy-actions {
+:deep(.playtest-opening-card-copy-actions) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.35rem;
 }
 
-.playtest-opening-copy-button {
+:deep(.playtest-opening-copy-button) {
   display: grid;
   width: 1.8rem;
   height: 1.8rem;
@@ -623,25 +603,25 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     transform 140ms ease;
 }
 
-.playtest-opening-copy-button-selected {
+:deep(.playtest-opening-copy-button-selected) {
   border-color: color-mix(in srgb, var(--color-accent) 70%, var(--playtest-border));
   background: color-mix(in srgb, var(--color-accent) 26%, transparent);
   color: var(--playtest-text);
   transform: translateY(-0.08rem);
 }
 
-.playtest-opening-mana-actions {
+:deep(.playtest-opening-mana-actions) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.55rem;
 }
 
-.playtest-opening-mana-actions > button {
+:deep(.playtest-opening-mana-actions > button) {
   min-width: 8rem;
 }
 
-.playtest-opening-setup-stage {
+:deep(.playtest-opening-setup-stage) {
   display: grid;
   width: min(100%, 96rem);
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -652,31 +632,31 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   justify-self: center;
 }
 
-.playtest-opening-setup-stage-library-only {
+:deep(.playtest-opening-setup-stage-library-only) {
   width: min(100%, 54rem);
   grid-template-columns: minmax(0, 1fr);
 }
 
-.playtest-opening-setup-guide {
+:deep(.playtest-opening-setup-guide) {
   min-height: 0;
 }
 
-.playtest-opening-setup-guide {
+:deep(.playtest-opening-setup-guide) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: stretch;
 }
 
-.playtest-opening-setup-library-area {
+:deep(.playtest-opening-setup-library-area) {
   display: grid;
   min-height: 0;
 }
 
-.playtest-opening-setup-stage-library-only .playtest-opening-setup-library-area {
+:deep(.playtest-opening-setup-stage-library-only .playtest-opening-setup-library-area) {
   grid-template-rows: minmax(0, 1fr);
 }
 
-.playtest-opening-setup-list {
+:deep(.playtest-opening-setup-list) {
   display: grid;
   gap: 0.75rem;
   overflow: auto;
@@ -684,20 +664,20 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 1rem 0.35rem 0.5rem 0.2rem;
 }
 
-.playtest-opening-setup-footer {
+:deep(.playtest-opening-setup-footer) {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid color-mix(in srgb, var(--playtest-border) 72%, transparent);
   padding: 0.85rem 0.2rem 0;
 }
 
-.playtest-opening-setup-card {
+:deep(.playtest-opening-setup-card) {
   align-items: flex-start;
   border-top: 1px solid color-mix(in srgb, var(--playtest-border) 72%, transparent);
   padding-top: 0.75rem;
 }
 
-.playtest-opening-setup-card {
+:deep(.playtest-opening-setup-card) {
   display: grid;
   grid-template-columns: var(--playtest-card-width, 9.75rem) minmax(0, 1fr);
   gap: 1rem;
@@ -709,29 +689,29 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     transform 160ms ease;
 }
 
-.playtest-opening-setup-card:hover,
-.playtest-opening-setup-card:focus-visible {
+:deep(.playtest-opening-setup-card:hover),
+:deep(.playtest-opening-setup-card:focus-visible) {
   border-top-color: color-mix(in srgb, var(--color-accent) 54%, var(--playtest-border));
   transform: translateX(0.16rem);
 }
 
-.playtest-opening-setup-card-handled {
+:deep(.playtest-opening-setup-card-handled) {
   opacity: 0.72;
 }
 
-.playtest-opening-setup-card-preview {
+:deep(.playtest-opening-setup-card-preview) {
   width: var(--playtest-card-width, 9.75rem);
   min-width: var(--playtest-card-width, 9.75rem);
 }
 
-.playtest-opening-setup-card-main {
+:deep(.playtest-opening-setup-card-main) {
   display: grid;
   min-width: 0;
   align-content: start;
   gap: 0.55rem;
 }
 
-.playtest-opening-setup-card-title {
+:deep(.playtest-opening-setup-card-title) {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -742,7 +722,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   font-weight: 900;
 }
 
-.playtest-opening-setup-rule-text {
+:deep(.playtest-opening-setup-rule-text) {
   border: 1px solid color-mix(in srgb, var(--playtest-border) 76%, transparent);
   border-radius: 0.65rem;
   background: color-mix(in srgb, var(--playtest-panel-strong) 62%, transparent);
@@ -757,12 +737,12 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     border-color 160ms ease;
 }
 
-.playtest-opening-setup-card-handled .playtest-opening-setup-rule-text {
+:deep(.playtest-opening-setup-card-handled .playtest-opening-setup-rule-text) {
   border-color: color-mix(in srgb, var(--color-accent) 44%, var(--playtest-border));
   background: color-mix(in srgb, var(--color-accent) 10%, var(--playtest-panel-strong));
 }
 
-.playtest-opening-setup-check {
+:deep(.playtest-opening-setup-check) {
   display: inline-flex;
   width: max-content;
   align-items: center;
@@ -772,13 +752,13 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   font-weight: 900;
 }
 
-.playtest-opening-setup-check input {
+:deep(.playtest-opening-setup-check input) {
   width: 1rem;
   height: 1rem;
   accent-color: var(--color-accent);
 }
 
-.playtest-opening-hand-stage {
+:deep(.playtest-opening-hand-stage) {
   display: grid;
   align-content: center;
   justify-items: center;
@@ -786,7 +766,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   gap: 1rem;
 }
 
-.playtest-opening-hand {
+:deep(.playtest-opening-hand) {
   --playtest-opening-hand-card-width: clamp(10.75rem, 13vw, 13rem);
   position: relative;
   display: flex;
@@ -798,11 +778,11 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
   padding: 1.4rem 2rem 2.1rem;
 }
 
-.playtest-opening-hand-actions {
+:deep(.playtest-opening-hand-actions) {
   width: min(100%, 78rem);
 }
 
-.playtest-opening-hand-card {
+:deep(.playtest-opening-hand-card) {
   --playtest-card-width: var(--playtest-opening-hand-card-width);
   flex: 0 0 auto;
   transform-origin: 50% 112%;
@@ -878,44 +858,6 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     filter 160ms ease;
 }
 
-.playtest-card-list-enter-active,
-.playtest-card-list-leave-active {
-  transition:
-    opacity 170ms ease,
-    transform 170ms ease,
-    filter 170ms ease;
-}
-
-.playtest-card-list-enter-from,
-.playtest-card-list-leave-to {
-  opacity: 0;
-  filter: blur(0.12rem);
-  transform: translateY(0.35rem) scale(0.98);
-}
-
-.playtest-card-list-move {
-  transition: transform 180ms ease;
-}
-
-.playtest-hand-fan-enter-active,
-.playtest-hand-fan-leave-active {
-  transition:
-    opacity 170ms ease,
-    filter 170ms ease;
-}
-
-.playtest-hand-fan-enter-from,
-.playtest-hand-fan-leave-to {
-  opacity: 0;
-  filter: blur(0.12rem);
-}
-
-.playtest-hand-fan-move {
-  transition:
-    transform 190ms ease,
-    margin 190ms ease;
-}
-
 .playtest-opening-stacks {
   display: flex;
   flex: 0 1 auto;
@@ -931,7 +873,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     overflow: auto;
   }
 
-  .playtest-opening-hand-actions {
+  :deep(.playtest-opening-hand-actions) {
     align-items: stretch;
     flex-direction: column;
   }
@@ -959,15 +901,15 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
     grid-template-columns: 1fr;
   }
 
-  .playtest-opening-setup-stage {
+  :deep(.playtest-opening-setup-stage) {
     grid-template-columns: 1fr;
   }
 
-  .playtest-opening-setup-card {
+  :deep(.playtest-opening-setup-card) {
     grid-template-columns: var(--playtest-card-width, 9.75rem) minmax(0, 1fr);
   }
 
-  .playtest-opening-hand {
+  :deep(.playtest-opening-hand) {
     --playtest-opening-hand-card-width: clamp(9rem, 28vw, 11rem);
   }
 
@@ -979,15 +921,7 @@ const bottomFanCardStyle = (index: number, total: number): Record<string, string
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .playtest-opening *,
-  .playtest-opening-stage-enter-active,
-  .playtest-opening-stage-leave-active,
-  .playtest-card-list-enter-active,
-  .playtest-card-list-leave-active,
-  .playtest-card-list-move,
-  .playtest-hand-fan-enter-active,
-  .playtest-hand-fan-leave-active,
-  .playtest-hand-fan-move {
+  .playtest-opening :deep(*) {
     animation-duration: 1ms !important;
     transition-duration: 1ms !important;
   }
