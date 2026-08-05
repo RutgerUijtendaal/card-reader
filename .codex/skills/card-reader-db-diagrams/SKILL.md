@@ -13,8 +13,8 @@ description: Maintain Card Reader database schema diagrams and SVG schematics. U
 4. Keep generated scratch copies under `.tmp/codex/` only while iterating; the committed source of truth is the SVG in `docs/`.
 5. Validate SVG XML after editing:
 
-```powershell
-$svg = Get-Content docs/card-database-diagram.svg -Raw; [xml]$svg | Out-Null
+```bash
+uv run --no-project python -c "import xml.etree.ElementTree as ET; ET.parse('docs/card-database-diagram.svg')"
 ```
 
 ## Diagram Layout

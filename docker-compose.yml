@@ -11,7 +11,7 @@ services:
       CARD_READER_ENV: ${CARD_READER_ENV:-production}
       CARD_READER_API_HOST: 0.0.0.0
       CARD_READER_API_PORT: 8000
-      CARD_READER_APP_DATA_DIR: ${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}
+      CARD_READER_APP_DATA_DIR: /var/lib/card-reader
       CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
       CARD_READER_DEVELOPER_DATA_DIR: ${CARD_READER_DEVELOPER_DATA_DIR:-/var/lib/card-reader/dev-data}
       CARD_READER_DEVELOPER_DATA_ACCEL_REDIRECT_PREFIX: "${CARD_READER_DEVELOPER_DATA_ACCEL_REDIRECT_PREFIX:-}"
@@ -56,7 +56,7 @@ services:
       - .env
     environment:
       CARD_READER_ENV: ${CARD_READER_ENV:-production}
-      CARD_READER_APP_DATA_DIR: ${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}
+      CARD_READER_APP_DATA_DIR: /var/lib/card-reader
       CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
       CARD_READER_DEVELOPER_DATA_DIR: ${CARD_READER_DEVELOPER_DATA_DIR:-/var/lib/card-reader/dev-data}
       CARD_READER_DEVELOPER_DATA_PUBLIC_API_BASE_URL: ${CARD_READER_DEVELOPER_DATA_PUBLIC_API_BASE_URL:-https://maityscardgame.com/api}
@@ -70,6 +70,7 @@ services:
         condition: service_healthy
 
   parser:
+    platform: ${CARD_READER_PARSER_PLATFORM:-linux/amd64}
     build:
       context: .
       dockerfile: docker/parser.Dockerfile
@@ -79,7 +80,7 @@ services:
       - .env
     environment:
       CARD_READER_ENV: ${CARD_READER_ENV:-production}
-      CARD_READER_APP_DATA_DIR: ${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}
+      CARD_READER_APP_DATA_DIR: /var/lib/card-reader
       CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
       CARD_READER_SAVE_DEBUG_CROPS: ${CARD_READER_SAVE_DEBUG_CROPS:-false}
       DJANGO_SETTINGS_MODULE: card_reader_core.django_settings

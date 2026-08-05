@@ -7,7 +7,7 @@ name = "card-reader-core"
 version = "0.1.10"
 description = "Shared core runtime and data layer for Card Reader services"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = [
   "django>=5.1.0",
   "pillow>=10.4.0",

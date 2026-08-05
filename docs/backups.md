@@ -31,17 +31,43 @@ Choose a destination appropriate for the current environment:
 uv run --project . python scripts/create-backup.py --backup-root BACKUP_DIRECTORY
 ```
 
-The Linux wrapper supports the same arguments and can run through the configured Compose service:
+The Unix wrapper supports the same arguments and can run through the configured Compose service:
 
 ```bash
-scripts/create-backup.sh --backup-root BACKUP_DIRECTORY
+./scripts/create-backup.sh --backup-root BACKUP_DIRECTORY
 ```
+
+To run the backup inside the API service, select the same Compose configuration as the running
+stack. The default bind-mounted deployment needs no override:
+
+```bash
+CARD_READER_BACKUP_RUNNER=docker_compose \
+  ./scripts/create-backup.sh --backup-root BACKUP_DIRECTORY
+```
+
+For the local Docker-managed volume, also set
+`CARD_READER_BACKUP_COMPOSE_OVERRIDE_FILE=docker-compose.local.yml`.
 
 ## Restore an archive
 
 ```bash
 uv run --project . python scripts/restore-backup.py BACKUP_ARCHIVE
 ```
+
+Restore through the API service so the restore process can access the running stack's configured
+storage directly:
+
+```bash
+CARD_READER_RESTORE_RUNNER=docker_compose \
+  ./scripts/restore-backup.sh BACKUP_ARCHIVE
+```
+
+The Docker wrapper stops the Compose stack, restores and validates the archive, creates the safety
+backup on the host, and restarts the stack with `docker compose up --wait`.
+
+For the local Docker-managed volume, set `CARD_READER_RESTORE_COMPOSE_OVERRIDE_FILE` to
+`docker-compose.local.yml` so the restore command uses the same merged configuration as the running
+stack. The default bind-mounted deployment continues to use `docker-compose.yml` alone.
 
 Restore validates the manifest and checksums before replacing live data. By default it stops and
 restarts the Compose stack, creates a pre-restore safety archive beside the selected archive, and

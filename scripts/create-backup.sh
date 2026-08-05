@@ -42,13 +42,18 @@ if [[ "${CARD_READER_BACKUP_RUNNER:-}" == "docker_compose" ]]; then
 
   container_backup_root="${CARD_READER_BACKUP_CONTAINER_ROOT:-/backup}"
   compose_file="${CARD_READER_BACKUP_COMPOSE_FILE:-$ROOT_DIR/docker-compose.yml}"
+  compose_override_file="${CARD_READER_BACKUP_COMPOSE_OVERRIDE_FILE:-}"
   compose_service="${CARD_READER_BACKUP_COMPOSE_SERVICE:-api}"
   compose_cmd="${CARD_READER_BACKUP_COMPOSE_CMD:-docker compose}"
 
   read -r -a compose_args <<< "$compose_cmd"
+  compose_file_args=(-f "$compose_file")
+  if [[ -n "$compose_override_file" ]]; then
+    compose_file_args+=(-f "$compose_override_file")
+  fi
   docker_args=(
     "${compose_args[@]}"
-    -f "$compose_file"
+    "${compose_file_args[@]}"
     run
     --rm
     --no-deps

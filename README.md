@@ -28,11 +28,25 @@ https://trello.com/b/sCM4JM5V/cards
 
 ## Prerequisites
 
-- Node.js 22+
-- `pnpm` 10+
-- Python 3.12+
-- `uv`
-- Docker for containerized API/parser runs
+- [Node.js 22+](https://nodejs.org/en/download)
+- [`pnpm` 10+](https://pnpm.io/installation)
+- Python 3.12 or 3.13 (`.python-version` pins development to 3.12)
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/) for Python and workspace dependency management
+- [Docker](https://docs.docker.com/get-started/get-docker/) is optional and only needed for container workflows
+
+These are system tools. `pnpm bootstrap:dev` installs the JavaScript and Python project dependencies
+after they are available. Check the installed tools and versions before bootstrapping:
+
+```bash
+pnpm preflight
+```
+
+Native full-workspace development is supported on Windows x86_64, Linux x86_64, and Apple Silicon
+macOS. PaddlePaddle does not provide every OS/architecture combination used by the parser. On Intel
+macOS or ARM Linux, run the Python services with Docker Compose and the frontend separately instead
+of using `pnpm setup` and `pnpm dev`; ARM Linux hosts must have amd64 container emulation enabled.
+On those platforms, `pnpm preflight` requires Docker and Docker Compose and prints the supported
+split-development workflow instead of directing you to the unsupported native bootstrap.
 
 ## Quick Start
 
@@ -127,7 +141,9 @@ Important settings in `./.env.example`:
 - `CARD_READER_CSRF_TRUSTED_ORIGINS`
 - `CARD_READER_CORS_ORIGINS`
 - `CARD_READER_APP_DATA_DIR`
+- `CARD_READER_PUBLIC_APP_DATA_DIR`
 - `CARD_READER_DATABASE_PATH`
+- `CARD_READER_PARSER_PLATFORM`
 
 ## Auth Model
 
@@ -162,7 +178,22 @@ Current container behavior:
 - `parser`: starts the background parser and waits for the API health check
 - `developer-data-builder`: processes queued staff builds outside Gunicorn
 
-The API and parser share a Docker volume mounted at `/var/lib/card-reader`.
+The API, parser, and developer-data builder share bind-mounted deployment storage at
+`/var/lib/card-reader`.
+The parser defaults to a `linux/amd64` container so the same locked PaddlePaddle build works on
+x86_64 hosts and through Docker Desktop emulation on Apple Silicon.
+
+The default Compose file preserves the deployment contract: `CARD_READER_APP_DATA_DIR` and
+`CARD_READER_PUBLIC_APP_DATA_DIR` select the host directories that are bind-mounted into the
+containers. Existing deployments can continue using the normal command unchanged.
+
+For a local Docker Desktop run where host paths should not be configured, use the local override.
+It replaces the bind mounts with the Docker-managed `card_reader_data` volume and requires Docker
+Compose 2.24.4 or newer:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
 
 Health check:
 
@@ -175,6 +206,9 @@ curl http://127.0.0.1:8000/health
 Default storage locations:
 
 - local development: `storage/`
-- Docker: `/var/lib/card-reader`
+- default Docker deployment: the host paths configured through `CARD_READER_APP_DATA_DIR` and
+  `CARD_READER_PUBLIC_APP_DATA_DIR`
+- local Docker override: the `card_reader_data` volume mounted at `/var/lib/card-reader`
 
-Set `CARD_READER_APP_DATA_DIR` to override the storage root.
+Containers use `/var/lib/card-reader` consistently. The host-path settings affect bind-mount
+sources; native processes can also use `CARD_READER_APP_DATA_DIR` to select their storage root.
