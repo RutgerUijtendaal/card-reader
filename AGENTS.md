@@ -189,6 +189,8 @@ Core stack:
   Linux ARM64 wheel. Docker Desktop provides emulation on Apple Silicon.
 - Native full-workspace development supports Windows x86_64, Linux x86_64, and macOS ARM64 on
   Python 3.12 or 3.13; `.python-version` pins the default environment to Python 3.12.
+- On unsupported non-x64 native hosts, preflight verifies the container fallback by running an
+  `alpine:3.21` probe as `linux/amd64`; keep this aligned with the parser service platform.
 - API container startup runs migrations, user seeds, default seeds, then Gunicorn.
 - Parser container waits for the API health check and assumes the schema is ready.
 - Parser container uses `DJANGO_SETTINGS_MODULE=card_reader_core.django_settings`.
@@ -197,7 +199,7 @@ Core stack:
 
 ## Development Commands
 From repo root:
-- Install deps: `pnpm setup`
+- Install all dependencies: `pnpm setup:deps`
 - Install Node deps only: `pnpm deps:js`
 - Install Python deps only: `pnpm deps:py`
 - Dev default: `pnpm dev`

@@ -3,6 +3,7 @@ import process from 'node:process';
 
 import {
   getNativePlatformSupport,
+  requiresAmd64EmulationProbe,
   unsupportedNativePlatformMessage,
 } from './native-platform-support.mjs';
 
@@ -139,6 +140,7 @@ if (dockerResult.ok) {
   }
 }
 
+let composeReady = false;
 if (!nativePlatform.supported && dockerResult.ok) {
   const composeResult = runTool('docker', ['compose', 'version']);
   const composeVersion = parseVersion(composeResult.output);
@@ -148,11 +150,37 @@ if (!nativePlatform.supported && dockerResult.ok) {
       (composeVersion.major === 2 &&
         (composeVersion.minor > 24 || (composeVersion.minor === 24 && composeVersion.patch >= 4))));
   if (composeResult.ok && supportsVolumeOverride) {
+    composeReady = true;
     pass('Docker Compose', `${composeResult.output.split(/\r?\n/, 1)[0]} (requires 2.24.4+)`);
   } else {
     fail(
       'Docker Compose',
       `version 2.24.4+ is required for the local volume override: ${links.docker}`,
+    );
+  }
+}
+
+if (composeReady && requiresAmd64EmulationProbe()) {
+  const probeImage = 'alpine:3.21';
+  const emulationResult = runTool('docker', [
+    'run',
+    '--rm',
+    '--platform=linux/amd64',
+    probeImage,
+    'uname',
+    '-m',
+  ]);
+  const expectedArchitectures = new Set(['x86_64', 'amd64']);
+  const reportedArchitecture = emulationResult.output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => expectedArchitectures.has(line));
+  if (emulationResult.ok && reportedArchitecture) {
+    pass('linux/amd64 emulation', `${probeImage} reported ${reportedArchitecture}`);
+  } else {
+    fail(
+      'linux/amd64 emulation',
+      `unable to run ${probeImage} as linux/amd64; enable binfmt/QEMU emulation and ensure Docker is running`,
     );
   }
 }

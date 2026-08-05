@@ -10,6 +10,13 @@ export function getNativePlatformSupport(platform = process.platform, architectu
   };
 }
 
+export function requiresAmd64EmulationProbe(
+  platform = process.platform,
+  architecture = process.arch,
+) {
+  return architecture !== 'x64' && !getNativePlatformSupport(platform, architecture).supported;
+}
+
 export function unsupportedNativePlatformMessage(platformKey) {
   return [
     `Native parser dependencies are not available for ${platformKey}.`,

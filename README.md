@@ -44,9 +44,11 @@ pnpm preflight
 Native full-workspace development is supported on Windows x86_64, Linux x86_64, and Apple Silicon
 macOS. PaddlePaddle does not provide every OS/architecture combination used by the parser. On Intel
 macOS or ARM Linux, run the Python services with Docker Compose and the frontend separately instead
-of using `pnpm setup` and `pnpm dev`; ARM Linux hosts must have amd64 container emulation enabled.
+of using `pnpm setup:deps` and `pnpm dev`; ARM Linux hosts must have amd64 container emulation enabled.
 On those platforms, `pnpm preflight` requires Docker and Docker Compose and prints the supported
-split-development workflow instead of directing you to the unsupported native bootstrap.
+split-development workflow instead of directing you to the unsupported native bootstrap. On
+unsupported non-x64 hosts, it also runs `alpine:3.21` once as `linux/amd64` to verify that Docker is
+running with binfmt/QEMU emulation; Docker may pull that small probe image on the first check.
 
 ## Quick Start
 
@@ -82,7 +84,7 @@ That starts:
 Useful commands from the repo root:
 
 ```bash
-pnpm setup
+pnpm setup:deps
 pnpm bootstrap:dev
 pnpm bootstrap:dev:reset
 pnpm deps:js
