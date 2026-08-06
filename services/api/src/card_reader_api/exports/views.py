@@ -13,9 +13,20 @@ from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import not_found, serializer_error
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts import encode_tts_deck_export, get_tts_export_sideboard, tts_export_filename
-from card_reader_api.exports.tts_cards import TtsCardExportError, build_tts_card_export
+from card_reader_api.exports.tts_cards import encode_tts_card_export
 from card_reader_core.repositories.exports import export_cards_csv
 from card_reader_core.services.decks import DeckService
+from card_reader_core.services.exports import (
+    TtsCardExportError,
+    TtsCardExportErrorCode,
+    TtsCardExportService,
+)
+
+_TTS_CARD_EXPORT_ERROR_STATUS = {
+    TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE: 409,
+    TtsCardExportErrorCode.CONTENT_VERSION_NOT_FOUND: 404,
+    TtsCardExportErrorCode.NO_USABLE_CARDS: 400,
+}
 
 
 class ExportCsvView(APIView):
@@ -78,14 +89,20 @@ class CardTtsExportView(APIView):
                 return serializer_error(filters_serializer)
             gallery_filters = filters_serializer.validated_filters()
 
+        service = TtsCardExportService()
         try:
-            export = build_tts_card_export(
-                source=source,
-                gallery_filters=gallery_filters,
-                absolute_url=request.build_absolute_uri,
-            )
+            if source["type"] == "gallery":
+                assert gallery_filters is not None
+                export_data = service.build_gallery_export(gallery_filters)
+            else:
+                export_data = service.build_content_version_export(str(source["content_version_id"]))
         except TtsCardExportError as exc:
-            return Response({"detail": exc.detail}, status=exc.status_code)
+            return Response(
+                {"detail": exc.detail},
+                status=_TTS_CARD_EXPORT_ERROR_STATUS[exc.code],
+            )
+
+        export = encode_tts_card_export(export_data, absolute_url=request.build_absolute_uri)
 
         response = HttpResponse(export.encoded_payload, content_type="text/plain; charset=utf-8")
         response["X-Card-Reader-Exported-Count"] = str(export.exported_count)

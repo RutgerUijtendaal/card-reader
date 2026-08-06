@@ -444,9 +444,15 @@ def list_card_generations(card_id: str) -> list[CardVersion]:
     )
 
 
-def list_cards_for_content_version(content_version_id: str) -> list[CardListRow]:
+def list_cards_for_content_version(
+    content_version_id: str,
+    *,
+    lifecycle_status: CardLifecycleFilter = "all",
+) -> list[CardListRow]:
+    versions = CardVersion.objects.filter(content_version_id=content_version_id)
+    versions = filter_queryset_by_card_lifecycle(versions, lifecycle_status)
     versions = (
-        CardVersion.objects.filter(content_version_id=content_version_id)
+        versions
         .select_related("card", "template", "previous_version", "content_version")
         .prefetch_related(
             "images",
@@ -676,12 +682,18 @@ def get_card_list_rows_by_version_ids(card_version_ids: list[str]) -> list[CardL
     return _build_card_list_rows(_hydrate_card_versions(card_version_ids))
 
 
-def get_latest_card_list_rows_by_card_ids(card_ids: list[str]) -> list[CardListRow]:
+def get_latest_card_list_rows_by_card_ids(
+    card_ids: list[str],
+    *,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+) -> list[CardListRow]:
     if not card_ids:
         return []
     normalized_card_ids = list(dict.fromkeys(card_ids))
+    versions = CardVersion.objects.filter(card_id__in=normalized_card_ids, is_latest=True)
+    versions = filter_queryset_by_card_lifecycle(versions, lifecycle_status)
     latest_version_ids_by_card_id = dict(
-        CardVersion.objects.filter(card_id__in=normalized_card_ids, is_latest=True)
+        versions
         .order_by("card_id", "version_number")
         .values_list("card_id", "id")
     )

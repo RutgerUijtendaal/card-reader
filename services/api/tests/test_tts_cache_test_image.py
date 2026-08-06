@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 
 from card_reader_api.cards import tts_cache_test
+from card_reader_core.config.settings import settings
+from card_reader_core.models import Card, CardVersion, CardVersionImage, Template
+from card_reader_core.repositories.cards import (
+    CardImageSource,
+    list_latest_active_card_image_sources,
+)
+from card_reader_core.storage import build_storage_relative_path
 
 
 @pytest.fixture(autouse=True)
@@ -19,7 +28,7 @@ def test_public_cache_test_image_alternates_between_direct_gets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     candidates = _candidates(tmp_path)
-    monkeypatch.setattr(tts_cache_test, "_list_candidates", lambda: candidates)
+    _set_candidates(monkeypatch, candidates)
     client = Client(HTTP_HOST="localhost")
 
     first = client.get("/tts/cache-test/card-image")
@@ -50,7 +59,7 @@ def test_cache_test_head_reserves_the_image_returned_by_the_following_get(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     candidates = _candidates(tmp_path)
-    monkeypatch.setattr(tts_cache_test, "_list_candidates", lambda: candidates)
+    _set_candidates(monkeypatch, candidates)
     client = Client(HTTP_HOST="localhost")
 
     first = client.get("/tts/cache-test/card-image")
@@ -77,8 +86,8 @@ def test_cache_test_requires_two_distinct_readable_images(
 ) -> None:
     monkeypatch.setattr(
         tts_cache_test,
-        "_list_candidates",
-        lambda: _candidates(tmp_path)[:candidate_count],
+        "list_latest_active_card_image_sources",
+        lambda *, limit: _candidates(tmp_path)[:candidate_count],
     )
 
     response = Client(HTTP_HOST="localhost").get("/tts/cache-test/card-image")
@@ -89,66 +98,39 @@ def test_cache_test_requires_two_distinct_readable_images(
     )
 
 
-def test_candidate_selection_requests_active_cards_and_skips_missing_or_duplicate_images(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    readable_a = tmp_path / "a.webp"
-    readable_a.write_bytes(b"a")
-    readable_b = tmp_path / "b.webp"
-    readable_b.write_bytes(b"b")
-    rows = [
-        _card_row("version-b", "card-b"),
-        _card_row("version-a", "card-a"),
-        _card_row("version-duplicate", "card-c"),
-        _card_row("version-missing", "card-d"),
-    ]
-    images = {
-        "version-a": SimpleNamespace(checksum="checksum-a", path=readable_a),
-        "version-b": SimpleNamespace(checksum="checksum-b", path=readable_b),
-        "version-duplicate": SimpleNamespace(checksum="checksum-a", path=readable_a),
-        "version-missing": SimpleNamespace(checksum="checksum-missing", path=None),
-    }
-    query_arguments: dict[str, object] = {}
-
-    def list_rows(**kwargs: object) -> list[SimpleNamespace]:
-        query_arguments.update(kwargs)
-        return rows
-
-    monkeypatch.setattr(tts_cache_test, "list_matching_cards", list_rows)
-    monkeypatch.setattr(
-        tts_cache_test,
-        "get_card_image",
-        lambda version_id: images[version_id],
+def test_candidate_query_is_bounded_and_skips_deprecated_missing_or_duplicate_images() -> None:
+    first = _create_card_image_source("first", checksum="bounded-a")
+    second = _create_card_image_source("second", checksum="bounded-b")
+    duplicate = _create_card_image_source("duplicate", checksum="bounded-a")
+    missing = _create_card_image_source("missing", checksum="bounded-missing", write_file=False)
+    deprecated = _create_card_image_source(
+        "deprecated",
+        checksum="bounded-deprecated",
+        lifecycle_status="deprecated",
     )
-    monkeypatch.setattr(
-        tts_cache_test,
-        "resolve_image_file_path",
-        lambda image: image.path,
-    )
+    card_ids = [first.id, second.id, duplicate.id, missing.id, deprecated.id]
 
-    candidates = tts_cache_test._list_candidates()
+    with CaptureQueriesContext(connection) as queries:
+        candidates = list_latest_active_card_image_sources(limit=2, card_ids=card_ids)
 
-    assert query_arguments["lifecycle_status"] == "active"
-    assert [(candidate.card_id, candidate.checksum) for candidate in candidates] == [
-        ("card-a", "checksum-a"),
-        ("card-b", "checksum-b"),
-    ]
+    assert len(queries) == 1
+    assert "LIMIT 64" in queries[0]["sql"].upper()
+    assert {candidate.checksum for candidate in candidates} == {"bounded-a", "bounded-b"}
 
 
-def _candidates(tmp_path: Path) -> list[tts_cache_test._CardImageCandidate]:
+def _candidates(tmp_path: Path) -> list[CardImageSource]:
     first_path = tmp_path / "first.webp"
     first_path.write_bytes(b"first-card-image")
     second_path = tmp_path / "second.webp"
     second_path.write_bytes(b"second-card-image")
     return [
-        tts_cache_test._CardImageCandidate(
+        CardImageSource(
             card_id="card-a",
             card_version_id="version-a",
             checksum="checksum-a",
             path=first_path,
         ),
-        tts_cache_test._CardImageCandidate(
+        CardImageSource(
             card_id="card-b",
             card_version_id="version-b",
             checksum="checksum-b",
@@ -157,13 +139,51 @@ def _candidates(tmp_path: Path) -> list[tts_cache_test._CardImageCandidate]:
     ]
 
 
-def _card_row(version_id: str, card_id: str) -> SimpleNamespace:
-    return SimpleNamespace(
-        version=SimpleNamespace(
-            id=version_id,
-            card=SimpleNamespace(id=card_id),
-        )
+def _set_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+    candidates: list[CardImageSource],
+) -> None:
+    def load_candidates(*, limit: int) -> list[CardImageSource]:
+        assert limit == 2
+        return candidates
+
+    monkeypatch.setattr(tts_cache_test, "list_latest_active_card_image_sources", load_candidates)
+
+
+def _create_card_image_source(
+    label: str,
+    *,
+    checksum: str,
+    lifecycle_status: str = "active",
+    write_file: bool = True,
+) -> Card:
+    suffix = uuid4().hex
+    card = Card.objects.create(
+        key=f"tts-cache-source-{label}-{suffix}",
+        label=f"TTS Cache Source {label}",
+        lifecycle_status=lifecycle_status,
     )
+    version = CardVersion.objects.create(
+        card=card,
+        template=Template.objects.get(key="mtg-like-v1"),
+        image_hash=f"tts-cache-source-{label}-{suffix}",
+        name=f"TTS Cache Source {label}",
+        is_latest=True,
+    )
+    card.latest_version = version
+    card.save(update_fields=["latest_version"])
+    stored_path = build_storage_relative_path("images", f"{checksum}-{suffix}.webp")
+    if write_file:
+        image_path = settings.storage_root_dir / stored_path
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(checksum.encode("utf-8"))
+    CardVersionImage.objects.create(
+        card_version=version,
+        source_file=stored_path,
+        stored_path=stored_path,
+        checksum=checksum,
+    )
+    return card
 
 
 def _response_body(response: object) -> bytes:

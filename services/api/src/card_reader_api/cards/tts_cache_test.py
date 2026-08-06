@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from threading import Lock
 
 from django.http import FileResponse
@@ -14,19 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.cards.file_views import file_response
-from card_reader_core.repositories.cards import (
-    get_card_image,
-    list_matching_cards,
-    resolve_image_file_path,
-)
-
-
-@dataclass(frozen=True)
-class _CardImageCandidate:
-    card_id: str
-    card_version_id: str
-    checksum: str
-    path: Path
+from card_reader_core.repositories.cards import CardImageSource, list_latest_active_card_image_sources
 
 
 @dataclass
@@ -47,52 +34,23 @@ class TtsCacheTestCardImageView(APIView):
     permission_classes = [AllowAny]
 
     def head(self, _request: Request) -> FileResponse | Response:
-        candidates = _list_candidates()
+        candidates = list_latest_active_card_image_sources(limit=2)
         if len(candidates) < 2:
             return _insufficient_candidates_response()
         candidate, last_modified_epoch = _reserve_next_candidate(candidates)
         return _candidate_response(candidate, last_modified_epoch)
 
     def get(self, _request: Request) -> FileResponse | Response:
-        candidates = _list_candidates()
+        candidates = list_latest_active_card_image_sources(limit=2)
         if len(candidates) < 2:
             return _insufficient_candidates_response()
         candidate, last_modified_epoch = _consume_next_candidate(candidates)
         return _candidate_response(candidate, last_modified_epoch)
 
 
-def _list_candidates() -> list[_CardImageCandidate]:
-    candidates_by_checksum: dict[str, _CardImageCandidate] = {}
-    rows = list_matching_cards(
-        query=None,
-        max_confidence=None,
-        lifecycle_status="active",
-    )
-    for row in rows:
-        image = get_card_image(row.version.id)
-        if image is None:
-            continue
-        checksum = image.checksum.strip()
-        if not checksum or checksum in candidates_by_checksum:
-            continue
-        image_path = resolve_image_file_path(image)
-        if image_path is None:
-            continue
-        candidates_by_checksum[checksum] = _CardImageCandidate(
-            card_id=str(row.version.card.id),
-            card_version_id=str(row.version.id),
-            checksum=checksum,
-            path=image_path,
-        )
-    return sorted(
-        candidates_by_checksum.values(),
-        key=lambda candidate: (candidate.card_id, candidate.card_version_id, candidate.checksum),
-    )[:2]
-
-
 def _reserve_next_candidate(
-    candidates: list[_CardImageCandidate],
-) -> tuple[_CardImageCandidate, int]:
+    candidates: list[CardImageSource],
+) -> tuple[CardImageSource, int]:
     with _rotation_lock:
         pending = _candidate_with_checksum(candidates, _rotation_state.pending_checksum)
         if pending is not None and _rotation_state.pending_last_modified_epoch is not None:
@@ -106,8 +64,8 @@ def _reserve_next_candidate(
 
 
 def _consume_next_candidate(
-    candidates: list[_CardImageCandidate],
-) -> tuple[_CardImageCandidate, int]:
+    candidates: list[CardImageSource],
+) -> tuple[CardImageSource, int]:
     with _rotation_lock:
         candidate = _candidate_with_checksum(candidates, _rotation_state.pending_checksum)
         last_modified_epoch = _rotation_state.pending_last_modified_epoch
@@ -122,9 +80,9 @@ def _consume_next_candidate(
 
 
 def _candidate_after(
-    candidates: list[_CardImageCandidate],
+    candidates: list[CardImageSource],
     previous_checksum: str | None,
-) -> _CardImageCandidate:
+) -> CardImageSource:
     for candidate in candidates:
         if candidate.checksum != previous_checksum:
             return candidate
@@ -132,9 +90,9 @@ def _candidate_after(
 
 
 def _candidate_with_checksum(
-    candidates: list[_CardImageCandidate],
+    candidates: list[CardImageSource],
     checksum: str | None,
-) -> _CardImageCandidate | None:
+) -> CardImageSource | None:
     if checksum is None:
         return None
     return next((candidate for candidate in candidates if candidate.checksum == checksum), None)
@@ -146,7 +104,7 @@ def _advance_last_modified_epoch() -> int:
     return next_epoch
 
 
-def _candidate_response(candidate: _CardImageCandidate, last_modified_epoch: int) -> FileResponse:
+def _candidate_response(candidate: CardImageSource, last_modified_epoch: int) -> FileResponse:
     response = file_response(candidate.path, "TTS cache-test card image is missing")
     response["Cache-Control"] = "public, no-cache"
     response["ETag"] = quote_etag(candidate.checksum)

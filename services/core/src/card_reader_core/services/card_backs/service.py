@@ -128,12 +128,23 @@ def _normalize_label(label: str | None, filename: str) -> str:
 
 
 def _stored_image_exists(card_back: CardBack) -> bool:
+    return resolve_card_back_image_asset_path(card_back) is not None
+
+
+def resolve_card_back_image_asset_path(card_back: CardBack) -> str | None:
     try:
         relative_path = relativize_image_storage_path(card_back.stored_path)
     except Exception:
-        return False
+        return None
     normalized = Path(relative_path).as_posix().strip("/")
     if not normalized.startswith("images/"):
-        return False
-    path = resolve_storage_path(normalized)
-    return path.exists() and path.is_file()
+        return None
+    path = resolve_storage_path(normalized).resolve()
+    images_root = (resolve_storage_path("images")).resolve()
+    try:
+        path.relative_to(images_root)
+    except ValueError:
+        return None
+    if not path.exists() or not path.is_file():
+        return None
+    return normalized

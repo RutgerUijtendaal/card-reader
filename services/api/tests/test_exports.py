@@ -351,6 +351,42 @@ def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_a
     ]
 
 
+def test_content_version_tts_card_export_excludes_deprecated_card_identities() -> None:
+    staff = _create_user("tts-card-version-active-staff", "password", is_staff=True)
+    client = Client(HTTP_HOST="cards.example")
+    client.force_login(staff)
+    _create_current_card_back("content-version-active")
+    content_version = _create_content_version("TTS active-only direct export")
+    active = _create_card(name="Content Version Active Card", is_hero=False)
+    deprecated = _create_card(name="Content Version Deprecated Card", is_hero=False)
+    active.latest_version.content_version = content_version
+    active.latest_version.save(update_fields=["content_version", "updated_at"])
+    deprecated.latest_version.content_version = content_version
+    deprecated.latest_version.save(update_fields=["content_version", "updated_at"])
+    deprecated.lifecycle_status = "deprecated"
+    deprecated.save(update_fields=["lifecycle_status", "updated_at"])
+    _create_card_image(active.latest_version, content=b"active")
+    _create_card_image(deprecated.latest_version, content=b"deprecated")
+
+    response = client.post(
+        "/exports/tts/cards",
+        data={
+            "source": {
+                "type": "content_version",
+                "content_version_id": content_version.id,
+            }
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response["X-Card-Reader-Exported-Count"] == "1"
+    assert response["X-Card-Reader-Skipped-Count"] == "0"
+    payload = _decode_tts_card_export(response.content)
+    assert [card["card_id"] for card in payload["cards"]] == [active.id]
+    assert payload["skipped"] == []
+
+
 def test_tts_card_export_requires_staff_and_a_current_card_back() -> None:
     regular = _create_user("tts-card-regular", "password", is_staff=False)
     regular_client = Client(HTTP_HOST="cards.example")

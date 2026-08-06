@@ -1,4 +1,4 @@
-from .images import resolve_image_file_path
+from .images import list_latest_active_card_image_sources, resolve_image_file_path
 from .queries import (
     get_card,
     get_card_image,
@@ -31,6 +31,8 @@ from .types import (
     CARD_SORT_VALUES,
     DEFAULT_CARD_LIFECYCLE_FILTER,
     DEFAULT_CARD_PAGE_SIZE,
+    CardFilterParams,
+    CardImageSource,
     CardLifecycleFilter,
     CardListCandidate,
     CardListRow,
@@ -47,6 +49,8 @@ from .writes import apply_parsed_fields_to_version, save_parsed_card, save_parse
 __all__ = [
     "CardListRow",
     "CardListCandidate",
+    "CardFilterParams",
+    "CardImageSource",
     "DEFAULT_FIELD_SOURCES",
     "DEFAULT_CARD_LIFECYCLE_FILTER",
     "DEFAULT_CARD_PAGE_SIZE",
@@ -82,6 +86,7 @@ __all__ = [
     "list_matching_cards",
     "list_filtered_latest_card_version_reparse_sources",
     "list_latest_card_version_reparse_sources",
+    "list_latest_active_card_image_sources",
     "promote_card_version",
     "resolve_image_file_path",
     "save_parsed_card",
