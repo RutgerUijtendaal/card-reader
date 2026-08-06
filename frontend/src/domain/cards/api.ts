@@ -21,6 +21,12 @@ export type TtsCardExportResponse = {
   skippedCount: number;
 };
 
+type TtsCardExportApiResponse = {
+  encoded_payload: string;
+  exported_count: number;
+  skipped_count: number;
+};
+
 export const fetchCards = async <TCard>(
   params: URLSearchParams | CardQueryParams,
 ): Promise<PaginatedCardsResponse<TCard>> => {
@@ -45,16 +51,11 @@ export const fetchCardFilters = async (): Promise<CardFiltersResponse> => {
   return response.data;
 };
 
-const parseCountHeader = (value: unknown): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-};
-
 export const exportTtsCards = async (source: TtsCardExportSource): Promise<TtsCardExportResponse> => {
-  const response = await api.post<string>('/exports/tts/cards', { source }, { responseType: 'text' });
+  const response = await api.post<TtsCardExportApiResponse>('/exports/tts/cards', { source });
   return {
-    encodedPayload: response.data,
-    exportedCount: parseCountHeader(response.headers['x-card-reader-exported-count']),
-    skippedCount: parseCountHeader(response.headers['x-card-reader-skipped-count']),
+    encodedPayload: response.data.encoded_payload,
+    exportedCount: response.data.exported_count,
+    skippedCount: response.data.skipped_count,
   };
 };

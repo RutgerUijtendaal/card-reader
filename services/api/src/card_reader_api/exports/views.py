@@ -11,6 +11,7 @@ from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.auth_access import is_authenticated
 from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import not_found, serializer_error
+from card_reader_api.common.urls import build_public_api_url
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts import encode_tts_deck_export, get_tts_export_sideboard, tts_export_filename
 from card_reader_api.exports.tts_cards import encode_tts_card_export
@@ -102,12 +103,17 @@ class CardTtsExportView(APIView):
                 status=_TTS_CARD_EXPORT_ERROR_STATUS[exc.code],
             )
 
-        export = encode_tts_card_export(export_data, absolute_url=request.build_absolute_uri)
-
-        response = HttpResponse(export.encoded_payload, content_type="text/plain; charset=utf-8")
-        response["X-Card-Reader-Exported-Count"] = str(export.exported_count)
-        response["X-Card-Reader-Skipped-Count"] = str(export.skipped_count)
-        return response
+        export = encode_tts_card_export(
+            export_data,
+            absolute_url=lambda path: build_public_api_url(request, path),
+        )
+        return Response(
+            {
+                "encoded_payload": export.encoded_payload,
+                "exported_count": export.exported_count,
+                "skipped_count": export.skipped_count,
+            }
+        )
 
 
 class DeckTtsExportView(APIView):

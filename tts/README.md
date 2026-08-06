@@ -15,6 +15,8 @@ matching importer.
   artwork. TTS added WebP support in v14.
 - The Card Reader website must be reachable from every player who needs to see the cards. `localhost` works only
   for a solo game running on the same computer; multiplayer requires a shared public or LAN-reachable origin.
+- When the externally visible API is mounted below a path prefix, configure its absolute base URL, for example
+  `CARD_READER_PUBLIC_API_BASE_URL=https://cards.example/api`. Direct exports use this base for front and back URLs.
 - A current card back must be configured in Card Reader before a direct-card export can be created.
 - Direct-card exports and Gallery CSV exports require a staff account. Existing deck name exports retain the deck's
   normal public/private viewing permissions.

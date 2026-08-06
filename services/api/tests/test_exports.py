@@ -240,10 +240,11 @@ def test_tts_export_preserves_saved_entry_order() -> None:
     assert "sideboards" not in payload
 
 
-def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images() -> None:
+def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images(monkeypatch) -> None:
     staff = _create_user("tts-card-gallery-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)
+    monkeypatch.setattr(settings, "public_api_base_url", "https://cards.example/api")
     _create_current_card_back("gallery")
     beta = _create_card(name="Direct Gallery Beta", is_hero=False)
     alpha = _create_card(name="Direct Gallery Alpha", is_hero=False)
@@ -269,9 +270,10 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
     )
 
     assert response.status_code == 200
-    assert response["X-Card-Reader-Exported-Count"] == "2"
-    assert response["X-Card-Reader-Skipped-Count"] == "1"
-    payload = _decode_tts_card_export(response.content)
+    response_payload = response.json()
+    assert response_payload["exported_count"] == 2
+    assert response_payload["skipped_count"] == 1
+    payload = _decode_tts_card_export(response_payload["encoded_payload"])
     assert payload["schema"] == "card-reader.tts-cards.v1"
     assert payload["collection"]["name"] == "Card Reader Gallery"
     assert payload["collection"]["source"]["filters"]["sort"] == "name_asc"
@@ -280,9 +282,9 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
         alpha.latest_version.name,
         beta.latest_version.name,
     ]
-    assert payload["cards"][0]["front_url"] == f"http://cards.example/cards/{alpha.id}/image"
+    assert payload["cards"][0]["front_url"] == f"https://cards.example/api/cards/{alpha.id}/image"
     assert payload["cards"][0]["quantity"] == 1
-    assert payload["card_back_url"].startswith("http://cards.example/card-images/images/")
+    assert payload["card_back_url"].startswith("https://cards.example/api/card-images/images/")
     assert payload["skipped"] == [
         {
             "card_id": missing.id,
@@ -333,7 +335,10 @@ def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_a
     )
 
     assert response.status_code == 200
-    payload = _decode_tts_card_export(response.content)
+    response_payload = response.json()
+    assert response_payload["exported_count"] == 1
+    assert response_payload["skipped_count"] == 0
+    payload = _decode_tts_card_export(response_payload["encoded_payload"])
     assert payload["collection"]["source"] == {
         "type": "content_version",
         "content_version_id": content_version.id,
@@ -380,9 +385,10 @@ def test_content_version_tts_card_export_excludes_deprecated_card_identities() -
     )
 
     assert response.status_code == 200
-    assert response["X-Card-Reader-Exported-Count"] == "1"
-    assert response["X-Card-Reader-Skipped-Count"] == "0"
-    payload = _decode_tts_card_export(response.content)
+    response_payload = response.json()
+    assert response_payload["exported_count"] == 1
+    assert response_payload["skipped_count"] == 0
+    payload = _decode_tts_card_export(response_payload["encoded_payload"])
     assert [card["card_id"] for card in payload["cards"]] == [active.id]
     assert payload["skipped"] == []
 
@@ -435,8 +441,8 @@ def test_tts_card_export_rejects_a_selection_without_usable_images() -> None:
     assert response.json()["detail"] == "No cards with usable latest images matched this export."
 
 
-def _decode_tts_card_export(content: bytes) -> dict[str, object]:
-    return json.loads(base64.b64decode(content).decode("utf-8"))
+def _decode_tts_card_export(encoded_payload: str) -> dict[str, object]:
+    return json.loads(base64.b64decode(encoded_payload).decode("utf-8"))
 
 
 def _create_current_card_back(label: str) -> CardBack:
