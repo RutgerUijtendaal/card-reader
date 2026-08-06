@@ -136,6 +136,16 @@
             {{ selectedVersion ? `${cards.length} card${cards.length === 1 ? '' : 's'} in ${selectedVersion.version_number}.` : 'Select a version.' }}
           </p>
         </div>
+        <button
+          v-if="selectedVersion"
+          class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+          type="button"
+          :disabled="isExportingTtsCards"
+          @click="exportSelectedVersion"
+        >
+          <Copy class="h-4 w-4" />
+          <span>{{ isExportingTtsCards ? 'Exporting...' : 'Export TTS Cards' }}</span>
+        </button>
       </div>
 
       <div class="app-scrollbar min-h-0 flex-1 overflow-y-auto pt-5">
@@ -189,7 +199,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Pencil } from 'lucide-vue-next';
+import { Copy, Pencil } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import CardGalleryItem from '@/domain/cards/components/CardGalleryItem.vue';
 import { fetchContentVersionCards, fetchContentVersions, updateContentVersion } from '@/features/admin/api/contentVersions';
@@ -198,6 +208,7 @@ import { useAdminRouteSync } from '@/features/admin/composables/useAdminRouteSyn
 import type { ContentVersionRecord } from '@/features/admin/types';
 import type { CardListItem } from '@/domain/cards/types';
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';
+import { useTtsCardExport } from '@/domain/cards/composables/useTtsCardExport';
 
 const versions = ref<ContentVersionRecord[]>([]);
 const cards = ref<CardListItem[]>([]);
@@ -214,6 +225,7 @@ const versionForm = ref({
 });
 const { route } = useAdminRouteSync();
 const { cardScale } = useGalleryOptions();
+const { copyTtsCardExport, isExportingTtsCards } = useTtsCardExport();
 
 const selectedVersion = computed(
   () => versions.value.find((version) => version.id === selectedVersionId.value) ?? null,
@@ -240,6 +252,14 @@ const galleryGridStyle = computed(() => ({
 
 const selectVersion = (versionId: string): void => {
   selectedVersionId.value = versionId;
+};
+
+const exportSelectedVersion = async (): Promise<void> => {
+  if (!selectedVersion.value) return;
+  await copyTtsCardExport({
+    type: 'content_version',
+    content_version_id: selectedVersion.value.id,
+  });
 };
 
 const resetForm = (): void => {

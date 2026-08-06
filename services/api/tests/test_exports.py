@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import base64
 import json
+from itertools import count
 
 from django.test import Client
 
+from card_reader_core.config.settings import settings
+from card_reader_core.models import CardBack, CardVersion, CardVersionImage, ContentVersion
+from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
+
+_CONTENT_VERSION_COUNTER = count(500)
 
 
 def test_public_deck_tts_export_returns_base64_payload() -> None:
@@ -232,4 +238,240 @@ def test_tts_export_preserves_saved_entry_order() -> None:
         alpha_card.latest_version.name,
     ]
     assert "sideboards" not in payload
+
+
+def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images() -> None:
+    staff = _create_user("tts-card-gallery-staff", "password", is_staff=True)
+    client = Client(HTTP_HOST="cards.example")
+    client.force_login(staff)
+    _create_current_card_back("gallery")
+    beta = _create_card(name="Direct Gallery Beta", is_hero=False)
+    alpha = _create_card(name="Direct Gallery Alpha", is_hero=False)
+    missing = _create_card(name="Direct Gallery Missing", is_hero=False)
+    _create_card_image(beta.latest_version, content=b"beta")
+    _create_card_image(alpha.latest_version, content=b"alpha")
+
+    response = client.post(
+        "/exports/tts/cards",
+        data={
+            "source": {
+                "type": "gallery",
+                "filters": {
+                    "q": "Direct Gallery",
+                    "sort": "name_asc",
+                    "page": 1,
+                    "page_size": 1,
+                    "show_groups": True,
+                },
+            }
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response["X-Card-Reader-Exported-Count"] == "2"
+    assert response["X-Card-Reader-Skipped-Count"] == "1"
+    payload = _decode_tts_card_export(response.content)
+    assert payload["schema"] == "card-reader.tts-cards.v1"
+    assert payload["collection"]["name"] == "Card Reader Gallery"
+    assert payload["collection"]["source"]["filters"]["sort"] == "name_asc"
+    assert "page" not in payload["collection"]["source"]["filters"]
+    assert [card["name"] for card in payload["cards"]] == [
+        alpha.latest_version.name,
+        beta.latest_version.name,
+    ]
+    assert payload["cards"][0]["front_url"] == f"http://cards.example/cards/{alpha.id}/image"
+    assert payload["cards"][0]["quantity"] == 1
+    assert payload["card_back_url"].startswith("http://cards.example/card-images/images/")
+    assert payload["skipped"] == [
+        {
+            "card_id": missing.id,
+            "name": missing.latest_version.name,
+            "reason": "Card has no usable latest image.",
+        }
+    ]
+
+
+def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_artwork() -> None:
+    staff = _create_user("tts-card-version-staff", "password", is_staff=True)
+    client = Client(HTTP_HOST="cards.example")
+    client.force_login(staff)
+    _create_current_card_back("content-version")
+    content_version = _create_content_version("TTS direct export")
+    card = _create_card(name="Content Version Direct Card", is_hero=False)
+    historical = card.latest_version
+    historical.is_latest = False
+    historical.content_version = content_version
+    historical.save(update_fields=["is_latest", "content_version", "updated_at"])
+    _clone_card_version(
+        historical,
+        version_number=2,
+        is_latest=False,
+        content_version=content_version,
+        name="Historical duplicate",
+    )
+    latest = _clone_card_version(
+        historical,
+        version_number=3,
+        is_latest=True,
+        content_version=None,
+        name="Current latest artwork",
+    )
+    card.latest_version = latest
+    card.save(update_fields=["latest_version", "updated_at"])
+    image = _create_card_image(latest, content=b"current")
+
+    response = client.post(
+        "/exports/tts/cards",
+        data={
+            "source": {
+                "type": "content_version",
+                "content_version_id": content_version.id,
+            }
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    payload = _decode_tts_card_export(response.content)
+    assert payload["collection"]["source"] == {
+        "type": "content_version",
+        "content_version_id": content_version.id,
+        "version_number": content_version.version_number,
+    }
+    assert payload["cards"] == [
+        {
+            "card_id": card.id,
+            "card_version_id": latest.id,
+            "name": latest.name,
+            "quantity": 1,
+            "front_url": f"http://cards.example/cards/{card.id}/image",
+            "image_checksum": image.checksum,
+        }
+    ]
+
+
+def test_tts_card_export_requires_staff_and_a_current_card_back() -> None:
+    regular = _create_user("tts-card-regular", "password", is_staff=False)
+    regular_client = Client(HTTP_HOST="cards.example")
+    regular_client.force_login(regular)
+    request_payload = {"source": {"type": "gallery", "filters": {"q": "nothing"}}}
+
+    assert Client(HTTP_HOST="cards.example").post(
+        "/exports/tts/cards",
+        data=request_payload,
+        content_type="application/json",
+    ).status_code in {401, 403}
+    assert regular_client.post(
+        "/exports/tts/cards",
+        data=request_payload,
+        content_type="application/json",
+    ).status_code == 403
+
+    CardBack.objects.filter(is_current=True).update(is_current=False)
+    staff = _create_user("tts-card-no-back-staff", "password", is_staff=True)
+    staff_client = Client(HTTP_HOST="cards.example")
+    staff_client.force_login(staff)
+    response = staff_client.post(
+        "/exports/tts/cards",
+        data=request_payload,
+        content_type="application/json",
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "A usable current card back is required before exporting TTS cards."
+
+
+def test_tts_card_export_rejects_a_selection_without_usable_images() -> None:
+    staff = _create_user("tts-card-empty-staff", "password", is_staff=True)
+    client = Client(HTTP_HOST="cards.example")
+    client.force_login(staff)
+    _create_current_card_back("empty-selection")
+    _create_card(name="TTS Empty Selection Card", is_hero=False)
+
+    response = client.post(
+        "/exports/tts/cards",
+        data={"source": {"type": "gallery", "filters": {"q": "TTS Empty Selection Card"}}},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "No cards with usable latest images matched this export."
+
+
+def _decode_tts_card_export(content: bytes) -> dict[str, object]:
+    return json.loads(base64.b64decode(content).decode("utf-8"))
+
+
+def _create_current_card_back(label: str) -> CardBack:
+    CardBack.objects.filter(is_current=True).update(is_current=False)
+    stored_path = build_storage_relative_path("images", f"tts-card-back-{label}.webp")
+    path = settings.storage_root_dir / stored_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"card-back")
+    return CardBack.objects.create(
+        label=f"TTS {label}",
+        original_filename=f"{label}.png",
+        source_file=f"uploads/card-backs/{label}.png",
+        stored_path=stored_path,
+        width=63,
+        height=88,
+        checksum=f"card-back-{label}",
+        is_current=True,
+    )
+
+
+def _create_card_image(version: CardVersion, *, content: bytes) -> CardVersionImage:
+    stored_path = build_storage_relative_path("images", f"tts-card-{version.id}.webp")
+    path = settings.storage_root_dir / stored_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return CardVersionImage.objects.create(
+        card_version=version,
+        source_file=stored_path,
+        stored_path=stored_path,
+        checksum=f"checksum-{version.id}",
+    )
+
+
+def _create_content_version(description: str) -> ContentVersion:
+    patch = next(_CONTENT_VERSION_COUNTER)
+    return ContentVersion.objects.create(
+        version_number=f"99.0.{patch}",
+        base_version="99.0",
+        major=99,
+        minor=0,
+        patch=patch,
+        description=description,
+    )
+
+
+def _clone_card_version(
+    source: CardVersion,
+    *,
+    version_number: int,
+    is_latest: bool,
+    content_version: ContentVersion | None,
+    name: str,
+) -> CardVersion:
+    return CardVersion.objects.create(
+        card=source.card,
+        version_number=version_number,
+        template=source.template,
+        image_hash=f"{source.image_hash}-{version_number}",
+        name=name,
+        type_line=source.type_line,
+        mana_cost=source.mana_cost,
+        mana_symbols_json=source.mana_symbols_json,
+        mana_value=source.mana_value,
+        rules_text_raw=source.rules_text_raw,
+        rules_text_enriched=source.rules_text_enriched,
+        rules_text=source.rules_text,
+        confidence=source.confidence,
+        field_sources_json=source.field_sources_json,
+        parsed_snapshot_json=source.parsed_snapshot_json,
+        is_latest=is_latest,
+        previous_version=source,
+        content_version=content_version,
+    )
 

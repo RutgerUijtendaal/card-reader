@@ -676,6 +676,23 @@ def get_card_list_rows_by_version_ids(card_version_ids: list[str]) -> list[CardL
     return _build_card_list_rows(_hydrate_card_versions(card_version_ids))
 
 
+def get_latest_card_list_rows_by_card_ids(card_ids: list[str]) -> list[CardListRow]:
+    if not card_ids:
+        return []
+    normalized_card_ids = list(dict.fromkeys(card_ids))
+    latest_version_ids_by_card_id = dict(
+        CardVersion.objects.filter(card_id__in=normalized_card_ids, is_latest=True)
+        .order_by("card_id", "version_number")
+        .values_list("card_id", "id")
+    )
+    version_ids = [
+        str(latest_version_ids_by_card_id[card_id])
+        for card_id in normalized_card_ids
+        if latest_version_ids_by_card_id.get(card_id) is not None
+    ]
+    return get_card_list_rows_by_version_ids(version_ids)
+
+
 def _hydrate_card_list_candidates(
     card_version_ids: list[str],
     *,

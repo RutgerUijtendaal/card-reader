@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.http import FileResponse, Http404
+from django.utils.http import http_date, quote_etag
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -328,7 +329,11 @@ class CardImageView(APIView):
         image_path = resolve_card_image_path(image)
         if image_path is None:
             raise Http404("Card image file is missing")
-        return file_response(image_path, "Card image file is missing")
+        response = file_response(image_path, "Card image file is missing")
+        response["Cache-Control"] = "public, no-cache"
+        response["ETag"] = quote_etag(image.checksum)
+        response["Last-Modified"] = http_date(card.updated_at.timestamp())
+        return response
 
 
 class CardVersionImageView(APIView):

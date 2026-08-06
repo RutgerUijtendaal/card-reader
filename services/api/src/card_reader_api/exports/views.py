@@ -9,8 +9,11 @@ from rest_framework.views import APIView
 from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.auth_access import is_authenticated
+from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import not_found, serializer_error
+from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts import encode_tts_deck_export, get_tts_export_sideboard, tts_export_filename
+from card_reader_api.exports.tts_cards import TtsCardExportError, build_tts_card_export
 from card_reader_core.repositories.exports import export_cards_csv
 from card_reader_core.services.decks import DeckService
 
@@ -56,6 +59,37 @@ class ExportCsvView(APIView):
         )
         response = HttpResponse(content, content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=cards.csv"
+        return response
+
+
+class CardTtsExportView(APIView):
+    permission_classes = [StaffAllowed]
+
+    def post(self, request: Request) -> HttpResponse | Response:
+        serializer = TtsCardExportRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        source = serializer.validated_source()
+
+        gallery_filters = None
+        if source["type"] == "gallery":
+            filters_serializer = CardFiltersQuerySerializer(data=source["filters"])
+            if not filters_serializer.is_valid():
+                return serializer_error(filters_serializer)
+            gallery_filters = filters_serializer.validated_filters()
+
+        try:
+            export = build_tts_card_export(
+                source=source,
+                gallery_filters=gallery_filters,
+                absolute_url=request.build_absolute_uri,
+            )
+        except TtsCardExportError as exc:
+            return Response({"detail": exc.detail}, status=exc.status_code)
+
+        response = HttpResponse(export.encoded_payload, content_type="text/plain; charset=utf-8")
+        response["X-Card-Reader-Exported-Count"] = str(export.exported_count)
+        response["X-Card-Reader-Skipped-Count"] = str(export.skipped_count)
         return response
 
 

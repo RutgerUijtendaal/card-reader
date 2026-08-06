@@ -13,15 +13,17 @@ local CONFIG = {
 }
 
 function importCardReaderDeck(encoded)
-    local ok, json_text = pcall(base64Decode, encoded)
-    if not ok then
-        error("Failed to decode base64 payload: " .. tostring(json_text))
-    end
-
-    local payload = JSON.decode(json_text)
-    validatePayload(payload)
+    local payload = decodePayload(encoded)
+    validateDeckPayload(payload)
 
     startImportJob(payload, buildImportRequests(payload))
+end
+
+function importCardReaderCards(encoded)
+    local payload = decodePayload(encoded)
+    validateCardPayload(payload)
+
+    startDirectCardImportJob(payload, buildDirectCardImportRequests(payload))
 end
 
 function inspectCardReaderLibrary()
@@ -35,7 +37,16 @@ function inspectCardReaderLibrary()
     print(table.concat(rows, "\n"))
 end
 
-function validatePayload(payload)
+function decodePayload(encoded)
+    local ok, json_text = pcall(base64Decode, encoded)
+    if not ok then
+        error("Failed to decode base64 payload: " .. tostring(json_text))
+    end
+
+    return JSON.decode(json_text)
+end
+
+function validateDeckPayload(payload)
     if type(payload) ~= "table" then
         error("Decoded payload must be a table.")
     end
@@ -53,6 +64,43 @@ function validatePayload(payload)
     end
 end
 
+function validateCardPayload(payload)
+    if type(payload) ~= "table" then
+        error("Decoded payload must be a table.")
+    end
+
+    if payload.schema ~= "card-reader.tts-cards.v1" then
+        error("Unsupported payload schema: " .. tostring(payload.schema))
+    end
+
+    if type(payload.collection) ~= "table" or type(payload.collection.name) ~= "string" then
+        error("Payload collection metadata is invalid.")
+    end
+
+    if type(payload.card_back_url) ~= "string" or trim(payload.card_back_url) == "" then
+        error("Payload card back URL is invalid.")
+    end
+
+    if type(payload.cards) ~= "table" then
+        error("Payload cards collection is invalid.")
+    end
+
+    for index, entry in ipairs(payload.cards) do
+        if type(entry) ~= "table"
+            or trim(entry.card_id or "") == ""
+            or trim(entry.card_version_id or "") == ""
+            or trim(entry.name or "") == ""
+            or trim(entry.front_url or "") == ""
+            or math.floor(tonumber(entry.quantity or 0) or 0) <= 0 then
+            error("Payload card entry " .. tostring(index) .. " is invalid.")
+        end
+    end
+
+    if payload.skipped ~= nil and type(payload.skipped) ~= "table" then
+        error("Payload skipped collection is invalid.")
+    end
+end
+
 function buildImportRequests(payload)
     local requests = {}
 
@@ -62,6 +110,25 @@ function buildImportRequests(payload)
 
     for _, entry in ipairs(payload.cards) do
         addImportRequest(requests, entry, "mainboard")
+    end
+
+    return requests
+end
+
+function buildDirectCardImportRequests(payload)
+    local requests = {}
+
+    for _, entry in ipairs(payload.cards) do
+        local quantity = math.floor(tonumber(entry.quantity or 0) or 0)
+        table.insert(requests, {
+            quantity = quantity,
+            remaining = quantity,
+            name = trim(entry.name),
+            card_id = trim(entry.card_id),
+            card_version_id = trim(entry.card_version_id),
+            front_url = trim(entry.front_url),
+            image_checksum = trim(entry.image_checksum or ""),
+        })
     end
 
     return requests
@@ -160,30 +227,60 @@ function addObjectToSearchIndex(search_index, object)
 end
 
 function startImportJob(payload, requests)
-    local job = {
+    local job = createImportJob(payload, requests)
+    job.search_index = createSearchIndex()
+    job.source_region_guids = CONFIG.source_region_guids
+    job.region_index = 1
+    job.region_objects = nil
+    job.region_object_index = 1
+    job.contained_objects = nil
+    job.contained_index = 1
+
+    print(string.format(
+        "Importing '%s' with %d card types and %d requested cards.",
+        payloadCollectionName(payload),
+        #requests,
+        countRequestedCards(requests)
+    ))
+    buildSearchIndexForImport(job)
+end
+
+function startDirectCardImportJob(payload, requests)
+    local job = createImportJob(payload, requests)
+    job.missing = buildExportSkippedRequests(payload.skipped)
+
+    print(string.format(
+        "Importing '%s' with %d card types and %d requested cards from image URLs.",
+        payloadCollectionName(payload),
+        #requests,
+        countRequestedCards(requests)
+    ))
+    spawnDirectCardBatch(job)
+end
+
+function createImportJob(payload, requests)
+    return {
         payload = payload,
         requests = requests,
-        search_index = createSearchIndex(),
-        source_region_guids = CONFIG.source_region_guids,
-        region_index = 1,
-        region_objects = nil,
-        region_object_index = 1,
-        contained_objects = nil,
-        contained_index = 1,
         request_index = 1,
         spawn_index = 1,
         expected_spawns = 0,
         spawned = {},
         missing = {},
     }
+end
 
-    print(string.format(
-        "Importing '%s' with %d card types and %d requested cards.",
-        payload.deck.name,
-        #requests,
-        countRequestedCards(requests)
-    ))
-    buildSearchIndexForImport(job)
+function buildExportSkippedRequests(skipped)
+    local requests = {}
+    for _, entry in ipairs(skipped or {}) do
+        table.insert(requests, {
+            quantity = 1,
+            name = trim(entry.name or entry.card_id or "Unknown card"),
+            role = "export",
+            reason = trim(entry.reason or "Skipped by Card Reader."),
+        })
+    end
+    return requests
 end
 
 function buildSearchIndexForImport(job)
@@ -303,6 +400,74 @@ function spawnImportCard(job, request)
             table.insert(job.spawned, spawned_object)
         end,
     })
+end
+
+function spawnDirectCardBatch(job)
+    local processed = 0
+
+    while processed < CONFIG.spawn_batch_size do
+        local request = job.requests[job.request_index]
+        if request == nil then
+            waitForImportSpawns(job)
+            return
+        end
+
+        if request.remaining <= 0 then
+            job.request_index = job.request_index + 1
+        else
+            spawnDirectCard(job, request)
+            request.remaining = request.remaining - 1
+            processed = processed + 1
+            if request.remaining <= 0 then
+                job.request_index = job.request_index + 1
+            end
+        end
+    end
+
+    Wait.frames(function()
+        spawnDirectCardBatch(job)
+    end, 1)
+end
+
+function spawnDirectCard(job, request)
+    local spawn_position = buildSpawnPosition(job.spawn_index)
+    job.expected_spawns = job.expected_spawns + 1
+    job.spawn_index = job.spawn_index + 1
+
+    spawnObject({
+        type = "CardCustom",
+        position = spawn_position,
+        callback_function = function(spawned_object)
+            spawned_object.setCustomObject({
+                face = verifiedAssetUrl(request.front_url),
+                back = job.payload.card_back_url,
+                type = 0,
+                sideways = false,
+            })
+            local reloaded_object = spawned_object.reload() or spawned_object
+            applyDirectCardMetadata(reloaded_object, request)
+            table.insert(job.spawned, reloaded_object)
+        end,
+    })
+end
+
+function verifiedAssetUrl(url)
+    local prefix = "{verifycache}"
+    if string.sub(url, 1, #prefix) == prefix then
+        return url
+    end
+    return prefix .. url
+end
+
+function applyDirectCardMetadata(object, request)
+    object.setName(request.name)
+    object.setGMNotes(JSON.encode({
+        schema = "card-reader.tts-card.v1",
+        card_id = request.card_id,
+        card_version_id = request.card_version_id,
+        image_checksum = request.image_checksum,
+        stable_front_url = request.front_url,
+    }))
 end
 
 function countMissingCards(missing)
@@ -459,6 +624,7 @@ end
 
 function finalizeImportedDeck(payload, objects, missing)
     local primary = findImportedDeckTarget(objects)
+    local collection_name = payloadCollectionName(payload)
 
     if primary == nil and #objects == 0 then
         print("No cards were spawned.")
@@ -466,9 +632,10 @@ function finalizeImportedDeck(payload, objects, missing)
     end
 
     if primary ~= nil and not primary.isDestroyed() then
-        primary.setName(payload.deck.name)
-        if payload.deck.description ~= nil then
-            primary.setDescription(payload.deck.description)
+        primary.setName(collection_name)
+        local description = payloadDescription(payload)
+        if description ~= nil then
+            primary.setDescription(description)
         end
     else
         print("Imported deck target could not be found for naming.")
@@ -478,13 +645,27 @@ function finalizeImportedDeck(payload, objects, missing)
     if missing_count > 0 then
         print(string.format(
             "Imported '%s' with %d spawned cards and %d missing cards.",
-            payload.deck.name,
+            collection_name,
             #objects,
             missing_count
         ))
     else
-        print(string.format("Imported '%s' with %d spawned cards.", payload.deck.name, #objects))
+        print(string.format("Imported '%s' with %d spawned cards.", collection_name, #objects))
     end
+end
+
+function payloadCollectionName(payload)
+    if type(payload.deck) == "table" then
+        return payload.deck.name
+    end
+    return payload.collection.name
+end
+
+function payloadDescription(payload)
+    if type(payload.deck) == "table" then
+        return payload.deck.description
+    end
+    return nil
 end
 
 function findImportedDeckTarget(objects)
@@ -555,16 +736,20 @@ function logMissingCards(missing)
 
     local rows = {}
     for index, request in ipairs(missing) do
-        table.insert(rows, string.format(
+        local row = string.format(
             "%d. %s x%d | role=%s",
             index,
             tostring(request.name or "-"),
             tonumber(request.quantity or 0) or 0,
             tostring(request.role or "-")
-        ))
+        )
+        if request.reason ~= nil and request.reason ~= "" then
+            row = row .. " | reason=" .. tostring(request.reason)
+        end
+        table.insert(rows, row)
     end
 
-    print("Missing Card Reader cards:\n" .. table.concat(rows, "\n"))
+    print("Skipped or missing Card Reader cards:\n" .. table.concat(rows, "\n"))
 end
 
 function applySpawnMetadata(object, request)
