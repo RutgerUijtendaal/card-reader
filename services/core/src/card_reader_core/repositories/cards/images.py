@@ -8,7 +8,7 @@ from card_reader_core.storage import relativize_storage_path, resolve_storage_pa
 from .types import CardImageSource
 
 _MAX_PUBLIC_IMAGE_CANDIDATE_LIMIT = 16
-_PUBLIC_IMAGE_SCAN_LIMIT = 64
+_PUBLIC_IMAGE_SCAN_PAGE_SIZE = 64
 
 
 def resolve_image_file_path(image: CardVersionImage) -> Path | None:
@@ -43,33 +43,43 @@ def list_latest_active_card_image_sources(
         "card_version__card_id",
         "-created_at",
         "-id",
-    )[:_PUBLIC_IMAGE_SCAN_LIMIT]
+    )
 
     sources: list[CardImageSource] = []
     seen_card_ids: set[str] = set()
     seen_checksums: set[str] = set()
-    for image in images:
-        card_id = str(image.card_version.card.id)
-        if card_id in seen_card_ids:
-            continue
-        image_path = resolve_image_file_path(image)
-        if image_path is None:
-            continue
-        seen_card_ids.add(card_id)
-        checksum = image.checksum.strip()
-        if not checksum or checksum in seen_checksums:
-            continue
-        seen_checksums.add(checksum)
-        sources.append(
-            CardImageSource(
-                card_id=card_id,
-                card_version_id=str(image.card_version.id),
-                checksum=checksum,
-                path=image_path,
-            )
-        )
-        if len(sources) == normalized_limit:
+    page_start = 0
+    while len(sources) < normalized_limit:
+        page = list(images[page_start : page_start + _PUBLIC_IMAGE_SCAN_PAGE_SIZE])
+        if not page:
             break
+
+        for image in page:
+            card_id = str(image.card_version.card.id)
+            if card_id in seen_card_ids:
+                continue
+            image_path = resolve_image_file_path(image)
+            if image_path is None:
+                continue
+            checksum = image.checksum.strip()
+            if not checksum or checksum in seen_checksums:
+                continue
+            seen_card_ids.add(card_id)
+            seen_checksums.add(checksum)
+            sources.append(
+                CardImageSource(
+                    card_id=card_id,
+                    card_version_id=str(image.card_version.id),
+                    checksum=checksum,
+                    path=image_path,
+                )
+            )
+            if len(sources) == normalized_limit:
+                break
+
+        if len(page) < _PUBLIC_IMAGE_SCAN_PAGE_SIZE:
+            break
+        page_start += _PUBLIC_IMAGE_SCAN_PAGE_SIZE
     return sources
 
 

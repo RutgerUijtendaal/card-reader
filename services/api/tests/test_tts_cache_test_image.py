@@ -118,6 +118,47 @@ def test_candidate_query_is_bounded_and_skips_deprecated_missing_or_duplicate_im
     assert {candidate.checksum for candidate in candidates} == {"bounded-a", "bounded-b"}
 
 
+def test_candidate_query_scans_later_bounded_pages_for_readable_images() -> None:
+    crowded = _create_card_image_source(
+        "crowded",
+        card_id="0000-crowded-card",
+        checksum="crowded-missing-0",
+        write_file=False,
+    )
+    for index in range(64):
+        stored_path = build_storage_relative_path(
+            "images",
+            f"crowded-missing-{index + 1}.webp",
+        )
+        CardVersionImage.objects.create(
+            card_version=crowded.latest_version,
+            source_file=stored_path,
+            stored_path=stored_path,
+            checksum=f"crowded-missing-{index + 1}",
+        )
+    first = _create_card_image_source(
+        "later-first",
+        card_id="zzzz-later-first",
+        checksum="later-a",
+    )
+    second = _create_card_image_source(
+        "later-second",
+        card_id="zzzz-later-second",
+        checksum="later-b",
+    )
+
+    with CaptureQueriesContext(connection) as queries:
+        candidates = list_latest_active_card_image_sources(
+            limit=2,
+            card_ids=[crowded.id, first.id, second.id],
+        )
+
+    assert len(queries) == 2
+    assert all("LIMIT 64" in query["sql"].upper() for query in queries)
+    assert "OFFSET 64" in queries[1]["sql"].upper()
+    assert [candidate.checksum for candidate in candidates] == ["later-a", "later-b"]
+
+
 def _candidates(tmp_path: Path) -> list[CardImageSource]:
     first_path = tmp_path / "first.webp"
     first_path.write_bytes(b"first-card-image")
@@ -153,12 +194,14 @@ def _set_candidates(
 def _create_card_image_source(
     label: str,
     *,
+    card_id: str | None = None,
     checksum: str,
     lifecycle_status: str = "active",
     write_file: bool = True,
 ) -> Card:
     suffix = uuid4().hex
     card = Card.objects.create(
+        id=card_id or str(uuid4()),
         key=f"tts-cache-source-{label}-{suffix}",
         label=f"TTS Cache Source {label}",
         lifecycle_status=lifecycle_status,
