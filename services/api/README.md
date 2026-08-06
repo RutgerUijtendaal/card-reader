@@ -7,7 +7,7 @@
 - REST API compatibility for the Vue app
 - Session login/logout/current-user endpoints
 - Authenticated developer-data discovery, grants, protected downloads, and staff build management
-- Staff-protected import, review, settings, catalog, template, and CSV export endpoints
+- Staff-protected import, review, settings, catalog, template, CSV export, and direct-card TTS export endpoints
 - Superuser-protected maintenance endpoints
 - Docker API entrypoint and health endpoint
 - Startup orchestration for migrations and seed commands
@@ -54,9 +54,11 @@ pnpm --filter @card-reader/api dev-data:doctor
 
 Auth is always enabled.
 
-- `/cards`, `/cards/filters`, card image endpoints, symbol assets, `/health`, and `/auth/*` are public.
+- `/cards`, `/cards/filters`, card image endpoints, the temporary `/tts/cache-test/card-image`
+  diagnostic, symbol assets, `/health`, and `/auth/*` are public.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck.
-- Import jobs, review, administrative settings APIs, catalog, templates, and CSV exports require `is_staff=true`.
+- Import jobs, review, administrative settings APIs, catalog, templates, CSV exports, and
+  `POST /exports/tts/cards` require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - Developer-data metadata, browser downloads, and code creation require an active staff user or an
   active user assigned the Developer role through the managed-users API.

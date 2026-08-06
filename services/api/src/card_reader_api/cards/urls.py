@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.urls import path, re_path
 
+from .tts_cache_test import TtsCacheTestCardImageView
 from .views import (
     CardDetailView,
     CardFiltersView,
@@ -19,6 +20,7 @@ from .views import (
 
 urlpatterns = [
     re_path(r"^card-images/(?P<relative_path>images/.*)$", ImmutableCardImageView.as_view()),
+    path("tts/cache-test/card-image", TtsCacheTestCardImageView.as_view()),
     path("cards", CardListView.as_view()),
     path("cards/filters", CardFiltersView.as_view()),
     path("cards/<str:card_id>", CardDetailView.as_view()),

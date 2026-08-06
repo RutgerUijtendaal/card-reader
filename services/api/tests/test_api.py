@@ -725,6 +725,74 @@ def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None
 
     assert response.status_code == 200
     assert b"".join(response.streaming_content) == b"fake-image"
+    assert response["Cache-Control"] == "public, no-cache"
+    assert response["ETag"] == f'"checksum-{version.id}"'
+    assert response["Last-Modified"]
+
+    head_response = Client(HTTP_HOST="localhost").head(f"/cards/{card.id}/image")
+    assert head_response.status_code == 200
+    assert b"".join(head_response.streaming_content) == b""
+    assert head_response["Cache-Control"] == response["Cache-Control"]
+    assert head_response["ETag"] == response["ETag"]
+    assert head_response["Last-Modified"] == response["Last-Modified"]
+
+
+def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_version() -> None:
+    card, first_version = _create_editable_card_version(name="Stable Image Card")
+    first_image = _create_card_image(first_version)
+    client = Client(HTTP_HOST="localhost")
+    stable_path = f"/cards/{card.id}/image"
+
+    first_response = client.get(stable_path)
+    first_last_modified = first_response["Last-Modified"]
+
+    first_version.is_latest = False
+    first_version.save(update_fields=["is_latest", "updated_at"])
+    second_version = CardVersion.objects.create(
+        card=card,
+        version_number=2,
+        template=first_version.template,
+        image_hash="stable-image-second-hash",
+        name=first_version.name,
+        type_line=first_version.type_line,
+        mana_cost=first_version.mana_cost,
+        mana_symbols_json=first_version.mana_symbols_json,
+        mana_value=first_version.mana_value,
+        rules_text_raw=first_version.rules_text_raw,
+        rules_text_enriched=first_version.rules_text_enriched,
+        rules_text=first_version.rules_text,
+        confidence=first_version.confidence,
+        field_sources_json=first_version.field_sources_json,
+        parsed_snapshot_json=first_version.parsed_snapshot_json,
+        is_latest=True,
+        previous_version=first_version,
+    )
+    second_path = settings.image_store_dir / f"stable-{second_version.id}.png"
+    second_path.write_bytes(b"new-stable-image")
+    second_image = CardVersionImage.objects.create(
+        card_version=second_version,
+        source_file=build_storage_relative_path("images", second_path.name),
+        stored_path=build_storage_relative_path("images", second_path.name),
+        checksum=f"checksum-{second_version.id}",
+    )
+    card.latest_version = second_version
+    card.updated_at = card.updated_at + timedelta(seconds=2)
+    card.save(update_fields=["latest_version", "updated_at"])
+
+    second_response = client.get(stable_path)
+
+    assert second_response.status_code == 200
+    assert b"".join(second_response.streaming_content) == b"new-stable-image"
+    assert second_response["ETag"] == f'"{second_image.checksum}"'
+    assert second_response["ETag"] != f'"{first_image.checksum}"'
+    assert second_response["Last-Modified"] != first_last_modified
+
+    redirect_id = f"merged-{card.id}"
+    CardMergeRedirect.objects.create(old_card_id=redirect_id, target_card=card)
+    redirect_response = client.head(f"/cards/{redirect_id}/image")
+    assert redirect_response.status_code == 200
+    assert redirect_response["ETag"] == second_response["ETag"]
+    assert redirect_response["Last-Modified"] == second_response["Last-Modified"]
 
 
 def test_card_image_asset_endpoint_serves_immutable_image_path() -> None:

@@ -153,7 +153,8 @@ Auth is always enabled.
 
 - Card gallery and card assets are public
 - Public deck detail and deck TTS export are available to any viewer who can access the deck
-- Import jobs, review, administrative settings APIs, catalog, templates, and CSV exports require a staff user
+- Import jobs, review, administrative settings APIs, catalog, templates, CSV exports, and direct-card TTS exports
+  require a staff user
 - Developer-data metadata, direct downloads, and bootstrap-code creation require an active staff
   account or an active account assigned the Developer role
 - Maintenance endpoints require a superuser

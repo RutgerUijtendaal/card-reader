@@ -58,15 +58,28 @@
                   @update:page-size="pageSize = $event"
                 />
               </div>
-              <button
+              <div
                 v-if="auth.canAccessStaffRoutes"
-                class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
-                type="button"
-                @click="exportCsv"
+                class="flex flex-wrap gap-2"
               >
-                <Download class="h-4 w-4" />
-                <span>Export CSV</span>
-              </button>
+                <button
+                  class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
+                  type="button"
+                  :disabled="isExportingTtsCards"
+                  @click="exportTtsCards"
+                >
+                  <Copy class="h-4 w-4" />
+                  <span>{{ isExportingTtsCards ? 'Exporting...' : 'Export TTS Cards' }}</span>
+                </button>
+                <button
+                  class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
+                  type="button"
+                  @click="exportCsv"
+                >
+                  <Download class="h-4 w-4" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
             </div>
           </template>
         </GalleryFilterSidebar>
@@ -124,7 +137,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useScroll } from '@vueuse/core';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { Download, Hammer, Images, Pencil } from 'lucide-vue-next';
+import { Copy, Download, Hammer, Images, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/shared/composables/useCsvExport';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
@@ -140,7 +153,10 @@ import type { GalleryItem } from '@/domain/cards/types';
 import {
   createEmptyCardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterState';
-import { buildCardFilterApiSearchParams } from '@/domain/cards/utils/filters/cardFilterRequest';
+import {
+  buildCardFilterApiPayload,
+  buildCardFilterApiSearchParams,
+} from '@/domain/cards/utils/filters/cardFilterRequest';
 import {
   buildCardFilterRouteQuery,
   getCardFilterSignature,
@@ -160,6 +176,7 @@ import GalleryFilterSidebar from '@/domain/cards/components/filters/GalleryFilte
 import { useCardCollection } from '@/domain/cards/composables/useCardCollection';
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
+import { useTtsCardExport } from '@/domain/cards/composables/useTtsCardExport';
 import { buildContextualNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState';
 
 const route = useRoute();
@@ -184,6 +201,7 @@ const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.q
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const { exportCardsCsv } = useCsvExport();
+const { copyTtsCardExport, isExportingTtsCards } = useTtsCardExport();
 const { cardScale, showCardGroups, pageSize } = useGalleryOptions();
 const { defaultSort, overrideSort, effectiveSort, setOverrideSort, clearOverrideSort } = useCardSortSurface('gallery');
 const {
@@ -234,6 +252,16 @@ const restoreScroll = (value: number): void => {
 const exportCsv = async (): Promise<void> => {
   const params = buildCardFilterApiSearchParams(selectionState.value);
   await exportCardsCsv(appendCardSortSearchParam(params, effectiveSort.value));
+};
+
+const exportTtsCards = async (): Promise<void> => {
+  await copyTtsCardExport({
+    type: 'gallery',
+    filters: {
+      ...buildCardFilterApiPayload(selectionState.value),
+      sort: effectiveSort.value,
+    },
+  });
 };
 
 const setGallerySortOverride = (value: typeof effectiveSort.value): void => {

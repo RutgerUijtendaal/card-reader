@@ -5,8 +5,8 @@ from pathlib import Path
 
 from django.core.management import call_command
 
-from card_reader_api.cards.serializers import CardFilterParams
 from card_reader_core.repositories.cards import (
+    CardFilterParams,
     LatestCardVersionReparseSource,
     list_filtered_latest_card_version_reparse_sources,
     list_latest_card_version_reparse_sources,

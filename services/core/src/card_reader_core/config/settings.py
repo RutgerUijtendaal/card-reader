@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     app_data_dir: Path | None = None
     low_confidence_threshold: float = 0.8
     save_debug_crops: bool = True
+    public_api_base_url: str | None = None
     developer_data_dir: Path | None = None
     developer_data_accel_redirect_prefix: str = ""
     developer_data_selection_file: Path | None = None

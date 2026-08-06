@@ -1,7 +1,31 @@
 import { api } from '@/shared/api/client';
 import type { CardFiltersResponse, CardVersionDetail, PaginatedCardsResponse } from '@/domain/cards/types';
+import type { CardFilterApiPayload } from '@/domain/cards/utils/filters/cardFilterRequest';
+import type { CardSort } from '@/domain/cards/utils/gallery/cardSort';
 
 export type CardQueryParams = Record<string, string | number | boolean | undefined>;
+
+export type TtsCardExportSource =
+  | {
+      type: 'gallery';
+      filters: CardFilterApiPayload & { sort: CardSort };
+    }
+  | {
+      type: 'content_version';
+      content_version_id: string;
+    };
+
+export type TtsCardExportResponse = {
+  encodedPayload: string;
+  exportedCount: number;
+  skippedCount: number;
+};
+
+type TtsCardExportApiResponse = {
+  encoded_payload: string;
+  exported_count: number;
+  skipped_count: number;
+};
 
 export const fetchCards = async <TCard>(
   params: URLSearchParams | CardQueryParams,
@@ -25,4 +49,13 @@ export const fetchCardVersions = async (cardId: string): Promise<CardVersionDeta
 export const fetchCardFilters = async (): Promise<CardFiltersResponse> => {
   const response = await api.get<CardFiltersResponse>('/cards/filters');
   return response.data;
+};
+
+export const exportTtsCards = async (source: TtsCardExportSource): Promise<TtsCardExportResponse> => {
+  const response = await api.post<TtsCardExportApiResponse>('/exports/tts/cards', { source });
+  return {
+    encodedPayload: response.data.encoded_payload,
+    exportedCount: response.data.exported_count,
+    skippedCount: response.data.skipped_count,
+  };
 };

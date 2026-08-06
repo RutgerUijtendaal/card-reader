@@ -40,6 +40,10 @@ def get_current_content_version() -> ContentVersion | None:
     return ContentVersion.objects.order_by("-major", "-minor", "-patch").first()
 
 
+def get_content_version(version_id: str) -> ContentVersion | None:
+    return ContentVersion.objects.filter(id=version_id).first()
+
+
 def list_content_versions() -> list[ContentVersion]:
     return list(
         ContentVersion.objects.annotate(card_count=Count("card_versions", distinct=True)).order_by(
@@ -110,6 +114,7 @@ __all__ = [
     "BASE_VERSION_PATTERN",
     "VERSION_NUMBER_PATTERN",
     "create_next_content_version",
+    "get_content_version",
     "get_current_content_version",
     "list_content_versions",
     "normalize_description",

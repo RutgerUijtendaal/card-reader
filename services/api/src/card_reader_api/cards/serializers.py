@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 from rest_framework import serializers
 
@@ -17,7 +17,7 @@ from card_reader_core.models import (
     normalize_card_lifecycle_filter,
 )
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
-from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES
+from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES, CardFilterParams
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
 
@@ -29,42 +29,6 @@ if TYPE_CHECKING:
 MetadataOption = Keyword | Tag | Type
 SCALAR_FIELDS = {"name", "type_line", "mana_cost", "attack", "health", "rules_text"}
 METADATA_GROUPS = {"keywords", "tags", "types", "symbols"}
-
-
-class CardFilterParams(TypedDict):
-    query: str | None
-    card_ids: list[str] | None
-    max_confidence: float | None
-    keyword_ids: list[str] | None
-    keyword_match: str | None
-    tag_ids: list[str] | None
-    tag_match: str | None
-    mana_symbol_ids: list[str] | None
-    mana_symbol_exclude_ids: list[str] | None
-    mana_symbol_match: str | None
-    affinity_symbol_ids: list[str] | None
-    affinity_symbol_exclude_ids: list[str] | None
-    affinity_symbol_match: str | None
-    devotion_symbol_ids: list[str] | None
-    devotion_symbol_exclude_ids: list[str] | None
-    devotion_symbol_match: str | None
-    other_symbol_ids: list[str] | None
-    other_symbol_exclude_ids: list[str] | None
-    other_symbol_match: str | None
-    symbol_ids: list[str] | None
-    type_ids: list[str] | None
-    type_exclude_ids: list[str] | None
-    type_match: str | None
-    mana_cost_min: int | None
-    mana_cost_max: int | None
-    template_id: str | None
-    is_hero: bool | None
-    attack_min: int | None
-    attack_max: int | None
-    health_min: int | None
-    health_max: int | None
-    lifecycle_status: CardLifecycleFilter
-    sort: CardSort
 
 
 class CardListFilterParams(CardFilterParams):

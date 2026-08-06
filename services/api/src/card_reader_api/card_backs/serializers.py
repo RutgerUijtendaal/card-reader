@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
-from card_reader_core.config.settings import settings
 from card_reader_core.models import CardBack
-from card_reader_core.storage import relativize_image_storage_path, resolve_storage_path
+from card_reader_core.services.card_backs import resolve_card_back_image_asset_path
 
 
 def card_back_payload(card_back: CardBack) -> dict[str, object]:
@@ -44,25 +41,8 @@ def current_card_back_payload(card_back: CardBack | None) -> dict[str, object]:
 
 
 def card_back_image_url(card_back: CardBack) -> str | None:
-    try:
-        relative_path = relativize_image_storage_path(card_back.stored_path)
-    except Exception:
-        return None
-
-    normalized = Path(relative_path).as_posix().strip("/")
-    if not normalized.startswith("images/"):
-        return None
-
-    requested_path = resolve_storage_path(normalized).resolve()
-    images_root = (settings.storage_root_dir.resolve() / "images").resolve()
-    try:
-        requested_path.relative_to(images_root)
-    except ValueError:
-        return None
-
-    if not requested_path.exists() or not requested_path.is_file():
-        return None
-    return f"/card-images/{normalized}"
+    asset_path = resolve_card_back_image_asset_path(card_back)
+    return None if asset_path is None else f"/card-images/{asset_path}"
 
 
 class CardBackUploadSerializer(serializers.Serializer[dict[str, object]]):
