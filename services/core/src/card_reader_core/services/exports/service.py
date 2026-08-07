@@ -17,6 +17,7 @@ from card_reader_core.repositories.cards import (
     list_matching_cards,
 )
 from card_reader_core.repositories.content_versions import get_content_version
+from card_reader_core.repositories.exports import get_tts_card_library_revision
 from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
 from card_reader_core.services.card_backs import (
     CardBackService,
@@ -91,6 +92,9 @@ class _ResolvedTtsCardSelection:
 
 
 class TtsCardExportService:
+    def get_library_revision(self) -> str:
+        return get_tts_card_library_revision()
+
     def build_library_export(self) -> TtsCardExportData:
         selection = _ResolvedTtsCardSelection(
             collection_name="Card Reader Library",

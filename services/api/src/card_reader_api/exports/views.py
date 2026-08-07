@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import hashlib
-
 from django.http import HttpResponse, HttpResponseNotModified
-from django.utils.http import quote_etag
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -21,11 +18,8 @@ from card_reader_api.exports.tts import (
     get_tts_export_sideboard,
     tts_export_filename,
 )
-from card_reader_api.exports.tts_cards import (
-    build_tts_card_export_payload,
-    encode_tts_card_export,
-    serialize_tts_card_export_payload,
-)
+from card_reader_api.exports.tts_cards import encode_tts_card_export
+from card_reader_api.exports.tts_library import tts_card_library_materializer
 from card_reader_core.repositories.exports import export_cards_csv
 from card_reader_core.services.decks import DeckService
 from card_reader_core.services.exports import (
@@ -139,26 +133,33 @@ class TtsCardLibraryView(APIView):
         return self._response(request, include_body=False)
 
     def _response(self, request: Request, *, include_body: bool) -> HttpResponse | Response:
-        try:
-            export_data = TtsCardExportService().build_library_export()
-        except TtsCardExportError as exc:
-            return _tts_card_export_error_response(exc)
-
-        payload = build_tts_card_export_payload(
-            export_data,
+        cache_key = build_public_api_url(request, "")
+        materialization = tts_card_library_materializer.materialize(
+            cache_key=cache_key,
             absolute_url=lambda path: build_public_api_url(request, path),
         )
-        content = serialize_tts_card_export_payload(payload)
-        etag = quote_etag(hashlib.sha256(content).hexdigest())
-        if request.headers.get("If-None-Match", "").strip() == etag:
+        if materialization.error_code is not None:
+            return _tts_card_export_error_response(
+                TtsCardExportError(
+                    materialization.error_code,
+                    materialization.error_detail or "TTS card library is unavailable.",
+                )
+            )
+
+        assert materialization.content is not None
+        assert materialization.etag is not None
+        if request.headers.get("If-None-Match", "").strip() == materialization.etag:
             response: HttpResponse = HttpResponseNotModified()
         elif include_body:
-            response = HttpResponse(content, content_type="application/json; charset=utf-8")
+            response = HttpResponse(
+                materialization.content,
+                content_type="application/json; charset=utf-8",
+            )
         else:
             response = HttpResponse(content_type="application/json; charset=utf-8")
-            response["Content-Length"] = str(len(content))
+            response["Content-Length"] = str(len(materialization.content))
         response["Cache-Control"] = "public, no-cache"
-        response["ETag"] = etag
+        response["ETag"] = materialization.etag
         return response
 
 

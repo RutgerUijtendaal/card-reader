@@ -4,6 +4,7 @@ import base64
 from io import BytesIO
 import json
 from itertools import count
+from unittest.mock import patch
 
 from django.test import Client
 from PIL import Image
@@ -18,6 +19,8 @@ from card_reader_core.models import (
 )
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
+from card_reader_core.services.exports import TtsCardExportService
+from card_reader_api.exports.tts_library import tts_card_library_materializer
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
 
 _CONTENT_VERSION_COUNTER = count(500)
@@ -421,6 +424,7 @@ def test_content_version_tts_card_export_excludes_deprecated_card_identities() -
 
 
 def test_public_tts_library_manifest_includes_active_and_deprecated_cards() -> None:
+    tts_card_library_materializer.clear()
     TtsCardSheet.objects.all().delete()
     _create_current_card_back("public-library")
     deprecated = _create_card(name="AAA Deprecated Library Card", is_hero=False)
@@ -455,11 +459,16 @@ def test_public_tts_library_manifest_includes_active_and_deprecated_cards() -> N
         }
     ]
 
-    head = client.head("/tts/card-library/cards.json")
-    not_modified = client.get(
-        "/tts/card-library/cards.json",
-        HTTP_IF_NONE_MATCH=response["ETag"],
-    )
+    with patch.object(
+        TtsCardExportService,
+        "build_library_export",
+        side_effect=AssertionError("cached manifest should not rebuild"),
+    ):
+        head = client.head("/tts/card-library/cards.json")
+        not_modified = client.get(
+            "/tts/card-library/cards.json",
+            HTTP_IF_NONE_MATCH=response["ETag"],
+        )
     assert head.status_code == 200
     assert head["ETag"] == response["ETag"]
     assert int(head["Content-Length"]) == len(response.content)
@@ -470,6 +479,7 @@ def test_public_tts_library_manifest_includes_active_and_deprecated_cards() -> N
 def test_public_tts_library_manifest_returns_retryable_pending_response(
     monkeypatch,
 ) -> None:
+    tts_card_library_materializer.clear()
     TtsCardSheet.objects.all().delete()
     storage_root = settings.storage_root_dir
     monkeypatch.setattr(settings, "app_data_dir", storage_root)
@@ -478,13 +488,23 @@ def test_public_tts_library_manifest_returns_retryable_pending_response(
     card = _create_card(name="Pending Public Library Card", is_hero=False)
     _create_card_image(card.latest_version, content=b"pending-library")
 
-    response = Client(HTTP_HOST="cards.example").get("/tts/card-library/cards.json")
+    client = Client(HTTP_HOST="cards.example")
+    response = client.get("/tts/card-library/cards.json")
 
     assert response.status_code == 503
     assert response["Retry-After"] == "2"
+    with patch.object(
+        TtsCardExportService,
+        "build_library_export",
+        side_effect=AssertionError("cached pending manifest should not rebuild"),
+    ):
+        cached_response = client.get("/tts/card-library/cards.json")
+    assert cached_response.status_code == 503
+    assert cached_response["Retry-After"] == "2"
 
 
 def test_public_tts_library_manifest_requires_a_current_card_back() -> None:
+    tts_card_library_materializer.clear()
     card = _create_card(name="Public Library Without Back", is_hero=False)
     _create_card_image(card.latest_version, content=b"no-library-back")
 

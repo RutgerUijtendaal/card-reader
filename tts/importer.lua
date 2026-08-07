@@ -498,9 +498,11 @@ end
 function createSearchIndex()
     return {
         entries = {},
+        legacy_entries = {},
         by_card_id = {},
         card_id_counts = {},
         by_name = {},
+        legacy_by_name = {},
         name_counts = {},
     }
 end
@@ -520,12 +522,18 @@ function addSearchIndexEntry(search_index, contained)
         if search_index.by_card_id[row.card_id] == nil then
             search_index.by_card_id[row.card_id] = row
         end
+    else
+        table.insert(search_index.legacy_entries, row)
     end
     if row.name ~= nil and row.name ~= "" then
         local normalized_name = normalizeLookupValue(row.name)
         search_index.name_counts[normalized_name] = (search_index.name_counts[normalized_name] or 0) + 1
         if search_index.by_name[normalized_name] == nil then
             search_index.by_name[normalized_name] = row
+        end
+        if (row.card_id == nil or row.card_id == "")
+            and search_index.legacy_by_name[normalized_name] == nil then
+            search_index.legacy_by_name[normalized_name] = row
         end
     end
 end
@@ -1034,29 +1042,33 @@ function readSourceMetadata(card_data)
 end
 
 function findSourceCard(request, search_index)
+    local name_index = search_index.by_name
+    local fuzzy_entries = search_index.entries
     if request.card_id ~= nil and request.card_id ~= "" then
         local card_id_match = search_index.by_card_id[request.card_id]
         if card_id_match ~= nil then
             return card_id_match
         end
+        name_index = search_index.legacy_by_name
+        fuzzy_entries = search_index.legacy_entries
     end
     if request.name == nil or request.name == "" then
         return nil
     end
 
     local normalized = normalizeLookupValue(request.name)
-    if search_index.by_name[normalized] ~= nil then
-        return search_index.by_name[normalized]
+    if name_index[normalized] ~= nil then
+        return name_index[normalized]
     end
 
-    return findFuzzyNameSource(normalized, search_index)
+    return findFuzzyNameSource(normalized, fuzzy_entries)
 end
 
-function findFuzzyNameSource(normalized_name, search_index)
+function findFuzzyNameSource(normalized_name, entries)
     local match = nil
     local match_count = 0
 
-    for _, entry in ipairs(search_index.entries) do
+    for _, entry in ipairs(entries) do
         if entry.name ~= nil and namesAreWithinDistance(normalized_name, normalizeLookupValue(entry.name), CONFIG.fuzzy_name_distance) then
             match = entry
             match_count = match_count + 1
