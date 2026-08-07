@@ -1,6 +1,6 @@
 local CONFIG = {
     source_region_guids = {
-        -- "abc123",
+        "cb7760",
     },
     spawn_position = { x = -45, y = 3, z = 50 },
     stack_y_spacing = 0.08,
