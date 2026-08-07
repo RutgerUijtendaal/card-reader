@@ -120,8 +120,9 @@ card-back URL is immutable and remains the back that was current at export time.
 ### Sheet operations
 
 Production and local development run `run_tts_sheet_renderer` as a separate process using the existing API image.
-Renderer startup releases claims left by an interrupted previous process before reconciling sheet state. A graceful
-shutdown also releases a claim acquired immediately before the stop request.
+Renderer startup releases expired claims left by an interrupted previous process before reconciling sheet state;
+live leases from an overlapping renderer are preserved. Render completion also verifies the exact lease before it
+can publish metadata. A graceful shutdown releases a claim acquired immediately before the stop request.
 Useful maintenance commands are:
 
 ```text

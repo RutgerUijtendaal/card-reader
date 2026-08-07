@@ -28,6 +28,7 @@ from card_reader_core.repositories.tts_card_sheets import (
     claim_next_renderable_sheet,
     claim_sheet_for_render,
     prioritize_sheets,
+    release_render_claim,
 )
 from card_reader_core.services.tts_card_sheets import (
     TtsCardSheetPreparationError,
@@ -275,9 +276,9 @@ def test_failed_metadata_publish_keeps_previous_sheet_revision_available(
     assert second_body == first_body
 
 
-def test_renderer_recovery_releases_orphaned_claims() -> None:
+def test_renderer_recovery_releases_expired_claims() -> None:
     TtsCardSheet.objects.all().delete()
-    claimed_at = now_utc()
+    claimed_at = now_utc() - timedelta(minutes=11)
     sheet = TtsCardSheet.objects.create(
         sequence=999_997,
         desired_revision=1,
@@ -289,6 +290,62 @@ def test_renderer_recovery_releases_orphaned_claims() -> None:
 
     sheet.refresh_from_db()
     assert sheet.render_claimed_at is None
+
+
+def test_renderer_recovery_preserves_live_claims() -> None:
+    TtsCardSheet.objects.all().delete()
+    claimed_at = now_utc()
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_993,
+        desired_revision=1,
+        rendered_revision=0,
+        render_claimed_at=claimed_at,
+    )
+
+    TtsCardSheetService().recover_renderer()
+
+    sheet.refresh_from_db()
+    assert sheet.render_claimed_at == claimed_at
+
+
+def test_stale_renderer_cannot_publish_over_a_new_claim() -> None:
+    TtsCardSheet.objects.all().delete()
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_992,
+        desired_revision=1,
+        rendered_revision=0,
+        render_not_before=now_utc() - timedelta(seconds=1),
+    )
+    stale_claim = claim_sheet_for_render(str(sheet.id))
+    assert stale_claim is not None
+    release_render_claim(
+        sheet_id=str(sheet.id),
+        claimed_at=stale_claim.render_claimed_at,
+    )
+    current_claim = claim_sheet_for_render(str(sheet.id))
+    assert current_claim is not None
+
+    with pytest.raises(tts_sheet_renderer.TtsCardSheetRenderLeaseLost):
+        tts_sheet_renderer.render_claimed_sheet(stale_claim)
+
+    sheet.refresh_from_db()
+    assert sheet.render_claimed_at == current_claim.render_claimed_at
+    assert sheet.rendered_revision == 0
+
+
+def test_reconciliation_includes_unreferenced_persisted_sheets() -> None:
+    TtsCardSheet.objects.all().delete()
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_991,
+        desired_revision=0,
+        rendered_revision=0,
+    )
+
+    result = TtsCardSheetService().reconcile_all(render=False)
+
+    sheet.refresh_from_db()
+    assert result.affected_sheets == 1
+    assert sheet.desired_revision == 1
 
 
 def test_renderer_stop_releases_the_claim_before_processing() -> None:

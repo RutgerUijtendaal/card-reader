@@ -373,6 +373,10 @@ def get_sheet_rendered_checksums(sheet_ids: list[str]) -> dict[str, str]:
     }
 
 
+def list_all_sheet_ids() -> list[str]:
+    return list(TtsCardSheet.objects.order_by("sequence").values_list("id", flat=True))
+
+
 def list_sheet_ids_needing_render(sheet_ids: list[str]) -> list[str]:
     return list(
         TtsCardSheet.objects.filter(id__in=sheet_ids, desired_revision__gt=F("rendered_revision"))
@@ -390,8 +394,10 @@ def release_render_claim(*, sheet_id: str, claimed_at: datetime | None = None) -
     )
 
 
-def release_all_render_claims() -> int:
-    return TtsCardSheet.objects.filter(render_claimed_at__isnull=False).update(
+def release_expired_render_claims() -> int:
+    return TtsCardSheet.objects.filter(
+        render_claimed_at__lt=now_utc() - _RENDER_CLAIM_TIMEOUT
+    ).update(
         render_claimed_at=None,
         updated_at=now_utc(),
     )
@@ -404,8 +410,15 @@ def mark_render_succeeded(
     rendered_revision: int,
     rendered_fingerprint: str,
     rendered_checksum: str,
-) -> TtsCardSheet:
-    sheet = TtsCardSheet.objects.select_for_update().get(id=sheet_id)
+    claimed_at: datetime,
+) -> TtsCardSheet | None:
+    sheet = (
+        TtsCardSheet.objects.select_for_update()
+        .filter(id=sheet_id, render_claimed_at=claimed_at)
+        .first()
+    )
+    if sheet is None or sheet.rendered_revision > rendered_revision:
+        return None
     now = now_utc()
     published_at = now.replace(microsecond=0)
     if sheet.published_at is not None and published_at <= sheet.published_at:
@@ -429,8 +442,14 @@ def mark_render_succeeded(
 
 
 @transaction.atomic
-def mark_render_failed(*, sheet_id: str, error: str) -> None:
-    sheet = TtsCardSheet.objects.select_for_update().get(id=sheet_id)
+def mark_render_failed(*, sheet_id: str, claimed_at: datetime, error: str) -> bool:
+    sheet = (
+        TtsCardSheet.objects.select_for_update()
+        .filter(id=sheet_id, render_claimed_at=claimed_at)
+        .first()
+    )
+    if sheet is None:
+        return False
     failure_count = sheet.render_failure_count + 1
     delay_seconds = min(300, 2 ** min(failure_count, 8))
     now = now_utc()
@@ -448,6 +467,7 @@ def mark_render_failed(*, sheet_id: str, error: str) -> None:
             "updated_at",
         ]
     )
+    return True
 
 
 def _allocate_slot(source: TtsCardImageSource) -> TtsCardSheetSlot:
@@ -563,12 +583,13 @@ __all__ = [
     "get_sheet_rendered_checksums",
     "get_sheet_with_slots",
     "iter_usable_card_source_batches",
+    "list_all_sheet_ids",
     "list_sheet_ids_needing_render",
     "list_usable_card_sources",
     "mark_render_failed",
     "mark_render_succeeded",
     "prioritize_sheets",
-    "release_all_render_claims",
+    "release_expired_render_claims",
     "release_render_claim",
     "request_sheet_rerender",
     "resolve_tts_card_image_path",

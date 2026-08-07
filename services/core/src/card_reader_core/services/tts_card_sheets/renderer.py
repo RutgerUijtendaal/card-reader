@@ -50,6 +50,10 @@ class TtsCardSheetRenderError(RuntimeError):
     pass
 
 
+class TtsCardSheetRenderLeaseLost(TtsCardSheetRenderError):
+    pass
+
+
 def tts_card_sheet_path(sheet_id: str, rendered_checksum: str) -> Path:
     return settings.tts_card_sheets_dir / f"{sheet_id}.{rendered_checksum}.webp"
 
@@ -62,6 +66,9 @@ def get_tts_card_sheet_layout(version: int) -> TtsCardSheetLayout:
 
 
 def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
+    claimed_at = claimed_sheet.render_claimed_at
+    if claimed_at is None:
+        raise TtsCardSheetRenderLeaseLost("TTS card-sheet render claim is no longer owned.")
     sheet = get_sheet_with_slots(str(claimed_sheet.id))
     if sheet is None:
         raise TtsCardSheetRenderError("TTS card sheet disappeared before rendering.")
@@ -72,6 +79,7 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
     except TtsCardSheetRenderError as exc:
         mark_render_failed(
             sheet_id=str(sheet.id),
+            claimed_at=claimed_at,
             error=str(exc),
         )
         raise
@@ -126,7 +134,12 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
             rendered_revision=target_revision,
             rendered_fingerprint=target_fingerprint,
             rendered_checksum=rendered_checksum,
+            claimed_at=claimed_at,
         )
+        if rendered_sheet is None:
+            raise TtsCardSheetRenderLeaseLost(
+                "TTS card-sheet render claim changed before publication."
+            )
         try:
             _remove_superseded_sheet_revisions(sheet_id=str(sheet.id), current_path=target)
         except Exception:
@@ -137,7 +150,12 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
             )
         return rendered_sheet
     except Exception as exc:
-        mark_render_failed(sheet_id=str(sheet.id), error=str(exc))
+        if not isinstance(exc, TtsCardSheetRenderLeaseLost):
+            mark_render_failed(
+                sheet_id=str(sheet.id),
+                claimed_at=claimed_at,
+                error=str(exc),
+            )
         if isinstance(exc, TtsCardSheetRenderError):
             raise
         raise TtsCardSheetRenderError(str(exc)) from exc
@@ -201,6 +219,7 @@ def _file_mtime_ns(path: Path) -> int:
 __all__ = [
     "TtsCardSheetLayout",
     "TtsCardSheetRenderError",
+    "TtsCardSheetRenderLeaseLost",
     "get_tts_card_sheet_layout",
     "render_claimed_sheet",
     "tts_card_sheet_path",

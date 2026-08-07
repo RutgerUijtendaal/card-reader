@@ -13,10 +13,11 @@ from card_reader_core.repositories.tts_card_sheets import (
     get_card_sheet_assignments,
     get_sheet_rendered_checksums,
     iter_usable_card_source_batches,
+    list_all_sheet_ids,
     list_sheet_ids_needing_render,
     list_usable_card_sources,
     prioritize_sheets,
-    release_all_render_claims,
+    release_expired_render_claims,
     request_sheet_rerender,
     sync_card_sources,
     sync_merged_card_source,
@@ -53,7 +54,7 @@ class TtsCardSheetService:
         usable_cards = 0
         assigned_cards = 0
         affected_sheet_ids: set[str] = set()
-        all_sheet_ids: set[str] = set()
+        all_sheet_ids = set(list_all_sheet_ids())
         for sources in iter_usable_card_source_batches():
             card_ids = [source.card.id for source in sources]
             usable_cards += len(sources)
@@ -115,7 +116,7 @@ class TtsCardSheetService:
             ensure_sheet_render_requested([sheet_id])
 
     def recover_renderer(self) -> TtsCardSheetReconciliationResult:
-        release_all_render_claims()
+        release_expired_render_claims()
         return self.reconcile_all(render=False)
 
     def render_sheets_now(
