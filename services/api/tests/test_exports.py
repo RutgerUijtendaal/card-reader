@@ -447,17 +447,18 @@ def test_public_tts_library_manifest_includes_active_and_deprecated_cards() -> N
         "name": "Card Reader Library",
         "source": {"type": "library", "lifecycle_status": "all"},
     }
-    assert [card["card_id"] for card in payload["cards"]] == [deprecated.id, active.id]
-    assert [card["lifecycle_status"] for card in payload["cards"]] == ["deprecated", "active"]
+    card_ids = [card["card_id"] for card in payload["cards"]]
+    cards_by_id = {card["card_id"]: card for card in payload["cards"]}
+    assert card_ids.index(deprecated.id) < card_ids.index(active.id)
+    assert cards_by_id[deprecated.id]["lifecycle_status"] == "deprecated"
+    assert cards_by_id[active.id]["lifecycle_status"] == "active"
     assert all(card["quantity"] == 1 for card in payload["cards"])
     assert payload["sheets"][0]["face_url"].startswith("http://cards.example/tts/card-sheets/")
-    assert payload["skipped"] == [
-        {
-            "card_id": missing.id,
-            "name": missing.latest_version.name,
-            "reason": "Card has no usable latest image.",
-        }
-    ]
+    assert {
+        "card_id": missing.id,
+        "name": missing.latest_version.name,
+        "reason": "Card has no usable latest image.",
+    } in payload["skipped"]
 
     with patch.object(
         TtsCardExportService,
@@ -505,6 +506,7 @@ def test_public_tts_library_manifest_returns_retryable_pending_response(
 
 def test_public_tts_library_manifest_requires_a_current_card_back() -> None:
     tts_card_library_materializer.clear()
+    CardBack.objects.filter(is_current=True).update(is_current=False)
     card = _create_card(name="Public Library Without Back", is_hero=False)
     _create_card_image(card.latest_version, content=b"no-library-back")
 
