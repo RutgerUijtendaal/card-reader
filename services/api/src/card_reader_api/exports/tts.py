@@ -21,7 +21,10 @@ def tts_export_filename(deck_name: str, *, sideboard_name: str | None = None) ->
 def get_tts_export_sideboard(deck: Any, sideboard_id: str | None) -> Any | None:
     if sideboard_id is None:
         return None
-    return next((sideboard for sideboard in deck.sideboards.all() if str(sideboard.id) == sideboard_id), None)
+    return next(
+        (sideboard for sideboard in deck.sideboards.all() if str(sideboard.id) == sideboard_id),
+        None,
+    )
 
 
 def _build_tts_export_payload(deck: Any, *, sideboard_id: str | None) -> dict[str, object]:
@@ -75,5 +78,6 @@ def _build_tts_export_card_ref(
     return {
         "role": role,
         "quantity": quantity,
+        "card_id": str(card.id),
         "name": getattr(version, "name", None) or card.label,
     }

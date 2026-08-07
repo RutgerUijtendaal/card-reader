@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseNotModified
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -13,8 +13,13 @@ from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import not_found, serializer_error
 from card_reader_api.common.urls import build_public_api_url
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
-from card_reader_api.exports.tts import encode_tts_deck_export, get_tts_export_sideboard, tts_export_filename
+from card_reader_api.exports.tts import (
+    encode_tts_deck_export,
+    get_tts_export_sideboard,
+    tts_export_filename,
+)
 from card_reader_api.exports.tts_cards import encode_tts_card_export
+from card_reader_api.exports.tts_library import tts_card_library_materializer
 from card_reader_core.repositories.exports import export_cards_csv
 from card_reader_core.services.decks import DeckService
 from card_reader_core.services.exports import (
@@ -26,8 +31,13 @@ from card_reader_core.services.exports import (
 _TTS_CARD_EXPORT_ERROR_STATUS = {
     TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE: 409,
     TtsCardExportErrorCode.CONTENT_VERSION_NOT_FOUND: 404,
+    TtsCardExportErrorCode.LIBRARY_UNSTABLE: 503,
     TtsCardExportErrorCode.NO_USABLE_CARDS: 400,
     TtsCardExportErrorCode.SHEETS_UNAVAILABLE: 503,
+}
+_RETRYABLE_TTS_CARD_EXPORT_ERRORS = {
+    TtsCardExportErrorCode.LIBRARY_UNSTABLE,
+    TtsCardExportErrorCode.SHEETS_UNAVAILABLE,
 }
 
 
@@ -97,15 +107,11 @@ class CardTtsExportView(APIView):
                 assert gallery_filters is not None
                 export_data = service.build_gallery_export(gallery_filters)
             else:
-                export_data = service.build_content_version_export(str(source["content_version_id"]))
+                export_data = service.build_content_version_export(
+                    str(source["content_version_id"])
+                )
         except TtsCardExportError as exc:
-            error_response = Response(
-                {"detail": exc.detail},
-                status=_TTS_CARD_EXPORT_ERROR_STATUS[exc.code],
-            )
-            if exc.code == TtsCardExportErrorCode.SHEETS_UNAVAILABLE:
-                error_response["Retry-After"] = "2"
-            return error_response
+            return _tts_card_export_error_response(exc)
 
         export = encode_tts_card_export(
             export_data,
@@ -119,6 +125,47 @@ class CardTtsExportView(APIView):
                 "sheet_count": export.sheet_count,
             }
         )
+
+
+class TtsCardLibraryView(APIView):
+    authentication_classes: list[type] = []
+    permission_classes = [AllowAny]
+
+    def get(self, request: Request) -> HttpResponse | Response:
+        return self._response(request, include_body=True)
+
+    def head(self, request: Request) -> HttpResponse | Response:
+        return self._response(request, include_body=False)
+
+    def _response(self, request: Request, *, include_body: bool) -> HttpResponse | Response:
+        cache_key = build_public_api_url(request, "")
+        materialization = tts_card_library_materializer.materialize(
+            cache_key=cache_key,
+            absolute_url=lambda path: build_public_api_url(request, path),
+        )
+        if materialization.error_code is not None:
+            return _tts_card_export_error_response(
+                TtsCardExportError(
+                    materialization.error_code,
+                    materialization.error_detail or "TTS card library is unavailable.",
+                )
+            )
+
+        assert materialization.content is not None
+        assert materialization.etag is not None
+        if request.headers.get("If-None-Match", "").strip() == materialization.etag:
+            response: HttpResponse = HttpResponseNotModified()
+        elif include_body:
+            response = HttpResponse(
+                materialization.content,
+                content_type="application/json; charset=utf-8",
+            )
+        else:
+            response = HttpResponse(content_type="application/json; charset=utf-8")
+            response["Content-Length"] = str(len(materialization.content))
+        response["Cache-Control"] = "public, no-cache"
+        response["ETag"] = materialization.etag
+        return response
 
 
 class DeckTtsExportView(APIView):
@@ -136,7 +183,9 @@ class DeckTtsExportView(APIView):
             return not_found("Sideboard not found")
 
         content = encode_tts_deck_export(deck, sideboard_id=sideboard_id)
-        filename = tts_export_filename(deck.name, sideboard_name=sideboard.name if sideboard is not None else None)
+        filename = tts_export_filename(
+            deck.name, sideboard_name=sideboard.name if sideboard is not None else None
+        )
         response = HttpResponse(content, content_type="text/plain; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
@@ -144,3 +193,13 @@ class DeckTtsExportView(APIView):
 
 def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
+
+
+def _tts_card_export_error_response(exc: TtsCardExportError) -> Response:
+    response = Response(
+        {"detail": exc.detail},
+        status=_TTS_CARD_EXPORT_ERROR_STATUS[exc.code],
+    )
+    if exc.code in _RETRYABLE_TTS_CARD_EXPORT_ERRORS:
+        response["Retry-After"] = "2"
+    return response

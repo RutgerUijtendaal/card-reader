@@ -3,8 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from card_reader_core.models import ACTIVE_CARD_LIFECYCLE_STATUS, CardVersionImage
+from card_reader_core.models import (
+    ACTIVE_CARD_LIFECYCLE_STATUS,
+    ALL_CARD_LIFECYCLE_FILTER,
+    CardVersionImage,
+)
 from card_reader_core.repositories.cards import (
+    CARD_SORT_NAME_ASC,
     CardFilterParams,
     CardListRow,
     get_latest_card_list_rows_by_card_ids,
@@ -12,6 +17,7 @@ from card_reader_core.repositories.cards import (
     list_matching_cards,
 )
 from card_reader_core.repositories.content_versions import get_content_version
+from card_reader_core.repositories.exports import get_tts_card_library_revision
 from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
 from card_reader_core.services.card_backs import (
     CardBackService,
@@ -33,6 +39,7 @@ class TtsCardExportCard:
     image_checksum: str
     sheet_id: str
     slot_index: int
+    lifecycle_status: str
 
 
 @dataclass(frozen=True)
@@ -65,6 +72,7 @@ class TtsCardExportData:
 class TtsCardExportErrorCode(StrEnum):
     CARD_BACK_UNAVAILABLE = "card_back_unavailable"
     CONTENT_VERSION_NOT_FOUND = "content_version_not_found"
+    LIBRARY_UNSTABLE = "library_unstable"
     NO_USABLE_CARDS = "no_usable_cards"
     SHEETS_UNAVAILABLE = "sheets_unavailable"
 
@@ -85,6 +93,26 @@ class _ResolvedTtsCardSelection:
 
 
 class TtsCardExportService:
+    def get_library_revision(self) -> str:
+        return get_tts_card_library_revision()
+
+    def build_library_export(self) -> TtsCardExportData:
+        selection = _ResolvedTtsCardSelection(
+            collection_name="Card Reader Library",
+            source_metadata={
+                "type": "library",
+                "lifecycle_status": ALL_CARD_LIFECYCLE_FILTER,
+            },
+            rows=list_matching_cards(
+                query=None,
+                max_confidence=None,
+                lifecycle_status=ALL_CARD_LIFECYCLE_FILTER,
+                sort=CARD_SORT_NAME_ASC,
+            ),
+            skipped=[],
+        )
+        return self._build_export(selection)
+
     def build_gallery_export(self, filters: CardFilterParams) -> TtsCardExportData:
         selection = _ResolvedTtsCardSelection(
             collection_name="Card Reader Gallery",
@@ -201,6 +229,7 @@ class TtsCardExportService:
                     image_checksum=assignment.image_checksum,
                     sheet_id=assignment.sheet_id,
                     slot_index=assignment.slot_index,
+                    lifecycle_status=row.version.card.lifecycle_status,
                 )
             )
 
@@ -225,7 +254,9 @@ class TtsCardExportService:
                 revision=assignment.rendered_revision,
                 image_checksum=assignment.rendered_checksum,
             )
-            for assignment in sorted(sheet_assignments.values(), key=lambda value: value.sheet_sequence)
+            for assignment in sorted(
+                sheet_assignments.values(), key=lambda value: value.sheet_sequence
+            )
         ]
         return TtsCardExportData(
             collection_name=selection.collection_name,

@@ -4,6 +4,7 @@ import base64
 from io import BytesIO
 import json
 from itertools import count
+from unittest.mock import patch
 
 from django.test import Client
 from PIL import Image
@@ -18,6 +19,12 @@ from card_reader_core.models import (
 )
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
+from card_reader_core.services.exports import TtsCardExportErrorCode, TtsCardExportService
+from card_reader_api.exports.tts_library import (
+    TtsCardLibraryMaterialization,
+    TtsCardLibraryMaterializer,
+    tts_card_library_materializer,
+)
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
 
 _CONTENT_VERSION_COUNTER = count(500)
@@ -52,12 +59,14 @@ def test_public_deck_tts_export_returns_base64_payload() -> None:
         "hero": {
             "role": "hero",
             "quantity": 1,
+            "card_id": hero.id,
             "name": hero.latest_version.name,
         },
         "cards": [
             {
                 "role": "mainboard",
                 "quantity": 4,
+                "card_id": card.id,
                 "name": card.latest_version.name,
             }
             for card in mainboard_cards
@@ -165,7 +174,9 @@ def test_tts_export_can_target_one_sideboard() -> None:
     )
     sideboard = next(sideboard for sideboard in deck.sideboards.all() if sideboard.name == "Tech")
 
-    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts?sideboard_id={sideboard.id}")
+    response = Client(HTTP_HOST="localhost").get(
+        f"/decks/{deck.id}/exports/tts?sideboard_id={sideboard.id}"
+    )
 
     assert response.status_code == 200
     assert "tts-export-targeted-deck-tech.tts.txt" in response["Content-Disposition"]
@@ -180,6 +191,7 @@ def test_tts_export_can_target_one_sideboard() -> None:
             {
                 "role": "sideboard",
                 "quantity": 6,
+                "card_id": sideboard_card.id,
                 "name": sideboard_card.latest_version.name,
             }
         ],
@@ -201,7 +213,9 @@ def test_tts_export_rejects_unknown_sideboard_id() -> None:
         sideboards=[],
     )
 
-    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts?sideboard_id=missing")
+    response = Client(HTTP_HOST="localhost").get(
+        f"/decks/{deck.id}/exports/tts?sideboard_id=missing"
+    )
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Sideboard not found"
@@ -248,7 +262,9 @@ def test_tts_export_preserves_saved_entry_order() -> None:
     assert "sideboards" not in payload
 
 
-def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images(monkeypatch) -> None:
+def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images(
+    monkeypatch,
+) -> None:
     TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-card-gallery-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
@@ -292,9 +308,7 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
         alpha.latest_version.name,
         beta.latest_version.name,
     ]
-    assert payload["sheets"][0]["face_url"].startswith(
-        "https://cards.example/api/tts/card-sheets/"
-    )
+    assert payload["sheets"][0]["face_url"].startswith("https://cards.example/api/tts/card-sheets/")
     assert payload["sheets"][0]["face_url"].endswith("/image.webp")
     assert payload["cards"][0]["sheet_id"] == payload["sheets"][0]["sheet_id"]
     assert {card["slot_index"] for card in payload["cards"]} == {0, 1}
@@ -370,6 +384,7 @@ def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_a
             "image_checksum": image.checksum,
             "sheet_id": payload["sheets"][0]["sheet_id"],
             "slot_index": 0,
+            "lifecycle_status": "active",
         }
     ]
 
@@ -412,6 +427,177 @@ def test_content_version_tts_card_export_excludes_deprecated_card_identities() -
     assert payload["skipped"] == []
 
 
+def test_public_tts_library_manifest_includes_active_and_deprecated_cards() -> None:
+    tts_card_library_materializer.clear()
+    TtsCardSheet.objects.all().delete()
+    _create_current_card_back("public-library")
+    deprecated = _create_card(name="AAA Deprecated Library Card", is_hero=False)
+    active = _create_card(name="BBB Active Library Card", is_hero=False)
+    missing = _create_card(name="CCC Missing Library Card", is_hero=False)
+    deprecated.lifecycle_status = "deprecated"
+    deprecated.save(update_fields=["lifecycle_status", "updated_at"])
+    _create_card_image(deprecated.latest_version, content=b"deprecated-library")
+    _create_card_image(active.latest_version, content=b"active-library")
+    client = Client(HTTP_HOST="cards.example")
+
+    response = client.get("/tts/card-library/cards.json")
+
+    assert response.status_code == 200
+    assert response["Cache-Control"] == "public, no-cache"
+    assert response["ETag"]
+    payload = response.json()
+    assert payload["schema"] == "card-reader.tts-cards.v2"
+    assert payload["collection"] == {
+        "name": "Card Reader Library",
+        "source": {"type": "library", "lifecycle_status": "all"},
+    }
+    card_ids = [card["card_id"] for card in payload["cards"]]
+    cards_by_id = {card["card_id"]: card for card in payload["cards"]}
+    assert card_ids.index(deprecated.id) < card_ids.index(active.id)
+    assert cards_by_id[deprecated.id]["lifecycle_status"] == "deprecated"
+    assert cards_by_id[active.id]["lifecycle_status"] == "active"
+    assert all(card["quantity"] == 1 for card in payload["cards"])
+    assert payload["sheets"][0]["face_url"].startswith("http://cards.example/tts/card-sheets/")
+    assert {
+        "card_id": missing.id,
+        "name": missing.latest_version.name,
+        "reason": "Card has no usable latest image.",
+    } in payload["skipped"]
+
+    with patch.object(
+        TtsCardExportService,
+        "build_library_export",
+        side_effect=AssertionError("cached manifest should not rebuild"),
+    ):
+        head = client.head("/tts/card-library/cards.json")
+        not_modified = client.get(
+            "/tts/card-library/cards.json",
+            HTTP_IF_NONE_MATCH=response["ETag"],
+        )
+    assert head.status_code == 200
+    assert head["ETag"] == response["ETag"]
+    assert int(head["Content-Length"]) == len(response.content)
+    assert not_modified.status_code == 304
+    assert not_modified["ETag"] == response["ETag"]
+
+
+def test_tts_library_materializer_rebuilds_before_caching_a_new_revision() -> None:
+    materializer = TtsCardLibraryMaterializer()
+    old_materialization = TtsCardLibraryMaterialization(
+        content=b"old",
+        etag='"old"',
+        error_code=None,
+        error_detail=None,
+    )
+    new_materialization = TtsCardLibraryMaterialization(
+        content=b"new",
+        etag='"new"',
+        error_code=None,
+        error_detail=None,
+    )
+
+    with (
+        patch.object(
+            TtsCardExportService,
+            "get_library_revision",
+            side_effect=["old", "old", "new", "new", "new"],
+        ),
+        patch.object(
+            materializer,
+            "_build",
+            side_effect=[old_materialization, new_materialization],
+        ) as build,
+    ):
+        rebuilt = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
+        cached = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
+
+    assert rebuilt is new_materialization
+    assert cached is new_materialization
+    assert build.call_count == 2
+
+
+def test_tts_library_materializer_rejects_an_unstable_snapshot() -> None:
+    materializer = TtsCardLibraryMaterializer()
+    candidate = TtsCardLibraryMaterialization(
+        content=b"unstable",
+        etag='"unstable"',
+        error_code=None,
+        error_detail=None,
+    )
+
+    with (
+        patch.object(
+            TtsCardExportService,
+            "get_library_revision",
+            side_effect=["initial", "initial", "first", "second", "third"],
+        ),
+        patch.object(materializer, "_build", return_value=candidate) as build,
+    ):
+        result = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
+
+    assert result.content is None
+    assert result.etag is None
+    assert result.error_code == TtsCardExportErrorCode.LIBRARY_UNSTABLE
+    assert build.call_count == 3
+
+
+def test_public_tts_library_manifest_retries_an_unstable_snapshot() -> None:
+    unstable = TtsCardLibraryMaterialization(
+        content=None,
+        etag=None,
+        error_code=TtsCardExportErrorCode.LIBRARY_UNSTABLE,
+        error_detail="The manifest changed while it was being prepared.",
+    )
+
+    with patch.object(tts_card_library_materializer, "materialize", return_value=unstable):
+        response = Client(HTTP_HOST="cards.example").get("/tts/card-library/cards.json")
+
+    assert response.status_code == 503
+    assert response["Retry-After"] == "2"
+    assert response.json()["detail"] == unstable.error_detail
+
+
+def test_public_tts_library_manifest_returns_retryable_pending_response(
+    monkeypatch,
+) -> None:
+    tts_card_library_materializer.clear()
+    TtsCardSheet.objects.all().delete()
+    storage_root = settings.storage_root_dir
+    monkeypatch.setattr(settings, "app_data_dir", storage_root)
+    monkeypatch.setattr(settings, "environment", "production")
+    _create_current_card_back("public-library-pending")
+    card = _create_card(name="Pending Public Library Card", is_hero=False)
+    _create_card_image(card.latest_version, content=b"pending-library")
+
+    client = Client(HTTP_HOST="cards.example")
+    response = client.get("/tts/card-library/cards.json")
+
+    assert response.status_code == 503
+    assert response["Retry-After"] == "2"
+    with patch.object(
+        TtsCardExportService,
+        "build_library_export",
+        side_effect=AssertionError("cached pending manifest should not rebuild"),
+    ):
+        cached_response = client.get("/tts/card-library/cards.json")
+    assert cached_response.status_code == 503
+    assert cached_response["Retry-After"] == "2"
+
+
+def test_public_tts_library_manifest_requires_a_current_card_back() -> None:
+    tts_card_library_materializer.clear()
+    CardBack.objects.filter(is_current=True).update(is_current=False)
+    card = _create_card(name="Public Library Without Back", is_hero=False)
+    _create_card_image(card.latest_version, content=b"no-library-back")
+
+    response = Client(HTTP_HOST="cards.example").get("/tts/card-library/cards.json")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "A usable current card back is required before exporting TTS cards."
+    )
+
+
 def test_tts_card_export_requires_staff_and_a_current_card_back() -> None:
     regular = _create_user("tts-card-regular", "password", is_staff=False)
     regular_client = Client(HTTP_HOST="cards.example")
@@ -423,11 +609,14 @@ def test_tts_card_export_requires_staff_and_a_current_card_back() -> None:
         data=request_payload,
         content_type="application/json",
     ).status_code in {401, 403}
-    assert regular_client.post(
-        "/exports/tts/cards",
-        data=request_payload,
-        content_type="application/json",
-    ).status_code == 403
+    assert (
+        regular_client.post(
+            "/exports/tts/cards",
+            data=request_payload,
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
 
     CardBack.objects.filter(is_current=True).update(is_current=False)
     staff = _create_user("tts-card-no-back-staff", "password", is_staff=True)
@@ -440,7 +629,10 @@ def test_tts_card_export_requires_staff_and_a_current_card_back() -> None:
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "A usable current card back is required before exporting TTS cards."
+    assert (
+        response.json()["detail"]
+        == "A usable current card back is required before exporting TTS cards."
+    )
 
 
 def test_tts_card_export_rejects_a_selection_without_usable_images() -> None:
@@ -538,4 +730,3 @@ def _clone_card_version(
         previous_version=source,
         content_version=content_version,
     )
-
