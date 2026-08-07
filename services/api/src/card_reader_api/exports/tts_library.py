@@ -77,7 +77,15 @@ class TtsCardLibraryMaterializer:
                 library_revision = refreshed_revision
 
             self._cached = None
-            return materialization
+            return TtsCardLibraryMaterialization(
+                content=None,
+                etag=None,
+                error_code=TtsCardExportErrorCode.LIBRARY_UNSTABLE,
+                error_detail=(
+                    "The TTS card library changed while its manifest was being prepared. "
+                    "Try again shortly."
+                ),
+            )
 
     def clear(self) -> None:
         with self._lock:

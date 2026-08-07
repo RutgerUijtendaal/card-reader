@@ -31,8 +31,13 @@ from card_reader_core.services.exports import (
 _TTS_CARD_EXPORT_ERROR_STATUS = {
     TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE: 409,
     TtsCardExportErrorCode.CONTENT_VERSION_NOT_FOUND: 404,
+    TtsCardExportErrorCode.LIBRARY_UNSTABLE: 503,
     TtsCardExportErrorCode.NO_USABLE_CARDS: 400,
     TtsCardExportErrorCode.SHEETS_UNAVAILABLE: 503,
+}
+_RETRYABLE_TTS_CARD_EXPORT_ERRORS = {
+    TtsCardExportErrorCode.LIBRARY_UNSTABLE,
+    TtsCardExportErrorCode.SHEETS_UNAVAILABLE,
 }
 
 
@@ -195,6 +200,6 @@ def _tts_card_export_error_response(exc: TtsCardExportError) -> Response:
         {"detail": exc.detail},
         status=_TTS_CARD_EXPORT_ERROR_STATUS[exc.code],
     )
-    if exc.code == TtsCardExportErrorCode.SHEETS_UNAVAILABLE:
+    if exc.code in _RETRYABLE_TTS_CARD_EXPORT_ERRORS:
         response["Retry-After"] = "2"
     return response

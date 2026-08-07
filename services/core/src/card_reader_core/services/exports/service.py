@@ -72,6 +72,7 @@ class TtsCardExportData:
 class TtsCardExportErrorCode(StrEnum):
     CARD_BACK_UNAVAILABLE = "card_back_unavailable"
     CONTENT_VERSION_NOT_FOUND = "content_version_not_found"
+    LIBRARY_UNSTABLE = "library_unstable"
     NO_USABLE_CARDS = "no_usable_cards"
     SHEETS_UNAVAILABLE = "sheets_unavailable"
 

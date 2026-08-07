@@ -19,7 +19,7 @@ from card_reader_core.models import (
 )
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
-from card_reader_core.services.exports import TtsCardExportService
+from card_reader_core.services.exports import TtsCardExportErrorCode, TtsCardExportService
 from card_reader_api.exports.tts_library import (
     TtsCardLibraryMaterialization,
     TtsCardLibraryMaterializer,
@@ -514,6 +514,47 @@ def test_tts_library_materializer_rebuilds_before_caching_a_new_revision() -> No
     assert rebuilt is new_materialization
     assert cached is new_materialization
     assert build.call_count == 2
+
+
+def test_tts_library_materializer_rejects_an_unstable_snapshot() -> None:
+    materializer = TtsCardLibraryMaterializer()
+    candidate = TtsCardLibraryMaterialization(
+        content=b"unstable",
+        etag='"unstable"',
+        error_code=None,
+        error_detail=None,
+    )
+
+    with (
+        patch.object(
+            TtsCardExportService,
+            "get_library_revision",
+            side_effect=["initial", "initial", "first", "second", "third"],
+        ),
+        patch.object(materializer, "_build", return_value=candidate) as build,
+    ):
+        result = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
+
+    assert result.content is None
+    assert result.etag is None
+    assert result.error_code == TtsCardExportErrorCode.LIBRARY_UNSTABLE
+    assert build.call_count == 3
+
+
+def test_public_tts_library_manifest_retries_an_unstable_snapshot() -> None:
+    unstable = TtsCardLibraryMaterialization(
+        content=None,
+        etag=None,
+        error_code=TtsCardExportErrorCode.LIBRARY_UNSTABLE,
+        error_detail="The manifest changed while it was being prepared.",
+    )
+
+    with patch.object(tts_card_library_materializer, "materialize", return_value=unstable):
+        response = Client(HTTP_HOST="cards.example").get("/tts/card-library/cards.json")
+
+    assert response.status_code == 503
+    assert response["Retry-After"] == "2"
+    assert response.json()["detail"] == unstable.error_detail
 
 
 def test_public_tts_library_manifest_returns_retryable_pending_response(
