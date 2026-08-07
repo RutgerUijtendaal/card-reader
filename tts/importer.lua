@@ -1,18 +1,31 @@
 local CONFIG = {
+    -- Fetch and synchronize the canonical Card Reader library whenever the save loads.
     auto_sync_enabled = true,
+    -- Public raw-JSON manifest used by automatic and manual library synchronization.
     library_manifest_url = "https://maityscardgame.com/tts/card-library/cards.json",
+    -- Seconds to wait between retryable manifest requests before giving up.
     auto_sync_retry_delays = { 2, 5, 15, 30 },
+    -- Horizontal distance between separately synchronized library batches.
     library_batch_spacing = 3,
+    -- Scripting regions scanned for existing library cards, with the first valid one receiving updates.
     source_region_guids = {
         "cb7760",
     },
+    -- Base world position used when spawning imported cards and the first library batch.
     spawn_position = { x = -45, y = 3, z = 50 },
+    -- Vertical offset between cards while they are spawned before stacking.
     stack_y_spacing = 0.08,
+    -- Maximum edit distance accepted by the legacy fuzzy-name deck lookup.
     fuzzy_name_distance = 1,
+    -- Maximum source-card metadata entries indexed per frame.
     index_batch_size = 50,
+    -- Maximum cards spawned per frame to keep TTS responsive.
     spawn_batch_size = 5,
+    -- Maximum seconds to wait for spawned objects to finish loading.
     wait_timeout_seconds = 15,
+    -- Frames allowed for spawned cards to settle before final grouping.
     finalize_wait_frames = 210,
+    -- Radius around the spawn point used to recover cards during final grouping.
     finalize_search_radius = 3,
 }
 
