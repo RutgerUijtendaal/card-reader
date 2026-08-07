@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING
 import pytest
 from PIL import Image
 
-from card_reader_parser.parsers.regions.stats_region_parser import StatsRegionParser
-
 if TYPE_CHECKING:
     from card_reader_parser.parsers.ocr_runner import OcrRunner
 
@@ -30,6 +28,8 @@ def test_stats_region_parser_extracts_expected_value_from_fixture(
     expected_value: str | None,
     integration_ocr_runner: OcrRunner,
 ) -> None:
+    from card_reader_parser.parsers.regions.stats_region_parser import StatsRegionParser
+
     fixture_path = FIXTURES_DIR / fixture_name
     assert fixture_path.exists(), f"Missing stats fixture image: {fixture_path}"
 
