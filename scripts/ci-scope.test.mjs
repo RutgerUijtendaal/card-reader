@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { detectCiScopes, resolveCiScopes } from './ci-scope.mjs';
+import { detectCiScopes, loadChangedPaths, resolveCiScopes } from './ci-scope.mjs';
 
 test('classifies OCR, macOS dependency, and portability paths independently', () => {
   assert.deepEqual(detectCiScopes(['services/integration/tests/test_parser.py']), {
@@ -34,6 +34,7 @@ test('covers shared runtime, API settings, Docker, and backup scope boundaries',
   });
 
   for (const changedPath of [
+    '.dockerignore',
     'docker/parser.Dockerfile',
     'docker-compose.local.yml',
     'scripts/create-backup.sh',
@@ -44,6 +45,24 @@ test('covers shared runtime, API settings, Docker, and backup scope boundaries',
       portability: true,
     });
   }
+});
+
+test('loads deletions and both sides of renames for scope classification', () => {
+  const paths = loadChangedPaths('base', 'head', (command, args, options) => {
+    assert.equal(command, 'git');
+    assert.deepEqual(args, ['diff', '--name-only', '--no-renames', 'base...head']);
+    assert.deepEqual(options, { encoding: 'utf8' });
+    return ['docker/parser.Dockerfile', 'archive/parser.Dockerfile', '.dockerignore', ''].join(
+      '\n',
+    );
+  });
+
+  assert.deepEqual(paths, [
+    'docker/parser.Dockerfile',
+    'archive/parser.Dockerfile',
+    '.dockerignore',
+  ]);
+  assert.equal(detectCiScopes(paths).portability, true);
 });
 
 test('shared Python and workflow changes enable every heavyweight scope', () => {

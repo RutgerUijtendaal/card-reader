@@ -52,6 +52,7 @@ function affectsPortability(filePath) {
     filePath.startsWith('services/parser/src/') ||
     filePath === 'docker-compose.yml' ||
     filePath === 'docker-compose.local.yml' ||
+    filePath === '.dockerignore' ||
     filePath === '.env.example' ||
     filePath === 'scripts/create-backup.sh' ||
     filePath === 'scripts/restore-backup.sh' ||
@@ -105,12 +106,10 @@ export function resolveCiScopes({
   }
 }
 
-function loadChangedPaths(baseSha, headSha) {
-  return execFileSync(
-    'git',
-    ['diff', '--name-only', '--diff-filter=ACMR', `${baseSha}...${headSha}`],
-    { encoding: 'utf8' },
-  )
+export function loadChangedPaths(baseSha, headSha, runGit = execFileSync) {
+  return runGit('git', ['diff', '--name-only', '--no-renames', `${baseSha}...${headSha}`], {
+    encoding: 'utf8',
+  })
     .split(/\r?\n/)
     .filter(Boolean);
 }
