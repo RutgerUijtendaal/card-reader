@@ -7,6 +7,8 @@ local CONFIG = {
     fuzzy_name_distance = 1,
     index_batch_size = 50,
     spawn_batch_size = 5,
+    direct_spawn_cooldown_frames = 30,
+    direct_asset_timeout_seconds = 60,
     wait_timeout_seconds = 15,
     finalize_wait_frames = 210,
     finalize_search_radius = 3,
@@ -255,7 +257,7 @@ function startDirectCardImportJob(payload, requests)
         #requests,
         countRequestedCards(requests)
     ))
-    spawnDirectCardBatch(job)
+    spawnNextDirectCard(job)
 end
 
 function createImportJob(payload, requests)
@@ -402,10 +404,8 @@ function spawnImportCard(job, request)
     })
 end
 
-function spawnDirectCardBatch(job)
-    local processed = 0
-
-    while processed < CONFIG.spawn_batch_size do
+function spawnNextDirectCard(job)
+    while true do
         local request = job.requests[job.request_index]
         if request == nil then
             waitForImportSpawns(job)
@@ -417,16 +417,12 @@ function spawnDirectCardBatch(job)
         else
             spawnDirectCard(job, request)
             request.remaining = request.remaining - 1
-            processed = processed + 1
             if request.remaining <= 0 then
                 job.request_index = job.request_index + 1
             end
+            return
         end
     end
-
-    Wait.frames(function()
-        spawnDirectCardBatch(job)
-    end, 1)
 end
 
 function spawnDirectCard(job, request)
@@ -440,6 +436,7 @@ function spawnDirectCard(job, request)
         callback_function = function(ready_object)
             applyDirectCardMetadata(ready_object, request)
             table.insert(job.spawned, ready_object)
+            waitForDirectCardAssets(job, ready_object)
         end,
     })
     spawned_object.setCustomObject({
@@ -448,6 +445,30 @@ function spawnDirectCard(job, request)
         type = 0,
         sideways = false,
     })
+end
+
+function waitForDirectCardAssets(job, object)
+    Wait.frames(function()
+        Wait.condition(
+            function()
+                scheduleNextDirectCard(job)
+            end,
+            function()
+                return object == nil or object.isDestroyed() or not object.loading_custom
+            end,
+            CONFIG.direct_asset_timeout_seconds,
+            function()
+                print("Timed out while waiting for a custom card image to load; continuing the import.")
+                scheduleNextDirectCard(job)
+            end
+        )
+    end, 1)
+end
+
+function scheduleNextDirectCard(job)
+    Wait.frames(function()
+        spawnNextDirectCard(job)
+    end, CONFIG.direct_spawn_cooldown_frames)
 end
 
 function verifiedAssetUrl(url)

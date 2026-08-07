@@ -49,9 +49,9 @@ After loading `tts/importer.lua`, open the TTS system console with the backtick 
 lua importCardReaderCards("PASTE_BASE64_HERE")
 ```
 
-The importer creates individual `CardCustom` objects in small frame-scheduled batches and groups them into one
-named stack at `CONFIG.spawn_position`. It applies the current exported card back to every card and stores Card
-Reader identity metadata in GM Notes.
+The importer creates individual `CardCustom` objects one at a time, waits for each card's custom assets to finish
+loading, and then groups them into one named stack at `CONFIG.spawn_position`. It applies the current exported card
+back to every card and stores Card Reader identity metadata in GM Notes.
 
 If the payload is too long for the console, add a temporary wrapper to the Global script:
 
@@ -214,5 +214,6 @@ lua inspectCardReaderLibrary()
 - [TTS v12 `{verifycache}` and `Last-Modified` support](https://www.tabletopsimulator.com/news/patch-notes/update-v12-0-0)
 - [TTS patch notes, including v14 WebP support](https://www.tabletopsimulator.com/news/patch-notes)
 
-TTS Lua does not expose a general-purpose worker-thread API. Both import paths use `Wait.frames` batching so large
-imports do not perform all indexing or spawning work in one blocking frame.
+TTS Lua does not expose a general-purpose worker-thread API. The name-matching flow uses `Wait.frames` batching.
+The direct-card flow serializes custom-card spawns with `Object.loading_custom` and a short frame cooldown so large
+imports do not trigger concurrent image downloads and decoding.
