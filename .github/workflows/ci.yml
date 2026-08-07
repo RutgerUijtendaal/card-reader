@@ -4,13 +4,37 @@ on:
   push:
     branches: [master]
   pull_request:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  UV_CACHE_DIR: ./.uv-cache
 
 jobs:
-  checks:
+  changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      ocr: ${{ steps.scopes.outputs.ocr }}
+      macos_dependencies: ${{ steps.scopes.outputs.macos_dependencies }}
+      portability: ${{ steps.scopes.outputs.portability }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Detect heavyweight CI scopes
+        id: scopes
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci-scope.mjs >> "$GITHUB_OUTPUT"
+
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -19,22 +43,32 @@ jobs:
           node-version: 22
           cache: pnpm
       - name: Install Node deps
-        run: pnpm install
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+        run: pnpm install --frozen-lockfile
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: "3.12"
+          python-version: '3.12'
+          enable-cache: true
+          cache-local-path: .uv-cache
+          cache-suffix: quality
+      - name: Restore Turbo cache
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'uv.lock') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'uv.lock') }}-
+            turbo-${{ runner.os }}-
       - name: Sync Python workspace
         run: uv --cache-dir ./.uv-cache sync --project . --all-packages --all-groups --locked
       - name: Lint
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
-      - name: Unit tests
-        run: pnpm test
 
-  macos-dependencies:
-    runs-on: macos-15
+  frontend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -42,19 +76,90 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Install Node dependencies
+      - name: Install Node deps
         run: pnpm install --frozen-lockfile
+      - name: Repository script tests
+        run: pnpm test:scripts
+      - name: Frontend tests
+        run: pnpm --filter @card-reader/web test
+
+  python-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: core
+            package: card-reader-core
+            filter: '@card-reader/core'
+          - target: api
+            package: card-reader-api
+            filter: '@card-reader/api'
+          - target: parser
+            package: card-reader-parser
+            filter: '@card-reader/parser'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - name: Setup uv and Python
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: "3.12"
+          python-version: '3.12'
+          enable-cache: true
+          cache-local-path: .uv-cache
+          cache-suffix: python-${{ matrix.target }}
+      - name: Sync package dependencies
+        run: uv --cache-dir ./.uv-cache sync --project . --package ${{ matrix.package }} --all-groups --locked
+      - name: Run ${{ matrix.target }} tests
+        run: pnpm --filter ${{ matrix.filter }} test
+
+  ocr-integration:
+    needs: changes
+    if: needs.changes.outputs.ocr == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-local-path: .uv-cache
+          cache-suffix: ocr-integration
+      - name: Sync integration dependencies
+        run: uv --cache-dir ./.uv-cache sync --project . --package card-reader-integration --all-groups --locked
+      - name: Run real OCR and cross-service integration tests
+        run: pnpm --filter @card-reader/integration test
+
+  macos-dependencies:
+    needs: changes
+    if: needs.changes.outputs.macos_dependencies == 'true'
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-local-path: .uv-cache
+          cache-suffix: macos-dependencies
       - name: Sync Python workspace on macOS ARM64
-        run: pnpm deps:py
+        run: node scripts/check-native-platform.mjs && uv --cache-dir ./.uv-cache sync --project . --all-packages --all-groups --locked
       - name: Import PaddlePaddle
         run: uv run --project . --package card-reader-parser python -c "import paddle; print(paddle.__version__)"
 
   portability:
+    needs: changes
+    if: needs.changes.outputs.portability == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - name: Check Unix script metadata and syntax
@@ -77,3 +182,33 @@ jobs:
           push: false
           cache-from: type=gha,scope=parser-amd64
           cache-to: type=gha,mode=max,scope=parser-amd64
+
+  checks:
+    if: always()
+    needs:
+      - changes
+      - quality
+      - frontend-tests
+      - python-tests
+      - ocr-integration
+      - macos-dependencies
+      - portability
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify required jobs
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          FRONTEND_RESULT: ${{ needs.frontend-tests.result }}
+          PYTHON_RESULT: ${{ needs.python-tests.result }}
+          OCR_RESULT: ${{ needs.ocr-integration.result }}
+          MACOS_RESULT: ${{ needs.macos-dependencies.result }}
+          PORTABILITY_RESULT: ${{ needs.portability.result }}
+        run: |
+          for result in "$CHANGES_RESULT" "$QUALITY_RESULT" "$FRONTEND_RESULT" "$PYTHON_RESULT" "$OCR_RESULT" "$MACOS_RESULT" "$PORTABILITY_RESULT"; do
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "A required CI job ended with result: $result"
+              exit 1
+            fi
+          done

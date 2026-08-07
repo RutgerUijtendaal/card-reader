@@ -1,0 +1,29 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "lint": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/services/core/src/card_reader_core/**",
+        "!$TURBO_ROOT$/services/core/src/card_reader_core/**/__pycache__/**",
+        "!$TURBO_ROOT$/services/core/src/card_reader_core/**/*.pyc"
+      ]
+    },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/services/core/src/card_reader_core/**",
+        "!$TURBO_ROOT$/services/core/src/card_reader_core/**/__pycache__/**",
+        "!$TURBO_ROOT$/services/core/src/card_reader_core/**/*.pyc"
+      ]
+    },
+    "typecheck": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/services/core/src/card_reader_core/**",
+        "!$TURBO_ROOT$/services/core/src/card_reader_core/**/__pycache__/**",
+        "!$TURBO_ROOT$/services/core/src/card_reader_core/**/*.pyc"
+      ]
+    }
+  }
+}
