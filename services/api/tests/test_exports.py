@@ -20,7 +20,11 @@ from card_reader_core.models import (
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 from card_reader_core.services.exports import TtsCardExportService
-from card_reader_api.exports.tts_library import tts_card_library_materializer
+from card_reader_api.exports.tts_library import (
+    TtsCardLibraryMaterialization,
+    TtsCardLibraryMaterializer,
+    tts_card_library_materializer,
+)
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
 
 _CONTENT_VERSION_COUNTER = count(500)
@@ -475,6 +479,41 @@ def test_public_tts_library_manifest_includes_active_and_deprecated_cards() -> N
     assert int(head["Content-Length"]) == len(response.content)
     assert not_modified.status_code == 304
     assert not_modified["ETag"] == response["ETag"]
+
+
+def test_tts_library_materializer_rebuilds_before_caching_a_new_revision() -> None:
+    materializer = TtsCardLibraryMaterializer()
+    old_materialization = TtsCardLibraryMaterialization(
+        content=b"old",
+        etag='"old"',
+        error_code=None,
+        error_detail=None,
+    )
+    new_materialization = TtsCardLibraryMaterialization(
+        content=b"new",
+        etag='"new"',
+        error_code=None,
+        error_detail=None,
+    )
+
+    with (
+        patch.object(
+            TtsCardExportService,
+            "get_library_revision",
+            side_effect=["old", "old", "new", "new", "new"],
+        ),
+        patch.object(
+            materializer,
+            "_build",
+            side_effect=[old_materialization, new_materialization],
+        ) as build,
+    ):
+        rebuilt = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
+        cached = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
+
+    assert rebuilt is new_materialization
+    assert cached is new_materialization
+    assert build.call_count == 2
 
 
 def test_public_tts_library_manifest_returns_retryable_pending_response(

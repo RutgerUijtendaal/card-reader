@@ -19,6 +19,7 @@ from card_reader_core.services.exports import (
 )
 
 _FILE_REVERIFICATION_SECONDS = 300.0
+_MAX_STABLE_BUILD_ATTEMPTS = 3
 
 
 @dataclass(frozen=True)
@@ -62,14 +63,20 @@ class TtsCardLibraryMaterializer:
             if cached is not None and self._is_current(cached, cache_key, library_revision, now):
                 return cached.materialization
 
-            materialization = self._build(service, absolute_url=absolute_url)
-            refreshed_revision = service.get_library_revision()
-            self._cached = _CachedTtsCardLibraryMaterialization(
-                cache_key=cache_key,
-                library_revision=refreshed_revision,
-                verified_at=time.monotonic(),
-                materialization=materialization,
-            )
+            for _attempt in range(_MAX_STABLE_BUILD_ATTEMPTS):
+                materialization = self._build(service, absolute_url=absolute_url)
+                refreshed_revision = service.get_library_revision()
+                if refreshed_revision == library_revision:
+                    self._cached = _CachedTtsCardLibraryMaterialization(
+                        cache_key=cache_key,
+                        library_revision=library_revision,
+                        verified_at=time.monotonic(),
+                        materialization=materialization,
+                    )
+                    return materialization
+                library_revision = refreshed_revision
+
+            self._cached = None
             return materialization
 
     def clear(self) -> None:
