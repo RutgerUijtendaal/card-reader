@@ -387,6 +387,10 @@ def _replace_live_runtime(runtime_paths: RuntimePaths, validated: ValidatedBacku
         _replace_directory(tts_sheet_target, tts_sheet_source)
     elif tts_sheet_target.exists():
         shutil.rmtree(tts_sheet_target)
+    _discard_inconsistent_tts_sheet_atlases(
+        database_path=runtime_paths.database_path,
+        atlas_dir=tts_sheet_target,
+    )
     _replace_directory(runtime_paths.app_data_dir / "maintenance", validated.app_data_root / "maintenance")
     if (validated.app_data_root / "logs").exists():
         _replace_directory(runtime_paths.app_data_dir / "logs", validated.app_data_root / "logs")
@@ -398,6 +402,30 @@ def _replace_directory(target_dir: Path, source_dir: Path) -> None:
     if target_dir.exists():
         shutil.rmtree(target_dir)
     shutil.copytree(source_dir, target_dir)
+
+
+def _discard_inconsistent_tts_sheet_atlases(*, database_path: Path, atlas_dir: Path) -> None:
+    if not atlas_dir.is_dir():
+        return
+    with sqlite3.connect(database_path) as connection:
+        table_exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tts_card_sheet'"
+        ).fetchone()
+        expected_checksums = (
+            {
+                str(sheet_id): str(rendered_checksum)
+                for sheet_id, rendered_checksum in connection.execute(
+                    "SELECT id, rendered_checksum FROM tts_card_sheet"
+                )
+            }
+            if table_exists is not None
+            else {}
+        )
+
+    for atlas_path in atlas_dir.glob("*.webp"):
+        expected_checksum = expected_checksums.get(atlas_path.stem, "")
+        if not expected_checksum or _sha256(atlas_path) != expected_checksum:
+            atlas_path.unlink()
 
 
 def _run_compose(compose_config: ComposeConfig, *args: str) -> None:

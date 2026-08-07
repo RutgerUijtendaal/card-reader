@@ -3,10 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 import time
 
+from django.db import transaction
+
 from card_reader_core.config.settings import settings
 from card_reader_core.repositories.tts_card_sheets import (
     TtsCardSheetAssignment,
     claim_sheet_for_render,
+    ensure_sheet_render_requested,
     get_card_sheet_assignments,
     iter_usable_card_source_batches,
     list_sheet_ids_needing_render,
@@ -75,12 +78,13 @@ class TtsCardSheetService:
 
     def sync_merge(self, *, target_card_id: str, source_card_ids: list[str]) -> set[str]:
         target_sources = list_usable_card_sources([target_card_id])
-        if not target_sources:
-            return set()
-        return sync_merged_card_source(
+        affected_sheet_ids = sync_merged_card_source(
             source_card_ids=source_card_ids,
-            target_source=target_sources[0],
+            target_card_id=target_card_id,
+            target_source=target_sources[0] if target_sources else None,
         )
+        transaction.on_commit(lambda: self.sync_cards([target_card_id]))
+        return affected_sheet_ids
 
     def prepare_cards(
         self,
@@ -105,7 +109,7 @@ class TtsCardSheetService:
         if force:
             request_sheet_rerender([sheet_id])
         else:
-            prioritize_sheets([sheet_id])
+            ensure_sheet_render_requested([sheet_id])
 
     def render_sheets_now(self, sheet_ids: list[str]) -> int:
         rendered = 0

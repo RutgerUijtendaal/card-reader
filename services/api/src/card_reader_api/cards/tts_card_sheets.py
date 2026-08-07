@@ -29,7 +29,7 @@ def _sheet_response(request: Request, sheet_id: str, *, include_body: bool) -> H
         return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
     path = tts_card_sheet_path(sheet_id)
     if sheet.published_at is None or not sheet.rendered_checksum or not path.is_file():
-        TtsCardSheetService().request_render(sheet_id, force=True)
+        TtsCardSheetService().request_render(sheet_id)
         unavailable_response = HttpResponse(
             "TTS card sheet is still being prepared.",
             status=503,

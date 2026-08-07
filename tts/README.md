@@ -130,6 +130,9 @@ Developer-data bundles contain Card records and immutable Card images, not TTS s
 bootstrap assign fresh local sheet IDs and render fresh atlases from those imported images. Production sheet IDs and
 coordinates are therefore not reproduced in a developer-data checkout.
 
+Runtime backups may include rendered atlases. Restore keeps only files whose SHA-256 matches the sheet state in the
+database snapshot; missing or mismatched atlases are rebuilt by the renderer after startup.
+
 ### Temporary cache-refresh test
 
 The temporary diagnostic endpoint remains available while cache behavior is being verified:

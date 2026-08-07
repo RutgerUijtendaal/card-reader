@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from io import BytesIO
 from uuid import uuid4
 
+from django.db import close_old_connections
 from django.test import Client
 from PIL import Image
 
@@ -15,7 +17,9 @@ from card_reader_core.models import (
     Template,
     TtsCardSheet,
     TtsCardSheetSlot,
+    now_utc,
 )
+from card_reader_core.services.card_merges import merge_cards
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 from card_reader_core.storage import build_storage_relative_path
 
@@ -52,6 +56,79 @@ def test_unreadable_images_are_not_assigned_to_sheets() -> None:
 
     assert sheet_ids == set()
     assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
+
+
+def test_assignment_snapshots_the_readable_source_file_fallback() -> None:
+    TtsCardSheet.objects.all().delete()
+    card = _create_sheet_card("source-fallback", color=(30, 40, 50))
+    version = card.latest_version
+    assert version is not None
+    image = version.images.get()
+    stored_path = settings.storage_root_dir / image.stored_path
+    fallback_path = build_storage_relative_path("uploads", f"tts-fallback-{uuid4().hex}.webp")
+    fallback_file = settings.storage_root_dir / fallback_path
+    fallback_file.parent.mkdir(parents=True, exist_ok=True)
+    fallback_file.write_bytes(stored_path.read_bytes())
+    stored_path.unlink()
+    image.stored_path = build_storage_relative_path("images", f"missing-{uuid4().hex}.webp")
+    image.source_file = fallback_path
+    image.save(update_fields=["stored_path", "source_file", "updated_at"])
+
+    TtsCardSheetService().sync_cards([card.id])
+
+    slot = TtsCardSheetSlot.objects.get(card_identity_id=card.id)
+    assert slot.image_stored_path == fallback_path
+
+
+def test_merge_rebinds_source_slots_when_target_artwork_is_unreadable() -> None:
+    TtsCardSheet.objects.all().delete()
+    target = _create_sheet_card("merge-target", color=(10, 20, 30))
+    source = _create_sheet_card("merge-source", color=(70, 80, 90))
+    target_version = target.latest_version
+    source_version = source.latest_version
+    assert target_version is not None
+    assert source_version is not None
+    target_image = target_version.images.get()
+    (settings.storage_root_dir / target_image.stored_path).write_bytes(b"not-an-image")
+    TtsCardSheetService().sync_cards([source.id])
+    source_slot = TtsCardSheetSlot.objects.get(card_identity_id=source.id)
+    original_checksum = source_slot.image_checksum
+    original_path = source_slot.image_stored_path
+
+    merge_cards(target_card_id=target.id, source_card_ids=[source.id])
+
+    source_slot.refresh_from_db()
+    assert source_slot.resolved_card_id == target.id
+    assert source_slot.card_version_id == source_version.id
+    assert source_slot.image_checksum == original_checksum
+    assert source_slot.image_stored_path == original_path
+    assert not Card.objects.filter(id=source.id).exists()
+
+
+def test_concurrent_allocation_reserves_unique_sqlite_slots() -> None:
+    TtsCardSheet.objects.all().delete()
+    cards = [
+        _create_sheet_card(f"concurrent-{index}", color=(index, 50, 70))
+        for index in range(12)
+    ]
+
+    def sync_card(card_id: str) -> None:
+        close_old_connections()
+        try:
+            TtsCardSheetService().sync_cards([card_id])
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(sync_card, [card.id for card in cards]))
+
+    slots = list(
+        TtsCardSheetSlot.objects.filter(card_identity_id__in=[card.id for card in cards])
+        .order_by("slot_index")
+        .values_list("slot_index", flat=True)
+    )
+    assert slots == list(range(12))
+    assert TtsCardSheet.objects.get().next_slot_index == 12
 
 
 def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_changes() -> None:
@@ -112,6 +189,26 @@ def test_unknown_and_unrendered_sheet_responses_are_explicit() -> None:
     assert unknown.status_code == 404
     assert pending.status_code == 503
     assert pending["Retry-After"] == "2"
+
+
+def test_public_sheet_request_preserves_failure_backoff() -> None:
+    TtsCardSheet.objects.all().delete()
+    render_not_before = now_utc() + timedelta(minutes=2)
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_998,
+        desired_revision=1,
+        rendered_revision=0,
+        render_failure_count=3,
+        render_not_before=render_not_before,
+    )
+
+    response = Client(HTTP_HOST="localhost").head(
+        f"/tts/card-sheets/{sheet.id}/image.webp"
+    )
+
+    sheet.refresh_from_db()
+    assert response.status_code == 503
+    assert sheet.render_not_before == render_not_before
 
 
 def _create_sheet_card(label: str, *, color: tuple[int, int, int]) -> Card:
