@@ -572,7 +572,7 @@ function startCardReaderLibraryScan(job, payload)
     job.payload = payload
     job.search_index = createSearchIndex()
     job.target_region_guid = target_region_guid
-    job.target_batch_count = 0
+    job.target_occupied_positions = {}
     job.region_index = 1
     job.current_region_guid = nil
     job.region_objects = nil
@@ -623,31 +623,31 @@ function scanCardReaderLibraryBatch(job)
             elseif object.isDestroyed() then
                 job.region_object_index = job.region_object_index + 1
                 processed = processed + 1
-            elseif object.tag == "Deck" then
+            else
                 if job.current_region_guid == job.target_region_guid then
-                    job.target_batch_count = job.target_batch_count + 1
+                    table.insert(job.target_occupied_positions, object.getPosition())
                 end
-                job.contained_objects = object.getObjects()
-                job.contained_index = 1
-                if #job.contained_objects == 0 then
-                    job.contained_objects = nil
+
+                if isCardReaderContainer(object) then
+                    job.contained_objects = object.getObjects()
+                    job.contained_index = 1
+                    if #job.contained_objects == 0 then
+                        job.contained_objects = nil
+                        job.region_object_index = job.region_object_index + 1
+                        processed = processed + 1
+                    end
+                elseif object.tag == "Card" then
+                    addSearchIndexEntry(job.search_index, {
+                        Name = object.getName(),
+                        Description = object.getDescription(),
+                        GMNotes = object.getGMNotes(),
+                    })
+                    job.region_object_index = job.region_object_index + 1
+                    processed = processed + 1
+                else
                     job.region_object_index = job.region_object_index + 1
                     processed = processed + 1
                 end
-            elseif object.tag == "Card" then
-                if job.current_region_guid == job.target_region_guid then
-                    job.target_batch_count = job.target_batch_count + 1
-                end
-                addSearchIndexEntry(job.search_index, {
-                    Name = object.getName(),
-                    Description = object.getDescription(),
-                    GMNotes = object.getGMNotes(),
-                })
-                job.region_object_index = job.region_object_index + 1
-                processed = processed + 1
-            else
-                job.region_object_index = job.region_object_index + 1
-                processed = processed + 1
             end
         end
     end
@@ -700,7 +700,7 @@ function finishCardReaderLibraryScan(job)
     local update_payload = buildCardReaderLibraryUpdatePayload(job.payload, missing_cards)
     local position, position_error = buildCardReaderLibraryBatchPosition(
         job.target_region_guid,
-        job.target_batch_count
+        job.target_occupied_positions
     )
     if position == nil then
         failCardReaderLibrarySync(job, position_error)
@@ -751,7 +751,7 @@ function buildCardReaderLibraryUpdatePayload(payload, missing_cards)
     }
 end
 
-function buildCardReaderLibraryBatchPosition(region_guid, existing_batch_count)
+function buildCardReaderLibraryBatchPosition(region_guid, occupied_positions)
     local region = getObjectFromGUID(region_guid)
     if not isScriptingRegion(region) then
         return nil, "the source scripting region disappeared before the update could spawn"
@@ -770,27 +770,40 @@ function buildCardReaderLibraryBatchPosition(region_guid, existing_batch_count)
 
     local columns = math.max(1, math.floor(tonumber(size.x) / spacing))
     local rows = math.max(1, math.floor(tonumber(size.z) / spacing))
-    local capacity = columns * rows
-    if existing_batch_count >= capacity then
-        return nil, string.format(
-            "the source scripting region is full (%d library batch slots)",
-            capacity
-        )
-    end
-
-    local column = existing_batch_count % columns
-    local row = math.floor(existing_batch_count / columns)
-    local local_x = (column - ((columns - 1) / 2)) * spacing
-    local local_z = (row - ((rows - 1) / 2)) * spacing
     local center = bounds.center or region.getPosition()
     local right = region.getTransformRight()
     local forward = region.getTransformForward()
+    local capacity = columns * rows
 
-    return {
-        x = center.x + (right.x * local_x) + (forward.x * local_z),
-        y = center.y + (right.y * local_x) + (forward.y * local_z),
-        z = center.z + (right.z * local_x) + (forward.z * local_z),
-    }
+    for slot_index = 0, capacity - 1 do
+        local column = slot_index % columns
+        local row = math.floor(slot_index / columns)
+        local local_x = (column - ((columns - 1) / 2)) * spacing
+        local local_z = (row - ((rows - 1) / 2)) * spacing
+        local candidate = {
+            x = center.x + (right.x * local_x) + (forward.x * local_z),
+            y = center.y + (right.y * local_x) + (forward.y * local_z),
+            z = center.z + (right.z * local_x) + (forward.z * local_z),
+        }
+        if cardReaderLibrarySlotIsVacant(candidate, occupied_positions, spacing) then
+            return candidate
+        end
+    end
+
+    return nil, string.format(
+        "the source scripting region is full (%d library batch slots)",
+        capacity
+    )
+end
+
+function cardReaderLibrarySlotIsVacant(candidate, occupied_positions, spacing)
+    local collision_radius = spacing / 2
+    for _, occupied in ipairs(occupied_positions) do
+        if horizontalDistance(candidate, occupied) < collision_radius then
+            return false
+        end
+    end
+    return true
 end
 
 function countDuplicateCardReaderIds(search_index)
@@ -920,6 +933,10 @@ end
 
 function isScriptingRegion(object)
     return object ~= nil and type(object.getObjects) == "function"
+end
+
+function isCardReaderContainer(object)
+    return object.tag == "Deck" or object.tag == "Bag" or object.tag == "Infinite"
 end
 
 function spawnImportBatch(job)
