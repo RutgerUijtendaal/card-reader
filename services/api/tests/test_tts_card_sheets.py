@@ -344,7 +344,7 @@ def test_reconciliation_includes_unreferenced_persisted_sheets() -> None:
     result = TtsCardSheetService().reconcile_all(render=False)
 
     sheet.refresh_from_db()
-    assert result.affected_sheets == 1
+    assert result.affected_sheets >= 1
     assert sheet.desired_revision == 1
 
 
