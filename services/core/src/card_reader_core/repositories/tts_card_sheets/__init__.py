@@ -9,6 +9,7 @@ from collections.abc import Iterator
 
 from django.db import transaction
 from django.db.models import F, Max, Prefetch, Q, QuerySet
+from PIL import Image
 
 from card_reader_core.models import (
     TTS_CARD_SHEET_CAPACITY,
@@ -87,12 +88,24 @@ def _usable_sources_from_cards(cards: list[Card]) -> list[TtsCardImageSource]:
         if version is None:
             continue
         for image in version.images.all():
-            path = resolve_image_file_path(image)
+            path = resolve_tts_card_image_path(image)
             if path is None:
                 continue
             sources.append(TtsCardImageSource(card=card, version=version, image=image, path=path))
             break
     return sources
+
+
+def resolve_tts_card_image_path(image: CardVersionImage) -> Path | None:
+    path = resolve_image_file_path(image)
+    if path is None:
+        return None
+    try:
+        with Image.open(path) as source_image:
+            source_image.verify()
+    except (OSError, SyntaxError, ValueError):
+        return None
+    return path
 
 
 @transaction.atomic
@@ -408,6 +421,7 @@ __all__ = [
     "mark_render_succeeded",
     "prioritize_sheets",
     "request_sheet_rerender",
+    "resolve_tts_card_image_path",
     "sync_card_sources",
     "sync_merged_card_source",
 ]

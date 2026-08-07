@@ -10,9 +10,9 @@ from card_reader_core.repositories.cards import (
     get_latest_card_list_rows_by_card_ids,
     list_cards_for_content_version,
     list_matching_cards,
-    resolve_image_file_path,
 )
 from card_reader_core.repositories.content_versions import get_content_version
+from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
 from card_reader_core.services.card_backs import (
     CardBackService,
     resolve_card_back_image_asset_path,
@@ -238,7 +238,7 @@ class TtsCardExportService:
 
 def _first_usable_image(row: CardListRow) -> CardVersionImage | None:
     for image in row.version.images.all():
-        if resolve_image_file_path(image) is not None:
+        if resolve_tts_card_image_path(image) is not None:
             return image
     return None
 

@@ -9,7 +9,13 @@ from django.test import Client
 from PIL import Image
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import CardBack, CardVersion, CardVersionImage, ContentVersion
+from card_reader_core.models import (
+    CardBack,
+    CardVersion,
+    CardVersionImage,
+    ContentVersion,
+    TtsCardSheet,
+)
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
@@ -243,6 +249,7 @@ def test_tts_export_preserves_saved_entry_order() -> None:
 
 
 def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images(monkeypatch) -> None:
+    TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-card-gallery-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)
@@ -303,6 +310,7 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
 
 
 def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_artwork() -> None:
+    TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-card-version-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)
@@ -367,6 +375,7 @@ def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_a
 
 
 def test_content_version_tts_card_export_excludes_deprecated_card_identities() -> None:
+    TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-card-version-active-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)

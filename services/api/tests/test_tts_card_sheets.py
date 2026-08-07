@@ -21,6 +21,7 @@ from card_reader_core.storage import build_storage_relative_path
 
 
 def test_assignments_fill_seventy_slots_before_appending_a_sheet() -> None:
+    TtsCardSheet.objects.all().delete()
     cards = [_create_sheet_card(f"batch-{index}", color=(index, 30, 60)) for index in range(71)]
 
     TtsCardSheetService().sync_cards([card.id for card in cards])
@@ -39,7 +40,22 @@ def test_assignments_fill_seventy_slots_before_appending_a_sheet() -> None:
     assert assignments[70].sheet_id == sheets[1].id
 
 
+def test_unreadable_images_are_not_assigned_to_sheets() -> None:
+    TtsCardSheet.objects.all().delete()
+    card = _create_sheet_card("unreadable", color=(20, 30, 40))
+    version = card.latest_version
+    assert version is not None
+    image = version.images.get()
+    (settings.storage_root_dir / image.stored_path).write_bytes(b"not-an-image")
+
+    sheet_ids = TtsCardSheetService().sync_cards([card.id])
+
+    assert sheet_ids == set()
+    assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
+
+
 def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_changes() -> None:
+    TtsCardSheet.objects.all().delete()
     card = _create_sheet_card("refresh", color=(20, 40, 60))
     service = TtsCardSheetService()
     sheet_ids = service.sync_cards([card.id])
@@ -84,6 +100,7 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
 
 
 def test_unknown_and_unrendered_sheet_responses_are_explicit() -> None:
+    TtsCardSheet.objects.all().delete()
     unknown = Client(HTTP_HOST="localhost").get(
         "/tts/card-sheets/00000000-0000-0000-0000-000000000000/image.webp"
     )
