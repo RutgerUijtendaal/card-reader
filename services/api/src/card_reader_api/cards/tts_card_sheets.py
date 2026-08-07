@@ -24,41 +24,53 @@ class TtsCardSheetImageView(APIView):
 
 
 def _sheet_response(request: Request, sheet_id: str, *, include_body: bool) -> HttpResponse:
-    sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
-    if sheet is None:
-        return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
-    path = tts_card_sheet_path(sheet_id, sheet.rendered_checksum)
-    if sheet.published_at is None or not sheet.rendered_checksum or not path.is_file():
-        TtsCardSheetService().request_render(sheet_id)
-        unavailable_response = HttpResponse(
-            "TTS card sheet is still being prepared.",
-            status=503,
-            content_type="text/plain",
-        )
-        unavailable_response["Retry-After"] = "2"
-        return unavailable_response
+    for attempt in range(2):
+        sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
+        if sheet is None:
+            return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
+        path = tts_card_sheet_path(sheet_id, sheet.rendered_checksum)
+        if sheet.published_at is None or not sheet.rendered_checksum or not path.is_file():
+            if attempt == 0 and sheet.rendered_checksum:
+                continue
+            break
 
-    etag = quote_etag(sheet.rendered_checksum)
-    if _request_cache_is_current(request, etag=etag, modified_epoch=int(sheet.published_at.timestamp())):
-        return _apply_sheet_headers(HttpResponseNotModified(), sheet=sheet, etag=etag)
+        etag = quote_etag(sheet.rendered_checksum)
+        if _request_cache_is_current(
+            request,
+            etag=etag,
+            modified_epoch=int(sheet.published_at.timestamp()),
+        ):
+            return _apply_sheet_headers(HttpResponseNotModified(), sheet=sheet, etag=etag)
 
-    if include_body:
-        response = cast(
-            HttpResponse,
-            FileResponse(
-                path.open("rb"),
-                content_type="image/webp",
-                as_attachment=False,
-                filename=f"card-reader-sheet-{sheet.sequence}.webp",
-            ),
-        )
-    else:
-        response = HttpResponse(content_type="image/webp")
-        response["Content-Length"] = str(path.stat().st_size)
-        response["Content-Disposition"] = (
-            f'inline; filename="card-reader-sheet-{sheet.sequence}.webp"'
-        )
-    return _apply_sheet_headers(response, sheet=sheet, etag=etag)
+        try:
+            if include_body:
+                response = cast(
+                    HttpResponse,
+                    FileResponse(
+                        path.open("rb"),
+                        content_type="image/webp",
+                        as_attachment=False,
+                        filename=f"card-reader-sheet-{sheet.sequence}.webp",
+                    ),
+                )
+            else:
+                response = HttpResponse(content_type="image/webp")
+                response["Content-Length"] = str(path.stat().st_size)
+                response["Content-Disposition"] = (
+                    f'inline; filename="card-reader-sheet-{sheet.sequence}.webp"'
+                )
+        except FileNotFoundError:
+            continue
+        return _apply_sheet_headers(response, sheet=sheet, etag=etag)
+
+    TtsCardSheetService().request_render(sheet_id)
+    unavailable_response = HttpResponse(
+        "TTS card sheet is still being prepared.",
+        status=503,
+        content_type="text/plain",
+    )
+    unavailable_response["Retry-After"] = "2"
+    return unavailable_response
 
 
 def _apply_sheet_headers(

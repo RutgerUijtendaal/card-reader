@@ -3,6 +3,8 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from io import BytesIO
+import os
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -22,7 +24,15 @@ from card_reader_core.models import (
     now_utc,
 )
 from card_reader_core.services.card_merges import merge_cards
-from card_reader_core.services.tts_card_sheets import TtsCardSheetService
+from card_reader_core.repositories.tts_card_sheets import (
+    claim_next_renderable_sheet,
+    claim_sheet_for_render,
+    prioritize_sheets,
+)
+from card_reader_core.services.tts_card_sheets import (
+    TtsCardSheetPreparationError,
+    TtsCardSheetService,
+)
 from card_reader_core.services.tts_card_sheets import renderer as tts_sheet_renderer
 from card_reader_core.storage import build_storage_relative_path
 
@@ -132,6 +142,50 @@ def test_concurrent_allocation_reserves_unique_sqlite_slots() -> None:
     )
     assert slots == list(range(12))
     assert TtsCardSheet.objects.get().next_slot_index == 12
+
+
+def test_concurrent_sqlite_render_claims_have_one_winner() -> None:
+    TtsCardSheet.objects.all().delete()
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_995,
+        desired_revision=1,
+        rendered_revision=0,
+        render_not_before=now_utc() - timedelta(seconds=1),
+    )
+
+    def claim_sheet(_index: int) -> str | None:
+        close_old_connections()
+        try:
+            claimed = claim_next_renderable_sheet()
+            return str(claimed.id) if claimed is not None else None
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        claimed_ids = list(executor.map(claim_sheet, range(4)))
+
+    assert claimed_ids.count(str(sheet.id)) == 1
+    assert claimed_ids.count(None) == 3
+
+
+def test_prioritization_and_inline_claim_preserve_active_failure_backoff() -> None:
+    TtsCardSheet.objects.all().delete()
+    render_not_before = now_utc() + timedelta(minutes=2)
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_994,
+        desired_revision=1,
+        rendered_revision=0,
+        render_failure_count=3,
+        render_not_before=render_not_before,
+    )
+
+    prioritize_sheets([str(sheet.id)])
+    claimed = claim_sheet_for_render(str(sheet.id), respect_not_before=True)
+
+    sheet.refresh_from_db()
+    assert claimed is None
+    assert sheet.render_priority == 1
+    assert sheet.render_not_before == render_not_before
 
 
 def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_changes() -> None:
@@ -252,6 +306,40 @@ def test_renderer_stop_releases_the_claim_before_processing() -> None:
     sheet.refresh_from_db()
     assert sheet.render_claimed_at is None
     assert sheet.rendered_revision == 0
+
+
+def test_superseded_sheet_revision_cleanup_keeps_only_current_and_previous(
+    tmp_path: Path,
+) -> None:
+    sheet_id = str(uuid4())
+    oldest = tmp_path / f"{sheet_id}.oldest.webp"
+    previous = tmp_path / f"{sheet_id}.previous.webp"
+    current = tmp_path / f"{sheet_id}.current.webp"
+    for index, path in enumerate((oldest, previous, current), start=1):
+        path.write_bytes(str(index).encode("ascii"))
+        os.utime(path, ns=(index, index))
+
+    tts_sheet_renderer._remove_superseded_sheet_revisions(
+        sheet_id=sheet_id,
+        current_path=current,
+    )
+
+    assert not oldest.exists()
+    assert previous.exists()
+    assert current.exists()
+
+
+def test_prepare_cards_translates_synchronous_render_failures() -> None:
+    TtsCardSheet.objects.all().delete()
+    selected = _create_sheet_card("selected-render-failure", color=(20, 30, 40))
+    broken_neighbor = _create_sheet_card("neighbor-render-failure", color=(50, 60, 70))
+    service = TtsCardSheetService()
+    service.sync_cards([selected.id, broken_neighbor.id])
+    broken_slot = TtsCardSheetSlot.objects.get(card_identity_id=broken_neighbor.id)
+    (settings.storage_root_dir / broken_slot.image_stored_path).unlink()
+
+    with pytest.raises(TtsCardSheetPreparationError, match="could not be rendered"):
+        service.prepare_cards([selected.id], timeout_seconds=0)
 
 
 def test_unknown_and_unrendered_sheet_responses_are_explicit() -> None:

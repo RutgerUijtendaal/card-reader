@@ -104,7 +104,8 @@ When a Card's latest artwork changes, Card Reader marks its sheet dirty. The bac
 nearby changes, rebuilds the atlas atomically, and publishes a new `ETag` and monotonically newer `Last-Modified`
 value at the same URL. Internally, each published atlas uses a checksum-versioned filename: the renderer finishes
 that immutable file before switching the database metadata, so requests cannot receive new bytes with stale cache
-headers.
+headers. Garbage collection retains the current revision and one prior revision for in-flight requests while
+removing older files, which bounds runtime and backup growth.
 
 TTS verifies an asset once per game session. After publishing or promoting artwork:
 

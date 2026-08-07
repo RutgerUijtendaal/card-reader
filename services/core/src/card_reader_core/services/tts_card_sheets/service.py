@@ -22,7 +22,7 @@ from card_reader_core.repositories.tts_card_sheets import (
     sync_merged_card_source,
 )
 
-from .renderer import render_claimed_sheet, tts_card_sheet_path
+from .renderer import TtsCardSheetRenderError, render_claimed_sheet, tts_card_sheet_path
 
 
 @dataclass(frozen=True)
@@ -99,7 +99,12 @@ class TtsCardSheetService:
         request_sheet_rerender(missing_sheet_ids)
         prioritize_sheets(sheet_ids)
         if settings.is_dev:
-            self.render_sheets_now(sheet_ids)
+            try:
+                self.render_sheets_now(sheet_ids, respect_not_before=True)
+            except TtsCardSheetRenderError as exc:
+                raise TtsCardSheetPreparationError(
+                    "One or more TTS card sheets could not be rendered. Try the export again shortly."
+                ) from exc
         self._wait_until_ready(sheet_ids, timeout_seconds=timeout_seconds)
         return get_card_sheet_assignments(card_ids)
 
@@ -113,11 +118,19 @@ class TtsCardSheetService:
         release_all_render_claims()
         return self.reconcile_all(render=False)
 
-    def render_sheets_now(self, sheet_ids: list[str]) -> int:
+    def render_sheets_now(
+        self,
+        sheet_ids: list[str],
+        *,
+        respect_not_before: bool = False,
+    ) -> int:
         rendered = 0
         for sheet_id in list(dict.fromkeys(sheet_ids)):
             while sheet_id in list_sheet_ids_needing_render([sheet_id]):
-                claimed = claim_sheet_for_render(sheet_id)
+                claimed = claim_sheet_for_render(
+                    sheet_id,
+                    respect_not_before=respect_not_before,
+                )
                 if claimed is None:
                     break
                 render_claimed_sheet(claimed)

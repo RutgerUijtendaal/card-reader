@@ -6,7 +6,8 @@ import hashlib
 import json
 from pathlib import Path
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from typing import TypeVar
 
 from django.db import IntegrityError, OperationalError, connection, transaction
 from django.db.models import F, Max, Prefetch, Q, QuerySet
@@ -31,6 +32,9 @@ _RENDER_CLAIM_TIMEOUT = timedelta(minutes=10)
 _RENDERER_FINGERPRINT_VERSION = 1
 _SQLITE_WRITE_RETRY_ATTEMPTS = 6
 _SLOT_RESERVATION_ATTEMPTS = 16
+_CLAIM_RESERVATION_ATTEMPTS = 16
+
+_RetryResult = TypeVar("_RetryResult")
 
 
 class TtsCardSheetAllocationError(RuntimeError):
@@ -121,15 +125,19 @@ def resolve_tts_card_image_path(image: CardVersionImage) -> Path | None:
 
 
 def sync_card_sources(sources: list[TtsCardImageSource]) -> set[str]:
+    return _retry_sqlite_write(lambda: _sync_card_sources_once(sources))
+
+
+def _retry_sqlite_write(operation: Callable[[], _RetryResult]) -> _RetryResult:
     for attempt in range(_SQLITE_WRITE_RETRY_ATTEMPTS):
         try:
-            return _sync_card_sources_once(sources)
+            return operation()
         except OperationalError as exc:
             is_locked = connection.vendor == "sqlite" and "locked" in str(exc).lower()
             if not is_locked or attempt == _SQLITE_WRITE_RETRY_ATTEMPTS - 1:
                 raise
             time.sleep(0.05 * (2**attempt))
-    raise TtsCardSheetAllocationError("TTS card-sheet allocation retries were exhausted.")
+    raise TtsCardSheetAllocationError("TTS card-sheet write retries were exhausted.")
 
 
 @transaction.atomic
@@ -237,11 +245,16 @@ def prioritize_sheets(sheet_ids: list[str]) -> None:
     if not sheet_ids:
         return
     now = now_utc()
-    TtsCardSheet.objects.filter(id__in=sheet_ids).update(
+    sheets = TtsCardSheet.objects.filter(id__in=sheet_ids)
+    sheets.update(
         render_priority=1,
-        render_not_before=now,
         updated_at=now,
     )
+    sheets.filter(
+        Q(render_failure_count=0)
+        | Q(render_not_before__isnull=True)
+        | Q(render_not_before__lte=now)
+    ).update(render_not_before=now, updated_at=now)
 
 
 def request_sheet_rerender(sheet_ids: list[str]) -> None:
@@ -281,39 +294,64 @@ def ensure_sheet_render_requested(sheet_ids: list[str]) -> None:
     )
 
 
-@transaction.atomic
 def claim_next_renderable_sheet() -> TtsCardSheet | None:
-    now = now_utc()
-    stale_before = now - _RENDER_CLAIM_TIMEOUT
-    sheet = (
-        TtsCardSheet.objects.select_for_update()
-        .filter(desired_revision__gt=F("rendered_revision"))
-        .filter(Q(render_not_before__isnull=True) | Q(render_not_before__lte=now))
-        .filter(Q(render_claimed_at__isnull=True) | Q(render_claimed_at__lt=stale_before))
-        .order_by("-render_priority", "render_not_before", "sequence")
-        .first()
+    return _retry_sqlite_write(_claim_next_renderable_sheet_once)
+
+
+def _claim_next_renderable_sheet_once() -> TtsCardSheet | None:
+    for _attempt in range(_CLAIM_RESERVATION_ATTEMPTS):
+        now = now_utc()
+        stale_before = now - _RENDER_CLAIM_TIMEOUT
+        claimable = (
+            TtsCardSheet.objects.filter(desired_revision__gt=F("rendered_revision"))
+            .filter(Q(render_not_before__isnull=True) | Q(render_not_before__lte=now))
+            .filter(Q(render_claimed_at__isnull=True) | Q(render_claimed_at__lt=stale_before))
+        )
+        sheet_id = (
+            claimable.order_by("-render_priority", "render_not_before", "sequence")
+            .values_list("id", flat=True)
+            .first()
+        )
+        if sheet_id is None:
+            return None
+        claimed = claimable.filter(id=sheet_id).update(render_claimed_at=now, updated_at=now)
+        if claimed == 1:
+            return TtsCardSheet.objects.filter(id=sheet_id, render_claimed_at=now).first()
+    return None
+
+
+def claim_sheet_for_render(
+    sheet_id: str,
+    *,
+    respect_not_before: bool = False,
+) -> TtsCardSheet | None:
+    return _retry_sqlite_write(
+        lambda: _claim_sheet_for_render_once(
+            sheet_id,
+            respect_not_before=respect_not_before,
+        )
     )
-    if sheet is None:
-        return None
-    sheet.render_claimed_at = now
-    sheet.updated_at = now
-    sheet.save(update_fields=["render_claimed_at", "updated_at"])
-    return sheet
 
 
-@transaction.atomic
-def claim_sheet_for_render(sheet_id: str) -> TtsCardSheet | None:
-    sheet = TtsCardSheet.objects.select_for_update().filter(id=sheet_id).first()
-    if sheet is None or sheet.desired_revision <= sheet.rendered_revision:
-        return None
+def _claim_sheet_for_render_once(
+    sheet_id: str,
+    *,
+    respect_not_before: bool,
+) -> TtsCardSheet | None:
     now = now_utc()
     stale_before = now - _RENDER_CLAIM_TIMEOUT
-    if sheet.render_claimed_at is not None and sheet.render_claimed_at >= stale_before:
+    claimable = (
+        TtsCardSheet.objects.filter(id=sheet_id, desired_revision__gt=F("rendered_revision"))
+        .filter(Q(render_claimed_at__isnull=True) | Q(render_claimed_at__lt=stale_before))
+    )
+    if respect_not_before:
+        claimable = claimable.filter(
+            Q(render_not_before__isnull=True) | Q(render_not_before__lte=now)
+        )
+    claimed = claimable.update(render_claimed_at=now, updated_at=now)
+    if claimed != 1:
         return None
-    sheet.render_claimed_at = now
-    sheet.updated_at = now
-    sheet.save(update_fields=["render_claimed_at", "updated_at"])
-    return sheet
+    return TtsCardSheet.objects.filter(id=sheet_id, render_claimed_at=now).first()
 
 
 def get_sheet_with_slots(sheet_id: str) -> TtsCardSheet | None:

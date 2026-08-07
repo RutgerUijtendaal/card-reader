@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 from pathlib import Path
 import tempfile
@@ -18,6 +19,7 @@ from card_reader_core.repositories.tts_card_sheets import (
 from card_reader_core.storage import resolve_storage_path
 
 _BACKGROUND = (0, 0, 0)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -119,12 +121,21 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
         target = tts_card_sheet_path(str(sheet.id), rendered_checksum)
         os.replace(temporary_path, target)
         temporary_path = None
-        return mark_render_succeeded(
+        rendered_sheet = mark_render_succeeded(
             sheet_id=str(sheet.id),
             rendered_revision=target_revision,
             rendered_fingerprint=target_fingerprint,
             rendered_checksum=rendered_checksum,
         )
+        try:
+            _remove_superseded_sheet_revisions(sheet_id=str(sheet.id), current_path=target)
+        except Exception:
+            logger.warning(
+                "Unexpected failure while pruning TTS card-sheet revisions. sheet_id=%s",
+                sheet.id,
+                exc_info=True,
+            )
+        return rendered_sheet
     except Exception as exc:
         mark_render_failed(sheet_id=str(sheet.id), error=str(exc))
         if isinstance(exc, TtsCardSheetRenderError):
@@ -141,6 +152,50 @@ def _sha256_file(path: Path) -> str:
         while chunk := handle.read(1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _remove_superseded_sheet_revisions(*, sheet_id: str, current_path: Path) -> None:
+    try:
+        candidates = list(current_path.parent.glob(f"{sheet_id}.*.webp"))
+        candidates.append(current_path.parent / f"{sheet_id}.webp")
+    except OSError:
+        logger.warning(
+            "Could not list superseded TTS card-sheet revisions. sheet_id=%s",
+            sheet_id,
+            exc_info=True,
+        )
+        return
+    existing_candidates = [candidate for candidate in candidates if candidate.is_file()]
+    newest_alternative = next(
+        (
+            candidate
+            for candidate in sorted(
+                existing_candidates,
+                key=_file_mtime_ns,
+                reverse=True,
+            )
+            if candidate != current_path
+        ),
+        None,
+    )
+    for candidate in candidates:
+        if candidate in {current_path, newest_alternative} or not candidate.is_file():
+            continue
+        try:
+            candidate.unlink()
+        except OSError:
+            logger.warning(
+                "Could not remove superseded TTS card-sheet revision. path=%s",
+                candidate,
+                exc_info=True,
+            )
+
+
+def _file_mtime_ns(path: Path) -> int:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return -1
 
 
 __all__ = [

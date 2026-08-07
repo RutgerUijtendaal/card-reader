@@ -164,7 +164,6 @@ function spawnCardReaderSheetDeck(payload)
     local object_data
     if #contained == 1 then
         object_data = contained[1]
-        object_data.Nickname = payload.collection.name
     else
         object_data = buildSheetDeckData(payload.collection.name, deck_ids, custom_deck, contained)
     end
@@ -174,7 +173,9 @@ function spawnCardReaderSheetDeck(payload)
         position = CONFIG.spawn_position,
         callback_function = function(object)
             if object ~= nil and not object.isDestroyed() then
-                object.setName(payload.collection.name)
+                if #contained > 1 then
+                    object.setName(payload.collection.name)
+                end
                 print(string.format(
                     "Imported '%s' with %d cards across %d sheets.",
                     payload.collection.name,
