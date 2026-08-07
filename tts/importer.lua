@@ -7,8 +7,6 @@ local CONFIG = {
     fuzzy_name_distance = 1,
     index_batch_size = 50,
     spawn_batch_size = 5,
-    direct_spawn_cooldown_frames = 30,
-    direct_asset_timeout_seconds = 60,
     wait_timeout_seconds = 15,
     finalize_wait_frames = 210,
     finalize_search_radius = 3,
@@ -24,8 +22,7 @@ end
 function importCardReaderCards(encoded)
     local payload = decodePayload(encoded)
     validateCardPayload(payload)
-
-    startDirectCardImportJob(payload, buildDirectCardImportRequests(payload))
+    spawnCardReaderSheetDeck(payload)
 end
 
 function inspectCardReaderLibrary()
@@ -71,7 +68,11 @@ function validateCardPayload(payload)
         error("Decoded payload must be a table.")
     end
 
-    if payload.schema ~= "card-reader.tts-cards.v1" then
+    if payload.schema == "card-reader.tts-cards.v1" then
+        error("This direct-card export is outdated. Re-export it from Card Reader to use sheet-based cards.")
+    end
+
+    if payload.schema ~= "card-reader.tts-cards.v2" then
         error("Unsupported payload schema: " .. tostring(payload.schema))
     end
 
@@ -83,16 +84,46 @@ function validateCardPayload(payload)
         error("Payload card back URL is invalid.")
     end
 
-    if type(payload.cards) ~= "table" then
+    if type(payload.sheets) ~= "table" or #payload.sheets == 0 then
+        error("Payload sheets collection is invalid.")
+    end
+
+    if type(payload.cards) ~= "table" or #payload.cards == 0 then
         error("Payload cards collection is invalid.")
     end
 
+    local sheets_by_id = {}
+    for index, sheet in ipairs(payload.sheets) do
+        if type(sheet) ~= "table" then
+            error("Payload sheet entry " .. tostring(index) .. " is invalid.")
+        end
+        local columns = math.floor(tonumber(sheet.columns or 0) or 0)
+        local rows = math.floor(tonumber(sheet.rows or 0) or 0)
+        local sheet_id = trim(sheet.sheet_id or "")
+        if sheet_id == ""
+            or trim(sheet.face_url or "") == ""
+            or columns <= 0
+            or rows <= 0
+            or columns > 10
+            or rows > 7
+            or sheets_by_id[sheet_id] ~= nil then
+            error("Payload sheet entry " .. tostring(index) .. " is invalid.")
+        end
+        sheets_by_id[sheet_id] = sheet
+    end
+
     for index, entry in ipairs(payload.cards) do
-        if type(entry) ~= "table"
-            or trim(entry.card_id or "") == ""
+        if type(entry) ~= "table" then
+            error("Payload card entry " .. tostring(index) .. " is invalid.")
+        end
+        local sheet = sheets_by_id[trim(entry.sheet_id or "")]
+        local slot_index = math.floor(tonumber(entry.slot_index or -1) or -1)
+        if trim(entry.card_id or "") == ""
             or trim(entry.card_version_id or "") == ""
             or trim(entry.name or "") == ""
-            or trim(entry.front_url or "") == ""
+            or sheet == nil
+            or slot_index < 0
+            or slot_index >= (tonumber(sheet.columns) * tonumber(sheet.rows))
             or math.floor(tonumber(entry.quantity or 0) or 0) <= 0 then
             error("Payload card entry " .. tostring(index) .. " is invalid.")
         end
@@ -101,6 +132,126 @@ function validateCardPayload(payload)
     if payload.skipped ~= nil and type(payload.skipped) ~= "table" then
         error("Payload skipped collection is invalid.")
     end
+end
+
+function spawnCardReaderSheetDeck(payload)
+    local custom_deck = {}
+    local sheet_keys = {}
+    for index, sheet in ipairs(payload.sheets) do
+        sheet_keys[sheet.sheet_id] = index
+        custom_deck[index] = buildCustomDeckState(sheet, payload.card_back_url)
+    end
+
+    local contained = {}
+    local deck_ids = {}
+    for _, entry in ipairs(payload.cards) do
+        local sheet_key = sheet_keys[entry.sheet_id]
+        local card_id = (sheet_key * 100) + math.floor(tonumber(entry.slot_index))
+        local quantity = math.floor(tonumber(entry.quantity))
+        for _ = 1, quantity do
+            table.insert(deck_ids, card_id)
+            table.insert(contained, buildSheetCardData(
+                entry,
+                card_id,
+                sheet_key,
+                custom_deck[sheet_key],
+                payload.sheets[sheet_key].face_url
+            ))
+        end
+    end
+
+    logMissingCards(buildExportSkippedRequests(payload.skipped))
+    local object_data
+    if #contained == 1 then
+        object_data = contained[1]
+        object_data.Nickname = payload.collection.name
+    else
+        object_data = buildSheetDeckData(payload.collection.name, deck_ids, custom_deck, contained)
+    end
+
+    spawnObjectData({
+        data = object_data,
+        position = CONFIG.spawn_position,
+        callback_function = function(object)
+            if object ~= nil and not object.isDestroyed() then
+                object.setName(payload.collection.name)
+                print(string.format(
+                    "Imported '%s' with %d cards across %d sheets.",
+                    payload.collection.name,
+                    #contained,
+                    #payload.sheets
+                ))
+            end
+        end,
+    })
+end
+
+function buildCustomDeckState(sheet, card_back_url)
+    return {
+        FaceURL = verifiedAssetUrl(trim(sheet.face_url)),
+        BackURL = trim(card_back_url),
+        NumWidth = math.floor(tonumber(sheet.columns)),
+        NumHeight = math.floor(tonumber(sheet.rows)),
+        BackIsHidden = true,
+        UniqueBack = false,
+    }
+end
+
+function buildSheetCardData(entry, card_id, sheet_key, custom_deck_state, sheet_url)
+    local gm_notes = JSON.encode({
+        schema = "card-reader.tts-card.v2",
+        card_id = trim(entry.card_id),
+        card_version_id = trim(entry.card_version_id),
+        image_checksum = trim(entry.image_checksum or ""),
+        sheet_id = trim(entry.sheet_id),
+        slot_index = math.floor(tonumber(entry.slot_index)),
+        stable_sheet_url = trim(sheet_url),
+    })
+    return {
+        Name = "CardCustom",
+        Transform = defaultObjectTransform(),
+        Nickname = trim(entry.name),
+        Description = "",
+        GMNotes = gm_notes,
+        CardID = card_id,
+        SidewaysCard = false,
+        CustomDeck = {
+            [sheet_key] = custom_deck_state,
+        },
+        LuaScript = "",
+        LuaScriptState = "",
+        XmlUI = "",
+    }
+end
+
+function buildSheetDeckData(name, deck_ids, custom_deck, contained)
+    return {
+        Name = "DeckCustom",
+        Transform = defaultObjectTransform(),
+        Nickname = name,
+        Description = "",
+        GMNotes = "",
+        DeckIDs = deck_ids,
+        CustomDeck = custom_deck,
+        ContainedObjects = contained,
+        LuaScript = "",
+        LuaScriptState = "",
+        XmlUI = "",
+    }
+end
+
+function defaultObjectTransform()
+    return {
+        posX = 0,
+        posY = 0,
+        posZ = 0,
+        rotX = 0,
+        rotY = 180,
+        rotZ = 180,
+        scaleX = 1,
+        scaleY = 1,
+        scaleZ = 1,
+    }
 end
 
 function buildImportRequests(payload)
@@ -112,25 +263,6 @@ function buildImportRequests(payload)
 
     for _, entry in ipairs(payload.cards) do
         addImportRequest(requests, entry, "mainboard")
-    end
-
-    return requests
-end
-
-function buildDirectCardImportRequests(payload)
-    local requests = {}
-
-    for _, entry in ipairs(payload.cards) do
-        local quantity = math.floor(tonumber(entry.quantity or 0) or 0)
-        table.insert(requests, {
-            quantity = quantity,
-            remaining = quantity,
-            name = trim(entry.name),
-            card_id = trim(entry.card_id),
-            card_version_id = trim(entry.card_version_id),
-            front_url = trim(entry.front_url),
-            image_checksum = trim(entry.image_checksum or ""),
-        })
     end
 
     return requests
@@ -245,19 +377,6 @@ function startImportJob(payload, requests)
         countRequestedCards(requests)
     ))
     buildSearchIndexForImport(job)
-end
-
-function startDirectCardImportJob(payload, requests)
-    local job = createImportJob(payload, requests)
-    job.missing = buildExportSkippedRequests(payload.skipped)
-
-    print(string.format(
-        "Importing '%s' with %d card types and %d requested cards from image URLs.",
-        payloadCollectionName(payload),
-        #requests,
-        countRequestedCards(requests)
-    ))
-    spawnNextDirectCard(job)
 end
 
 function createImportJob(payload, requests)
@@ -404,90 +523,12 @@ function spawnImportCard(job, request)
     })
 end
 
-function spawnNextDirectCard(job)
-    while true do
-        local request = job.requests[job.request_index]
-        if request == nil then
-            waitForImportSpawns(job)
-            return
-        end
-
-        if request.remaining <= 0 then
-            job.request_index = job.request_index + 1
-        else
-            spawnDirectCard(job, request)
-            request.remaining = request.remaining - 1
-            if request.remaining <= 0 then
-                job.request_index = job.request_index + 1
-            end
-            return
-        end
-    end
-end
-
-function spawnDirectCard(job, request)
-    local spawn_position = buildSpawnPosition(job.spawn_index)
-    job.expected_spawns = job.expected_spawns + 1
-    job.spawn_index = job.spawn_index + 1
-
-    local spawned_object = spawnObject({
-        type = "CardCustom",
-        position = spawn_position,
-        callback_function = function(ready_object)
-            applyDirectCardMetadata(ready_object, request)
-            table.insert(job.spawned, ready_object)
-            waitForDirectCardAssets(job, ready_object)
-        end,
-    })
-    spawned_object.setCustomObject({
-        face = verifiedAssetUrl(request.front_url),
-        back = job.payload.card_back_url,
-        type = 0,
-        sideways = false,
-    })
-end
-
-function waitForDirectCardAssets(job, object)
-    Wait.frames(function()
-        Wait.condition(
-            function()
-                scheduleNextDirectCard(job)
-            end,
-            function()
-                return object == nil or object.isDestroyed() or not object.loading_custom
-            end,
-            CONFIG.direct_asset_timeout_seconds,
-            function()
-                print("Timed out while waiting for a custom card image to load; continuing the import.")
-                scheduleNextDirectCard(job)
-            end
-        )
-    end, 1)
-end
-
-function scheduleNextDirectCard(job)
-    Wait.frames(function()
-        spawnNextDirectCard(job)
-    end, CONFIG.direct_spawn_cooldown_frames)
-end
-
 function verifiedAssetUrl(url)
     local prefix = "{verifycache}"
     if string.sub(url, 1, #prefix) == prefix then
         return url
     end
     return prefix .. url
-end
-
-function applyDirectCardMetadata(object, request)
-    object.setName(request.name)
-    object.setGMNotes(JSON.encode({
-        schema = "card-reader.tts-card.v1",
-        card_id = request.card_id,
-        card_version_id = request.card_version_id,
-        image_checksum = request.image_checksum,
-        stable_front_url = request.front_url,
-    }))
 end
 
 function countMissingCards(missing)

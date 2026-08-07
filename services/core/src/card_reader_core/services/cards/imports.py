@@ -9,6 +9,7 @@ from card_reader_core.services.notifications import (
     DECK_CARD_VERSION_CHANGE_IMPORT_CREATED,
     NotificationService,
 )
+from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 
 def save_parsed_card_with_notifications(
@@ -44,6 +45,7 @@ def save_parsed_card_with_notifications(
     )
     version = result.version
     if result.created_new_version:
+        card_id = version.card.id
         transaction.on_commit(
             lambda: NotificationService().notify_deck_owners_card_version_changed(
                 card_id=version.card.id,
@@ -56,4 +58,5 @@ def save_parsed_card_with_notifications(
                 import_item_id=item.id,
             )
         )
+        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card_id]))
     return version

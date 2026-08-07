@@ -22,6 +22,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".import_job", __name__),
     import_module(".metadata", __name__),
     import_module(".template", __name__),
+    import_module(".tts_card_sheet", __name__),
 )
 
 if TYPE_CHECKING:
@@ -116,6 +117,14 @@ if TYPE_CHECKING:
         Type,
     )
     from .template import Template
+    from .tts_card_sheet import (
+        TTS_CARD_SHEET_CAPACITY,
+        TTS_CARD_SHEET_COLUMNS,
+        TTS_CARD_SHEET_LAYOUT_VERSION,
+        TTS_CARD_SHEET_ROWS,
+        TtsCardSheet,
+        TtsCardSheetSlot,
+    )
 
 _EXPORTS = {
     "now_utc": ".base",
@@ -198,6 +207,12 @@ _EXPORTS = {
     "CardVersionType": ".metadata",
     "CardVersionMetadataSuggestion": ".metadata",
     "Template": ".template",
+    "TTS_CARD_SHEET_CAPACITY": ".tts_card_sheet",
+    "TTS_CARD_SHEET_COLUMNS": ".tts_card_sheet",
+    "TTS_CARD_SHEET_LAYOUT_VERSION": ".tts_card_sheet",
+    "TTS_CARD_SHEET_ROWS": ".tts_card_sheet",
+    "TtsCardSheet": ".tts_card_sheet",
+    "TtsCardSheetSlot": ".tts_card_sheet",
 }
 
 __all__ = [
@@ -281,6 +296,12 @@ __all__ = [
     "CardVersionType",
     "CardVersionMetadataSuggestion",
     "Template",
+    "TTS_CARD_SHEET_CAPACITY",
+    "TTS_CARD_SHEET_COLUMNS",
+    "TTS_CARD_SHEET_LAYOUT_VERSION",
+    "TTS_CARD_SHEET_ROWS",
+    "TtsCardSheet",
+    "TtsCardSheetSlot",
 ]
 
 

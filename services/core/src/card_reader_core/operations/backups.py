@@ -104,6 +104,11 @@ def create_backup_archive(
         public_root = content_root / "public"
         _copy_directory_contents(runtime_paths.app_data_dir / "uploads", app_data_root / "uploads", required=False)
         _copy_directory_contents(
+            runtime_paths.app_data_dir / "tts-card-sheets",
+            app_data_root / "tts-card-sheets",
+            required=False,
+        )
+        _copy_directory_contents(
             runtime_paths.app_data_dir / "maintenance",
             app_data_root / "maintenance",
             required=False,
@@ -376,6 +381,12 @@ def _replace_live_runtime(runtime_paths: RuntimePaths, validated: ValidatedBacku
 
     shutil.copy2(validated.database_snapshot_path, runtime_paths.database_path)
     _replace_directory(runtime_paths.app_data_dir / "uploads", validated.app_data_root / "uploads")
+    tts_sheet_target = runtime_paths.app_data_dir / "tts-card-sheets"
+    tts_sheet_source = validated.app_data_root / "tts-card-sheets"
+    if tts_sheet_source.exists():
+        _replace_directory(tts_sheet_target, tts_sheet_source)
+    elif tts_sheet_target.exists():
+        shutil.rmtree(tts_sheet_target)
     _replace_directory(runtime_paths.app_data_dir / "maintenance", validated.app_data_root / "maintenance")
     if (validated.app_data_root / "logs").exists():
         _replace_directory(runtime_paths.app_data_dir / "logs", validated.app_data_root / "logs")

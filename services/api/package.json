@@ -10,6 +10,7 @@
     "dev-data:doctor": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py doctor_dev_data",
     "dev-data:builder": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py run_dev_data_builder",
     "dev:builder": "pnpm run dev-data:builder",
+    "dev:tts-sheets": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py run_tts_sheet_renderer",
     "dev": "pnpm run migrate && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py seed_users && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py runserver 127.0.0.1:8000",
     "build": "echo \"Python service has no build step\"",
     "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api pytest -q",

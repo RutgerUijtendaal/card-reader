@@ -24,6 +24,7 @@ describe('card API', () => {
         encoded_payload: 'encoded-export',
         exported_count: 3,
         skipped_count: 1,
+        sheet_count: 2,
       },
     });
 
@@ -31,6 +32,7 @@ describe('card API', () => {
       encodedPayload: 'encoded-export',
       exportedCount: 3,
       skippedCount: 1,
+      sheetCount: 2,
     });
     expect(api.post).toHaveBeenCalledWith('/exports/tts/cards', { source });
   });

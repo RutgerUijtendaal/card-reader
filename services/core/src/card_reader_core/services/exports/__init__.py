@@ -4,6 +4,7 @@ from .service import (
     TtsCardExportError,
     TtsCardExportErrorCode,
     TtsCardExportService,
+    TtsCardExportSheet,
     TtsCardExportSkippedCard,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "TtsCardExportError",
     "TtsCardExportErrorCode",
     "TtsCardExportService",
+    "TtsCardExportSheet",
     "TtsCardExportSkippedCard",
 ]

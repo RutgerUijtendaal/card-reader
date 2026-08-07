@@ -17,6 +17,11 @@ from card_reader_core.services.card_backs import (
     CardBackService,
     resolve_card_back_image_asset_path,
 )
+from card_reader_core.services.tts_card_sheets import (
+    TtsCardSheetPreparationError,
+    TtsCardSheetService,
+    get_tts_card_sheet_layout,
+)
 
 
 @dataclass(frozen=True)
@@ -25,6 +30,18 @@ class TtsCardExportCard:
     card_version_id: str
     name: str
     quantity: int
+    image_checksum: str
+    sheet_id: str
+    slot_index: int
+
+
+@dataclass(frozen=True)
+class TtsCardExportSheet:
+    sheet_id: str
+    sequence: int
+    columns: int
+    rows: int
+    revision: int
     image_checksum: str
 
 
@@ -41,6 +58,7 @@ class TtsCardExportData:
     source_metadata: dict[str, object]
     card_back_asset_path: str
     cards: list[TtsCardExportCard]
+    sheets: list[TtsCardExportSheet]
     skipped: list[TtsCardExportSkippedCard]
 
 
@@ -48,6 +66,7 @@ class TtsCardExportErrorCode(StrEnum):
     CARD_BACK_UNAVAILABLE = "card_back_unavailable"
     CONTENT_VERSION_NOT_FOUND = "content_version_not_found"
     NO_USABLE_CARDS = "no_usable_cards"
+    SHEETS_UNAVAILABLE = "sheets_unavailable"
 
 
 class TtsCardExportError(ValueError):
@@ -131,7 +150,7 @@ class TtsCardExportService:
                 "A usable current card back is required before exporting TTS cards.",
             )
 
-        cards: list[TtsCardExportCard] = []
+        usable_rows: list[tuple[CardListRow, CardVersionImage]] = []
         skipped = list(selection.skipped)
         for row in selection.rows:
             image = _first_usable_image(row)
@@ -144,27 +163,75 @@ class TtsCardExportService:
                     )
                 )
                 continue
+            usable_rows.append((row, image))
+
+        if not usable_rows:
+            raise TtsCardExportError(
+                TtsCardExportErrorCode.NO_USABLE_CARDS,
+                "No cards with usable latest images matched this export.",
+            )
+
+        card_ids = [row.version.card.id for row, _image in usable_rows]
+        try:
+            assignments = TtsCardSheetService().prepare_cards(card_ids)
+        except TtsCardSheetPreparationError as exc:
+            raise TtsCardExportError(
+                TtsCardExportErrorCode.SHEETS_UNAVAILABLE,
+                str(exc),
+            ) from exc
+
+        cards: list[TtsCardExportCard] = []
+        for row, image in usable_rows:
+            assignment = assignments.get(row.version.card.id)
+            if assignment is None:
+                skipped.append(
+                    TtsCardExportSkippedCard(
+                        card_id=row.version.card.id,
+                        name=row.version.name,
+                        reason="Card has no TTS sheet assignment.",
+                    )
+                )
+                continue
             cards.append(
                 TtsCardExportCard(
                     card_id=row.version.card.id,
                     card_version_id=row.version.id,
                     name=row.version.name,
                     quantity=1,
-                    image_checksum=image.checksum,
+                    image_checksum=assignment.image_checksum,
+                    sheet_id=assignment.sheet_id,
+                    slot_index=assignment.slot_index,
                 )
             )
 
         if not cards:
             raise TtsCardExportError(
                 TtsCardExportErrorCode.NO_USABLE_CARDS,
-                "No cards with usable latest images matched this export.",
+                "No cards with usable TTS sheet assignments matched this export.",
             )
 
+        sheet_assignments = {
+            assignment.sheet_id: assignment
+            for assignment in assignments.values()
+            if assignment.card_id in {card.card_id for card in cards}
+        }
+        sheets = [
+            TtsCardExportSheet(
+                sheet_id=assignment.sheet_id,
+                sequence=assignment.sheet_sequence,
+                columns=get_tts_card_sheet_layout(assignment.layout_version).columns,
+                rows=get_tts_card_sheet_layout(assignment.layout_version).rows,
+                revision=assignment.rendered_revision,
+                image_checksum=assignment.rendered_checksum,
+            )
+            for assignment in sorted(sheet_assignments.values(), key=lambda value: value.sheet_sequence)
+        ]
         return TtsCardExportData(
             collection_name=selection.collection_name,
             source_metadata=selection.source_metadata,
             card_back_asset_path=card_back_asset_path,
             cards=cards,
+            sheets=sheets,
             skipped=skipped,
         )
 

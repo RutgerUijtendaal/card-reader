@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
-  <desc id="desc">Linear database diagram with Card in the center, card consumers and deck tags on the left, imported and parsed version data on the right, and import lineage above.</desc>
+  <desc id="desc">Linear database diagram with Card and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, imported and parsed version data on the right, and import lineage above.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
@@ -17,6 +17,7 @@
       .meta { fill: #fff7ed; stroke: #c2410c; }
       .review { fill: #fce7f3; stroke: #be185d; }
       .notify { fill: #e0f2fe; stroke: #0369a1; }
+      .tts { fill: #ecfeff; stroke: #0e7490; }
       .import { fill: #e2e8f0; stroke: #475569; }
       .external { fill: #f1f5f9; stroke: #64748b; stroke-dasharray: 6 5; }
       .title { font: 700 18px Arial, sans-serif; fill: #0f172a; }
@@ -33,7 +34,7 @@
 
   <rect class="bg" width="2000" height="1250"/>
   <text x="70" y="58" style="font: 800 34px Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
-  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable card identity. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
+  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable card identity and TTS sheets. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
 
   <rect class="band" x="55" y="130" width="1890" height="190"/>
   <text class="band-title" x="80" y="162">Import lineage / parser output</text>
@@ -139,6 +140,18 @@
   <text x="755" y="835" class="small">Card is the object decks, groups,</text>
   <text x="755" y="858" class="small">aliases, imports, and parsed versions</text>
   <text x="755" y="881" class="small">all converge on.</text>
+
+  <rect class="box tts" x="725" y="935" width="270" height="104"/>
+  <text class="title" x="785" y="970">TtsCardSheet</text>
+  <text class="field" x="750" y="996">layout + allocation cursor</text>
+  <text class="field" x="750" y="1020">desired/rendered revision</text>
+
+  <rect class="box tts" x="725" y="1070" width="270" height="142"/>
+  <text class="title-small" x="765" y="1105">TtsCardSheetSlot</text>
+  <text class="field" x="750" y="1131">sheet + permanent slot_index</text>
+  <text class="field" x="750" y="1155">card_identity_id</text>
+  <text class="field" x="750" y="1179">resolved_card + card_version</text>
+  <text class="field" x="750" y="1203">image snapshot</text>
 
   <rect class="band" x="1095" y="370" width="850" height="880"/>
   <text class="band-title" x="1120" y="402">What cards are made from</text>
@@ -259,6 +272,15 @@
   <text class="label" x="1015" y="575">versions</text>
   <path class="soft" d="M1125 595 C1048 645, 1040 725, 975 745"/>
   <text class="label" x="1015" y="710">latest_version</text>
+
+  <path class="line" d="M860 1070 L860 1039"/>
+  <text class="label" x="872" y="1058">sheet</text>
+  <path class="line" d="M725 1140 C665 1080, 670 850, 770 765"/>
+  <text class="label" x="628" y="968">resolved_card</text>
+  <path class="line" d="M995 1150 C1050 1080, 1070 750, 1175 635"/>
+  <text class="label" x="1005" y="1018">card_version</text>
+  <path class="line" d="M995 1188 C1190 1185, 1380 850, 1510 627"/>
+  <text class="label" x="1160" y="1118">image</text>
 
   <path class="line" d="M1405 500 L1455 451"/>
   <path class="line" d="M1405 540 L1455 586"/>

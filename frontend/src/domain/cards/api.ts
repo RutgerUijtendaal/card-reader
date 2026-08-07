@@ -19,12 +19,14 @@ export type TtsCardExportResponse = {
   encodedPayload: string;
   exportedCount: number;
   skippedCount: number;
+  sheetCount: number;
 };
 
 type TtsCardExportApiResponse = {
   encoded_payload: string;
   exported_count: number;
   skipped_count: number;
+  sheet_count: number;
 };
 
 export const fetchCards = async <TCard>(
@@ -57,5 +59,6 @@ export const exportTtsCards = async (source: TtsCardExportSource): Promise<TtsCa
     encodedPayload: response.data.encoded_payload,
     exportedCount: response.data.exported_count,
     skippedCount: response.data.skipped_count,
+    sheetCount: response.data.sheet_count,
   };
 };
