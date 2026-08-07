@@ -106,7 +106,9 @@ class TtsCardSheetService:
                 raise TtsCardSheetPreparationError(
                     "One or more TTS card sheets could not be rendered. Try the export again shortly."
                 ) from exc
-        self._wait_until_ready(sheet_ids, timeout_seconds=timeout_seconds)
+            self._wait_until_ready(sheet_ids, timeout_seconds=timeout_seconds)
+        else:
+            self._require_ready(sheet_ids)
         return get_card_sheet_assignments(card_ids)
 
     def request_render(self, sheet_id: str, *, force: bool = False) -> None:
@@ -150,6 +152,14 @@ class TtsCardSheetService:
                     "One or more TTS card sheets are still being prepared. Try the export again shortly."
                 )
             time.sleep(0.1)
+
+    def _require_ready(self, sheet_ids: list[str]) -> None:
+        pending = list_sheet_ids_needing_render(sheet_ids)
+        unavailable = self._unavailable_sheet_ids(sheet_ids)
+        if pending or unavailable:
+            raise TtsCardSheetPreparationError(
+                "One or more TTS card sheets are still being prepared. Try the export again shortly."
+            )
 
     @staticmethod
     def _unavailable_sheet_ids(sheet_ids: list[str]) -> list[str]:

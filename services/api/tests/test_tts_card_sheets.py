@@ -333,6 +333,30 @@ def test_stale_renderer_cannot_publish_over_a_new_claim() -> None:
     assert sheet.rendered_revision == 0
 
 
+def test_renderer_directory_setup_failure_releases_claim_and_applies_backoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    TtsCardSheet.objects.all().delete()
+    card = _create_sheet_card("directory-failure", color=(35, 45, 55))
+    service = TtsCardSheetService()
+    service.sync_cards([card.id])
+    assignment = TtsCardSheetSlot.objects.get(card_identity_id=card.id)
+    claimed = claim_sheet_for_render(assignment.sheet_id)
+    assert claimed is not None
+    blocked_storage_root = tmp_path / "blocked-storage-root"
+    blocked_storage_root.write_bytes(b"not a directory")
+    monkeypatch.setattr(settings, "app_data_dir", blocked_storage_root)
+
+    with pytest.raises(tts_sheet_renderer.TtsCardSheetRenderError):
+        tts_sheet_renderer.render_claimed_sheet(claimed)
+
+    claimed.refresh_from_db()
+    assert claimed.render_claimed_at is None
+    assert claimed.render_failure_count == 1
+    assert claimed.render_not_before is not None
+
+
 def test_reconciliation_includes_unreferenced_persisted_sheets() -> None:
     TtsCardSheet.objects.all().delete()
     sheet = TtsCardSheet.objects.create(
@@ -397,6 +421,29 @@ def test_prepare_cards_translates_synchronous_render_failures() -> None:
 
     with pytest.raises(TtsCardSheetPreparationError, match="could not be rendered"):
         service.prepare_cards([selected.id], timeout_seconds=0)
+
+
+def test_prepare_cards_does_not_wait_for_renderer_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    TtsCardSheet.objects.all().delete()
+    selected = _create_sheet_card("production-pending", color=(25, 35, 45))
+    storage_root = settings.storage_root_dir
+    monkeypatch.setattr(settings, "app_data_dir", storage_root)
+    monkeypatch.setattr(settings, "environment", "production")
+
+    def fail_if_waited(
+        _service: TtsCardSheetService,
+        _sheet_ids: list[str],
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        raise AssertionError(f"Production preparation waited for {timeout_seconds} seconds.")
+
+    monkeypatch.setattr(TtsCardSheetService, "_wait_until_ready", fail_if_waited)
+
+    with pytest.raises(TtsCardSheetPreparationError, match="still being prepared"):
+        TtsCardSheetService().prepare_cards([selected.id])
 
 
 def test_unknown_and_unrendered_sheet_responses_are_explicit() -> None:

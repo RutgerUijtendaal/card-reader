@@ -69,24 +69,16 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
     claimed_at = claimed_sheet.render_claimed_at
     if claimed_at is None:
         raise TtsCardSheetRenderLeaseLost("TTS card-sheet render claim is no longer owned.")
-    sheet = get_sheet_with_slots(str(claimed_sheet.id))
-    if sheet is None:
-        raise TtsCardSheetRenderError("TTS card sheet disappeared before rendering.")
-    target_revision = sheet.desired_revision
-    target_fingerprint = sheet.desired_fingerprint
-    try:
-        layout = get_tts_card_sheet_layout(sheet.layout_version)
-    except TtsCardSheetRenderError as exc:
-        mark_render_failed(
-            sheet_id=str(sheet.id),
-            claimed_at=claimed_at,
-            error=str(exc),
-        )
-        raise
-    output_dir = settings.tts_card_sheets_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:
+        sheet = get_sheet_with_slots(str(claimed_sheet.id))
+        if sheet is None:
+            raise TtsCardSheetRenderError("TTS card sheet disappeared before rendering.")
+        target_revision = sheet.desired_revision
+        target_fingerprint = sheet.desired_fingerprint
+        layout = get_tts_card_sheet_layout(sheet.layout_version)
+        output_dir = settings.tts_card_sheets_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
         canvas = Image.new("RGB", layout.image_size, _BACKGROUND)
         for slot in sheet.slots.all():
             image_path = resolve_storage_path(slot.image_stored_path)
@@ -152,7 +144,7 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
     except Exception as exc:
         if not isinstance(exc, TtsCardSheetRenderLeaseLost):
             mark_render_failed(
-                sheet_id=str(sheet.id),
+                sheet_id=str(claimed_sheet.id),
                 claimed_at=claimed_at,
                 error=str(exc),
             )

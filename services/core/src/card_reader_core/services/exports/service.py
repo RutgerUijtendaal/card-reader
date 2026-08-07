@@ -210,10 +210,11 @@ class TtsCardExportService:
                 "No cards with usable TTS sheet assignments matched this export.",
             )
 
+        exported_card_ids = {card.card_id for card in cards}
         sheet_assignments = {
             assignment.sheet_id: assignment
             for assignment in assignments.values()
-            if assignment.card_id in {card.card_id for card in cards}
+            if assignment.card_id in exported_card_ids
         }
         sheets = [
             TtsCardExportSheet(
