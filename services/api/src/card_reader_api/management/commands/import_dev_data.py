@@ -5,6 +5,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from card_reader_core.operations.developer_data import DeveloperDataError, import_developer_data
+from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 
 class Command(BaseCommand):
@@ -24,10 +25,12 @@ class Command(BaseCommand):
             )
         except (DeveloperDataError, OSError) as exc:
             raise CommandError(str(exc)) from exc
+        sheet_result = TtsCardSheetService().reconcile_all(render=True)
         self.stdout.write(
             self.style.SUCCESS(
                 f"Imported developer-data bundle {result.bundle_version}; "
                 f"copied {result.copied_assets} assets."
+                f" Generated {sheet_result.affected_sheets} TTS card sheets."
             )
         )
 

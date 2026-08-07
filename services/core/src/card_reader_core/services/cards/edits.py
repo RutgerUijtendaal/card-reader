@@ -11,6 +11,7 @@ from card_reader_core.services.notifications import (
     DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
     NotificationService,
 )
+from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 
 def update_latest_card_version_with_notifications(
@@ -56,4 +57,5 @@ def promote_card_version_with_notifications(
                 actor_id=actor_id,
             )
         )
+        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card.id]))
     return promoted

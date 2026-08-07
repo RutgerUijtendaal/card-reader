@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.db import transaction
 
 from card_reader_core.models import Card, CardAlias, CardMergeRedirect, CardVersion, now_utc
+from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 from .aliases import build_alias_previews, ensure_card_alias
 from .relations import merge_card_group_references, merge_deck_references, preview_relation_changes
@@ -44,6 +45,7 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
     merge_deck_references(target.id, source_ids)
     merge_card_group_references(target.id, source_ids)
     merge_card_versions(target.id, source_ids)
+    TtsCardSheetService().sync_merge(target_card_id=target.id, source_card_ids=source_ids)
     CardAlias.objects.filter(card_id__in=source_ids).update(card=target, updated_at=now_utc())
 
     for alias in preview.aliases:

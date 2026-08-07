@@ -170,6 +170,8 @@ Core stack:
 - Developer-data bundles may contain catalogs, templates, deck tags, symbol assets, the current card
   back, and curated cards with their versions, images, aliases, groups, metadata, content versions,
   lifecycle state, and deck-building overrides.
+- Developer-data bundles do not contain TTS card-sheet rows, coordinates, or rendered atlases. After
+  import, reconcile and render fresh local sheets from the imported Card images.
 - Bundles must exclude users, decks, notifications, activity/access records, import jobs, uploads,
   raw OCR, parse flags, suggestions, logs, debug crops, credentials, and source/server paths.
 - Production bundles live outside `maintenance/`, under `/var/lib/card-reader/dev-data` by default.
@@ -181,6 +183,10 @@ Core stack:
 
 ## Docker And Runtime
 - `api`, `parser`, and `developer-data-builder` share runtime data at `/var/lib/card-reader`.
+- `tts-sheet-renderer` uses the API image, core polling-worker abstraction, shared database, and shared
+  runtime storage. TTS sheet rows are the durable coalescing queue; no external broker is required.
+- Persistent TTS sheet slots are append-only. Never move, compact, delete, or reuse a Card identity's
+  assigned sheet coordinate; merges preserve source slots and resolve them to the target Card.
 - The default `docker-compose.yml` preserves the deployment storage contract by bind-mounting the
   host paths selected by `CARD_READER_APP_DATA_DIR` and `CARD_READER_PUBLIC_APP_DATA_DIR`.
 - Use `docker-compose.local.yml` when local Docker development should replace those bind mounts with
@@ -248,6 +254,7 @@ Local app URL:
 - `GET /cards/{card_id}/generations`
 - `GET /cards/{card_id}/image`
 - `GET /cards/{card_id}/versions/{version_id}/image`
+- `GET/HEAD /tts/card-sheets/{sheet_id}/image.webp`
 - `GET /symbols/assets/{asset_path}`
 - `GET /exports/csv`
 - `GET /decks/rules`

@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import base64
+from io import BytesIO
 import json
 from itertools import count
 
 from django.test import Client
+from PIL import Image
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import CardBack, CardVersion, CardVersionImage, ContentVersion
+from card_reader_core.models import (
+    CardBack,
+    CardVersion,
+    CardVersionImage,
+    ContentVersion,
+    TtsCardSheet,
+)
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
@@ -241,6 +249,7 @@ def test_tts_export_preserves_saved_entry_order() -> None:
 
 
 def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images(monkeypatch) -> None:
+    TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-card-gallery-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)
@@ -273,8 +282,9 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
     response_payload = response.json()
     assert response_payload["exported_count"] == 2
     assert response_payload["skipped_count"] == 1
+    assert response_payload["sheet_count"] == 1
     payload = _decode_tts_card_export(response_payload["encoded_payload"])
-    assert payload["schema"] == "card-reader.tts-cards.v1"
+    assert payload["schema"] == "card-reader.tts-cards.v2"
     assert payload["collection"]["name"] == "Card Reader Gallery"
     assert payload["collection"]["source"]["filters"]["sort"] == "name_asc"
     assert "page" not in payload["collection"]["source"]["filters"]
@@ -282,7 +292,12 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
         alpha.latest_version.name,
         beta.latest_version.name,
     ]
-    assert payload["cards"][0]["front_url"] == f"https://cards.example/api/cards/{alpha.id}/image"
+    assert payload["sheets"][0]["face_url"].startswith(
+        "https://cards.example/api/tts/card-sheets/"
+    )
+    assert payload["sheets"][0]["face_url"].endswith("/image.webp")
+    assert payload["cards"][0]["sheet_id"] == payload["sheets"][0]["sheet_id"]
+    assert {card["slot_index"] for card in payload["cards"]} == {0, 1}
     assert payload["cards"][0]["quantity"] == 1
     assert payload["card_back_url"].startswith("https://cards.example/api/card-images/images/")
     assert payload["skipped"] == [
@@ -295,6 +310,7 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
 
 
 def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_artwork() -> None:
+    TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-card-version-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)
@@ -338,6 +354,7 @@ def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_a
     response_payload = response.json()
     assert response_payload["exported_count"] == 1
     assert response_payload["skipped_count"] == 0
+    assert response_payload["sheet_count"] == 1
     payload = _decode_tts_card_export(response_payload["encoded_payload"])
     assert payload["collection"]["source"] == {
         "type": "content_version",
@@ -350,13 +367,15 @@ def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_a
             "card_version_id": latest.id,
             "name": latest.name,
             "quantity": 1,
-            "front_url": f"http://cards.example/cards/{card.id}/image",
             "image_checksum": image.checksum,
+            "sheet_id": payload["sheets"][0]["sheet_id"],
+            "slot_index": 0,
         }
     ]
 
 
 def test_content_version_tts_card_export_excludes_deprecated_card_identities() -> None:
+    TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-card-version-active-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
     client.force_login(staff)
@@ -467,7 +486,10 @@ def _create_card_image(version: CardVersion, *, content: bytes) -> CardVersionIm
     stored_path = build_storage_relative_path("images", f"tts-card-{version.id}.webp")
     path = settings.storage_root_dir / stored_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
+    color = tuple((content[index % len(content)] if content else 0) for index in range(3))
+    buffer = BytesIO()
+    Image.new("RGB", (50, 70), color).save(buffer, format="WEBP")
+    path.write_bytes(buffer.getvalue())
     return CardVersionImage.objects.create(
         card_version=version,
         source_file=stored_path,

@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 from urllib.request import Request
 
@@ -10,6 +12,20 @@ import pytest
 
 from card_reader_api.management.commands import bootstrap_dev
 from card_reader_core.operations.developer_data import DeveloperDataLock
+
+
+def test_bootstrap_command_loads_in_a_fresh_process() -> None:
+    api_dir = Path(__file__).resolve().parents[1]
+
+    completed = subprocess.run(
+        [sys.executable, "manage.py", "help", "bootstrap_dev"],
+        cwd=api_dir,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 class _Response:

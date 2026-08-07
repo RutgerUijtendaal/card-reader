@@ -35,6 +35,7 @@ from card_reader_core.models import (
     Symbol,
     Tag,
     Template,
+    TtsCardSheet,
     Type,
 )
 from card_reader_core.operations.developer_data import (
@@ -597,6 +598,7 @@ def _create_version(
 
 
 def _clear_domain_data() -> None:
+    TtsCardSheet.objects.all().delete()
     Deck.objects.all().delete()
     ImportJob.objects.all().delete()
     CardGroup.objects.all().delete()

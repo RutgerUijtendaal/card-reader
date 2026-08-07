@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
 from .images import list_latest_active_card_image_sources, resolve_image_file_path
 from .queries import (
     get_card,
@@ -43,8 +48,25 @@ from .types import (
     ParsedCardSaveResult,
     ParsedSnapshotPayload,
 )
-from .edits import promote_card_version, update_latest_card_version
-from .writes import apply_parsed_fields_to_version, save_parsed_card, save_parsed_card_result
+if TYPE_CHECKING:
+    from .edits import promote_card_version, update_latest_card_version
+    from .writes import apply_parsed_fields_to_version, save_parsed_card, save_parsed_card_result
+
+_LAZY_MUTATION_EXPORTS = {
+    "apply_parsed_fields_to_version": ".writes",
+    "promote_card_version": ".edits",
+    "save_parsed_card": ".writes",
+    "save_parsed_card_result": ".writes",
+    "update_latest_card_version": ".edits",
+}
+
+
+def __getattr__(name: str) -> Any:
+    module_name = _LAZY_MUTATION_EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module(module_name, __name__)
+    return getattr(module, name)
 
 __all__ = [
     "CardListRow",

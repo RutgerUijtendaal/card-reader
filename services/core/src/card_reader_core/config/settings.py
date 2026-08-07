@@ -76,6 +76,10 @@ class Settings(BaseSettings):
         return self.storage_root_dir / "debug-crops"
 
     @property
+    def tts_card_sheets_dir(self) -> Path:
+        return self.storage_root_dir / "tts-card-sheets"
+
+    @property
     def developer_data_root_dir(self) -> Path:
         if self.developer_data_dir is not None:
             return self.developer_data_dir

@@ -7,6 +7,10 @@ services:
     volumes: !override
       - card_reader_data:/var/lib/card-reader
 
+  tts-sheet-renderer:
+    volumes: !override
+      - card_reader_data:/var/lib/card-reader
+
   parser:
     volumes: !override
       - card_reader_data:/var/lib/card-reader

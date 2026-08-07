@@ -27,6 +27,7 @@ _TTS_CARD_EXPORT_ERROR_STATUS = {
     TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE: 409,
     TtsCardExportErrorCode.CONTENT_VERSION_NOT_FOUND: 404,
     TtsCardExportErrorCode.NO_USABLE_CARDS: 400,
+    TtsCardExportErrorCode.SHEETS_UNAVAILABLE: 503,
 }
 
 
@@ -98,10 +99,13 @@ class CardTtsExportView(APIView):
             else:
                 export_data = service.build_content_version_export(str(source["content_version_id"]))
         except TtsCardExportError as exc:
-            return Response(
+            error_response = Response(
                 {"detail": exc.detail},
                 status=_TTS_CARD_EXPORT_ERROR_STATUS[exc.code],
             )
+            if exc.code == TtsCardExportErrorCode.SHEETS_UNAVAILABLE:
+                error_response["Retry-After"] = "2"
+            return error_response
 
         export = encode_tts_card_export(
             export_data,
@@ -112,6 +116,7 @@ class CardTtsExportView(APIView):
                 "encoded_payload": export.encoded_payload,
                 "exported_count": export.exported_count,
                 "skipped_count": export.skipped_count,
+                "sheet_count": export.sheet_count,
             }
         )
 

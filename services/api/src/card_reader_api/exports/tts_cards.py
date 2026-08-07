@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from card_reader_core.services.exports import TtsCardExportData
 
-TTS_CARD_EXPORT_SCHEMA = "card-reader.tts-cards.v1"
+TTS_CARD_EXPORT_SCHEMA = "card-reader.tts-cards.v2"
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,7 @@ class EncodedTtsCardExport:
     encoded_payload: str
     exported_count: int
     skipped_count: int
+    sheet_count: int
 
 
 def encode_tts_card_export(
@@ -29,13 +30,27 @@ def encode_tts_card_export(
             "source": export.source_metadata,
         },
         "card_back_url": absolute_url(f"/card-images/{export.card_back_asset_path}"),
+        "sheets": [
+            {
+                "sheet_id": sheet.sheet_id,
+                "face_url": absolute_url(
+                    f"/tts/card-sheets/{sheet.sheet_id}/image.webp"
+                ),
+                "columns": sheet.columns,
+                "rows": sheet.rows,
+                "revision": sheet.revision,
+                "image_checksum": sheet.image_checksum,
+            }
+            for sheet in export.sheets
+        ],
         "cards": [
             {
                 "card_id": card.card_id,
                 "card_version_id": card.card_version_id,
                 "name": card.name,
                 "quantity": card.quantity,
-                "front_url": absolute_url(f"/cards/{card.card_id}/image"),
+                "sheet_id": card.sheet_id,
+                "slot_index": card.slot_index,
                 "image_checksum": card.image_checksum,
             }
             for card in export.cards
@@ -56,4 +71,5 @@ def encode_tts_card_export(
         encoded_payload=encoded_payload,
         exported_count=len(export.cards),
         skipped_count=len(export.skipped),
+        sheet_count=len(export.sheets),
     )

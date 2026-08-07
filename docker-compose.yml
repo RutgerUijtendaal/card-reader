@@ -69,6 +69,37 @@ services:
       api:
         condition: service_healthy
 
+  tts-sheet-renderer:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: card-reader-tts-sheet-renderer
+    restart: unless-stopped
+    command:
+      [
+        "uv",
+        "run",
+        "--frozen",
+        "--package",
+        "card-reader-api",
+        "python",
+        "manage.py",
+        "run_tts_sheet_renderer",
+      ]
+    env_file:
+      - .env
+    environment:
+      CARD_READER_ENV: ${CARD_READER_ENV:-production}
+      CARD_READER_APP_DATA_DIR: /var/lib/card-reader
+      CARD_READER_DATABASE_PATH: ${CARD_READER_DATABASE_PATH:-card_reader.db}
+    volumes:
+      - "${CARD_READER_APP_DATA_DIR:-/var/lib/card-reader}:/var/lib/card-reader"
+      - "${CARD_READER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader/public}/images:/var/lib/card-reader/images"
+      - "${CARD_READER_PUBLIC_APP_DATA_DIR:-/var/lib/card-reader/public}/symbols:/var/lib/card-reader/symbols"
+    depends_on:
+      api:
+        condition: service_healthy
+
   parser:
     platform: ${CARD_READER_PARSER_PLATFORM:-linux/amd64}
     build:

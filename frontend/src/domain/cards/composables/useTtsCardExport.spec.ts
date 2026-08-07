@@ -31,6 +31,7 @@ describe('useTtsCardExport', () => {
       encodedPayload: 'base64-gallery',
       exportedCount: 3,
       skippedCount: 0,
+      sheetCount: 1,
     });
     const source = {
       type: 'gallery' as const,
@@ -42,7 +43,9 @@ describe('useTtsCardExport', () => {
 
     expect(exportTtsCards).toHaveBeenCalledWith(source);
     expect(clipboardWriteText).toHaveBeenCalledWith('base64-gallery');
-    expect(toast.success).toHaveBeenCalledWith('3 TTS cards copied to clipboard');
+    expect(toast.success).toHaveBeenCalledWith('3 TTS cards copied to clipboard', {
+      description: 'Uses 1 persistent sheet.',
+    });
   });
 
   test('reports skipped cards for a content-version export', async () => {
@@ -50,6 +53,7 @@ describe('useTtsCardExport', () => {
       encodedPayload: 'base64-version',
       exportedCount: 2,
       skippedCount: 1,
+      sheetCount: 2,
     });
 
     const { copyTtsCardExport } = useTtsCardExport();
@@ -57,7 +61,7 @@ describe('useTtsCardExport', () => {
 
     expect(clipboardWriteText).toHaveBeenCalledWith('base64-version');
     expect(toast.success).toHaveBeenCalledWith('2 TTS cards copied to clipboard', {
-      description: '1 card skipped because no usable image was available.',
+      description: 'Uses 2 persistent sheets. 1 card skipped because no usable image was available.',
     });
   });
 

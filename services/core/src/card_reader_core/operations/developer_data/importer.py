@@ -28,6 +28,7 @@ from card_reader_core.models import (
     Symbol,
     Tag,
     Template,
+    TtsCardSheet,
     Type,
 )
 
@@ -111,6 +112,7 @@ def _ensure_domain_is_empty(payload: DeveloperDataPayload) -> None:
         Symbol,
         Tag,
         Template,
+        TtsCardSheet,
         Type,
     ):
         if model.objects.exists():

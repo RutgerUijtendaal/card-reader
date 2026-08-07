@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -19,6 +20,9 @@ from card_reader_core.operations.backups import (
     validate_backup_archive,
 )
 
+_SHEET_BYTES = b"sheet"
+_SHEET_CHECKSUM = hashlib.sha256(_SHEET_BYTES).hexdigest()
+
 
 def test_create_backup_archive_captures_expected_runtime(tmp_path: Path) -> None:
     runtime_paths = _build_runtime(tmp_path / "runtime")
@@ -31,6 +35,7 @@ def test_create_backup_archive_captures_expected_runtime(tmp_path: Path) -> None
     file_paths = {entry["path"] for entry in manifest["files"]}
     assert f"db/{runtime_paths.database_path.name}" in file_paths
     assert "app_data/uploads/upload.txt" in file_paths
+    assert f"app_data/tts-card-sheets/sheet-1.{_SHEET_CHECKSUM}.webp" in file_paths
     assert "app_data/maintenance/task.txt" in file_paths
     assert "public/images/card.png" in file_paths
     assert "public/symbols/symbol.svg" in file_paths
@@ -87,6 +92,42 @@ def test_restore_backup_archive_restores_runtime_state(tmp_path: Path) -> None:
     assert (target_runtime.app_data_dir / "uploads" / "upload.txt").read_text(encoding="utf-8") == "upload"
     assert (target_runtime.public_app_data_dir / "images" / "card.png").read_text(encoding="utf-8") == "image"
     assert (target_runtime.public_app_data_dir / "symbols" / "symbol.svg").read_text(encoding="utf-8") == "symbol"
+    assert (
+        target_runtime.app_data_dir
+        / "tts-card-sheets"
+        / f"sheet-1.{_SHEET_CHECKSUM}.webp"
+    ).read_bytes() == _SHEET_BYTES
+
+
+def test_restore_discards_tts_atlas_that_does_not_match_snapshot_database(
+    tmp_path: Path,
+) -> None:
+    source_runtime = _build_runtime(tmp_path / "source-runtime")
+    atlas_path = (
+        source_runtime.app_data_dir
+        / "tts-card-sheets"
+        / f"sheet-1.{_SHEET_CHECKSUM}.webp"
+    )
+    atlas_path.write_bytes(b"newer-sheet")
+    archive = create_backup_archive(
+        runtime_paths=source_runtime,
+        backup_root=tmp_path / "backups",
+    ).archive_path
+
+    target_runtime = _build_runtime(tmp_path / "target-runtime")
+    restore_backup_archive(
+        archive_path=archive,
+        runtime_paths=target_runtime,
+        backup_root=tmp_path / "safety",
+        compose_config=None,
+        healthcheck_url=None,
+    )
+
+    assert not (
+        target_runtime.app_data_dir
+        / "tts-card-sheets"
+        / f"sheet-1.{_SHEET_CHECKSUM}.webp"
+    ).exists()
 
 
 def test_restore_backup_archive_extracts_under_writable_backup_root(
@@ -236,6 +277,7 @@ def _build_runtime(root: Path) -> RuntimePaths:
 
     (app_data_dir / "uploads").mkdir(parents=True, exist_ok=True)
     (app_data_dir / "maintenance").mkdir(parents=True, exist_ok=True)
+    (app_data_dir / "tts-card-sheets").mkdir(parents=True, exist_ok=True)
     (app_data_dir / "logs").mkdir(parents=True, exist_ok=True)
     (public_dir / "images").mkdir(parents=True, exist_ok=True)
     (public_dir / "symbols").mkdir(parents=True, exist_ok=True)
@@ -243,10 +285,20 @@ def _build_runtime(root: Path) -> RuntimePaths:
     with sqlite3.connect(database_path) as connection:
         connection.execute("CREATE TABLE cards (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
         connection.execute("INSERT INTO cards (name) VALUES (?)", ("Arcane Owl",))
+        connection.execute(
+            "CREATE TABLE tts_card_sheet (id TEXT PRIMARY KEY, rendered_checksum TEXT NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO tts_card_sheet (id, rendered_checksum) VALUES (?, ?)",
+            ("sheet-1", _SHEET_CHECKSUM),
+        )
         connection.commit()
 
     _write_text(app_data_dir / "uploads" / "upload.txt", "upload")
     _write_text(app_data_dir / "maintenance" / "task.txt", "task")
+    (app_data_dir / "tts-card-sheets" / f"sheet-1.{_SHEET_CHECKSUM}.webp").write_bytes(
+        _SHEET_BYTES
+    )
     _write_text(app_data_dir / "logs" / "api.log", "log")
     _write_text(public_dir / "images" / "card.png", "image")
     _write_text(public_dir / "symbols" / "symbol.svg", "symbol")
