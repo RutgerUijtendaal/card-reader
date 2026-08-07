@@ -11,6 +11,7 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   UV_CACHE_DIR: ./.uv-cache
+  UV_VERSION: 0.12.3
 
 jobs:
   changes:
@@ -47,6 +48,7 @@ jobs:
       - name: Setup uv and Python
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: '3.12'
           enable-cache: true
           cache-local-path: .uv-cache
@@ -105,6 +107,7 @@ jobs:
       - name: Setup uv and Python
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: '3.12'
           enable-cache: true
           cache-local-path: .uv-cache
@@ -119,6 +122,14 @@ jobs:
     if: needs.changes.outputs.ocr == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: full-flow
+            tests: tests/test_parser_db_full_flow_cases.py
+          - group: workflows-and-stats
+            tests: tests/test_card_edit_reparse.py tests/test_metadata_suggestions.py tests/test_catalog_contract.py tests/test_stats_region_ocr.py
     env:
       PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True'
     steps:
@@ -127,14 +138,16 @@ jobs:
       - name: Setup uv and Python
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: '3.12'
           enable-cache: true
           cache-local-path: .uv-cache
-          cache-suffix: ocr-integration
+          cache-suffix: ocr-integration-${{ matrix.group }}
       - name: Sync integration dependencies
         run: uv --cache-dir ./.uv-cache sync --project . --package card-reader-integration --all-groups --locked
-      - name: Run real OCR and cross-service integration tests
-        run: pnpm --filter @card-reader/integration test
+      - name: Run ${{ matrix.group }} real OCR integration tests
+        working-directory: services/integration
+        run: uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-integration pytest --tb=long -vv --durations=20 --durations-min=0.5 ${{ matrix.tests }}
 
   macos-dependencies:
     needs: changes
@@ -146,6 +159,7 @@ jobs:
       - name: Setup uv and Python
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: '3.12'
           enable-cache: true
           cache-local-path: .uv-cache
