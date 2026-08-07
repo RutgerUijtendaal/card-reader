@@ -23,7 +23,22 @@ def encode_tts_card_export(
     *,
     absolute_url: Callable[[str], str],
 ) -> EncodedTtsCardExport:
-    payload = {
+    payload = build_tts_card_export_payload(export, absolute_url=absolute_url)
+    encoded_payload = base64.b64encode(serialize_tts_card_export_payload(payload)).decode("ascii")
+    return EncodedTtsCardExport(
+        encoded_payload=encoded_payload,
+        exported_count=len(export.cards),
+        skipped_count=len(export.skipped),
+        sheet_count=len(export.sheets),
+    )
+
+
+def build_tts_card_export_payload(
+    export: TtsCardExportData,
+    *,
+    absolute_url: Callable[[str], str],
+) -> dict[str, object]:
+    return {
         "schema": TTS_CARD_EXPORT_SCHEMA,
         "collection": {
             "name": export.collection_name,
@@ -33,9 +48,7 @@ def encode_tts_card_export(
         "sheets": [
             {
                 "sheet_id": sheet.sheet_id,
-                "face_url": absolute_url(
-                    f"/tts/card-sheets/{sheet.sheet_id}/image.webp"
-                ),
+                "face_url": absolute_url(f"/tts/card-sheets/{sheet.sheet_id}/image.webp"),
                 "columns": sheet.columns,
                 "rows": sheet.rows,
                 "revision": sheet.revision,
@@ -52,6 +65,7 @@ def encode_tts_card_export(
                 "sheet_id": card.sheet_id,
                 "slot_index": card.slot_index,
                 "image_checksum": card.image_checksum,
+                "lifecycle_status": card.lifecycle_status,
             }
             for card in export.cards
         ],
@@ -64,12 +78,16 @@ def encode_tts_card_export(
             for card in export.skipped
         ],
     }
-    encoded_payload = base64.b64encode(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    ).decode("ascii")
-    return EncodedTtsCardExport(
-        encoded_payload=encoded_payload,
-        exported_count=len(export.cards),
-        skipped_count=len(export.skipped),
-        sheet_count=len(export.sheets),
-    )
+
+
+def serialize_tts_card_export_payload(payload: dict[str, object]) -> bytes:
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+__all__ = [
+    "EncodedTtsCardExport",
+    "TTS_CARD_EXPORT_SCHEMA",
+    "build_tts_card_export_payload",
+    "encode_tts_card_export",
+    "serialize_tts_card_export_payload",
+]

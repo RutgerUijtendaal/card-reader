@@ -1,4 +1,8 @@
 local CONFIG = {
+    auto_sync_enabled = true,
+    library_manifest_url = "https://maityscardgame.com/tts/card-library/cards.json",
+    auto_sync_retry_delays = { 2, 5, 15, 30 },
+    library_batch_spacing = 3,
     source_region_guids = {
         "cb7760",
     },
@@ -12,6 +16,31 @@ local CONFIG = {
     finalize_search_radius = 3,
 }
 
+local library_sync_state = {
+    generation = 0,
+    in_progress = false,
+}
+
+function onLoad()
+    if not CONFIG.auto_sync_enabled then
+        return
+    end
+
+    Wait.frames(function()
+        startCardReaderLibraryAutoSync()
+    end, 1)
+end
+
+function startCardReaderLibraryAutoSync()
+    if CONFIG.auto_sync_enabled then
+        startCardReaderLibrarySync(true)
+    end
+end
+
+function syncCardReaderLibrary()
+    startCardReaderLibrarySync(false)
+end
+
 function importCardReaderDeck(encoded)
     local payload = decodePayload(encoded)
     validateDeckPayload(payload)
@@ -23,6 +52,129 @@ function importCardReaderCards(encoded)
     local payload = decodePayload(encoded)
     validateCardPayload(payload)
     spawnCardReaderSheetDeck(payload)
+end
+
+function startCardReaderLibrarySync(is_automatic)
+    if is_automatic and not CONFIG.auto_sync_enabled then
+        return
+    end
+    if library_sync_state.in_progress then
+        print("A Card Reader library synchronization is already running.")
+        return
+    end
+    if trim(CONFIG.library_manifest_url or "") == "" then
+        print("Card Reader library synchronization is not configured: library_manifest_url is empty.")
+        return
+    end
+
+    library_sync_state.generation = library_sync_state.generation + 1
+    library_sync_state.in_progress = true
+    local job = {
+        generation = library_sync_state.generation,
+        is_automatic = is_automatic,
+        retry_index = 1,
+    }
+    print("Fetching the latest Card Reader library manifest.")
+    requestCardReaderLibraryManifest(job)
+end
+
+function requestCardReaderLibraryManifest(job)
+    if not librarySyncJobIsCurrent(job) then
+        return
+    end
+    if job.is_automatic and not CONFIG.auto_sync_enabled then
+        finishCardReaderLibrarySync(job)
+        return
+    end
+
+    WebRequest.get(cardReaderLibraryRequestUrl(job), function(request)
+        if not librarySyncJobIsCurrent(job) then
+            return
+        end
+        if request.is_error then
+            retryCardReaderLibrarySync(job, "request failed: " .. tostring(request.error), nil)
+            return
+        end
+
+        local response_code = tonumber(request.response_code or 0) or 0
+        if response_code == 304 then
+            job.cache_bust = tostring(math.random(100000, 999999)) .. "-" .. tostring(job.retry_index)
+            retryCardReaderLibrarySync(job, "received an empty cached response", nil)
+            return
+        end
+        if response_code == 429 or response_code >= 500 then
+            retryCardReaderLibrarySync(
+                job,
+                "server returned HTTP " .. tostring(response_code),
+                request.getResponseHeader("Retry-After")
+            )
+            return
+        end
+        if response_code ~= 200 then
+            failCardReaderLibrarySync(job, "server returned HTTP " .. tostring(response_code))
+            return
+        end
+
+        local decoded_ok, payload = pcall(JSON.decode, request.text)
+        if not decoded_ok then
+            failCardReaderLibrarySync(job, "manifest JSON is invalid: " .. tostring(payload))
+            return
+        end
+        local validation_ok, validation_error = pcall(validateCardPayload, payload)
+        if not validation_ok then
+            failCardReaderLibrarySync(job, "manifest validation failed: " .. tostring(validation_error))
+            return
+        end
+
+        startCardReaderLibraryScan(job, payload)
+    end)
+end
+
+function cardReaderLibraryRequestUrl(job)
+    if job.cache_bust == nil then
+        return CONFIG.library_manifest_url
+    end
+    local separator = string.find(CONFIG.library_manifest_url, "?", 1, true) and "&" or "?"
+    return CONFIG.library_manifest_url
+        .. separator
+        .. "card_reader_refresh="
+        .. tostring(job.cache_bust)
+end
+
+function retryCardReaderLibrarySync(job, reason, retry_after)
+    local delay = CONFIG.auto_sync_retry_delays[job.retry_index]
+    if delay == nil or (job.is_automatic and not CONFIG.auto_sync_enabled) then
+        failCardReaderLibrarySync(job, reason .. "; retry limit reached")
+        return
+    end
+
+    local requested_delay = tonumber(retry_after or 0) or 0
+    if requested_delay > delay then
+        delay = requested_delay
+    end
+    job.retry_index = job.retry_index + 1
+    print(string.format("Card Reader library sync %s; retrying in %d seconds.", reason, delay))
+    Wait.time(function()
+        requestCardReaderLibraryManifest(job)
+    end, delay)
+end
+
+function failCardReaderLibrarySync(job, reason)
+    if not librarySyncJobIsCurrent(job) then
+        return
+    end
+    print("Card Reader library synchronization stopped: " .. tostring(reason))
+    finishCardReaderLibrarySync(job)
+end
+
+function finishCardReaderLibrarySync(job)
+    if librarySyncJobIsCurrent(job) then
+        library_sync_state.in_progress = false
+    end
+end
+
+function librarySyncJobIsCurrent(job)
+    return library_sync_state.in_progress and job.generation == library_sync_state.generation
 end
 
 function inspectCardReaderLibrary()
@@ -134,7 +286,8 @@ function validateCardPayload(payload)
     end
 end
 
-function spawnCardReaderSheetDeck(payload)
+function spawnCardReaderSheetDeck(payload, options)
+    options = options or {}
     local custom_deck = {}
     local sheet_keys = {}
     for index, sheet in ipairs(payload.sheets) do
@@ -170,7 +323,7 @@ function spawnCardReaderSheetDeck(payload)
 
     spawnObjectData({
         data = object_data,
-        position = CONFIG.spawn_position,
+        position = options.position or CONFIG.spawn_position,
         callback_function = function(object)
             if object ~= nil and not object.isDestroyed() then
                 if #contained > 1 then
@@ -182,6 +335,9 @@ function spawnCardReaderSheetDeck(payload)
                     #contained,
                     #payload.sheets
                 ))
+            end
+            if type(options.callback_function) == "function" then
+                options.callback_function(object, #contained)
             end
         end,
     })
@@ -207,6 +363,7 @@ function buildSheetCardData(entry, card_id, sheet_key, custom_deck_state, sheet_
         sheet_id = trim(entry.sheet_id),
         slot_index = math.floor(tonumber(entry.slot_index)),
         stable_sheet_url = trim(sheet_url),
+        lifecycle_status = trim(entry.lifecycle_status or ""),
     })
     return {
         Name = "CardCustom",
@@ -272,12 +429,14 @@ end
 function addImportRequest(requests, entry, fallback_role)
     local quantity = math.floor(tonumber(entry.quantity or 0) or 0)
     local name = trim(entry.name or "")
+    local card_id = trim(entry.card_id or "")
     if quantity <= 0 or name == "" then
         return
     end
 
     local role = tostring(entry.role or fallback_role)
-    local key = role .. "\n" .. normalizeLookupValue(name)
+    local identity_key = card_id ~= "" and card_id or normalizeLookupValue(name)
+    local key = role .. "\n" .. identity_key
     local existing = requests.by_key ~= nil and requests.by_key[key] or nil
     if existing ~= nil then
         existing.quantity = existing.quantity + quantity
@@ -290,6 +449,7 @@ function addImportRequest(requests, entry, fallback_role)
         quantity = quantity,
         remaining = quantity,
         name = name,
+        card_id = card_id,
         source_resolved = false,
         source = nil,
     }
@@ -325,7 +485,10 @@ end
 function createSearchIndex()
     return {
         entries = {},
+        by_card_id = {},
+        card_id_counts = {},
         by_name = {},
+        name_counts = {},
     }
 end
 
@@ -334,12 +497,23 @@ function addSearchIndexEntry(search_index, contained)
     local row = {
         data = contained,
         name = metadata.name,
+        card_id = metadata.card_id,
     }
 
     table.insert(search_index.entries, row)
 
-    if row.name ~= nil then
-        search_index.by_name[normalizeLookupValue(row.name)] = row
+    if row.card_id ~= nil and row.card_id ~= "" then
+        search_index.card_id_counts[row.card_id] = (search_index.card_id_counts[row.card_id] or 0) + 1
+        if search_index.by_card_id[row.card_id] == nil then
+            search_index.by_card_id[row.card_id] = row
+        end
+    end
+    if row.name ~= nil and row.name ~= "" then
+        local normalized_name = normalizeLookupValue(row.name)
+        search_index.name_counts[normalized_name] = (search_index.name_counts[normalized_name] or 0) + 1
+        if search_index.by_name[normalized_name] == nil then
+            search_index.by_name[normalized_name] = row
+        end
     end
 end
 
@@ -359,6 +533,223 @@ function addObjectToSearchIndex(search_index, object)
     end
 
     addSearchIndexEntry(search_index, data)
+end
+
+function startCardReaderLibraryScan(job, payload)
+    local target_region_guid = nil
+    for _, guid in ipairs(CONFIG.source_region_guids) do
+        if isScriptingRegion(getObjectFromGUID(guid)) then
+            target_region_guid = guid
+            break
+        end
+    end
+    if target_region_guid == nil then
+        failCardReaderLibrarySync(job, "no configured source scripting region was found")
+        return
+    end
+
+    job.payload = payload
+    job.search_index = createSearchIndex()
+    job.target_region_guid = target_region_guid
+    job.target_batch_count = 0
+    job.region_index = 1
+    job.current_region_guid = nil
+    job.region_objects = nil
+    job.region_object_index = 1
+    job.contained_objects = nil
+    job.contained_index = 1
+    scanCardReaderLibraryBatch(job)
+end
+
+function scanCardReaderLibraryBatch(job)
+    if not librarySyncJobIsCurrent(job) then
+        return
+    end
+
+    local processed = 0
+    while processed < CONFIG.index_batch_size do
+        if job.contained_objects ~= nil then
+            local contained = job.contained_objects[job.contained_index]
+            if contained == nil then
+                job.contained_objects = nil
+                job.region_object_index = job.region_object_index + 1
+            else
+                addSearchIndexEntry(job.search_index, contained)
+                job.contained_index = job.contained_index + 1
+                processed = processed + 1
+            end
+        elseif job.region_objects == nil then
+            local guid = CONFIG.source_region_guids[job.region_index]
+            if guid == nil then
+                finishCardReaderLibraryScan(job)
+                return
+            end
+
+            local region = getObjectFromGUID(guid)
+            if not isScriptingRegion(region) then
+                job.region_index = job.region_index + 1
+            else
+                job.current_region_guid = guid
+                job.region_objects = region.getObjects()
+                job.region_object_index = 1
+            end
+        else
+            local object = job.region_objects[job.region_object_index]
+            if object == nil then
+                job.region_objects = nil
+                job.current_region_guid = nil
+                job.region_index = job.region_index + 1
+            elseif object.isDestroyed() then
+                job.region_object_index = job.region_object_index + 1
+                processed = processed + 1
+            elseif object.tag == "Deck" then
+                if job.current_region_guid == job.target_region_guid then
+                    job.target_batch_count = job.target_batch_count + 1
+                end
+                job.contained_objects = object.getObjects()
+                job.contained_index = 1
+                if #job.contained_objects == 0 then
+                    job.contained_objects = nil
+                    job.region_object_index = job.region_object_index + 1
+                    processed = processed + 1
+                end
+            elseif object.tag == "Card" then
+                if job.current_region_guid == job.target_region_guid then
+                    job.target_batch_count = job.target_batch_count + 1
+                end
+                addSearchIndexEntry(job.search_index, {
+                    Name = object.getName(),
+                    Description = object.getDescription(),
+                    GMNotes = object.getGMNotes(),
+                })
+                job.region_object_index = job.region_object_index + 1
+                processed = processed + 1
+            else
+                job.region_object_index = job.region_object_index + 1
+                processed = processed + 1
+            end
+        end
+    end
+
+    Wait.frames(function()
+        scanCardReaderLibraryBatch(job)
+    end, 1)
+end
+
+function finishCardReaderLibraryScan(job)
+    if not librarySyncJobIsCurrent(job) then
+        return
+    end
+
+    local missing_cards = {}
+    local existing_count = 0
+    local legacy_count = 0
+    for _, card in ipairs(job.payload.cards) do
+        local card_id = trim(card.card_id or "")
+        local existing = job.search_index.by_card_id[card_id]
+        if existing ~= nil then
+            existing_count = existing_count + 1
+        else
+            local normalized_name = normalizeLookupValue(card.name or "")
+            local legacy = job.search_index.by_name[normalized_name]
+            if job.search_index.name_counts[normalized_name] == 1
+                and legacy ~= nil
+                and (legacy.card_id == nil or legacy.card_id == "") then
+                legacy_count = legacy_count + 1
+            else
+                table.insert(missing_cards, card)
+            end
+        end
+    end
+
+    local duplicate_count = countDuplicateCardReaderIds(job.search_index)
+    local skipped_count = #(job.payload.skipped or {})
+    if #missing_cards == 0 then
+        printCardReaderLibrarySyncSummary(
+            existing_count,
+            0,
+            legacy_count,
+            duplicate_count,
+            skipped_count
+        )
+        finishCardReaderLibrarySync(job)
+        return
+    end
+
+    local update_payload = buildCardReaderLibraryUpdatePayload(job.payload, missing_cards)
+    local position = buildCardReaderLibraryBatchPosition(job.target_batch_count)
+    spawnCardReaderSheetDeck(update_payload, {
+        position = position,
+        callback_function = function(object, spawned_count)
+            if object == nil or object.isDestroyed() then
+                failCardReaderLibrarySync(job, "the missing-card batch failed to spawn")
+                return
+            end
+            printCardReaderLibrarySyncSummary(
+                existing_count,
+                spawned_count,
+                legacy_count,
+                duplicate_count,
+                skipped_count
+            )
+            finishCardReaderLibrarySync(job)
+        end,
+    })
+end
+
+function buildCardReaderLibraryUpdatePayload(payload, missing_cards)
+    local required_sheet_ids = {}
+    for _, card in ipairs(missing_cards) do
+        required_sheet_ids[card.sheet_id] = true
+    end
+
+    local sheets = {}
+    for _, sheet in ipairs(payload.sheets) do
+        if required_sheet_ids[sheet.sheet_id] then
+            table.insert(sheets, sheet)
+        end
+    end
+
+    return {
+        schema = payload.schema,
+        collection = {
+            name = string.format("Card Reader Library Update (%d new)", #missing_cards),
+            source = payload.collection.source,
+        },
+        card_back_url = payload.card_back_url,
+        sheets = sheets,
+        cards = missing_cards,
+        skipped = {},
+    }
+end
+
+function buildCardReaderLibraryBatchPosition(existing_batch_count)
+    return {
+        x = CONFIG.spawn_position.x + (existing_batch_count * CONFIG.library_batch_spacing),
+        y = CONFIG.spawn_position.y,
+        z = CONFIG.spawn_position.z,
+    }
+end
+
+function countDuplicateCardReaderIds(search_index)
+    local duplicate_count = 0
+    for _, count in pairs(search_index.card_id_counts) do
+        if count > 1 then
+            duplicate_count = duplicate_count + count - 1
+        end
+    end
+    return duplicate_count
+end
+
+function printCardReaderLibrarySyncSummary(existing, added, legacy, duplicates, skipped)
+    print(string.format(
+        "Card Reader library sync complete: existing=%d, added=%d, legacy-matched=%d, duplicates=%d, server-skipped=%d.",
+        existing,
+        added,
+        legacy,
+        duplicates,
+        skipped
+    ))
 end
 
 function startImportJob(payload, requests)
@@ -569,22 +960,32 @@ function waitForImportSpawns(job)
 end
 
 function readSourceMetadata(card_data)
-    local gm_notes = card_data.GMNotes or ""
-    local description = card_data.Description or ""
-    local nickname = trim(card_data.Nickname or card_data.Name or "")
+    local gm_notes = card_data.GMNotes or card_data.gm_notes or ""
+    local description = card_data.Description or card_data.description or ""
+    local nickname = trim(card_data.Nickname or card_data.nickname or card_data.Name or card_data.name or "")
     local metadata = {
         name = nickname,
+        card_id = nil,
     }
 
     local parsed = decodeEmbeddedJson(gm_notes) or decodeEmbeddedJson(description)
     if parsed ~= nil then
         metadata.name = parsed.name or metadata.name
+        if type(parsed.card_id) == "string" and trim(parsed.card_id) ~= "" then
+            metadata.card_id = trim(parsed.card_id)
+        end
     end
 
     return metadata
 end
 
 function findSourceCard(request, search_index)
+    if request.card_id ~= nil and request.card_id ~= "" then
+        local card_id_match = search_index.by_card_id[request.card_id]
+        if card_id_match ~= nil then
+            return card_id_match
+        end
+    end
     if request.name == nil or request.name == "" then
         return nil
     end

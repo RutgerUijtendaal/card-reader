@@ -1,12 +1,13 @@
 # Tabletop Simulator Imports
 
-This directory contains two independent TTS import flows:
+This directory contains three related TTS flows:
 
-- `importCardReaderDeck(...)` clones cards already present in configured TTS scripting regions by name.
+- `importCardReaderDeck(...)` clones cards already present in configured TTS scripting regions by Card ID or name.
 - `importCardReaderCards(...)` creates a native custom deck from persistent Card Reader card sheets.
+- `syncCardReaderLibrary()` fetches the canonical public library and creates only missing Card identities.
 
-Both exports are base64-encoded JSON. Paste `tts/importer.lua` into the TTS Global script or another script object,
-then invoke the matching function from the system console.
+Manual deck and card exports are base64-encoded JSON. The automatic library manifest is raw JSON fetched directly
+by TTS. Paste `tts/importer.lua` into the TTS Global script, then invoke manual functions from the system console.
 
 ## Requirements
 
@@ -14,6 +15,7 @@ then invoke the matching function from the system console.
 - The Card Reader origin must be reachable by every connected player. `localhost` is suitable only for a solo game
   running on the same computer.
 - Configure `CARD_READER_PUBLIC_API_BASE_URL` when the public API uses a different host or path prefix.
+- Configure `CONFIG.library_manifest_url` in the Lua script when the canonical library is hosted elsewhere.
 - A current Card Reader card back is required before exporting.
 - Gallery and content-version TTS exports require a staff account.
 
@@ -82,7 +84,8 @@ The decoded `card-reader.tts-cards.v2` payload has this shape:
       "quantity": 1,
       "sheet_id": "sheet-id",
       "slot_index": 23,
-      "image_checksum": "card-sha256"
+      "image_checksum": "card-sha256",
+      "lifecycle_status": "active"
     }
   ],
   "skipped": []
@@ -91,6 +94,48 @@ The decoded `card-reader.tts-cards.v2` payload has this shape:
 
 V1 direct-card payloads are intentionally rejected with an instruction to re-export. TTS objects previously
 created from V1 remain usable but are not migrated automatically.
+
+## Automatic library synchronization
+
+The public canonical manifest is available without a Card Reader session:
+
+```text
+https://maityscardgame.com/tts/card-library/cards.json
+```
+
+It contains every usable active or deprecated Card once, using each Card's current latest version and permanent
+sheet coordinate. The response uses `card-reader.tts-cards.v2` as raw JSON; manual clipboard exports remain base64.
+
+The relevant Lua configuration defaults are:
+
+```lua
+auto_sync_enabled = true
+library_manifest_url = "https://maityscardgame.com/tts/card-library/cards.json"
+auto_sync_retry_delays = { 2, 5, 15, 30 }
+library_batch_spacing = 3
+```
+
+With `auto_sync_enabled = true`, Global `onLoad()` fetches the manifest, scans `source_region_guids` over multiple
+frames, and compares immutable Card IDs stored in GM Notes. Only missing identities are spawned. Each update is a
+separate native Card or Deck positioned beside existing batches in the first valid configured region; batches are
+not regrouped. The configured scripting region should therefore be reserved for the Card Reader library.
+
+Set `auto_sync_enabled = false` to disable startup requests and automatic retries. Manual synchronization remains
+available while disabled:
+
+```text
+lua syncCardReaderLibrary()
+```
+
+If the game already has a Global `onLoad()`, keep that handler and call `startCardReaderLibraryAutoSync()` from it
+instead of defining a second `onLoad()`. Request failures, HTTP 429 responses, and server errors use the configured
+bounded retry delays; a manual call starts a fresh retry sequence.
+
+Synchronization is additive. It never removes Cards, combines update batches, rewrites existing objects, or polls
+during a live session. Exact unique names prevent duplicate creation for legacy objects without Card Reader GM
+Notes, but those matches are reported as legacy. Duplicate Card IDs and server-skipped images are also reported.
+Existing names, lifecycle metadata, and GM Notes remain snapshots; stable sheet artwork refreshes on reload as
+described below. Each separate batch keeps the immutable card back current when that batch was created.
 
 ## Artwork refresh and caching
 
@@ -159,8 +204,9 @@ The original flow remains available for decks that clone an existing TTS library
 3. Place loose Cards, decks, or bags inside those scripting regions.
 4. Run `lua importCardReaderDeck("PASTE_BASE64_HERE")`.
 
-It uses `card-reader.tts-deck.v1`, resolves exact normalized names followed by a unique one-character fuzzy match,
-and reports missing or ambiguous Cards without stopping the remaining import. Use
+It uses `card-reader.tts-deck.v1` and now includes optional Card IDs. The importer resolves Card IDs first, then
+retains exact normalized names and unique one-character fuzzy matches for older exports or library objects. It
+reports missing or ambiguous Cards without stopping the remaining import. Use
 `lua inspectCardReaderLibrary()` to list names available in configured regions.
 
 ## References

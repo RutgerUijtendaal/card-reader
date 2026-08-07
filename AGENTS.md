@@ -141,8 +141,8 @@ Core stack:
 
 ## Auth Rules
 - Auth is enabled by default.
-- Card gallery and card assets are public.
-- Import jobs, review, admin, catalog, templates, and exports require `is_staff=true`.
+- Card gallery, card assets, and the canonical TTS card-library manifest are public.
+- Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - Developer-data metadata, browser downloads, and bootstrap-code creation require an active
   authenticated user who is either staff or has the Developer role. Code exchange is
@@ -187,6 +187,9 @@ Core stack:
   runtime storage. TTS sheet rows are the durable coalescing queue; no external broker is required.
 - Persistent TTS sheet slots are append-only. Never move, compact, delete, or reuse a Card identity's
   assigned sheet coordinate; merges preserve source slots and resolve them to the target Card.
+- The public TTS library manifest includes usable active and deprecated Cards. TTS library synchronization is
+  additive, identifies Cards by immutable Card ID, and must not prune existing saved objects automatically.
+- TTS deck exports include Card IDs and importers must prefer them over names while retaining legacy name fallback.
 - The default `docker-compose.yml` preserves the deployment storage contract by bind-mounting the
   host paths selected by `CARD_READER_APP_DATA_DIR` and `CARD_READER_PUBLIC_APP_DATA_DIR`.
 - Use `docker-compose.local.yml` when local Docker development should replace those bind mounts with
@@ -255,6 +258,7 @@ Local app URL:
 - `GET /cards/{card_id}/image`
 - `GET /cards/{card_id}/versions/{version_id}/image`
 - `GET/HEAD /tts/card-sheets/{sheet_id}/image.webp`
+- `GET/HEAD /tts/card-library/cards.json`
 - `GET /symbols/assets/{asset_path}`
 - `GET /exports/csv`
 - `GET /decks/rules`
