@@ -5,13 +5,13 @@ local CONFIG = {
     library_manifest_url = "https://maityscardgame.com/tts/card-library/cards.json",
     -- Seconds to wait between retryable manifest requests before giving up.
     auto_sync_retry_delays = { 2, 5, 15, 30 },
-    -- Horizontal distance between separately synchronized library batches.
+    -- Minimum center-to-center spacing between library batches inside the source region.
     library_batch_spacing = 3,
-    -- Scripting regions scanned for existing library cards, with the first valid one receiving updates.
+    -- Regions scanned for library cards; automatic updates spawn inside the first valid one.
     source_region_guids = {
         "cb7760",
     },
-    -- Base world position used when spawning imported cards and the first library batch.
+    -- World position used for manual card and deck imports triggered by players.
     spawn_position = { x = -45, y = 3, z = 50 },
     -- Vertical offset between cards while they are spawned before stacking.
     stack_y_spacing = 0.08,
@@ -690,7 +690,14 @@ function finishCardReaderLibraryScan(job)
     end
 
     local update_payload = buildCardReaderLibraryUpdatePayload(job.payload, missing_cards)
-    local position = buildCardReaderLibraryBatchPosition(job.target_batch_count)
+    local position, position_error = buildCardReaderLibraryBatchPosition(
+        job.target_region_guid,
+        job.target_batch_count
+    )
+    if position == nil then
+        failCardReaderLibrarySync(job, position_error)
+        return
+    end
     spawnCardReaderSheetDeck(update_payload, {
         position = position,
         callback_function = function(object, spawned_count)
@@ -736,11 +743,45 @@ function buildCardReaderLibraryUpdatePayload(payload, missing_cards)
     }
 end
 
-function buildCardReaderLibraryBatchPosition(existing_batch_count)
+function buildCardReaderLibraryBatchPosition(region_guid, existing_batch_count)
+    local region = getObjectFromGUID(region_guid)
+    if not isScriptingRegion(region) then
+        return nil, "the source scripting region disappeared before the update could spawn"
+    end
+
+    local spacing = tonumber(CONFIG.library_batch_spacing) or 0
+    if spacing <= 0 then
+        return nil, "library_batch_spacing must be greater than zero"
+    end
+
+    local bounds = region.getBoundsNormalized()
+    local size = bounds and bounds.size or nil
+    if size == nil or tonumber(size.x) == nil or tonumber(size.z) == nil then
+        return nil, "the source scripting region has no usable bounds"
+    end
+
+    local columns = math.max(1, math.floor(tonumber(size.x) / spacing))
+    local rows = math.max(1, math.floor(tonumber(size.z) / spacing))
+    local capacity = columns * rows
+    if existing_batch_count >= capacity then
+        return nil, string.format(
+            "the source scripting region is full (%d library batch slots)",
+            capacity
+        )
+    end
+
+    local column = existing_batch_count % columns
+    local row = math.floor(existing_batch_count / columns)
+    local local_x = (column - ((columns - 1) / 2)) * spacing
+    local local_z = (row - ((rows - 1) / 2)) * spacing
+    local center = bounds.center or region.getPosition()
+    local right = region.getTransformRight()
+    local forward = region.getTransformForward()
+
     return {
-        x = CONFIG.spawn_position.x + (existing_batch_count * CONFIG.library_batch_spacing),
-        y = CONFIG.spawn_position.y,
-        z = CONFIG.spawn_position.z,
+        x = center.x + (right.x * local_x) + (forward.x * local_z),
+        y = center.y + (right.y * local_x) + (forward.y * local_z),
+        z = center.z + (right.z * local_x) + (forward.z * local_z),
     }
 end
 

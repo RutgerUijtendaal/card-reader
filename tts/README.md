@@ -118,7 +118,9 @@ library_batch_spacing = 3
 With `auto_sync_enabled = true`, Global `onLoad()` fetches the manifest, scans `source_region_guids` over multiple
 frames, and compares immutable Card IDs stored in GM Notes. Only missing identities are spawned. Each update is a
 separate native Card or Deck positioned beside existing batches in the first valid configured region; batches are
-not regrouped. The configured scripting region should therefore be reserved for the Card Reader library.
+not regrouped. Rotated regions are supported, and synchronization stops instead of spawning outside the region when
+its batch slots are full. The configured scripting region should therefore be reserved for the Card Reader library.
+Manual card and deck imports continue to use `spawn_position`; that player-facing location is not used by autosync.
 
 Set `auto_sync_enabled = false` to disable startup requests and automatic retries. Manual synchronization remains
 available while disabled:
