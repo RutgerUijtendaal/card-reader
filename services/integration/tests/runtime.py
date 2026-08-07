@@ -11,5 +11,5 @@ def configure_test_environment() -> Path:
     RUNTIME_ROOT.mkdir(parents=True, exist_ok=True)
     os.environ["CARD_READER_APP_DATA_DIR"] = str(RUNTIME_ROOT)
     os.environ["CARD_READER_ENV"] = "test"
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_api.project.settings")
+    os.environ["DJANGO_SETTINGS_MODULE"] = "card_reader_api.project.test_settings"
     return RUNTIME_ROOT

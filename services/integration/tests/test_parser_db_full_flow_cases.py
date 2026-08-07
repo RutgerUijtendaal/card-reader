@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from helpers import assert_recursive_exact, case_id, load_case, load_case_paths, run_case
 
+if TYPE_CHECKING:
+    from card_reader_parser.parsers.card_parser import CardParser
+
 CASES_DIR = Path(__file__).resolve().parent / "fixtures" / "parser_db_cases"
 
 
 @pytest.mark.parametrize("case_path", load_case_paths(CASES_DIR), ids=case_id)
-def test_parser_db_full_flow_with_real_ocr(case_path: Path) -> None:
+def test_parser_db_full_flow_with_real_ocr(
+    case_path: Path,
+    integration_card_parser: CardParser,
+) -> None:
     case = load_case(case_path)
-    db_state = run_case(case_path)
+    db_state = run_case(case_path, integration_card_parser)
     assert_recursive_exact(case["expected"], db_state)

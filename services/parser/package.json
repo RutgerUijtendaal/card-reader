@@ -6,7 +6,7 @@
     "predev": "uv --cache-dir ../../.uv-cache sync --project ../.. --all-packages --all-groups --locked",
     "dev": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser python -m card_reader_parser.main",
     "build": "echo \"Python service has no build step\"",
-    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser pytest -q",
+    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser pytest -q --durations=20 --durations-min=0.5",
     "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser ruff check src",
     "fix": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser ruff check src --fix",
     "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-parser mypy src"

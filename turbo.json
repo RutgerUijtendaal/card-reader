@@ -1,11 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": [
-    "services/core/src/**",
-    "services/api/src/**",
-    "services/parser/src/**",
-    "services/*/pyproject.toml"
-  ],
+  "globalDependencies": ["package.json", "pnpm-lock.yaml", "pyproject.toml", "uv.lock"],
   "tasks": {
     "dev": {
       "cache": false,
@@ -25,7 +20,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "lint": {
       "outputs": []

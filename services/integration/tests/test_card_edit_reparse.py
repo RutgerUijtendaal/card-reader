@@ -1,25 +1,28 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from helpers import FIXTURES_ROOT, load_case, load_db_state
+
+if TYPE_CHECKING:
+    from card_reader_parser.parsers.card_parser import CardParser
 
 CASE_PATH = Path(__file__).resolve().parent / "fixtures" / "parser_db_cases" / "silver_stake_full_flow_case.json"
 
 
-def test_reparse_preserves_manual_fields_and_metadata_groups() -> None:
+def test_reparse_preserves_manual_fields_and_metadata_groups(
+    integration_card_parser: CardParser,
+) -> None:
     from card_reader_core.repositories.cards import get_latest_card_version, update_latest_card_version
     from card_reader_core.repositories.import_jobs import create_import_job
     from card_reader_core.repositories.metadata import get_tags_for_card_version
     from card_reader_core.services.parser_jobs import ImportProcessorService
-    from card_reader_parser.parsers.card_parser import CardParser
 
     case = load_case(CASE_PATH)
     image_path = (FIXTURES_ROOT / case["input"]["image"]).resolve()
 
-    parser = CardParser()
-    processor = ImportProcessorService(parser)
+    processor = ImportProcessorService(integration_card_parser)
 
     first_job = create_import_job(
         source_path=image_path,
@@ -67,7 +70,9 @@ def test_reparse_preserves_manual_fields_and_metadata_groups() -> None:
     assert _snapshot_metadata_tags(reparsed_state) == original_tag_keys
 
 
-def test_targeted_reparse_can_switch_template_without_creating_new_version() -> None:
+def test_targeted_reparse_can_switch_template_without_creating_new_version(
+    integration_card_parser: CardParser,
+) -> None:
     from card_reader_core.models import Template
     from card_reader_core.repositories.cards import get_latest_card_version, update_latest_card_version
     from card_reader_core.repositories.import_jobs import (
@@ -76,13 +81,11 @@ def test_targeted_reparse_can_switch_template_without_creating_new_version() -> 
         create_import_job_with_files,
     )
     from card_reader_core.services.parser_jobs import ImportProcessorService
-    from card_reader_parser.parsers.card_parser import CardParser
 
     case = load_case(CASE_PATH)
     image_path = (FIXTURES_ROOT / case["input"]["image"]).resolve()
 
-    parser = CardParser()
-    processor = ImportProcessorService(parser)
+    processor = ImportProcessorService(integration_card_parser)
 
     first_job = create_import_job(
         source_path=image_path,

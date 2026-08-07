@@ -4,11 +4,16 @@ import logging
 import shutil
 from pathlib import Path
 from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
-from catalog_seed import build_catalog_preflight, seed_integration_catalog
+from catalog_seed import build_catalog_preflight, check_ocr_runtime, seed_integration_catalog
 from runtime import configure_test_environment
+
+if TYPE_CHECKING:
+    from card_reader_parser.parsers.card_parser import CardParser
+    from card_reader_parser.parsers.ocr_runner import OcrRunner
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -29,6 +34,24 @@ def integration_runtime() -> Path:
 
     call_command("migrate", interactive=False, verbosity=0)
     return runtime_root
+
+
+@pytest.fixture(scope="session", autouse=True)
+def integration_ocr_runner(integration_runtime: Path) -> OcrRunner:
+    from card_reader_parser.parsers.ocr_runner import OcrRunner
+
+    runner = OcrRunner()
+    issues = check_ocr_runtime(runner)
+    if issues:
+        raise RuntimeError("\n".join(issues))
+    return runner
+
+
+@pytest.fixture(scope="session")
+def integration_card_parser(integration_ocr_runner: OcrRunner) -> CardParser:
+    from card_reader_parser.parsers.card_parser import CardParser
+
+    return CardParser(ocr_runner=integration_ocr_runner)
 
 
 @pytest.fixture(scope="session", autouse=True)

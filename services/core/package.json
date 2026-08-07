@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "echo \"Core has no standalone dev process\"",
     "build": "echo \"Core has no build step\"",
-    "test": "echo \"No core tests yet\"",
+    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-core pytest -q --durations=20 --durations-min=0.5",
     "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-core ruff check src",
     "fix": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-core ruff check src --fix",
     "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-core mypy src"
