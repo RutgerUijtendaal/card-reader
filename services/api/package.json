@@ -13,7 +13,7 @@
     "dev:tts-sheets": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py run_tts_sheet_renderer",
     "dev": "pnpm run migrate && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py seed_users && uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api python manage.py runserver 127.0.0.1:8000",
     "build": "echo \"Python service has no build step\"",
-    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api pytest -q",
+    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api pytest -q --durations=20 --durations-min=0.5",
     "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api ruff check src tests",
     "fix": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api ruff check src tests --fix",
     "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-api mypy src"

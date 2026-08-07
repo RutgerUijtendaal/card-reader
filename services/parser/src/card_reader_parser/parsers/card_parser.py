@@ -33,10 +33,10 @@ AFFINITY = "affinity"
 
 
 class CardParser:
-    def __init__(self) -> None:
+    def __init__(self, *, ocr_runner: OcrRunner | None = None) -> None:
         self._template_service = TemplateService()
         self._cropper = RegionCropper()
-        self._ocr_runner = OcrRunner()
+        self._ocr_runner = ocr_runner if ocr_runner is not None else OcrRunner()
         self._symbol_detector = SymbolDetector()
         self._metadata_extractor = KnownMetadataExtractor()
         self._name_mana_cost_parser = NameManaCostParser(self._ocr_runner, self._symbol_detector)

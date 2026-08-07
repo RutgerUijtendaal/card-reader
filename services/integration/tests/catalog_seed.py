@@ -11,6 +11,7 @@ from runtime import REPO_ROOT
 
 if TYPE_CHECKING:
     from card_reader_core.models import Keyword, Tag, Type
+    from card_reader_parser.parsers.ocr_runner import OcrRunner
 
 CATALOG_ROOT = Path(__file__).resolve().parent / "fixtures" / "catalog"
 CATALOG_FILES = {
@@ -66,18 +67,15 @@ def build_catalog_preflight() -> list[str]:
             asset_path.read_bytes()
         except OSError as exc:
             issues.append(f"Unreadable catalog symbol asset: {asset_path} ({exc})")
-    issues.extend(_check_ocr_runtime())
     return issues
 
 
-def _check_ocr_runtime() -> list[str]:
+def check_ocr_runtime(runner: OcrRunner) -> list[str]:
     from PIL import Image
 
-    from card_reader_parser.parsers.ocr_runner import OcrRunner
     from card_reader_parser.parsers.region_config import build_ocr_engine_config
 
     issues: list[str] = []
-    runner = OcrRunner()
     engine = runner._get_ocr_engine(build_ocr_engine_config(None))
     if engine is None:
         issues.append("Failed to initialize PaddleOCR for integration tests.")

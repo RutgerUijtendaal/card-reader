@@ -7,7 +7,7 @@ from pathlib import Path
 TEST_STORAGE_ROOT = Path(tempfile.mkdtemp(prefix="card-reader-api-tests-"))
 os.environ["CARD_READER_APP_DATA_DIR"] = str(TEST_STORAGE_ROOT)
 os.environ["CARD_READER_ENV"] = "test"
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_api.project.settings")
+os.environ["DJANGO_SETTINGS_MODULE"] = "card_reader_api.project.test_settings"
 
 import django  # noqa: E402
 from card_reader_core.database.connection import initialize_database  # noqa: E402

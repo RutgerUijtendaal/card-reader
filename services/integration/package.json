@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "echo \"Integration test package has no build step\"",
-    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-integration pytest --tb=long -vv",
+    "test": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-integration pytest --tb=long -vv --durations=20 --durations-min=0.5",
     "lint": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-integration ruff check tests",
     "typecheck": "uv --cache-dir ../../.uv-cache run --project ../.. --package card-reader-integration mypy tests"
   }

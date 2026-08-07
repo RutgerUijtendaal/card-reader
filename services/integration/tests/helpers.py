@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from card_reader_core.models import CardVersion
+    from card_reader_parser.parsers.card_parser import CardParser
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures"
 UNORDERED_LIST_PATH_SUFFIXES = {
@@ -35,16 +36,14 @@ def load_case(case_path: Path) -> dict[str, Any]:
     return json.loads(case_path.read_text(encoding="utf-8"))
 
 
-def run_case(case_path: Path) -> dict[str, Any]:
+def run_case(case_path: Path, parser: CardParser) -> dict[str, Any]:
     from card_reader_core.repositories.import_jobs import create_import_job
     from card_reader_core.services.parser_jobs import ImportProcessorService
-    from card_reader_parser.parsers.card_parser import CardParser
 
     case = load_case(case_path)
     image_path = (FIXTURES_ROOT / case["input"]["image"]).resolve()
     assert image_path.exists(), f"Fixture image does not exist: {image_path}"
 
-    parser = CardParser()
     processor = ImportProcessorService(parser)
     job = create_import_job(
         source_path=image_path,
