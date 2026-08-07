@@ -434,20 +434,19 @@ function spawnDirectCard(job, request)
     job.expected_spawns = job.expected_spawns + 1
     job.spawn_index = job.spawn_index + 1
 
-    spawnObject({
+    local spawned_object = spawnObject({
         type = "CardCustom",
         position = spawn_position,
-        callback_function = function(spawned_object)
-            spawned_object.setCustomObject({
-                face = verifiedAssetUrl(request.front_url),
-                back = job.payload.card_back_url,
-                type = 0,
-                sideways = false,
-            })
-            local reloaded_object = spawned_object.reload() or spawned_object
-            applyDirectCardMetadata(reloaded_object, request)
-            table.insert(job.spawned, reloaded_object)
+        callback_function = function(ready_object)
+            applyDirectCardMetadata(ready_object, request)
+            table.insert(job.spawned, ready_object)
         end,
+    })
+    spawned_object.setCustomObject({
+        face = verifiedAssetUrl(request.front_url),
+        back = job.payload.card_back_url,
+        type = 0,
+        sideways = false,
     })
 end
 
