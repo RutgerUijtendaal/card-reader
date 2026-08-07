@@ -830,49 +830,70 @@ function deepCopy(value)
     return result
 end
 
+local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local BASE64_VALUES = {}
+local BASE64_OUTPUT_CHUNK_SIZE = 1024
+
+for index = 1, #BASE64_ALPHABET do
+    BASE64_VALUES[string.sub(BASE64_ALPHABET, index, index)] = index - 1
+end
+
 function base64Decode(input)
-    local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    local clean = cleanBase64Input(input, alphabet)
-    local bits = {}
+    if type(input) ~= "string" then
+        error("Base64 input must be a string.")
+    end
 
-    for index = 1, #clean do
-        local character = string.sub(clean, index, index)
-        if character ~= "=" then
-            local offset = string.find(alphabet, character, 1, true)
-            if offset == nil then
-                error("Invalid base64 character: " .. character)
-            end
-
-            local value = offset - 1
-            for shift = 5, 0, -1 do
-                table.insert(bits, bit32.extract(value, shift, 1))
-            end
-        end
+    local clean = string.gsub(input, "%s", "")
+    if #clean == 0 or #clean % 4 ~= 0 then
+        error("Invalid base64 input length.")
     end
 
     local output = {}
-    for index = 1, #bits, 8 do
-        if index + 7 <= #bits then
-            local byte = 0
-            for shift = 0, 7 do
-                byte = byte + bit32.lshift(bits[index + shift], 7 - shift)
-            end
-            table.insert(output, string.char(byte))
+    local output_chunk = {}
+
+    for index = 1, #clean, 4 do
+        local character1 = string.sub(clean, index, index)
+        local character2 = string.sub(clean, index + 1, index + 1)
+        local character3 = string.sub(clean, index + 2, index + 2)
+        local character4 = string.sub(clean, index + 3, index + 3)
+        local is_last_group = index + 3 == #clean
+
+        if character1 == "="
+            or character2 == "="
+            or (character3 == "=" and character4 ~= "=")
+            or ((character3 == "=" or character4 == "=") and not is_last_group) then
+            error("Invalid base64 padding near position " .. tostring(index) .. ".")
         end
+
+        local value1 = BASE64_VALUES[character1]
+        local value2 = BASE64_VALUES[character2]
+        local value3 = character3 == "=" and 0 or BASE64_VALUES[character3]
+        local value4 = character4 == "=" and 0 or BASE64_VALUES[character4]
+        if value1 == nil or value2 == nil or value3 == nil or value4 == nil then
+            error("Invalid base64 character near position " .. tostring(index) .. ".")
+        end
+
+        local byte1 = (value1 * 4) + math.floor(value2 / 16)
+        local byte2 = ((value2 % 16) * 16) + math.floor(value3 / 4)
+        local byte3 = ((value3 % 4) * 64) + value4
+
+        if character3 == "=" then
+            output_chunk[#output_chunk + 1] = string.char(byte1)
+        elseif character4 == "=" then
+            output_chunk[#output_chunk + 1] = string.char(byte1, byte2)
+        else
+            output_chunk[#output_chunk + 1] = string.char(byte1, byte2, byte3)
+        end
+
+        if #output_chunk >= BASE64_OUTPUT_CHUNK_SIZE then
+            output[#output + 1] = table.concat(output_chunk)
+            output_chunk = {}
+        end
+    end
+
+    if #output_chunk > 0 then
+        output[#output + 1] = table.concat(output_chunk)
     end
 
     return table.concat(output)
-end
-
-function cleanBase64Input(input, alphabet)
-    local clean = {}
-
-    for index = 1, #input do
-        local character = string.sub(input, index, index)
-        if character == "=" or string.find(alphabet, character, 1, true) ~= nil then
-            table.insert(clean, character)
-        end
-    end
-
-    return table.concat(clean)
 end
