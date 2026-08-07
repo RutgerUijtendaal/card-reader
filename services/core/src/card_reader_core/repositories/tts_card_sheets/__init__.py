@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 import hashlib
 import json
 from pathlib import Path
@@ -324,11 +324,38 @@ def get_sheet_with_slots(sheet_id: str) -> TtsCardSheet | None:
     )
 
 
+def get_sheet_rendered_checksums(sheet_ids: list[str]) -> dict[str, str]:
+    if not sheet_ids:
+        return {}
+    return {
+        str(sheet_id): str(rendered_checksum)
+        for sheet_id, rendered_checksum in TtsCardSheet.objects.filter(id__in=sheet_ids).values_list(
+            "id", "rendered_checksum"
+        )
+    }
+
+
 def list_sheet_ids_needing_render(sheet_ids: list[str]) -> list[str]:
     return list(
         TtsCardSheet.objects.filter(id__in=sheet_ids, desired_revision__gt=F("rendered_revision"))
         .order_by("sequence")
         .values_list("id", flat=True)
+    )
+
+
+def release_render_claim(*, sheet_id: str, claimed_at: datetime | None = None) -> None:
+    if claimed_at is None:
+        return
+    TtsCardSheet.objects.filter(id=sheet_id, render_claimed_at=claimed_at).update(
+        render_claimed_at=None,
+        updated_at=now_utc(),
+    )
+
+
+def release_all_render_claims() -> int:
+    return TtsCardSheet.objects.filter(render_claimed_at__isnull=False).update(
+        render_claimed_at=None,
+        updated_at=now_utc(),
     )
 
 
@@ -495,6 +522,7 @@ __all__ = [
     "claim_sheet_for_render",
     "ensure_sheet_render_requested",
     "get_card_sheet_assignments",
+    "get_sheet_rendered_checksums",
     "get_sheet_with_slots",
     "iter_usable_card_source_batches",
     "list_sheet_ids_needing_render",
@@ -502,6 +530,8 @@ __all__ = [
     "mark_render_failed",
     "mark_render_succeeded",
     "prioritize_sheets",
+    "release_all_render_claims",
+    "release_render_claim",
     "request_sheet_rerender",
     "resolve_tts_card_image_path",
     "sync_card_sources",

@@ -5,10 +5,12 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from uuid import uuid4
 
+import pytest
 from django.db import close_old_connections
 from django.test import Client
 from PIL import Image
 
+from card_reader_api.management.commands.run_tts_sheet_renderer import _process_claimed_sheet
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
     Card,
@@ -21,6 +23,7 @@ from card_reader_core.models import (
 )
 from card_reader_core.services.card_merges import merge_cards
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
+from card_reader_core.services.tts_card_sheets import renderer as tts_sheet_renderer
 from card_reader_core.storage import build_storage_relative_path
 
 
@@ -174,6 +177,81 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
     assert head.content == b""
     assert not_modified.status_code == 304
     assert not_modified["ETag"] == second["ETag"]
+
+
+def test_failed_metadata_publish_keeps_previous_sheet_revision_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    TtsCardSheet.objects.all().delete()
+    card = _create_sheet_card("atomic-publish", color=(20, 40, 60))
+    service = TtsCardSheetService()
+    sheet_ids = service.sync_cards([card.id])
+    service.render_sheets_now(sorted(sheet_ids))
+    sheet = TtsCardSheet.objects.get(id=next(iter(sheet_ids)))
+    client = Client(HTTP_HOST="localhost")
+    first = client.get(f"/tts/card-sheets/{sheet.id}/image.webp")
+    first_body = b"".join(first.streaming_content)
+
+    previous = card.latest_version
+    assert previous is not None
+    previous.is_latest = False
+    previous.save(update_fields=["is_latest", "updated_at"])
+    latest = _create_version(
+        card,
+        "atomic-publish-latest",
+        color=(180, 20, 40),
+        version_number=2,
+    )
+    card.latest_version = latest
+    card.save(update_fields=["latest_version", "updated_at"])
+    changed_sheet_ids = service.sync_cards([card.id])
+
+    def fail_metadata_publish(**_kwargs: object) -> TtsCardSheet:
+        raise RuntimeError("database write failed")
+
+    monkeypatch.setattr(tts_sheet_renderer, "mark_render_succeeded", fail_metadata_publish)
+    with pytest.raises(tts_sheet_renderer.TtsCardSheetRenderError, match="database write failed"):
+        service.render_sheets_now(sorted(changed_sheet_ids))
+
+    second = client.get(f"/tts/card-sheets/{sheet.id}/image.webp")
+    second_body = b"".join(second.streaming_content)
+    assert second.status_code == 200
+    assert second["ETag"] == first["ETag"]
+    assert second["Last-Modified"] == first["Last-Modified"]
+    assert second_body == first_body
+
+
+def test_renderer_recovery_releases_orphaned_claims() -> None:
+    TtsCardSheet.objects.all().delete()
+    claimed_at = now_utc()
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_997,
+        desired_revision=1,
+        rendered_revision=0,
+        render_claimed_at=claimed_at,
+    )
+
+    TtsCardSheetService().recover_renderer()
+
+    sheet.refresh_from_db()
+    assert sheet.render_claimed_at is None
+
+
+def test_renderer_stop_releases_the_claim_before_processing() -> None:
+    TtsCardSheet.objects.all().delete()
+    claimed_at = now_utc()
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_996,
+        desired_revision=1,
+        rendered_revision=0,
+        render_claimed_at=claimed_at,
+    )
+
+    _process_claimed_sheet(sheet, lambda: True)
+
+    sheet.refresh_from_db()
+    assert sheet.render_claimed_at is None
+    assert sheet.rendered_revision == 0
 
 
 def test_unknown_and_unrendered_sheet_responses_are_explicit() -> None:

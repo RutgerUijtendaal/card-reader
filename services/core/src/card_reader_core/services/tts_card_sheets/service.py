@@ -11,10 +11,12 @@ from card_reader_core.repositories.tts_card_sheets import (
     claim_sheet_for_render,
     ensure_sheet_render_requested,
     get_card_sheet_assignments,
+    get_sheet_rendered_checksums,
     iter_usable_card_source_batches,
     list_sheet_ids_needing_render,
     list_usable_card_sources,
     prioritize_sheets,
+    release_all_render_claims,
     request_sheet_rerender,
     sync_card_sources,
     sync_merged_card_source,
@@ -59,9 +61,7 @@ class TtsCardSheetService:
             assignments = get_card_sheet_assignments(card_ids)
             assigned_cards += len(assignments)
             all_sheet_ids.update(row.sheet_id for row in assignments.values())
-        missing_sheet_ids = [
-            sheet_id for sheet_id in all_sheet_ids if not tts_card_sheet_path(sheet_id).is_file()
-        ]
+        missing_sheet_ids = self._unavailable_sheet_ids(list(all_sheet_ids))
         request_sheet_rerender(missing_sheet_ids)
         affected_sheet_ids.update(missing_sheet_ids)
         if force:
@@ -95,9 +95,7 @@ class TtsCardSheetService:
         self.sync_cards(card_ids)
         assignments = get_card_sheet_assignments(card_ids)
         sheet_ids = list(dict.fromkeys(row.sheet_id for row in assignments.values()))
-        missing_sheet_ids = [
-            sheet_id for sheet_id in sheet_ids if not tts_card_sheet_path(sheet_id).is_file()
-        ]
+        missing_sheet_ids = self._unavailable_sheet_ids(sheet_ids)
         request_sheet_rerender(missing_sheet_ids)
         prioritize_sheets(sheet_ids)
         if settings.is_dev:
@@ -110,6 +108,10 @@ class TtsCardSheetService:
             request_sheet_rerender([sheet_id])
         else:
             ensure_sheet_render_requested([sheet_id])
+
+    def recover_renderer(self) -> TtsCardSheetReconciliationResult:
+        release_all_render_claims()
+        return self.reconcile_all(render=False)
 
     def render_sheets_now(self, sheet_ids: list[str]) -> int:
         rendered = 0
@@ -126,7 +128,7 @@ class TtsCardSheetService:
         deadline = time.monotonic() + max(0.0, timeout_seconds)
         while True:
             pending = list_sheet_ids_needing_render(sheet_ids)
-            unavailable = [sheet_id for sheet_id in sheet_ids if not tts_card_sheet_path(sheet_id).is_file()]
+            unavailable = self._unavailable_sheet_ids(sheet_ids)
             if not pending and not unavailable:
                 return
             if time.monotonic() >= deadline:
@@ -134,6 +136,16 @@ class TtsCardSheetService:
                     "One or more TTS card sheets are still being prepared. Try the export again shortly."
                 )
             time.sleep(0.1)
+
+    @staticmethod
+    def _unavailable_sheet_ids(sheet_ids: list[str]) -> list[str]:
+        rendered_checksums = get_sheet_rendered_checksums(sheet_ids)
+        return [
+            sheet_id
+            for sheet_id in sheet_ids
+            if not rendered_checksums.get(sheet_id)
+            or not tts_card_sheet_path(sheet_id, rendered_checksums[sheet_id]).is_file()
+        ]
 
 
 __all__ = [

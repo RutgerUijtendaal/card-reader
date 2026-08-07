@@ -102,7 +102,9 @@ TTS receives each face URL with the verification prefix:
 
 When a Card's latest artwork changes, Card Reader marks its sheet dirty. The background sheet renderer coalesces
 nearby changes, rebuilds the atlas atomically, and publishes a new `ETag` and monotonically newer `Last-Modified`
-value at the same URL.
+value at the same URL. Internally, each published atlas uses a checksum-versioned filename: the renderer finishes
+that immutable file before switching the database metadata, so requests cannot receive new bytes with stale cache
+headers.
 
 TTS verifies an asset once per game session. After publishing or promoting artwork:
 
@@ -117,6 +119,8 @@ card-back URL is immutable and remains the back that was current at export time.
 ### Sheet operations
 
 Production and local development run `run_tts_sheet_renderer` as a separate process using the existing API image.
+Renderer startup releases claims left by an interrupted previous process before reconciling sheet state. A graceful
+shutdown also releases a claim acquired immediately before the stop request.
 Useful maintenance commands are:
 
 ```text

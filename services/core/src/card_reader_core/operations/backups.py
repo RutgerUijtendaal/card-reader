@@ -411,19 +411,20 @@ def _discard_inconsistent_tts_sheet_atlases(*, database_path: Path, atlas_dir: P
         table_exists = connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tts_card_sheet'"
         ).fetchone()
-        expected_checksums = (
+        expected_files = (
             {
-                str(sheet_id): str(rendered_checksum)
+                f"{sheet_id}.{rendered_checksum}.webp": str(rendered_checksum)
                 for sheet_id, rendered_checksum in connection.execute(
                     "SELECT id, rendered_checksum FROM tts_card_sheet"
                 )
+                if rendered_checksum
             }
             if table_exists is not None
             else {}
         )
 
     for atlas_path in atlas_dir.glob("*.webp"):
-        expected_checksum = expected_checksums.get(atlas_path.stem, "")
+        expected_checksum = expected_files.get(atlas_path.name, "")
         if not expected_checksum or _sha256(atlas_path) != expected_checksum:
             atlas_path.unlink()
 

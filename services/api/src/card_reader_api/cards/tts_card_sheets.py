@@ -27,7 +27,7 @@ def _sheet_response(request: Request, sheet_id: str, *, include_body: bool) -> H
     sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
     if sheet is None:
         return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
-    path = tts_card_sheet_path(sheet_id)
+    path = tts_card_sheet_path(sheet_id, sheet.rendered_checksum)
     if sheet.published_at is None or not sheet.rendered_checksum or not path.is_file():
         TtsCardSheetService().request_render(sheet_id)
         unavailable_response = HttpResponse(

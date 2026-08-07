@@ -20,6 +20,9 @@ from card_reader_core.operations.backups import (
     validate_backup_archive,
 )
 
+_SHEET_BYTES = b"sheet"
+_SHEET_CHECKSUM = hashlib.sha256(_SHEET_BYTES).hexdigest()
+
 
 def test_create_backup_archive_captures_expected_runtime(tmp_path: Path) -> None:
     runtime_paths = _build_runtime(tmp_path / "runtime")
@@ -32,7 +35,7 @@ def test_create_backup_archive_captures_expected_runtime(tmp_path: Path) -> None
     file_paths = {entry["path"] for entry in manifest["files"]}
     assert f"db/{runtime_paths.database_path.name}" in file_paths
     assert "app_data/uploads/upload.txt" in file_paths
-    assert "app_data/tts-card-sheets/sheet-1.webp" in file_paths
+    assert f"app_data/tts-card-sheets/sheet-1.{_SHEET_CHECKSUM}.webp" in file_paths
     assert "app_data/maintenance/task.txt" in file_paths
     assert "public/images/card.png" in file_paths
     assert "public/symbols/symbol.svg" in file_paths
@@ -89,14 +92,22 @@ def test_restore_backup_archive_restores_runtime_state(tmp_path: Path) -> None:
     assert (target_runtime.app_data_dir / "uploads" / "upload.txt").read_text(encoding="utf-8") == "upload"
     assert (target_runtime.public_app_data_dir / "images" / "card.png").read_text(encoding="utf-8") == "image"
     assert (target_runtime.public_app_data_dir / "symbols" / "symbol.svg").read_text(encoding="utf-8") == "symbol"
-    assert (target_runtime.app_data_dir / "tts-card-sheets" / "sheet-1.webp").read_bytes() == b"sheet"
+    assert (
+        target_runtime.app_data_dir
+        / "tts-card-sheets"
+        / f"sheet-1.{_SHEET_CHECKSUM}.webp"
+    ).read_bytes() == _SHEET_BYTES
 
 
 def test_restore_discards_tts_atlas_that_does_not_match_snapshot_database(
     tmp_path: Path,
 ) -> None:
     source_runtime = _build_runtime(tmp_path / "source-runtime")
-    atlas_path = source_runtime.app_data_dir / "tts-card-sheets" / "sheet-1.webp"
+    atlas_path = (
+        source_runtime.app_data_dir
+        / "tts-card-sheets"
+        / f"sheet-1.{_SHEET_CHECKSUM}.webp"
+    )
     atlas_path.write_bytes(b"newer-sheet")
     archive = create_backup_archive(
         runtime_paths=source_runtime,
@@ -112,7 +123,11 @@ def test_restore_discards_tts_atlas_that_does_not_match_snapshot_database(
         healthcheck_url=None,
     )
 
-    assert not (target_runtime.app_data_dir / "tts-card-sheets" / "sheet-1.webp").exists()
+    assert not (
+        target_runtime.app_data_dir
+        / "tts-card-sheets"
+        / f"sheet-1.{_SHEET_CHECKSUM}.webp"
+    ).exists()
 
 
 def test_restore_backup_archive_extracts_under_writable_backup_root(
@@ -275,13 +290,15 @@ def _build_runtime(root: Path) -> RuntimePaths:
         )
         connection.execute(
             "INSERT INTO tts_card_sheet (id, rendered_checksum) VALUES (?, ?)",
-            ("sheet-1", hashlib.sha256(b"sheet").hexdigest()),
+            ("sheet-1", _SHEET_CHECKSUM),
         )
         connection.commit()
 
     _write_text(app_data_dir / "uploads" / "upload.txt", "upload")
     _write_text(app_data_dir / "maintenance" / "task.txt", "task")
-    (app_data_dir / "tts-card-sheets" / "sheet-1.webp").write_bytes(b"sheet")
+    (app_data_dir / "tts-card-sheets" / f"sheet-1.{_SHEET_CHECKSUM}.webp").write_bytes(
+        _SHEET_BYTES
+    )
     _write_text(app_data_dir / "logs" / "api.log", "log")
     _write_text(public_dir / "images" / "card.png", "image")
     _write_text(public_dir / "symbols" / "symbol.svg", "symbol")

@@ -48,8 +48,8 @@ class TtsCardSheetRenderError(RuntimeError):
     pass
 
 
-def tts_card_sheet_path(sheet_id: str) -> Path:
-    return settings.tts_card_sheets_dir / f"{sheet_id}.webp"
+def tts_card_sheet_path(sheet_id: str, rendered_checksum: str) -> Path:
+    return settings.tts_card_sheets_dir / f"{sheet_id}.{rendered_checksum}.webp"
 
 
 def get_tts_card_sheet_layout(version: int) -> TtsCardSheetLayout:
@@ -73,8 +73,8 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
             error=str(exc),
         )
         raise
-    target = tts_card_sheet_path(str(sheet.id))
-    target.parent.mkdir(parents=True, exist_ok=True)
+    output_dir = settings.tts_card_sheets_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:
         canvas = Image.new("RGB", layout.image_size, _BACKGROUND)
@@ -106,7 +106,7 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
         with tempfile.NamedTemporaryFile(
             prefix=f".{sheet.id}.",
             suffix=".webp.tmp",
-            dir=target.parent,
+            dir=output_dir,
             delete=False,
         ) as temporary:
             temporary_path = Path(temporary.name)
@@ -116,6 +116,7 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
                 raise TtsCardSheetRenderError("Rendered TTS sheet has unexpected dimensions.")
             validation_image.verify()
         rendered_checksum = _sha256_file(temporary_path)
+        target = tts_card_sheet_path(str(sheet.id), rendered_checksum)
         os.replace(temporary_path, target)
         temporary_path = None
         return mark_render_succeeded(
