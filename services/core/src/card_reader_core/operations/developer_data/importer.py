@@ -31,6 +31,7 @@ from card_reader_core.models import (
     TtsCardSheet,
     Type,
 )
+from card_reader_core.metadata import mana_family_sort_key
 
 from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle, sha256_file
 from .schema import DeveloperDataManifest, DeveloperDataPayload
@@ -254,6 +255,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
                 mana_cost=version.mana_cost,
                 mana_symbols_json=version.mana_symbols,
                 mana_value=version.mana_value,
+                mana_family_sort_key=mana_family_sort_key(version.symbol_keys),
                 attack=version.attack,
                 health=version.health,
                 rules_text_raw=version.rules_text_raw,

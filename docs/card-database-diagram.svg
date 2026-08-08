@@ -160,7 +160,7 @@
   <text class="title" x="1180" y="492">CardVersion</text>
   <text class="field" x="1155" y="520">parsed card snapshot</text>
   <text class="field" x="1155" y="545">name, type_line, rules_text</text>
-  <text class="field" x="1155" y="570">mana, stats, confidence</text>
+  <text class="field" x="1155" y="570">mana + mana-family sort key</text>
   <text class="field" x="1155" y="595">previous_version</text>
   <text class="field" x="1155" y="620">content_version</text>
 

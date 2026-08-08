@@ -9,6 +9,7 @@ from card_reader_api.cards.serializers import CardListFilterParams, card_payload
 from card_reader_core.repositories.cards import (
     CARD_SORT_MANA_ASC,
     CARD_SORT_MANA_DESC,
+    CARD_SORT_MANA_TYPE_ASC,
     CARD_SORT_NAME_ASC,
     CARD_SORT_TYPES_ASC,
     get_card_list_rows_by_version_ids,
@@ -29,11 +30,13 @@ MANA_TYPE_KEY = "mana"
 class GroupedGalleryItem(TypedDict):
     result_type: Literal["card", "card_group"]
     item_id: str
+    sort_card_id: str
     card_version_id: str | None
     group_id: str | None
     label: str
     name: str
     mana_value: int | None
+    mana_family_sort_key: int
     updated_at: datetime
     types: list["Type"]
 
@@ -52,6 +55,9 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
         mana_symbol_ids=filters["mana_symbol_ids"],
         mana_symbol_exclude_ids=filters["mana_symbol_exclude_ids"],
         mana_symbol_match=filters["mana_symbol_match"],
+        mana_family_keys=filters["mana_family_keys"],
+        mana_family_exclude_keys=filters["mana_family_exclude_keys"],
+        mana_family_match=filters["mana_family_match"],
         affinity_symbol_ids=filters["affinity_symbol_ids"],
         affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
         affinity_symbol_match=filters["affinity_symbol_match"],
@@ -94,11 +100,13 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
             _build_grouped_gallery_item(
                 result_type="card",
                 item_id=row.version.card.id,
+                sort_card_id=row.version.card.id,
                 card_version_id=row.version.id,
                 group_id=None,
                 label=row.version.card.label,
                 name=row.version.name,
                 mana_value=row.version.mana_value,
+                mana_family_sort_key=row.version.mana_family_sort_key,
                 updated_at=row.version.updated_at,
                 types=row.types,
             )
@@ -123,11 +131,13 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
             _build_grouped_gallery_item(
                 result_type="card_group",
                 item_id=group.id,
+                sort_card_id=group.anchor_card.id,
                 card_version_id=None,
                 group_id=group.id,
                 label=group.anchor_card.label,
                 name=anchor_version.name,
                 mana_value=anchor_version.mana_value,
+                mana_family_sort_key=anchor_version.mana_family_sort_key,
                 updated_at=anchor_version.updated_at,
                 types=anchor_metadata.get(anchor_version.id, {"types": []})["types"],
             )
@@ -155,22 +165,26 @@ def _build_grouped_gallery_item(
     *,
     result_type: Literal["card", "card_group"],
     item_id: str,
+    sort_card_id: str,
     card_version_id: str | None,
     group_id: str | None,
     label: str,
     name: str,
     mana_value: int | None,
+    mana_family_sort_key: int,
     updated_at: datetime,
     types: list["Type"],
 ) -> GroupedGalleryItem:
     return {
         "result_type": result_type,
         "item_id": item_id,
+        "sort_card_id": sort_card_id,
         "card_version_id": card_version_id,
         "group_id": group_id,
         "label": label,
         "name": name,
         "mana_value": mana_value,
+        "mana_family_sort_key": mana_family_sort_key,
         "updated_at": updated_at,
         "types": types,
     }
@@ -233,6 +247,13 @@ def _grouped_gallery_sort_key(
         return (mana_value is None, mana_value if mana_value is not None else 0, name, item_id)
     if sort == CARD_SORT_MANA_DESC:
         return (mana_value is None, -(mana_value if mana_value is not None else 0), name, item_id)
+    if sort == CARD_SORT_MANA_TYPE_ASC:
+        return (
+            item["mana_family_sort_key"],
+            item["name"],
+            item["label"],
+            item["sort_card_id"],
+        )
     if sort == CARD_SORT_TYPES_ASC:
         bucket, linked_card_count, type_label = _grouped_gallery_type_sort_value(item["types"], type_sort_lookup)
         return (bucket, -linked_card_count, type_label, name, label, item_id)

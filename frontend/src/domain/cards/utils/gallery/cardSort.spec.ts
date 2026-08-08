@@ -70,4 +70,20 @@ describe('cardSort type sorting', () => {
 
     expect(compareCardSort(multiTypeCard, creatureCard, 'types_asc', lookup)).toBeLessThan(0);
   });
+
+  test('sorts by the server-provided mana-family rank before name', () => {
+    const arcane = { ...buildCard('arcane', 'Zulu', []), mana_family_sort_key: 0 };
+    const dark = { ...buildCard('dark', 'Alpha', []), mana_family_sort_key: 1 };
+    const noFamily = buildCard('none', 'Beta', []);
+
+    expect(compareCardSort(arcane, dark, 'mana_type_asc')).toBeLessThan(0);
+    expect(compareCardSort(dark, noFamily, 'mana_type_asc')).toBeLessThan(0);
+  });
+
+  test('uses backend-compatible exact text tie-breakers for mana-family sorting', () => {
+    const uppercase = { ...buildCard('uppercase', 'Zoo', []), mana_family_sort_key: 0 };
+    const lowercase = { ...buildCard('lowercase', 'alpha', []), mana_family_sort_key: 0 };
+
+    expect(compareCardSort(uppercase, lowercase, 'mana_type_asc')).toBeLessThan(0);
+  });
 });

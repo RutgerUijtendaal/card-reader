@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,17 +11,20 @@ from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: 
 from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata import (  # noqa: E402
+    delete_symbol,
     get_tags_for_card_version,
     replace_card_version_keywords,
     replace_card_version_symbols,
     replace_card_version_tags,
     replace_card_version_types,
+    update_symbol,
 )
 from card_reader_core.services.imports import ImportService  # noqa: E402
 from card_reader_core.services.parser_jobs import ImportProcessorService  # noqa: E402
 from card_reader_core.config.settings import settings  # noqa: E402
 from card_reader_core.storage import build_storage_relative_path, relativize_image_storage_path, resolve_storage_path  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
+from django.apps import apps  # noqa: E402
 from django.db import connection  # noqa: E402
 from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
 from django.test.utils import CaptureQueriesContext  # noqa: E402
@@ -1074,6 +1078,26 @@ def test_filters_payload_keeps_symbol_asset_urls_public() -> None:
     assert returned["asset_url"] == "/symbols/assets/mana/test-symbol.svg"
 
 
+def test_filters_payload_includes_the_ordered_mana_family_catalog() -> None:
+    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
+    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+
+    response = Client(HTTP_HOST="localhost").get("/cards/filters")
+
+    assert response.status_code == 200
+    families = response.json()["mana_families"]
+    assert [(row["key"], row["label"], row["rank"]) for row in families] == [
+        ("arcane", "Arcane", 0),
+        ("dark", "Dark", 1),
+        ("divine", "Divine", 2),
+        ("martial", "Martial", 3),
+        ("occult", "Occult", 4),
+        ("primal", "Primal", 5),
+    ]
+    assert families[0]["mana_symbol"]["id"] == arcane_mana.id
+    assert families[0]["affinity_symbol"]["id"] == arcane_affinity.id
+
+
 def test_filters_payload_includes_type_linked_card_counts() -> None:
     counted_type = _create_type(key="filters-counted-type", label="Filters Counted Type")
     _card, version = _create_editable_card_version(name="Filters Counted Card")
@@ -1597,6 +1621,13 @@ def test_cards_list_rejects_unknown_sort() -> None:
     assert "valid choice" in response.json()["detail"].lower()
 
 
+def test_cards_list_rejects_unknown_mana_family() -> None:
+    response = Client(HTTP_HOST="localhost").get("/cards", {"mana_family_keys": ["unknown"]})
+
+    assert response.status_code == 400
+    assert "valid choice" in response.json()["detail"].lower()
+
+
 def test_cards_list_supports_name_and_mana_sorting() -> None:
     low_card, low_version = _create_editable_card_version(name="Sort Probe Low Mana")
     high_card, high_version = _create_editable_card_version(name="Sort Probe High Mana")
@@ -1624,6 +1655,126 @@ def test_cards_list_supports_name_and_mana_sorting() -> None:
     mana_ids = [row["id"] for row in mana_response.json()["results"][:3]]
     assert name_ids == [alpha_card.id, high_card.id, low_card.id]
     assert mana_ids == [high_card.id, alpha_card.id, low_card.id]
+
+
+def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> None:
+    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
+    dark_affinity = _get_or_create_symbol(key="dark-affinity", label="Dark Affinity", symbol_type="affinity")
+    cards_and_versions = [
+        _create_editable_card_version(name="Family Sort Zeta Arcane"),
+        _create_editable_card_version(name="Family Sort Alpha Dark"),
+        _create_editable_card_version(name="Family Sort Beta Dual"),
+        _create_editable_card_version(name="Family Sort Gamma None"),
+    ]
+    for _card, version in cards_and_versions:
+        _create_card_image(version)
+    replace_card_version_symbols(card_version_id=cards_and_versions[0][1].id, symbol_ids=[arcane_mana.id])
+    replace_card_version_symbols(card_version_id=cards_and_versions[1][1].id, symbol_ids=[dark_affinity.id])
+    replace_card_version_symbols(
+        card_version_id=cards_and_versions[2][1].id,
+        symbol_ids=[arcane_mana.id, dark_affinity.id],
+    )
+
+    client = Client(HTTP_HOST="localhost")
+    first_response = client.get(
+        "/cards",
+        {"sort": "mana_type_asc", "q": "Family Sort", "page": 1, "page_size": 2},
+    )
+    second_response = client.get(
+        "/cards",
+        {"sort": "mana_type_asc", "q": "Family Sort", "page": 2, "page_size": 2},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert [row["id"] for row in first_response.json()["results"]] == [
+        cards_and_versions[0][0].id,
+        cards_and_versions[1][0].id,
+    ]
+    assert [row["id"] for row in second_response.json()["results"]] == [
+        cards_and_versions[2][0].id,
+        cards_and_versions[3][0].id,
+    ]
+    assert [row["mana_family_sort_key"] for row in first_response.json()["results"]] == [0, 1]
+    from card_reader_core.repositories.cards.queries import _apply_sql_card_sort
+
+    paginated_query = _apply_sql_card_sort(
+        CardVersion.objects.filter(name__icontains="Family Sort"),
+        "mana_type_asc",
+    ).values_list("id", flat=True)[:2]
+    sql = str(paginated_query.query)
+    assert "mana_family_sort_key" in sql
+    assert "ORDER BY" in sql
+    assert "LIMIT 2" in sql
+
+
+def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> None:
+    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
+    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+    dark_mana = _get_or_create_symbol(key="dark-mana", label="Dark Mana", symbol_type="mana")
+    rows = [
+        _create_editable_card_version(name="Family Filter Mana"),
+        _create_editable_card_version(name="Family Filter Affinity"),
+        _create_editable_card_version(name="Family Filter Dual"),
+        _create_editable_card_version(name="Family Filter Dark"),
+    ]
+    for _card, version in rows:
+        _create_card_image(version)
+    replace_card_version_symbols(card_version_id=rows[0][1].id, symbol_ids=[arcane_mana.id])
+    replace_card_version_symbols(card_version_id=rows[1][1].id, symbol_ids=[arcane_affinity.id])
+    replace_card_version_symbols(card_version_id=rows[2][1].id, symbol_ids=[arcane_affinity.id, dark_mana.id])
+    replace_card_version_symbols(card_version_id=rows[3][1].id, symbol_ids=[dark_mana.id])
+
+    client = Client(HTTP_HOST="localhost")
+    any_response = client.get("/cards", {"q": "Family Filter", "mana_family_keys": ["arcane"]})
+    all_response = client.get(
+        "/cards",
+        {
+            "q": "Family Filter",
+            "mana_family_keys": ["arcane", "dark"],
+            "mana_family_match": "all",
+        },
+    )
+    exclude_response = client.get(
+        "/cards",
+        {"q": "Family Filter", "mana_family_exclude_keys": ["arcane"]},
+    )
+
+    assert any_response.status_code == 200
+    assert all_response.status_code == 200
+    assert exclude_response.status_code == 200
+    assert {row["id"] for row in any_response.json()["results"]} == {
+        rows[0][0].id,
+        rows[1][0].id,
+        rows[2][0].id,
+    }
+    assert [row["id"] for row in all_response.json()["results"]] == [rows[2][0].id]
+    assert {row["id"] for row in exclude_response.json()["results"]} == {
+        rows[3][0].id,
+    }
+
+
+def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() -> None:
+    symbol = _get_or_create_symbol(key="family-sync-unmatched", label="Family Sync", symbol_type="affinity")
+    _card, version = _create_editable_card_version(name="Family Synchronization")
+    replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
+    version.refresh_from_db()
+    assert version.mana_family_sort_key == 63
+
+    update_symbol(entry_id=str(symbol.id), updates={"key": "primal-affinity"})
+    version.refresh_from_db()
+    assert version.mana_family_sort_key == 5
+
+    version.mana_family_sort_key = 63
+    version.save(update_fields=["mana_family_sort_key"])
+    migration = import_module("card_reader_core.migrations.0051_card_version_mana_family_sort_key")
+    migration.backfill_mana_family_sort_keys(apps, None)
+    version.refresh_from_db()
+    assert version.mana_family_sort_key == 5
+
+    assert delete_symbol(entry_id=str(symbol.id)) is True
+    version.refresh_from_db()
+    assert version.mana_family_sort_key == 63
 
 
 def test_cards_list_supports_type_sorting() -> None:
@@ -1756,6 +1907,36 @@ def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     assert results[1]["anchor_card_id"] == anchor_card.id
 
 
+def test_grouped_gallery_mana_family_sort_uses_the_anchor_version() -> None:
+    arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
+    dark_affinity = _get_or_create_symbol(key="dark-affinity", label="Dark Affinity", symbol_type="affinity")
+    group_anchor, anchor_version = _create_editable_card_version(name="Family Group Zeta Anchor")
+    group_member, member_version = _create_editable_card_version(name="Family Group Alpha Member")
+    standalone, standalone_version = _create_editable_card_version(name="Family Group Beta Standalone")
+    for version in (anchor_version, member_version, standalone_version):
+        _create_card_image(version)
+    replace_card_version_symbols(card_version_id=anchor_version.id, symbol_ids=[arcane_mana.id])
+    replace_card_version_symbols(card_version_id=member_version.id, symbol_ids=[dark_affinity.id])
+    replace_card_version_symbols(card_version_id=standalone_version.id, symbol_ids=[dark_affinity.id])
+    _create_card_group(
+        "mana-family-sorted-group",
+        anchor_card=group_anchor,
+        members=[group_anchor, group_member],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"show_groups": "true", "sort": "mana_type_asc", "q": "Family Group"},
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert results[0]["result_type"] == "card_group"
+    assert results[0]["anchor_card_id"] == group_anchor.id
+    assert results[1]["result_type"] == "card"
+    assert results[1]["id"] == standalone.id
+
+
 def test_grouped_gallery_paginates_before_hydrating_payloads() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Paged Group Beta Anchor")
     member_card, member_version = _create_editable_card_version(name="Paged Group Beta Member")
@@ -1834,6 +2015,27 @@ def test_export_cards_csv_honors_selected_sort() -> None:
     rows = response.content.decode("utf-8").splitlines()
     assert rows[1].split(",")[1] == "Sort Export Alpha Export"
     assert rows[2].split(",")[1] == "Sort Export Zebra Export"
+
+
+def test_export_cards_csv_honors_mana_family_sort() -> None:
+    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+    dark_mana = _get_or_create_symbol(key="dark-mana", label="Dark Mana", symbol_type="mana")
+    _dark_card, dark_version = _create_editable_card_version(name="Family Export Alpha Dark")
+    _arcane_card, arcane_version = _create_editable_card_version(name="Family Export Zeta Arcane")
+    _create_card_image(dark_version)
+    _create_card_image(arcane_version)
+    replace_card_version_symbols(card_version_id=dark_version.id, symbol_ids=[dark_mana.id])
+    replace_card_version_symbols(card_version_id=arcane_version.id, symbol_ids=[arcane_affinity.id])
+
+    response = _staff_client("csv-export-family-sort-user").get(
+        "/exports/csv",
+        {"sort": "mana_type_asc", "q": "Family Export"},
+    )
+
+    assert response.status_code == 200
+    rows = response.content.decode("utf-8").splitlines()
+    assert rows[1].split(",")[1] == "Family Export Zeta Arcane"
+    assert rows[2].split(",")[1] == "Family Export Alpha Dark"
 
 
 def test_card_detail_and_group_detail_include_card_group_membership() -> None:
@@ -3015,6 +3217,22 @@ def _staff_client(username: str) -> Client:
     client = Client(HTTP_HOST="localhost")
     client.force_login(user)
     return client
+
+
+def _get_or_create_symbol(*, key: str, label: str, symbol_type: str) -> Symbol:
+    symbol, _created = Symbol.objects.get_or_create(
+        key=key,
+        defaults={
+            "label": label,
+            "symbol_type": symbol_type,
+            "detector_type": "template",
+            "detection_config_json": {},
+            "text_enrichment_json": {},
+            "reference_assets_json": [],
+            "enabled": True,
+        },
+    )
+    return symbol
 
 
 def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:

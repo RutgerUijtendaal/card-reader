@@ -44,6 +44,7 @@ export type CardHoverTooltipModel = {
   mana_cost: string;
   mana_symbols: string[];
   mana_value: number | null;
+  mana_family_sort_key?: number;
   attack: number | null;
   health: number | null;
   rules_text: string;

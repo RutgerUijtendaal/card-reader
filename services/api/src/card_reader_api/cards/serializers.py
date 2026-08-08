@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from rest_framework import serializers
 
+from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
     CARD_LIFECYCLE_FILTER_VALUES,
     CARD_LIFECYCLE_STATUSES,
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
+MANA_FAMILY_KEYS = tuple(family.key for family in MANA_FAMILIES)
 MetadataOption = Keyword | Tag | Type
 SCALAR_FIELDS = {"name", "type_line", "mana_cost", "attack", "health", "rules_text"}
 METADATA_GROUPS = {"keywords", "tags", "types", "symbols"}
@@ -67,6 +69,7 @@ def card_payload(
         "mana_cost": version.mana_cost,
         "mana_symbols": _decode_mana_symbols(version.mana_symbols_json),
         "mana_value": version.mana_value,
+        "mana_family_sort_key": version.mana_family_sort_key,
         "attack": version.attack,
         "health": version.health,
         "rules_text_enriched": version.rules_text_enriched or version.rules_text,
@@ -229,6 +232,17 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     mana_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     mana_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     mana_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    mana_family_keys = serializers.ListField(
+        child=serializers.ChoiceField(choices=MANA_FAMILY_KEYS),
+        required=False,
+        allow_empty=True,
+    )
+    mana_family_exclude_keys = serializers.ListField(
+        child=serializers.ChoiceField(choices=MANA_FAMILY_KEYS),
+        required=False,
+        allow_empty=True,
+    )
+    mana_family_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
     affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     affinity_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     affinity_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
@@ -272,6 +286,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "mana_symbol_ids": self._string_list_or_none("mana_symbol_ids"),
             "mana_symbol_exclude_ids": self._string_list_or_none("mana_symbol_exclude_ids"),
             "mana_symbol_match": self._string_or_none("mana_symbol_match"),
+            "mana_family_keys": self._string_list_or_none("mana_family_keys"),
+            "mana_family_exclude_keys": self._string_list_or_none("mana_family_exclude_keys"),
+            "mana_family_match": self._string_or_none("mana_family_match"),
             "affinity_symbol_ids": self._string_list_or_none("affinity_symbol_ids"),
             "affinity_symbol_exclude_ids": self._string_list_or_none("affinity_symbol_exclude_ids"),
             "affinity_symbol_match": self._string_or_none("affinity_symbol_match"),

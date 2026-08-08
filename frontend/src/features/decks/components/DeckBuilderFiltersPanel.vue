@@ -16,7 +16,7 @@
         Setup
       </p>
       <p class="theme-section-muted text-sm">
-        Select a hero to continue. Use affinity to narrow the hero pool.
+        Select a hero to continue. Use mana type or unmatched affinity to narrow the hero pool.
       </p>
     </div>
 
@@ -35,8 +35,8 @@
 
     <CardFilterSections
       :state="controller.filters.filterSectionsState.value"
-      :visible-sections="controller.deck.isHeroStep.value ? ['affinity'] : undefined"
-      :default-open-sections="controller.deck.isHeroStep.value ? ['affinity'] : undefined"
+      :visible-sections="controller.deck.isHeroStep.value ? ['mana', 'affinity'] : undefined"
+      :default-open-sections="controller.deck.isHeroStep.value ? ['mana', 'affinity'] : undefined"
     />
 
     <template #footer>

@@ -9,7 +9,7 @@ export type CardTypeMetadata = {
   label: string;
 };
 
-export type CardSort = 'updated_desc' | 'name_asc' | 'mana_asc' | 'mana_desc' | 'types_asc';
+export type CardSort = 'updated_desc' | 'name_asc' | 'mana_asc' | 'mana_desc' | 'mana_type_asc' | 'types_asc';
 
 export type CardSortOption = {
   value: CardSort;
@@ -45,6 +45,11 @@ export const cardSortOptions: CardSortOption[] = [
     label: 'Mana Value High to Low',
     description: 'Sort cards by mana value from highest to lowest.',
   },
+  {
+    value: 'mana_type_asc',
+    label: 'Mana Type',
+    description: 'Sort by Arcane, Dark, Divine, Martial, Occult, Primal, multitype, then no mana type.',
+  },
 ];
 
 export const isCardSort = (value: unknown): value is CardSort =>
@@ -57,6 +62,7 @@ export const getCardSortCompactLabel = (sort: CardSort): string => {
   if (sort === 'name_asc') return 'Name';
   if (sort === 'mana_asc') return 'Mana ↑';
   if (sort === 'mana_desc') return 'Mana ↓';
+  if (sort === 'mana_type_asc') return 'Mana Type';
   if (sort === 'types_asc') return 'Types';
   return 'Updated';
 };
@@ -71,6 +77,7 @@ type SortableCardLike = {
   label: string;
   name: string;
   mana_value: number | null;
+  mana_family_sort_key?: number;
   updated_at: string;
   types?: CardTypeMetadata[];
 };
@@ -100,6 +107,11 @@ export const isManaTypeKey = (value: string): boolean => normalizeTypeKey(value)
 const parseTimestamp = (value: string): number => {
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const compareStableText = (left: string, right: string): number => {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 };
 
 export const buildTypeSortBuckets = (types: TypeSortMetadata[]): TypeSortBucket[] =>
@@ -203,6 +215,13 @@ export const compareCardSort = <TCard extends SortableCardLike>(
     if (leftMana !== null && rightMana === null) return -1;
     if (leftMana !== null && rightMana !== null && leftMana !== rightMana) return rightMana - leftMana;
     return left.name.localeCompare(right.name) || left.label.localeCompare(right.label) || left.id.localeCompare(right.id);
+  }
+  if (sort === 'mana_type_asc') {
+    return (left.mana_family_sort_key ?? Number.MAX_SAFE_INTEGER)
+      - (right.mana_family_sort_key ?? Number.MAX_SAFE_INTEGER)
+      || compareStableText(left.name, right.name)
+      || compareStableText(left.label, right.label)
+      || compareStableText(left.id, right.id);
   }
   if (sort === 'types_asc') {
     const leftType = getCardTypeSortValue(left, typeSortLookup);

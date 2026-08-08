@@ -16,11 +16,20 @@ export type SymbolFilterOption = MetadataOption & {
   asset_url: string | null;
 };
 
+export type ManaFamilyOption = {
+  key: string;
+  label: string;
+  rank: number;
+  mana_symbol: SymbolFilterOption | null;
+  affinity_symbol: SymbolFilterOption | null;
+};
+
 export type CardFiltersResponse = {
   keywords: MetadataOption[];
   tags: MetadataOption[];
   symbols: SymbolFilterOption[];
   types: MetadataOption[];
+  mana_families?: ManaFamilyOption[];
 };
 
 export type FieldSourceValue = 'auto' | 'manual';

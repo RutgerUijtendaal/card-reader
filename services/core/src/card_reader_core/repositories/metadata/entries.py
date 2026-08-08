@@ -2,10 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db import transaction
 from django.db.models import Count, Q
 
-from card_reader_core.models import CardVersion, Keyword, Symbol, Tag, Type, active_card_lifecycle_q, now_utc
+from card_reader_core.models import (
+    CardVersion,
+    CardVersionSymbol,
+    Keyword,
+    Symbol,
+    Tag,
+    Type,
+    active_card_lifecycle_q,
+    now_utc,
+)
 
+from .links import refresh_card_version_mana_family_sort_keys
 from .types import MetadataRow
 
 
@@ -156,9 +167,17 @@ def update_type(*, entry_id: str, updates: dict[str, object]) -> Type | None:
     return None if row is None else _update(row, updates)
 
 
+@transaction.atomic
 def update_symbol(*, entry_id: str, updates: dict[str, object]) -> Symbol | None:
     row = get_symbol(entry_id)
-    return None if row is None else _update(row, updates)
+    if row is None:
+        return None
+    linked_version_ids = list(
+        CardVersionSymbol.objects.filter(symbol_id=row.id).values_list("card_version_id", flat=True)
+    )
+    updated = _update(row, updates)
+    refresh_card_version_mana_family_sort_keys([str(version_id) for version_id in linked_version_ids])
+    return updated
 
 
 def delete_keyword(*, entry_id: str) -> bool:
@@ -176,8 +195,16 @@ def delete_type(*, entry_id: str) -> bool:
     return deleted > 0
 
 
+@transaction.atomic
 def delete_symbol(*, entry_id: str) -> bool:
-    deleted, _ = Symbol.objects.filter(id=entry_id).delete()
+    row = get_symbol(entry_id)
+    if row is None:
+        return False
+    linked_version_ids = list(
+        CardVersionSymbol.objects.filter(symbol_id=row.id).values_list("card_version_id", flat=True)
+    )
+    deleted, _ = row.delete()
+    refresh_card_version_mana_family_sort_keys([str(version_id) for version_id in linked_version_ids])
     return deleted > 0
 
 

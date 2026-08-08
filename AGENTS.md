@@ -115,6 +115,9 @@ Core stack:
   - paginated or query-backed card collections should sort in the backend
   - already-loaded embedded card collections may sort client-side for presentation
   - shared sort keys and semantics must stay aligned across both layers
+  - canonical mana-family order is Arcane, Dark, Divine, Martial, Occult, then Primal; changing it requires a release
+  - paired mana and affinity symbols represent the same canonical family for family sorting, filtering, and deck-builder hero presets
+  - query-backed mana-family sorting uses the indexed `CardVersion.mana_family_sort_key`; numeric colorless symbols and unmatched affinities stay in the no-family bucket
 - Card lifecycle status controls normal visibility:
   - `active` is the default for play/browsing surfaces such as gallery, grouped gallery, public group detail, catalog linked-card counts/previews, and exports.
   - `deprecated` cards should stay directly retrievable by id and available in explicit management/query flows such as `lifecycle_status=all` or `lifecycle_status=deprecated`.

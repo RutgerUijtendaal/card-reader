@@ -16,6 +16,14 @@ Card versions connect parsed content to managed catalogs such as card types, key
 
 Aliases provide alternate names or identifiers for the same card identity. They support matching and redirects without creating duplicate cards solely because an import used a different spelling or historical name.
 
+### Mana families
+
+The application owns six canonical mana families in a fixed release-time order: Arcane, Dark, Divine, Martial, Occult, and Primal. Each family's mana symbol and paired affinity symbol are aliases for the same family. The legacy `primla-affinity` symbol key remains readable as Primal for existing data, but APIs and UI state use `primal-affinity`.
+
+`CardVersion.mana_family_sort_key` stores an indexed rank derived from the version's linked symbols. Single-family cards use the six family ranks. Multitype cards follow them in lexicographic family-tuple order, and numeric colorless symbols, unmatched named affinities, and cards without a canonical symbol share the final no-family bucket. Replacing, renaming, or deleting linked symbols refreshes the stored rank so gallery queries can sort before pagination without deriving it per result.
+
+Card gallery APIs expose `sort=mana_type_asc` and canonical filters through repeated `mana_family_keys` and `mana_family_exclude_keys` parameters plus `mana_family_match=any|all`. A canonical filter matches either the mana or affinity representation. Existing mana- and affinity-symbol parameters remain literal and backward compatible. `GET /cards/filters` supplies the ordered `mana_families` catalog used by gallery filters, deck-builder hero selection, and hero-derived deck presets; unmatched affinities remain available in the separate Affinity filter.
+
 ## Lifecycle state
 
 Cards have an explicit lifecycle state:
@@ -42,4 +50,3 @@ Merges are domain operations, not raw row deletion. Conflict checks and a previe
 API views handle authorization, request validation, and response formatting. Core card, card-group, and card-merge services enforce lifecycle and relationship rules, while repositories own the underlying Django queries and writes.
 
 This separation keeps imports, staff tools, deck building, and future clients aligned on the same card behavior.
-

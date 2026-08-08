@@ -91,7 +91,8 @@ export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorF
 
   const applyHeroAffinityManaPreset = (hero: DeckCardSummary | null): void => {
     resetFilters();
-    const preset = buildHeroAffinityManaPreset(hero, filterController.filterCatalog.value.manaSymbols);
+    const catalog = filterController.filterCatalog.value;
+    const preset = buildHeroAffinityManaPreset(hero, catalog.manaSymbols, catalog.manaFamilyBySymbolKey);
     if (!preset) {
       return;
     }
@@ -112,6 +113,9 @@ export const useDeckEditorFilters = ({ deckCardIds, editorMode }: UseDeckEditorF
     return {
       ...createEmptyCardFilterSelectionState(),
       query: selection.query,
+      manaSymbolMatch: selection.manaSymbolMatch,
+      manaTypeSymbolIds: selection.manaTypeSymbolIds,
+      manaTypeSymbolExcludeIds: selection.manaTypeSymbolExcludeIds,
       affinitySymbolMatch: selection.affinitySymbolMatch,
       affinitySymbolIds: selection.affinitySymbolIds,
       affinitySymbolExcludeIds: selection.affinitySymbolExcludeIds,

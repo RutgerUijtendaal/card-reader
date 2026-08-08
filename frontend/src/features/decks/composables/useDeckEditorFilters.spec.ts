@@ -44,6 +44,43 @@ const buildFiltersResponse = (): CardFiltersResponse => ({
       asset_url: null,
     },
   ],
+  mana_families: [
+    {
+      key: 'arcane',
+      label: 'Arcane',
+      rank: 0,
+      mana_symbol: {
+        id: 'arcane-mana-id',
+        key: 'arcane-mana',
+        label: 'Arcane Mana',
+        symbol_type: 'mana',
+        text_token: '{AM}',
+        asset_url: null,
+      },
+      affinity_symbol: null,
+    },
+    {
+      key: 'martial',
+      label: 'Martial',
+      rank: 3,
+      mana_symbol: {
+        id: 'martial-mana-id',
+        key: 'martial-mana',
+        label: 'Martial Mana',
+        symbol_type: 'mana',
+        text_token: '{MM}',
+        asset_url: null,
+      },
+      affinity_symbol: {
+        id: 'martial-affinity-id',
+        key: 'martial-affinity',
+        label: 'Martial Affinity',
+        symbol_type: 'affinity',
+        text_token: '{AFFINITY:MARTIAL}',
+        asset_url: null,
+      },
+    },
+  ],
 });
 
 const buildHero = (): DeckCardSummary =>
@@ -194,12 +231,12 @@ describe('useDeckEditorFilters', () => {
     const params = controller.buildSearchParams();
     expect(controller.query.value).toBe('');
     expect(controller.currentDeckOnly.value).toBe(false);
-    expect(params.getAll('mana_symbol_ids')).toEqual(['martial-mana-id']);
-    expect(params.getAll('mana_symbol_exclude_ids')).toEqual(['arcane-mana-id']);
-    expect(params.get('mana_symbol_match')).toBe('any');
+    expect(params.getAll('mana_family_keys')).toEqual(['martial']);
+    expect(params.getAll('mana_family_exclude_keys')).toEqual(['arcane']);
+    expect(params.get('mana_family_match')).toBe('any');
   });
 
-  test('ignores hidden mana filters while selecting a hero in setup mode', async () => {
+  test('keeps canonical mana-family filters while selecting a hero in setup mode', async () => {
     mockedGet.mockResolvedValue({ data: buildFiltersResponse() });
     const editorMode = ref<DeckEditorMode>('cards');
     const controller = useDeckEditorFilters({
@@ -212,8 +249,8 @@ describe('useDeckEditorFilters', () => {
     editorMode.value = 'hero';
 
     const params = controller.buildSearchParams();
-    expect(params.getAll('mana_symbol_ids')).toEqual([]);
-    expect(params.getAll('mana_symbol_exclude_ids')).toEqual([]);
-    expect(params.get('mana_symbol_match')).toBeNull();
+    expect(params.getAll('mana_family_keys')).toEqual(['martial']);
+    expect(params.getAll('mana_family_exclude_keys')).toEqual(['arcane']);
+    expect(params.get('mana_family_match')).toBe('any');
   });
 });
