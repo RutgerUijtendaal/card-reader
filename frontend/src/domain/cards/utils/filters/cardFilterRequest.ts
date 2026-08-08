@@ -17,9 +17,9 @@ export type CardFilterApiPayload = {
   type_ids?: string[];
   type_exclude_ids?: string[];
   type_match?: 'any' | 'all';
-  mana_symbol_ids?: string[];
-  mana_symbol_exclude_ids?: string[];
-  mana_symbol_match?: 'any' | 'all';
+  mana_family_keys?: string[];
+  mana_family_exclude_keys?: string[];
+  mana_family_match?: 'any' | 'all';
   affinity_symbol_ids?: string[];
   affinity_symbol_exclude_ids?: string[];
   affinity_symbol_match?: 'any' | 'all';
@@ -60,11 +60,11 @@ export const buildCardFilterApiPayload = (
   }
   if (normalized.typeExcludeIds.length > 0) payload.type_exclude_ids = normalized.typeExcludeIds;
   if (normalized.manaTypeSymbolIds.length > 0) {
-    payload.mana_symbol_ids = normalized.manaTypeSymbolIds;
-    payload.mana_symbol_match = normalized.manaSymbolMatch;
+    payload.mana_family_keys = normalized.manaTypeSymbolIds;
+    payload.mana_family_match = normalized.manaSymbolMatch;
   }
   if (normalized.manaTypeSymbolExcludeIds.length > 0)
-    payload.mana_symbol_exclude_ids = normalized.manaTypeSymbolExcludeIds;
+    payload.mana_family_exclude_keys = normalized.manaTypeSymbolExcludeIds;
   if (normalized.affinitySymbolIds.length > 0) {
     payload.affinity_symbol_ids = normalized.affinitySymbolIds;
     payload.affinity_symbol_match = normalized.affinitySymbolMatch;
@@ -116,11 +116,11 @@ export const buildCardFilterApiSearchParams = (
     params.set('type_match', payload.type_match ?? normalized.typeMatch);
   }
   payload.type_exclude_ids?.forEach((id) => params.append('type_exclude_ids', id));
-  if (payload.mana_symbol_ids) {
-    payload.mana_symbol_ids.forEach((id) => params.append('mana_symbol_ids', id));
-    params.set('mana_symbol_match', payload.mana_symbol_match ?? normalized.manaSymbolMatch);
+  if (payload.mana_family_keys) {
+    payload.mana_family_keys.forEach((key) => params.append('mana_family_keys', key));
+    params.set('mana_family_match', payload.mana_family_match ?? normalized.manaSymbolMatch);
   }
-  payload.mana_symbol_exclude_ids?.forEach((id) => params.append('mana_symbol_exclude_ids', id));
+  payload.mana_family_exclude_keys?.forEach((key) => params.append('mana_family_exclude_keys', key));
   if (payload.affinity_symbol_ids) {
     payload.affinity_symbol_ids.forEach((id) => params.append('affinity_symbol_ids', id));
     params.set('affinity_symbol_match', payload.affinity_symbol_match ?? normalized.affinitySymbolMatch);

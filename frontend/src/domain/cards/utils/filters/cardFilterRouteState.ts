@@ -31,7 +31,7 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
     keywordMatch: query.keyword_match === 'all' ? 'all' : 'any',
     tagMatch: query.tag_match === 'all' ? 'all' : 'any',
     typeMatch: query.type_match === 'all' ? 'all' : 'any',
-    manaSymbolMatch: query.mana_symbol_match === 'all' ? 'all' : 'any',
+    manaSymbolMatch: query.mana_family_match === 'all' || query.mana_symbol_match === 'all' ? 'all' : 'any',
     affinitySymbolMatch: query.affinity_symbol_match === 'all' ? 'all' : 'any',
     devotionSymbolMatch: query.devotion_symbol_match === 'all' ? 'all' : 'any',
     otherSymbolMatch: query.other_symbol_match === 'all' ? 'all' : 'any',
@@ -44,8 +44,14 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
     healthMax: typeof query.health_max === 'string' ? query.health_max : '',
     keywordKeys: readQueryValues(query.keyword_keys),
     tagKeys: readQueryValues(query.tag_keys),
-    manaSymbolKeys: readQueryValues(query.mana_symbol_keys),
-    manaSymbolExcludeKeys: readQueryValues(query.mana_symbol_exclude_keys),
+    manaSymbolKeys: [
+      ...readQueryValues(query.mana_family_keys),
+      ...readQueryValues(query.mana_symbol_keys),
+    ],
+    manaSymbolExcludeKeys: [
+      ...readQueryValues(query.mana_family_exclude_keys),
+      ...readQueryValues(query.mana_symbol_exclude_keys),
+    ],
     affinitySymbolKeys: readQueryValues(query.affinity_symbol_keys),
     affinitySymbolExcludeKeys: readQueryValues(query.affinity_symbol_exclude_keys),
     devotionSymbolKeys: readQueryValues(query.devotion_symbol_keys),
@@ -66,7 +72,7 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
   if (normalized.tagMatch === 'all') query.tag_match = 'all';
   if (normalized.typeMatch === 'all') query.type_match = 'all';
-  if (normalized.manaSymbolMatch === 'all') query.mana_symbol_match = 'all';
+  if (normalized.manaSymbolMatch === 'all') query.mana_family_match = 'all';
   if (normalized.affinitySymbolMatch === 'all') query.affinity_symbol_match = 'all';
   if (normalized.devotionSymbolMatch === 'all') query.devotion_symbol_match = 'all';
   if (normalized.otherSymbolMatch === 'all') query.other_symbol_match = 'all';
@@ -79,9 +85,9 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   if (normalized.healthMax) query.health_max = normalized.healthMax;
   if (normalized.keywordKeys.length > 0) query.keyword_keys = normalized.keywordKeys;
   if (normalized.tagKeys.length > 0) query.tag_keys = normalized.tagKeys;
-  if (normalized.manaSymbolKeys.length > 0) query.mana_symbol_keys = normalized.manaSymbolKeys;
+  if (normalized.manaSymbolKeys.length > 0) query.mana_family_keys = normalized.manaSymbolKeys;
   if (normalized.manaSymbolExcludeKeys.length > 0)
-    query.mana_symbol_exclude_keys = normalized.manaSymbolExcludeKeys;
+    query.mana_family_exclude_keys = normalized.manaSymbolExcludeKeys;
   if (normalized.affinitySymbolKeys.length > 0)
     query.affinity_symbol_keys = normalized.affinitySymbolKeys;
   if (normalized.affinitySymbolExcludeKeys.length > 0)

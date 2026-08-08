@@ -21,8 +21,8 @@ const selection: CardFilterSelectionState = {
   healthMax: '',
   keywordIds: ['kw-1'],
   tagIds: ['tag-1'],
-  manaTypeSymbolIds: ['sym-1'],
-  manaTypeSymbolExcludeIds: ['sym-1'],
+  manaTypeSymbolIds: ['arcane'],
+  manaTypeSymbolExcludeIds: ['arcane'],
   affinitySymbolIds: ['sym-2'],
   affinitySymbolExcludeIds: ['sym-2'],
   devotionSymbolIds: ['sym-3'],
@@ -43,9 +43,9 @@ describe('cardFilterRequest', () => {
     expect(params.get('keyword_match')).toBe('all');
     expect(params.getAll('tag_ids')).toEqual(['tag-1']);
     expect(params.get('tag_match')).toBe('all');
-    expect(params.getAll('mana_symbol_ids')).toEqual(['sym-1']);
-    expect(params.getAll('mana_symbol_exclude_ids')).toEqual(['sym-1']);
-    expect(params.get('mana_symbol_match')).toBe('all');
+    expect(params.getAll('mana_family_keys')).toEqual(['arcane']);
+    expect(params.getAll('mana_family_exclude_keys')).toEqual(['arcane']);
+    expect(params.get('mana_family_match')).toBe('all');
     expect(params.getAll('affinity_symbol_ids')).toEqual(['sym-2']);
     expect(params.getAll('affinity_symbol_exclude_ids')).toEqual(['sym-2']);
     expect(params.get('affinity_symbol_match')).toBe('all');
@@ -68,8 +68,8 @@ describe('cardFilterRequest', () => {
       keyword_match: 'all',
       tag_ids: ['tag-1'],
       tag_match: 'all',
-      mana_symbol_ids: ['sym-1'],
-      mana_symbol_exclude_ids: ['sym-1'],
+      mana_family_keys: ['arcane'],
+      mana_family_exclude_keys: ['arcane'],
       affinity_symbol_ids: ['sym-2'],
       affinity_symbol_exclude_ids: ['sym-2'],
       devotion_symbol_ids: ['sym-3'],

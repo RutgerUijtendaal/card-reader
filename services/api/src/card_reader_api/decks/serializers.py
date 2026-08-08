@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
+from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
 from card_reader_core.models import (
     Card,
     CardVersion,
@@ -261,6 +262,8 @@ def deck_card_payload(card: Card) -> dict[str, object]:
             "type_line": "",
             "mana_cost": "",
             "mana_symbols": [],
+            "mana_value": None,
+            "mana_family_sort_key": NO_MANA_FAMILY_SORT_KEY,
             "attack": None,
             "health": None,
             "rules_text": "",

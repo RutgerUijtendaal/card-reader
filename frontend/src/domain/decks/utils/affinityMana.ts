@@ -1,16 +1,6 @@
 import type { CardHoverTooltipModel } from '@/domain/cards/types/cardModels';
 import type { SymbolFilterOption } from '@/domain/cards/types';
 
-export const AFFINITY_TO_MANA_SYMBOL_KEYS: Readonly<Record<string, readonly string[]>> = {
-  'arcane-affinity': ['arcane-mana'],
-  'dark-affinity': ['dark-mana'],
-  'divine-affinity': ['divine-mana'],
-  'martial-affinity': ['martial-mana'],
-  'occult-affinity': ['occult-mana'],
-  'primla-affinity': ['primal-mana'],
-  'primal-affinity': ['primal-mana'],
-};
-
 export type HeroAffinityManaPreset = {
   includedManaSymbolKeys: string[];
   excludedManaSymbolKeys: string[];
@@ -19,8 +9,12 @@ export type HeroAffinityManaPreset = {
 const uniqueSorted = (values: readonly string[]): string[] =>
   [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
 
-export const getManaSymbolKeysForAffinityKeys = (affinitySymbolKeys: readonly string[]): string[] =>
-  uniqueSorted(affinitySymbolKeys.flatMap((key) => AFFINITY_TO_MANA_SYMBOL_KEYS[key] ?? []));
+export const getManaSymbolKeysForAffinityKeys = (
+  affinitySymbolKeys: readonly string[],
+  manaFamilyBySymbolKey: Readonly<Record<string, string>>,
+): string[] => uniqueSorted(
+  affinitySymbolKeys.map((key) => manaFamilyBySymbolKey[key]).filter((key): key is string => Boolean(key)),
+);
 
 export const getHeroAffinitySymbolKeys = (hero: Pick<CardHoverTooltipModel, 'symbols'> | null): string[] => {
   if (!hero) {
@@ -36,12 +30,14 @@ export const getHeroAffinitySymbolKeys = (hero: Pick<CardHoverTooltipModel, 'sym
 export const buildHeroAffinityManaPreset = (
   hero: Pick<CardHoverTooltipModel, 'symbols'> | null,
   manaSymbols: readonly SymbolFilterOption[],
+  manaFamilyBySymbolKey: Readonly<Record<string, string>>,
 ): HeroAffinityManaPreset | null => {
   const manaSymbolKeys = uniqueSorted(manaSymbols.map((symbol) => symbol.key));
   const availableManaSymbolKeys = new Set(manaSymbolKeys);
-  const includedManaSymbolKeys = getManaSymbolKeysForAffinityKeys(getHeroAffinitySymbolKeys(hero)).filter((key) =>
-    availableManaSymbolKeys.has(key),
-  );
+  const includedManaSymbolKeys = getManaSymbolKeysForAffinityKeys(
+    getHeroAffinitySymbolKeys(hero),
+    manaFamilyBySymbolKey,
+  ).filter((key) => availableManaSymbolKeys.has(key));
 
   if (includedManaSymbolKeys.length === 0) {
     return null;

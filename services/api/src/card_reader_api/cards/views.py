@@ -68,6 +68,9 @@ class CardListView(APIView):
             mana_symbol_ids=filters["mana_symbol_ids"],
             mana_symbol_exclude_ids=filters["mana_symbol_exclude_ids"],
             mana_symbol_match=filters["mana_symbol_match"],
+            mana_family_keys=filters["mana_family_keys"],
+            mana_family_exclude_keys=filters["mana_family_exclude_keys"],
+            mana_family_match=filters["mana_family_match"],
             affinity_symbol_ids=filters["affinity_symbol_ids"],
             affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
             affinity_symbol_match=filters["affinity_symbol_match"],
@@ -126,12 +129,27 @@ class CardFiltersView(APIView):
 
     def get(self, _request: Request) -> Response:
         metadata = get_filter_metadata()
+        symbols_by_key = {symbol.key: symbol for symbol in metadata["symbols"]}
         return Response(
             {
                 "keywords": [metadata_option(row) for row in metadata["keywords"]],
                 "tags": [metadata_option(row) for row in metadata["tags"]],
                 "symbols": [symbol_option(row) for row in metadata["symbols"]],
                 "types": [metadata_option(row) for row in metadata["types"]],
+                "mana_families": [
+                    {
+                        "key": family.key,
+                        "label": family.label,
+                        "rank": family.rank,
+                        "mana_symbol": symbol_option(symbols_by_key[family.mana_symbol_key])
+                        if family.mana_symbol_key in symbols_by_key
+                        else None,
+                        "affinity_symbol": symbol_option(symbols_by_key[family.affinity_symbol_key])
+                        if family.affinity_symbol_key in symbols_by_key
+                        else None,
+                    }
+                    for family in metadata["mana_families"]
+                ],
             }
         )
 

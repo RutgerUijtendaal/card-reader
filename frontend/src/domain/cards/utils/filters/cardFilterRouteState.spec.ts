@@ -31,9 +31,22 @@ describe('cardFilterRouteState', () => {
     });
 
     expect(buildCardFilterRouteQuery(state)).toMatchObject({
+      mana_family_keys: ['mana-fire', 'mana-water'],
       type_keys: ['creature'],
       type_exclude_keys: ['spell'],
     });
+  });
+
+  test('parses canonical mana-family route params', () => {
+    const state = parseCardFilterRouteQuery({
+      mana_family_keys: ['arcane', 'dark'],
+      mana_family_exclude_keys: ['primal'],
+      mana_family_match: 'all',
+    });
+
+    expect(state.manaSymbolKeys).toEqual(['arcane', 'dark']);
+    expect(state.manaSymbolExcludeKeys).toEqual(['primal']);
+    expect(state.manaSymbolMatch).toBe('all');
   });
 
   test('round-trips non-default lifecycle status through route query state', () => {

@@ -30,6 +30,7 @@ from .snapshots import (
 from .types import (
     CARD_SORT_MANA_ASC,
     CARD_SORT_MANA_DESC,
+    CARD_SORT_MANA_TYPE_ASC,
     CARD_SORT_NAME_ASC,
     CARD_SORT_TYPES_ASC,
     CARD_SORT_UPDATED_DESC,
@@ -88,6 +89,7 @@ __all__ = [
     "apply_parsed_fields_to_version",
     "CARD_SORT_MANA_ASC",
     "CARD_SORT_MANA_DESC",
+    "CARD_SORT_MANA_TYPE_ASC",
     "CARD_SORT_NAME_ASC",
     "CARD_SORT_TYPES_ASC",
     "CARD_SORT_UPDATED_DESC",

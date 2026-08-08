@@ -14,7 +14,7 @@ const symbol = (key: string, symbolType: string): DeckCardSummary['symbols'][num
 });
 
 const manaOption = (key: string): SymbolFilterOption => ({
-  id: `${key}-id`,
+  id: key,
   key,
   label: key,
   linked_card_count: 1,
@@ -23,11 +23,20 @@ const manaOption = (key: string): SymbolFilterOption => ({
   asset_url: null,
 });
 
+const familyBySymbolKey = {
+  'arcane-affinity': 'arcane',
+  'divine-affinity': 'divine',
+  'martial-affinity': 'martial',
+};
+
 describe('affinity mana mapping', () => {
   test('maps standardized affinity keys to mana keys', () => {
-    expect(getManaSymbolKeysForAffinityKeys(['martial-affinity', 'arcane-affinity', 'martial-affinity'])).toEqual([
-      'arcane-mana',
-      'martial-mana',
+    expect(getManaSymbolKeysForAffinityKeys(
+      ['martial-affinity', 'arcane-affinity', 'martial-affinity'],
+      familyBySymbolKey,
+    )).toEqual([
+      'arcane',
+      'martial',
     ]);
   });
 
@@ -38,18 +47,22 @@ describe('affinity mana mapping', () => {
 
     expect(
       buildHeroAffinityManaPreset(hero, [
-        manaOption('arcane-mana'),
-        manaOption('divine-mana'),
-        manaOption('martial-mana'),
-        manaOption('occult-mana'),
-      ]),
+        manaOption('arcane'),
+        manaOption('divine'),
+        manaOption('martial'),
+        manaOption('occult'),
+      ], familyBySymbolKey),
     ).toEqual({
-      includedManaSymbolKeys: ['divine-mana', 'martial-mana'],
-      excludedManaSymbolKeys: ['arcane-mana', 'occult-mana'],
+      includedManaSymbolKeys: ['divine', 'martial'],
+      excludedManaSymbolKeys: ['arcane', 'occult'],
     });
   });
 
   test('does not create a preset when the hero has no mapped affinity', () => {
-    expect(buildHeroAffinityManaPreset({ symbols: [symbol('sola-affinity', 'affinity')] }, [manaOption('martial-mana')])).toBeNull();
+    expect(buildHeroAffinityManaPreset(
+      { symbols: [symbol('sola-affinity', 'affinity')] },
+      [manaOption('martial')],
+      familyBySymbolKey,
+    )).toBeNull();
   });
 });

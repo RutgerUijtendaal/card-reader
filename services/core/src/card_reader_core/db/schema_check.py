@@ -50,6 +50,7 @@ EXPECTED_TABLE_COLUMNS = {
         "mana_cost",
         "mana_symbols_json",
         "mana_value",
+        "mana_family_sort_key",
         "attack",
         "health",
         "rules_text_raw",

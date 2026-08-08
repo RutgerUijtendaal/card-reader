@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
+from card_reader_core.metadata import MANA_FAMILIES, ManaFamilyDefinition
 from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
 from card_reader_core.repositories.cards import (
     FieldSourcesPayload,
@@ -37,18 +38,23 @@ class CardMetadata(TypedDict):
     types: list[Type]
 
 
+class CardFilterMetadata(CardMetadata):
+    mana_families: tuple[ManaFamilyDefinition, ...]
+
+
 class CardEditState(TypedDict):
     field_sources: FieldSourcesPayload
     parsed_snapshot: ParsedSnapshotPayload
     parse_result: ParseResult | None
 
 
-def get_filter_metadata() -> CardMetadata:
+def get_filter_metadata() -> CardFilterMetadata:
     return {
         "keywords": list_keywords(),
         "tags": list_tags(),
         "symbols": list_symbols(),
         "types": list_types_for_card_sort(),
+        "mana_families": MANA_FAMILIES,
     }
 
 

@@ -4,6 +4,7 @@ from typing import Any
 
 from django.db.models import Count, F, Prefetch, Q, QuerySet
 
+from card_reader_core.metadata import mana_family_symbol_keys, normalize_mana_family_keys
 from card_reader_core.models import (
     Card,
     CardMergeRedirect,
@@ -23,6 +24,7 @@ from .images import resolve_image_file_path
 from .types import (
     CARD_SORT_MANA_ASC,
     CARD_SORT_MANA_DESC,
+    CARD_SORT_MANA_TYPE_ASC,
     CARD_SORT_NAME_ASC,
     CARD_SORT_TYPES_ASC,
     CARD_SORT_UPDATED_DESC,
@@ -51,6 +53,9 @@ def list_cards(
     mana_symbol_ids: list[str] | None = None,
     mana_symbol_exclude_ids: list[str] | None = None,
     mana_symbol_match: str | None = None,
+    mana_family_keys: list[str] | None = None,
+    mana_family_exclude_keys: list[str] | None = None,
+    mana_family_match: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
@@ -90,6 +95,9 @@ def list_cards(
         mana_symbol_ids=mana_symbol_ids,
         mana_symbol_exclude_ids=mana_symbol_exclude_ids,
         mana_symbol_match=mana_symbol_match,
+        mana_family_keys=mana_family_keys,
+        mana_family_exclude_keys=mana_family_exclude_keys,
+        mana_family_match=mana_family_match,
         affinity_symbol_ids=affinity_symbol_ids,
         affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
         affinity_symbol_match=affinity_symbol_match,
@@ -143,6 +151,9 @@ def list_matching_cards(
     mana_symbol_ids: list[str] | None = None,
     mana_symbol_exclude_ids: list[str] | None = None,
     mana_symbol_match: str | None = None,
+    mana_family_keys: list[str] | None = None,
+    mana_family_exclude_keys: list[str] | None = None,
+    mana_family_match: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
@@ -178,6 +189,9 @@ def list_matching_cards(
         mana_symbol_ids=mana_symbol_ids,
         mana_symbol_exclude_ids=mana_symbol_exclude_ids,
         mana_symbol_match=mana_symbol_match,
+        mana_family_keys=mana_family_keys,
+        mana_family_exclude_keys=mana_family_exclude_keys,
+        mana_family_match=mana_family_match,
         affinity_symbol_ids=affinity_symbol_ids,
         affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
         affinity_symbol_match=affinity_symbol_match,
@@ -217,6 +231,9 @@ def list_matching_card_candidates(
     mana_symbol_ids: list[str] | None = None,
     mana_symbol_exclude_ids: list[str] | None = None,
     mana_symbol_match: str | None = None,
+    mana_family_keys: list[str] | None = None,
+    mana_family_exclude_keys: list[str] | None = None,
+    mana_family_match: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
@@ -252,6 +269,9 @@ def list_matching_card_candidates(
         mana_symbol_ids=mana_symbol_ids,
         mana_symbol_exclude_ids=mana_symbol_exclude_ids,
         mana_symbol_match=mana_symbol_match,
+        mana_family_keys=mana_family_keys,
+        mana_family_exclude_keys=mana_family_exclude_keys,
+        mana_family_match=mana_family_match,
         affinity_symbol_ids=affinity_symbol_ids,
         affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
         affinity_symbol_match=affinity_symbol_match,
@@ -354,6 +374,9 @@ def list_filtered_latest_card_version_reparse_sources(
     mana_symbol_ids: list[str] | None = None,
     mana_symbol_exclude_ids: list[str] | None = None,
     mana_symbol_match: str | None = None,
+    mana_family_keys: list[str] | None = None,
+    mana_family_exclude_keys: list[str] | None = None,
+    mana_family_match: str | None = None,
     affinity_symbol_ids: list[str] | None = None,
     affinity_symbol_exclude_ids: list[str] | None = None,
     affinity_symbol_match: str | None = None,
@@ -389,6 +412,9 @@ def list_filtered_latest_card_version_reparse_sources(
         mana_symbol_ids=mana_symbol_ids,
         mana_symbol_exclude_ids=mana_symbol_exclude_ids,
         mana_symbol_match=mana_symbol_match,
+        mana_family_keys=mana_family_keys,
+        mana_family_exclude_keys=mana_family_exclude_keys,
+        mana_family_match=mana_family_match,
         affinity_symbol_ids=affinity_symbol_ids,
         affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
         affinity_symbol_match=affinity_symbol_match,
@@ -537,6 +563,41 @@ def exclude_by_links(
     return queryset.exclude(id__in=version_ids)
 
 
+def filter_by_mana_families(
+    queryset: QuerySet[CardVersion],
+    family_keys: list[str] | None,
+    *,
+    match_mode: str | None,
+) -> QuerySet[CardVersion]:
+    normalized_keys = normalize_mana_family_keys(family_keys or [])
+    if not normalized_keys:
+        return queryset
+    if match_mode == "all":
+        for family_key in normalized_keys:
+            version_ids = CardVersionSymbol.objects.filter(
+                symbol__key__in=mana_family_symbol_keys([family_key]),
+            ).values_list("card_version_id", flat=True)
+            queryset = queryset.filter(id__in=version_ids)
+        return queryset
+    version_ids = CardVersionSymbol.objects.filter(
+        symbol__key__in=mana_family_symbol_keys(list(normalized_keys)),
+    ).values_list("card_version_id", flat=True)
+    return queryset.filter(id__in=version_ids)
+
+
+def exclude_by_mana_families(
+    queryset: QuerySet[CardVersion],
+    family_keys: list[str] | None,
+) -> QuerySet[CardVersion]:
+    normalized_keys = normalize_mana_family_keys(family_keys or [])
+    if not normalized_keys:
+        return queryset
+    version_ids = CardVersionSymbol.objects.filter(
+        symbol__key__in=mana_family_symbol_keys(list(normalized_keys)),
+    ).values_list("card_version_id", flat=True)
+    return queryset.exclude(id__in=version_ids)
+
+
 def _build_filtered_versions_queryset(
     *,
     query: str | None,
@@ -549,6 +610,9 @@ def _build_filtered_versions_queryset(
     mana_symbol_ids: list[str] | None,
     mana_symbol_exclude_ids: list[str] | None,
     mana_symbol_match: str | None,
+    mana_family_keys: list[str] | None,
+    mana_family_exclude_keys: list[str] | None,
+    mana_family_match: str | None,
     affinity_symbol_ids: list[str] | None,
     affinity_symbol_exclude_ids: list[str] | None,
     affinity_symbol_match: str | None,
@@ -593,6 +657,8 @@ def _build_filtered_versions_queryset(
     versions = filter_by_links(versions, CardVersionTag, "tag_id", tag_ids, match_mode=tag_match)
     versions = filter_by_links(versions, CardVersionSymbol, "symbol_id", mana_symbol_ids, match_mode=mana_symbol_match)
     versions = exclude_by_links(versions, CardVersionSymbol, "symbol_id", mana_symbol_exclude_ids)
+    versions = filter_by_mana_families(versions, mana_family_keys, match_mode=mana_family_match)
+    versions = exclude_by_mana_families(versions, mana_family_exclude_keys)
     versions = filter_by_links(
         versions, CardVersionSymbol, "symbol_id", affinity_symbol_ids, match_mode=affinity_symbol_match
     )
@@ -643,6 +709,13 @@ def _apply_sql_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> Que
     if sort == CARD_SORT_MANA_DESC:
         return queryset.order_by(
             F("mana_value").desc(nulls_last=True),
+            "name",
+            "card__label",
+            "card__id",
+        )
+    if sort == CARD_SORT_MANA_TYPE_ASC:
+        return queryset.order_by(
+            "mana_family_sort_key",
             "name",
             "card__label",
             "card__id",
