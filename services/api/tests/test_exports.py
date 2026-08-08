@@ -306,7 +306,7 @@ def test_deck_tts_export_requires_usable_hero_artwork() -> None:
 
     assert response.status_code == 409
     assert response.json()["detail"] == (
-        "Required deck hero 'TTS Export Required Hero' has no usable latest image."
+        f"Required deck hero '{hero.latest_version.name}' has no usable latest image."
     )
 
 
