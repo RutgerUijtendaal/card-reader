@@ -4,9 +4,14 @@ import logging
 
 from django.db import OperationalError
 
+from card_reader_core.database.connection import SQLITE_DATABASE_TIMEOUT_SECONDS
 from card_reader_core.models import WorkerActivity
 from card_reader_core.operations.workers import heartbeat as heartbeat_module
-from card_reader_core.operations.workers.heartbeat import WorkerHeartbeatSession
+from card_reader_core.operations.workers.heartbeat import (
+    DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS,
+    WORKER_HEARTBEAT_STALE_AFTER,
+    WorkerHeartbeatSession,
+)
 
 
 class _FakeThread:
@@ -18,6 +23,14 @@ class _FakeThread:
 
     def join(self, timeout: float | None = None) -> None:
         del timeout
+
+
+def test_worker_stale_window_exceeds_scheduled_interval_and_database_timeout() -> None:
+    minimum_window = (
+        DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS + SQLITE_DATABASE_TIMEOUT_SECONDS
+    )
+
+    assert WORKER_HEARTBEAT_STALE_AFTER.total_seconds() > minimum_window
 
 
 def test_worker_registration_retries_before_later_activity(monkeypatch) -> None:
@@ -51,6 +64,12 @@ def test_worker_registration_retries_before_later_activity(monkeypatch) -> None:
     session.start()
     session.mark_busy("work-1")
 
+    assert registration_attempts == 0
+    assert activity_updates == []
+
+    session._report_status()
+    session._report_status()
+
     assert registration_attempts == 2
     assert activity_updates == [(WorkerActivity.busy, "work-1")]
 
@@ -76,11 +95,15 @@ def test_worker_activity_updates_only_on_successful_transitions(monkeypatch) -> 
     )
 
     session.start()
+    session._report_status()
     session.mark_idle()
     session.mark_idle()
     session.mark_busy("work-1")
+    session.mark_busy("work-1")
+    session._report_status()
     session.mark_idle()
     session.mark_idle()
+    session._report_status()
 
     assert activity_updates == [
         (WorkerActivity.busy, "work-1"),
@@ -117,12 +140,49 @@ def test_worker_heartbeat_retries_failed_activity_transition(monkeypatch) -> Non
     )
 
     session.start()
+    session._report_status()
     session.mark_busy("work-1")
-    session._report_heartbeat()
-    session._report_heartbeat()
+    session._report_status()
+    session._report_status()
+    session._report_status()
 
     assert activity_updates == [
         (WorkerActivity.busy, "work-1"),
         (WorkerActivity.busy, "work-1"),
     ]
     assert len(heartbeat_updates) == 1
+
+
+def test_worker_public_lifecycle_never_writes_on_calling_thread(monkeypatch) -> None:
+    writes: list[str] = []
+
+    monkeypatch.setattr(heartbeat_module, "Thread", _FakeThread)
+    monkeypatch.setattr(
+        heartbeat_module,
+        "register_worker",
+        lambda **_kwargs: writes.append("register"),
+    )
+    monkeypatch.setattr(
+        heartbeat_module,
+        "update_worker_activity",
+        lambda **_kwargs: writes.append("activity"),
+    )
+    monkeypatch.setattr(
+        heartbeat_module,
+        "stop_worker",
+        lambda **_kwargs: writes.append("stop"),
+    )
+
+    session = WorkerHeartbeatSession(
+        worker_key="test-worker",
+        display_name="Test worker",
+        logger=logging.getLogger(__name__),
+        interval_seconds=5,
+    )
+
+    session.start()
+    session.mark_busy("work-1")
+    session.mark_idle()
+    session.stop()
+
+    assert writes == []

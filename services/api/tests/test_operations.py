@@ -14,6 +14,7 @@ from card_reader_core.models import (
     WorkerHeartbeat,
     now_utc,
 )
+from card_reader_core.operations.workers import WORKER_HEARTBEAT_STALE_AFTER
 from card_reader_core.repositories.tts_card_sheets import (
     TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT,
 )
@@ -62,6 +63,7 @@ def test_operations_overview_reports_workers_and_normalized_queues() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["stale_after_seconds"] == int(WORKER_HEARTBEAT_STALE_AFTER.total_seconds())
     workers = {worker["key"]: worker for worker in payload["workers"]}
     assert workers["parser"]["health"] == "online"
     assert workers["parser"]["activity"] == "busy"

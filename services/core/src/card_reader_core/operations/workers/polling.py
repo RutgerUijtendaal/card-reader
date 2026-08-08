@@ -9,7 +9,7 @@ from threading import Event
 import time
 from typing import Generic, TypeVar
 
-from .heartbeat import WorkerHeartbeatSession
+from .heartbeat import DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS, WorkerHeartbeatSession
 
 WorkItem = TypeVar("WorkItem")
 StopRequested = Callable[[], bool]
@@ -20,7 +20,7 @@ class PollingWorkerConfig:
     name: str
     interval_seconds: float
     key: str | None = None
-    heartbeat_interval_seconds: float = 10.0
+    heartbeat_interval_seconds: float = DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS
     once: bool = False
     shutdown_marker: Path | None = None
 

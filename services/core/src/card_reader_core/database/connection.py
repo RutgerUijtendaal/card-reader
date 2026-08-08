@@ -4,6 +4,8 @@ from pathlib import Path
 
 from card_reader_core.config.settings import settings
 
+SQLITE_DATABASE_TIMEOUT_SECONDS = 30
+
 
 def _resolve_database_path() -> Path:
     configured_path = settings.database_path

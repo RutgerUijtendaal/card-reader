@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from card_reader_core.database.connection import DATABASE_PATH
+from card_reader_core.database.connection import DATABASE_PATH, SQLITE_DATABASE_TIMEOUT_SECONDS
 from card_reader_core.config.settings import settings as core_settings
 
 
@@ -84,7 +84,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": str(DATABASE_PATH),
-        "OPTIONS": {"timeout": 30},
+        "OPTIONS": {"timeout": SQLITE_DATABASE_TIMEOUT_SECONDS},
     }
 }
 

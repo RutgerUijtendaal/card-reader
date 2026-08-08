@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from card_reader_core.models import (
@@ -11,6 +11,7 @@ from card_reader_core.models import (
     WorkerHeartbeat,
     now_utc,
 )
+from card_reader_core.operations.workers import WORKER_HEARTBEAT_STALE_AFTER
 from card_reader_core.repositories.operations import (
     developer_data_build_status_counts,
     import_job_status_counts,
@@ -25,7 +26,6 @@ from card_reader_core.repositories.tts_card_sheets import (
 from card_reader_core.repositories.worker_heartbeats import list_worker_heartbeats
 
 _RECENT_ITEM_LIMIT = 20
-_WORKER_STALE_AFTER = timedelta(seconds=30)
 
 _EXPECTED_WORKERS = (
     ("parser", "Parser worker", "imports"),
@@ -50,7 +50,7 @@ class OperationsOverviewService:
         now = now_utc()
         return {
             "generated_at": _iso(now),
-            "stale_after_seconds": int(_WORKER_STALE_AFTER.total_seconds()),
+            "stale_after_seconds": int(WORKER_HEARTBEAT_STALE_AFTER.total_seconds()),
             "workers": self._worker_payloads(now=now),
             "queues": [
                 self._import_queue_payload(),
@@ -64,7 +64,7 @@ class OperationsOverviewService:
         for row in list_worker_heartbeats():
             rows_by_key.setdefault(row.worker_key, []).append(row)
 
-        stale_before = now - _WORKER_STALE_AFTER
+        stale_before = now - WORKER_HEARTBEAT_STALE_AFTER
         payloads: list[dict[str, Any]] = []
         for worker_key, display_name, queue_key in _EXPECTED_WORKERS:
             rows = rows_by_key.get(worker_key, [])

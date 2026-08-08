@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import timedelta
 from threading import Event, Lock, Thread
 
 from django.db import close_old_connections
 
+from card_reader_core.database.connection import SQLITE_DATABASE_TIMEOUT_SECONDS
 from card_reader_core.models import WorkerActivity
 from card_reader_core.repositories.worker_heartbeats import (
     heartbeat_worker,
@@ -14,6 +16,12 @@ from card_reader_core.repositories.worker_heartbeats import (
     update_worker_activity,
 )
 from card_reader_core.models.base import uuid_str
+
+DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS = 10.0
+# Cover a scheduled interval, SQLite's full lock wait, and two intervals of scheduling margin.
+WORKER_HEARTBEAT_STALE_AFTER = timedelta(
+    seconds=SQLITE_DATABASE_TIMEOUT_SECONDS + (3 * DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS)
+)
 
 
 class WorkerHeartbeatSession:
@@ -31,15 +39,14 @@ class WorkerHeartbeatSession:
         self._interval_seconds = max(1.0, interval_seconds)
         self._instance_id = uuid_str()
         self._stop_event = Event()
+        self._wake_event = Event()
         self._thread: Thread | None = None
         self._registered = False
-        self._registration_lock = Lock()
         self._activity_lock = Lock()
         self._desired_activity: tuple[WorkerActivity, str | None] = (WorkerActivity.idle, None)
         self._reported_activity: tuple[WorkerActivity, str | None] | None = None
 
     def start(self) -> None:
-        self._ensure_registered()
         self._thread = Thread(
             target=self._heartbeat_loop,
             name=f"{self._worker_key}-heartbeat",
@@ -48,97 +55,95 @@ class WorkerHeartbeatSession:
         self._thread.start()
 
     def mark_busy(self, work_id: str) -> None:
-        self._report_activity(
-            "mark busy",
+        self._set_desired_activity(
             activity=WorkerActivity.busy,
             current_work_id=work_id,
         )
 
     def mark_idle(self) -> None:
-        self._report_activity(
-            "mark idle",
+        self._set_desired_activity(
             activity=WorkerActivity.idle,
             current_work_id=None,
         )
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._wake_event.set()
         if self._thread is not None:
             self._thread.join(timeout=min(2.0, self._interval_seconds))
-        self._report_registered("stop", lambda: stop_worker(instance_id=self._instance_id))
 
     def _heartbeat_loop(self) -> None:
         close_old_connections()
         try:
-            while not self._stop_event.wait(self._interval_seconds):
-                self._report_heartbeat()
+            while not self._stop_event.is_set():
+                self._report_status()
+                self._wake_event.wait(self._interval_seconds)
+                self._wake_event.clear()
+            self._report_stop()
         finally:
             close_old_connections()
 
-    def _report_heartbeat(self) -> None:
+    def _report_status(self) -> None:
+        was_registered = self._registered
         if not self._ensure_registered():
             return
-        with self._activity_lock:
-            if self._reported_activity != self._desired_activity:
-                self._report_desired_activity_locked("retry activity")
-            else:
-                self._report(
-                    "heartbeat",
-                    lambda: heartbeat_worker(instance_id=self._instance_id),
-                )
+        desired_activity = self._desired_activity_snapshot()
+        if self._reported_activity != desired_activity:
+            activity, current_work_id = desired_activity
+            reported = self._report(
+                "activity",
+                lambda: update_worker_activity(
+                    instance_id=self._instance_id,
+                    activity=activity,
+                    current_work_id=current_work_id,
+                ),
+            )
+            if reported:
+                self._reported_activity = desired_activity
+            return
+        if not was_registered:
+            return
+        self._report(
+            "heartbeat",
+            lambda: heartbeat_worker(instance_id=self._instance_id),
+        )
 
     def _ensure_registered(self) -> bool:
         if self._registered:
             return True
-        with self._registration_lock:
-            if self._registered:
-                return True
-            registered = self._report(
-                "register",
-                lambda: register_worker(
-                    instance_id=self._instance_id,
-                    worker_key=self._worker_key,
-                    display_name=self._display_name,
-                ),
-            )
-            if registered:
-                self._registered = True
-                with self._activity_lock:
-                    self._reported_activity = (WorkerActivity.idle, None)
-            return self._registered
+        registered = self._report(
+            "register",
+            lambda: register_worker(
+                instance_id=self._instance_id,
+                worker_key=self._worker_key,
+                display_name=self._display_name,
+            ),
+        )
+        if registered:
+            self._registered = True
+            self._reported_activity = (WorkerActivity.idle, None)
+        return self._registered
 
-    def _report_activity(
+    def _set_desired_activity(
         self,
-        operation: str,
         *,
         activity: WorkerActivity,
         current_work_id: str | None,
     ) -> None:
+        desired_activity = (activity, current_work_id)
         with self._activity_lock:
-            self._desired_activity = (activity, current_work_id)
-        if not self._ensure_registered():
-            return
+            if self._desired_activity == desired_activity:
+                return
+            self._desired_activity = desired_activity
+        self._wake_event.set()
+
+    def _desired_activity_snapshot(self) -> tuple[WorkerActivity, str | None]:
         with self._activity_lock:
-            self._report_desired_activity_locked(operation)
+            return self._desired_activity
 
-    def _report_desired_activity_locked(self, operation: str) -> None:
-        if self._reported_activity == self._desired_activity:
-            return
-        activity, current_work_id = self._desired_activity
-        reported = self._report(
-            operation,
-            lambda: update_worker_activity(
-                instance_id=self._instance_id,
-                activity=activity,
-                current_work_id=current_work_id,
-            ),
-        )
-        if reported:
-            self._reported_activity = self._desired_activity
-
-    def _report_registered(self, operation: str, callback: Callable[[], object]) -> None:
+    def _report_stop(self) -> None:
         if self._ensure_registered():
-            self._report(operation, callback)
+            self._report("stop", lambda: stop_worker(instance_id=self._instance_id))
 
     def _report(self, operation: str, callback: Callable[[], object]) -> bool:
         try:
