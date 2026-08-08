@@ -40,24 +40,24 @@ from card_reader_core.services.tts_card_sheets import service as tts_sheet_servi
 from card_reader_core.storage import build_storage_relative_path
 
 
-def test_assignments_fill_seventy_slots_before_appending_a_sheet() -> None:
+def test_assignments_fill_sixty_three_slots_before_appending_a_sheet() -> None:
     TtsCardSheet.objects.all().delete()
-    cards = [_create_sheet_card(f"batch-{index}", color=(index, 30, 60)) for index in range(71)]
+    cards = [_create_sheet_card(f"batch-{index}", color=(index, 30, 60)) for index in range(64)]
 
     TtsCardSheetService().sync_cards([card.id for card in cards])
 
     sheets = list(TtsCardSheet.objects.order_by("sequence"))
     assert len(sheets) == 2
-    assert sheets[0].next_slot_index == 70
+    assert sheets[0].next_slot_index == 63
     assert sheets[1].next_slot_index == 1
     assignments = list(
         TtsCardSheetSlot.objects.filter(card_identity_id__in=[card.id for card in cards])
         .select_related("sheet")
         .order_by("sheet__sequence", "slot_index")
     )
-    assert [slot.slot_index for slot in assignments[:70]] == list(range(70))
-    assert assignments[70].slot_index == 0
-    assert assignments[70].sheet_id == sheets[1].id
+    assert [slot.slot_index for slot in assignments[:63]] == list(range(63))
+    assert assignments[63].slot_index == 0
+    assert assignments[63].sheet_id == sheets[1].id
 
 
 def test_unreadable_images_are_not_assigned_to_sheets() -> None:
@@ -381,7 +381,7 @@ def test_reconciliation_upgrades_legacy_layout_once(
     monkeypatch.setattr(tts_sheet_service, "iter_usable_card_source_batches", lambda: ())
     sheet = TtsCardSheet.objects.create(
         sequence=999_990,
-        layout_version=1,
+        layout_version=2,
         desired_revision=4,
         desired_fingerprint="legacy-layout",
         rendered_revision=4,
@@ -406,7 +406,7 @@ def test_reconciliation_upgrades_legacy_layout_once(
     assert sheet.desired_revision == first_revision
 
 
-def test_current_layout_renders_canonical_cards_without_resizing_or_letterboxing(
+def test_current_layout_uses_canonical_images_without_resizing_or_letterboxing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     TtsCardSheet.objects.all().delete()
@@ -426,7 +426,8 @@ def test_current_layout_renders_canonical_cards_without_resizing_or_letterboxing
     layout = tts_sheet_renderer.get_tts_card_sheet_layout(sheet.layout_version)
     path = tts_sheet_renderer.tts_card_sheet_path(str(sheet.id), sheet.rendered_checksum)
     with Image.open(path) as rendered:
-        assert rendered.size == (8220, 7854)
+        assert rendered.size == (7398, 7854)
+        assert max(rendered.size) <= 8192
         assert (layout.cell_width, layout.cell_height) == (822, 1122)
         top_pixel = rendered.getpixel((layout.cell_width // 2, 0))
         middle_pixel = rendered.getpixel(
