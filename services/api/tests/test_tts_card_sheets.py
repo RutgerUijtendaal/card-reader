@@ -36,6 +36,7 @@ from card_reader_core.services.tts_card_sheets import (
     TtsCardSheetService,
 )
 from card_reader_core.services.tts_card_sheets import renderer as tts_sheet_renderer
+from card_reader_core.services.tts_card_sheets import service as tts_sheet_service
 from card_reader_core.storage import build_storage_relative_path
 
 
@@ -373,8 +374,11 @@ def test_reconciliation_includes_unreferenced_persisted_sheets() -> None:
     assert sheet.desired_revision == 1
 
 
-def test_reconciliation_upgrades_legacy_layout_once() -> None:
+def test_reconciliation_upgrades_legacy_layout_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     TtsCardSheet.objects.all().delete()
+    monkeypatch.setattr(tts_sheet_service, "iter_usable_card_source_batches", lambda: ())
     sheet = TtsCardSheet.objects.create(
         sequence=999_990,
         layout_version=1,
@@ -391,7 +395,7 @@ def test_reconciliation_upgrades_legacy_layout_once() -> None:
     sheet.refresh_from_db()
     first_revision = sheet.desired_revision
     assert sheet.layout_version == TTS_CARD_SHEET_LAYOUT_VERSION
-    assert first.affected_sheets >= 1
+    assert first.affected_sheets == 1
     assert first_revision == 5
     assert sheet.rendered_revision == 4
     assert sheet.rendered_checksum == "published-sheet"
