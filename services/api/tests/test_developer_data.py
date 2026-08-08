@@ -63,7 +63,9 @@ def test_current_bundle_and_browser_download_are_available_to_regular_users() ->
     assert current_response.json()["available"] is True
     assert current_response.json()["bundle_version"] == "browser-download"
     assert download_response.status_code == 200
-    assert b"".join(download_response.streaming_content) == content
+    download_body = b"".join(download_response.streaming_content)
+    download_response.close()
+    assert download_body == content
     assert download_response["Content-Disposition"].endswith(
         'filename="card-reader-dev-data-browser-download.tar.gz"'
     )
@@ -152,7 +154,9 @@ def test_code_is_pinned_single_use_and_token_can_retry_until_expiry() -> None:
             HTTP_AUTHORIZATION=f"DevData {token}",
         )
         assert response.status_code == 200
-        assert b"".join(response.streaming_content) == content
+        response_body = b"".join(response.streaming_content)
+        response.close()
+        assert response_body == content
 
     grant = DeveloperDataDownloadGrant.objects.get(bundle_version="token-retry")
     set_developer_role(grant.user, enabled=False)
@@ -297,6 +301,7 @@ def test_staff_can_download_lock_file_for_successful_build() -> None:
 
 def test_build_worker_marks_success_and_recovers_already_published_bundle(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     from card_reader_api.developer_data.build_worker import process_developer_data_build
 
@@ -315,6 +320,9 @@ def test_build_worker_marks_success_and_recovers_already_published_bundle(
         size_bytes=4321,
         created_at=timezone.now(),
     )
+    published_root = tmp_path / "published"
+    published_root.mkdir()
+    monkeypatch.setattr(settings, "developer_data_dir", published_root)
     monkeypatch.setattr(
         "card_reader_api.developer_data.build_worker.PublishedBundleStore.get",
         lambda _store, _version: artifact,

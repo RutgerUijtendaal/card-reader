@@ -1,39 +1,53 @@
 from __future__ import annotations
 
 import logging
-import shutil
-from pathlib import Path
 from collections.abc import Generator
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
-from catalog_seed import build_catalog_preflight, check_ocr_runtime, seed_integration_catalog
-from runtime import configure_test_environment
+from runtime import cleanup_test_environment, configure_test_environment
+
+INTEGRATION_RUNTIME_ROOT = configure_test_environment()
+
+from catalog_seed import (  # noqa: E402
+    build_catalog_preflight,
+    check_ocr_runtime,
+    seed_integration_catalog,
+)
 
 if TYPE_CHECKING:
+    from card_reader_core.testing import SqliteTestBaseline
     from card_reader_parser.parsers.card_parser import CardParser
     from card_reader_parser.parsers.ocr_runner import OcrRunner
 
 
 @pytest.fixture(scope="session", autouse=True)
-def integration_runtime() -> Path:
-    runtime_root = configure_test_environment()
+def integration_runtime() -> Generator[Path, None, None]:
+    runtime_root = INTEGRATION_RUNTIME_ROOT
 
-    import django
-    from django.core.management import call_command
+    try:
+        import django
+        from django.core.management import call_command
 
-    django.setup()
+        django.setup()
 
-    from card_reader_core.database.connection import initialize_database
+        from card_reader_core.database.connection import initialize_database
 
-    initialize_database()
-    issues = build_catalog_preflight()
-    if issues:
-        raise RuntimeError("\n".join(issues))
+        initialize_database()
+        issues = build_catalog_preflight()
+        if issues:
+            raise RuntimeError("\n".join(issues))
 
-    call_command("migrate", interactive=False, verbosity=0)
-    return runtime_root
+        call_command("migrate", interactive=False, verbosity=0)
+        seed_integration_catalog()
+        yield runtime_root
+    finally:
+        from django.db import connections
+
+        connections.close_all()
+        cleanup_test_environment()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -80,22 +94,26 @@ def integration_logging(integration_runtime: Path) -> Generator[None, None, None
         file_handler.close()
 
 
+@pytest.fixture(scope="session")
+def integration_test_baseline(
+    integration_runtime: Path,
+) -> Generator[SqliteTestBaseline, None, None]:
+    from card_reader_core.testing import SqliteTestBaseline, mark_sqlite_test_storage
+
+    mark_sqlite_test_storage(integration_runtime)
+    baseline = SqliteTestBaseline(
+        storage_root=integration_runtime,
+        preserved_runtime_names={"logs"},
+    )
+    try:
+        yield baseline
+    finally:
+        baseline.close()
+
+
 @pytest.fixture(autouse=True)
-def reset_runtime(integration_runtime: Path) -> None:
-    from django.core.management import call_command
-    from django.db import connections
-
-    connections.close_all()
-    call_command("flush", interactive=False, verbosity=0)
-    _clear_runtime_directories(integration_runtime)
-    seed_integration_catalog()
-
-
-def _clear_runtime_directories(runtime_root: Path) -> None:
-    for child in runtime_root.iterdir():
-        if child.name in {"card_reader.db", "logs"}:
-            continue
-        if child.is_dir():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
+def isolate_integration_test_state(
+    integration_test_baseline: SqliteTestBaseline,
+) -> Generator[None, None, None]:
+    yield
+    integration_test_baseline.restore()

@@ -1,17 +1,26 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 import os
-import tempfile
 from pathlib import Path
+import tempfile
 
-TEST_STORAGE_ROOT = Path(tempfile.mkdtemp(prefix="card-reader-api-tests-"))
+import pytest
+
+_TEST_STORAGE_DIRECTORY = tempfile.TemporaryDirectory(prefix="card-reader-api-tests-")
+TEST_STORAGE_ROOT = Path(_TEST_STORAGE_DIRECTORY.name)
 os.environ["CARD_READER_APP_DATA_DIR"] = str(TEST_STORAGE_ROOT)
 os.environ["CARD_READER_ENV"] = "test"
 os.environ["DJANGO_SETTINGS_MODULE"] = "card_reader_api.project.test_settings"
 
 import django  # noqa: E402
 from card_reader_core.database.connection import initialize_database  # noqa: E402
+from card_reader_core.testing import (  # noqa: E402
+    SqliteTestBaseline,
+    mark_sqlite_test_storage,
+)
 from django.core.management import call_command  # noqa: E402
+from django.db import connections  # noqa: E402
 
 initialize_database()
 django.setup()
@@ -118,12 +127,42 @@ def _seed_default_catalog_rows() -> None:
         )
 
 
-call_command("migrate", interactive=False, verbosity=0)
-Template.objects.update_or_create(
-    key="mtg-like-v1",
-    defaults={
-        "label": "MTG Like V1",
-        "definition_json": _default_template_definition(),
-    },
-)
-_seed_default_catalog_rows()
+@pytest.fixture(scope="session", autouse=True)
+def api_test_runtime() -> Iterator[SqliteTestBaseline]:
+    baseline: SqliteTestBaseline | None = None
+    try:
+        call_command("migrate", interactive=False, verbosity=0)
+        Template.objects.update_or_create(
+            key="mtg-like-v1",
+            defaults={
+                "label": "MTG Like V1",
+                "definition_json": _default_template_definition(),
+            },
+        )
+        _seed_default_catalog_rows()
+        mark_sqlite_test_storage(TEST_STORAGE_ROOT)
+        baseline = SqliteTestBaseline(storage_root=TEST_STORAGE_ROOT)
+        yield baseline
+    finally:
+        if baseline is not None:
+            baseline.close()
+        else:
+            connections.close_all()
+        _TEST_STORAGE_DIRECTORY.cleanup()
+
+
+@pytest.fixture(autouse=True)
+def isolate_api_test_state(api_test_runtime: SqliteTestBaseline) -> Iterator[None]:
+    from card_reader_api.exports.tts_library import tts_card_library_materializer
+
+    tts_card_library_materializer.clear()
+    try:
+        yield
+    finally:
+        tts_card_library_materializer.clear()
+        api_test_runtime.restore()
+
+
+@pytest.fixture
+def test_storage_root() -> Path:
+    return TEST_STORAGE_ROOT

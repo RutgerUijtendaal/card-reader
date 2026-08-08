@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from card_reader_core.repositories.helpers import normalize_slug_key
 
-from runtime import REPO_ROOT
+from runtime import RUNTIME_ROOT
 
 if TYPE_CHECKING:
     from card_reader_core.models import Keyword, Tag, Type
@@ -277,7 +277,7 @@ def _build_filtered_tags_file(omit_tag_keys: set[str] | None) -> Path:
         for label in _load_json(CATALOG_FILES["tags"])
         if _slugify_label(label) not in omit_tag_keys
     ]
-    filtered_path = REPO_ROOT / "services" / "integration" / ".runtime" / "seed-tags.filtered.json"
+    filtered_path = RUNTIME_ROOT / "seed-tags.filtered.json"
     filtered_path.write_text(f"{json.dumps(filtered_entries, indent=2)}\n", encoding="utf-8")
     return filtered_path
 

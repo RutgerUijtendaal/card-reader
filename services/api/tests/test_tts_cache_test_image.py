@@ -230,4 +230,7 @@ def _create_card_image_source(
 
 
 def _response_body(response: object) -> bytes:
-    return b"".join(response.streaming_content)
+    try:
+        return b"".join(response.streaming_content)
+    finally:
+        response.close()

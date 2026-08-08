@@ -20,11 +20,6 @@ def _png_bytes(*, width: int = 7, height: int = 11) -> bytes:
     return buffer.getvalue()
 
 
-@pytest.fixture(autouse=True)
-def clear_card_backs() -> None:
-    CardBack.objects.all().delete()
-
-
 def test_current_card_back_endpoint_returns_null_without_auth_when_unset() -> None:
     response = Client(HTTP_HOST="localhost").get("/card-backs/current")
 
