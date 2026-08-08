@@ -8,7 +8,6 @@ from card_reader_core.models import (
     ImportJob,
     TtsCardSheet,
     WorkerActivity,
-    WorkerHeartbeat,
     now_utc,
 )
 from card_reader_core.operations.workers import WORKER_HEARTBEAT_STALE_AFTER
@@ -23,7 +22,9 @@ from card_reader_core.repositories.operations import (
 from card_reader_core.repositories.tts_card_sheets import (
     TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT,
 )
-from card_reader_core.repositories.worker_heartbeats import list_worker_heartbeats
+from card_reader_core.repositories.worker_heartbeats import (
+    fetch_worker_heartbeat_snapshots,
+)
 
 _RECENT_ITEM_LIMIT = 20
 
@@ -60,20 +61,16 @@ class OperationsOverviewService:
         }
 
     def _worker_payloads(self, *, now: datetime) -> list[dict[str, Any]]:
-        rows_by_key: dict[str, list[WorkerHeartbeat]] = {}
-        for row in list_worker_heartbeats():
-            rows_by_key.setdefault(row.worker_key, []).append(row)
-
         stale_before = now - WORKER_HEARTBEAT_STALE_AFTER
+        snapshots = fetch_worker_heartbeat_snapshots(
+            worker_keys=(worker_key for worker_key, _display_name, _queue_key in _EXPECTED_WORKERS),
+            stale_before=stale_before,
+        )
         payloads: list[dict[str, Any]] = []
         for worker_key, display_name, queue_key in _EXPECTED_WORKERS:
-            rows = rows_by_key.get(worker_key, [])
-            live = [
-                row
-                for row in rows
-                if row.stopped_at is None and row.last_heartbeat_at >= stale_before
-            ]
-            latest = rows[0] if rows else None
+            snapshot = snapshots[worker_key]
+            live = snapshot.live_instances
+            fallback = snapshot.fallback
             if live:
                 activity = (
                     WorkerActivity.busy.value
@@ -82,14 +79,14 @@ class OperationsOverviewService:
                 )
                 health = "online"
                 last_seen_at = max(row.last_heartbeat_at for row in live)
-            elif latest is None:
+            elif fallback is None:
                 activity = WorkerActivity.stopped.value
                 health = "never_seen"
                 last_seen_at = None
             else:
-                activity = str(latest.activity)
-                health = "stopped" if latest.stopped_at is not None else "stale"
-                last_seen_at = latest.last_heartbeat_at
+                activity = str(fallback.activity)
+                health = "stale" if fallback.stopped_at is None else "stopped"
+                last_seen_at = fallback.last_heartbeat_at
 
             payloads.append(
                 {

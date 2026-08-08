@@ -18,6 +18,9 @@ from card_reader_core.operations.workers import WORKER_HEARTBEAT_STALE_AFTER
 from card_reader_core.repositories.tts_card_sheets import (
     TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT,
 )
+from card_reader_core.repositories.worker_heartbeats import (
+    fetch_worker_heartbeat_snapshots,
+)
 from card_reader_core.services.operations import OperationsOverviewService
 
 
@@ -73,6 +76,83 @@ def test_operations_overview_reports_workers_and_normalized_queues() -> None:
     assert queues["imports"]["status_counts"]["queued"] >= 1
     assert queues["tts-card-sheets"]["status_counts"]["queued"] >= 1
     assert queues["developer-data-builds"]["status_counts"]["failed"] >= 1
+
+
+def test_operations_overview_prioritizes_stale_instance_over_stopped_history() -> None:
+    user_model = get_user_model()
+    staff = user_model.objects.create_user(
+        username="stale-worker-staff",
+        password="password",
+        is_staff=True,
+    )
+    now = now_utc()
+    stale_at = now - WORKER_HEARTBEAT_STALE_AFTER - timedelta(seconds=1)
+    WorkerHeartbeat.objects.create(
+        worker_key="parser",
+        display_name="Parser worker",
+        activity=WorkerActivity.busy,
+        current_work_id="crashed-import",
+        started_at=stale_at,
+        last_heartbeat_at=stale_at,
+    )
+    WorkerHeartbeat.objects.create(
+        worker_key="parser",
+        display_name="Parser worker",
+        activity=WorkerActivity.stopped,
+        started_at=now,
+        last_heartbeat_at=now,
+        stopped_at=now,
+    )
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(staff)
+
+    response = client.get("/operations")
+
+    assert response.status_code == 200
+    workers = {worker["key"]: worker for worker in response.json()["workers"]}
+    assert workers["parser"]["health"] == "stale"
+    assert workers["parser"]["activity"] == "busy"
+    assert workers["parser"]["last_seen_at"] == stale_at.isoformat()
+
+
+def test_worker_heartbeat_snapshot_bounds_inactive_history() -> None:
+    now = now_utc()
+    stale_at = now - WORKER_HEARTBEAT_STALE_AFTER - timedelta(seconds=1)
+    stale = WorkerHeartbeat.objects.create(
+        worker_key="parser",
+        display_name="Parser worker",
+        activity=WorkerActivity.busy,
+        started_at=stale_at,
+        last_heartbeat_at=stale_at,
+    )
+    WorkerHeartbeat.objects.bulk_create(
+        [
+            WorkerHeartbeat(
+                worker_key="parser",
+                display_name="Parser worker",
+                activity=WorkerActivity.stopped,
+                started_at=now - timedelta(seconds=index),
+                last_heartbeat_at=now - timedelta(seconds=index),
+                stopped_at=now - timedelta(seconds=index),
+            )
+            for index in range(50)
+        ]
+    )
+    live = WorkerHeartbeat.objects.create(
+        worker_key="parser",
+        display_name="Parser worker",
+        activity=WorkerActivity.idle,
+        started_at=now,
+        last_heartbeat_at=now,
+    )
+
+    snapshots = fetch_worker_heartbeat_snapshots(
+        worker_keys=("parser",),
+        stale_before=now - WORKER_HEARTBEAT_STALE_AFTER,
+    )
+
+    assert [row.id for row in snapshots["parser"].live_instances] == [live.id]
+    assert snapshots["parser"].fallback == stale
 
 
 def test_operations_overview_requires_staff() -> None:
