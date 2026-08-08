@@ -28,8 +28,8 @@ newer layout version upgrades existing sheets in place once and queues them for 
 IDs or slot positions.
 
 An export references the existing sheets containing its Cards. It does not create a compact export-specific atlas,
-so a sparse selection may reference several sheets. The Lua importer combines those definitions into one native TTS
-custom deck rather than spawning and grouping independent `CardCustom` objects.
+so a sparse selection may reference several sheets. The Lua importer spawns the referenced `CardCustom` objects in
+small batches, waits for them to load and settle, and then combines them into one native TTS custom deck.
 
 ### Export
 
@@ -56,8 +56,8 @@ function importLatestCardReaderCards()
 end
 ```
 
-The importer spawns one native Card for a one-Card export or one native custom Deck for larger exports. Quantities
-reuse the same sheet cell. Names and Card Reader identity metadata are stored on the contained Cards.
+The importer spawns every exported copy as a native Card, then combines multiple Cards into a native custom Deck.
+Quantities reuse the same sheet cell. Names and Card Reader identity metadata are stored on the Cards.
 
 The decoded `card-reader.tts-cards.v2` payload has this shape:
 
@@ -119,10 +119,11 @@ library_batch_spacing = 3
 ```
 
 With `auto_sync_enabled = true`, Global `onLoad()` fetches the manifest, scans `source_region_guids` over multiple
-frames, and compares immutable Card IDs stored in GM Notes. Only missing identities are spawned. Each update is a
-separate native Card or Deck positioned beside existing batches in the first valid configured region; batches are
-not regrouped. Rotated regions are supported, and synchronization stops instead of spawning outside the region when
-its batch slots are full. The configured scripting region should therefore be reserved for the Card Reader library.
+frames, and compares immutable Card IDs stored in GM Notes. Only missing identities are spawned. Each missing Card
+is spawned individually and the update is combined into a separate native Card or Deck positioned beside existing
+batches in the first valid configured region; existing batches are not regrouped. Rotated regions are supported,
+and synchronization stops instead of spawning outside the region when its batch slots are full. The configured
+scripting region should therefore be reserved for the Card Reader library.
 Manual card and deck imports continue to use `spawn_position`; that player-facing location is not used by autosync.
 
 Set `auto_sync_enabled = false` to disable startup requests and automatic retries. Manual synchronization remains

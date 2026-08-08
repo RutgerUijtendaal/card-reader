@@ -370,13 +370,11 @@ function spawnCardReaderSheetDeck(payload, options)
     end
 
     local contained = {}
-    local deck_ids = {}
     for _, entry in ipairs(payload.cards) do
         local sheet_key = sheet_keys[entry.sheet_id]
         local card_id = (sheet_key * 100) + math.floor(tonumber(entry.slot_index))
         local quantity = math.floor(tonumber(entry.quantity))
         for _ = 1, quantity do
-            table.insert(deck_ids, card_id)
             table.insert(contained, buildSheetCardData(
                 entry,
                 card_id,
@@ -388,33 +386,105 @@ function spawnCardReaderSheetDeck(payload, options)
     end
 
     logMissingCards(buildExportSkippedRequests(payload.skipped))
-    local object_data
-    if #contained == 1 then
-        object_data = contained[1]
-    else
-        object_data = buildSheetDeckData(payload.collection.name, deck_ids, custom_deck, contained)
+    startSheetCardSpawnJob(payload, contained, options)
+end
+
+function startSheetCardSpawnJob(payload, cards, options)
+    local job = {
+        payload = payload,
+        cards = cards,
+        card_index = 1,
+        spawn_position = options.position or CONFIG.spawn_position,
+        spawned = {},
+        callback_function = options.callback_function,
+    }
+
+    print(string.format(
+        "Importing '%s' by spawning %d sheet-backed cards individually.",
+        payload.collection.name,
+        #cards
+    ))
+    spawnSheetCardBatch(job)
+end
+
+function spawnSheetCardBatch(job)
+    local processed = 0
+    while processed < CONFIG.spawn_batch_size do
+        local card_data = job.cards[job.card_index]
+        if card_data == nil then
+            waitForSheetCardSpawns(job)
+            return
+        end
+
+        local spawn_index = job.card_index
+        job.card_index = job.card_index + 1
+        processed = processed + 1
+        spawnObjectData({
+            data = card_data,
+            position = buildStackedSpawnPosition(job.spawn_position, spawn_index),
+            callback_function = function(object)
+                if object ~= nil then
+                    table.insert(job.spawned, object)
+                end
+            end,
+        })
     end
 
-    spawnObjectData({
-        data = object_data,
-        position = options.position or CONFIG.spawn_position,
-        callback_function = function(object)
-            if object ~= nil and not object.isDestroyed() then
-                if #contained > 1 then
-                    object.setName(payload.collection.name)
-                end
-                print(string.format(
-                    "Imported '%s' with %d cards across %d sheets.",
-                    payload.collection.name,
-                    #contained,
-                    #payload.sheets
-                ))
-            end
-            if type(options.callback_function) == "function" then
-                options.callback_function(object, #contained)
-            end
+    Wait.frames(function()
+        spawnSheetCardBatch(job)
+    end, 1)
+end
+
+function waitForSheetCardSpawns(job)
+    local function schedule_finalize()
+        Wait.frames(function()
+            finalizeSheetCardSpawnJob(job)
+        end, CONFIG.finalize_wait_frames)
+    end
+
+    Wait.condition(
+        schedule_finalize,
+        function()
+            return #job.spawned == #job.cards
         end,
-    })
+        CONFIG.wait_timeout_seconds,
+        function()
+            print(string.format(
+                "Timed out while waiting for sheet-backed cards to finish spawning. Spawned %d of %d cards.",
+                #job.spawned,
+                #job.cards
+            ))
+            schedule_finalize()
+        end
+    )
+end
+
+function finalizeSheetCardSpawnJob(job)
+    local object = findImportedDeckTarget(job.spawned, job.spawn_position)
+    if object ~= nil and not object.isDestroyed() then
+        object.setName(job.payload.collection.name)
+        print(string.format(
+            "Imported '%s' with %d individually spawned cards across %d sheets.",
+            job.payload.collection.name,
+            #job.spawned,
+            #job.payload.sheets
+        ))
+    else
+        print("Imported sheet-backed cards could not be combined into a deck.")
+    end
+
+    if type(job.callback_function) == "function" then
+        job.callback_function(object, #job.spawned)
+    end
+end
+
+function buildStackedSpawnPosition(base_position, index)
+    local zero_based = index - 1
+    return {
+        x = base_position.x,
+        y = base_position.y + (zero_based * CONFIG.stack_y_spacing),
+        z = base_position.z,
+    }
 end
 
 function buildCustomDeckState(sheet, card_back_url)
@@ -450,22 +520,6 @@ function buildSheetCardData(entry, card_id, sheet_key, custom_deck_state, sheet_
         CustomDeck = {
             [sheet_key] = custom_deck_state,
         },
-        LuaScript = "",
-        LuaScriptState = "",
-        XmlUI = "",
-    }
-end
-
-function buildSheetDeckData(name, deck_ids, custom_deck, contained)
-    return {
-        Name = "DeckCustom",
-        Transform = defaultObjectTransform(),
-        Nickname = name,
-        Description = "",
-        GMNotes = "",
-        DeckIDs = deck_ids,
-        CustomDeck = custom_deck,
-        ContainedObjects = contained,
         LuaScript = "",
         LuaScriptState = "",
         XmlUI = "",
@@ -1215,13 +1269,7 @@ function namesMatchWithOneInsertionOrDeletion(left, right)
 end
 
 function buildSpawnPosition(index)
-    local zero_based = index - 1
-
-    return {
-        x = CONFIG.spawn_position.x,
-        y = CONFIG.spawn_position.y + (zero_based * CONFIG.stack_y_spacing),
-        z = CONFIG.spawn_position.z,
-    }
+    return buildStackedSpawnPosition(CONFIG.spawn_position, index)
 end
 
 function scheduleFinalizeImportedDeck(job)
@@ -1276,7 +1324,7 @@ function payloadDescription(payload)
     return nil
 end
 
-function findImportedDeckTarget(objects)
+function findImportedDeckTarget(objects, fallback_position)
     local live_objects = collectLiveObjects(objects)
     if #live_objects > 1 then
         local grouped = group(live_objects) or {}
@@ -1287,7 +1335,7 @@ function findImportedDeckTarget(objects)
         return live_objects[1]
     end
 
-    return findNearestSpawnedObject()
+    return findNearestSpawnedObject(fallback_position or CONFIG.spawn_position)
 end
 
 function collectLiveObjects(objects)
@@ -1302,14 +1350,14 @@ function collectLiveObjects(objects)
     return live_objects
 end
 
-function findNearestSpawnedObject()
+function findNearestSpawnedObject(spawn_position)
     local nearest = nil
     local nearest_distance = nil
 
     for _, object in ipairs(getAllObjects()) do
         if isImportDeckTargetCandidate(object) then
             local position = object.getPosition()
-            local distance = horizontalDistance(position, CONFIG.spawn_position)
+            local distance = horizontalDistance(position, spawn_position)
 
             if distance <= CONFIG.finalize_search_radius
                 and (nearest_distance == nil or distance < nearest_distance) then
