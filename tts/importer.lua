@@ -1,40 +1,12 @@
 local CONFIG = {
-    -- Fetch and synchronize the canonical Card Reader library whenever the save loads.
-    auto_sync_enabled = false,
-    -- Public raw-JSON manifest used by automatic and manual library synchronization.
-    library_manifest_url = "https://maityscardgame.com/api/tts/card-library/cards.json",
-    -- Seconds to wait between retryable manifest requests before giving up.
-    auto_sync_retry_delays = { 2, 5, 15, 30 },
-    -- Minimum center-to-center spacing between library batches inside the source region.
-    library_batch_spacing = 3,
-    -- Regions scanned for library cards; automatic updates spawn inside the first valid one.
-    source_region_guids = {
-        "cb7760",
-    },
-    -- World position used for manual card and deck imports triggered by players.
+    -- World position used for Card Reader imports triggered by players.
     spawn_position = { x = -45, y = 3, z = 50 },
-    -- Vertical offset between cards while they are spawned before stacking.
-    stack_y_spacing = 0.08,
-    -- Maximum edit distance accepted by the legacy fuzzy-name deck lookup.
-    fuzzy_name_distance = 1,
-    -- Maximum source-card metadata entries indexed per frame.
-    index_batch_size = 50,
-    -- Maximum cards spawned per frame to keep TTS responsive.
-    spawn_batch_size = 5,
-    -- Maximum seconds to wait for spawned objects to finish loading.
-    wait_timeout_seconds = 15,
-    -- Frames allowed for spawned cards to settle before final grouping.
-    finalize_wait_frames = 210,
-    -- Radius around the spawn point used to recover cards during final grouping.
-    finalize_search_radius = 3,
 }
 
--- Importer
-
-local deck_string = ""
+local import_string = ""
 
 function input_func(obj, color, input, still_editing)
-    deck_string = input or ""
+    import_string = input or ""
 end
 
 function onLoad()
@@ -46,214 +18,30 @@ function onLoad()
         position = { x = 0, y = 0.2, z = -0.5 },
         width = 1000,
         height = 200,
-        value = deck_string,
+        value = import_string,
     })
     self.createButton({
-        click_function = "click_func",
+        click_function = "click_import",
         function_owner = self,
-        label = "Import Deck",
-        position = { -0.65, 0.2, 0.30 },
-        width = 600,
+        label = "Import",
+        position = { 0, 0.2, 0.30 },
+        width = 1200,
         height = 300,
         font_size = 100,
         color = { 0.5, 0.5, 1 },
         font_color = { 1, 1, 1 },
-        tooltip = "Pray to Steve it works",
+        tooltip = "Import a Card Reader export",
     })
-    self.createButton({
-        click_function = "click_func2",
-        function_owner = self,
-        label = "Import Gallery",
-        position = { 0.65, 0.2, 0.30 },
-        width = 600,
-        height = 300,
-        font_size = 85,
-        color = { 0.75, 0.0, 0 },
-        font_color = { 1, 1, 1 },
-        tooltip = "Pray to Steve it works",
-    })
-
-    if not CONFIG.auto_sync_enabled then
-        return
-    end
-
-    Wait.frames(function()
-        startCardReaderLibraryAutoSync()
-    end, 1)
 end
 
-function click_func(obj, color, alt_click)
-    print(deck_string)
-    importCardReaderDeck(deck_string)
+function click_import(obj, color, alt_click)
+    importCardReaderExport(import_string)
 end
 
-function click_func2(obj, color, alt_click)
-    print(deck_string)
-    importCardReaderCards(deck_string)
-end
-
--- THE ACTUAL IMPORTER CODE 
-
-local library_sync_state = {
-    generation = 0,
-    in_progress = false,
-}
-
-function startCardReaderLibraryAutoSync()
-    if CONFIG.auto_sync_enabled then
-        startCardReaderLibrarySync(true)
-    end
-end
-
-function syncCardReaderLibrary()
-    startCardReaderLibrarySync(false)
-end
-
-function importCardReaderDeck(encoded)
+function importCardReaderExport(encoded)
     local payload = decodePayload(encoded)
-    validateDeckPayload(payload)
-
-    startImportJob(payload, buildImportRequests(payload))
-end
-
-function importCardReaderCards(encoded)
-    local payload = decodePayload(encoded)
-    validateCardPayload(payload)
+    validateExportPayload(payload)
     spawnCardReaderSheetDeck(payload)
-end
-
-function startCardReaderLibrarySync(is_automatic)
-    if is_automatic and not CONFIG.auto_sync_enabled then
-        return
-    end
-    if library_sync_state.in_progress then
-        print("A Card Reader library synchronization is already running.")
-        return
-    end
-    if trim(CONFIG.library_manifest_url or "") == "" then
-        print("Card Reader library synchronization is not configured: library_manifest_url is empty.")
-        return
-    end
-
-    library_sync_state.generation = library_sync_state.generation + 1
-    library_sync_state.in_progress = true
-    local job = {
-        generation = library_sync_state.generation,
-        is_automatic = is_automatic,
-        retry_index = 1,
-    }
-    print("Fetching the latest Card Reader library manifest.")
-    requestCardReaderLibraryManifest(job)
-end
-
-function requestCardReaderLibraryManifest(job)
-    if not librarySyncJobIsCurrent(job) then
-        return
-    end
-    if job.is_automatic and not CONFIG.auto_sync_enabled then
-        finishCardReaderLibrarySync(job)
-        return
-    end
-
-    WebRequest.get(cardReaderLibraryRequestUrl(job), function(request)
-        if not librarySyncJobIsCurrent(job) then
-            return
-        end
-        if request.is_error then
-            retryCardReaderLibrarySync(job, "request failed: " .. tostring(request.error), nil)
-            return
-        end
-
-        local response_code = tonumber(request.response_code or 0) or 0
-        if response_code == 304 then
-            job.cache_bust = tostring(math.random(100000, 999999)) .. "-" .. tostring(job.retry_index)
-            retryCardReaderLibrarySync(job, "received an empty cached response", nil)
-            return
-        end
-        if response_code == 429 or response_code >= 500 then
-            retryCardReaderLibrarySync(
-                job,
-                "server returned HTTP " .. tostring(response_code),
-                request.getResponseHeader("Retry-After")
-            )
-            return
-        end
-        if response_code ~= 200 then
-            failCardReaderLibrarySync(job, "server returned HTTP " .. tostring(response_code))
-            return
-        end
-
-        local decoded_ok, payload = pcall(JSON.decode, request.text)
-        if not decoded_ok then
-            failCardReaderLibrarySync(job, "manifest JSON is invalid: " .. tostring(payload))
-            return
-        end
-        local validation_ok, validation_error = pcall(validateCardPayload, payload)
-        if not validation_ok then
-            failCardReaderLibrarySync(job, "manifest validation failed: " .. tostring(validation_error))
-            return
-        end
-
-        startCardReaderLibraryScan(job, payload)
-    end)
-end
-
-function cardReaderLibraryRequestUrl(job)
-    if job.cache_bust == nil then
-        return CONFIG.library_manifest_url
-    end
-    local separator = string.find(CONFIG.library_manifest_url, "?", 1, true) and "&" or "?"
-    return CONFIG.library_manifest_url
-        .. separator
-        .. "card_reader_refresh="
-        .. tostring(job.cache_bust)
-end
-
-function retryCardReaderLibrarySync(job, reason, retry_after)
-    local delay = CONFIG.auto_sync_retry_delays[job.retry_index]
-    if delay == nil or (job.is_automatic and not CONFIG.auto_sync_enabled) then
-        failCardReaderLibrarySync(job, reason .. "; retry limit reached")
-        return
-    end
-
-    local requested_delay = tonumber(retry_after or 0) or 0
-    if requested_delay > delay then
-        delay = requested_delay
-    end
-    job.retry_index = job.retry_index + 1
-    print(string.format("Card Reader library sync %s; retrying in %d seconds.", reason, delay))
-    Wait.time(function()
-        requestCardReaderLibraryManifest(job)
-    end, delay)
-end
-
-function failCardReaderLibrarySync(job, reason)
-    if not librarySyncJobIsCurrent(job) then
-        return
-    end
-    print("Card Reader library synchronization stopped: " .. tostring(reason))
-    finishCardReaderLibrarySync(job)
-end
-
-function finishCardReaderLibrarySync(job)
-    if librarySyncJobIsCurrent(job) then
-        library_sync_state.in_progress = false
-    end
-end
-
-function librarySyncJobIsCurrent(job)
-    return library_sync_state.in_progress and job.generation == library_sync_state.generation
-end
-
-function inspectCardReaderLibrary()
-    local search_index = buildSearchIndex(CONFIG.source_region_guids)
-    local rows = {}
-
-    for _, entry in ipairs(search_index.entries) do
-        table.insert(rows, entry.name or "-")
-    end
-
-    print(table.concat(rows, "\n"))
 end
 
 function decodePayload(encoded)
@@ -265,49 +53,37 @@ function decodePayload(encoded)
     return JSON.decode(json_text)
 end
 
-function validateDeckPayload(payload)
+function validateExportPayload(payload)
     if type(payload) ~= "table" then
         error("Decoded payload must be a table.")
     end
 
-    if payload.schema ~= "card-reader.tts-deck.v1" then
-        error("Unsupported payload schema: " .. tostring(payload.schema))
+    if payload.schema == "card-reader.tts-deck.v1"
+        or payload.schema == "card-reader.tts-cards.v1" then
+        error("This export is outdated. Re-export it from Card Reader to use sheet-based cards.")
     end
-
-    if type(payload.deck) ~= "table" or type(payload.deck.name) ~= "string" then
-        error("Payload deck metadata is invalid.")
-    end
-
-    if type(payload.cards) ~= "table" then
-        error("Payload cards collection is invalid.")
-    end
-end
-
-function validateCardPayload(payload)
-    if type(payload) ~= "table" then
-        error("Decoded payload must be a table.")
-    end
-
-    if payload.schema == "card-reader.tts-cards.v1" then
-        error("This direct-card export is outdated. Re-export it from Card Reader to use sheet-based cards.")
-    end
-
     if payload.schema ~= "card-reader.tts-cards.v2" then
         error("Unsupported payload schema: " .. tostring(payload.schema))
     end
 
-    if type(payload.collection) ~= "table" or type(payload.collection.name) ~= "string" then
+    if type(payload.collection) ~= "table"
+        or type(payload.collection.name) ~= "string"
+        or trim(payload.collection.name) == "" then
         error("Payload collection metadata is invalid.")
     end
-
+    if payload.collection.description ~= nil
+        and type(payload.collection.description) ~= "string" then
+        error("Payload collection description is invalid.")
+    end
+    if payload.collection.source ~= nil and type(payload.collection.source) ~= "table" then
+        error("Payload collection source is invalid.")
+    end
     if type(payload.card_back_url) ~= "string" or trim(payload.card_back_url) == "" then
         error("Payload card back URL is invalid.")
     end
-
     if type(payload.sheets) ~= "table" or #payload.sheets == 0 then
         error("Payload sheets collection is invalid.")
     end
-
     if type(payload.cards) ~= "table" or #payload.cards == 0 then
         error("Payload cards collection is invalid.")
     end
@@ -344,7 +120,8 @@ function validateCardPayload(payload)
             or sheet == nil
             or slot_index < 0
             or slot_index >= (tonumber(sheet.columns) * tonumber(sheet.rows))
-            or math.floor(tonumber(entry.quantity or 0) or 0) <= 0 then
+            or math.floor(tonumber(entry.quantity or 0) or 0) <= 0
+            or (entry.role ~= nil and type(entry.role) ~= "string") then
             error("Payload card entry " .. tostring(index) .. " is invalid.")
         end
     end
@@ -354,8 +131,7 @@ function validateCardPayload(payload)
     end
 end
 
-function spawnCardReaderSheetDeck(payload, options)
-    options = options or {}
+function spawnCardReaderSheetDeck(payload)
     local custom_deck = {}
     local sheet_keys = {}
     for index, sheet in ipairs(payload.sheets) do
@@ -379,31 +155,34 @@ function spawnCardReaderSheetDeck(payload, options)
         end
     end
 
-    logMissingCards(buildExportSkippedRequests(payload.skipped))
+    logSkippedCards(payload.skipped)
     local object_data
     if #contained == 1 then
-        object_data = buildStandaloneSheetCardData(contained[1], custom_deck)
+        object_data = buildStandaloneSheetCardData(
+            contained[1],
+            custom_deck,
+            payload.collection
+        )
     else
-        object_data = buildSheetDeckData(payload.collection.name, deck_ids, custom_deck, contained)
+        object_data = buildSheetDeckData(
+            payload.collection,
+            deck_ids,
+            custom_deck,
+            contained
+        )
     end
 
     spawnObjectData({
         data = object_data,
-        position = options.position or CONFIG.spawn_position,
+        position = CONFIG.spawn_position,
         callback_function = function(object)
             if object ~= nil and not object.isDestroyed() then
-                if #contained > 1 then
-                    object.setName(payload.collection.name)
-                end
                 print(string.format(
                     "Imported '%s' with %d cards across %d sheets.",
                     payload.collection.name,
                     #contained,
                     #payload.sheets
                 ))
-            end
-            if type(options.callback_function) == "function" then
-                options.callback_function(object, #contained)
             end
         end,
     })
@@ -421,22 +200,27 @@ function buildCustomDeckState(sheet, card_back_url)
 end
 
 function buildSheetContainedCardData(entry, card_id, sheet_url)
-    local gm_notes = JSON.encode({
+    local metadata = {
         schema = "card-reader.tts-card.v2",
         card_id = trim(entry.card_id),
         card_version_id = trim(entry.card_version_id),
+        name = trim(entry.name),
         image_checksum = trim(entry.image_checksum or ""),
         sheet_id = trim(entry.sheet_id),
         slot_index = math.floor(tonumber(entry.slot_index)),
         stable_sheet_url = trim(sheet_url),
         lifecycle_status = trim(entry.lifecycle_status or ""),
-    })
+    }
+    if type(entry.role) == "string" and trim(entry.role) ~= "" then
+        metadata.role = trim(entry.role)
+    end
+
     return {
         Name = "Card",
         Transform = defaultObjectTransform(),
         Nickname = trim(entry.name),
         Description = "",
-        GMNotes = gm_notes,
+        GMNotes = JSON.encode(metadata),
         CardID = card_id,
         SidewaysCard = false,
         LuaScript = "",
@@ -445,23 +229,34 @@ function buildSheetContainedCardData(entry, card_id, sheet_url)
     }
 end
 
-function buildStandaloneSheetCardData(contained_card, custom_deck)
+function buildStandaloneSheetCardData(contained_card, custom_deck, collection)
     local object_data = deepCopy(contained_card)
     local sheet_key = math.floor(tonumber(object_data.CardID) / 100)
     object_data.Name = "CardCustom"
     object_data.CustomDeck = {
         [sheet_key] = custom_deck[sheet_key],
     }
+
+    if collectionIsDeck(collection) then
+        object_data.Nickname = trim(collection.name)
+        object_data.Description = collectionDescription(collection)
+        local metadata = JSON.decode(object_data.GMNotes)
+        metadata.collection = collection
+        object_data.GMNotes = JSON.encode(metadata)
+    end
     return object_data
 end
 
-function buildSheetDeckData(name, deck_ids, custom_deck, contained)
+function buildSheetDeckData(collection, deck_ids, custom_deck, contained)
     return {
         Name = "DeckCustom",
         Transform = defaultObjectTransform(),
-        Nickname = name,
-        Description = "",
-        GMNotes = "",
+        Nickname = trim(collection.name),
+        Description = collectionDescription(collection),
+        GMNotes = JSON.encode({
+            schema = "card-reader.tts-collection.v1",
+            collection = collection,
+        }),
         DeckIDs = deck_ids,
         CustomDeck = custom_deck,
         ContainedObjects = contained,
@@ -469,6 +264,17 @@ function buildSheetDeckData(name, deck_ids, custom_deck, contained)
         LuaScriptState = "",
         XmlUI = "",
     }
+end
+
+function collectionIsDeck(collection)
+    return type(collection.source) == "table" and collection.source.type == "deck"
+end
+
+function collectionDescription(collection)
+    if type(collection.description) == "string" then
+        return collection.description
+    end
+    return ""
 end
 
 function defaultObjectTransform()
@@ -485,576 +291,6 @@ function defaultObjectTransform()
     }
 end
 
-function buildImportRequests(payload)
-    local requests = {}
-
-    if type(payload.hero) == "table" and tonumber(payload.hero.quantity or 0) > 0 then
-        addImportRequest(requests, payload.hero, "hero")
-    end
-
-    for _, entry in ipairs(payload.cards) do
-        addImportRequest(requests, entry, "mainboard")
-    end
-
-    return requests
-end
-
-function addImportRequest(requests, entry, fallback_role)
-    local quantity = math.floor(tonumber(entry.quantity or 0) or 0)
-    local name = trim(entry.name or "")
-    local card_id = trim(entry.card_id or "")
-    if quantity <= 0 or name == "" then
-        return
-    end
-
-    local role = tostring(entry.role or fallback_role)
-    local identity_key = card_id ~= "" and card_id or normalizeLookupValue(name)
-    local key = role .. "\n" .. identity_key
-    local existing = requests.by_key ~= nil and requests.by_key[key] or nil
-    if existing ~= nil then
-        existing.quantity = existing.quantity + quantity
-        existing.remaining = existing.remaining + quantity
-        return
-    end
-
-    local request = {
-        role = role,
-        quantity = quantity,
-        remaining = quantity,
-        name = name,
-        card_id = card_id,
-        source_resolved = false,
-        source = nil,
-    }
-    table.insert(requests, request)
-
-    requests.by_key = requests.by_key or {}
-    requests.by_key[key] = request
-end
-
-function countRequestedCards(requests)
-    local total = 0
-    for _, request in ipairs(requests) do
-        total = total + request.quantity
-    end
-    return total
-end
-
-function buildSearchIndex(region_guids)
-    local search_index = createSearchIndex()
-
-    for _, guid in ipairs(region_guids) do
-        local region = getObjectFromGUID(guid)
-        if isScriptingRegion(region) then
-            for _, object in ipairs(region.getObjects()) do
-                addObjectToSearchIndex(search_index, object)
-            end
-        end
-    end
-
-    return search_index
-end
-
-function createSearchIndex()
-    return {
-        entries = {},
-        legacy_entries = {},
-        by_card_id = {},
-        card_id_counts = {},
-        by_name = {},
-        legacy_by_name = {},
-        name_counts = {},
-    }
-end
-
-function addSearchIndexEntry(search_index, contained)
-    local metadata = readSourceMetadata(contained)
-    local row = {
-        data = contained,
-        name = metadata.name,
-        card_id = metadata.card_id,
-    }
-
-    table.insert(search_index.entries, row)
-
-    if row.card_id ~= nil and row.card_id ~= "" then
-        search_index.card_id_counts[row.card_id] = (search_index.card_id_counts[row.card_id] or 0) + 1
-        if search_index.by_card_id[row.card_id] == nil then
-            search_index.by_card_id[row.card_id] = row
-        end
-    else
-        table.insert(search_index.legacy_entries, row)
-    end
-    if row.name ~= nil and row.name ~= "" then
-        local normalized_name = normalizeLookupValue(row.name)
-        search_index.name_counts[normalized_name] = (search_index.name_counts[normalized_name] or 0) + 1
-        if search_index.by_name[normalized_name] == nil then
-            search_index.by_name[normalized_name] = row
-        end
-        if (row.card_id == nil or row.card_id == "")
-            and search_index.legacy_by_name[normalized_name] == nil then
-            search_index.legacy_by_name[normalized_name] = row
-        end
-    end
-end
-
-function addObjectToSearchIndex(search_index, object)
-    if object == nil or object.isDestroyed() then
-        return
-    end
-
-    local data = object.getData()
-    local contained_objects = data.ContainedObjects or {}
-
-    if #contained_objects > 0 then
-        for _, contained in ipairs(contained_objects) do
-            addSearchIndexEntry(search_index, contained)
-        end
-        return
-    end
-
-    addSearchIndexEntry(search_index, data)
-end
-
-function startCardReaderLibraryScan(job, payload)
-    local target_region_guid = nil
-    for _, guid in ipairs(CONFIG.source_region_guids) do
-        if isScriptingRegion(getObjectFromGUID(guid)) then
-            target_region_guid = guid
-            break
-        end
-    end
-    if target_region_guid == nil then
-        failCardReaderLibrarySync(job, "no configured source scripting region was found")
-        return
-    end
-
-    job.payload = payload
-    job.search_index = createSearchIndex()
-    job.target_region_guid = target_region_guid
-    job.target_occupied_positions = {}
-    job.region_index = 1
-    job.current_region_guid = nil
-    job.region_objects = nil
-    job.region_object_index = 1
-    job.contained_objects = nil
-    job.contained_index = 1
-    scanCardReaderLibraryBatch(job)
-end
-
-function scanCardReaderLibraryBatch(job)
-    if not librarySyncJobIsCurrent(job) then
-        return
-    end
-
-    local processed = 0
-    while processed < CONFIG.index_batch_size do
-        if job.contained_objects ~= nil then
-            local contained = job.contained_objects[job.contained_index]
-            if contained == nil then
-                job.contained_objects = nil
-                job.region_object_index = job.region_object_index + 1
-            else
-                addSearchIndexEntry(job.search_index, contained)
-                job.contained_index = job.contained_index + 1
-                processed = processed + 1
-            end
-        elseif job.region_objects == nil then
-            local guid = CONFIG.source_region_guids[job.region_index]
-            if guid == nil then
-                finishCardReaderLibraryScan(job)
-                return
-            end
-
-            local region = getObjectFromGUID(guid)
-            if not isScriptingRegion(region) then
-                job.region_index = job.region_index + 1
-            else
-                job.current_region_guid = guid
-                job.region_objects = region.getObjects()
-                job.region_object_index = 1
-            end
-        else
-            local object = job.region_objects[job.region_object_index]
-            if object == nil then
-                job.region_objects = nil
-                job.current_region_guid = nil
-                job.region_index = job.region_index + 1
-            elseif object.isDestroyed() then
-                job.region_object_index = job.region_object_index + 1
-                processed = processed + 1
-            else
-                if job.current_region_guid == job.target_region_guid then
-                    table.insert(job.target_occupied_positions, object.getPosition())
-                end
-
-                if isEnumerableCardReaderContainer(object) then
-                    local contained_objects = object.getObjects()
-                    if type(contained_objects) == "table" and #contained_objects > 0 then
-                        job.contained_objects = contained_objects
-                        job.contained_index = 1
-                    else
-                        job.region_object_index = job.region_object_index + 1
-                        processed = processed + 1
-                    end
-                elseif object.tag == "Card" then
-                    addSearchIndexEntry(job.search_index, {
-                        Name = object.getName(),
-                        Description = object.getDescription(),
-                        GMNotes = object.getGMNotes(),
-                    })
-                    job.region_object_index = job.region_object_index + 1
-                    processed = processed + 1
-                else
-                    job.region_object_index = job.region_object_index + 1
-                    processed = processed + 1
-                end
-            end
-        end
-    end
-
-    Wait.frames(function()
-        scanCardReaderLibraryBatch(job)
-    end, 1)
-end
-
-function finishCardReaderLibraryScan(job)
-    if not librarySyncJobIsCurrent(job) then
-        return
-    end
-
-    local missing_cards = {}
-    local existing_count = 0
-    local legacy_count = 0
-    for _, card in ipairs(job.payload.cards) do
-        local card_id = trim(card.card_id or "")
-        local existing = job.search_index.by_card_id[card_id]
-        if existing ~= nil then
-            existing_count = existing_count + 1
-        else
-            local normalized_name = normalizeLookupValue(card.name or "")
-            local legacy = job.search_index.by_name[normalized_name]
-            if job.search_index.name_counts[normalized_name] == 1
-                and legacy ~= nil
-                and (legacy.card_id == nil or legacy.card_id == "") then
-                legacy_count = legacy_count + 1
-            else
-                table.insert(missing_cards, card)
-            end
-        end
-    end
-
-    local duplicate_count = countDuplicateCardReaderIds(job.search_index)
-    local skipped_count = #(job.payload.skipped or {})
-    if #missing_cards == 0 then
-        printCardReaderLibrarySyncSummary(
-            existing_count,
-            0,
-            legacy_count,
-            duplicate_count,
-            skipped_count
-        )
-        finishCardReaderLibrarySync(job)
-        return
-    end
-
-    local update_payload = buildCardReaderLibraryUpdatePayload(job.payload, missing_cards)
-    local position, position_error = buildCardReaderLibraryBatchPosition(
-        job.target_region_guid,
-        job.target_occupied_positions
-    )
-    if position == nil then
-        failCardReaderLibrarySync(job, position_error)
-        return
-    end
-    spawnCardReaderSheetDeck(update_payload, {
-        position = position,
-        callback_function = function(object, spawned_count)
-            if object == nil or object.isDestroyed() then
-                failCardReaderLibrarySync(job, "the missing-card batch failed to spawn")
-                return
-            end
-            printCardReaderLibrarySyncSummary(
-                existing_count,
-                spawned_count,
-                legacy_count,
-                duplicate_count,
-                skipped_count
-            )
-            finishCardReaderLibrarySync(job)
-        end,
-    })
-end
-
-function buildCardReaderLibraryUpdatePayload(payload, missing_cards)
-    local required_sheet_ids = {}
-    for _, card in ipairs(missing_cards) do
-        required_sheet_ids[card.sheet_id] = true
-    end
-
-    local sheets = {}
-    for _, sheet in ipairs(payload.sheets) do
-        if required_sheet_ids[sheet.sheet_id] then
-            table.insert(sheets, sheet)
-        end
-    end
-
-    return {
-        schema = payload.schema,
-        collection = {
-            name = string.format("Card Reader Library Update (%d new)", #missing_cards),
-            source = payload.collection.source,
-        },
-        card_back_url = payload.card_back_url,
-        sheets = sheets,
-        cards = missing_cards,
-        skipped = {},
-    }
-end
-
-function buildCardReaderLibraryBatchPosition(region_guid, occupied_positions)
-    local region = getObjectFromGUID(region_guid)
-    if not isScriptingRegion(region) then
-        return nil, "the source scripting region disappeared before the update could spawn"
-    end
-
-    local spacing = tonumber(CONFIG.library_batch_spacing) or 0
-    if spacing <= 0 then
-        return nil, "library_batch_spacing must be greater than zero"
-    end
-
-    local bounds = region.getBoundsNormalized()
-    local size = bounds and bounds.size or nil
-    if size == nil or tonumber(size.x) == nil or tonumber(size.z) == nil then
-        return nil, "the source scripting region has no usable bounds"
-    end
-
-    local columns = math.max(1, math.floor(tonumber(size.x) / spacing))
-    local rows = math.max(1, math.floor(tonumber(size.z) / spacing))
-    local center = bounds.center or region.getPosition()
-    local right = region.getTransformRight()
-    local forward = region.getTransformForward()
-    local capacity = columns * rows
-
-    for slot_index = 0, capacity - 1 do
-        local column = slot_index % columns
-        local row = math.floor(slot_index / columns)
-        local local_x = (column - ((columns - 1) / 2)) * spacing
-        local local_z = (row - ((rows - 1) / 2)) * spacing
-        local candidate = {
-            x = center.x + (right.x * local_x) + (forward.x * local_z),
-            y = center.y + (right.y * local_x) + (forward.y * local_z),
-            z = center.z + (right.z * local_x) + (forward.z * local_z),
-        }
-        if cardReaderLibrarySlotIsVacant(candidate, occupied_positions, spacing) then
-            return candidate
-        end
-    end
-
-    return nil, string.format(
-        "the source scripting region is full (%d library batch slots)",
-        capacity
-    )
-end
-
-function cardReaderLibrarySlotIsVacant(candidate, occupied_positions, spacing)
-    local collision_radius = spacing / 2
-    for _, occupied in ipairs(occupied_positions) do
-        if horizontalDistance(candidate, occupied) < collision_radius then
-            return false
-        end
-    end
-    return true
-end
-
-function countDuplicateCardReaderIds(search_index)
-    local duplicate_count = 0
-    for _, count in pairs(search_index.card_id_counts) do
-        if count > 1 then
-            duplicate_count = duplicate_count + count - 1
-        end
-    end
-    return duplicate_count
-end
-
-function printCardReaderLibrarySyncSummary(existing, added, legacy, duplicates, skipped)
-    print(string.format(
-        "Card Reader library sync complete: existing=%d, added=%d, legacy-matched=%d, duplicates=%d, server-skipped=%d.",
-        existing,
-        added,
-        legacy,
-        duplicates,
-        skipped
-    ))
-end
-
-function startImportJob(payload, requests)
-    local job = createImportJob(payload, requests)
-    job.search_index = createSearchIndex()
-    job.source_region_guids = CONFIG.source_region_guids
-    job.region_index = 1
-    job.region_objects = nil
-    job.region_object_index = 1
-    job.contained_objects = nil
-    job.contained_index = 1
-
-    print(string.format(
-        "Importing '%s' with %d card types and %d requested cards.",
-        payloadCollectionName(payload),
-        #requests,
-        countRequestedCards(requests)
-    ))
-    buildSearchIndexForImport(job)
-end
-
-function createImportJob(payload, requests)
-    return {
-        payload = payload,
-        requests = requests,
-        request_index = 1,
-        spawn_index = 1,
-        expected_spawns = 0,
-        spawned = {},
-        missing = {},
-    }
-end
-
-function buildExportSkippedRequests(skipped)
-    local requests = {}
-    for _, entry in ipairs(skipped or {}) do
-        table.insert(requests, {
-            quantity = 1,
-            name = trim(entry.name or entry.card_id or "Unknown card"),
-            role = "export",
-            reason = trim(entry.reason or "Skipped by Card Reader."),
-        })
-    end
-    return requests
-end
-
-function buildSearchIndexForImport(job)
-    local processed = 0
-
-    while processed < CONFIG.index_batch_size do
-        if job.contained_objects ~= nil then
-            local contained = job.contained_objects[job.contained_index]
-            if contained == nil then
-                job.contained_objects = nil
-                job.region_object_index = job.region_object_index + 1
-            else
-                addSearchIndexEntry(job.search_index, contained)
-                job.contained_index = job.contained_index + 1
-                processed = processed + 1
-            end
-        elseif job.region_objects == nil then
-            local guid = job.source_region_guids[job.region_index]
-            if guid == nil then
-                print(string.format("Indexed %d source cards.", #job.search_index.entries))
-                spawnImportBatch(job)
-                return
-            end
-
-            local region = getObjectFromGUID(guid)
-            if region == nil then
-                print("Source scripting region not found: " .. tostring(guid))
-                job.region_index = job.region_index + 1
-            elseif not isScriptingRegion(region) then
-                print("Source GUID is not a scripting region: " .. tostring(guid))
-                job.region_index = job.region_index + 1
-            else
-                job.region_objects = region.getObjects()
-                job.region_object_index = 1
-            end
-        else
-            local object = job.region_objects[job.region_object_index]
-            if object == nil then
-                job.region_objects = nil
-                job.region_index = job.region_index + 1
-            elseif object.isDestroyed() then
-                job.region_object_index = job.region_object_index + 1
-            else
-                local data = object.getData()
-                local contained_objects = data.ContainedObjects or {}
-                if #contained_objects > 0 then
-                    job.contained_objects = contained_objects
-                    job.contained_index = 1
-                else
-                    addSearchIndexEntry(job.search_index, data)
-                    job.region_object_index = job.region_object_index + 1
-                    processed = processed + 1
-                end
-            end
-        end
-    end
-
-    Wait.frames(function()
-        buildSearchIndexForImport(job)
-    end, 1)
-end
-
-function isScriptingRegion(object)
-    return object ~= nil and type(object.getObjects) == "function"
-end
-
-function isEnumerableCardReaderContainer(object)
-    return object.tag == "Deck" or object.tag == "Bag"
-end
-
-function spawnImportBatch(job)
-    local processed = 0
-
-    while processed < CONFIG.spawn_batch_size do
-        local request = job.requests[job.request_index]
-        if request == nil then
-            waitForImportSpawns(job)
-            return
-        end
-
-        if request.remaining <= 0 then
-            job.request_index = job.request_index + 1
-        else
-            if not request.source_resolved then
-                request.source = findSourceCard(request, job.search_index)
-                request.source_resolved = true
-            end
-
-            if request.source == nil then
-                table.insert(job.missing, request)
-                job.request_index = job.request_index + 1
-                processed = processed + 1
-            else
-                spawnImportCard(job, request)
-                request.remaining = request.remaining - 1
-                processed = processed + 1
-                if request.remaining <= 0 then
-                    job.request_index = job.request_index + 1
-                end
-            end
-        end
-    end
-
-    Wait.frames(function()
-        spawnImportBatch(job)
-    end, 1)
-end
-
-function spawnImportCard(job, request)
-    local spawn_position = buildSpawnPosition(job.spawn_index)
-    local object_data = deepCopy(request.source.data)
-    object_data.GUID = nil
-    job.expected_spawns = job.expected_spawns + 1
-    job.spawn_index = job.spawn_index + 1
-
-    spawnObjectData({
-        data = object_data,
-        position = spawn_position,
-        callback_function = function(spawned_object)
-            applySpawnMetadata(spawned_object, request)
-            table.insert(job.spawned, spawned_object)
-        end,
-    })
-end
-
 function verifiedAssetUrl(url)
     local prefix = "{verifycache}"
     if string.sub(url, 1, #prefix) == prefix then
@@ -1063,322 +299,28 @@ function verifiedAssetUrl(url)
     return prefix .. url
 end
 
-function countMissingCards(missing)
-    local total = 0
-    for _, request in ipairs(missing or {}) do
-        total = total + (tonumber(request.quantity or 0) or 0)
-    end
-    return total
-end
-
-function waitForImportSpawns(job)
-    logMissingCards(job.missing)
-
-    if job.expected_spawns == 0 then
-        finalizeImportedDeck(job.payload, job.spawned, job.missing)
-        return
-    end
-
-    Wait.condition(
-        function()
-            scheduleFinalizeImportedDeck(job)
-        end,
-        function()
-            return #job.spawned == job.expected_spawns
-        end,
-        CONFIG.wait_timeout_seconds,
-        function()
-            print(string.format(
-                "Timed out while waiting for imported cards to finish spawning. Spawned %d of %d found cards.",
-                #job.spawned,
-                job.expected_spawns
-            ))
-            logMissingCards(job.missing)
-            scheduleFinalizeImportedDeck(job)
-        end
-    )
-end
-
-function readSourceMetadata(card_data)
-    local gm_notes = card_data.GMNotes or card_data.gm_notes or ""
-    local description = card_data.Description or card_data.description or ""
-    local nickname = trim(card_data.Nickname or card_data.nickname or card_data.Name or card_data.name or "")
-    local metadata = {
-        name = nickname,
-        card_id = nil,
-    }
-
-    local parsed = decodeEmbeddedJson(gm_notes) or decodeEmbeddedJson(description)
-    if parsed ~= nil then
-        metadata.name = parsed.name or metadata.name
-        if type(parsed.card_id) == "string" and trim(parsed.card_id) ~= "" then
-            metadata.card_id = trim(parsed.card_id)
-        end
-    end
-
-    return metadata
-end
-
-function findSourceCard(request, search_index)
-    local name_index = search_index.by_name
-    local fuzzy_entries = search_index.entries
-    if request.card_id ~= nil and request.card_id ~= "" then
-        local card_id_match = search_index.by_card_id[request.card_id]
-        if card_id_match ~= nil then
-            return card_id_match
-        end
-        name_index = search_index.legacy_by_name
-        fuzzy_entries = search_index.legacy_entries
-    end
-    if request.name == nil or request.name == "" then
-        return nil
-    end
-
-    local normalized = normalizeLookupValue(request.name)
-    if name_index[normalized] ~= nil then
-        return name_index[normalized]
-    end
-
-    return findFuzzyNameSource(normalized, fuzzy_entries)
-end
-
-function findFuzzyNameSource(normalized_name, entries)
-    local match = nil
-    local match_count = 0
-
-    for _, entry in ipairs(entries) do
-        if entry.name ~= nil and namesAreWithinDistance(normalized_name, normalizeLookupValue(entry.name), CONFIG.fuzzy_name_distance) then
-            match = entry
-            match_count = match_count + 1
-            if match_count > 1 then
-                return nil
-            end
-        end
-    end
-
-    return match
-end
-
-function namesAreWithinDistance(left, right, max_distance)
-    local left_length = #left
-    local right_length = #right
-    local length_delta = math.abs(left_length - right_length)
-
-    if length_delta > max_distance then
-        return false
-    end
-
-    if left_length == right_length then
-        local differences = 0
-        for index = 1, left_length do
-            if string.sub(left, index, index) ~= string.sub(right, index, index) then
-                differences = differences + 1
-                if differences > max_distance then
-                    return false
-                end
-            end
-        end
-        return true
-    end
-
-    return namesMatchWithOneInsertionOrDeletion(left, right)
-end
-
-function namesMatchWithOneInsertionOrDeletion(left, right)
-    local shorter = left
-    local longer = right
-
-    if #left > #right then
-        shorter = right
-        longer = left
-    end
-
-    local shorter_index = 1
-    local longer_index = 1
-    local skipped = 0
-
-    while shorter_index <= #shorter and longer_index <= #longer do
-        if string.sub(shorter, shorter_index, shorter_index) == string.sub(longer, longer_index, longer_index) then
-            shorter_index = shorter_index + 1
-            longer_index = longer_index + 1
-        else
-            skipped = skipped + 1
-            if skipped > 1 then
-                return false
-            end
-            longer_index = longer_index + 1
-        end
-    end
-
-    return true
-end
-
-function buildSpawnPosition(index)
-    local zero_based = index - 1
-    return {
-        x = CONFIG.spawn_position.x,
-        y = CONFIG.spawn_position.y + (zero_based * CONFIG.stack_y_spacing),
-        z = CONFIG.spawn_position.z,
-    }
-end
-
-function scheduleFinalizeImportedDeck(job)
-    Wait.frames(function()
-        finalizeImportedDeck(job.payload, job.spawned, job.missing)
-    end, CONFIG.finalize_wait_frames)
-end
-
-function finalizeImportedDeck(payload, objects, missing)
-    local primary = findImportedDeckTarget(objects)
-    local collection_name = payloadCollectionName(payload)
-
-    if primary == nil and #objects == 0 then
-        print("No cards were spawned.")
-        return
-    end
-
-    if primary ~= nil and not primary.isDestroyed() then
-        primary.setName(collection_name)
-        local description = payloadDescription(payload)
-        if description ~= nil then
-            primary.setDescription(description)
-        end
-    else
-        print("Imported deck target could not be found for naming.")
-    end
-
-    local missing_count = countMissingCards(missing)
-    if missing_count > 0 then
-        print(string.format(
-            "Imported '%s' with %d spawned cards and %d missing cards.",
-            collection_name,
-            #objects,
-            missing_count
-        ))
-    else
-        print(string.format("Imported '%s' with %d spawned cards.", collection_name, #objects))
-    end
-end
-
-function payloadCollectionName(payload)
-    if type(payload.deck) == "table" then
-        return payload.deck.name
-    end
-    return payload.collection.name
-end
-
-function payloadDescription(payload)
-    if type(payload.deck) == "table" then
-        return payload.deck.description
-    end
-    return nil
-end
-
-function findImportedDeckTarget(objects, fallback_position)
-    local live_objects = collectLiveObjects(objects)
-    if #live_objects > 1 then
-        local grouped = group(live_objects) or {}
-        return grouped[1] or live_objects[1]
-    end
-
-    if #live_objects == 1 then
-        return live_objects[1]
-    end
-
-    return findNearestSpawnedObject(fallback_position or CONFIG.spawn_position)
-end
-
-function collectLiveObjects(objects)
-    local live_objects = {}
-
-    for _, object in ipairs(objects or {}) do
-        if object ~= nil and not object.isDestroyed() then
-            table.insert(live_objects, object)
-        end
-    end
-
-    return live_objects
-end
-
-function findNearestSpawnedObject(spawn_position)
-    local nearest = nil
-    local nearest_distance = nil
-
-    for _, object in ipairs(getAllObjects()) do
-        if isImportDeckTargetCandidate(object) then
-            local position = object.getPosition()
-            local distance = horizontalDistance(position, spawn_position)
-
-            if distance <= CONFIG.finalize_search_radius
-                and (nearest_distance == nil or distance < nearest_distance) then
-                nearest = object
-                nearest_distance = distance
-            end
-        end
-    end
-
-    return nearest
-end
-
-function isImportDeckTargetCandidate(object)
-    if object == nil or object.isDestroyed() then
-        return false
-    end
-
-    return object.tag == "Card" or object.tag == "Deck"
-end
-
-function horizontalDistance(left, right)
-    local dx = left.x - right.x
-    local dz = left.z - right.z
-
-    return math.sqrt((dx * dx) + (dz * dz))
-end
-
-function logMissingCards(missing)
-    if missing == nil or #missing == 0 then
+function logSkippedCards(skipped)
+    if skipped == nil or #skipped == 0 then
         return
     end
 
     local rows = {}
-    for index, request in ipairs(missing) do
+    for index, entry in ipairs(skipped) do
+        local quantity = math.floor(tonumber(entry.quantity or 1) or 1)
         local row = string.format(
             "%d. %s x%d | role=%s",
             index,
-            tostring(request.name or "-"),
-            tonumber(request.quantity or 0) or 0,
-            tostring(request.role or "-")
+            tostring(entry.name or entry.card_id or "Unknown card"),
+            quantity,
+            tostring(entry.role or "export")
         )
-        if request.reason ~= nil and request.reason ~= "" then
-            row = row .. " | reason=" .. tostring(request.reason)
+        if entry.reason ~= nil and entry.reason ~= "" then
+            row = row .. " | reason=" .. tostring(entry.reason)
         end
         table.insert(rows, row)
     end
 
-    print("Skipped or missing Card Reader cards:\n" .. table.concat(rows, "\n"))
-end
-
-function applySpawnMetadata(object, request)
-    if request.name ~= nil and request.name ~= "" then
-        object.setName(request.name)
-    end
-end
-
-function decodeEmbeddedJson(text)
-    if type(text) ~= "string" or trim(text) == "" then
-        return nil
-    end
-
-    local ok, parsed = pcall(JSON.decode, text)
-    if ok and type(parsed) == "table" then
-        return parsed
-    end
-
-    return nil
-end
-
-function normalizeLookupValue(value)
-    return string.lower(trim(tostring(value)))
+    print("Skipped Card Reader cards:\n" .. table.concat(rows, "\n"))
 end
 
 function trim(value)
@@ -1388,15 +330,12 @@ function trim(value)
 
     local first = 1
     local last = #value
-
     while first <= last and isWhitespace(string.sub(value, first, first)) do
         first = first + 1
     end
-
     while last >= first and isWhitespace(string.sub(value, last, last)) do
         last = last - 1
     end
-
     return string.sub(value, first, last)
 end
 
@@ -1436,7 +375,6 @@ function base64Decode(input)
 
     local output = {}
     local output_chunk = {}
-
     for index = 1, #clean, 4 do
         local character1 = string.sub(clean, index, index)
         local character2 = string.sub(clean, index + 1, index + 1)
@@ -1480,6 +418,5 @@ function base64Decode(input)
     if #output_chunk > 0 then
         output[#output + 1] = table.concat(output_chunk)
     end
-
     return table.concat(output)
 end

@@ -4,36 +4,33 @@ import base64
 from io import BytesIO
 import json
 from itertools import count
-from unittest.mock import patch
 
 from django.test import Client
 from PIL import Image
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    Card,
     CardBack,
     CardVersion,
     CardVersionImage,
     ContentVersion,
+    DeckTag,
     TtsCardSheet,
 )
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckSideboardInput
-from card_reader_core.services.exports import TtsCardExportErrorCode, TtsCardExportService
-from card_reader_api.exports.tts_library import (
-    TtsCardLibraryMaterialization,
-    TtsCardLibraryMaterializer,
-    tts_card_library_materializer,
-)
 from test_decks import _build_mainboard_cards, _create_card, _create_user, _login_and_get_csrf_token
 
 _CONTENT_VERSION_COUNTER = count(500)
 
 
-def test_public_deck_tts_export_returns_base64_payload() -> None:
+def test_public_deck_tts_export_returns_sheet_payload_with_metadata() -> None:
+    TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-public-owner", "password")
     hero = _create_card(name="TTS Export Hero", is_hero=True)
     mainboard_cards = _build_mainboard_cards()
+    tag = DeckTag.objects.create(kind="role", key="tts-control", label="TTS Control")
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
         name="TTS Export Deck",
@@ -42,41 +39,51 @@ def test_public_deck_tts_export_returns_base64_payload() -> None:
         hero_card_id=hero.id,
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
+        difficulty="hard",
+        tag_ids=[tag.id],
     )
+    _prepare_tts_export("public-deck", [hero, *mainboard_cards])
 
-    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+    response = Client(HTTP_HOST="cards.example").get(f"/decks/{deck.id}/exports/tts")
 
     assert response.status_code == 200
-    assert response["Content-Type"].startswith("text/plain")
-    assert "tts-export-deck.tts.txt" in response["Content-Disposition"]
-    payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
-    assert payload == {
-        "schema": "card-reader.tts-deck.v1",
-        "deck": {
-            "name": "TTS Export Deck",
-            "description": "Export me",
+    response_payload = response.json()
+    assert response_payload["exported_count"] == 1 + (4 * len(mainboard_cards))
+    assert response_payload["skipped_count"] == 0
+    assert response_payload["sheet_count"] == 1
+    payload = _decode_tts_card_export(response_payload["encoded_payload"])
+    assert payload["schema"] == "card-reader.tts-cards.v2"
+    assert payload["collection"] == {
+        "name": "TTS Export Deck",
+        "description": "Export me",
+        "source": {
+            "type": "deck",
+            "deck_id": deck.id,
+            "scope": "mainboard",
+            "hero_card_id": hero.id,
+            "difficulty": "hard",
+            "tags": [
+                {
+                    "id": tag.id,
+                    "key": "tts-control",
+                    "label": "TTS Control",
+                    "kind": "role",
+                }
+            ],
         },
-        "hero": {
-            "role": "hero",
-            "quantity": 1,
-            "card_id": hero.id,
-            "name": hero.latest_version.name,
-        },
-        "cards": [
-            {
-                "role": "mainboard",
-                "quantity": 4,
-                "card_id": card.id,
-                "name": card.latest_version.name,
-            }
-            for card in mainboard_cards
-        ],
     }
-    assert len(payload["cards"]) == len(mainboard_cards)
-    assert payload["cards"][0]["role"] == "mainboard"
+    assert payload["cards"][0]["card_id"] == hero.id
+    assert payload["cards"][0]["role"] == "hero"
+    assert [card["card_id"] for card in payload["cards"][1:]] == [
+        card.id for card in mainboard_cards
+    ]
+    assert all(card["role"] == "mainboard" for card in payload["cards"][1:])
+    assert all(card["quantity"] == 4 for card in payload["cards"][1:])
+    assert payload["sheets"][0]["face_url"].startswith("http://cards.example/tts/card-sheets/")
 
 
 def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner() -> None:
+    TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-private-owner", "password")
     hero = _create_card(name="Private Export Hero", is_hero=True)
     mainboard_cards = _build_mainboard_cards()
@@ -89,6 +96,7 @@ def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner()
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
     )
+    _prepare_tts_export("private-deck", [hero, *mainboard_cards])
 
     public_response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
 
@@ -101,6 +109,7 @@ def test_private_deck_tts_export_is_hidden_from_non_owner_but_visible_to_owner()
 
 
 def test_unlisted_deck_tts_export_is_visible_to_non_owner_by_link() -> None:
+    TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-unlisted-owner", "password")
     hero = _create_card(name="Unlisted Export Hero", is_hero=True)
     mainboard_cards = _build_mainboard_cards()
@@ -113,13 +122,15 @@ def test_unlisted_deck_tts_export_is_visible_to_non_owner_by_link() -> None:
         entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
         sideboards=[],
     )
+    _prepare_tts_export("unlisted-deck", [hero, *mainboard_cards])
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
 
     assert response.status_code == 200
 
 
-def test_tts_export_omits_sideboard_entries_ignored_by_importer() -> None:
+def test_main_deck_tts_export_omits_sideboard_entries() -> None:
+    TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-sideboard-owner", "password")
     hero = _create_card(name="TTS Export Sideboard Hero", is_hero=True)
     mainboard_cards = _build_mainboard_cards()
@@ -138,17 +149,21 @@ def test_tts_export_omits_sideboard_entries_ignored_by_importer() -> None:
             )
         ],
     )
+    _prepare_tts_export("mainboard-only", [hero, *mainboard_cards])
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
 
     assert response.status_code == 200
-    payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
-    assert len(payload["cards"]) == len(mainboard_cards)
-    assert "sideboards" not in payload
-    assert "overall_total_cards" not in payload["deck"]
+    payload = _decode_tts_card_export(response.json()["encoded_payload"])
+    assert [card["card_id"] for card in payload["cards"]] == [
+        hero.id,
+        *[card.id for card in mainboard_cards],
+    ]
+    assert sideboard_card.id not in {card["card_id"] for card in payload["cards"]}
 
 
 def test_tts_export_can_target_one_sideboard() -> None:
+    TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-target-sideboard-owner", "password")
     hero = _create_card(name="TTS Export Target Sideboard Hero", is_hero=True)
     mainboard_cards = _build_mainboard_cards()
@@ -173,30 +188,45 @@ def test_tts_export_can_target_one_sideboard() -> None:
         ],
     )
     sideboard = next(sideboard for sideboard in deck.sideboards.all() if sideboard.name == "Tech")
+    _prepare_tts_export("target-sideboard", [sideboard_card])
 
     response = Client(HTTP_HOST="localhost").get(
         f"/decks/{deck.id}/exports/tts?sideboard_id={sideboard.id}"
     )
 
     assert response.status_code == 200
-    assert "tts-export-targeted-deck-tech.tts.txt" in response["Content-Disposition"]
-    payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
-    assert payload == {
-        "schema": "card-reader.tts-deck.v1",
-        "deck": {
-            "name": "TTS Export Targeted Deck - Tech",
-            "description": "Sideboard export",
+    assert response.json()["exported_count"] == 6
+    payload = _decode_tts_card_export(response.json()["encoded_payload"])
+    assert payload["collection"] == {
+        "name": "TTS Export Targeted Deck - Tech",
+        "description": "Sideboard export",
+        "source": {
+            "type": "deck",
+            "deck_id": deck.id,
+            "scope": "sideboard",
+            "hero_card_id": hero.id,
+            "difficulty": None,
+            "tags": [],
+            "sideboard_id": sideboard.id,
+            "sideboard_name": "Tech",
         },
-        "cards": [
-            {
-                "role": "sideboard",
-                "quantity": 6,
-                "card_id": sideboard_card.id,
-                "name": sideboard_card.latest_version.name,
-            }
-        ],
     }
-    assert "hero" not in payload
+    assert [
+        {
+            "card_id": card["card_id"],
+            "name": card["name"],
+            "quantity": card["quantity"],
+            "role": card["role"],
+        }
+        for card in payload["cards"]
+    ] == [
+        {
+            "card_id": sideboard_card.id,
+            "name": sideboard_card.latest_version.name,
+            "quantity": 6,
+            "role": "sideboard",
+        }
+    ]
 
 
 def test_tts_export_rejects_unknown_sideboard_id() -> None:
@@ -221,7 +251,146 @@ def test_tts_export_rejects_unknown_sideboard_id() -> None:
     assert response.json()["detail"] == "Sideboard not found"
 
 
+def test_deck_tts_export_reports_skipped_non_hero_quantities() -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-skipped-owner", "password")
+    hero = _create_card(name="TTS Export Skipped Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    missing = mainboard_cards[0]
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Skipped Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    _prepare_tts_export("skipped-mainboard", [hero, *mainboard_cards[1:]])
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 200
+    response_payload = response.json()
+    assert response_payload["exported_count"] == 1 + (4 * (len(mainboard_cards) - 1))
+    assert response_payload["skipped_count"] == 4
+    payload = _decode_tts_card_export(response_payload["encoded_payload"])
+    assert payload["skipped"] == [
+        {
+            "card_id": missing.id,
+            "name": missing.latest_version.name,
+            "quantity": 4,
+            "reason": "Card has no usable latest image.",
+            "role": "mainboard",
+        }
+    ]
+
+
+def test_deck_tts_export_requires_usable_hero_artwork() -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-required-hero-owner", "password")
+    hero = _create_card(name="TTS Export Required Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Required Hero Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    _prepare_tts_export("required-hero", mainboard_cards)
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Required deck hero 'TTS Export Required Hero' has no usable latest image."
+    )
+
+
+def test_owned_deck_tts_export_includes_deprecated_referenced_cards() -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-deprecated-owner", "password")
+    hero = _create_card(name="TTS Export Deprecated Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deprecated = mainboard_cards[0]
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Deprecated Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    deprecated.lifecycle_status = "deprecated"
+    deprecated.save(update_fields=["lifecycle_status", "updated_at"])
+    _prepare_tts_export("deprecated-deck", [hero, *mainboard_cards])
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+
+    response = client.get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 200
+    payload = _decode_tts_card_export(response.json()["encoded_payload"])
+    exported = next(card for card in payload["cards"] if card["card_id"] == deprecated.id)
+    assert exported["lifecycle_status"] == "deprecated"
+
+
+def test_deck_tts_export_returns_retryable_pending_sheet_response(monkeypatch) -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-pending-owner", "password")
+    hero = _create_card(name="TTS Export Pending Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export Pending Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    _prepare_tts_export("pending-deck", [hero, *mainboard_cards])
+    monkeypatch.setattr(settings, "environment", "production")
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 503
+    assert response["Retry-After"] == "2"
+
+
+def test_deck_tts_export_requires_a_current_card_back() -> None:
+    TtsCardSheet.objects.all().delete()
+    CardBack.objects.filter(is_current=True).update(is_current=False)
+    owner = _create_user("tts-export-no-back-owner", "password")
+    hero = _create_card(name="TTS Export No Back Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Export No Back Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    for card in [hero, *mainboard_cards]:
+        assert card.latest_version is not None
+        _create_card_image(card.latest_version, content=card.id.encode("utf-8"))
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "A usable current card back is required before exporting TTS cards."
+    )
+
+
 def test_tts_export_preserves_saved_entry_order() -> None:
+    TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-order-owner", "password")
     hero = _create_card(name="TTS Export Order Hero", is_hero=True)
     alpha_card = _create_card(name="Alpha TTS Card", is_hero=False)
@@ -250,16 +419,16 @@ def test_tts_export_preserves_saved_entry_order() -> None:
             )
         ],
     )
+    _prepare_tts_export("saved-order", [hero, beta_card, alpha_card, *filler_cards])
 
     response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
 
     assert response.status_code == 200
-    payload = json.loads(base64.b64decode(response.content).decode("utf-8"))
-    assert [card["name"] for card in payload["cards"][:2]] == [
+    payload = _decode_tts_card_export(response.json()["encoded_payload"])
+    assert [card["name"] for card in payload["cards"][1:3]] == [
         beta_card.latest_version.name,
         alpha_card.latest_version.name,
     ]
-    assert "sideboards" not in payload
 
 
 def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_images(
@@ -318,6 +487,7 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
         {
             "card_id": missing.id,
             "name": missing.latest_version.name,
+            "quantity": 1,
             "reason": "Card has no usable latest image.",
         }
     ]
@@ -427,177 +597,6 @@ def test_content_version_tts_card_export_excludes_deprecated_card_identities() -
     assert payload["skipped"] == []
 
 
-def test_public_tts_library_manifest_includes_active_and_deprecated_cards() -> None:
-    tts_card_library_materializer.clear()
-    TtsCardSheet.objects.all().delete()
-    _create_current_card_back("public-library")
-    deprecated = _create_card(name="AAA Deprecated Library Card", is_hero=False)
-    active = _create_card(name="BBB Active Library Card", is_hero=False)
-    missing = _create_card(name="CCC Missing Library Card", is_hero=False)
-    deprecated.lifecycle_status = "deprecated"
-    deprecated.save(update_fields=["lifecycle_status", "updated_at"])
-    _create_card_image(deprecated.latest_version, content=b"deprecated-library")
-    _create_card_image(active.latest_version, content=b"active-library")
-    client = Client(HTTP_HOST="cards.example")
-
-    response = client.get("/tts/card-library/cards.json")
-
-    assert response.status_code == 200
-    assert response["Cache-Control"] == "public, no-cache"
-    assert response["ETag"]
-    payload = response.json()
-    assert payload["schema"] == "card-reader.tts-cards.v2"
-    assert payload["collection"] == {
-        "name": "Card Reader Library",
-        "source": {"type": "library", "lifecycle_status": "all"},
-    }
-    card_ids = [card["card_id"] for card in payload["cards"]]
-    cards_by_id = {card["card_id"]: card for card in payload["cards"]}
-    assert card_ids.index(deprecated.id) < card_ids.index(active.id)
-    assert cards_by_id[deprecated.id]["lifecycle_status"] == "deprecated"
-    assert cards_by_id[active.id]["lifecycle_status"] == "active"
-    assert all(card["quantity"] == 1 for card in payload["cards"])
-    assert payload["sheets"][0]["face_url"].startswith("http://cards.example/tts/card-sheets/")
-    assert {
-        "card_id": missing.id,
-        "name": missing.latest_version.name,
-        "reason": "Card has no usable latest image.",
-    } in payload["skipped"]
-
-    with patch.object(
-        TtsCardExportService,
-        "build_library_export",
-        side_effect=AssertionError("cached manifest should not rebuild"),
-    ):
-        head = client.head("/tts/card-library/cards.json")
-        not_modified = client.get(
-            "/tts/card-library/cards.json",
-            HTTP_IF_NONE_MATCH=response["ETag"],
-        )
-    assert head.status_code == 200
-    assert head["ETag"] == response["ETag"]
-    assert int(head["Content-Length"]) == len(response.content)
-    assert not_modified.status_code == 304
-    assert not_modified["ETag"] == response["ETag"]
-
-
-def test_tts_library_materializer_rebuilds_before_caching_a_new_revision() -> None:
-    materializer = TtsCardLibraryMaterializer()
-    old_materialization = TtsCardLibraryMaterialization(
-        content=b"old",
-        etag='"old"',
-        error_code=None,
-        error_detail=None,
-    )
-    new_materialization = TtsCardLibraryMaterialization(
-        content=b"new",
-        etag='"new"',
-        error_code=None,
-        error_detail=None,
-    )
-
-    with (
-        patch.object(
-            TtsCardExportService,
-            "get_library_revision",
-            side_effect=["old", "old", "new", "new", "new"],
-        ),
-        patch.object(
-            materializer,
-            "_build",
-            side_effect=[old_materialization, new_materialization],
-        ) as build,
-    ):
-        rebuilt = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
-        cached = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
-
-    assert rebuilt is new_materialization
-    assert cached is new_materialization
-    assert build.call_count == 2
-
-
-def test_tts_library_materializer_rejects_an_unstable_snapshot() -> None:
-    materializer = TtsCardLibraryMaterializer()
-    candidate = TtsCardLibraryMaterialization(
-        content=b"unstable",
-        etag='"unstable"',
-        error_code=None,
-        error_detail=None,
-    )
-
-    with (
-        patch.object(
-            TtsCardExportService,
-            "get_library_revision",
-            side_effect=["initial", "initial", "first", "second", "third"],
-        ),
-        patch.object(materializer, "_build", return_value=candidate) as build,
-    ):
-        result = materializer.materialize(cache_key="origin", absolute_url=lambda path: path)
-
-    assert result.content is None
-    assert result.etag is None
-    assert result.error_code == TtsCardExportErrorCode.LIBRARY_UNSTABLE
-    assert build.call_count == 3
-
-
-def test_public_tts_library_manifest_retries_an_unstable_snapshot() -> None:
-    unstable = TtsCardLibraryMaterialization(
-        content=None,
-        etag=None,
-        error_code=TtsCardExportErrorCode.LIBRARY_UNSTABLE,
-        error_detail="The manifest changed while it was being prepared.",
-    )
-
-    with patch.object(tts_card_library_materializer, "materialize", return_value=unstable):
-        response = Client(HTTP_HOST="cards.example").get("/tts/card-library/cards.json")
-
-    assert response.status_code == 503
-    assert response["Retry-After"] == "2"
-    assert response.json()["detail"] == unstable.error_detail
-
-
-def test_public_tts_library_manifest_returns_retryable_pending_response(
-    monkeypatch,
-) -> None:
-    tts_card_library_materializer.clear()
-    TtsCardSheet.objects.all().delete()
-    storage_root = settings.storage_root_dir
-    monkeypatch.setattr(settings, "app_data_dir", storage_root)
-    monkeypatch.setattr(settings, "environment", "production")
-    _create_current_card_back("public-library-pending")
-    card = _create_card(name="Pending Public Library Card", is_hero=False)
-    _create_card_image(card.latest_version, content=b"pending-library")
-
-    client = Client(HTTP_HOST="cards.example")
-    response = client.get("/tts/card-library/cards.json")
-
-    assert response.status_code == 503
-    assert response["Retry-After"] == "2"
-    with patch.object(
-        TtsCardExportService,
-        "build_library_export",
-        side_effect=AssertionError("cached pending manifest should not rebuild"),
-    ):
-        cached_response = client.get("/tts/card-library/cards.json")
-    assert cached_response.status_code == 503
-    assert cached_response["Retry-After"] == "2"
-
-
-def test_public_tts_library_manifest_requires_a_current_card_back() -> None:
-    tts_card_library_materializer.clear()
-    CardBack.objects.filter(is_current=True).update(is_current=False)
-    card = _create_card(name="Public Library Without Back", is_hero=False)
-    _create_card_image(card.latest_version, content=b"no-library-back")
-
-    response = Client(HTTP_HOST="cards.example").get("/tts/card-library/cards.json")
-
-    assert response.status_code == 409
-    assert response.json()["detail"] == (
-        "A usable current card back is required before exporting TTS cards."
-    )
-
-
 def test_tts_card_export_requires_staff_and_a_current_card_back() -> None:
     regular = _create_user("tts-card-regular", "password", is_staff=False)
     regular_client = Client(HTTP_HOST="cards.example")
@@ -654,6 +653,13 @@ def test_tts_card_export_rejects_a_selection_without_usable_images() -> None:
 
 def _decode_tts_card_export(encoded_payload: str) -> dict[str, object]:
     return json.loads(base64.b64decode(encoded_payload).decode("utf-8"))
+
+
+def _prepare_tts_export(label: str, cards: list[Card]) -> None:
+    _create_current_card_back(label)
+    for card in cards:
+        assert card.latest_version is not None
+        _create_card_image(card.latest_version, content=f"{label}-{card.id}".encode("utf-8"))
 
 
 def _create_current_card_back(label: str) -> CardBack:

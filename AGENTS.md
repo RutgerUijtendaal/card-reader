@@ -141,7 +141,8 @@ Core stack:
 
 ## Auth Rules
 - Auth is enabled by default.
-- Card gallery, card assets, and the canonical TTS card-library manifest are public.
+- Card gallery and card assets are public. Deck TTS exports follow deck visibility; gallery and
+  content-version TTS exports require staff access.
 - Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - Developer-data metadata, browser downloads, and bootstrap-code creation require an active
@@ -187,9 +188,11 @@ Core stack:
   runtime storage. TTS sheet rows are the durable coalescing queue; no external broker is required.
 - Persistent TTS sheet slots are append-only. Never move, compact, delete, or reuse a Card identity's
   assigned sheet coordinate; merges preserve source slots and resolve them to the target Card.
-- The public TTS library manifest includes usable active and deprecated Cards. TTS library synchronization is
-  additive, identifies Cards by immutable Card ID, and must not prune existing saved objects automatically.
-- TTS deck exports include Card IDs and importers must prefer them over names while retaining legacy name fallback.
+- Website TTS exports for decks, sideboards, gallery selections, and content versions all use the
+  `card-reader.tts-cards.v2` persistent-sheet payload. The object importer spawns those sheets directly and must not
+  depend on scripting regions, preloaded card libraries, name matching, or automatic library synchronization.
+- TTS deck exports preserve saved quantities and order, mark hero/mainboard/sideboard roles, include deprecated
+  Cards still referenced by decks, and require usable hero artwork for main-deck exports.
 - The default `docker-compose.yml` preserves the deployment storage contract by bind-mounting the
   host paths selected by `CARD_READER_APP_DATA_DIR` and `CARD_READER_PUBLIC_APP_DATA_DIR`.
 - Use `docker-compose.local.yml` when local Docker development should replace those bind mounts with
@@ -258,7 +261,8 @@ Local app URL:
 - `GET /cards/{card_id}/image`
 - `GET /cards/{card_id}/versions/{version_id}/image`
 - `GET/HEAD /tts/card-sheets/{sheet_id}/image.webp`
-- `GET/HEAD /tts/card-library/cards.json`
+- `POST /exports/tts/cards`
+- `GET /decks/{deck_id}/exports/tts`
 - `GET /symbols/assets/{asset_path}`
 - `GET /exports/csv`
 - `GET /decks/rules`

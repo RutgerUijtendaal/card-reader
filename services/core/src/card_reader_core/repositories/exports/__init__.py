@@ -1,20 +1,11 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import io
-import json
 from typing import TYPE_CHECKING
 
-from django.db.models import Count, Max, Sum
-
 from card_reader_core.models import (
-    Card,
-    CardBack,
-    CardVersionImage,
     Symbol,
-    TtsCardSheet,
-    TtsCardSheetSlot,
 )
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC
 from card_reader_core.rules import render_enriched_rule_text
@@ -26,50 +17,6 @@ from ..metadata import (
 
 if TYPE_CHECKING:
     from card_reader_core.repositories.cards import CardSort
-
-
-def get_tts_card_library_revision() -> str:
-    cards = Card.objects.aggregate(
-        count=Count("id"),
-        updated_at=Max("updated_at"),
-        latest_version_updated_at=Max("latest_version__updated_at"),
-    )
-    latest_version_ids = Card.objects.exclude(latest_version_id__isnull=True).values(
-        "latest_version_id"
-    )
-    images = CardVersionImage.objects.filter(card_version_id__in=latest_version_ids).aggregate(
-        count=Count("id"),
-        updated_at=Max("updated_at"),
-    )
-    card_back = (
-        CardBack.objects.filter(is_current=True)
-        .values("id", "checksum", "stored_path", "updated_at")
-        .first()
-    )
-    sheets = TtsCardSheet.objects.aggregate(
-        count=Count("id"),
-        desired_revision_total=Sum("desired_revision"),
-        rendered_revision_total=Sum("rendered_revision"),
-        published_at=Max("published_at"),
-    )
-    slots = TtsCardSheetSlot.objects.aggregate(
-        count=Count("id"),
-        updated_at=Max("updated_at"),
-    )
-    revision_data = {
-        "cards": cards,
-        "images": images,
-        "card_back": card_back,
-        "sheets": sheets,
-        "slots": slots,
-    }
-    serialized = json.dumps(
-        revision_data,
-        default=str,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return hashlib.sha256(serialized).hexdigest()
 
 
 def export_cards_csv(

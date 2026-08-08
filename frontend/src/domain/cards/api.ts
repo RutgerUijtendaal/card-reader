@@ -1,7 +1,16 @@
 import { api } from '@/shared/api/client';
-import type { CardFiltersResponse, CardVersionDetail, PaginatedCardsResponse } from '@/domain/cards/types';
+import type {
+  CardFiltersResponse,
+  CardVersionDetail,
+  PaginatedCardsResponse,
+} from '@/domain/cards/types';
 import type { CardFilterApiPayload } from '@/domain/cards/utils/filters/cardFilterRequest';
 import type { CardSort } from '@/domain/cards/utils/gallery/cardSort';
+import {
+  mapTtsExportResponse,
+  type TtsExportApiResponse,
+  type TtsExportResponse,
+} from '@/domain/cards/utils/ttsExportResponse';
 
 export type CardQueryParams = Record<string, string | number | boolean | undefined>;
 
@@ -15,26 +24,13 @@ export type TtsCardExportSource =
       content_version_id: string;
     };
 
-export type TtsCardExportResponse = {
-  encodedPayload: string;
-  exportedCount: number;
-  skippedCount: number;
-  sheetCount: number;
-};
-
-type TtsCardExportApiResponse = {
-  encoded_payload: string;
-  exported_count: number;
-  skipped_count: number;
-  sheet_count: number;
-};
-
 export const fetchCards = async <TCard>(
   params: URLSearchParams | CardQueryParams,
 ): Promise<PaginatedCardsResponse<TCard>> => {
-  const response = params instanceof URLSearchParams
-    ? await api.get<PaginatedCardsResponse<TCard>>(`/cards?${params.toString()}`)
-    : await api.get<PaginatedCardsResponse<TCard>>('/cards', { params });
+  const response =
+    params instanceof URLSearchParams
+      ? await api.get<PaginatedCardsResponse<TCard>>(`/cards?${params.toString()}`)
+      : await api.get<PaginatedCardsResponse<TCard>>('/cards', { params });
   return response.data;
 };
 
@@ -53,12 +49,7 @@ export const fetchCardFilters = async (): Promise<CardFiltersResponse> => {
   return response.data;
 };
 
-export const exportTtsCards = async (source: TtsCardExportSource): Promise<TtsCardExportResponse> => {
-  const response = await api.post<TtsCardExportApiResponse>('/exports/tts/cards', { source });
-  return {
-    encodedPayload: response.data.encoded_payload,
-    exportedCount: response.data.exported_count,
-    skippedCount: response.data.skipped_count,
-    sheetCount: response.data.sheet_count,
-  };
+export const exportTtsCards = async (source: TtsCardExportSource): Promise<TtsExportResponse> => {
+  const response = await api.post<TtsExportApiResponse>('/exports/tts/cards', { source });
+  return mapTtsExportResponse(response.data);
 };

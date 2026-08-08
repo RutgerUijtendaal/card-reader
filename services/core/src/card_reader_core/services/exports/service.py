@@ -7,9 +7,10 @@ from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     ALL_CARD_LIFECYCLE_FILTER,
     CardVersionImage,
+    Deck,
+    DeckSideboard,
 )
 from card_reader_core.repositories.cards import (
-    CARD_SORT_NAME_ASC,
     CardFilterParams,
     CardListRow,
     get_latest_card_list_rows_by_card_ids,
@@ -17,7 +18,6 @@ from card_reader_core.repositories.cards import (
     list_matching_cards,
 )
 from card_reader_core.repositories.content_versions import get_content_version
-from card_reader_core.repositories.exports import get_tts_card_library_revision
 from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
 from card_reader_core.services.card_backs import (
     CardBackService,
@@ -40,6 +40,7 @@ class TtsCardExportCard:
     sheet_id: str
     slot_index: int
     lifecycle_status: str
+    role: str | None
 
 
 @dataclass(frozen=True)
@@ -56,12 +57,15 @@ class TtsCardExportSheet:
 class TtsCardExportSkippedCard:
     card_id: str
     name: str
+    quantity: int
     reason: str
+    role: str | None
 
 
 @dataclass(frozen=True)
 class TtsCardExportData:
     collection_name: str
+    collection_description: str | None
     source_metadata: dict[str, object]
     card_back_asset_path: str
     cards: list[TtsCardExportCard]
@@ -72,8 +76,8 @@ class TtsCardExportData:
 class TtsCardExportErrorCode(StrEnum):
     CARD_BACK_UNAVAILABLE = "card_back_unavailable"
     CONTENT_VERSION_NOT_FOUND = "content_version_not_found"
-    LIBRARY_UNSTABLE = "library_unstable"
     NO_USABLE_CARDS = "no_usable_cards"
+    REQUIRED_CARD_UNAVAILABLE = "required_card_unavailable"
     SHEETS_UNAVAILABLE = "sheets_unavailable"
 
 
@@ -85,42 +89,32 @@ class TtsCardExportError(ValueError):
 
 
 @dataclass(frozen=True)
+class _ResolvedTtsCardSelectionEntry:
+    row: CardListRow
+    quantity: int
+    role: str | None
+    required: bool = False
+
+
+@dataclass(frozen=True)
 class _ResolvedTtsCardSelection:
     collection_name: str
+    collection_description: str | None
     source_metadata: dict[str, object]
-    rows: list[CardListRow]
+    entries: list[_ResolvedTtsCardSelectionEntry]
     skipped: list[TtsCardExportSkippedCard]
 
 
 class TtsCardExportService:
-    def get_library_revision(self) -> str:
-        return get_tts_card_library_revision()
-
-    def build_library_export(self) -> TtsCardExportData:
-        selection = _ResolvedTtsCardSelection(
-            collection_name="Card Reader Library",
-            source_metadata={
-                "type": "library",
-                "lifecycle_status": ALL_CARD_LIFECYCLE_FILTER,
-            },
-            rows=list_matching_cards(
-                query=None,
-                max_confidence=None,
-                lifecycle_status=ALL_CARD_LIFECYCLE_FILTER,
-                sort=CARD_SORT_NAME_ASC,
-            ),
-            skipped=[],
-        )
-        return self._build_export(selection)
-
     def build_gallery_export(self, filters: CardFilterParams) -> TtsCardExportData:
         selection = _ResolvedTtsCardSelection(
             collection_name="Card Reader Gallery",
+            collection_description=None,
             source_metadata={
                 "type": "gallery",
                 "filters": {key: value for key, value in filters.items() if value is not None},
             },
-            rows=list_matching_cards(**filters),
+            entries=_selection_entries(list_matching_cards(**filters)),
             skipped=[],
         )
         return self._build_export(selection)
@@ -148,7 +142,9 @@ class TtsCardExportService:
                 TtsCardExportSkippedCard(
                     card_id=row.version.card.id,
                     name=row.version.name,
+                    quantity=1,
                     reason="Card has no latest version.",
+                    role=None,
                 )
                 for row in version_rows
                 if row.version.card.id not in resolved_card_ids
@@ -157,12 +153,99 @@ class TtsCardExportService:
         return self._build_export(
             _ResolvedTtsCardSelection(
                 collection_name=f"Card Reader {content_version.version_number}",
+                collection_description=None,
                 source_metadata={
                     "type": "content_version",
                     "content_version_id": content_version.id,
                     "version_number": content_version.version_number,
                 },
-                rows=rows,
+                entries=_selection_entries(rows),
+                skipped=skipped,
+            )
+        )
+
+    def build_deck_export(
+        self,
+        deck: Deck,
+        *,
+        sideboard: DeckSideboard | None = None,
+    ) -> TtsCardExportData:
+        if sideboard is None:
+            requested = [
+                (deck.hero_card, 1, "hero", True),
+                *[
+                    (entry.card, int(entry.quantity), "mainboard", False)
+                    for entry in deck.entries.all()
+                ],
+            ]
+            collection_name = deck.name
+            scope = "mainboard"
+        else:
+            requested = [
+                (entry.card, int(entry.quantity), "sideboard", False)
+                for entry in sideboard.entries.all()
+            ]
+            collection_name = f"{deck.name} - {sideboard.name}"
+            scope = "sideboard"
+
+        rows = get_latest_card_list_rows_by_card_ids(
+            [card.id for card, _quantity, _role, _required in requested],
+            lifecycle_status=ALL_CARD_LIFECYCLE_FILTER,
+        )
+        rows_by_card_id = {row.version.card.id: row for row in rows}
+        entries: list[_ResolvedTtsCardSelectionEntry] = []
+        skipped: list[TtsCardExportSkippedCard] = []
+        for card, quantity, role, required in requested:
+            row = rows_by_card_id.get(card.id)
+            name = card.latest_version.name if card.latest_version is not None else card.label
+            if row is None:
+                if required:
+                    raise _required_card_unavailable(name, "has no latest version")
+                skipped.append(
+                    TtsCardExportSkippedCard(
+                        card_id=card.id,
+                        name=name,
+                        quantity=quantity,
+                        reason="Card has no latest version.",
+                        role=role,
+                    )
+                )
+                continue
+            entries.append(
+                _ResolvedTtsCardSelectionEntry(
+                    row=row,
+                    quantity=quantity,
+                    role=role,
+                    required=required,
+                )
+            )
+
+        source_metadata: dict[str, object] = {
+            "type": "deck",
+            "deck_id": str(deck.id),
+            "scope": scope,
+            "hero_card_id": str(deck.hero_card.id),
+            "difficulty": deck.difficulty,
+            "tags": [
+                {
+                    "id": assignment.tag.id,
+                    "key": assignment.tag.key,
+                    "label": assignment.tag.label,
+                    "kind": assignment.tag.kind,
+                }
+                for assignment in deck.tag_assignments.all()
+            ],
+        }
+        if sideboard is not None:
+            source_metadata["sideboard_id"] = str(sideboard.id)
+            source_metadata["sideboard_name"] = sideboard.name
+
+        return self._build_export(
+            _ResolvedTtsCardSelection(
+                collection_name=collection_name,
+                collection_description=deck.description,
+                source_metadata=source_metadata,
+                entries=entries,
                 skipped=skipped,
             )
         )
@@ -178,28 +261,33 @@ class TtsCardExportService:
                 "A usable current card back is required before exporting TTS cards.",
             )
 
-        usable_rows: list[tuple[CardListRow, CardVersionImage]] = []
+        usable_entries: list[tuple[_ResolvedTtsCardSelectionEntry, CardVersionImage]] = []
         skipped = list(selection.skipped)
-        for row in selection.rows:
+        for entry in selection.entries:
+            row = entry.row
             image = _first_usable_image(row)
             if image is None:
+                if entry.required:
+                    raise _required_card_unavailable(row.version.name, "has no usable latest image")
                 skipped.append(
                     TtsCardExportSkippedCard(
                         card_id=row.version.card.id,
                         name=row.version.name,
+                        quantity=entry.quantity,
                         reason="Card has no usable latest image.",
+                        role=entry.role,
                     )
                 )
                 continue
-            usable_rows.append((row, image))
+            usable_entries.append((entry, image))
 
-        if not usable_rows:
+        if not usable_entries:
             raise TtsCardExportError(
                 TtsCardExportErrorCode.NO_USABLE_CARDS,
                 "No cards with usable latest images matched this export.",
             )
 
-        card_ids = [row.version.card.id for row, _image in usable_rows]
+        card_ids = [entry.row.version.card.id for entry, _image in usable_entries]
         try:
             assignments = TtsCardSheetService().prepare_cards(card_ids)
         except TtsCardSheetPreparationError as exc:
@@ -209,14 +297,22 @@ class TtsCardExportService:
             ) from exc
 
         cards: list[TtsCardExportCard] = []
-        for row, image in usable_rows:
+        for entry, image in usable_entries:
+            row = entry.row
             assignment = assignments.get(row.version.card.id)
             if assignment is None:
+                if entry.required:
+                    raise _required_card_unavailable(
+                        row.version.name,
+                        "has no TTS sheet assignment",
+                    )
                 skipped.append(
                     TtsCardExportSkippedCard(
                         card_id=row.version.card.id,
                         name=row.version.name,
+                        quantity=entry.quantity,
                         reason="Card has no TTS sheet assignment.",
+                        role=entry.role,
                     )
                 )
                 continue
@@ -225,11 +321,12 @@ class TtsCardExportService:
                     card_id=row.version.card.id,
                     card_version_id=row.version.id,
                     name=row.version.name,
-                    quantity=1,
+                    quantity=entry.quantity,
                     image_checksum=assignment.image_checksum,
                     sheet_id=assignment.sheet_id,
                     slot_index=assignment.slot_index,
                     lifecycle_status=row.version.card.lifecycle_status,
+                    role=entry.role,
                 )
             )
 
@@ -260,6 +357,7 @@ class TtsCardExportService:
         ]
         return TtsCardExportData(
             collection_name=selection.collection_name,
+            collection_description=selection.collection_description,
             source_metadata=selection.source_metadata,
             card_back_asset_path=card_back_asset_path,
             cards=cards,
@@ -278,11 +376,23 @@ def _first_usable_image(row: CardListRow) -> CardVersionImage | None:
 def _deduplicate_skipped(
     rows: list[TtsCardExportSkippedCard],
 ) -> list[TtsCardExportSkippedCard]:
-    seen: set[str] = set()
+    seen: set[tuple[str, str | None]] = set()
     out: list[TtsCardExportSkippedCard] = []
     for row in rows:
-        if row.card_id in seen:
+        key = (row.card_id, row.role)
+        if key in seen:
             continue
-        seen.add(row.card_id)
+        seen.add(key)
         out.append(row)
     return out
+
+
+def _selection_entries(rows: list[CardListRow]) -> list[_ResolvedTtsCardSelectionEntry]:
+    return [_ResolvedTtsCardSelectionEntry(row=row, quantity=1, role=None) for row in rows]
+
+
+def _required_card_unavailable(name: str, reason: str) -> TtsCardExportError:
+    return TtsCardExportError(
+        TtsCardExportErrorCode.REQUIRED_CARD_UNAVAILABLE,
+        f"Required deck hero '{name}' {reason}.",
+    )

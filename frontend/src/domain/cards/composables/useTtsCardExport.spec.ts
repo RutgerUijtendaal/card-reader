@@ -61,12 +61,14 @@ describe('useTtsCardExport', () => {
 
     expect(clipboardWriteText).toHaveBeenCalledWith('base64-version');
     expect(toast.success).toHaveBeenCalledWith('2 TTS cards copied to clipboard', {
-      description: 'Uses 2 persistent sheets. 1 card skipped because no usable image was available.',
+      description: 'Uses 2 persistent sheets. 1 card could not be exported.',
     });
   });
 
   test('surfaces an API detail when the export fails', async () => {
-    vi.mocked(exportTtsCards).mockRejectedValue({ response: { data: { detail: 'Current card back is missing.' } } });
+    vi.mocked(exportTtsCards).mockRejectedValue({
+      response: { data: { detail: 'Current card back is missing.' } },
+    });
 
     const { copyTtsCardExport } = useTtsCardExport();
     await copyTtsCardExport({ type: 'content_version', content_version_id: 'version-1' });
