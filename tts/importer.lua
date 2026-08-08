@@ -689,11 +689,12 @@ function scanCardReaderLibraryBatch(job)
                     table.insert(job.target_occupied_positions, object.getPosition())
                 end
 
-                if isCardReaderContainer(object) then
-                    job.contained_objects = object.getObjects()
-                    job.contained_index = 1
-                    if #job.contained_objects == 0 then
-                        job.contained_objects = nil
+                if isEnumerableCardReaderContainer(object) then
+                    local contained_objects = object.getObjects()
+                    if type(contained_objects) == "table" and #contained_objects > 0 then
+                        job.contained_objects = contained_objects
+                        job.contained_index = 1
+                    else
                         job.region_object_index = job.region_object_index + 1
                         processed = processed + 1
                     end
@@ -996,8 +997,8 @@ function isScriptingRegion(object)
     return object ~= nil and type(object.getObjects) == "function"
 end
 
-function isCardReaderContainer(object)
-    return object.tag == "Deck" or object.tag == "Bag" or object.tag == "Infinite"
+function isEnumerableCardReaderContainer(object)
+    return object.tag == "Deck" or object.tag == "Bag"
 end
 
 function spawnImportBatch(job)
