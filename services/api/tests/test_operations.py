@@ -116,6 +116,45 @@ def test_operations_overview_treats_expired_tts_claim_as_queued() -> None:
     assert items[str(active_sheet.id)]["status"] == "running"
 
 
+def test_operations_overview_keeps_recent_terminal_imports_when_active_queue_is_full() -> None:
+    user_model = get_user_model()
+    staff = user_model.objects.create_user(
+        username="recent-terminal-import-staff",
+        password="password",
+        is_staff=True,
+    )
+    template = Template.objects.get(key="mtg-like-v1")
+    older_at = now_utc() - timedelta(hours=1)
+    ImportJob.objects.bulk_create(
+        [
+            ImportJob(
+                id=f"older-active-import-{index}",
+                source_path=f"uploads/older-active-{index}",
+                template=template,
+                status="queued",
+                created_at=older_at,
+                updated_at=older_at,
+            )
+            for index in range(20)
+        ]
+    )
+    recent_failed = ImportJob.objects.create(
+        id="recent-failed-import",
+        source_path="uploads/recent-failed",
+        template=template,
+        status="failed",
+    )
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(staff)
+
+    response = client.get("/operations")
+
+    assert response.status_code == 200
+    queues = {queue["key"]: queue for queue in response.json()["queues"]}
+    import_ids = {item["id"] for item in queues["imports"]["items"]}
+    assert recent_failed.id in import_ids
+
+
 def test_import_list_active_filter_excludes_completed_jobs() -> None:
     user_model = get_user_model()
     staff = user_model.objects.create_user(

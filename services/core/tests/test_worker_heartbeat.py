@@ -53,3 +53,36 @@ def test_worker_registration_retries_before_later_activity(monkeypatch) -> None:
 
     assert registration_attempts == 2
     assert activity_updates == [(WorkerActivity.busy, "work-1")]
+
+
+def test_worker_activity_updates_only_on_successful_transitions(monkeypatch) -> None:
+    activity_updates: list[tuple[WorkerActivity, str | None]] = []
+
+    def update_activity(
+        *, instance_id: str, activity: WorkerActivity, current_work_id: str | None
+    ) -> None:
+        del instance_id
+        activity_updates.append((activity, current_work_id))
+
+    monkeypatch.setattr(heartbeat_module, "Thread", _FakeThread)
+    monkeypatch.setattr(heartbeat_module, "register_worker", lambda **_kwargs: object())
+    monkeypatch.setattr(heartbeat_module, "update_worker_activity", update_activity)
+
+    session = WorkerHeartbeatSession(
+        worker_key="test-worker",
+        display_name="Test worker",
+        logger=logging.getLogger(__name__),
+        interval_seconds=5,
+    )
+
+    session.start()
+    session.mark_idle()
+    session.mark_idle()
+    session.mark_busy("work-1")
+    session.mark_idle()
+    session.mark_idle()
+
+    assert activity_updates == [
+        (WorkerActivity.busy, "work-1"),
+        (WorkerActivity.idle, None),
+    ]

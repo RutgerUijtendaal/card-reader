@@ -277,6 +277,8 @@
 
 <script setup lang="ts">
 import { RefreshCw, ServerCog } from 'lucide-vue-next';
+import { nextTick, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import { operationsLinkUrl } from '@/features/operations/api';
@@ -292,6 +294,30 @@ import {
 } from '@/features/operations/utils/operationsUtils';
 
 const { overview, loading, refreshing, errorMessage, loadOverview } = useOperationsOverview();
+const route = useRoute();
+let pendingHash = route.hash;
+
+const scrollToPendingHash = async (): Promise<void> => {
+  if (!overview.value || !pendingHash) return;
+  const hash = pendingHash;
+  await nextTick();
+  if (pendingHash !== hash) return;
+  const target = document.getElementById(hash.slice(1));
+  if (!target) return;
+  target.scrollIntoView({ block: 'start' });
+  pendingHash = '';
+};
+
+watch(
+  () => route.hash,
+  (hash) => {
+    pendingHash = hash;
+    void scrollToPendingHash();
+  },
+  { immediate: true },
+);
+watch(overview, () => void scrollToPendingHash());
+
 const formatTimestamp = formatOperationsTimestamp;
 const statusEntries = operationsStatusEntries;
 const healthClass = workerHealthClass;

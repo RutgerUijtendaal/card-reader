@@ -7,7 +7,6 @@ from django.db.models import Count, F, Q
 from card_reader_core.models import (
     DeveloperDataBuild,
     ImportJob,
-    ImportJobStatus,
     TtsCardSheet,
 )
 from card_reader_core.repositories.tts_card_sheets import (
@@ -23,25 +22,10 @@ def import_job_status_counts() -> dict[str, int]:
 
 
 def list_import_jobs_for_operations(*, limit: int) -> list[ImportJob]:
-    active_statuses = [
-        ImportJobStatus.running,
-        ImportJobStatus.canceling,
-        ImportJobStatus.queued,
-    ]
-    active = list(
+    return list(
         ImportJob.objects.select_related("content_version", "template")
-        .filter(status__in=active_statuses)
         .order_by("-updated_at")[:limit]
     )
-    remaining = max(0, limit - len(active))
-    if remaining == 0:
-        return active
-    recent = list(
-        ImportJob.objects.select_related("content_version", "template")
-        .exclude(id__in=[job.id for job in active])
-        .order_by("-updated_at")[:remaining]
-    )
-    return [*active, *recent]
 
 
 def list_recent_developer_data_builds(*, limit: int) -> list[DeveloperDataBuild]:

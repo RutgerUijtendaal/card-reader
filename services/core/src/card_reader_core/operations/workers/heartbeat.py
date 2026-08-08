@@ -34,6 +34,7 @@ class WorkerHeartbeatSession:
         self._thread: Thread | None = None
         self._registered = False
         self._registration_lock = Lock()
+        self._reported_activity: tuple[WorkerActivity, str | None] | None = None
 
     def start(self) -> None:
         self._ensure_registered()
@@ -45,23 +46,17 @@ class WorkerHeartbeatSession:
         self._thread.start()
 
     def mark_busy(self, work_id: str) -> None:
-        self._report_registered(
+        self._report_activity(
             "mark busy",
-            lambda: update_worker_activity(
-                instance_id=self._instance_id,
-                activity=WorkerActivity.busy,
-                current_work_id=work_id,
-            ),
+            activity=WorkerActivity.busy,
+            current_work_id=work_id,
         )
 
     def mark_idle(self) -> None:
-        self._report_registered(
+        self._report_activity(
             "mark idle",
-            lambda: update_worker_activity(
-                instance_id=self._instance_id,
-                activity=WorkerActivity.idle,
-                current_work_id=None,
-            ),
+            activity=WorkerActivity.idle,
+            current_work_id=None,
         )
 
     def stop(self) -> None:
@@ -87,7 +82,7 @@ class WorkerHeartbeatSession:
         with self._registration_lock:
             if self._registered:
                 return True
-            self._registered = self._report(
+            registered = self._report(
                 "register",
                 lambda: register_worker(
                     instance_id=self._instance_id,
@@ -95,7 +90,33 @@ class WorkerHeartbeatSession:
                     display_name=self._display_name,
                 ),
             )
+            if registered:
+                self._registered = True
+                self._reported_activity = (WorkerActivity.idle, None)
             return self._registered
+
+    def _report_activity(
+        self,
+        operation: str,
+        *,
+        activity: WorkerActivity,
+        current_work_id: str | None,
+    ) -> None:
+        if not self._ensure_registered():
+            return
+        desired_activity = (activity, current_work_id)
+        if self._reported_activity == desired_activity:
+            return
+        reported = self._report(
+            operation,
+            lambda: update_worker_activity(
+                instance_id=self._instance_id,
+                activity=activity,
+                current_work_id=current_work_id,
+            ),
+        )
+        if reported:
+            self._reported_activity = desired_activity
 
     def _report_registered(self, operation: str, callback: Callable[[], object]) -> None:
         if self._ensure_registered():
