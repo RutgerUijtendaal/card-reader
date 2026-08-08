@@ -15,6 +15,7 @@ from PIL import Image
 from card_reader_api.management.commands.run_tts_sheet_renderer import _process_claimed_sheet
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    TTS_CARD_SHEET_LAYOUT_VERSION,
     Card,
     CardVersion,
     CardVersionImage,
@@ -372,6 +373,59 @@ def test_reconciliation_includes_unreferenced_persisted_sheets() -> None:
     assert sheet.desired_revision == 1
 
 
+def test_reconciliation_upgrades_legacy_layout_once() -> None:
+    TtsCardSheet.objects.all().delete()
+    sheet = TtsCardSheet.objects.create(
+        sequence=999_990,
+        layout_version=1,
+        desired_revision=4,
+        desired_fingerprint="legacy-layout",
+        rendered_revision=4,
+        rendered_fingerprint="legacy-layout",
+        rendered_checksum="published-sheet",
+    )
+    service = TtsCardSheetService()
+
+    first = service.reconcile_all(render=False)
+
+    sheet.refresh_from_db()
+    first_revision = sheet.desired_revision
+    assert sheet.layout_version == TTS_CARD_SHEET_LAYOUT_VERSION
+    assert first.affected_sheets == 1
+    assert first_revision == 5
+    assert sheet.rendered_revision == 4
+    assert sheet.rendered_checksum == "published-sheet"
+
+    second = service.reconcile_all(render=False)
+
+    sheet.refresh_from_db()
+    assert second.affected_sheets == 1
+    assert sheet.desired_revision == first_revision
+
+
+def test_current_layout_renders_canonical_cards_without_resizing_or_letterboxing() -> None:
+    TtsCardSheet.objects.all().delete()
+    color = (40, 80, 120)
+    card = _create_sheet_card("canonical-ratio", color=color, image_size=(822, 1122))
+    service = TtsCardSheetService()
+    sheet_ids = service.sync_cards([card.id])
+
+    assert service.render_sheets_now(sorted(sheet_ids)) == 1
+
+    sheet = TtsCardSheet.objects.get(id=next(iter(sheet_ids)))
+    layout = tts_sheet_renderer.get_tts_card_sheet_layout(sheet.layout_version)
+    path = tts_sheet_renderer.tts_card_sheet_path(str(sheet.id), sheet.rendered_checksum)
+    with Image.open(path) as rendered:
+        assert rendered.size == (8220, 7854)
+        assert (layout.cell_width, layout.cell_height) == (822, 1122)
+        top_pixel = rendered.getpixel((layout.cell_width // 2, 0))
+        bottom_pixel = rendered.getpixel(
+            (layout.cell_width // 2, layout.cell_height - 1)
+        )
+    assert all(abs(actual - expected) <= 8 for actual, expected in zip(top_pixel, color))
+    assert all(abs(actual - expected) <= 8 for actual, expected in zip(bottom_pixel, color))
+
+
 def test_renderer_stop_releases_the_claim_before_processing() -> None:
     TtsCardSheet.objects.all().delete()
     claimed_at = now_utc()
@@ -481,13 +535,24 @@ def test_public_sheet_request_preserves_failure_backoff() -> None:
     assert sheet.render_not_before == render_not_before
 
 
-def _create_sheet_card(label: str, *, color: tuple[int, int, int]) -> Card:
+def _create_sheet_card(
+    label: str,
+    *,
+    color: tuple[int, int, int],
+    image_size: tuple[int, int] = (50, 70),
+) -> Card:
     suffix = uuid4().hex
     card = Card.objects.create(
         key=f"tts-sheet-{label}-{suffix}",
         label=f"TTS Sheet {label}",
     )
-    version = _create_version(card, label, color=color, version_number=1)
+    version = _create_version(
+        card,
+        label,
+        color=color,
+        version_number=1,
+        image_size=image_size,
+    )
     card.latest_version = version
     card.save(update_fields=["latest_version", "updated_at"])
     return card
@@ -499,6 +564,7 @@ def _create_version(
     *,
     color: tuple[int, int, int],
     version_number: int,
+    image_size: tuple[int, int] = (50, 70),
 ) -> CardVersion:
     suffix = uuid4().hex
     version = CardVersion.objects.create(
@@ -513,14 +579,14 @@ def _create_version(
     path = settings.storage_root_dir / stored_path
     path.parent.mkdir(parents=True, exist_ok=True)
     buffer = BytesIO()
-    Image.new("RGB", (50, 70), color).save(buffer, format="WEBP")
+    Image.new("RGB", image_size, color).save(buffer, format="WEBP")
     path.write_bytes(buffer.getvalue())
     CardVersionImage.objects.create(
         card_version=version,
         source_file=stored_path,
         stored_path=stored_path,
-        width=50,
-        height=70,
+        width=image_size[0],
+        height=image_size[1],
         checksum=f"tts-sheet-{suffix}",
     )
     return version
