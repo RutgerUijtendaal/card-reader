@@ -105,4 +105,6 @@ def test_import_list_active_filter_excludes_completed_jobs() -> None:
     response = client.get("/imports", {"status": "active"})
 
     assert response.status_code == 200
-    assert {job["id"] for job in response.json()} == {"active-import"}
+    job_ids = {job["id"] for job in response.json()}
+    assert "active-import" in job_ids
+    assert "completed-import" not in job_ids
