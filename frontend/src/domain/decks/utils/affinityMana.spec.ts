@@ -27,6 +27,7 @@ const familyBySymbolKey = {
   'arcane-affinity': 'arcane',
   'divine-affinity': 'divine',
   'martial-affinity': 'martial',
+  'martial-mana': 'martial',
 };
 
 describe('affinity mana mapping', () => {
@@ -40,9 +41,9 @@ describe('affinity mana mapping', () => {
     ]);
   });
 
-  test('builds an include/exclude mana preset from hero affinity symbols', () => {
+  test('builds an include/exclude mana preset from either hero representation', () => {
     const hero = {
-      symbols: [symbol('martial-affinity', 'affinity'), symbol('divine-affinity', 'affinity'), symbol('exhaust', 'generic')],
+      symbols: [symbol('martial-mana', 'mana'), symbol('divine-affinity', 'affinity'), symbol('exhaust', 'generic')],
     };
 
     expect(

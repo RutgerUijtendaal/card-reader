@@ -16,15 +16,14 @@ export const getManaSymbolKeysForAffinityKeys = (
   affinitySymbolKeys.map((key) => manaFamilyBySymbolKey[key]).filter((key): key is string => Boolean(key)),
 );
 
-export const getHeroAffinitySymbolKeys = (hero: Pick<CardHoverTooltipModel, 'symbols'> | null): string[] => {
+const getHeroManaFamilySymbolKeys = (
+  hero: Pick<CardHoverTooltipModel, 'symbols'> | null,
+  manaFamilyBySymbolKey: Readonly<Record<string, string>>,
+): string[] => {
   if (!hero) {
     return [];
   }
-  return uniqueSorted(
-    hero.symbols
-      .filter((symbol) => symbol.symbol_type === 'affinity')
-      .map((symbol) => symbol.key),
-  );
+  return uniqueSorted(hero.symbols.map((symbol) => symbol.key).filter((key) => manaFamilyBySymbolKey[key]));
 };
 
 export const buildHeroAffinityManaPreset = (
@@ -35,7 +34,7 @@ export const buildHeroAffinityManaPreset = (
   const manaSymbolKeys = uniqueSorted(manaSymbols.map((symbol) => symbol.key));
   const availableManaSymbolKeys = new Set(manaSymbolKeys);
   const includedManaSymbolKeys = getManaSymbolKeysForAffinityKeys(
-    getHeroAffinitySymbolKeys(hero),
+    getHeroManaFamilySymbolKeys(hero, manaFamilyBySymbolKey),
     manaFamilyBySymbolKey,
   ).filter((key) => availableManaSymbolKeys.has(key));
 

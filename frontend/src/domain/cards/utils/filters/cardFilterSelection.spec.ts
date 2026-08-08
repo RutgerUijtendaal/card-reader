@@ -221,4 +221,43 @@ describe('cardFilterSelection', () => {
     expect(selection.manaTypeSymbolIds).toEqual(['arcane']);
     expect(selection.affinitySymbolIds).toEqual([]);
   });
+
+  test('preserves the match mode when migrating an affinity-only predicate', () => {
+    const selection = buildCardFilterSelectionState(
+      {
+        ...createEmptyCardFilterState(),
+        affinitySymbolMatch: 'all',
+        affinitySymbolKeys: ['arcane-affinity'],
+      },
+      createCardFilterCatalog(filters),
+    );
+
+    expect(selection.manaSymbolMatch).toBe('all');
+    expect(selection.manaTypeSymbolIds).toEqual(['arcane']);
+  });
+
+  test('keeps mixed legacy affinities in one literal predicate', () => {
+    const catalog = createCardFilterCatalog(filters);
+    const selection = buildCardFilterSelectionState(
+      {
+        ...createEmptyCardFilterState(),
+        affinitySymbolMatch: 'any',
+        affinitySymbolKeys: ['arcane-affinity', 'sola-affinity'],
+      },
+      catalog,
+    );
+
+    expect(selection.manaTypeSymbolIds).toEqual([]);
+    expect(selection.affinitySymbolIds).toEqual(['sym-2', 'sym-2b']);
+    expect(buildCardFilterStateFromSelection(selection, catalog).affinitySymbolKeys).toEqual([
+      'arcane-affinity',
+      'sola-affinity',
+    ]);
+  });
+
+  test('marks fallback mana options for the literal symbol API contract', () => {
+    const catalog = createCardFilterCatalog({ ...filters, mana_families: undefined });
+
+    expect(catalog.manaSymbols.map((row) => row.id)).toEqual(['legacy-mana-symbol:sym-1']);
+  });
 });

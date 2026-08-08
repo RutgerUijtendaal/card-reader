@@ -248,7 +248,12 @@ def _grouped_gallery_sort_key(
     if sort == CARD_SORT_MANA_DESC:
         return (mana_value is None, -(mana_value if mana_value is not None else 0), name, item_id)
     if sort == CARD_SORT_MANA_TYPE_ASC:
-        return (item["mana_family_sort_key"], name, label, item["sort_card_id"])
+        return (
+            item["mana_family_sort_key"],
+            item["name"],
+            item["label"],
+            item["sort_card_id"],
+        )
     if sort == CARD_SORT_TYPES_ASC:
         bucket, linked_card_count, type_label = _grouped_gallery_type_sort_value(item["types"], type_sort_lookup)
         return (bucket, -linked_card_count, type_label, name, label, item_id)

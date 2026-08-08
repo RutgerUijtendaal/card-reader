@@ -109,6 +109,11 @@ const parseTimestamp = (value: string): number => {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 };
 
+const compareStableText = (left: string, right: string): number => {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+};
+
 export const buildTypeSortBuckets = (types: TypeSortMetadata[]): TypeSortBucket[] =>
   [...types].sort((left, right) => {
     const leftIsMana = isManaTypeKey(left.key);
@@ -214,9 +219,9 @@ export const compareCardSort = <TCard extends SortableCardLike>(
   if (sort === 'mana_type_asc') {
     return (left.mana_family_sort_key ?? Number.MAX_SAFE_INTEGER)
       - (right.mana_family_sort_key ?? Number.MAX_SAFE_INTEGER)
-      || left.name.localeCompare(right.name)
-      || left.label.localeCompare(right.label)
-      || left.id.localeCompare(right.id);
+      || compareStableText(left.name, right.name)
+      || compareStableText(left.label, right.label)
+      || compareStableText(left.id, right.id);
   }
   if (sort === 'types_asc') {
     const leftType = getCardTypeSortValue(left, typeSortLookup);
