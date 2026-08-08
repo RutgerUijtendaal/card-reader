@@ -42,18 +42,7 @@ def developer_data_build_status_counts() -> dict[str, int]:
 
 
 def list_tts_card_sheets_for_operations(*, limit: int) -> list[TtsCardSheet]:
-    pending = list(
-        TtsCardSheet.objects.filter(desired_revision__gt=F("rendered_revision"))
-        .order_by("-updated_at")[:limit]
-    )
-    remaining = max(0, limit - len(pending))
-    if remaining == 0:
-        return pending
-    recent = list(
-        TtsCardSheet.objects.exclude(id__in=[sheet.id for sheet in pending])
-        .order_by("-updated_at")[:remaining]
-    )
-    return [*pending, *recent]
+    return list(TtsCardSheet.objects.order_by("-updated_at")[:limit])
 
 
 def tts_card_sheet_status_counts(*, now: datetime) -> dict[str, int]:

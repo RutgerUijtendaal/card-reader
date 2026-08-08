@@ -155,6 +155,41 @@ def test_operations_overview_keeps_recent_terminal_imports_when_active_queue_is_
     assert recent_failed.id in import_ids
 
 
+def test_operations_overview_keeps_recent_completed_sheet_when_pending_queue_is_full() -> None:
+    user_model = get_user_model()
+    staff = user_model.objects.create_user(
+        username="recent-completed-sheet-staff",
+        password="password",
+        is_staff=True,
+    )
+    older_at = now_utc() - timedelta(hours=1)
+    TtsCardSheet.objects.bulk_create(
+        [
+            TtsCardSheet(
+                sequence=2000 + index,
+                desired_revision=1,
+                created_at=older_at,
+                updated_at=older_at,
+            )
+            for index in range(20)
+        ]
+    )
+    recent_completed = TtsCardSheet.objects.create(
+        sequence=2020,
+        desired_revision=1,
+        rendered_revision=1,
+    )
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(staff)
+
+    response = client.get("/operations")
+
+    assert response.status_code == 200
+    queues = {queue["key"]: queue for queue in response.json()["queues"]}
+    sheet_ids = {item["id"] for item in queues["tts-card-sheets"]["items"]}
+    assert recent_completed.id in sheet_ids
+
+
 def test_import_list_active_filter_excludes_completed_jobs() -> None:
     user_model = get_user_model()
     staff = user_model.objects.create_user(

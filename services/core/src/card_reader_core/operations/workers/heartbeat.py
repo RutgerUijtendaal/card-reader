@@ -34,6 +34,8 @@ class WorkerHeartbeatSession:
         self._thread: Thread | None = None
         self._registered = False
         self._registration_lock = Lock()
+        self._activity_lock = Lock()
+        self._desired_activity: tuple[WorkerActivity, str | None] = (WorkerActivity.idle, None)
         self._reported_activity: tuple[WorkerActivity, str | None] | None = None
 
     def start(self) -> None:
@@ -69,12 +71,21 @@ class WorkerHeartbeatSession:
         close_old_connections()
         try:
             while not self._stop_event.wait(self._interval_seconds):
-                self._report_registered(
+                self._report_heartbeat()
+        finally:
+            close_old_connections()
+
+    def _report_heartbeat(self) -> None:
+        if not self._ensure_registered():
+            return
+        with self._activity_lock:
+            if self._reported_activity != self._desired_activity:
+                self._report_desired_activity_locked("retry activity")
+            else:
+                self._report(
                     "heartbeat",
                     lambda: heartbeat_worker(instance_id=self._instance_id),
                 )
-        finally:
-            close_old_connections()
 
     def _ensure_registered(self) -> bool:
         if self._registered:
@@ -92,7 +103,8 @@ class WorkerHeartbeatSession:
             )
             if registered:
                 self._registered = True
-                self._reported_activity = (WorkerActivity.idle, None)
+                with self._activity_lock:
+                    self._reported_activity = (WorkerActivity.idle, None)
             return self._registered
 
     def _report_activity(
@@ -102,11 +114,17 @@ class WorkerHeartbeatSession:
         activity: WorkerActivity,
         current_work_id: str | None,
     ) -> None:
+        with self._activity_lock:
+            self._desired_activity = (activity, current_work_id)
         if not self._ensure_registered():
             return
-        desired_activity = (activity, current_work_id)
-        if self._reported_activity == desired_activity:
+        with self._activity_lock:
+            self._report_desired_activity_locked(operation)
+
+    def _report_desired_activity_locked(self, operation: str) -> None:
+        if self._reported_activity == self._desired_activity:
             return
+        activity, current_work_id = self._desired_activity
         reported = self._report(
             operation,
             lambda: update_worker_activity(
@@ -116,7 +134,7 @@ class WorkerHeartbeatSession:
             ),
         )
         if reported:
-            self._reported_activity = desired_activity
+            self._reported_activity = self._desired_activity
 
     def _report_registered(self, operation: str, callback: Callable[[], object]) -> None:
         if self._ensure_registered():
