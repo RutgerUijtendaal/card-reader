@@ -17,6 +17,7 @@ from card_reader_core.models import (
 from card_reader_core.repositories.tts_card_sheets import (
     TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT,
 )
+from card_reader_core.services.operations import OperationsOverviewService
 
 
 def test_operations_overview_reports_workers_and_normalized_queues() -> None:
@@ -82,6 +83,43 @@ def test_operations_overview_requires_staff() -> None:
     client.force_login(user)
 
     assert client.get("/operations").status_code == 403
+
+
+def test_operations_overview_adds_developer_data_download_link_in_api_layer() -> None:
+    user_model = get_user_model()
+    staff = user_model.objects.create_user(
+        username="operations-download-link-staff",
+        password="password",
+        is_staff=True,
+    )
+    build = DeveloperDataBuild.objects.create(
+        requested_by=staff,
+        bundle_version="dev-operations-download-link",
+        status="succeeded",
+        is_active_build=False,
+    )
+    core_payload = OperationsOverviewService().build()
+    core_queues = {queue["key"]: queue for queue in core_payload["queues"]}
+    core_items = {
+        item["id"]: item for item in core_queues["developer-data-builds"]["items"]
+    }
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(staff)
+
+    response = client.get("/operations")
+
+    assert core_items[build.id]["links"] == []
+    assert response.status_code == 200
+    api_queues = {queue["key"]: queue for queue in response.json()["queues"]}
+    api_items = {
+        item["id"]: item for item in api_queues["developer-data-builds"]["items"]
+    }
+    assert api_items[build.id]["links"] == [
+        {
+            "label": "Download lock file",
+            "href": f"/developer-data/builds/{build.id}/lock",
+        }
+    ]
 
 
 def test_operations_overview_treats_expired_tts_claim_as_queued() -> None:

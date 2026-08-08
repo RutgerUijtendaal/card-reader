@@ -41,7 +41,7 @@ export const router = createRouter({
     { path: '/settings', component: SettingsPage, meta: { title: 'Settings' } },
     { path: '/imports', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Imports' } },
     { path: '/operations', component: OperationsPage, meta: { requiresStaff: true, title: 'Operations' } },
-    { path: '/import-jobs', redirect: '/operations' },
+    { path: '/import-jobs', redirect: '/imports' },
     { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true, title: 'Edit Card' } },
     { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue' } },
     { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin' } },

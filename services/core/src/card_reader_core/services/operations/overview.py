@@ -231,14 +231,6 @@ def _tts_item_payload(sheet: TtsCardSheet, *, now: datetime) -> dict[str, Any]:
 
 def _developer_data_item_payload(build: DeveloperDataBuild) -> dict[str, Any]:
     requested_by = build.requested_by.username if build.requested_by is not None else "Deleted user"
-    links: list[dict[str, str]] = []
-    if str(build.status) == "succeeded":
-        links.append(
-            {
-                "label": "Download lock file",
-                "href": f"/developer-data/builds/{build.id}/lock",
-            }
-        )
     metadata = [{"label": "Requested by", "value": requested_by}]
     if build.size_bytes is not None:
         metadata.append({"label": "Size", "value": str(build.size_bytes)})
@@ -255,7 +247,7 @@ def _developer_data_item_payload(build: DeveloperDataBuild) -> dict[str, Any]:
         "progress_total": None,
         "error_message": build.error_message or None,
         "metadata": metadata,
-        "links": links,
+        "links": [],
     }
 
 
