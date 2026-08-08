@@ -2,7 +2,7 @@ local CONFIG = {
     -- Fetch and synchronize the canonical Card Reader library whenever the save loads.
     auto_sync_enabled = false,
     -- Public raw-JSON manifest used by automatic and manual library synchronization.
-    library_manifest_url = "https://maityscardgame.com/tts/card-library/cards.json",
+    library_manifest_url = "https://maityscardgame.com/api/tts/card-library/cards.json",
     -- Seconds to wait between retryable manifest requests before giving up.
     auto_sync_retry_delays = { 2, 5, 15, 30 },
     -- Minimum center-to-center spacing between library batches inside the source region.

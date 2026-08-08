@@ -103,7 +103,7 @@ created from V1 remain usable but are not migrated automatically.
 The public canonical manifest is available without a Card Reader session:
 
 ```text
-https://maityscardgame.com/tts/card-library/cards.json
+https://maityscardgame.com/api/tts/card-library/cards.json
 ```
 
 It contains every usable active or deprecated Card once, using each Card's current latest version and permanent
@@ -113,7 +113,7 @@ The relevant Lua configuration defaults are:
 
 ```lua
 auto_sync_enabled = true
-library_manifest_url = "https://maityscardgame.com/tts/card-library/cards.json"
+library_manifest_url = "https://maityscardgame.com/api/tts/card-library/cards.json"
 auto_sync_retry_delays = { 2, 5, 15, 30 }
 library_batch_spacing = 3
 ```
