@@ -3,8 +3,17 @@ from __future__ import annotations
 from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus
 
 
-def list_import_jobs() -> list[ImportJob]:
-    return list(ImportJob.objects.select_related("content_version", "template").order_by("-created_at"))
+def list_import_jobs(*, active_only: bool = False) -> list[ImportJob]:
+    jobs = ImportJob.objects.select_related("content_version", "template")
+    if active_only:
+        jobs = jobs.filter(
+            status__in=[
+                ImportJobStatus.queued,
+                ImportJobStatus.running,
+                ImportJobStatus.canceling,
+            ]
+        )
+    return list(jobs.order_by("-created_at"))
 
 
 def fetch_job(job_id: str) -> ImportJob | None:

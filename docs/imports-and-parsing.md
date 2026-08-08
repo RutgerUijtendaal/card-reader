@@ -4,7 +4,7 @@ Card imports turn one or more uploaded images into card records that can be revi
 
 ## End-to-end flow
 
-1. A staff user uploads supported image files from the Imports interface.
+1. A staff user uploads supported image files from the staff-only `/imports` interface.
 2. The API stores the source files and creates an import job with one queued item per image.
 3. The parser worker polls for work and atomically claims a queued item.
 4. The parser loads the selected parsing template and current catalog resources, then crops regions, runs OCR, extracts fields, and detects symbols.
@@ -21,6 +21,11 @@ Claiming is coordinated through the shared core layer. This prevents the API, pa
 
 The API and parser share the database and storage root. In the standard development and production layouts they run as separate processes, so both must be running for queued items to advance.
 
+The staff-only `/operations` page shows the parser worker heartbeat alongside queued, running, and
+recent import jobs. `/imports` remains the place to create imports and interrupt active work. Worker
+heartbeats distinguish an idle parser from a process that has stopped reporting; they are
+operational telemetry and do not replace durable import job state.
+
 ## Templates and catalogs
 
 Parsing templates describe where fields and symbols appear on a card image and how those regions should be interpreted. Catalogs provide the known keywords, tags, symbols, and card types used to match extracted text and detected artwork to application metadata.
@@ -31,11 +36,14 @@ Templates and catalogs are read at processing time. Changing them affects future
 
 An import job is the user-facing batch, while import items are the individual units claimed by workers. Item state is durable, allowing the UI to show queued, processing, completed, failed, or cancelled work even if a process restarts.
 
-Cancellation stops work that has not yet completed. Failed or cancelled items can be retried through the supported API and UI flows rather than by manually editing database state. Worker claims and state transitions are designed to avoid two workers completing the same queued item.
+Cancellation stops work that has not yet completed. Active imports can be interrupted from
+`/imports`, while complete queue history remains visible under `/operations`. Failed or cancelled
+items can be retried through supported API and UI flows rather than by manually editing database
+state. Worker claims and state transitions are designed to avoid two workers completing the same
+queued item.
 
 ## Review and card history
 
 Parser output is intentionally reviewable rather than treated as unquestionable source data. Reviewers can inspect images, parsed values, symbols, metadata matches, and suggestions before correcting the card version.
 
 Reparsing creates new content through the card-version workflow instead of erasing historical state. See [Card management](card-management.md) for the distinction between a stable card identity and its versions.
-

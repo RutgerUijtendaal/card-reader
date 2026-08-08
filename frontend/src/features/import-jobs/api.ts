@@ -2,7 +2,7 @@ import { api } from '@/shared/api/client';
 import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
 
 export const fetchImportJobs = async (): Promise<ImportJob[]> => {
-  const response = await api.get<ImportJob[]>('/imports');
+  const response = await api.get<ImportJob[]>('/imports', { params: { status: 'active' } });
   return response.data;
 };
 

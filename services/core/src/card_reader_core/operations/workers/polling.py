@@ -9,6 +9,8 @@ from threading import Event
 import time
 from typing import Generic, TypeVar
 
+from .heartbeat import DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS, WorkerHeartbeatSession
+
 WorkItem = TypeVar("WorkItem")
 StopRequested = Callable[[], bool]
 
@@ -17,6 +19,8 @@ StopRequested = Callable[[], bool]
 class PollingWorkerConfig:
     name: str
     interval_seconds: float
+    key: str | None = None
+    heartbeat_interval_seconds: float = DEFAULT_WORKER_HEARTBEAT_INTERVAL_SECONDS
     once: bool = False
     shutdown_marker: Path | None = None
 
@@ -97,22 +101,36 @@ class PollingWorker(Generic[WorkItem]):
             logger=logger,
             marker_file=config.shutdown_marker,
         )
+        self._heartbeat: WorkerHeartbeatSession | None = None
+        if config.key is not None:
+            self._heartbeat = WorkerHeartbeatSession(
+                worker_key=config.key,
+                display_name=config.name,
+                logger=logger,
+                interval_seconds=config.heartbeat_interval_seconds,
+            )
 
     def run(self) -> None:
         self._shutdown.install_signal_handlers()
         if not self._initialize_and_recover_for_startup():
             self._logger.info("%s stopped before startup completed", self._config.name)
             return
-        self._logger.info(
-            "%s loop started. interval_seconds=%.2f",
-            self._config.name,
-            self._config.interval_seconds,
-        )
-        while not self._shutdown.should_stop():
-            self._run_iteration()
-            if self._config.once:
-                break
-        self._logger.info("%s loop stopped gracefully", self._config.name)
+        if self._heartbeat is not None:
+            self._heartbeat.start()
+        try:
+            self._logger.info(
+                "%s loop started. interval_seconds=%.2f",
+                self._config.name,
+                self._config.interval_seconds,
+            )
+            while not self._shutdown.should_stop():
+                self._run_iteration()
+                if self._config.once:
+                    break
+            self._logger.info("%s loop stopped gracefully", self._config.name)
+        finally:
+            if self._heartbeat is not None:
+                self._heartbeat.stop()
 
     def _initialize_and_recover_for_startup(self) -> bool:
         while not self._shutdown.should_stop():
@@ -133,9 +151,13 @@ class PollingWorker(Generic[WorkItem]):
         try:
             work = self._claim_next()
             if work is None:
+                if self._heartbeat is not None:
+                    self._heartbeat.mark_idle()
                 if not self._config.once:
                     self._shutdown.interruptible_wait(self._config.interval_seconds)
                 return
+            if self._heartbeat is not None:
+                self._heartbeat.mark_busy(self._work_identifier(work))
             self._on_claimed(work)
             try:
                 self._process(work, self._shutdown.should_stop)
@@ -146,6 +168,9 @@ class PollingWorker(Generic[WorkItem]):
                     self._config.name,
                     self._work_identifier(work),
                 )
+            finally:
+                if self._heartbeat is not None:
+                    self._heartbeat.mark_idle()
             return
         except Exception:
             self._logger.exception(

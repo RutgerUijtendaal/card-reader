@@ -33,6 +33,7 @@ class Command(BaseCommand):
 
         PollingWorker[DeveloperDataBuild](
             config=PollingWorkerConfig(
+                key="developer-data-builder",
                 name="Developer-data builder",
                 interval_seconds=poll_seconds,
                 once=once,

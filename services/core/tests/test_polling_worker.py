@@ -68,6 +68,53 @@ def test_polling_worker_recovers_claim_failures(monkeypatch: pytest.MonkeyPatch)
     assert recovery_count == 2
 
 
+def test_polling_worker_reports_busy_and_idle_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    _disable_signal_handlers(monkeypatch)
+    events: list[str] = []
+
+    class FakeHeartbeatSession:
+        def __init__(self, **_kwargs: object) -> None:
+            events.append("heartbeat:init")
+
+        def start(self) -> None:
+            events.append("heartbeat:start")
+
+        def mark_busy(self, work_id: str) -> None:
+            events.append(f"heartbeat:busy:{work_id}")
+
+        def mark_idle(self) -> None:
+            events.append("heartbeat:idle")
+
+        def stop(self) -> None:
+            events.append("heartbeat:stop")
+
+    monkeypatch.setattr(
+        "card_reader_core.operations.workers.polling.WorkerHeartbeatSession",
+        FakeHeartbeatSession,
+    )
+
+    PollingWorker[str](
+        config=PollingWorkerConfig(
+            key="test-worker",
+            name="Test worker",
+            interval_seconds=0.01,
+            once=True,
+        ),
+        logger=logging.getLogger("test.polling-worker"),
+        claim_next=lambda: "work-1",
+        process=lambda _work, _should_stop: events.append("process"),
+    ).run()
+
+    assert events == [
+        "heartbeat:init",
+        "heartbeat:start",
+        "heartbeat:busy:work-1",
+        "process",
+        "heartbeat:idle",
+        "heartbeat:stop",
+    ]
+
+
 def test_polling_worker_retries_startup_failures(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

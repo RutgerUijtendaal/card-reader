@@ -23,6 +23,7 @@ _REGISTERED_MODEL_MODULES = (
     import_module(".metadata", __name__),
     import_module(".template", __name__),
     import_module(".tts_card_sheet", __name__),
+    import_module(".worker_heartbeat", __name__),
 )
 
 if TYPE_CHECKING:
@@ -125,6 +126,7 @@ if TYPE_CHECKING:
         TtsCardSheet,
         TtsCardSheetSlot,
     )
+    from .worker_heartbeat import WorkerActivity, WorkerHeartbeat
 
 _EXPORTS = {
     "now_utc": ".base",
@@ -213,6 +215,8 @@ _EXPORTS = {
     "TTS_CARD_SHEET_ROWS": ".tts_card_sheet",
     "TtsCardSheet": ".tts_card_sheet",
     "TtsCardSheetSlot": ".tts_card_sheet",
+    "WorkerActivity": ".worker_heartbeat",
+    "WorkerHeartbeat": ".worker_heartbeat",
 }
 
 __all__ = [
@@ -302,6 +306,8 @@ __all__ = [
     "TTS_CARD_SHEET_ROWS",
     "TtsCardSheet",
     "TtsCardSheetSlot",
+    "WorkerActivity",
+    "WorkerHeartbeat",
 ]
 
 

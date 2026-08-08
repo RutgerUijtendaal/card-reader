@@ -3,6 +3,7 @@ import { useAuthStore } from '@/domain/session/store';
 import LoginPage from '@/features/auth/LoginPage.vue';
 import PasswordSetupPage from '@/features/auth/PasswordSetupPage.vue';
 import ImportJobsPage from '@/features/import-jobs/ImportJobsPage.vue';
+import OperationsPage from '@/features/operations/OperationsPage.vue';
 import CardGalleryPage from '@/features/card-gallery/CardGalleryPage.vue';
 import CardGroupDetailPage from '@/features/card-groups/CardGroupDetailPage.vue';
 import CardDetailPage from '@/features/card-detail/CardDetailPage.vue';
@@ -38,7 +39,9 @@ export const router = createRouter({
     { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, title: 'Edit Deck' }, props: true },
     { path: '/notifications', component: NotificationsPage, meta: { requiresAuth: true, title: 'Notifications' } },
     { path: '/settings', component: SettingsPage, meta: { title: 'Settings' } },
-    { path: '/import-jobs', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Import Jobs' } },
+    { path: '/imports', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Imports' } },
+    { path: '/operations', component: OperationsPage, meta: { requiresStaff: true, title: 'Operations' } },
+    { path: '/import-jobs', redirect: '/imports' },
     { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true, title: 'Edit Card' } },
     { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue' } },
     { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin' } },
@@ -52,7 +55,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.path === '/login' && auth.canAccessStaffRoutes) {
-    return '/import-jobs';
+    return '/operations';
   }
 
   if (to.meta.requiresAuth && !auth.authenticated) {
