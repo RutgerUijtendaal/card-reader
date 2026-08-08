@@ -27,8 +27,8 @@ def encode_tts_card_export(
     encoded_payload = base64.b64encode(serialize_tts_card_export_payload(payload)).decode("ascii")
     return EncodedTtsCardExport(
         encoded_payload=encoded_payload,
-        exported_count=len(export.cards),
-        skipped_count=len(export.skipped),
+        exported_count=sum(card.quantity for card in export.cards),
+        skipped_count=sum(card.quantity for card in export.skipped),
         sheet_count=len(export.sheets),
     )
 
@@ -38,12 +38,16 @@ def build_tts_card_export_payload(
     *,
     absolute_url: Callable[[str], str],
 ) -> dict[str, object]:
+    collection: dict[str, object] = {
+        "name": export.collection_name,
+        "source": export.source_metadata,
+    }
+    if export.collection_description is not None:
+        collection["description"] = export.collection_description
+
     return {
         "schema": TTS_CARD_EXPORT_SCHEMA,
-        "collection": {
-            "name": export.collection_name,
-            "source": export.source_metadata,
-        },
+        "collection": collection,
         "card_back_url": absolute_url(f"/card-images/{export.card_back_asset_path}"),
         "sheets": [
             {
@@ -57,27 +61,40 @@ def build_tts_card_export_payload(
             for sheet in export.sheets
         ],
         "cards": [
-            {
-                "card_id": card.card_id,
-                "card_version_id": card.card_version_id,
-                "name": card.name,
-                "quantity": card.quantity,
-                "sheet_id": card.sheet_id,
-                "slot_index": card.slot_index,
-                "image_checksum": card.image_checksum,
-                "lifecycle_status": card.lifecycle_status,
-            }
+            _optional_role(
+                {
+                    "card_id": card.card_id,
+                    "card_version_id": card.card_version_id,
+                    "name": card.name,
+                    "quantity": card.quantity,
+                    "sheet_id": card.sheet_id,
+                    "slot_index": card.slot_index,
+                    "image_checksum": card.image_checksum,
+                    "lifecycle_status": card.lifecycle_status,
+                },
+                card.role,
+            )
             for card in export.cards
         ],
         "skipped": [
-            {
-                "card_id": card.card_id,
-                "name": card.name,
-                "reason": card.reason,
-            }
+            _optional_role(
+                {
+                    "card_id": card.card_id,
+                    "name": card.name,
+                    "quantity": card.quantity,
+                    "reason": card.reason,
+                },
+                card.role,
+            )
             for card in export.skipped
         ],
     }
+
+
+def _optional_role(payload: dict[str, object], role: str | None) -> dict[str, object]:
+    if role is not None:
+        payload["role"] = role
+    return payload
 
 
 def serialize_tts_card_export_payload(payload: dict[str, object]) -> bytes:

@@ -115,8 +115,6 @@ def isolate_api_test_state(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> Iterator[None]:
-    from card_reader_api.exports.tts_library import tts_card_library_materializer
-
     monkeypatch.setattr(core_settings, "app_data_dir", tmp_path)
     Template.objects.update_or_create(
         key="mtg-like-v1",
@@ -126,11 +124,7 @@ def isolate_api_test_state(
         },
     )
     _seed_default_catalog_rows()
-    tts_card_library_materializer.clear()
-    try:
-        yield
-    finally:
-        tts_card_library_materializer.clear()
+    yield
 
 
 @pytest.fixture

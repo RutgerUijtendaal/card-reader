@@ -7,7 +7,9 @@
 - REST API compatibility for the Vue app
 - Session login/logout/current-user endpoints
 - Authenticated developer-data discovery, grants, protected downloads, and staff build management
-- Staff-protected import, review, settings, catalog, template, CSV export, and direct-card TTS export endpoints
+- Staff-protected import, review, settings, catalog, template, CSV export, and gallery/content-version TTS export
+  endpoints
+- Public visibility-aware deck and sideboard TTS exports using the shared persistent-sheet payload
 - Superuser-protected maintenance endpoints
 - Docker API entrypoint and health endpoint
 - Startup orchestration for migrations and seed commands

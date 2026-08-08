@@ -7,6 +7,11 @@ import type {
   DeckUpdateRequest,
   DeckUpsertRequest,
 } from '@/domain/decks/types';
+import {
+  mapTtsExportResponse,
+  type TtsExportApiResponse,
+  type TtsExportResponse,
+} from '@/domain/cards/utils/ttsExportResponse';
 
 export const fetchDeckTags = async (): Promise<DeckTagCatalog> => {
   const response = await api.get<DeckTagCatalog>('/deck-tags');
@@ -29,8 +34,12 @@ const withSummaryView = (params?: URLSearchParams): URLSearchParams => {
   return nextParams;
 };
 
-export const fetchPublicDeckSummaries = async (params?: URLSearchParams): Promise<DeckSummaryRecord[]> => {
-  const response = await api.get<DeckSummaryRecord[]>('/decks', { params: withSummaryView(params) });
+export const fetchPublicDeckSummaries = async (
+  params?: URLSearchParams,
+): Promise<DeckSummaryRecord[]> => {
+  const response = await api.get<DeckSummaryRecord[]>('/decks', {
+    params: withSummaryView(params),
+  });
   return response.data;
 };
 
@@ -44,8 +53,12 @@ export const fetchMyDecks = async (params?: URLSearchParams): Promise<DeckRecord
   return response.data;
 };
 
-export const fetchMyDeckSummaries = async (params?: URLSearchParams): Promise<DeckSummaryRecord[]> => {
-  const response = await api.get<DeckSummaryRecord[]>('/my/decks', { params: withSummaryView(params) });
+export const fetchMyDeckSummaries = async (
+  params?: URLSearchParams,
+): Promise<DeckSummaryRecord[]> => {
+  const response = await api.get<DeckSummaryRecord[]>('/my/decks', {
+    params: withSummaryView(params),
+  });
   return response.data;
 };
 
@@ -59,7 +72,10 @@ export const createDeck = async (payload: DeckUpsertRequest): Promise<DeckRecord
   return response.data;
 };
 
-export const updateDeck = async (deckId: string, payload: DeckUpdateRequest): Promise<DeckRecord> => {
+export const updateDeck = async (
+  deckId: string,
+  payload: DeckUpdateRequest,
+): Promise<DeckRecord> => {
   const response = await api.patch<DeckRecord>(`/my/decks/${deckId}`, payload);
   return response.data;
 };
@@ -68,8 +84,11 @@ export const deleteDeck = async (deckId: string): Promise<void> => {
   await api.delete(`/my/decks/${deckId}`);
 };
 
-export const exportDeckTts = async (deckId: string, sideboardId?: string): Promise<Blob> => {
+export const exportDeckTts = async (
+  deckId: string,
+  sideboardId?: string,
+): Promise<TtsExportResponse> => {
   const params = sideboardId ? { sideboard_id: sideboardId } : undefined;
-  const response = await api.get<Blob>(`/decks/${deckId}/exports/tts`, { params, responseType: 'blob' });
-  return response.data;
+  const response = await api.get<TtsExportApiResponse>(`/decks/${deckId}/exports/tts`, { params });
+  return mapTtsExportResponse(response.data);
 };
