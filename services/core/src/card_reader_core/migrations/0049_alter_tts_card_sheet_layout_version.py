@@ -17,10 +17,9 @@ class Migration(migrations.Migration):
     dependencies = [("card_reader_core", "0048_alter_tts_card_sheet_layout_version")]
 
     operations = [
-        migrations.RunPython(
-            reset_test_phase_tts_card_sheets,
-            reverse_code=migrations.RunPython.noop,
-        ),
+        # Earlier application versions cannot read layout 3, and the deleted
+        # test-phase assignments cannot be reconstructed safely during rollback.
+        migrations.RunPython(reset_test_phase_tts_card_sheets),
         migrations.RemoveConstraint(
             model_name="ttscardsheet",
             name="ck_tts_sheet_next_slot_capacity",
