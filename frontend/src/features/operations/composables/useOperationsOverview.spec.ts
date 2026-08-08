@@ -25,9 +25,25 @@ const buildOverview = (generatedAt: string): OperationsOverview => ({
   queues: [],
 });
 
+let mountedState!: ReturnType<typeof useOperationsOverview>;
+const TestOperationsOverview = defineComponent({
+  setup() {
+    mountedState = useOperationsOverview();
+    return () => h('div');
+  },
+});
+
+const mountOperationsOverview = () => {
+  const app = createApp(TestOperationsOverview);
+  const host = document.createElement('div');
+  app.mount(host);
+  return { app, state: mountedState };
+};
+
 describe('useOperationsOverview', () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.useRealTimers();
+    mockedFetchOperationsOverview.mockReset();
   });
 
   test('ignores stale responses and preserves the latest refresh state', async () => {
@@ -37,17 +53,7 @@ describe('useOperationsOverview', () => {
       .mockReturnValueOnce(staleRequest.promise)
       .mockReturnValueOnce(latestRequest.promise);
 
-    let state!: ReturnType<typeof useOperationsOverview>;
-    const app = createApp(
-      defineComponent({
-        setup() {
-          state = useOperationsOverview();
-          return () => h('div');
-        },
-      }),
-    );
-    const host = document.createElement('div');
-    app.mount(host);
+    const { app, state } = mountOperationsOverview();
     const latestLoad = state.loadOverview();
 
     staleRequest.resolve(buildOverview('stale'));
@@ -63,6 +69,35 @@ describe('useOperationsOverview', () => {
     expect(state.overview.value?.generated_at).toBe('latest');
     expect(state.loading.value).toBe(false);
     expect(state.refreshing.value).toBe(false);
+
+    app.unmount();
+  });
+
+  test('does not replace a slow request on the polling interval', async () => {
+    vi.useFakeTimers();
+    const slowRequest = createDeferred<OperationsOverview>();
+    mockedFetchOperationsOverview
+      .mockReturnValueOnce(slowRequest.promise)
+      .mockResolvedValueOnce(buildOverview('polled'));
+
+    const { app, state } = mountOperationsOverview();
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect(mockedFetchOperationsOverview).toHaveBeenCalledTimes(1);
+    expect(state.loading.value).toBe(true);
+
+    slowRequest.resolve(buildOverview('slow'));
+    await slowRequest.promise;
+    await Promise.resolve();
+
+    expect(state.overview.value?.generated_at).toBe('slow');
+    expect(state.loading.value).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(mockedFetchOperationsOverview).toHaveBeenCalledTimes(2);
+    expect(state.overview.value?.generated_at).toBe('polled');
 
     app.unmount();
   });

@@ -10,9 +10,11 @@ export const useOperationsOverview = () => {
   const errorMessage = ref('');
   const documentVisibility = useDocumentVisibility();
   let latestRequestId = 0;
+  let activeRequestCount = 0;
 
   const loadOverview = async (): Promise<void> => {
     const requestId = ++latestRequestId;
+    activeRequestCount += 1;
     refreshing.value = true;
     try {
       const nextOverview = await fetchOperationsOverview();
@@ -24,6 +26,7 @@ export const useOperationsOverview = () => {
       console.error('Load operations overview failed', error);
       errorMessage.value = 'Worker and queue status could not be loaded.';
     } finally {
+      activeRequestCount -= 1;
       if (requestId === latestRequestId) {
         loading.value = false;
         refreshing.value = false;
@@ -31,8 +34,12 @@ export const useOperationsOverview = () => {
     }
   };
 
+  const pollOverview = (): void => {
+    if (activeRequestCount === 0) void loadOverview();
+  };
+
   const { pause, resume } = useIntervalFn(
-    () => void loadOverview(),
+    pollOverview,
     5000,
     { immediate: false },
   );
@@ -42,7 +49,7 @@ export const useOperationsOverview = () => {
     (visibility) => {
       if (visibility === 'visible') {
         resume();
-        if (!loading.value) void loadOverview();
+        if (!loading.value) pollOverview();
       } else {
         pause();
       }
