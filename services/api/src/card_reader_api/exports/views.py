@@ -14,7 +14,6 @@ from card_reader_api.common.responses import not_found, serializer_error
 from card_reader_api.common.urls import build_public_api_url
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts_cards import encode_tts_card_export
-from card_reader_core.models import Deck, DeckSideboard
 from card_reader_core.repositories.exports import export_cards_csv
 from card_reader_core.services.decks import DeckService
 from card_reader_core.services.exports import (
@@ -26,6 +25,7 @@ from card_reader_core.services.exports import (
 _TTS_CARD_EXPORT_ERROR_STATUS = {
     TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE: 409,
     TtsCardExportErrorCode.CONTENT_VERSION_NOT_FOUND: 404,
+    TtsCardExportErrorCode.DECK_SOURCE_NOT_FOUND: 404,
     TtsCardExportErrorCode.NO_USABLE_CARDS: 400,
     TtsCardExportErrorCode.REQUIRED_CARD_UNAVAILABLE: 409,
     TtsCardExportErrorCode.SHEETS_UNAVAILABLE: 503,
@@ -131,12 +131,11 @@ class DeckTtsExportView(APIView):
             return not_found("Deck not found")
 
         sideboard_id = request.query_params.get("sideboard_id")
-        sideboard = _get_tts_export_sideboard(deck, sideboard_id)
-        if sideboard_id is not None and sideboard is None:
-            return not_found("Sideboard not found")
-
         try:
-            export_data = TtsCardExportService().build_deck_export(deck, sideboard=sideboard)
+            export_data = TtsCardExportService().build_deck_export(
+                str(deck.id),
+                sideboard_id=sideboard_id,
+            )
         except TtsCardExportError as exc:
             return _tts_card_export_error_response(exc)
 
@@ -156,18 +155,6 @@ class DeckTtsExportView(APIView):
 
 def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
-
-
-def _get_tts_export_sideboard(
-    deck: Deck,
-    sideboard_id: str | None,
-) -> DeckSideboard | None:
-    if sideboard_id is None:
-        return None
-    return next(
-        (sideboard for sideboard in deck.sideboards.all() if str(sideboard.id) == sideboard_id),
-        None,
-    )
 
 
 def _tts_card_export_error_response(exc: TtsCardExportError) -> Response:

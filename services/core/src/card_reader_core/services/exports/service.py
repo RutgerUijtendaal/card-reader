@@ -7,8 +7,6 @@ from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     ALL_CARD_LIFECYCLE_FILTER,
     CardVersionImage,
-    Deck,
-    DeckSideboard,
 )
 from card_reader_core.repositories.cards import (
     CardFilterParams,
@@ -18,6 +16,7 @@ from card_reader_core.repositories.cards import (
     list_matching_cards,
 )
 from card_reader_core.repositories.content_versions import get_content_version
+from card_reader_core.repositories.decks import get_deck_export_snapshot
 from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
 from card_reader_core.services.card_backs import (
     CardBackService,
@@ -76,6 +75,7 @@ class TtsCardExportData:
 class TtsCardExportErrorCode(StrEnum):
     CARD_BACK_UNAVAILABLE = "card_back_unavailable"
     CONTENT_VERSION_NOT_FOUND = "content_version_not_found"
+    DECK_SOURCE_NOT_FOUND = "deck_source_not_found"
     NO_USABLE_CARDS = "no_usable_cards"
     REQUIRED_CARD_UNAVAILABLE = "required_card_unavailable"
     SHEETS_UNAVAILABLE = "sheets_unavailable"
@@ -166,84 +166,73 @@ class TtsCardExportService:
 
     def build_deck_export(
         self,
-        deck: Deck,
+        deck_id: str,
         *,
-        sideboard: DeckSideboard | None = None,
+        sideboard_id: str | None = None,
     ) -> TtsCardExportData:
-        if sideboard is None:
-            requested = [
-                (deck.hero_card, 1, "hero", True),
-                *[
-                    (entry.card, int(entry.quantity), "mainboard", False)
-                    for entry in deck.entries.all()
-                ],
-            ]
-            collection_name = deck.name
-            scope = "mainboard"
-        else:
-            requested = [
-                (entry.card, int(entry.quantity), "sideboard", False)
-                for entry in sideboard.entries.all()
-            ]
-            collection_name = f"{deck.name} - {sideboard.name}"
-            scope = "sideboard"
+        snapshot = get_deck_export_snapshot(deck_id, sideboard_id=sideboard_id)
+        if snapshot is None:
+            detail = "Sideboard not found" if sideboard_id is not None else "Deck not found"
+            raise TtsCardExportError(TtsCardExportErrorCode.DECK_SOURCE_NOT_FOUND, detail)
 
         rows = get_latest_card_list_rows_by_card_ids(
-            [card.id for card, _quantity, _role, _required in requested],
+            [entry.card_id for entry in snapshot.entries],
             lifecycle_status=ALL_CARD_LIFECYCLE_FILTER,
         )
         rows_by_card_id = {row.version.card.id: row for row in rows}
         entries: list[_ResolvedTtsCardSelectionEntry] = []
         skipped: list[TtsCardExportSkippedCard] = []
-        for card, quantity, role, required in requested:
-            row = rows_by_card_id.get(card.id)
-            name = card.latest_version.name if card.latest_version is not None else card.label
+        for requested_entry in snapshot.entries:
+            row = rows_by_card_id.get(requested_entry.card_id)
             if row is None:
-                if required:
-                    raise _required_card_unavailable(name, "has no latest version")
+                if requested_entry.required:
+                    raise _required_card_unavailable(
+                        requested_entry.card_name,
+                        "has no latest version",
+                    )
                 skipped.append(
                     TtsCardExportSkippedCard(
-                        card_id=card.id,
-                        name=name,
-                        quantity=quantity,
+                        card_id=requested_entry.card_id,
+                        name=requested_entry.card_name,
+                        quantity=requested_entry.quantity,
                         reason="Card has no latest version.",
-                        role=role,
+                        role=requested_entry.role,
                     )
                 )
                 continue
             entries.append(
                 _ResolvedTtsCardSelectionEntry(
                     row=row,
-                    quantity=quantity,
-                    role=role,
-                    required=required,
+                    quantity=requested_entry.quantity,
+                    role=requested_entry.role,
+                    required=requested_entry.required,
                 )
             )
 
         source_metadata: dict[str, object] = {
             "type": "deck",
-            "deck_id": str(deck.id),
-            "scope": scope,
-            "hero_card_id": str(deck.hero_card.id),
-            "difficulty": deck.difficulty,
+            "deck_id": snapshot.deck_id,
+            "scope": snapshot.scope,
+            "hero_card_id": snapshot.hero_card_id,
+            "difficulty": snapshot.difficulty,
             "tags": [
                 {
-                    "id": assignment.tag.id,
-                    "key": assignment.tag.key,
-                    "label": assignment.tag.label,
-                    "kind": assignment.tag.kind,
+                    "id": tag.id,
+                    "key": tag.key,
+                    "label": tag.label,
+                    "kind": tag.kind,
                 }
-                for assignment in deck.tag_assignments.all()
+                for tag in snapshot.tags
             ],
         }
-        if sideboard is not None:
-            source_metadata["sideboard_id"] = str(sideboard.id)
-            source_metadata["sideboard_name"] = sideboard.name
+        if snapshot.sideboard_id is not None:
+            source_metadata["sideboard_id"] = snapshot.sideboard_id
+            source_metadata["sideboard_name"] = snapshot.sideboard_name
 
         return self._build_export(
             _ResolvedTtsCardSelection(
-                collection_name=collection_name,
-                collection_description=deck.description,
+                collection_name=snapshot.collection_name,
+                collection_description=snapshot.collection_description,
                 source_metadata=source_metadata,
                 entries=entries,
                 skipped=skipped,
