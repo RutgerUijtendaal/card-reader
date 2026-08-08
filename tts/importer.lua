@@ -29,12 +29,52 @@ local CONFIG = {
     finalize_search_radius = 3,
 }
 
-local library_sync_state = {
-    generation = 0,
-    in_progress = false,
-}
+ -- Importer
+deckString = ""
+
+function input_func(obj, color, input, stillEditing)
+    deckString = input or ""
+    end
+
 
 function onLoad()
+    self.createInput({
+        input_function = "input_func",
+        function_owner = self,
+        label          = "Import String",
+        alignment      = 3,
+        position       = {x=0, y=0.2, z=-0.5},
+        width          = 1000,
+        height         = 200,
+        value          = DeckString or "",
+    })
+    params = {
+        click_function = "click_func",
+        function_owner = self,
+        label          = "Import Deck",
+        position       = {-0.65, 0.2, 0.30},
+        width          = 600,
+        height         = 300,
+        font_size      = 100,
+        color          = {0.5, 0.5, 1},
+        font_color     = {1, 1, 1},
+        tooltip        = "Pray to Steve it works",
+    }
+    self.createButton(params)
+        params2 = {
+        click_function = "click_func2",
+        function_owner = self,
+        label          = "Import Gallery",
+        position       = {0.65, 0.2, 0.30},
+        width          = 600,
+        height         = 300,
+        font_size      = 85,
+        color          = {0.75, 0.0, 0},
+        font_color     = {1, 1, 1},
+        tooltip        = "Pray to Steve it works",
+    }
+    self.createButton(params2)
+
     if not CONFIG.auto_sync_enabled then
         return
     end
@@ -43,6 +83,27 @@ function onLoad()
         startCardReaderLibraryAutoSync()
     end, 1)
 end
+
+-- Create Button
+
+function click_func(obj, color, alt_click)
+    print(deckString)
+    importCardReaderDeck(deckString)
+end
+
+-- Create Button
+
+function click_func2(obj, color, alt_click)
+    print(deckString)
+    importCardReaderCards(deckString)
+end
+
+-- THE ACTUAL IMPORTER CODE 
+
+local library_sync_state = {
+    generation = 0,
+    in_progress = false,
+}
 
 function startCardReaderLibraryAutoSync()
     if CONFIG.auto_sync_enabled then
