@@ -61,8 +61,8 @@ storage targets. It creates a local safety archive under the gitignored
 Staff normally publish from **Settings → Developer Data**:
 
 1. Choose **Build new version**.
-2. Follow the durable build through queued, running, and completed states.
-3. Download the generated `dev-data.lock.json`.
+2. Follow the durable build through queued, running, and completed states under **Operations**.
+3. Download the generated `dev-data.lock.json` from the developer-data queue history.
 4. Commit that lock file with the application change that should pin the bundle.
 
 The dedicated builder worker exports the reviewed selection, validates it through an isolated
@@ -81,3 +81,6 @@ uv run --project . --package card-reader-api python services/api/manage.py run_d
 
 Production uses Nginx internal redirects for authorized file transfer. Local development falls back
 to Django `FileResponse`, so the same browser and bootstrap flows work without Nginx.
+
+The Operations page also reports whether the dedicated builder process is online, idle, busy,
+stopped, or stale. Build rows remain the durable source of truth if a worker heartbeat disappears.

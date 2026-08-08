@@ -196,57 +196,32 @@
         v-if="buildsLoading"
         class="theme-section-muted mt-4 text-sm"
       >
-        Loading build history…
+        Loading current build state…
       </div>
 
       <div
-        v-else-if="builds.length === 0"
-        class="theme-card-frame-muted theme-section-muted mt-4 rounded-xl border px-4 py-3 text-sm"
+        v-else-if="activeBuild"
+        class="theme-card-frame-muted mt-4 rounded-xl border px-4 py-3"
       >
-        No staff-generated builds yet.
-      </div>
-
-      <div
-        v-else
-        class="theme-divider mt-4 border-t"
-      >
-        <div
-          v-for="build in builds.slice(0, 8)"
-          :key="build.id"
-          class="theme-divider flex flex-col gap-3 border-b py-4 sm:flex-row sm:items-center"
-        >
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="theme-section-title break-all font-mono text-sm font-semibold">
-                {{ build.bundle_version }}
-              </span>
-              <span
-                class="theme-pill px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
-                :class="buildStatusClass(build.status)"
-              >
-                {{ build.status }}
-              </span>
-            </div>
-            <p class="theme-section-muted mt-1 text-xs">
-              Requested by {{ build.requested_by ?? 'a deleted user' }} · {{ formatDate(build.created_at) }}
-            </p>
-            <p
-              v-if="build.error_message"
-              class="mt-2 text-sm text-red-600 dark:text-red-300"
-            >
-              {{ build.error_message }}
-            </p>
-          </div>
-          <a
-            v-if="build.lock_download_url"
-            class="btn-secondary shrink-0 justify-center gap-2"
-            :href="developerDataLockUrl(build.lock_download_url)"
-          >
-            <FileDown class="h-4 w-4" />
-            Download lock file
-          </a>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="theme-section-title break-all font-mono text-sm font-semibold">
+            {{ activeBuild.bundle_version }}
+          </span>
+          <span class="theme-pill theme-pill-warning px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
+            {{ activeBuild.status }}
+          </span>
         </div>
+        <p class="theme-section-muted mt-1 text-xs">
+          Requested by {{ activeBuild.requested_by ?? 'a deleted user' }} · {{ formatDate(activeBuild.created_at) }}
+        </p>
       </div>
+
+      <a
+        class="btn-secondary mt-4 inline-flex justify-center"
+        href="/operations#queue-developer-data-builds"
+      >
+        View build history in Operations
+      </a>
     </div>
   </section>
 </template>
@@ -254,18 +229,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useIntervalFn } from '@vueuse/core';
-import { Check, Copy, Download, FileDown, KeyRound, LoaderCircle, PackagePlus } from 'lucide-vue-next';
+import { Check, Copy, Download, KeyRound, LoaderCircle, PackagePlus } from 'lucide-vue-next';
 import {
   createDeveloperDataBuild,
   createDeveloperDataGrant,
   developerDataDownloadUrl,
-  developerDataLockUrl,
   fetchDeveloperDataBuilds,
   fetchCurrentDeveloperData,
 } from '@/domain/developer-data/api';
 import type {
   DeveloperDataBuild,
-  DeveloperDataBuildStatus,
   DeveloperDataBundle,
   DeveloperDataGrant,
 } from '@/domain/developer-data/types';
@@ -291,6 +264,9 @@ const downloadUrl = computed(() =>
 );
 const hasActiveBuild = computed(() =>
   builds.value.some((build) => build.status === 'queued' || build.status === 'running'),
+);
+const activeBuild = computed(() =>
+  builds.value.find((build) => build.status === 'queued' || build.status === 'running') ?? null,
 );
 
 const { pause: pauseBuildPolling, resume: resumeBuildPolling } = useIntervalFn(
@@ -354,7 +330,7 @@ async function loadBuilds(): Promise<void> {
       await loadBundle();
     }
   } catch {
-    buildError.value = 'Build history could not be loaded.';
+    buildError.value = 'Current build state could not be loaded.';
   } finally {
     buildsLoading.value = false;
   }
@@ -371,16 +347,6 @@ const createBuild = async (): Promise<void> => {
   } finally {
     creatingBuild.value = false;
   }
-};
-
-const buildStatusClass = (status: DeveloperDataBuildStatus): string => {
-  if (status === 'succeeded') {
-    return 'theme-pill-success';
-  }
-  if (status === 'failed') {
-    return 'theme-pill-danger';
-  }
-  return status === 'running' ? 'theme-pill-warning' : 'theme-pill-neutral';
 };
 
 const formatBytes = (value: number): string => {

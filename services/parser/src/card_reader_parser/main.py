@@ -65,6 +65,7 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
 
     PollingWorker[ImportJob](
         config=PollingWorkerConfig(
+            key="parser",
             name="Parser worker",
             interval_seconds=interval_seconds,
             shutdown_marker=Path(marker) if marker else None,
@@ -82,5 +83,4 @@ def run_parser_loop(interval_seconds: float = 1.5) -> None:
 
 if __name__ == "__main__":
     run_parser_loop()
-
 

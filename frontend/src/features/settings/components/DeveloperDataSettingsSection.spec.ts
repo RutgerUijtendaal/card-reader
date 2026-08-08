@@ -8,21 +8,18 @@ const {
   downloadUrlMock,
   fetchBuildsMock,
   fetchCurrentMock,
-  lockUrlMock,
 } = vi.hoisted(() => ({
   createBuildMock: vi.fn(),
   createGrantMock: vi.fn(),
   downloadUrlMock: vi.fn((path: string) => `https://cards.example.test/api${path}`),
   fetchBuildsMock: vi.fn(),
   fetchCurrentMock: vi.fn(),
-  lockUrlMock: vi.fn((path: string) => `https://cards.example.test/api${path}`),
 }));
 
 vi.mock('@/domain/developer-data/api', () => ({
   createDeveloperDataBuild: createBuildMock,
   createDeveloperDataGrant: createGrantMock,
   developerDataDownloadUrl: downloadUrlMock,
-  developerDataLockUrl: lockUrlMock,
   fetchDeveloperDataBuilds: fetchBuildsMock,
   fetchCurrentDeveloperData: fetchCurrentMock,
 }));
@@ -116,7 +113,7 @@ describe('DeveloperDataSettingsSection', () => {
     mounted.unmount();
   });
 
-  test('lets staff queue builds and download a completed lock file', async () => {
+  test('centralizes build history and lets staff queue a build', async () => {
     fetchCurrentMock.mockResolvedValue({ available: false });
     fetchBuildsMock.mockResolvedValue([
       {
@@ -150,12 +147,11 @@ describe('DeveloperDataSettingsSection', () => {
     });
     const mounted = await mountSection(true);
 
-    const lockDownload = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a')).find((link) =>
-      link.textContent?.includes('Download lock file'),
+    const operationsLink = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a')).find((link) =>
+      link.textContent?.includes('View build history in Operations'),
     );
-    expect(lockDownload?.href).toBe(
-      'https://cards.example.test/api/developer-data/builds/completed-build/lock',
-    );
+    expect(operationsLink?.getAttribute('href')).toBe('/operations#queue-developer-data-builds');
+    expect(mounted.container.textContent).not.toContain('dev-completed');
 
     const buildButton = Array.from(mounted.container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Build new version'),

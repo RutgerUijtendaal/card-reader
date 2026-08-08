@@ -189,7 +189,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Gamepad2, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
+import { Activity, Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Gamepad2, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
 import AppHotkeysPanel from '@/app/components/AppHotkeysPanel.vue';
 import ThemeModeMenu from '@/app/components/ThemeModeMenu.vue';
@@ -241,7 +241,8 @@ const items = computed<NavItem[]>(() => [
   { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: Hammer, requiresAuth: true },
   { label: 'Notifications', to: '/notifications', icon: Bell, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },
   { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
-  { label: 'Import Jobs', to: '/import-jobs', icon: Upload, requiresStaff: true },
+  { label: 'Imports', to: '/imports', icon: Upload, requiresStaff: true },
+  { label: 'Operations', to: '/operations', icon: Activity, requiresStaff: true },
   { label: 'Review Queue', to: '/review', icon: ClipboardCheck, requiresStaff: true, badgeCount: openParseFlagItemCount.value },
   { label: 'Admin', to: '/admin', icon: Settings, requiresStaff: true, badgeCount: pendingAccessRequestCount.value },
 ]);

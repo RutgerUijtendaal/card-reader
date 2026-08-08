@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { api } from '@/shared/api/client';
-import { createImportJob, fetchCurrentContentVersion } from '@/features/import-jobs/api';
+import { createImportJob, fetchCurrentContentVersion, fetchImportJobs } from '@/features/import-jobs/api';
 
 vi.mock('@/shared/api/client', () => ({
   api: {
@@ -10,6 +10,13 @@ vi.mock('@/shared/api/client', () => ({
 }));
 
 describe('importJobs api', () => {
+  test('fetches only active imports for the management page', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+
+    await expect(fetchImportJobs()).resolves.toEqual([]);
+    expect(api.get).toHaveBeenCalledWith('/imports', { params: { status: 'active' } });
+  });
+
   test('fetches the current content version', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({
       data: {

@@ -31,8 +31,11 @@ logger = logging.getLogger(__name__)
 
 
 class ImportListView(APIView):
-    def get(self, _request: Request) -> Response:
-        jobs = list_import_jobs()
+    def get(self, request: Request) -> Response:
+        status_filter = request.query_params.get("status", "all")
+        if status_filter not in {"all", "active"}:
+            return bad_request("status must be either 'all' or 'active'")
+        jobs = list_import_jobs(active_only=status_filter == "active")
         return Response([import_job_payload(job) for job in jobs])
 
 

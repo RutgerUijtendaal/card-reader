@@ -77,6 +77,7 @@ That starts:
 - the API
 - the parser worker
 - the developer-data builder worker
+- the TTS card-sheet renderer worker
 - the web app
 
 ## Local Development
@@ -180,9 +181,9 @@ Current container behavior:
 - `api`: runs migrations, seeds users/default data, then starts Gunicorn
 - `parser`: starts the background parser and waits for the API health check
 - `developer-data-builder`: processes queued staff builds outside Gunicorn
+- `tts-sheet-renderer`: processes the durable TTS card-sheet render queue
 
-The API, parser, and developer-data builder share bind-mounted deployment storage at
-`/var/lib/card-reader`.
+The API and all three workers share bind-mounted deployment storage at `/var/lib/card-reader`.
 The parser defaults to a `linux/amd64` container so the same locked PaddlePaddle build works on
 x86_64 hosts and through Docker Desktop emulation on Apple Silicon.
 
@@ -203,6 +204,9 @@ Health check:
 ```bash
 curl http://127.0.0.1:8000/health
 ```
+
+Staff can monitor parser, developer-data, and TTS worker heartbeats plus recent queue activity from
+the `/operations` page. Import creation and active import cancellation live at `/imports`.
 
 ## Storage
 

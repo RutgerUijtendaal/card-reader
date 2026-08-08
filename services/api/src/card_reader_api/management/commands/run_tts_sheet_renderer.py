@@ -41,6 +41,7 @@ class Command(BaseCommand):
 
         PollingWorker[TtsCardSheet](
             config=PollingWorkerConfig(
+                key="tts-sheet-renderer",
                 name="TTS card-sheet renderer",
                 interval_seconds=interval,
                 once=bool(options["once"]),
