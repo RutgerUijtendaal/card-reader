@@ -28,7 +28,7 @@ from card_reader_core.storage import relativize_storage_path
 
 _RENDER_DEBOUNCE = timedelta(seconds=2)
 _RENDER_MAX_DEBOUNCE = timedelta(seconds=30)
-_RENDER_CLAIM_TIMEOUT = timedelta(minutes=10)
+TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT = timedelta(minutes=10)
 _RENDERER_FINGERPRINT_VERSION = 1
 _SQLITE_WRITE_RETRY_ATTEMPTS = 6
 _SLOT_RESERVATION_ATTEMPTS = 16
@@ -324,7 +324,7 @@ def claim_next_renderable_sheet() -> TtsCardSheet | None:
 def _claim_next_renderable_sheet_once() -> TtsCardSheet | None:
     for _attempt in range(_CLAIM_RESERVATION_ATTEMPTS):
         now = now_utc()
-        stale_before = now - _RENDER_CLAIM_TIMEOUT
+        stale_before = now - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT
         claimable = (
             TtsCardSheet.objects.filter(desired_revision__gt=F("rendered_revision"))
             .filter(Q(render_not_before__isnull=True) | Q(render_not_before__lte=now))
@@ -362,7 +362,7 @@ def _claim_sheet_for_render_once(
     respect_not_before: bool,
 ) -> TtsCardSheet | None:
     now = now_utc()
-    stale_before = now - _RENDER_CLAIM_TIMEOUT
+    stale_before = now - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT
     claimable = (
         TtsCardSheet.objects.filter(id=sheet_id, desired_revision__gt=F("rendered_revision"))
         .filter(Q(render_claimed_at__isnull=True) | Q(render_claimed_at__lt=stale_before))
@@ -419,7 +419,7 @@ def release_render_claim(*, sheet_id: str, claimed_at: datetime | None = None) -
 
 def release_expired_render_claims() -> int:
     return TtsCardSheet.objects.filter(
-        render_claimed_at__lt=now_utc() - _RENDER_CLAIM_TIMEOUT
+        render_claimed_at__lt=now_utc() - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT
     ).update(
         render_claimed_at=None,
         updated_at=now_utc(),

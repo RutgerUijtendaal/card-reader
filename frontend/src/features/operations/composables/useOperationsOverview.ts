@@ -9,18 +9,25 @@ export const useOperationsOverview = () => {
   const refreshing = ref(false);
   const errorMessage = ref('');
   const documentVisibility = useDocumentVisibility();
+  let latestRequestId = 0;
 
   const loadOverview = async (): Promise<void> => {
+    const requestId = ++latestRequestId;
     refreshing.value = true;
     try {
-      overview.value = await fetchOperationsOverview();
+      const nextOverview = await fetchOperationsOverview();
+      if (requestId !== latestRequestId) return;
+      overview.value = nextOverview;
       errorMessage.value = '';
     } catch (error) {
+      if (requestId !== latestRequestId) return;
       console.error('Load operations overview failed', error);
       errorMessage.value = 'Worker and queue status could not be loaded.';
     } finally {
-      loading.value = false;
-      refreshing.value = false;
+      if (requestId === latestRequestId) {
+        loading.value = false;
+        refreshing.value = false;
+      }
     }
   };
 

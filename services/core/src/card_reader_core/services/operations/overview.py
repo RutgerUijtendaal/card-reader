@@ -19,6 +19,9 @@ from card_reader_core.repositories.operations import (
     list_tts_card_sheets_for_operations,
     tts_card_sheet_status_counts,
 )
+from card_reader_core.repositories.tts_card_sheets import (
+    TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT,
+)
 from card_reader_core.repositories.worker_heartbeats import list_worker_heartbeats
 
 _RECENT_ITEM_LIMIT = 20
@@ -197,6 +200,7 @@ def _import_item_payload(job: ImportJob) -> dict[str, Any]:
 
 
 def _tts_item_payload(sheet: TtsCardSheet, *, now: datetime) -> dict[str, Any]:
+    claim_is_active = _tts_claim_is_active(sheet, now=now)
     retry_at = (
         _iso(sheet.render_not_before)
         if sheet.render_failure_count > 0 and sheet.render_not_before is not None
@@ -215,7 +219,7 @@ def _tts_item_payload(sheet: TtsCardSheet, *, now: datetime) -> dict[str, Any]:
         "native_status": None,
         "created_at": _iso(sheet.created_at),
         "updated_at": _iso(sheet.updated_at),
-        "started_at": _iso(sheet.render_claimed_at),
+        "started_at": _iso(sheet.render_claimed_at) if claim_is_active else None,
         "finished_at": _iso(sheet.published_at),
         "progress_current": sheet.rendered_revision,
         "progress_total": sheet.desired_revision,
@@ -258,13 +262,20 @@ def _developer_data_item_payload(build: DeveloperDataBuild) -> dict[str, Any]:
 def _tts_status(sheet: TtsCardSheet, *, now: datetime) -> str:
     if sheet.desired_revision <= sheet.rendered_revision:
         return "completed"
-    if sheet.render_claimed_at is not None:
+    if _tts_claim_is_active(sheet, now=now):
         return "running"
     if sheet.render_failure_count > 0:
         return "retrying"
     if sheet.render_not_before is not None and sheet.render_not_before > now:
         return "scheduled"
     return "queued"
+
+
+def _tts_claim_is_active(sheet: TtsCardSheet, *, now: datetime) -> bool:
+    return (
+        sheet.render_claimed_at is not None
+        and sheet.render_claimed_at >= now - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT
+    )
 
 
 def _normalize_import_status(status: str) -> str:

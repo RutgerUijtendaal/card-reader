@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import Client
 
@@ -11,6 +13,9 @@ from card_reader_core.models import (
     WorkerActivity,
     WorkerHeartbeat,
     now_utc,
+)
+from card_reader_core.repositories.tts_card_sheets import (
+    TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT,
 )
 
 
@@ -77,6 +82,38 @@ def test_operations_overview_requires_staff() -> None:
     client.force_login(user)
 
     assert client.get("/operations").status_code == 403
+
+
+def test_operations_overview_treats_expired_tts_claim_as_queued() -> None:
+    user_model = get_user_model()
+    staff = user_model.objects.create_user(
+        username="stale-tts-claim-staff",
+        password="password",
+        is_staff=True,
+    )
+    now = now_utc()
+    stale_sheet = TtsCardSheet.objects.create(
+        sequence=1002,
+        desired_revision=1,
+        render_claimed_at=now - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT - timedelta(seconds=1),
+    )
+    active_sheet = TtsCardSheet.objects.create(
+        sequence=1003,
+        desired_revision=1,
+        render_claimed_at=now,
+    )
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(staff)
+
+    response = client.get("/operations")
+
+    assert response.status_code == 200
+    queues = {queue["key"]: queue for queue in response.json()["queues"]}
+    tts_queue = queues["tts-card-sheets"]
+    items = {item["id"]: item for item in tts_queue["items"]}
+    assert items[str(stale_sheet.id)]["status"] == "queued"
+    assert items[str(stale_sheet.id)]["started_at"] is None
+    assert items[str(active_sheet.id)]["status"] == "running"
 
 
 def test_import_list_active_filter_excludes_completed_jobs() -> None:
