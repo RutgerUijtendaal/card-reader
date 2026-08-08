@@ -117,6 +117,7 @@ def test_grant_creation_requires_csrf_and_replacement_revokes_the_old_code() -> 
     assert expired_exchange.status_code == 400
 
 
+@pytest.mark.django_db(transaction=True)
 def test_code_is_pinned_single_use_and_token_can_retry_until_expiry() -> None:
     content = _publish_test_bundle("token-retry")
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)

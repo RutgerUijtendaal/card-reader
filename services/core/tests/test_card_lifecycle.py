@@ -1,14 +1,8 @@
 from __future__ import annotations
 
-import os
 from types import SimpleNamespace
 
-import django
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "card_reader_core.django_settings")
-django.setup()
-
-from card_reader_core.models import (  # noqa: E402
+from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     ALL_CARD_LIFECYCLE_FILTER,
     DEFAULT_CARD_LIFECYCLE_FILTER,

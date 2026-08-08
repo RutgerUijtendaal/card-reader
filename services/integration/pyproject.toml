@@ -22,6 +22,7 @@ dependencies = [
 [tool.pytest.ini_options]
 pythonpath = ["tests", "../parser/src", "../api/src", "../core/src"]
 testpaths = ["tests"]
+DJANGO_SETTINGS_MODULE = "card_reader_api.project.test_settings"
 
 [tool.ruff]
 line-length = 100
@@ -38,5 +39,6 @@ warn_unused_ignores = true
 dev = [
     "mypy>=1.11.2",
     "pytest>=8.3.3",
+    "pytest-django>=4.11.1",
     "ruff>=0.6.9",
 ]

@@ -122,6 +122,7 @@ def test_merge_rebinds_source_slots_when_target_artwork_is_unreadable() -> None:
     assert not Card.objects.filter(id=source.id).exists()
 
 
+@pytest.mark.django_db(transaction=True)
 def test_concurrent_allocation_reserves_unique_sqlite_slots() -> None:
     TtsCardSheet.objects.all().delete()
     cards = [
@@ -148,6 +149,7 @@ def test_concurrent_allocation_reserves_unique_sqlite_slots() -> None:
     assert TtsCardSheet.objects.get().next_slot_index == 12
 
 
+@pytest.mark.django_db(transaction=True)
 def test_concurrent_sqlite_render_claims_have_one_winner() -> None:
     TtsCardSheet.objects.all().delete()
     sheet = TtsCardSheet.objects.create(
@@ -192,6 +194,7 @@ def test_prioritization_and_inline_claim_preserve_active_failure_backoff() -> No
     assert sheet.render_not_before == render_not_before
 
 
+@pytest.mark.django_db(transaction=True)
 def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_changes() -> None:
     TtsCardSheet.objects.all().delete()
     card = _create_sheet_card("refresh", color=(20, 40, 60))
@@ -241,6 +244,7 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
     not_modified.close()
 
 
+@pytest.mark.django_db(transaction=True)
 def test_failed_metadata_publish_keeps_previous_sheet_revision_available(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

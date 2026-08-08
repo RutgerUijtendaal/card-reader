@@ -709,6 +709,7 @@ def test_cards_list_returns_paginated_payload() -> None:
     assert second_card.id in result_ids
 
 
+@pytest.mark.django_db(transaction=True)
 def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None:
     card, version = _create_editable_card_version(name="Image Card")
     image_path = settings.image_store_dir / f"checksum-{version.id}.png"
@@ -741,6 +742,7 @@ def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None
     assert head_response["Last-Modified"] == response["Last-Modified"]
 
 
+@pytest.mark.django_db(transaction=True)
 def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_version() -> None:
     card, first_version = _create_editable_card_version(name="Stable Image Card")
     first_image = _create_card_image(first_version)
@@ -973,6 +975,7 @@ def test_admin_content_version_patch_rejects_invalid_version_number() -> None:
     assert content_version.version_number == "176.1.0"
 
 
+@pytest.mark.django_db(transaction=True)
 def test_admin_content_version_patch_rejects_duplicate_version_number() -> None:
     first = ContentVersion.objects.create(
         version_number="177.1.0",
