@@ -36,16 +36,9 @@ class TtsCardSheetLayout:
 
 
 _LAYOUTS = {
-    1: TtsCardSheetLayout(
-        version=1,
-        columns=10,
-        rows=7,
-        cell_width=400,
-        cell_height=560,
-    ),
-    2: TtsCardSheetLayout(
-        version=2,
-        columns=10,
+    3: TtsCardSheetLayout(
+        version=3,
+        columns=9,
         rows=7,
         cell_width=822,
         cell_height=1122,

@@ -3,7 +3,7 @@
 This directory contains three related TTS flows:
 
 - `importCardReaderDeck(...)` clones cards already present in configured TTS scripting regions by Card ID or name.
-- `importCardReaderCards(...)` creates one full native custom deck per referenced Card Reader card sheet.
+- `importCardReaderCards(...)` creates a native custom deck from persistent Card Reader card sheets.
 - `syncCardReaderLibrary()` fetches the canonical public library and creates only missing Card identities.
 
 Manual deck and card exports are base64-encoded JSON. The automatic library manifest is raw JSON fetched directly
@@ -21,15 +21,14 @@ by TTS. Paste `tts/importer.lua` into the TTS Global script, then invoke manual 
 
 ## Persistent sheet flow
 
-Card Reader assigns each usable Card a permanent position on a global 10×7 sheet. Sheets are filled in batches of
-70 and stored under stable public `.webp` URLs. The current layout uses full-resolution 822×1122 cells, producing an
-8220×7854 atlas without resizing or letterboxing canonical Card images. Assignments never move or get reused. A
-newer layout version upgrades existing sheets in place once and queues them for regeneration without changing their
-IDs or slot positions.
+Card Reader assigns each usable Card a permanent position on a global 9×7 sheet. Sheets are filled in batches of 63
+and stored under stable public `.webp` URLs. The current layout uses the original 822×1122 Card images without
+resizing or letterboxing, producing a 7398×7854 atlas that stays within TTS's 8192-pixel texture limit on both axes.
+Layout version 3 resets the test-phase sheet assignments once; assignments never move or get reused after that reset.
 
 An export references the existing sheets containing its Cards. It does not create a compact export-specific atlas,
-so a sparse selection may reference several sheets. During the current diagnostic flow, the manual Lua importer
-spawns each referenced atlas directly as one full native TTS `DeckCustom`.
+so a sparse selection may reference several sheets. The Lua importer combines those definitions into one native TTS
+custom deck rather than spawning and grouping independent `CardCustom` objects.
 
 ### Export
 
@@ -56,11 +55,8 @@ function importLatestCardReaderCards()
 end
 ```
 
-The diagnostic importer ignores the payload's individual Card selection and quantities. It spawns one full
-`DeckCustom` per referenced sheet with the native Rectangle Rounded shape default, `sideways = false`, and a Card
-count equal to the sheet's columns multiplied by rows. It does not create, rename, or add metadata to individual
-Cards. Unused atlas cells can therefore appear as blank Cards; this is intentional while isolating the native TTS
-sheet-deck behavior.
+The importer spawns one native Card for a one-Card export or one native custom Deck for larger exports. Quantities
+reuse the same sheet cell. Names and Card Reader identity metadata are stored on the contained Cards.
 
 The decoded `card-reader.tts-cards.v2` payload has this shape:
 
@@ -76,7 +72,7 @@ The decoded `card-reader.tts-cards.v2` payload has this shape:
     {
       "sheet_id": "sheet-id",
       "face_url": "https://cards.example/tts/card-sheets/sheet-id/image.webp",
-      "columns": 10,
+      "columns": 9,
       "rows": 7,
       "revision": 4,
       "image_checksum": "sheet-sha256"
@@ -122,11 +118,10 @@ library_batch_spacing = 3
 ```
 
 With `auto_sync_enabled = true`, Global `onLoad()` fetches the manifest, scans `source_region_guids` over multiple
-frames, and compares immutable Card IDs stored in GM Notes. Only missing identities are spawned. Each missing Card
-is spawned individually and the update is combined into a separate native Card or Deck positioned beside existing
-batches in the first valid configured region; existing batches are not regrouped. Rotated regions are supported,
-and synchronization stops instead of spawning outside the region when its batch slots are full. The configured
-scripting region should therefore be reserved for the Card Reader library.
+frames, and compares immutable Card IDs stored in GM Notes. Only missing identities are spawned. Each update is a
+separate native Card or Deck positioned beside existing batches in the first valid configured region; batches are
+not regrouped. Rotated regions are supported, and synchronization stops instead of spawning outside the region when
+its batch slots are full. The configured scripting region should therefore be reserved for the Card Reader library.
 Manual card and deck imports continue to use `spawn_position`; that player-facing location is not used by autosync.
 
 Set `auto_sync_enabled = false` to disable startup requests and automatic retries. Manual synchronization remains
