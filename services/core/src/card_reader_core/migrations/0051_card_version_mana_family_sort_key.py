@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from itertools import combinations
 
+from django.apps.registry import Apps
 from django.db import migrations, models
+from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 
 
 FAMILY_KEYS = ("arcane", "dark", "divine", "martial", "occult", "primal")
@@ -23,7 +25,7 @@ MULTI_RANKS = {
 NO_FAMILY_SORT_KEY = len(FAMILY_KEYS) + len(MULTI_COMBINATIONS)
 
 
-def backfill_mana_family_sort_keys(apps, _schema_editor) -> None:
+def backfill_mana_family_sort_keys(apps: Apps, _schema_editor: BaseDatabaseSchemaEditor) -> None:
     CardVersion = apps.get_model("card_reader_core", "CardVersion")
     CardVersionSymbol = apps.get_model("card_reader_core", "CardVersionSymbol")
     ranks_by_version_id: dict[str, set[int]] = {}
