@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
 from datetime import timedelta
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 
@@ -24,13 +22,6 @@ from card_reader_core.repositories.worker_heartbeats import (
     fetch_worker_heartbeat_snapshots,
 )
 from card_reader_core.services.operations import OperationsOverviewService
-
-
-@pytest.fixture(autouse=True)
-def isolate_operations_worker_heartbeats() -> Iterator[None]:
-    WorkerHeartbeat.objects.all().delete()
-    yield
-    WorkerHeartbeat.objects.all().delete()
 
 
 def test_operations_overview_reports_workers_and_normalized_queues() -> None:

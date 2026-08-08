@@ -37,11 +37,13 @@ mypy_path = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+DJANGO_SETTINGS_MODULE = "card_reader_api.project.test_settings"
 
 [dependency-groups]
 dev = [
     "mypy>=1.11.2",
     "pytest>=8.3.3",
+    "pytest-django>=4.11.1",
     "httpx>=0.27.2",
     "ruff>=0.6.9",
     "watchfiles>=0.24.0",

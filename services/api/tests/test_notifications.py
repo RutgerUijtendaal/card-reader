@@ -6,6 +6,7 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.test import Client
+import pytest
 
 from card_reader_core.config import settings
 from card_reader_core.models import (
@@ -594,6 +595,7 @@ def test_card_update_does_not_notify_deck_owner() -> None:
     assert UserNotification.objects.filter(recipient_id=str(actor.pk)).count() == 0
 
 
+@pytest.mark.django_db(transaction=True)
 def test_card_promotion_notifies_sideboard_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-sideboard-owner", "password")
@@ -774,6 +776,7 @@ def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
     assert UserNotification.objects.filter(recipient_id=str(owner.pk)).count() == 0
 
 
+@pytest.mark.django_db(transaction=True)
 def test_import_new_version_notifies_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-new-owner", "password")

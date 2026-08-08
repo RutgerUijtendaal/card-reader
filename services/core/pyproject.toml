@@ -27,6 +27,9 @@ card_reader_core = ["py.typed"]
 [tool.ruff]
 line-length = 100
 
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "card_reader_core.django_settings"
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
@@ -35,6 +38,7 @@ strict = true
 dev = [
     "mypy>=1.11.2",
     "pytest>=8.3.3",
+    "pytest-django>=4.11.1",
     "ruff>=0.6.9",
     "django-stubs>=6.0.3",
 ]

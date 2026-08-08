@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 import os
 from pathlib import Path
+import time
 from uuid import uuid4
 
 import pytest
@@ -121,6 +122,7 @@ def test_merge_rebinds_source_slots_when_target_artwork_is_unreadable() -> None:
     assert not Card.objects.filter(id=source.id).exists()
 
 
+@pytest.mark.django_db(transaction=True)
 def test_concurrent_allocation_reserves_unique_sqlite_slots() -> None:
     TtsCardSheet.objects.all().delete()
     cards = [
@@ -147,6 +149,7 @@ def test_concurrent_allocation_reserves_unique_sqlite_slots() -> None:
     assert TtsCardSheet.objects.get().next_slot_index == 12
 
 
+@pytest.mark.django_db(transaction=True)
 def test_concurrent_sqlite_render_claims_have_one_winner() -> None:
     TtsCardSheet.objects.all().delete()
     sheet = TtsCardSheet.objects.create(
@@ -191,6 +194,7 @@ def test_prioritization_and_inline_claim_preserve_active_failure_backoff() -> No
     assert sheet.render_not_before == render_not_before
 
 
+@pytest.mark.django_db(transaction=True)
 def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_changes() -> None:
     TtsCardSheet.objects.all().delete()
     card = _create_sheet_card("refresh", color=(20, 40, 60))
@@ -203,6 +207,7 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
     first = client.get(f"/tts/card-sheets/{sheet.id}/image.webp")
     first_body = b"".join(first.streaming_content)
     first_modified = _parse_http_date(first["Last-Modified"])
+    first.close()
 
     previous = card.latest_version
     assert previous is not None
@@ -216,6 +221,7 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
 
     second = client.get(f"/tts/card-sheets/{sheet.id}/image.webp")
     second_body = b"".join(second.streaming_content)
+    second.close()
     head = client.head(f"/tts/card-sheets/{sheet.id}/image.webp")
     not_modified = client.get(
         f"/tts/card-sheets/{sheet.id}/image.webp",
@@ -232,10 +238,13 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
     assert head["Last-Modified"] == second["Last-Modified"]
     assert head["Content-Type"] == "image/webp"
     assert head.content == b""
+    head.close()
     assert not_modified.status_code == 304
     assert not_modified["ETag"] == second["ETag"]
+    not_modified.close()
 
 
+@pytest.mark.django_db(transaction=True)
 def test_failed_metadata_publish_keeps_previous_sheet_revision_available(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -248,6 +257,7 @@ def test_failed_metadata_publish_keeps_previous_sheet_revision_available(
     client = Client(HTTP_HOST="localhost")
     first = client.get(f"/tts/card-sheets/{sheet.id}/image.webp")
     first_body = b"".join(first.streaming_content)
+    first.close()
 
     previous = card.latest_version
     assert previous is not None
@@ -272,6 +282,7 @@ def test_failed_metadata_publish_keeps_previous_sheet_revision_available(
 
     second = client.get(f"/tts/card-sheets/{sheet.id}/image.webp")
     second_body = b"".join(second.streaming_content)
+    second.close()
     assert second.status_code == 200
     assert second["ETag"] == first["ETag"]
     assert second["Last-Modified"] == first["Last-Modified"]
@@ -467,9 +478,11 @@ def test_superseded_sheet_revision_cleanup_keeps_only_current_and_previous(
     oldest = tmp_path / f"{sheet_id}.oldest.webp"
     previous = tmp_path / f"{sheet_id}.previous.webp"
     current = tmp_path / f"{sheet_id}.current.webp"
+    base_timestamp = time.time() - 60
     for index, path in enumerate((oldest, previous, current), start=1):
         path.write_bytes(str(index).encode("ascii"))
-        os.utime(path, ns=(index, index))
+        timestamp = base_timestamp + index
+        os.utime(path, times=(timestamp, timestamp))
 
     tts_sheet_renderer._remove_superseded_sheet_revisions(
         sheet_id=sheet_id,

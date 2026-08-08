@@ -709,6 +709,7 @@ def test_cards_list_returns_paginated_payload() -> None:
     assert second_card.id in result_ids
 
 
+@pytest.mark.django_db(transaction=True)
 def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None:
     card, version = _create_editable_card_version(name="Image Card")
     image_path = settings.image_store_dir / f"checksum-{version.id}.png"
@@ -724,19 +725,24 @@ def test_card_gallery_image_endpoint_serves_latest_image(tmp_path: Path) -> None
     response = Client(HTTP_HOST="localhost").get(f"/cards/{card.id}/image")
 
     assert response.status_code == 200
-    assert b"".join(response.streaming_content) == b"fake-image"
+    response_body = b"".join(response.streaming_content)
+    response.close()
+    assert response_body == b"fake-image"
     assert response["Cache-Control"] == "public, no-cache"
     assert response["ETag"] == f'"checksum-{version.id}"'
     assert response["Last-Modified"]
 
     head_response = Client(HTTP_HOST="localhost").head(f"/cards/{card.id}/image")
+    head_body = b"".join(head_response.streaming_content)
+    head_response.close()
     assert head_response.status_code == 200
-    assert b"".join(head_response.streaming_content) == b""
+    assert head_body == b""
     assert head_response["Cache-Control"] == response["Cache-Control"]
     assert head_response["ETag"] == response["ETag"]
     assert head_response["Last-Modified"] == response["Last-Modified"]
 
 
+@pytest.mark.django_db(transaction=True)
 def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_version() -> None:
     card, first_version = _create_editable_card_version(name="Stable Image Card")
     first_image = _create_card_image(first_version)
@@ -745,6 +751,7 @@ def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_ver
 
     first_response = client.get(stable_path)
     first_last_modified = first_response["Last-Modified"]
+    first_response.close()
 
     first_version.is_latest = False
     first_version.save(update_fields=["is_latest", "updated_at"])
@@ -782,7 +789,9 @@ def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_ver
     second_response = client.get(stable_path)
 
     assert second_response.status_code == 200
-    assert b"".join(second_response.streaming_content) == b"new-stable-image"
+    second_body = b"".join(second_response.streaming_content)
+    second_response.close()
+    assert second_body == b"new-stable-image"
     assert second_response["ETag"] == f'"{second_image.checksum}"'
     assert second_response["ETag"] != f'"{first_image.checksum}"'
     assert second_response["Last-Modified"] != first_last_modified
@@ -790,6 +799,7 @@ def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_ver
     redirect_id = f"merged-{card.id}"
     CardMergeRedirect.objects.create(old_card_id=redirect_id, target_card=card)
     redirect_response = client.head(f"/cards/{redirect_id}/image")
+    redirect_response.close()
     assert redirect_response.status_code == 200
     assert redirect_response["ETag"] == second_response["ETag"]
     assert redirect_response["Last-Modified"] == second_response["Last-Modified"]
@@ -802,7 +812,9 @@ def test_card_image_asset_endpoint_serves_immutable_image_path() -> None:
     response = Client(HTTP_HOST="localhost").get(f"/card-images/{image.stored_path}")
 
     assert response.status_code == 200
-    assert b"".join(response.streaming_content) == b"gallery-image"
+    response_body = b"".join(response.streaming_content)
+    response.close()
+    assert response_body == b"gallery-image"
     assert card.id
 
 
@@ -963,6 +975,7 @@ def test_admin_content_version_patch_rejects_invalid_version_number() -> None:
     assert content_version.version_number == "176.1.0"
 
 
+@pytest.mark.django_db(transaction=True)
 def test_admin_content_version_patch_rejects_duplicate_version_number() -> None:
     first = ContentVersion.objects.create(
         version_number="177.1.0",
