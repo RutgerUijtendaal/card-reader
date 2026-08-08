@@ -22,7 +22,10 @@ by TTS. Paste `tts/importer.lua` into the TTS Global script, then invoke manual 
 ## Persistent sheet flow
 
 Card Reader assigns each usable Card a permanent position on a global 10×7 sheet. Sheets are filled in batches of
-70 and stored under stable public `.webp` URLs. Assignments never move or get reused.
+70 and stored under stable public `.webp` URLs. The current layout uses full-resolution 822×1122 cells, producing an
+8220×7854 atlas without resizing or letterboxing canonical Card images. Assignments never move or get reused. A
+newer layout version upgrades existing sheets in place once and queues them for regeneration without changing their
+IDs or slot positions.
 
 An export references the existing sheets containing its Cards. It does not create a compact export-specific atlas,
 so a sparse selection may reference several sheets. The Lua importer combines those definitions into one native TTS

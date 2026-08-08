@@ -294,6 +294,29 @@ def ensure_sheet_render_requested(sheet_ids: list[str]) -> None:
     )
 
 
+def upgrade_sheet_layouts() -> set[str]:
+    return _retry_sqlite_write(_upgrade_sheet_layouts_once)
+
+
+@transaction.atomic
+def _upgrade_sheet_layouts_once() -> set[str]:
+    sheet_ids = {
+        str(sheet_id)
+        for sheet_id in TtsCardSheet.objects.select_for_update()
+        .filter(layout_version__lt=TTS_CARD_SHEET_LAYOUT_VERSION)
+        .values_list("id", flat=True)
+    }
+    if not sheet_ids:
+        return set()
+
+    TtsCardSheet.objects.filter(id__in=sheet_ids).update(
+        layout_version=TTS_CARD_SHEET_LAYOUT_VERSION,
+        updated_at=now_utc(),
+    )
+    _refresh_sheet_fingerprints(sheet_ids)
+    return sheet_ids
+
+
 def claim_next_renderable_sheet() -> TtsCardSheet | None:
     return _retry_sqlite_write(_claim_next_renderable_sheet_once)
 
@@ -595,4 +618,5 @@ __all__ = [
     "resolve_tts_card_image_path",
     "sync_card_sources",
     "sync_merged_card_source",
+    "upgrade_sheet_layouts",
 ]

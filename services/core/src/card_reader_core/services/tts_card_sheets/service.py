@@ -21,6 +21,7 @@ from card_reader_core.repositories.tts_card_sheets import (
     request_sheet_rerender,
     sync_card_sources,
     sync_merged_card_source,
+    upgrade_sheet_layouts,
 )
 
 from .renderer import TtsCardSheetRenderError, render_claimed_sheet, tts_card_sheet_path
@@ -53,7 +54,7 @@ class TtsCardSheetService:
     ) -> TtsCardSheetReconciliationResult:
         usable_cards = 0
         assigned_cards = 0
-        affected_sheet_ids: set[str] = set()
+        affected_sheet_ids = upgrade_sheet_layouts()
         all_sheet_ids = set(list_all_sheet_ids())
         for sources in iter_usable_card_source_batches():
             card_ids = [source.card.id for source in sources]

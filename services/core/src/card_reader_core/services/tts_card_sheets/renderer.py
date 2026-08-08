@@ -42,7 +42,14 @@ _LAYOUTS = {
         rows=7,
         cell_width=400,
         cell_height=560,
-    )
+    ),
+    2: TtsCardSheetLayout(
+        version=2,
+        columns=10,
+        rows=7,
+        cell_width=822,
+        cell_height=1122,
+    ),
 }
 
 
@@ -88,19 +95,23 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
                 )
             with Image.open(image_path) as source_image:
                 normalized = ImageOps.exif_transpose(source_image).convert("RGB")
-                contained = ImageOps.contain(
-                    normalized,
-                    (layout.cell_width, layout.cell_height),
-                    Image.Resampling.LANCZOS,
-                )
-                cell = Image.new("RGB", (layout.cell_width, layout.cell_height), _BACKGROUND)
-                cell.paste(
-                    contained,
-                    (
-                        (layout.cell_width - contained.width) // 2,
-                        (layout.cell_height - contained.height) // 2,
-                    ),
-                )
+                cell_size = (layout.cell_width, layout.cell_height)
+                if normalized.size == cell_size:
+                    cell = normalized
+                else:
+                    contained = ImageOps.contain(
+                        normalized,
+                        cell_size,
+                        Image.Resampling.LANCZOS,
+                    )
+                    cell = Image.new("RGB", cell_size, _BACKGROUND)
+                    cell.paste(
+                        contained,
+                        (
+                            (layout.cell_width - contained.width) // 2,
+                            (layout.cell_height - contained.height) // 2,
+                        ),
+                    )
             x = (slot.slot_index % layout.columns) * layout.cell_width
             y = (slot.slot_index // layout.columns) * layout.cell_height
             canvas.paste(cell, (x, y))
