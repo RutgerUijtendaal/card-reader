@@ -29,51 +29,49 @@ local CONFIG = {
     finalize_search_radius = 3,
 }
 
- -- Importer
-deckString = ""
+-- Importer
 
-function input_func(obj, color, input, stillEditing)
-    deckString = input or ""
-    end
+local deck_string = ""
 
+function input_func(obj, color, input, still_editing)
+    deck_string = input or ""
+end
 
 function onLoad()
     self.createInput({
         input_function = "input_func",
         function_owner = self,
-        label          = "Import String",
-        alignment      = 3,
-        position       = {x=0, y=0.2, z=-0.5},
-        width          = 1000,
-        height         = 200,
-        value          = DeckString or "",
+        label = "Import String",
+        alignment = 3,
+        position = { x = 0, y = 0.2, z = -0.5 },
+        width = 1000,
+        height = 200,
+        value = deck_string,
     })
-    params = {
+    self.createButton({
         click_function = "click_func",
         function_owner = self,
-        label          = "Import Deck",
-        position       = {-0.65, 0.2, 0.30},
-        width          = 600,
-        height         = 300,
-        font_size      = 100,
-        color          = {0.5, 0.5, 1},
-        font_color     = {1, 1, 1},
-        tooltip        = "Pray to Steve it works",
-    }
-    self.createButton(params)
-        params2 = {
+        label = "Import Deck",
+        position = { -0.65, 0.2, 0.30 },
+        width = 600,
+        height = 300,
+        font_size = 100,
+        color = { 0.5, 0.5, 1 },
+        font_color = { 1, 1, 1 },
+        tooltip = "Pray to Steve it works",
+    })
+    self.createButton({
         click_function = "click_func2",
         function_owner = self,
-        label          = "Import Gallery",
-        position       = {0.65, 0.2, 0.30},
-        width          = 600,
-        height         = 300,
-        font_size      = 85,
-        color          = {0.75, 0.0, 0},
-        font_color     = {1, 1, 1},
-        tooltip        = "Pray to Steve it works",
-    }
-    self.createButton(params2)
+        label = "Import Gallery",
+        position = { 0.65, 0.2, 0.30 },
+        width = 600,
+        height = 300,
+        font_size = 85,
+        color = { 0.75, 0.0, 0 },
+        font_color = { 1, 1, 1 },
+        tooltip = "Pray to Steve it works",
+    })
 
     if not CONFIG.auto_sync_enabled then
         return
@@ -84,18 +82,14 @@ function onLoad()
     end, 1)
 end
 
--- Create Button
-
 function click_func(obj, color, alt_click)
-    print(deckString)
-    importCardReaderDeck(deckString)
+    print(deck_string)
+    importCardReaderDeck(deck_string)
 end
 
--- Create Button
-
 function click_func2(obj, color, alt_click)
-    print(deckString)
-    importCardReaderCards(deckString)
+    print(deck_string)
+    importCardReaderCards(deck_string)
 end
 
 -- THE ACTUAL IMPORTER CODE 
@@ -377,11 +371,9 @@ function spawnCardReaderSheetDeck(payload, options)
         local quantity = math.floor(tonumber(entry.quantity))
         for _ = 1, quantity do
             table.insert(deck_ids, card_id)
-            table.insert(contained, buildSheetCardData(
+            table.insert(contained, buildSheetContainedCardData(
                 entry,
                 card_id,
-                sheet_key,
-                custom_deck[sheet_key],
                 payload.sheets[sheet_key].face_url
             ))
         end
@@ -390,7 +382,7 @@ function spawnCardReaderSheetDeck(payload, options)
     logMissingCards(buildExportSkippedRequests(payload.skipped))
     local object_data
     if #contained == 1 then
-        object_data = contained[1]
+        object_data = buildStandaloneSheetCardData(contained[1], custom_deck)
     else
         object_data = buildSheetDeckData(payload.collection.name, deck_ids, custom_deck, contained)
     end
@@ -428,7 +420,7 @@ function buildCustomDeckState(sheet, card_back_url)
     }
 end
 
-function buildSheetCardData(entry, card_id, sheet_key, custom_deck_state, sheet_url)
+function buildSheetContainedCardData(entry, card_id, sheet_url)
     local gm_notes = JSON.encode({
         schema = "card-reader.tts-card.v2",
         card_id = trim(entry.card_id),
@@ -440,20 +432,27 @@ function buildSheetCardData(entry, card_id, sheet_key, custom_deck_state, sheet_
         lifecycle_status = trim(entry.lifecycle_status or ""),
     })
     return {
-        Name = "CardCustom",
+        Name = "Card",
         Transform = defaultObjectTransform(),
         Nickname = trim(entry.name),
         Description = "",
         GMNotes = gm_notes,
         CardID = card_id,
         SidewaysCard = false,
-        CustomDeck = {
-            [sheet_key] = custom_deck_state,
-        },
         LuaScript = "",
         LuaScriptState = "",
         XmlUI = "",
     }
+end
+
+function buildStandaloneSheetCardData(contained_card, custom_deck)
+    local object_data = deepCopy(contained_card)
+    local sheet_key = math.floor(tonumber(object_data.CardID) / 100)
+    object_data.Name = "CardCustom"
+    object_data.CustomDeck = {
+        [sheet_key] = custom_deck[sheet_key],
+    }
+    return object_data
 end
 
 function buildSheetDeckData(name, deck_ids, custom_deck, contained)
