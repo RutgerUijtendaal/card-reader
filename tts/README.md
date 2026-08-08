@@ -3,7 +3,7 @@
 This directory contains three related TTS flows:
 
 - `importCardReaderDeck(...)` clones cards already present in configured TTS scripting regions by Card ID or name.
-- `importCardReaderCards(...)` creates a native custom deck from persistent Card Reader card sheets.
+- `importCardReaderCards(...)` creates one full native custom deck per referenced Card Reader card sheet.
 - `syncCardReaderLibrary()` fetches the canonical public library and creates only missing Card identities.
 
 Manual deck and card exports are base64-encoded JSON. The automatic library manifest is raw JSON fetched directly
@@ -28,8 +28,8 @@ newer layout version upgrades existing sheets in place once and queues them for 
 IDs or slot positions.
 
 An export references the existing sheets containing its Cards. It does not create a compact export-specific atlas,
-so a sparse selection may reference several sheets. The Lua importer spawns the referenced `CardCustom` objects in
-small batches, waits for them to load and settle, and then combines them into one native TTS custom deck.
+so a sparse selection may reference several sheets. During the current diagnostic flow, the manual Lua importer
+spawns each referenced atlas directly as one full native TTS `DeckCustom`.
 
 ### Export
 
@@ -56,8 +56,11 @@ function importLatestCardReaderCards()
 end
 ```
 
-The importer spawns every exported copy as a native Card, then combines multiple Cards into a native custom Deck.
-Quantities reuse the same sheet cell. Names and Card Reader identity metadata are stored on the Cards.
+The diagnostic importer ignores the payload's individual Card selection and quantities. It spawns one full
+`DeckCustom` per referenced sheet with the native Rectangle Rounded shape default, `sideways = false`, and a Card
+count equal to the sheet's columns multiplied by rows. It does not create, rename, or add metadata to individual
+Cards. Unused atlas cells can therefore appear as blank Cards; this is intentional while isolating the native TTS
+sheet-deck behavior.
 
 The decoded `card-reader.tts-cards.v2` payload has this shape:
 

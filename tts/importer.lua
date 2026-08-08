@@ -125,7 +125,7 @@ end
 function importCardReaderCards(encoded)
     local payload = decodePayload(encoded)
     validateCardPayload(payload)
-    spawnCardReaderSheetDeck(payload)
+    spawnCardReaderFullSheetDecks(payload)
 end
 
 function startCardReaderLibrarySync(is_automatic)
@@ -387,6 +387,69 @@ function spawnCardReaderSheetDeck(payload, options)
 
     logMissingCards(buildExportSkippedRequests(payload.skipped))
     startSheetCardSpawnJob(payload, contained, options)
+end
+
+function spawnCardReaderFullSheetDecks(payload)
+    local completed_count = 0
+    local spawned_count = 0
+    local sheet_count = #payload.sheets
+
+    logMissingCards(buildExportSkippedRequests(payload.skipped))
+    print(string.format(
+        "Importing '%s' as %d full custom sheet decks without card-level data.",
+        payload.collection.name,
+        sheet_count
+    ))
+
+    for index, sheet in ipairs(payload.sheets) do
+        local sheet_index = index
+        local sheet_entry = sheet
+        spawnObject({
+            type = "DeckCustom",
+            position = buildFullSheetDeckSpawnPosition(CONFIG.spawn_position, sheet_index),
+            rotation = { x = 0, y = 180, z = 180 },
+            callback_function = function(deck)
+                completed_count = completed_count + 1
+                if deck ~= nil then
+                    deck.setName(string.format("%s - Sheet %d", payload.collection.name, sheet_index))
+                    deck.setCustomObject({
+                        face = verifiedAssetUrl(trim(sheet_entry.face_url)),
+                        back = trim(payload.card_back_url),
+                        unique_back = false,
+                        width = math.floor(tonumber(sheet_entry.columns)),
+                        height = math.floor(tonumber(sheet_entry.rows)),
+                        number = math.floor(tonumber(sheet_entry.columns))
+                            * math.floor(tonumber(sheet_entry.rows)),
+                        sideways = false,
+                        back_is_hidden = true,
+                    })
+                    spawned_count = spawned_count + 1
+                else
+                    print("A full custom sheet deck failed to spawn.")
+                end
+
+                if completed_count == sheet_count then
+                    print(string.format(
+                        "Imported '%s' as %d of %d full custom sheet decks.",
+                        payload.collection.name,
+                        spawned_count,
+                        sheet_count
+                    ))
+                end
+            end,
+        })
+    end
+end
+
+function buildFullSheetDeckSpawnPosition(base_position, index)
+    local zero_based = index - 1
+    local column = zero_based % 4
+    local row = math.floor(zero_based / 4)
+    return {
+        x = base_position.x + (column * CONFIG.library_batch_spacing),
+        y = base_position.y,
+        z = base_position.z + (row * CONFIG.library_batch_spacing),
+    }
 end
 
 function startSheetCardSpawnJob(payload, cards, options)
