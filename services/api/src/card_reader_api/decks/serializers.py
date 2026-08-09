@@ -15,8 +15,11 @@ from card_reader_core.models import (
     CardVersionImage,
     Deck,
     DeckDifficulty,
+    DeckEntry,
+    DeckSideboard,
     DeckVisibility,
     GAME_MASTER_CARD_POOL,
+    PLAYER_CARD_POOL,
     card_role_keys,
 )
 from card_reader_core.repositories.cards import get_card_image
@@ -85,18 +88,25 @@ def deck_payload(
     include_pending_suggestions: bool = False,
     allow_game_master_cards: bool = False,
 ) -> dict[str, object]:
-    validation = DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
     sideboards = list(deck.sideboards.all())
+    has_restricted_cards = not allow_game_master_cards and _deck_contains_game_master_cards(
+        deck,
+        entries=entries,
+        sideboards=sideboards,
+    )
+    validation = None if has_restricted_cards else DeckService().get_deck_validation(deck)
     constraint_entries = [
         DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="mainboard")
         for entry in entries
+        if allow_game_master_cards or entry.card.card_pool == PLAYER_CARD_POOL
     ]
     constraint_entries.extend(
         DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="sideboard")
         for sideboard in sideboards
         for entry in sideboard.entries.all()
+        if allow_game_master_cards or entry.card.card_pool == PLAYER_CARD_POOL
     )
     return {
         "id": deck.id,
@@ -153,15 +163,23 @@ def deck_payload(
             "mainboard_unique_cards": totals.mainboard_unique_cards,
         },
         "status": {
-            "is_valid": validation.is_valid,
-            "label": validation.status_label,
-            "issues": validation.issues,
-            "warnings": validation.warnings,
-            "deprecated_card_count": validation.deprecated_card_count,
-            "deprecated_card_ids": validation.deprecated_card_ids or [],
+            "is_valid": False if validation is None else validation.is_valid,
+            "label": "In Progress" if validation is None else validation.status_label,
+            "issues": (
+                ["Deck contains cards that are unavailable in the Player workspace."]
+                if validation is None
+                else validation.issues
+            ),
+            "warnings": [] if validation is None else validation.warnings,
+            "deprecated_card_count": 0 if validation is None else validation.deprecated_card_count,
+            "deprecated_card_ids": [] if validation is None else validation.deprecated_card_ids or [],
         },
         "deck_building_rules": effective_deck_building_rules_json(
-            hero_card=deck.hero_card,
+            hero_card=(
+                deck.hero_card
+                if allow_game_master_cards or deck.hero_card.card_pool == PLAYER_CARD_POOL
+                else None
+            ),
             entries=constraint_entries,
         ),
         "tags": deck_tags_payload(deck),
@@ -171,6 +189,23 @@ def deck_payload(
         "created_at": deck.created_at.isoformat(),
         "updated_at": deck.updated_at.isoformat(),
     }
+
+
+def _deck_contains_game_master_cards(
+    deck: Deck,
+    *,
+    entries: Iterable[DeckEntry],
+    sideboards: Iterable[DeckSideboard],
+) -> bool:
+    if deck.hero_card.card_pool == GAME_MASTER_CARD_POOL:
+        return True
+    if any(entry.card.card_pool == GAME_MASTER_CARD_POOL for entry in entries):
+        return True
+    return any(
+        entry.card.card_pool == GAME_MASTER_CARD_POOL
+        for sideboard in sideboards
+        for entry in sideboard.entries.all()
+    )
 
 
 def deck_tags_payload(deck: Deck) -> list[dict[str, object]]:

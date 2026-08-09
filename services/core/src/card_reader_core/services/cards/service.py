@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from card_reader_core.metadata import MANA_FAMILIES, ManaFamilyDefinition
-from card_reader_core.models import Card, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
+from card_reader_core.models import Card, CardPool, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
 from card_reader_core.repositories.cards import (
     FieldSourcesPayload,
     ParsedSnapshotPayload,
@@ -48,12 +48,12 @@ class CardEditState(TypedDict):
     parse_result: ParseResult | None
 
 
-def get_filter_metadata() -> CardFilterMetadata:
+def get_filter_metadata(*, card_pool: CardPool | None = None) -> CardFilterMetadata:
     return {
         "keywords": list_keywords(),
         "tags": list_tags(),
         "symbols": list_symbols(),
-        "types": list_types_for_card_sort(),
+        "types": list_types_for_card_sort(card_pool=card_pool),
         "mana_families": MANA_FAMILIES,
     }
 

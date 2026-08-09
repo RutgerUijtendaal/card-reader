@@ -137,6 +137,7 @@ def list_cards(
     total_count, page_ids = _paginated_card_version_ids(
         versions,
         sort=sort,
+        card_pool=card_pool,
         offset=offset,
         limit=normalized_page_size,
     )
@@ -232,7 +233,7 @@ def list_matching_cards(
         health_max=health_max,
         lifecycle_status=lifecycle_status,
     )
-    version_ids = _ordered_card_version_ids(versions, sort)
+    version_ids = _ordered_card_version_ids(versions, sort, card_pool=card_pool)
     return get_card_list_rows_by_version_ids(version_ids)
 
 
@@ -318,7 +319,7 @@ def list_matching_card_candidates(
         health_max=health_max,
         lifecycle_status=lifecycle_status,
     )
-    version_ids = _ordered_card_version_ids(versions, sort)
+    version_ids = _ordered_card_version_ids(versions, sort, card_pool=card_pool)
     return _hydrate_card_list_candidates(
         version_ids,
         include_types=sort == CARD_SORT_TYPES_ASC,
@@ -473,7 +474,7 @@ def list_filtered_latest_card_version_reparse_sources(
         health_max=health_max,
         lifecycle_status=lifecycle_status,
     )
-    version_ids = _ordered_card_version_ids(versions, sort)
+    version_ids = _ordered_card_version_ids(versions, sort, card_pool=card_pool)
     out: list[LatestCardVersionReparseSource] = []
     for version in _hydrate_card_versions(version_ids):
         image_path = None
@@ -768,20 +769,26 @@ def _paginated_card_version_ids(
     queryset: QuerySet[CardVersion],
     *,
     sort: CardSort,
+    card_pool: CardPool,
     offset: int,
     limit: int,
 ) -> tuple[int, list[str]]:
     if sort == CARD_SORT_TYPES_ASC:
-        ordered_ids = _ordered_type_sort_card_version_ids(queryset)
+        ordered_ids = _ordered_type_sort_card_version_ids(queryset, card_pool=card_pool)
         return len(ordered_ids), ordered_ids[offset : offset + limit]
     total_count = queryset.count()
     page_ids = list(_apply_sql_card_sort(queryset, sort).values_list("id", flat=True)[offset : offset + limit])
     return total_count, page_ids
 
 
-def _ordered_card_version_ids(queryset: QuerySet[CardVersion], sort: CardSort) -> list[str]:
+def _ordered_card_version_ids(
+    queryset: QuerySet[CardVersion],
+    sort: CardSort,
+    *,
+    card_pool: CardPool,
+) -> list[str]:
     if sort == CARD_SORT_TYPES_ASC:
-        return _ordered_type_sort_card_version_ids(queryset)
+        return _ordered_type_sort_card_version_ids(queryset, card_pool=card_pool)
     return list(_apply_sql_card_sort(queryset, sort).values_list("id", flat=True))
 
 
@@ -812,11 +819,15 @@ def _apply_sql_card_sort(queryset: QuerySet[CardVersion], sort: CardSort) -> Que
     return queryset.order_by("-updated_at", "card__label", "card__id")
 
 
-def _ordered_type_sort_card_version_ids(queryset: QuerySet[CardVersion]) -> list[str]:
+def _ordered_type_sort_card_version_ids(
+    queryset: QuerySet[CardVersion],
+    *,
+    card_pool: CardPool,
+) -> list[str]:
     version_rows = list(queryset.select_related("card"))
     version_ids = [version.id for version in version_rows]
     types_by_version_id = _types_by_card_version_ids(version_ids)
-    type_sort_lookup = _type_sort_lookup()
+    type_sort_lookup = _type_sort_lookup(card_pool=card_pool)
     version_rows.sort(
         key=lambda version: (
             *_card_type_sort_key(types_by_version_id.get(version.id, []), type_sort_lookup),
@@ -925,7 +936,7 @@ def _types_by_card_version_ids(card_version_ids: list[str]) -> dict[str, list[Ty
     return grouped
 
 
-def _type_sort_lookup() -> dict[str, tuple[int, str]]:
+def _type_sort_lookup(*, card_pool: CardPool) -> dict[str, tuple[int, str]]:
     lookup: dict[str, tuple[int, str]] = {}
     for row in (
         Type.objects.annotate(
@@ -934,7 +945,8 @@ def _type_sort_lookup() -> dict[str, tuple[int, str]]:
                 filter=Q(card_version_types__card_version__is_latest=True)
                 & active_card_lifecycle_q(
                     field_path="card_version_types__card_version__card__lifecycle_status",
-                ),
+                )
+                & Q(card_version_types__card_version__card__card_pool=card_pool),
                 distinct=True,
             ),
         )

@@ -1181,6 +1181,28 @@ def test_filters_payload_includes_type_linked_card_counts() -> None:
     assert returned["linked_card_count"] == 1
 
 
+def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
+    counted_type = _create_type(key="filters-pool-counted-type", label="Filters Pool Counted Type")
+    _player_card, player_version = _create_editable_card_version(name="Filters Player Counted Card")
+    game_master_card, game_master_version = _create_editable_card_version(
+        name="Filters Game Master Counted Card"
+    )
+    game_master_card.card_pool = "game_master"
+    game_master_card.save(update_fields=["card_pool"])
+    replace_card_version_types(card_version_id=player_version.id, type_ids=[counted_type.id])
+    replace_card_version_types(card_version_id=game_master_version.id, type_ids=[counted_type.id])
+
+    public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
+    staff_response = _staff_client("filters-pool-count-staff").get("/cards/filters")
+
+    assert public_response.status_code == 200
+    assert staff_response.status_code == 200
+    public_type = next(row for row in public_response.json()["types"] if row["id"] == counted_type.id)
+    staff_type = next(row for row in staff_response.json()["types"] if row["id"] == counted_type.id)
+    assert public_type["linked_card_count"] == 1
+    assert staff_type["linked_card_count"] == 2
+
+
 def test_filters_payload_orders_types_by_linked_card_count_without_pinning_mana() -> None:
     mana_type = _create_type(key="mana", label="Mana")
     common_type = _create_type(key="filters-order-common-type", label="Filters Order Common Type")

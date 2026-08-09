@@ -2,6 +2,8 @@
 
 Card Reader currently delivers notifications through one durable channel: the authenticated in-app inbox. `UserNotification` rows are the source of truth for inbox history and the unread badge.
 
+Card-linked notification flows are currently Player-workspace flows. They do not create parse-review or deck-version notifications for Game Master cards. When a Player card is reclassified into the Game Master pool, existing notifications whose structured metadata identifies that card are archived: the durable rows remain stored, but they no longer appear in inbox lists, unread counts, or update endpoints.
+
 The inbox is one chronological feed. New rows retain an unread indicator until opened, event-type filters are applied server-side, and older results append through the shared load-more pattern.
 
 ## Event catalog

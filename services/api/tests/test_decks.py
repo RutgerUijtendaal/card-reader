@@ -5,6 +5,7 @@ from itertools import count
 
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.http import HttpResponse
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 
@@ -1753,6 +1754,52 @@ def test_deck_create_is_idempotent_per_owner_and_creation_key() -> None:
     assert DeckCreation.objects.filter(owner=owner, client_creation_id=creation_key).count() == 1
 
 
+def test_deck_create_replay_rejects_newly_restricted_cards_without_returning_card_data() -> None:
+    username = "deck-idempotency-reclassified-user"
+    password = "password"
+    _create_user(username, password)
+    hero = _create_card(name="Idempotency Reclassified Hero", hero=True)
+    reclassified = _create_card(name="Idempotency Secret Event", hero=False)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    creation_key = "bf6cbe1c-ae32-4d2f-a7a8-b5f39175c5df"
+    payload = {
+        "name": "Idempotency Reclassified Deck",
+        "description": None,
+        "visibility": "private",
+        "hero_card_id": hero.id,
+        "entries": [{"card_id": reclassified.id, "quantity": 1}],
+        "sideboards": [],
+    }
+    create_response = client.post(
+        "/my/decks",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+    assert create_response.status_code == 201
+    reclassified.card_pool = "game_master"
+    reclassified.save(update_fields=["card_pool"])
+
+    replay_response = client.post(
+        "/my/decks",
+        data={"name": "ignored replay body"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+    lookup_response = client.get(f"/my/decks/by-creation-key/{creation_key}")
+
+    assert replay_response.status_code == 409
+    assert lookup_response.status_code == 409
+    assert replay_response.json() == {
+        "detail": "The deck created by this key is no longer eligible for replay."
+    }
+    assert reclassified.id not in replay_response.content.decode()
+    assert reclassified.label not in replay_response.content.decode()
+
+
 def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
     creation_key = "b08b9444-9b79-4878-aef2-38bbf357578f"
     first_username = "deck-idempotency-first-user"
@@ -3075,6 +3122,83 @@ def test_game_master_cards_are_staff_scoped_for_lists_and_details() -> None:
     assert [row["id"] for row in response.json()["results"]] == [gm_card.id]
 
 
+def test_deck_writes_treat_game_master_card_ids_as_missing_player_cards() -> None:
+    username = "gm-deck-write-scope-user"
+    password = "password"
+    _create_user(username, password)
+    player_hero = _create_card(name="GM Write Player Hero", hero=True)
+    game_master_hero = _create_card(name="GM Write Secret Hero", hero=True)
+    game_master_card = _create_card(name="GM Write Secret Card", hero=False)
+    Card.objects.filter(id__in=[game_master_hero.id, game_master_card.id]).update(
+        card_pool="game_master"
+    )
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    def create_response(
+        *,
+        hero_card_id: str,
+        entries: list[dict[str, object]],
+        sideboards: list[dict[str, object]] | None = None,
+    ) -> HttpResponse:
+        return client.post(
+            "/my/decks",
+            data={
+                "name": "GM Write Scope Deck",
+                "visibility": "private",
+                "hero_card_id": hero_card_id,
+                "entries": entries,
+                "sideboards": sideboards or [],
+            },
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+    restricted_hero_response = create_response(hero_card_id=game_master_hero.id, entries=[])
+    missing_hero_response = create_response(hero_card_id="missing-hero", entries=[])
+    restricted_entry_response = create_response(
+        hero_card_id=player_hero.id,
+        entries=[{"card_id": game_master_card.id, "quantity": 1}],
+    )
+    missing_entry_response = create_response(
+        hero_card_id=player_hero.id,
+        entries=[{"card_id": "missing-card", "quantity": 1}],
+    )
+    restricted_sideboard_response = create_response(
+        hero_card_id=player_hero.id,
+        entries=[],
+        sideboards=[
+            {
+                "name": "Restricted",
+                "entries": [{"card_id": game_master_card.id, "quantity": 1}],
+            }
+        ],
+    )
+    missing_sideboard_response = create_response(
+        hero_card_id=player_hero.id,
+        entries=[],
+        sideboards=[
+            {
+                "name": "Missing",
+                "entries": [{"card_id": "missing-card", "quantity": 1}],
+            }
+        ],
+    )
+
+    assert restricted_hero_response.status_code == 400
+    assert restricted_hero_response.json() == missing_hero_response.json() == {
+        "detail": "Hero card not found."
+    }
+    assert restricted_entry_response.status_code == 400
+    assert restricted_entry_response.json() == missing_entry_response.json() == {
+        "detail": "One or more selected mainboard cards do not exist."
+    }
+    assert restricted_sideboard_response.status_code == 400
+    assert restricted_sideboard_response.json() == missing_sideboard_response.json() == {
+        "detail": "One or more selected sideboard cards do not exist."
+    }
+
+
 def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_staff() -> None:
     owner = _create_user("gm-deck-owner", "password")
     staff = _create_user("gm-deck-staff", "password", is_staff=True)
@@ -3090,7 +3214,10 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
         sideboards=[],
     )
     reclassified.card_pool = "game_master"
-    reclassified.save(update_fields=["card_pool"])
+    reclassified.deck_building_config_json = {
+        "overrides": {"mainboard_copy_limit": {"max": 73}},
+    }
+    reclassified.save(update_fields=["card_pool", "deck_building_config_json"])
     CardRoleAssignment.objects.create(card=reclassified, role="event")
 
     owner_client = Client(HTTP_HOST="localhost")
@@ -3100,11 +3227,15 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert owner_response.status_code == 200
     owner_payload = owner_response.json()
     assert owner_payload["status"]["is_valid"] is False
-    assert "Mainboard cards must belong to the Player pool." in owner_payload["status"]["issues"]
+    assert owner_payload["status"]["issues"] == [
+        "Deck contains cards that are unavailable in the Player workspace."
+    ]
+    assert owner_payload["deck_building_rules"]["mainboard_copy_limit"]["max"] == 4
     restricted_card = owner_payload["mainboard"]["entries"][0]["card"]
     assert restricted_card["restricted"] is True
     assert restricted_card["name"] == "Restricted Game Master card"
     assert "Secret Reclassified Event" not in owner_response.content.decode()
+    assert '"max": 73' not in owner_response.content.decode()
     owner_search_response = owner_client.get(
         "/my/decks",
         {"view": "summary", "q": "Secret Reclassified Event"},
@@ -3120,6 +3251,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert staff_response.json()["mainboard"]["entries"][0]["card"]["name"].startswith(
         "Secret Reclassified Event"
     )
+    assert staff_response.json()["deck_building_rules"]["mainboard_copy_limit"]["max"] == 73
     owner.is_staff = True
     owner.save(update_fields=["is_staff"])
     staff_owner_client = Client(HTTP_HOST="localhost")

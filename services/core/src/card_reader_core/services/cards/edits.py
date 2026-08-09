@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import Card, CardVersion
+from card_reader_core.models import GAME_MASTER_CARD_POOL, Card, CardVersion
 from card_reader_core.repositories.cards import (
     promote_card_version,
     update_latest_card_version,
@@ -34,6 +34,8 @@ def update_latest_card_version_with_notifications(
     )
     if updated is not None and "card_pool" in updates:
         card, _version = updated
+        if card.card_pool == GAME_MASTER_CARD_POOL:
+            transaction.on_commit(lambda: NotificationService().archive_card_notifications(card.id))
         transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card.id]))
     return updated
 

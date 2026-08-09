@@ -6,6 +6,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 
 from card_reader_core.models import (
+    CardPool,
     CardVersion,
     CardVersionSymbol,
     Keyword,
@@ -49,15 +50,17 @@ def list_types(*, keys: set[str] | None = None) -> list[Type]:
     return _list(Type, keys=keys)
 
 
-def list_types_for_card_sort() -> list[Type]:
+def list_types_for_card_sort(*, card_pool: CardPool | None = None) -> list[Type]:
+    linked_card_filter = Q(card_version_types__card_version__is_latest=True) & active_card_lifecycle_q(
+        field_path="card_version_types__card_version__card__lifecycle_status",
+    )
+    if card_pool is not None:
+        linked_card_filter &= Q(card_version_types__card_version__card__card_pool=card_pool)
     return list(
         Type.objects.annotate(
             linked_card_count=Count(
                 "card_version_types",
-                filter=Q(card_version_types__card_version__is_latest=True)
-                & active_card_lifecycle_q(
-                    field_path="card_version_types__card_version__card__lifecycle_status",
-                ),
+                filter=linked_card_filter,
                 distinct=True,
             ),
         ).order_by(

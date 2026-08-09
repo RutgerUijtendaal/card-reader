@@ -20,6 +20,7 @@ from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import get_card_versions_metadata
 
 if TYPE_CHECKING:
+    from card_reader_core.models import CardPool
     from card_reader_core.models import CardGroup
     from card_reader_core.models import Type
     from card_reader_core.repositories.cards import CardLifecycleFilter, CardSort
@@ -153,7 +154,11 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
             )
         )
 
-    type_sort_lookup = _build_type_sort_lookup() if filters["sort"] == CARD_SORT_TYPES_ASC else None
+    type_sort_lookup = (
+        _build_type_sort_lookup(filters["card_pool"])
+        if filters["sort"] == CARD_SORT_TYPES_ASC
+        else None
+    )
     grouped_items.sort(key=lambda row: _grouped_gallery_sort_key(row, filters["sort"], type_sort_lookup))
     total_count = len(grouped_items)
     normalized_page = max(page, 1)
@@ -274,9 +279,9 @@ def _grouped_gallery_sort_key(
     return (-updated_at.timestamp(), label, item_id)
 
 
-def _build_type_sort_lookup() -> dict[str, tuple[int, str]]:
+def _build_type_sort_lookup(card_pool: CardPool) -> dict[str, tuple[int, str]]:
     lookup: dict[str, tuple[int, str]] = {}
-    for row in list_types_for_card_sort():
+    for row in list_types_for_card_sort(card_pool=card_pool):
         key = str(row.key).strip().casefold()
         lookup[key] = (int(getattr(row, "linked_card_count", 0)), str(row.label).casefold())
     return lookup

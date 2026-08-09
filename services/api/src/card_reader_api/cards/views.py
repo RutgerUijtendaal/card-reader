@@ -38,7 +38,7 @@ from card_reader_core.repositories.cards import (
     list_cards,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
-from card_reader_core.models import GAME_MASTER_CARD_POOL, Card
+from card_reader_core.models import GAME_MASTER_CARD_POOL, PLAYER_CARD_POOL, Card
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -139,7 +139,9 @@ class CardFiltersView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        metadata = get_filter_metadata()
+        metadata = get_filter_metadata(
+            card_pool=None if can_access_game_master_cards(request.user) else PLAYER_CARD_POOL,
+        )
         symbols_by_key = {symbol.key: symbol for symbol in metadata["symbols"]}
         return Response(
             {

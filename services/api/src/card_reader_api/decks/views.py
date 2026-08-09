@@ -18,7 +18,7 @@ from card_reader_api.decks.serializers import (
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
-from card_reader_core.models import PLAYER_CARD_POOL, Deck
+from card_reader_core.models import GAME_MASTER_CARD_POOL, PLAYER_CARD_POOL, Deck
 from card_reader_core.services.decks import (
     DeckCreationDeletedError,
     DeckEntryInput,
@@ -27,12 +27,25 @@ from card_reader_core.services.decks import (
     DeckSummaryPage,
     DeckUpdateInput,
     deck_building_rules_metadata_json,
+    deck_uses_card_pool,
 )
 from card_reader_core.services.deck_tags import DeckTagService
 
 
 def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
+
+
+def _restricted_creation_replay_response(request: Request, deck: Deck) -> Response | None:
+    if can_access_game_master_cards(request.user) or not deck_uses_card_pool(
+        deck,
+        GAME_MASTER_CARD_POOL,
+    ):
+        return None
+    return Response(
+        {"detail": "The deck created by this key is no longer eligible for replay."},
+        status=status.HTTP_409_CONFLICT,
+    )
 
 
 def _deck_list_response(
@@ -273,6 +286,9 @@ class OwnerDeckListCreateView(APIView):
                 client_creation_id,
             )
             if existing is not None:
+                restricted_response = _restricted_creation_replay_response(request, existing)
+                if restricted_response is not None:
+                    return restricted_response
                 return Response(
                     deck_payload(
                         existing,
@@ -353,6 +369,9 @@ class OwnerDeckCreationLookupView(APIView):
                     status=status.HTTP_410_GONE,
                 )
             return not_found("Deck not found")
+        restricted_response = _restricted_creation_replay_response(request, deck)
+        if restricted_response is not None:
+            return restricted_response
         return Response(
             deck_payload(
                 deck,

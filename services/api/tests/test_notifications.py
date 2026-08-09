@@ -536,6 +536,43 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     assert payload["metadata"] == notification.metadata_json
 
 
+def test_parse_flag_review_does_not_notify_after_card_moves_to_game_master_pool() -> None:
+    _clear_notifications()
+    submitter = _create_user("notification-gm-flag-submit", "password")
+    reviewer = _create_user("notification-gm-flag-reviewer", "password", is_staff=True)
+    card, version = _create_card_version(name="Notification Reclassified Flag Card")
+    submit_client = Client(HTTP_HOST="localhost")
+    submit_client.force_login(submitter)
+    submit_response = submit_client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={
+            "items": [
+                {
+                    "property_key": "name",
+                    "expected_value": "Corrected Reclassified Flag Card",
+                }
+            ],
+        },
+        content_type="application/json",
+    )
+    assert submit_response.status_code == 201
+    card.card_pool = "game_master"
+    card.save(update_fields=["card_pool"])
+    review_client = Client(HTTP_HOST="localhost")
+    review_client.force_login(reviewer)
+    flag = review_client.get("/review/parse-flags").json()["results"][0]
+    item_id = flag["items"][0]["id"]
+
+    review_response = review_client.patch(
+        f"/review/parse-flags/items/{item_id}",
+        data={"status": "resolved"},
+        content_type="application/json",
+    )
+
+    assert review_response.status_code == 200
+    assert not UserNotification.objects.filter(recipient_id=str(submitter.pk)).exists()
+
+
 def test_parse_flag_self_review_creates_notification_in_development(monkeypatch) -> None:
     _clear_notifications()
     monkeypatch.setattr(settings, "environment", "development")
@@ -697,6 +734,68 @@ def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
     assert notification.subject_id == f"{deck.id}:{hero.id}"
     assert notification.event_count == 2
     assert not UserNotification.objects.filter(recipient_id=str(actor.pk)).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_game_master_reclassification_archives_card_notifications_and_stops_future_delivery() -> None:
+    _clear_notifications()
+    owner = _create_user("notification-reclassified-owner", "password")
+    hero = _create_card(name="Notification Reclassified Hero", hero=True)
+    card = _create_card(name="Notification Reclassified Card", hero=False)
+    DeckService().create_owner_deck(
+        owner_id=str(owner.pk),
+        name="Notification Reclassified Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=1)],
+        sideboards=[],
+    )
+    version = card.latest_version
+    assert version is not None
+    service = NotificationService()
+    created = service.notify_deck_owners_card_version_changed(
+        card_id=card.id,
+        card_version_id=version.id,
+        previous_card_version_id=None,
+        cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+    )
+    create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="reclassified-flag-item",
+            target_url=f"/cards/{card.id}?version_id={version.id}",
+            title=f"Flag resolved: {card.label}",
+            message="A card-linked flag was resolved.",
+            metadata={"card_id": card.id, "card_version_id": version.id},
+        )
+    )
+    assert len(created) == 1
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 2
+
+    updated = update_latest_card_version_with_notifications(
+        card_id=card.id,
+        updates={"card_pool": "game_master"},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+
+    assert updated is not None
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 0
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    assert client.get("/notifications?status=all").json()["count"] == 0
+    assert service.notify_deck_owners_card_version_changed(
+        card_id=card.id,
+        card_version_id=version.id,
+        previous_card_version_id=None,
+        cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
+    ) == []
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 0
 
 
 def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
