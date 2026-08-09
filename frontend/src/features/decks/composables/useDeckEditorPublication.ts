@@ -221,7 +221,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     if (creationState.value.status !== 'idle') return;
     if (publicationSucceeded) {
       await runTerminalNavigation(
-        'The confirmed deck outcome could not be opened. Click Create to try again.',
+        'The confirmed deck outcome could not be opened. Click Continue to try again.',
       );
       return;
     }
