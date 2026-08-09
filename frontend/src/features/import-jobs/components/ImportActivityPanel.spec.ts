@@ -34,7 +34,12 @@ const recentJob: OperationsQueueItem = {
 };
 
 const mountPanel = async (
-  options: { activeJobs?: ImportJob[]; recentJobs?: OperationsQueueItem[] } = {},
+  options: {
+    activeJobs?: ImportJob[];
+    recentJobs?: OperationsQueueItem[];
+    activeLoaded?: boolean;
+    historyLoaded?: boolean;
+  } = {},
 ) => {
   const onRefresh = vi.fn();
   const onCancel = vi.fn();
@@ -49,7 +54,8 @@ const mountPanel = async (
   const app = createApp(ImportActivityPanel, {
     activeJobs: options.activeJobs ?? [activeJob],
     recentJobs: options.recentJobs ?? [recentJob],
-    loaded: true,
+    activeLoaded: options.activeLoaded ?? true,
+    historyLoaded: options.historyLoaded ?? true,
     refreshing: false,
     errorMessage: '',
     queuedCount: 0,
@@ -107,6 +113,19 @@ describe('ImportActivityPanel', () => {
     expect(mounted.host.textContent).toContain('No active imports.');
     expect(mounted.host.textContent).toContain('No recent import history.');
     expect(mounted.host.querySelector('a[href="/operations#queue-imports"]')).not.toBeNull();
+
+    mounted.app.unmount();
+  });
+
+  test('shows active controls while recent history is still loading', async () => {
+    const mounted = await mountPanel({ historyLoaded: false });
+
+    expect(mounted.host.textContent).toContain('mtg-like-v1 · Unversioned');
+    expect(mounted.host.textContent).toContain('Interrupt');
+    expect(mounted.host.querySelector('[aria-label="Loading active imports"]')).toBeNull();
+    expect(
+      mounted.host.querySelector('[aria-label="Loading recent import history"]'),
+    ).not.toBeNull();
 
     mounted.app.unmount();
   });

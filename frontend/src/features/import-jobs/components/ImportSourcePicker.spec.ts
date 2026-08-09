@@ -107,4 +107,29 @@ describe('ImportSourcePicker', () => {
 
     mounted.app.unmount();
   });
+
+  test('clears a previous selection when its replacement has no supported images', async () => {
+    const mounted = mountPicker();
+    const previousImage = new File(['image'], 'previous.png', { type: 'image/png' });
+    mounted.selectedFiles.value = [previousImage];
+    await nextTick();
+
+    const unsupportedFile = new File(['notes'], 'notes.txt', { type: 'text/plain' });
+    const directoryInput = mounted.host.querySelectorAll<HTMLInputElement>('input[type="file"]')[1];
+    Object.defineProperty(directoryInput, 'files', {
+      configurable: true,
+      value: [unsupportedFile],
+    });
+    directoryInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    expect(mounted.onClear).toHaveBeenCalledOnce();
+    expect(mounted.selectedFiles.value).toEqual([]);
+    expect(mounted.host.textContent).not.toContain('previous.png');
+    expect(mounted.host.textContent).toContain('Choose PNG, JPG, JPEG, or WebP card images.');
+    expect(mounted.host.querySelectorAll<HTMLInputElement>('input[type="file"]')[1].files)
+      .toHaveLength(0);
+
+    mounted.app.unmount();
+  });
 });

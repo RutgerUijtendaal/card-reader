@@ -58,14 +58,27 @@ const historyItem = (id: string, status: OperationsQueueItem['status']): Operati
   links: [],
 });
 
-const historyPage = (results: OperationsQueueItem[]): OperationsQueuePage => ({
-  count: results.length,
-  next_page: null,
-  previous_page: null,
-  page: 1,
-  page_size: 20,
+const historyPage = (
+  results: OperationsQueueItem[],
+  options: { page?: number; nextPage?: number | null; count?: number } = {},
+): OperationsQueuePage => ({
+  count: options.count ?? results.length,
+  next_page: options.nextPage ?? null,
+  previous_page: (options.page ?? 1) > 1 ? (options.page ?? 1) - 1 : null,
+  page: options.page ?? 1,
+  page_size: 100,
   results,
 });
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+};
 
 const currentVersion = {
   id: 'version-1',
@@ -117,19 +130,23 @@ describe('useImportJobsController', () => {
 
     await vi.waitFor(() => {
       expect(mounted.controller.formLoaded.value).toBe(true);
-      expect(mounted.controller.activityLoaded.value).toBe(true);
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
     });
 
     expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['active-job']);
     expect(mounted.controller.recentJobs.value.map((job) => job.id)).toEqual(['finished-job']);
-    expect(fetchOperationsQueuePage).toHaveBeenCalledWith('imports', 1, 20);
+    expect(fetchOperationsQueuePage).toHaveBeenCalledWith('imports', 1, 100);
 
     mounted.app.unmount();
   });
 
   test('keeps activity data when a manual refresh fails', async () => {
     const mounted = mountController();
-    await vi.waitFor(() => expect(mounted.controller.activityLoaded.value).toBe(true));
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
     vi.mocked(fetchImportJobs).mockRejectedValueOnce(new Error('Active unavailable'));
     vi.mocked(fetchOperationsQueuePage).mockRejectedValueOnce(new Error('History unavailable'));
 
@@ -144,9 +161,82 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
+  test('keeps active jobs usable and polling while recent history is pending', async () => {
+    const pendingHistoryRequest = deferred<OperationsQueuePage>();
+    vi.mocked(fetchOperationsQueuePage).mockImplementationOnce(
+      () => pendingHistoryRequest.promise,
+    );
+    const mounted = mountController();
+
+    await vi.waitFor(() => expect(mounted.controller.activeJobsLoaded.value).toBe(true));
+    expect(mounted.controller.historyLoaded.value).toBe(false);
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['active-job']);
+
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob('polled-job')]);
+    await mounted.controller.pollJobs();
+
+    expect(fetchImportJobs).toHaveBeenCalledTimes(2);
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['polled-job']);
+
+    mounted.app.unmount();
+  });
+
+  test('ignores an older active-job response that resolves after a newer refresh', async () => {
+    const initialActiveRequest = deferred<ImportJob[]>();
+    vi.mocked(fetchImportJobs)
+      .mockImplementationOnce(() => initialActiveRequest.promise)
+      .mockResolvedValueOnce([activeJob('new-job')]);
+    const mounted = mountController();
+    await vi.waitFor(() => expect(fetchImportJobs).toHaveBeenCalledOnce());
+
+    await mounted.controller.refreshActivity();
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['new-job']);
+
+    initialActiveRequest.resolve([]);
+    await Promise.resolve();
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['new-job']);
+
+    mounted.app.unmount();
+  });
+
+  test('pages through active history rows until five terminal jobs are available', async () => {
+    const firstPageItems = Array.from(
+      { length: 100 },
+      (_, index) => historyItem(`running-${index}`, 'running'),
+    );
+    const terminalItems = Array.from(
+      { length: 6 },
+      (_, index) => historyItem(`finished-${index}`, 'completed'),
+    );
+    vi.mocked(fetchOperationsQueuePage).mockImplementation(async (_queue, page) => {
+      if (page === 1) {
+        return historyPage(firstPageItems, { nextPage: 2, count: 106 });
+      }
+      return historyPage(terminalItems, { page: 2, count: 106 });
+    });
+    const mounted = mountController();
+
+    await vi.waitFor(() => expect(mounted.controller.historyLoaded.value).toBe(true));
+
+    expect(fetchOperationsQueuePage).toHaveBeenNthCalledWith(1, 'imports', 1, 100);
+    expect(fetchOperationsQueuePage).toHaveBeenNthCalledWith(2, 'imports', 2, 100);
+    expect(mounted.controller.recentJobs.value.map((job) => job.id)).toEqual([
+      'finished-0',
+      'finished-1',
+      'finished-2',
+      'finished-3',
+      'finished-4',
+    ]);
+
+    mounted.app.unmount();
+  });
+
   test('refreshes recent history when polling observes a finished active job', async () => {
     const mounted = mountController();
-    await vi.waitFor(() => expect(mounted.controller.activityLoaded.value).toBe(true));
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
     vi.mocked(fetchImportJobs).mockResolvedValueOnce([]);
     vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
       historyPage([historyItem('active-job', 'completed')]),
@@ -189,7 +279,8 @@ describe('useImportJobsController', () => {
 
     await vi.waitFor(() => {
       expect(mounted.controller.formLoaded.value).toBe(true);
-      expect(mounted.controller.activityLoaded.value).toBe(true);
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
     });
 
     expect(mounted.controller.formErrorMessage.value).toBe('Import options could not be loaded.');

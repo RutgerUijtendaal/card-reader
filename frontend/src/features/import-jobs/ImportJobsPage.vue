@@ -217,7 +217,8 @@
           <ImportActivityPanel
             :active-jobs="activeJobs"
             :recent-jobs="recentJobs"
-            :loaded="activityLoaded"
+            :active-loaded="activeJobsLoaded"
+            :history-loaded="historyLoaded"
             :refreshing="isRefreshing"
             :error-message="activityErrorMessage"
             :queued-count="queuedCount"
@@ -257,7 +258,8 @@ const {
   activeJobs,
   recentJobs,
   formLoaded,
-  activityLoaded,
+  activeJobsLoaded,
+  historyLoaded,
   isRefreshing,
   creatingJob,
   cancellingJobIds,

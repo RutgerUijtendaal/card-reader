@@ -141,6 +141,7 @@ const directoryInput = ref<HTMLInputElement | null>(null);
 const isDragging = ref(false);
 const selectionError = ref('');
 const sourceKind = ref<'image' | 'folder' | 'drop' | null>(null);
+let preserveErrorThroughReset = false;
 
 const visibleFiles = computed(() => props.files.slice(0, VISIBLE_FILE_LIMIT));
 const additionalFileCount = computed(() => Math.max(0, props.files.length - VISIBLE_FILE_LIMIT));
@@ -175,6 +176,9 @@ const selectFiles = (files: File[], kind: 'image' | 'folder' | 'drop'): void => 
 
   if (supportedFiles.length === 0) {
     selectionError.value = 'Choose PNG, JPG, JPEG, or WebP card images.';
+    sourceKind.value = null;
+    preserveErrorThroughReset = true;
+    emit('clear');
     return;
   }
 
@@ -210,8 +214,12 @@ watch(
   () => props.resetKey,
   () => {
     isDragging.value = false;
-    selectionError.value = '';
     sourceKind.value = null;
+    if (preserveErrorThroughReset) {
+      preserveErrorThroughReset = false;
+      return;
+    }
+    selectionError.value = '';
   },
 );
 </script>

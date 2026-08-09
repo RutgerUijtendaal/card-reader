@@ -46,23 +46,6 @@
     </p>
 
     <div
-      v-if="!loaded"
-      class="theme-divider mt-5 border-t"
-      aria-label="Loading import activity"
-    >
-      <div
-        v-for="index in 3"
-        :key="index"
-        class="theme-divider animate-pulse space-y-3 border-b py-4 last:border-b-0"
-      >
-        <div class="h-4 w-24 rounded bg-[var(--color-surface-muted)]" />
-        <div class="h-4 w-2/3 rounded bg-[var(--color-surface-muted)]" />
-        <div class="h-1.5 w-full rounded bg-[var(--color-surface-muted)]" />
-      </div>
-    </div>
-
-    <div
-      v-else
       class="theme-divider mt-5 border-t"
     >
       <section
@@ -79,8 +62,18 @@
           </h4>
         </div>
 
+        <div
+          v-if="!activeLoaded"
+          class="animate-pulse space-y-3 py-4"
+          aria-label="Loading active imports"
+        >
+          <div class="h-4 w-24 rounded bg-[var(--color-surface-muted)]" />
+          <div class="h-4 w-2/3 rounded bg-[var(--color-surface-muted)]" />
+          <div class="h-1.5 w-full rounded bg-[var(--color-surface-muted)]" />
+        </div>
+
         <p
-          v-if="activeJobs.length === 0"
+          v-else-if="activeJobs.length === 0"
           class="theme-section-muted py-4 text-sm"
         >
           No active imports.
@@ -158,8 +151,18 @@
           Latest completed, failed, or cancelled work.
         </p>
 
+        <div
+          v-if="!historyLoaded"
+          class="animate-pulse space-y-3 py-4"
+          aria-label="Loading recent import history"
+        >
+          <div class="h-4 w-28 rounded bg-[var(--color-surface-muted)]" />
+          <div class="h-4 w-3/4 rounded bg-[var(--color-surface-muted)]" />
+          <div class="h-1.5 w-full rounded bg-[var(--color-surface-muted)]" />
+        </div>
+
         <p
-          v-if="recentJobs.length === 0"
+          v-else-if="recentJobs.length === 0"
           class="theme-section-muted py-4 text-sm"
         >
           No recent import history.
@@ -236,7 +239,8 @@ import {
 defineProps<{
   activeJobs: ImportJob[];
   recentJobs: OperationsQueueItem[];
-  loaded: boolean;
+  activeLoaded: boolean;
+  historyLoaded: boolean;
   refreshing: boolean;
   errorMessage: string;
   queuedCount: number;

@@ -27,7 +27,8 @@ import {
   hasActiveImportJobs,
 } from '@/features/import-jobs/utils/importJobUtils';
 
-const IMPORT_HISTORY_PAGE_SIZE = 20;
+const IMPORT_HISTORY_PAGE_SIZE = 100;
+const RECENT_IMPORT_JOB_LIMIT = 5;
 
 export const useImportJobsController = () => {
   const pickerTemplateId = ref('mtg-like-v1');
@@ -50,6 +51,8 @@ export const useImportJobsController = () => {
   const lastRefreshedAt = ref<string | null>(null);
   const templates = ref<TemplateRecord[]>([]);
   const documentVisibility = useDocumentVisibility();
+  let activeJobsRequestId = 0;
+  let historyRequestId = 0;
 
   const queuedCount = computed(
     () => activeJobs.value.filter((job) => job.status === 'queued').length,
@@ -65,7 +68,6 @@ export const useImportJobsController = () => {
   const recentJobs = computed(() =>
     getRecentImportJobs(historyItems.value, activeJobIds.value),
   );
-  const activityLoaded = computed(() => activeJobsLoaded.value && historyLoaded.value);
   const isRefreshing = computed(
     () => activeJobsRefreshing.value || historyRefreshing.value,
   );
@@ -83,27 +85,53 @@ export const useImportJobsController = () => {
   });
 
   const loadActiveJobs = async (): Promise<boolean> => {
+    const requestId = ++activeJobsRequestId;
     activeJobsRefreshing.value = true;
     const previousIds = new Set(activeJobs.value.map((job) => job.id));
     try {
       const nextJobs = await fetchImportJobs();
+      if (requestId !== activeJobsRequestId) return false;
       activeJobs.value = nextJobs;
       lastRefreshedAt.value = new Date().toLocaleTimeString();
       return [...previousIds].some((jobId) => !nextJobs.some((job) => job.id === jobId));
     } finally {
-      activeJobsLoaded.value = true;
-      activeJobsRefreshing.value = false;
+      if (requestId === activeJobsRequestId) {
+        activeJobsLoaded.value = true;
+        activeJobsRefreshing.value = false;
+      }
     }
   };
 
   const loadRecentJobs = async (): Promise<void> => {
+    const requestId = ++historyRequestId;
     historyRefreshing.value = true;
     try {
-      const page = await fetchOperationsQueuePage('imports', 1, IMPORT_HISTORY_PAGE_SIZE);
-      historyItems.value = page.results;
+      const nextItems: OperationsQueueItem[] = [];
+      let nextPage: number | null = 1;
+
+      while (nextPage !== null) {
+        const page = await fetchOperationsQueuePage(
+          'imports',
+          nextPage,
+          IMPORT_HISTORY_PAGE_SIZE,
+        );
+        if (requestId !== historyRequestId) return;
+        nextItems.push(...page.results);
+        if (
+          getRecentImportJobs(nextItems, activeJobIds.value, RECENT_IMPORT_JOB_LIMIT).length
+          >= RECENT_IMPORT_JOB_LIMIT
+        ) {
+          break;
+        }
+        nextPage = page.next_page;
+      }
+
+      if (requestId === historyRequestId) historyItems.value = nextItems;
     } finally {
-      historyLoaded.value = true;
-      historyRefreshing.value = false;
+      if (requestId === historyRequestId) {
+        historyLoaded.value = true;
+        historyRefreshing.value = false;
+      }
     }
   };
 
@@ -216,7 +244,11 @@ export const useImportJobsController = () => {
   };
 
   const pollJobs = async (): Promise<void> => {
-    if (documentVisibility.value !== 'visible' || !hasActiveJobs.value || isRefreshing.value) return;
+    if (
+      documentVisibility.value !== 'visible'
+      || !hasActiveJobs.value
+      || activeJobsRefreshing.value
+    ) return;
     try {
       const activeJobFinished = await loadActiveJobs();
       if (activeJobFinished) await loadRecentJobs();
@@ -264,7 +296,10 @@ export const useImportJobsController = () => {
     activeJobs,
     recentJobs,
     formLoaded,
-    activityLoaded,
+    activeJobsLoaded,
+    historyLoaded,
+    activeJobsRefreshing,
+    historyRefreshing,
     isRefreshing,
     creatingJob,
     cancellingJobIds,
