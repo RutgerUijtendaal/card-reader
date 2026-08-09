@@ -14,7 +14,7 @@ const buildVersion = (overrides: Partial<CardVersionDetail> = {}): CardVersionDe
   id: 'card-1',
   key: 'card-1',
   label: 'Card 1',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   deck_building_config: { overrides: {} },
   template_id: 'template-1',
   version_id: 'version-1',
@@ -86,7 +86,7 @@ const buildForm = (overrides: Partial<EditorForm> = {}): EditorForm => ({
   attack: '',
   health: '',
   rules_text: '',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   deck_building_config: JSON.stringify({ overrides: {} }, null, 2),
   lifecycle_status: 'active',
   keyword_ids: [],
@@ -243,7 +243,7 @@ describe('CardVersionEditorPane tabs', () => {
     const mounted = await mountPane();
 
     expect(mounted.container.textContent).toContain('Card Version Editor');
-    expect(mounted.container.textContent).not.toContain('Hero Card');
+    expect(mounted.container.textContent).not.toContain('Card Classification');
     expect(mounted.container.textContent).not.toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).not.toContain('Card Status');
     expect(mounted.container.textContent).toContain('Mana Cost');
@@ -252,7 +252,9 @@ describe('CardVersionEditorPane tabs', () => {
     await clickButton(mounted.container, 'Card');
 
     expect(mounted.container.textContent).toContain('Card Editor');
-    expect(mounted.container.textContent).toContain('Hero Card');
+    expect(mounted.container.textContent).toContain('Card Classification');
+    expect(mounted.container.textContent).toContain('Game Master');
+    expect(mounted.container.textContent).toContain('Standard');
     expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).toContain('Card Status');
     expect(mounted.container.textContent).not.toContain('Mana Cost');

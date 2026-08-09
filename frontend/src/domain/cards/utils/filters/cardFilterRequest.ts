@@ -7,10 +7,15 @@ import {
   buildCardLifecycleApiParams,
   type CardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
+import type { CardPool, CardRoleFilter } from '@/domain/cards/types/cardModels';
 
 export type CardFilterApiPayload = {
   q?: string;
   lifecycle_status?: CardLifecycleFilterValue;
+  card_pool?: CardPool;
+  card_roles?: CardRoleFilter[];
+  card_role_exclude?: CardRoleFilter[];
+  card_role_match?: 'any' | 'all';
   keyword_ids?: string[];
   keyword_match?: 'any' | 'all';
   tag_ids?: string[];
@@ -58,10 +63,17 @@ export const buildCardFilterApiPayload = (
   const manaFamilyExcludeKeys = normalized.manaTypeSymbolExcludeIds.filter(
     (id) => !id.startsWith(LEGACY_MANA_SYMBOL_ID_PREFIX),
   );
-  const payload: CardFilterApiPayload = {};
+  const payload: CardFilterApiPayload = { card_pool: normalized.cardPool };
 
   if (normalized.query) payload.q = normalized.query;
   Object.assign(payload, buildCardLifecycleApiParams(normalized.lifecycleStatus));
+  if (normalized.cardRoleIds.length > 0) {
+    payload.card_roles = normalized.cardRoleIds;
+    payload.card_role_match = normalized.cardRoleMatch;
+  }
+  if (normalized.cardRoleExcludeIds.length > 0) {
+    payload.card_role_exclude = normalized.cardRoleExcludeIds;
+  }
   if (normalized.keywordIds.length > 0) {
     payload.keyword_ids = normalized.keywordIds;
     payload.keyword_match = normalized.keywordMatch;
@@ -122,9 +134,13 @@ export const buildCardFilterApiSearchParams = (
   const payload = buildCardFilterApiPayload(state);
   const normalized = normalizeCardFilterSelectionState(state);
   const params = new URLSearchParams();
+  params.set('card_pool', payload.card_pool ?? 'player');
 
   if (payload.q) params.set('q', payload.q);
   if (payload.lifecycle_status) params.set('lifecycle_status', payload.lifecycle_status);
+  payload.card_roles?.forEach((role) => params.append('card_roles', role));
+  payload.card_role_exclude?.forEach((role) => params.append('card_role_exclude', role));
+  if (payload.card_roles) params.set('card_role_match', payload.card_role_match ?? normalized.cardRoleMatch);
   if (payload.keyword_ids) {
     payload.keyword_ids.forEach((id) => params.append('keyword_ids', id));
     params.set('keyword_match', payload.keyword_match ?? normalized.keywordMatch);

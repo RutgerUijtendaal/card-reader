@@ -8,7 +8,7 @@ const buildVersion = (): CardVersionDetail => ({
   id: 'card-1',
   key: 'card-1',
   label: 'Card 1',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   deck_building_config: { overrides: {} },
   template_id: 'template-1',
   version_id: 'version-1',

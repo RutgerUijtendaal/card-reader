@@ -16,6 +16,8 @@ from card_reader_core.models import (
     Deck,
     DeckDifficulty,
     DeckVisibility,
+    GAME_MASTER_CARD_POOL,
+    card_role_keys,
 )
 from card_reader_core.repositories.cards import get_card_image
 from card_reader_core.services.cards import CardMetadata
@@ -36,7 +38,12 @@ class DeckListFilterParams(TypedDict):
     deck_tag_match: str | None
 
 
-def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> dict[str, object]:
+def deck_summary_payload(
+    deck: Deck,
+    *,
+    include_pending_suggestions: bool = False,
+    allow_game_master_cards: bool = False,
+) -> dict[str, object]:
     validation = DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     return {
@@ -49,7 +56,10 @@ def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = Fals
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
         },
-        "hero_card": deck_hero_summary_payload(deck.hero_card),
+        "hero_card": deck_hero_summary_payload(
+            deck.hero_card,
+            allow_game_master_cards=allow_game_master_cards,
+        ),
         "mainboard": {
             "total_cards": totals.mainboard_total_cards,
             "unique_cards": totals.mainboard_unique_cards,
@@ -69,7 +79,12 @@ def deck_summary_payload(deck: Deck, *, include_pending_suggestions: bool = Fals
     }
 
 
-def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> dict[str, object]:
+def deck_payload(
+    deck: Deck,
+    *,
+    include_pending_suggestions: bool = False,
+    allow_game_master_cards: bool = False,
+) -> dict[str, object]:
     validation = DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
@@ -94,14 +109,20 @@ def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> di
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
         },
-        "hero_card": deck_card_payload(deck.hero_card),
+        "hero_card": deck_card_payload(
+            deck.hero_card,
+            allow_game_master_cards=allow_game_master_cards,
+        ),
         "mainboard": {
             "total_cards": totals.mainboard_total_cards,
             "unique_cards": totals.mainboard_unique_cards,
             "entries": [
                 {
                     "quantity": entry.quantity,
-                    "card": deck_card_payload(entry.card),
+                    "card": deck_card_payload(
+                        entry.card,
+                        allow_game_master_cards=allow_game_master_cards,
+                    ),
                 }
                 for entry in entries
             ],
@@ -115,7 +136,10 @@ def deck_payload(deck: Deck, *, include_pending_suggestions: bool = False) -> di
                 "entries": [
                     {
                         "quantity": entry.quantity,
-                        "card": deck_card_payload(entry.card),
+                        "card": deck_card_payload(
+                            entry.card,
+                            allow_game_master_cards=allow_game_master_cards,
+                        ),
                     }
                     for entry in sideboard.entries.all()
                 ],
@@ -200,7 +224,13 @@ def deck_tag_suggestion_results_payload(
     ]
 
 
-def deck_hero_summary_payload(card: Card) -> dict[str, object]:
+def deck_hero_summary_payload(
+    card: Card,
+    *,
+    allow_game_master_cards: bool = False,
+) -> dict[str, object]:
+    if card.card_pool == GAME_MASTER_CARD_POOL and not allow_game_master_cards:
+        return _restricted_deck_card_summary(card)
     version = card.latest_version
     if version is None:
         return {
@@ -243,7 +273,13 @@ def _prefetched_card_image_asset_url(
     return card_image_asset_url(first_image, fallback_url=fallback_url)
 
 
-def deck_card_payload(card: Card) -> dict[str, object]:
+def deck_card_payload(
+    card: Card,
+    *,
+    allow_game_master_cards: bool = False,
+) -> dict[str, object]:
+    if card.card_pool == GAME_MASTER_CARD_POOL and not allow_game_master_cards:
+        return _restricted_deck_card_payload(card)
     version = card.latest_version
     if version is None:
         return {
@@ -251,7 +287,8 @@ def deck_card_payload(card: Card) -> dict[str, object]:
             "result_type": "card",
             "key": card.key,
             "label": card.label,
-            "is_hero": card.is_hero,
+            "card_pool": card.card_pool,
+            "card_roles": list(card_role_keys(card)),
             "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
             "lifecycle_status": card.lifecycle_status,
             "template_id": "",
@@ -285,6 +322,53 @@ def deck_card_payload(card: Card) -> dict[str, object]:
         image_url=card_image_asset_url(image, fallback_url=f"/cards/{card.id}/image"),
         metadata=metadata,
     )
+
+
+def _restricted_deck_card_summary(card: Card) -> dict[str, object]:
+    return {
+        "id": card.id,
+        "key": "restricted-game-master-card",
+        "label": "Restricted Game Master card",
+        "name": "Restricted Game Master card",
+        "image_url": None,
+        "symbols": [],
+        "restricted": True,
+    }
+
+
+def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
+    return {
+        "id": card.id,
+        "result_type": "card",
+        "key": "restricted-game-master-card",
+        "label": "Restricted Game Master card",
+        "card_pool": card.card_pool,
+        "card_roles": [],
+        "deck_building_config": normalize_deck_building_config({}),
+        "lifecycle_status": card.lifecycle_status,
+        "template_id": "",
+        "version_id": "",
+        "version_number": 0,
+        "previous_version_id": None,
+        "is_latest": True,
+        "name": "Restricted Game Master card",
+        "type_line": "",
+        "mana_cost": "",
+        "mana_symbols": [],
+        "mana_value": None,
+        "mana_family_sort_key": NO_MANA_FAMILY_SORT_KEY,
+        "attack": None,
+        "health": None,
+        "rules_text": "",
+        "confidence": 0.0,
+        "created_at": "",
+        "image_url": None,
+        "keywords": [],
+        "tags": [],
+        "symbols": [],
+        "types": [],
+        "restricted": True,
+    }
 
 
 def _deck_card_metadata(version: CardVersion) -> CardMetadata:

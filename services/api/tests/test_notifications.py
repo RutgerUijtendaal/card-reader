@@ -398,7 +398,7 @@ def test_notification_event_name_migration_preserves_rows_and_dedupe_keys() -> N
 def test_notification_previous_version_migration_backfills_only_safe_rows() -> None:
     _clear_notifications()
     user = _create_user("notification-version-migration", "password")
-    card = _create_card(name="Notification Version Migration Card", is_hero=False)
+    card = _create_card(name="Notification Version Migration Card", hero=False)
     previous_version = card.latest_version
     assert previous_version is not None
     current_version = CardVersion.objects.create(
@@ -445,7 +445,7 @@ def test_notification_previous_version_migration_backfills_only_safe_rows() -> N
             },
         )
     )
-    mismatched_card = _create_card(name="Mismatched Notification Card", is_hero=False)
+    mismatched_card = _create_card(name="Mismatched Notification Card", hero=False)
     mismatched = create_or_coalesce_notification(
         NotificationInput(
             recipient_id=str(user.pk),
@@ -568,8 +568,8 @@ def test_card_update_does_not_notify_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-deck-owner", "password")
     actor = _create_user("notification-card-editor", "password", is_staff=True)
-    hero = _create_card(name="Notification Hero", is_hero=True)
-    card = _create_card(name="Notification Mainboard", is_hero=False)
+    hero = _create_card(name="Notification Hero", hero=True)
+    card = _create_card(name="Notification Mainboard", hero=False)
     DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Deck",
@@ -600,8 +600,8 @@ def test_card_promotion_notifies_sideboard_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-sideboard-owner", "password")
     actor = _create_user("notification-sideboard-editor", "password", is_staff=True)
-    hero = _create_card(name="Notification Sideboard Hero", is_hero=True)
-    card = _create_card(name="Notification Sideboard Card", is_hero=False)
+    hero = _create_card(name="Notification Sideboard Hero", hero=True)
+    card = _create_card(name="Notification Sideboard Card", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Sideboard Deck",
@@ -656,7 +656,7 @@ def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
     _clear_notifications()
     owner = _create_user("notification-hero-owner", "password")
     actor = _create_user("notification-hero-actor", "password", is_staff=True)
-    hero = _create_card(name="Notification Changed Hero", is_hero=True)
+    hero = _create_card(name="Notification Changed Hero", hero=True)
     hero_version = hero.latest_version
     assert hero_version is not None
     deck = DeckService().create_owner_deck(
@@ -703,8 +703,8 @@ def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-noop-promotion-owner", "password")
     actor = _create_user("notification-noop-promotion-editor", "password", is_staff=True)
-    hero = _create_card(name="Notification Noop Promotion Hero", is_hero=True)
-    card = _create_card(name="Notification Noop Promotion Card", is_hero=False)
+    hero = _create_card(name="Notification Noop Promotion Hero", hero=True)
+    card = _create_card(name="Notification Noop Promotion Card", hero=False)
     DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Noop Promotion Deck",
@@ -731,8 +731,8 @@ def test_noop_card_promotion_does_not_notify_deck_owner() -> None:
 def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-owner", "password")
-    hero = _create_card(name="Notification Import Hero", is_hero=True)
-    card = _create_card(name="Notification Import Card", is_hero=False)
+    hero = _create_card(name="Notification Import Hero", hero=True)
+    card = _create_card(name="Notification Import Card", hero=False)
     DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Import Deck",
@@ -780,8 +780,8 @@ def test_import_reparse_does_not_notify_affected_deck_owner() -> None:
 def test_import_new_version_notifies_affected_deck_owner() -> None:
     _clear_notifications()
     owner = _create_user("notification-import-new-owner", "password")
-    hero = _create_card(name="Notification Import New Hero", is_hero=True)
-    card = _create_card(name="Notification Import New Card", is_hero=False)
+    hero = _create_card(name="Notification Import New Hero", hero=True)
+    card = _create_card(name="Notification Import New Card", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.pk),
         name="Notification Import New Deck",

@@ -26,7 +26,7 @@ def linked_deck_payload(deck: Deck) -> dict[str, object]:
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
         },
-        "hero_card": deck_hero_summary_payload(deck.hero_card),
+        "hero_card": deck_hero_summary_payload(deck.hero_card, allow_game_master_cards=True),
         "updated_at": deck.updated_at.isoformat(),
     }
 

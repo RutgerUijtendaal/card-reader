@@ -8,7 +8,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.cards.file_views import file_response, immutable_card_image_response, symbol_asset_response
+from card_reader_api.cards.file_views import (
+    card_for_immutable_image,
+    file_response,
+    immutable_card_image_response,
+    symbol_asset_response,
+)
 from card_reader_api.cards.grouped_gallery import grouped_gallery_payload
 from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.public_urls import card_image_asset_url
@@ -23,7 +28,7 @@ from card_reader_api.cards.serializers import (
     metadata_option,
     symbol_option,
 )
-from card_reader_api.common.auth_access import is_authenticated
+from card_reader_api.common.auth_access import can_access_game_master_cards, is_authenticated
 from card_reader_api.common.responses import serializer_error
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
@@ -33,6 +38,7 @@ from card_reader_core.repositories.cards import (
     list_cards,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
+from card_reader_core.models import GAME_MASTER_CARD_POOL, Card
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -54,6 +60,8 @@ class CardListView(APIView):
         if not serializer.is_valid():
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
+        if filters["card_pool"] == GAME_MASTER_CARD_POOL and not can_access_game_master_cards(request.user):
+            return Response({"detail": "Game Master cards require staff access."}, status=status.HTTP_403_FORBIDDEN)
         show_groups = filters["show_groups"]
         if show_groups:
             return Response(grouped_gallery_payload(filters))
@@ -87,7 +95,10 @@ class CardListView(APIView):
             mana_cost_min=filters["mana_cost_min"],
             mana_cost_max=filters["mana_cost_max"],
             template_id=filters["template_id"],
-            is_hero=filters["is_hero"],
+            card_pool=filters["card_pool"],
+            card_roles=filters["card_roles"],
+            card_role_exclude=filters["card_role_exclude"],
+            card_role_match=filters["card_role_match"],
             attack_min=filters["attack_min"],
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
@@ -127,7 +138,7 @@ class CardListView(APIView):
 class CardFiltersView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request) -> Response:
+    def get(self, request: Request) -> Response:
         metadata = get_filter_metadata()
         symbols_by_key = {symbol.key: symbol for symbol in metadata["symbols"]}
         return Response(
@@ -136,6 +147,20 @@ class CardFiltersView(APIView):
                 "tags": [metadata_option(row) for row in metadata["tags"]],
                 "symbols": [symbol_option(row) for row in metadata["symbols"]],
                 "types": [metadata_option(row) for row in metadata["types"]],
+                "card_pools": [
+                    {"key": "player", "label": "Player", "rank": 0},
+                    *(
+                        [{"key": "game_master", "label": "Game Master", "rank": 1}]
+                        if can_access_game_master_cards(request.user)
+                        else []
+                    ),
+                ],
+                "card_roles": [
+                    {"key": "standard", "label": "Standard", "rank": 0, "derived": True},
+                    {"key": "hero", "label": "Hero", "rank": 1, "derived": False},
+                    {"key": "boon", "label": "Boon", "rank": 2, "derived": False},
+                    {"key": "event", "label": "Event", "rank": 3, "derived": False},
+                ],
                 "mana_families": [
                     {
                         "key": family.key,
@@ -161,14 +186,20 @@ class CardDetailView(APIView):
         card, version, image = get_card_with_image(card_id)
         if card is None or version is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
+        _raise_if_card_hidden(request, card)
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
         card_groups = [
-            card_group_summary_payload(group, card_id=card.id)
+            card_group_summary_payload(group, card_id=card.id, card_pool=card.card_pool)
             for group in CardGroupService().get_groups_for_card(card.id)
+            if group.anchor_card.card_pool == card.card_pool
         ]
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
-        deck_references = card_deck_references_payload(card.id, viewer_id=viewer_id)
+        deck_references = card_deck_references_payload(
+            card.id,
+            viewer_id=viewer_id,
+            allow_game_master_cards=can_access_game_master_cards(request.user),
+        )
         return Response(
             card_payload(
                 card,
@@ -185,10 +216,11 @@ class CardDetailView(APIView):
 class CardGenerationsView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str) -> Response:
+    def get(self, request: Request, card_id: str) -> Response:
         card = get_card(card_id)
         if card is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
+        _raise_if_card_hidden(request, card)
 
         versions = list_card_generations(card_id)
         if not versions:
@@ -340,10 +372,11 @@ class LatestCardReparseView(APIView):
 class CardImageView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str) -> FileResponse:
+    def get(self, request: Request, card_id: str) -> FileResponse:
         card, _version, image = get_card_with_image(card_id)
         if card is None or image is None:
             raise Http404("Card image not found")
+        _raise_if_card_hidden(request, card)
         image_path = resolve_card_image_path(image)
         if image_path is None:
             raise Http404("Card image file is missing")
@@ -357,11 +390,13 @@ class CardImageView(APIView):
 class CardVersionImageView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, card_id: str, version_id: str) -> FileResponse:
-        if get_card(card_id) is None:
+    def get(self, request: Request, card_id: str, version_id: str) -> FileResponse:
+        card = get_card(card_id)
+        if card is None:
             raise Http404("Card not found")
+        _raise_if_card_hidden(request, card)
         image = get_card_image(version_id)
-        if image is None:
+        if image is None or image.card_version.card.id != card.id:
             raise Http404("Card image not found")
         image_path = resolve_card_image_path(image)
         if image_path is None:
@@ -372,7 +407,11 @@ class CardVersionImageView(APIView):
 class ImmutableCardImageView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, _request: Request, relative_path: str) -> FileResponse:
+    def get(self, request: Request, relative_path: str) -> FileResponse:
+        card = card_for_immutable_image(relative_path)
+        if card is None:
+            raise Http404("Card image not found")
+        _raise_if_card_hidden(request, card)
         return immutable_card_image_response(relative_path)
 
 
@@ -381,3 +420,8 @@ class SymbolAssetView(APIView):
 
     def get(self, _request: Request, asset_path: str) -> FileResponse:
         return symbol_asset_response(asset_path)
+
+
+def _raise_if_card_hidden(request: Request, card: Card) -> None:
+    if card.card_pool == GAME_MASTER_CARD_POOL and not can_access_game_master_cards(request.user):
+        raise Http404("Card not found")

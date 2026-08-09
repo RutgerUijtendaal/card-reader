@@ -1,5 +1,6 @@
 import type { TemplateParserType } from '@/domain/templates/types';
 import type { JsonObject } from '@/shared/types/json';
+import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
 
 export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types' | 'deck-roles' | 'deck-types';
 export type SuggestedCatalogKind = 'suggested-tags' | 'suggested-types' | 'suggested-deck-types';
@@ -159,6 +160,8 @@ export type LinkedCardPreview = {
   card_version_id: string;
   card_version_name: string;
   image_url: string | null;
+  card_pool: CardPool;
+  card_roles: CardRole[];
 };
 
 export type LinkedDeckPreview = {
@@ -329,6 +332,8 @@ export type SuggestionOccurrencePreview = {
   image_url: string | null;
   source_text: string;
   normalized_source_text: string;
+  card_pool: CardPool;
+  card_roles: CardRole[];
 };
 
 export type SuggestionAcceptedTarget = {

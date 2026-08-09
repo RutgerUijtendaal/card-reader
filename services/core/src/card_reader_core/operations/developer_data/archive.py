@@ -6,7 +6,12 @@ from pathlib import Path, PurePosixPath
 import tarfile
 import tempfile
 
-from .schema import DeveloperDataManifest, DeveloperDataPayload
+from .schema import (
+    SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS,
+    DeveloperDataManifest,
+    DeveloperDataPayload,
+    adopt_payload_for_format,
+)
 
 
 class DeveloperDataError(RuntimeError):
@@ -65,7 +70,7 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
         manifest = DeveloperDataManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise DeveloperDataError("Developer-data manifest is invalid.") from exc
-    if manifest.format_version != 1:
+    if manifest.format_version not in SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS:
         raise DeveloperDataError(f"Unsupported developer-data format: {manifest.format_version}")
 
     expected_paths: set[str] = set()
@@ -89,7 +94,10 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
         unexpected = sorted(actual_paths.symmetric_difference(expected_paths))
         raise DeveloperDataError(f"Developer-data archive file list differs from its manifest: {unexpected}")
     try:
-        payload = DeveloperDataPayload.model_validate_json(data_path.read_text(encoding="utf-8"))
+        raw_payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload = DeveloperDataPayload.model_validate(
+            adopt_payload_for_format(raw_payload, format_version=manifest.format_version)
+        )
     except Exception as exc:
         raise DeveloperDataError("Developer-data payload is invalid.") from exc
     return manifest, payload

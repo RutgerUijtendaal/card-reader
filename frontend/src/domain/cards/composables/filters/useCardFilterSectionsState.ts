@@ -4,16 +4,16 @@ import type { CardFiltersResponse } from '@/domain/cards/types';
 import type { CardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
 import type { MetadataFavoriteGroup } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';
 import type { ReturnTypeUseCardFilterState } from '@/domain/cards/composables/filters/useCardFilterState';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import type {
   CardFilterSectionsState,
   LifecycleFilterValue,
   MatchMode,
 } from '@/domain/cards/utils/filters/cardFilterSectionsState';
 
-const createArrayUpdater =
-  (target: { value: string[] }) =>
+const createArrayUpdater = <T extends string>(target: { value: T[] }) =>
   (value: string[]): void => {
-    target.value = value;
+    target.value = value as T[];
   };
 
 const createStringUpdater =
@@ -34,6 +34,12 @@ const createLifecycleUpdater =
     target.value = value;
   };
 
+const createCardPoolUpdater =
+  (target: { value: CardPool }) =>
+  (value: CardPool): void => {
+    target.value = value;
+  };
+
 export const useCardFilterSectionsState = (
   filterState: ReturnTypeUseCardFilterState,
   filters: Ref<CardFiltersResponse>,
@@ -41,6 +47,12 @@ export const useCardFilterSectionsState = (
   favoriteKeys: Record<MetadataFavoriteGroup, ComputedRef<string[]>>,
   toggleFavorite: (group: MetadataFavoriteGroup, key: string) => void,
 ) => {
+  const resetClassificationGroup = (): void => {
+    filterState.cardPool.value = 'player';
+    filterState.cardRoleIds.value = [];
+    filterState.cardRoleExcludeIds.value = ['hero'];
+    filterState.cardRoleMatch.value = 'any';
+  };
   const resetManaGroup = (): void => {
     filterState.manaTypeSymbolIds.value = [];
     filterState.manaTypeSymbolExcludeIds.value = [];
@@ -88,6 +100,25 @@ export const useCardFilterSectionsState = (
   };
 
   const filterSectionsState = computed<CardFilterSectionsState>(() => ({
+    cardPool: filterState.cardPool.value,
+    onUpdateCardPool: createCardPoolUpdater(filterState.cardPool),
+    cardPoolOptions: (filters.value.card_pools ?? []).map((option) => ({
+      id: option.key,
+      key: option.key,
+      label: option.label,
+    })),
+    selectedCardRoles: filterState.cardRoleIds.value,
+    onUpdateSelectedCardRoles: createArrayUpdater(filterState.cardRoleIds),
+    excludedCardRoles: filterState.cardRoleExcludeIds.value,
+    onUpdateExcludedCardRoles: createArrayUpdater(filterState.cardRoleExcludeIds),
+    cardRoleMatch: filterState.cardRoleMatch.value,
+    onUpdateCardRoleMatch: createMatchModeUpdater(filterState.cardRoleMatch),
+    cardRoleOptions: (filters.value.card_roles ?? []).map((option) => ({
+      id: option.key,
+      key: option.key,
+      label: option.label,
+    })),
+    resetClassificationGroup,
     lifecycleStatus: filterState.lifecycleStatus.value,
     onUpdateLifecycleStatus: createLifecycleUpdater(filterState.lifecycleStatus),
     selectedManaTypeSymbolIds: filterState.manaTypeSymbolIds.value,
@@ -164,6 +195,7 @@ export const useCardFilterSectionsState = (
 
   return {
     filterSectionsState,
+    resetClassificationGroup,
     resetManaGroup,
     resetAffinityGroup,
     resetDevotionGroup,

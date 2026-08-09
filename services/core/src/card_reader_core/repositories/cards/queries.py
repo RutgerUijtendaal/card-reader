@@ -6,7 +6,12 @@ from django.db.models import Count, F, Prefetch, Q, QuerySet
 
 from card_reader_core.metadata import mana_family_symbol_keys, normalize_mana_family_keys
 from card_reader_core.models import (
+    DEFAULT_CARD_POOL,
+    STANDARD_CARD_ROLE,
     Card,
+    CardPool,
+    CardRoleAssignment,
+    CardRoleFilter,
     CardMergeRedirect,
     CardVersion,
     CardVersionImage,
@@ -72,7 +77,10 @@ def list_cards(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    is_hero: bool | None = None,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_roles: list[CardRoleFilter] | None = None,
+    card_role_exclude: list[CardRoleFilter] | None = None,
+    card_role_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -114,7 +122,10 @@ def list_cards(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
-        is_hero=is_hero,
+        card_pool=card_pool,
+        card_roles=card_roles,
+        card_role_exclude=card_role_exclude,
+        card_role_match=card_role_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -170,7 +181,10 @@ def list_matching_cards(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    is_hero: bool | None = None,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_roles: list[CardRoleFilter] | None = None,
+    card_role_exclude: list[CardRoleFilter] | None = None,
+    card_role_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -208,7 +222,10 @@ def list_matching_cards(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
-        is_hero=is_hero,
+        card_pool=card_pool,
+        card_roles=card_roles,
+        card_role_exclude=card_role_exclude,
+        card_role_match=card_role_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -250,7 +267,10 @@ def list_matching_card_candidates(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    is_hero: bool | None = None,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_roles: list[CardRoleFilter] | None = None,
+    card_role_exclude: list[CardRoleFilter] | None = None,
+    card_role_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -288,7 +308,10 @@ def list_matching_card_candidates(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
-        is_hero=is_hero,
+        card_pool=card_pool,
+        card_roles=card_roles,
+        card_role_exclude=card_role_exclude,
+        card_role_match=card_role_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -303,10 +326,15 @@ def list_matching_card_candidates(
 
 
 def get_card(card_id: str) -> Card | None:
-    card = Card.objects.filter(id=card_id).first()
+    card = Card.objects.prefetch_related("role_assignments").filter(id=card_id).first()
     if card is not None:
         return card
-    redirect = CardMergeRedirect.objects.select_related("target_card").filter(old_card_id=card_id).first()
+    redirect = (
+        CardMergeRedirect.objects.select_related("target_card")
+        .prefetch_related("target_card__role_assignments")
+        .filter(old_card_id=card_id)
+        .first()
+    )
     return redirect.target_card if redirect is not None else None
 
 
@@ -314,6 +342,7 @@ def get_latest_card_version(card_id: str) -> CardVersion | None:
     return (
         CardVersion.objects.filter(card_id=card_id, is_latest=True)
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
+        .prefetch_related("card__role_assignments")
         .order_by("-version_number")
         .first()
     )
@@ -393,7 +422,10 @@ def list_filtered_latest_card_version_reparse_sources(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
-    is_hero: bool | None = None,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_roles: list[CardRoleFilter] | None = None,
+    card_role_exclude: list[CardRoleFilter] | None = None,
+    card_role_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -431,7 +463,10 @@ def list_filtered_latest_card_version_reparse_sources(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
-        is_hero=is_hero,
+        card_pool=card_pool,
+        card_roles=card_roles,
+        card_role_exclude=card_role_exclude,
+        card_role_match=card_role_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -466,6 +501,7 @@ def list_card_generations(card_id: str) -> list[CardVersion]:
     return list(
         CardVersion.objects.filter(card_id=card.id)
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
+        .prefetch_related("card__role_assignments")
         .order_by("-version_number")
     )
 
@@ -513,8 +549,13 @@ def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> Qu
         queryset = queryset.filter(mana_value__isnull=False, mana_value__lte=filters["mana_cost_max"])
     if filters["template_id"]:
         queryset = queryset.filter(template__key=filters["template_id"])
-    if filters["is_hero"] is not None:
-        queryset = queryset.filter(card__is_hero=filters["is_hero"])
+    queryset = queryset.filter(card__card_pool=filters["card_pool"])
+    queryset = filter_by_card_roles(
+        queryset,
+        filters["card_roles"],
+        match_mode=str(filters["card_role_match"]),
+    )
+    queryset = exclude_by_card_roles(queryset, filters["card_role_exclude"])
     if filters["attack_min"] is not None:
         queryset = queryset.filter(attack__isnull=False, attack__gte=filters["attack_min"])
     if filters["attack_max"] is not None:
@@ -523,6 +564,48 @@ def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> Qu
         queryset = queryset.filter(health__isnull=False, health__gte=filters["health_min"])
     if filters["health_max"] is not None:
         queryset = queryset.filter(health__isnull=False, health__lte=filters["health_max"])
+    return queryset
+
+
+def filter_by_card_roles(
+    queryset: QuerySet[CardVersion],
+    values: object,
+    *,
+    match_mode: str,
+) -> QuerySet[CardVersion]:
+    if not isinstance(values, list) or not values:
+        return queryset
+    roles = list(dict.fromkeys(str(value) for value in values))
+    includes_standard = STANDARD_CARD_ROLE in roles
+    persisted_roles = [role for role in roles if role != STANDARD_CARD_ROLE]
+    if match_mode == "all":
+        if includes_standard:
+            return queryset.filter(card__role_assignments__isnull=True)
+        matching_cards = (
+            CardRoleAssignment.objects.filter(role__in=persisted_roles)
+            .values("card_id")
+            .annotate(match_count=Count("role", distinct=True))
+            .filter(match_count=len(persisted_roles))
+            .values_list("card_id", flat=True)
+        )
+        return queryset.filter(card_id__in=matching_cards)
+
+    role_query = Q(card__role_assignments__role__in=persisted_roles)
+    if includes_standard:
+        role_query |= Q(card__role_assignments__isnull=True)
+    return queryset.filter(role_query).distinct()
+
+
+def exclude_by_card_roles(queryset: QuerySet[CardVersion], values: object) -> QuerySet[CardVersion]:
+    if not isinstance(values, list) or not values:
+        return queryset
+    roles = list(dict.fromkeys(str(value) for value in values))
+    if STANDARD_CARD_ROLE in roles:
+        queryset = queryset.exclude(card__role_assignments__isnull=True)
+    persisted_roles = [role for role in roles if role != STANDARD_CARD_ROLE]
+    if persisted_roles:
+        card_ids = CardRoleAssignment.objects.filter(role__in=persisted_roles).values_list("card_id", flat=True)
+        queryset = queryset.exclude(card_id__in=card_ids)
     return queryset
 
 
@@ -629,7 +712,10 @@ def _build_filtered_versions_queryset(
     mana_cost_min: int | None,
     mana_cost_max: int | None,
     template_id: str | None,
-    is_hero: bool | None,
+    card_pool: CardPool,
+    card_roles: list[CardRoleFilter] | None,
+    card_role_exclude: list[CardRoleFilter] | None,
+    card_role_match: str,
     attack_min: int | None,
     attack_max: int | None,
     health_min: int | None,
@@ -647,7 +733,10 @@ def _build_filtered_versions_queryset(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
-        is_hero=is_hero,
+        card_pool=card_pool,
+        card_roles=card_roles,
+        card_role_exclude=card_role_exclude,
+        card_role_match=card_role_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -802,6 +891,7 @@ def _hydrate_card_list_candidates(
 
 def _card_list_prefetches() -> tuple[Any, ...]:
     return (
+        "card__role_assignments",
         Prefetch("images", queryset=CardVersionImage.objects.order_by("-created_at")),
         Prefetch(
             "card_version_keywords",

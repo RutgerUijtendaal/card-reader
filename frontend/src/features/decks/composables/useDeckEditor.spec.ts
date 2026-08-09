@@ -140,7 +140,7 @@ const buildHero = (id: string, name: string) => ({
   result_type: 'card' as const,
   key: id,
   label: name,
-  is_hero: true,
+  card_pool: 'player' as const, card_roles: ['hero' as const],
   template_id: '',
   version_id: `${id}-version`,
   version_number: 1,
@@ -208,7 +208,7 @@ const flushAsyncEditorWork = async (): Promise<void> => {
 
 const buildCard = (id: string, name: string) => ({
   ...buildHero(id, name),
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   type_line: 'Unit',
 });
 
@@ -289,7 +289,7 @@ describe('useDeckEditor', () => {
         result_type: 'card',
         key: 'hero-1',
         label: 'Hero',
-        is_hero: true,
+        card_pool: 'player' as const, card_roles: ['hero' as const],
         template_id: '',
         version_id: 'hero-version',
         version_number: 1,

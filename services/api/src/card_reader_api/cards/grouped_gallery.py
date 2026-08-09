@@ -74,7 +74,10 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
         mana_cost_min=filters["mana_cost_min"],
         mana_cost_max=filters["mana_cost_max"],
         template_id=filters["template_id"],
-        is_hero=filters["is_hero"],
+        card_pool=filters["card_pool"],
+        card_roles=filters["card_roles"],
+        card_role_exclude=filters["card_role_exclude"],
+        card_role_match=filters["card_role_match"],
         attack_min=filters["attack_min"],
         attack_max=filters["attack_max"],
         health_min=filters["health_min"],
@@ -83,13 +86,17 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
         sort=filters["sort"],
     )
     matching_card_ids = [row.version.card.id for row in matching_rows]
-    groups = CardGroupService().get_groups_for_cards(matching_card_ids)
+    groups = [
+        group
+        for group in CardGroupService().get_groups_for_cards(matching_card_ids)
+        if group.anchor_card.card_pool == filters["card_pool"]
+    ]
     lifecycle_status = filters["lifecycle_status"]
 
     participant_card_ids = {
         member.card.id
         for group in groups
-        for member in card_group_visible_members(group, lifecycle_status)
+        for member in card_group_visible_members(group, lifecycle_status, card_pool=filters["card_pool"])
     }
 
     grouped_items: list[GroupedGalleryItem] = []
@@ -124,7 +131,10 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
     )
     for group in groups:
         anchor_version = anchor_versions.get(group.id)
-        member_ids = {member.card.id for member in card_group_visible_members(group, lifecycle_status)}
+        member_ids = {
+            member.card.id
+            for member in card_group_visible_members(group, lifecycle_status, card_pool=filters["card_pool"])
+        }
         if anchor_version is None or not member_ids.intersection(matching_card_ids):
             continue
         grouped_items.append(
@@ -150,7 +160,7 @@ def grouped_gallery_payload(filters: CardListFilterParams) -> dict[str, object]:
     normalized_page_size = max(1, min(page_size, 100))
     offset = (normalized_page - 1) * normalized_page_size
     page_items = grouped_items[offset : offset + normalized_page_size]
-    results = _hydrate_grouped_gallery_payloads(page_items, groups, lifecycle_status)
+    results = _hydrate_grouped_gallery_payloads(page_items, groups, lifecycle_status, card_pool=filters["card_pool"])
     return {
         "count": total_count,
         "next_page": normalized_page + 1 if normalized_page * normalized_page_size < total_count else None,
@@ -194,6 +204,8 @@ def _hydrate_grouped_gallery_payloads(
     page_items: list[GroupedGalleryItem],
     groups: list["CardGroup"],
     lifecycle_status: "CardLifecycleFilter",
+    *,
+    card_pool: str,
 ) -> list[dict[str, object]]:
     card_version_ids = [
         item["card_version_id"]
@@ -226,7 +238,9 @@ def _hydrate_grouped_gallery_payloads(
         group_id = item["group_id"]
         group = groups_by_id.get(group_id or "")
         if group is not None:
-            payloads.append(card_group_gallery_payload(group, lifecycle_status=lifecycle_status))
+            payloads.append(
+                card_group_gallery_payload(group, lifecycle_status=lifecycle_status, card_pool=card_pool)
+            )
     return payloads
 
 

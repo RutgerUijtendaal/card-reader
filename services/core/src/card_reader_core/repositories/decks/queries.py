@@ -264,8 +264,6 @@ def list_owner_deck_summary_page(
         cursor_created_at=cursor_created_at,
         cursor_id=cursor_id,
     )
-
-
 def _paginate_deck_summary_queryset(
     queryset: QuerySet[Deck],
     *,

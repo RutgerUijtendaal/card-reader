@@ -94,6 +94,10 @@ describe('cardFilterSelection', () => {
     const selection = buildCardFilterSelectionState(
       {
         query: 'dragon',
+        cardPool: 'player',
+        cardRoleMatch: 'any',
+        cardRoleKeys: [],
+        cardRoleExcludeKeys: ['hero'],
         keywordMatch: 'all',
         tagMatch: 'any',
         typeMatch: 'all',
@@ -150,6 +154,10 @@ describe('cardFilterSelection', () => {
     const state = buildCardFilterStateFromSelection(
       {
         query: '',
+        cardPool: 'player',
+        cardRoleMatch: 'any',
+        cardRoleIds: [],
+        cardRoleExcludeIds: ['hero'],
         keywordMatch: 'all',
         tagMatch: 'all',
         typeMatch: 'any',

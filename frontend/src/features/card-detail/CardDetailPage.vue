@@ -131,7 +131,8 @@
             @toggle-additional-symbol="toggleAdditionalSymbol"
             @update-group-search="setMetadataSearch"
             @update-field="updateField"
-            @update-hero="updateHero"
+            @update-card-pool="updateCardPool"
+            @toggle-card-role="toggleCardRole"
             @update-deck-building-config="updateDeckBuildingConfig"
             @update-lifecycle-status="updateLifecycleStatus"
           />
@@ -167,6 +168,7 @@ import {
   type CardLifecycleStatus,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { ScalarFieldName } from '@/domain/cards/types';
+import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
 
 const {
   card,
@@ -233,8 +235,14 @@ const updateField = (fieldName: ScalarFieldName, value: string): void => {
   form[fieldName] = value;
 };
 
-const updateHero = (value: boolean): void => {
-  form.is_hero = value;
+const updateCardPool = (value: CardPool): void => {
+  form.card_pool = value;
+};
+
+const toggleCardRole = (role: CardRole, checked: boolean): void => {
+  form.card_roles = checked
+    ? [...new Set([...form.card_roles, role])]
+    : form.card_roles.filter((value) => value !== role);
 };
 
 const updateDeckBuildingConfig = (value: string): void => {

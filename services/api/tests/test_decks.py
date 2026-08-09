@@ -10,6 +10,7 @@ from django.test.utils import CaptureQueriesContext
 
 from card_reader_core.models import (
     Card,
+    CardRoleAssignment,
     CardVersion,
     CardVersionImage,
     CardVersionKeyword,
@@ -90,7 +91,7 @@ def _login_and_get_csrf_token(client: Client, username: str, password: str) -> s
 def _create_card(
     *,
     name: str,
-    is_hero: bool,
+    hero: bool,
     type_labels: list[str] | None = None,
     lifecycle_status: str = "active",
     deck_building_config: dict[str, object] | None = None,
@@ -100,17 +101,18 @@ def _create_card(
     card = Card.objects.create(
         key=unique_name.lower().replace(" ", "-"),
         label=unique_name,
-        is_hero=is_hero,
         lifecycle_status=lifecycle_status,
         deck_building_config_json=deck_building_config or {},
     )
+    if hero:
+        CardRoleAssignment.objects.create(card=card, role="hero")
     version = CardVersion.objects.create(
         card=card,
         version_number=1,
         template=template,
         image_hash=f"hash-{unique_name}",
         name=unique_name,
-        type_line="Hero" if is_hero else "Follower",
+        type_line="Hero" if hero else "Follower",
         mana_cost="",
         mana_symbols_json=[],
         rules_text_raw="",
@@ -136,7 +138,7 @@ def _create_card(
         parsed_snapshot_json={
             "fields": {
                 "name": name,
-                "type_line": "Hero" if is_hero else "Follower",
+                "type_line": "Hero" if hero else "Follower",
                 "mana_cost": "",
                 "attack": None,
                 "health": None,
@@ -213,7 +215,7 @@ def _build_mainboard_cards(total_unique: int = 15) -> list[Card]:
     cards: list[Card] = []
     for index in range(total_unique):
         type_labels = ["Mana"] if index < 3 else None
-        cards.append(_create_card(name=f"Mainboard Card {index}", is_hero=False, type_labels=type_labels))
+        cards.append(_create_card(name=f"Mainboard Card {index}", hero=False, type_labels=type_labels))
     return cards
 
 
@@ -253,7 +255,7 @@ def test_deck_rules_metadata_endpoint_returns_backend_owned_defaults() -> None:
 
 def test_public_deck_list_excludes_private_decks() -> None:
     owner = _create_user("deck-public-owner", "password")
-    hero = _create_card(name="Public Hero", is_hero=True)
+    hero = _create_card(name="Public Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
 
     public_deck = DeckService().create_owner_deck(
@@ -293,7 +295,7 @@ def test_public_deck_list_excludes_private_decks() -> None:
 
 def test_public_deck_list_excludes_invalid_public_decks() -> None:
     owner = _create_user("deck-invalid-public-owner", "password")
-    hero = _create_card(name="Draft Hero", is_hero=True)
+    hero = _create_card(name="Draft Hero", hero=True)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
         name="Draft Deck",
@@ -312,10 +314,10 @@ def test_public_deck_list_excludes_invalid_public_decks() -> None:
 
 def test_public_deck_list_excludes_decks_with_deprecated_cards_but_owner_can_view_warning() -> None:
     owner = _create_user("deck-deprecated-card-owner", "password")
-    hero = _create_card(name="Deprecated Warning Hero", is_hero=True)
+    hero = _create_card(name="Deprecated Warning Hero", hero=True)
     deprecated_card = _create_card(
         name="Deprecated Mainboard Card",
-        is_hero=False,
+        hero=False,
         lifecycle_status="deprecated",
         type_labels=["Mana"],
     )
@@ -352,7 +354,7 @@ def test_public_deck_list_excludes_decks_with_deprecated_cards_but_owner_can_vie
 
 def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
     owner = _create_user("deck-minimum-public-owner", "password")
-    hero = _create_card(name="Minimum Hero", is_hero=True)
+    hero = _create_card(name="Minimum Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -372,7 +374,7 @@ def test_public_deck_list_includes_valid_20_card_public_decks() -> None:
 
 def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
     owner = _create_user("deck-summary-public-owner", "password")
-    hero = _create_card(name="Summary Public Hero", is_hero=True)
+    hero = _create_card(name="Summary Public Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     public_deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -437,7 +439,7 @@ def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
 def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     owner = _create_user("deck-summary-owner-user", "password")
     other_owner = _create_user("deck-summary-other-user", "password")
-    hero = _create_card(name="Summary Owner Hero", is_hero=True)
+    hero = _create_card(name="Summary Owner Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     _login_and_get_csrf_token(client, owner.username, "password")
@@ -580,10 +582,10 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
 def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:
     owner = _create_user("deck-summary-search-owner", "password")
     other_owner = _create_user("deck-summary-search-other", "password")
-    deck_name_hero = _create_card(name="Neutral Summary Hero", is_hero=True)
-    hero_match = _create_card(name="Summary Search Hero", is_hero=True)
-    mainboard_match = _create_card(name="Summary Search Blade", is_hero=False, type_labels=["Mana"])
-    sideboard_match = _create_card(name="Summary Search Trap", is_hero=False)
+    deck_name_hero = _create_card(name="Neutral Summary Hero", hero=True)
+    hero_match = _create_card(name="Summary Search Hero", hero=True)
+    mainboard_match = _create_card(name="Summary Search Blade", hero=False, type_labels=["Mana"])
+    sideboard_match = _create_card(name="Summary Search Trap", hero=False)
     mainboard_cards = _build_mainboard_cards(total_unique=14)
 
     name_deck = DeckService().create_owner_deck(
@@ -658,7 +660,7 @@ def test_deck_summary_search_matches_overview_fields_without_leaking_private_dec
 
 def test_deck_summary_list_query_count_stays_bounded() -> None:
     owner = _create_user("deck-summary-query-owner", "password")
-    hero = _create_card(name="Summary Query Hero", is_hero=True)
+    hero = _create_card(name="Summary Query Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     for index in range(4):
         DeckService().create_owner_deck(
@@ -681,8 +683,8 @@ def test_deck_summary_list_query_count_stays_bounded() -> None:
 
 def test_public_deck_list_filters_by_hero_name() -> None:
     owner = _create_user("deck-filter-hero-owner", "password")
-    target_hero = _create_card(name="Aurora Captain", is_hero=True)
-    other_hero = _create_card(name="Shadow Caller", is_hero=True)
+    target_hero = _create_card(name="Aurora Captain", hero=True)
+    other_hero = _create_card(name="Shadow Caller", hero=True)
     mainboard_cards = _build_mainboard_cards()
 
     target_deck = DeckService().create_owner_deck(
@@ -713,7 +715,7 @@ def test_public_deck_list_filters_by_hero_name() -> None:
 def test_public_deck_list_filters_by_author_username() -> None:
     target_owner = _create_user("deck-author-target", "password")
     other_owner = _create_user("deck-author-other", "password")
-    hero = _create_card(name="Author Filter Hero", is_hero=True)
+    hero = _create_card(name="Author Filter Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
 
     target_deck = DeckService().create_owner_deck(
@@ -744,8 +746,8 @@ def test_public_deck_list_filters_by_author_username() -> None:
 
 def test_public_deck_list_filters_by_mainboard_card_name() -> None:
     owner = _create_user("deck-filter-mainboard-owner", "password")
-    hero = _create_card(name="Mainboard Hero", is_hero=True)
-    featured_card = _create_card(name="Sun Spear", is_hero=False)
+    hero = _create_card(name="Mainboard Hero", hero=True)
+    featured_card = _create_card(name="Sun Spear", hero=False)
     filler_cards = _build_mainboard_cards(total_unique=14)
 
     target_deck = DeckService().create_owner_deck(
@@ -779,8 +781,8 @@ def test_public_deck_list_filters_by_mainboard_card_name() -> None:
 
 def test_public_deck_list_filters_by_sideboard_card_name() -> None:
     owner = _create_user("deck-filter-sideboard-owner", "password")
-    hero = _create_card(name="Sideboard Filter Hero", is_hero=True)
-    sideboard_card = _create_card(name="Moon Trap", is_hero=False)
+    hero = _create_card(name="Sideboard Filter Hero", hero=True)
+    sideboard_card = _create_card(name="Moon Trap", hero=False)
     mainboard_cards = _build_mainboard_cards()
 
     target_deck = DeckService().create_owner_deck(
@@ -815,9 +817,9 @@ def test_public_deck_list_filters_by_sideboard_card_name() -> None:
 
 def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
     owner = _create_user("deck-filter-and-owner", "password")
-    matching_hero = _create_card(name="Ember Warden", is_hero=True)
-    non_matching_hero = _create_card(name="Frost Sage", is_hero=True)
-    featured_card = _create_card(name="Solar Flare", is_hero=False)
+    matching_hero = _create_card(name="Ember Warden", hero=True)
+    non_matching_hero = _create_card(name="Frost Sage", hero=True)
+    featured_card = _create_card(name="Solar Flare", hero=False)
     filler_cards = _build_mainboard_cards(total_unique=14)
 
     target_deck = DeckService().create_owner_deck(
@@ -862,9 +864,9 @@ def test_public_deck_list_combines_hero_and_card_filters_with_and() -> None:
 
 def test_public_deck_list_filters_by_affinity_symbols_with_any_match() -> None:
     owner = _create_user("deck-filter-affinity-any-owner", "password")
-    hero = _create_card(name="Affinity Any Hero", is_hero=True)
-    fire_card = _create_card(name="Firecard", is_hero=False)
-    water_card = _create_card(name="Watercard", is_hero=False)
+    hero = _create_card(name="Affinity Any Hero", hero=True)
+    fire_card = _create_card(name="Firecard", hero=False)
+    water_card = _create_card(name="Watercard", hero=False)
     _add_card_metadata(fire_card, symbol_specs=[("aff-fire", "Fire Affinity", "{AF}", "affinity")])
     _add_card_metadata(water_card, symbol_specs=[("aff-water", "Water Affinity", "{AW}", "affinity")])
     fire_symbol_id = Symbol.objects.get(key="aff-fire").id
@@ -906,9 +908,9 @@ def test_public_deck_list_filters_by_affinity_symbols_with_any_match() -> None:
 
 def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
     owner = _create_user("deck-filter-affinity-all-owner", "password")
-    hero = _create_card(name="Affinity All Hero", is_hero=True)
-    dual_card = _create_card(name="Dual Affinity Card", is_hero=False)
-    fire_only_card = _create_card(name="Fire Only Card", is_hero=False)
+    hero = _create_card(name="Affinity All Hero", hero=True)
+    dual_card = _create_card(name="Dual Affinity Card", hero=False)
+    fire_only_card = _create_card(name="Fire Only Card", hero=False)
     _add_card_metadata(
         dual_card,
         symbol_specs=[
@@ -956,10 +958,10 @@ def test_public_deck_list_filters_by_affinity_symbols_with_all_match() -> None:
 
 def test_public_deck_list_filters_by_affinity_symbol_exclusions() -> None:
     owner = _create_user("deck-filter-affinity-exclude-owner", "password")
-    hero = _create_card(name="Affinity Exclude Hero", is_hero=True)
-    fire_card = _create_card(name="Exclude Fire Card", is_hero=False)
-    water_card = _create_card(name="Exclude Water Card", is_hero=False)
-    dual_card = _create_card(name="Exclude Dual Card", is_hero=False)
+    hero = _create_card(name="Affinity Exclude Hero", hero=True)
+    fire_card = _create_card(name="Exclude Fire Card", hero=False)
+    water_card = _create_card(name="Exclude Water Card", hero=False)
+    dual_card = _create_card(name="Exclude Dual Card", hero=False)
     _add_card_metadata(fire_card, symbol_specs=[("aff-fire-exclude", "Fire Affinity", "{AF}", "affinity")])
     _add_card_metadata(water_card, symbol_specs=[("aff-water-exclude", "Water Affinity", "{AW}", "affinity")])
     _add_card_metadata(
@@ -1024,10 +1026,10 @@ def test_public_deck_list_filters_by_affinity_symbol_exclusions() -> None:
 
 def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> None:
     owner = _create_user("deck-filter-visibility-owner", "password")
-    target_hero = _create_card(name="Visible Filter Hero", is_hero=True)
-    private_hero = _create_card(name="Hidden Filter Hero", is_hero=True)
-    invalid_hero = _create_card(name="Draft Filter Hero", is_hero=True)
-    featured_card = _create_card(name="Comet Blade", is_hero=False)
+    target_hero = _create_card(name="Visible Filter Hero", hero=True)
+    private_hero = _create_card(name="Hidden Filter Hero", hero=True)
+    invalid_hero = _create_card(name="Draft Filter Hero", hero=True)
+    featured_card = _create_card(name="Comet Blade", hero=False)
     filler_cards = _build_mainboard_cards(total_unique=14)
 
     public_deck = DeckService().create_owner_deck(
@@ -1072,7 +1074,7 @@ def test_public_deck_list_filters_still_exclude_private_and_invalid_decks() -> N
 
 def test_deck_payload_includes_card_types() -> None:
     owner = _create_user("deck-types-owner", "password")
-    hero = _create_card(name="Typed Hero", is_hero=True, type_labels=["Hero", "Mage"])
+    hero = _create_card(name="Typed Hero", hero=True, type_labels=["Hero", "Mage"])
     mainboard_cards = _build_mainboard_cards()
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -1095,8 +1097,8 @@ def test_deck_payload_includes_card_types() -> None:
 
 def test_deck_payload_includes_tooltip_metadata() -> None:
     owner = _create_user("deck-tooltip-owner", "password")
-    hero = _create_card(name="Tooltip Hero", is_hero=True)
-    card = _create_card(name="Tooltip Card", is_hero=False, type_labels=["Equipment", "Amulet"])
+    hero = _create_card(name="Tooltip Hero", hero=True)
+    card = _create_card(name="Tooltip Card", hero=False, type_labels=["Equipment", "Amulet"])
     _add_card_metadata(
         card,
         keyword_labels=["Gain"],
@@ -1142,7 +1144,7 @@ def test_deck_payload_includes_tooltip_metadata() -> None:
 
 def test_deck_payload_uses_immutable_card_image_urls() -> None:
     owner = _create_user("deck-image-owner", "password")
-    hero = _create_card(name="Image Hero", is_hero=True)
+    hero = _create_card(name="Image Hero", hero=True)
     version = hero.latest_version
     assert version is not None
     image_name = f"deck-image-{version.id}.png"
@@ -1174,7 +1176,7 @@ def test_deck_payload_uses_immutable_card_image_urls() -> None:
 
 def test_deck_summary_uses_first_existing_prefetched_hero_image() -> None:
     owner = _create_user("deck-summary-image-owner", "password")
-    hero = _create_card(name="Summary Image Hero", is_hero=True)
+    hero = _create_card(name="Summary Image Hero", hero=True)
     version = hero.latest_version
     assert version is not None
     valid_image_name = f"deck-summary-valid-image-{version.id}.png"
@@ -1214,7 +1216,7 @@ def test_deck_summary_uses_first_existing_prefetched_hero_image() -> None:
 
 def test_public_deck_detail_hides_private_decks_from_non_owners() -> None:
     owner = _create_user("deck-private-owner", "password")
-    hero = _create_card(name="Private Hero", is_hero=True)
+    hero = _create_card(name="Private Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -1233,7 +1235,7 @@ def test_public_deck_detail_hides_private_decks_from_non_owners() -> None:
 
 def test_public_deck_detail_allows_unlisted_decks_for_guests() -> None:
     owner = _create_user("deck-unlisted-owner", "password")
-    hero = _create_card(name="Unlisted Hero", is_hero=True)
+    hero = _create_card(name="Unlisted Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -1255,7 +1257,7 @@ def test_authenticated_owner_can_crud_decks() -> None:
     username = "deck-owner-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Owner Hero", is_hero=True)
+    hero = _create_card(name="Owner Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1310,7 +1312,7 @@ def test_deck_long_description_round_trips_normalizes_and_stays_out_of_summaries
     username = "deck-long-description-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Long Description Hero", is_hero=True)
+    hero = _create_card(name="Long Description Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1349,7 +1351,7 @@ def test_deck_patch_preserves_and_clears_long_description() -> None:
     username = "deck-long-description-patch-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Long Description Patch Hero", is_hero=True)
+    hero = _create_card(name="Long Description Patch Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1408,7 +1410,7 @@ def test_deck_difficulty_round_trips_in_full_and_summary_payloads() -> None:
     username = "deck-difficulty-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Difficulty Hero", is_hero=True)
+    hero = _create_card(name="Difficulty Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1455,7 +1457,7 @@ def test_deck_patch_preserves_and_clears_difficulty() -> None:
     username = "deck-difficulty-patch-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Difficulty Patch Hero", is_hero=True)
+    hero = _create_card(name="Difficulty Patch Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1497,8 +1499,8 @@ def test_deck_patch_preserves_and_clears_difficulty() -> None:
 def test_owner_deck_list_filters_owned_decks_by_card_name_without_leaking_other_users_decks() -> None:
     owner = _create_user("deck-owner-filter-user", "password")
     other_owner = _create_user("deck-owner-filter-other-user", "password")
-    hero = _create_card(name="Owner Filter Hero", is_hero=True)
-    featured_card = _create_card(name="Owner Filter Blade", is_hero=False)
+    hero = _create_card(name="Owner Filter Hero", hero=True)
+    featured_card = _create_card(name="Owner Filter Blade", hero=False)
     filler_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     _login_and_get_csrf_token(client, owner.username, "password")
@@ -1547,7 +1549,7 @@ def test_owner_deck_list_filters_owned_decks_by_card_name_without_leaking_other_
 def test_owner_deck_list_ignores_public_author_filter() -> None:
     owner = _create_user("deck-owner-author-filter-user", "password")
     other_owner = _create_user("deck-owner-author-filter-other", "password")
-    hero = _create_card(name="Owner Author Filter Hero", is_hero=True)
+    hero = _create_card(name="Owner Author Filter Hero", hero=True)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     _login_and_get_csrf_token(client, owner.username, "password")
 
@@ -1579,9 +1581,9 @@ def test_owner_deck_list_ignores_public_author_filter() -> None:
 
 def test_owner_deck_list_filters_owned_decks_by_affinity_symbol() -> None:
     owner = _create_user("deck-owner-affinity-filter-user", "password")
-    hero = _create_card(name="Owner Affinity Hero", is_hero=True)
-    fire_card = _create_card(name="Owner Fire Card", is_hero=False)
-    water_card = _create_card(name="Owner Water Card", is_hero=False)
+    hero = _create_card(name="Owner Affinity Hero", hero=True)
+    fire_card = _create_card(name="Owner Fire Card", hero=False)
+    water_card = _create_card(name="Owner Water Card", hero=False)
     _add_card_metadata(fire_card, symbol_specs=[("owner-aff-fire", "Owner Fire Affinity", "{OF}", "affinity")])
     _add_card_metadata(water_card, symbol_specs=[("owner-aff-water", "Owner Water Affinity", "{OW}", "affinity")])
     fire_symbol_id = Symbol.objects.get(key="owner-aff-fire").id
@@ -1624,10 +1626,10 @@ def test_owner_deck_list_filters_owned_decks_by_affinity_symbol() -> None:
 
 def test_deck_payload_includes_sideboards_and_aggregate_totals() -> None:
     owner = _create_user("deck-sideboard-owner", "password")
-    hero = _create_card(name="Sideboard Hero", is_hero=True)
+    hero = _create_card(name="Sideboard Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    sideboard_card = _create_card(name="Sideboard Card", is_hero=False)
-    extra_sideboard_card = _create_card(name="Second Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="Sideboard Card", hero=False)
+    extra_sideboard_card = _create_card(name="Second Sideboard Card", hero=False)
 
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -1673,9 +1675,9 @@ def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
     username = "deck-sideboard-crud-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Sideboard CRUD Hero", is_hero=True)
+    hero = _create_card(name="Sideboard CRUD Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    sideboard_card = _create_card(name="CRUD Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="CRUD Sideboard Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -1713,7 +1715,7 @@ def test_deck_create_is_idempotent_per_owner_and_creation_key() -> None:
     username = "deck-idempotency-user"
     password = "password"
     owner = _create_user(username, password)
-    hero = _create_card(name="Idempotency Hero", is_hero=True)
+    hero = _create_card(name="Idempotency Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1758,7 +1760,7 @@ def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
     password = "password"
     _create_user(first_username, password)
     _create_user(second_username, password)
-    hero = _create_card(name="Scoped Idempotency Hero", is_hero=True)
+    hero = _create_card(name="Scoped Idempotency Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     payload = {
         "name": "Scoped Idempotency Deck",
@@ -1806,7 +1808,7 @@ def test_deleted_deck_keeps_creation_key_as_a_tombstone() -> None:
     username = "deck-idempotency-deleted-user"
     password = "password"
     owner = _create_user(username, password)
-    hero = _create_card(name="Deleted Idempotency Hero", is_hero=True)
+    hero = _create_card(name="Deleted Idempotency Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1873,10 +1875,10 @@ def test_deck_create_preserves_submitted_board_entry_order() -> None:
     username = "deck-create-entry-order-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Create Order Hero", is_hero=True)
-    alpha_card = _create_card(name="Create Order Alpha", is_hero=False, type_labels=["Mana"])
-    beta_card = _create_card(name="Create Order Beta", is_hero=False, type_labels=["Mana"])
-    gamma_card = _create_card(name="Create Order Gamma", is_hero=False, type_labels=["Mana"])
+    hero = _create_card(name="Create Order Hero", hero=True)
+    alpha_card = _create_card(name="Create Order Alpha", hero=False, type_labels=["Mana"])
+    beta_card = _create_card(name="Create Order Beta", hero=False, type_labels=["Mana"])
+    gamma_card = _create_card(name="Create Order Gamma", hero=False, type_labels=["Mana"])
     filler_cards = _build_mainboard_cards(total_unique=12)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -1925,9 +1927,9 @@ def test_patch_preserves_sideboards_when_omitted() -> None:
     username = "deck-patch-preserve-sideboards-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Patch Preserve Hero", is_hero=True)
+    hero = _create_card(name="Patch Preserve Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    sideboard_card = _create_card(name="Patch Preserve Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="Patch Preserve Sideboard Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -1983,9 +1985,9 @@ def test_patch_clears_sideboards_when_explicitly_empty() -> None:
     username = "deck-patch-clear-sideboards-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Patch Clear Hero", is_hero=True)
+    hero = _create_card(name="Patch Clear Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    sideboard_card = _create_card(name="Patch Clear Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="Patch Clear Sideboard Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -2027,10 +2029,10 @@ def test_deck_patch_persists_reordered_board_entries() -> None:
     username = "deck-patch-entry-order-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Patch Order Hero", is_hero=True)
-    alpha_card = _create_card(name="Patch Order Alpha", is_hero=False, type_labels=["Mana"])
-    beta_card = _create_card(name="Patch Order Beta", is_hero=False, type_labels=["Mana"])
-    gamma_card = _create_card(name="Patch Order Gamma", is_hero=False, type_labels=["Mana"])
+    hero = _create_card(name="Patch Order Hero", hero=True)
+    alpha_card = _create_card(name="Patch Order Alpha", hero=False, type_labels=["Mana"])
+    beta_card = _create_card(name="Patch Order Beta", hero=False, type_labels=["Mana"])
+    gamma_card = _create_card(name="Patch Order Gamma", hero=False, type_labels=["Mana"])
     filler_cards = _build_mainboard_cards(total_unique=12)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2106,7 +2108,7 @@ def test_patch_preserves_mainboard_when_entries_omitted() -> None:
     username = "deck-patch-preserve-entries-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Patch Preserve Entries Hero", is_hero=True)
+    hero = _create_card(name="Patch Preserve Entries Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2144,9 +2146,9 @@ def test_sideboard_name_is_required() -> None:
     username = "deck-sideboard-name-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Sideboard Name Hero", is_hero=True)
+    hero = _create_card(name="Sideboard Name Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    sideboard_card = _create_card(name="Nameless Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="Nameless Sideboard Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -2176,7 +2178,7 @@ def test_sideboards_reject_hero_cards() -> None:
     username = "deck-sideboard-hero-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Sideboard Hero Reject", is_hero=True)
+    hero = _create_card(name="Sideboard Hero Reject", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2208,9 +2210,9 @@ def test_sideboards_reject_quantities_above_100() -> None:
     username = "deck-sideboard-quantity-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Sideboard Quantity Hero", is_hero=True)
+    hero = _create_card(name="Sideboard Quantity Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    sideboard_card = _create_card(name="Large Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="Large Sideboard Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -2240,8 +2242,8 @@ def test_deck_create_warns_for_multiple_legendary_mainboard_copies() -> None:
     username = "deck-legendary-mainboard-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Legendary Limit Hero", is_hero=True)
-    legendary_card = _create_card(name="Legendary Mainboard Card", is_hero=False, type_labels=["Legendary"])
+    hero = _create_card(name="Legendary Limit Hero", hero=True)
+    legendary_card = _create_card(name="Legendary Mainboard Card", hero=False, type_labels=["Legendary"])
     mainboard_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2275,7 +2277,7 @@ def test_deck_update_uses_legendary_scope_for_warnings() -> None:
     owner = _create_user(username, password)
     hero = _create_card(
         name="Legendary Sideboard Hero",
-        is_hero=True,
+        hero=True,
         deck_building_config={
             "overrides": {
                 "legendary_copy_limit": {
@@ -2284,7 +2286,7 @@ def test_deck_update_uses_legendary_scope_for_warnings() -> None:
             }
         },
     )
-    legendary_card = _create_card(name="Legendary Sideboard Card", is_hero=False, type_labels=["Legendary"])
+    legendary_card = _create_card(name="Legendary Sideboard Card", hero=False, type_labels=["Legendary"])
     mainboard_cards = _build_mainboard_cards()
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -2328,9 +2330,9 @@ def test_deck_create_allows_one_legendary_copy_and_large_non_legendary_sideboard
     username = "deck-legendary-valid-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Valid Legendary Hero", is_hero=True)
-    legendary_card = _create_card(name="Valid Legendary Card", is_hero=False, type_labels=["Legendary"])
-    sideboard_card = _create_card(name="Valid Large Sideboard Card", is_hero=False)
+    hero = _create_card(name="Valid Legendary Hero", hero=True)
+    legendary_card = _create_card(name="Valid Legendary Card", hero=False, type_labels=["Legendary"])
+    sideboard_card = _create_card(name="Valid Large Sideboard Card", hero=False)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2364,8 +2366,8 @@ def test_deck_create_rejects_non_legendary_mainboard_copies_above_four() -> None
     username = "deck-mainboard-limit-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Mainboard Limit Hero", is_hero=True)
-    limited_card = _create_card(name="Mainboard Limited Card", is_hero=False)
+    hero = _create_card(name="Mainboard Limit Hero", hero=True)
+    limited_card = _create_card(name="Mainboard Limited Card", hero=False)
     mainboard_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2396,7 +2398,7 @@ def test_hero_override_allows_six_mainboard_copies() -> None:
     _create_user(username, password)
     hero = _create_card(
         name="Mainboard Override Hero",
-        is_hero=True,
+        hero=True,
         deck_building_config={
             "overrides": {
                 "mainboard_copy_limit": {
@@ -2405,7 +2407,7 @@ def test_hero_override_allows_six_mainboard_copies() -> None:
             }
         },
     )
-    limited_card = _create_card(name="Mainboard Six Copy Card", is_hero=False)
+    limited_card = _create_card(name="Mainboard Six Copy Card", hero=False)
     mainboard_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2434,10 +2436,10 @@ def test_card_self_override_allows_only_that_card_above_default_copy_limit() -> 
     username = "deck-self-copy-limit-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Self Copy Limit Hero", is_hero=True)
+    hero = _create_card(name="Self Copy Limit Hero", hero=True)
     self_limited_card = _create_card(
         name="Self Six Copy Card",
-        is_hero=False,
+        hero=False,
         deck_building_config={
             "overrides": {
                 "mainboard_copy_limit": {
@@ -2475,10 +2477,10 @@ def test_card_self_override_does_not_raise_other_cards_copy_limit() -> None:
     username = "deck-self-copy-limit-other-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Self Copy Limit Other Hero", is_hero=True)
+    hero = _create_card(name="Self Copy Limit Other Hero", hero=True)
     self_limited_card = _create_card(
         name="Self Limit Source Card",
-        is_hero=False,
+        hero=False,
         deck_building_config={
             "overrides": {
                 "mainboard_copy_limit": {
@@ -2488,7 +2490,7 @@ def test_card_self_override_does_not_raise_other_cards_copy_limit() -> None:
             }
         },
     )
-    other_limited_card = _create_card(name="Default Limited Other Card", is_hero=False)
+    other_limited_card = _create_card(name="Default Limited Other Card", hero=False)
     mainboard_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2518,10 +2520,10 @@ def test_card_self_legendary_limit_applies_only_to_that_legendary_card() -> None
     username = "deck-self-legendary-limit-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Self Legendary Hero", is_hero=True)
+    hero = _create_card(name="Self Legendary Hero", hero=True)
     self_limited_legendary = _create_card(
         name="Self Limited Legendary",
-        is_hero=False,
+        hero=False,
         type_labels=["Legendary"],
         deck_building_config={
             "overrides": {
@@ -2534,7 +2536,7 @@ def test_card_self_legendary_limit_applies_only_to_that_legendary_card() -> None
             }
         },
     )
-    other_legendary = _create_card(name="Other Soft Legendary", is_hero=False, type_labels=["Legendary"])
+    other_legendary = _create_card(name="Other Soft Legendary", hero=False, type_labels=["Legendary"])
     mainboard_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2582,7 +2584,7 @@ def test_card_self_legendary_limit_applies_only_to_that_legendary_card() -> None
 def test_card_deck_building_overrides_resolve_independent_of_entry_order() -> None:
     first_card = _create_card(
         name="Ordered Override First",
-        is_hero=False,
+        hero=False,
         deck_building_config={
             "overrides": {
                 "mainboard_copy_limit": {
@@ -2593,7 +2595,7 @@ def test_card_deck_building_overrides_resolve_independent_of_entry_order() -> No
     )
     second_card = _create_card(
         name="Ordered Override Second",
-        is_hero=False,
+        hero=False,
         deck_building_config={
             "overrides": {
                 "mainboard_copy_limit": {
@@ -2620,7 +2622,7 @@ def test_whole_deck_mainboard_copy_scope_counts_sideboard_copies() -> None:
     _create_user(username, password)
     hero = _create_card(
         name="Whole Copy Scope Hero",
-        is_hero=True,
+        hero=True,
         deck_building_config={
             "overrides": {
                 "mainboard_copy_limit": {
@@ -2630,7 +2632,7 @@ def test_whole_deck_mainboard_copy_scope_counts_sideboard_copies() -> None:
             }
         },
     )
-    limited_card = _create_card(name="Whole Copy Limited Card", is_hero=False)
+    limited_card = _create_card(name="Whole Copy Limited Card", hero=False)
     mainboard_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2667,7 +2669,7 @@ def test_whole_deck_mainboard_card_count_scope_counts_sideboard_cards() -> None:
     _create_user(username, password)
     hero = _create_card(
         name="Whole Count Scope Hero",
-        is_hero=True,
+        hero=True,
         deck_building_config={
             "overrides": {
                 "mainboard_card_count": {
@@ -2678,7 +2680,7 @@ def test_whole_deck_mainboard_card_count_scope_counts_sideboard_cards() -> None:
         },
     )
     mainboard_cards = _build_mainboard_cards(total_unique=20)
-    sideboard_card = _create_card(name="Whole Count Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="Whole Count Sideboard Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -2709,9 +2711,9 @@ def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
     username = "deck-sideboard-duplicate-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Sideboard Duplicate Hero", is_hero=True)
+    hero = _create_card(name="Sideboard Duplicate Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
-    sideboard_card = _create_card(name="Duplicate Sideboard Card", is_hero=False)
+    sideboard_card = _create_card(name="Duplicate Sideboard Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -2744,7 +2746,7 @@ def test_sideboards_reject_duplicate_cards_within_same_sideboard() -> None:
 def test_non_owner_cannot_update_or_delete_deck() -> None:
     owner = _create_user("deck-owner-locked", "password")
     other_user = _create_user("deck-other-locked", "password")
-    hero = _create_card(name="Locked Hero", is_hero=True)
+    hero = _create_card(name="Locked Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -2784,7 +2786,7 @@ def test_non_owner_cannot_update_or_delete_deck() -> None:
 def test_staff_can_edit_another_users_deck_but_not_delete_it() -> None:
     owner = _create_user("deck-staff-tag-owner", "password")
     staff = _create_user("deck-staff-tag-manager", "password", is_staff=True)
-    hero = _create_card(name="Staff Tag Hero", is_hero=True)
+    hero = _create_card(name="Staff Tag Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     role = DeckTag.objects.create(kind="role", key="staff-control", label="Staff Control")
     deck = DeckService().create_owner_deck(
@@ -2851,7 +2853,7 @@ def test_deck_create_rejects_non_hero_card_as_hero() -> None:
     username = "deck-invalid-hero-user"
     password = "password"
     _create_user(username, password)
-    non_hero = _create_card(name="Not Hero", is_hero=False)
+    non_hero = _create_card(name="Not Hero", hero=False)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2877,7 +2879,7 @@ def test_deck_create_allows_invalid_in_progress_drafts_below_minimum_card_count(
     username = "deck-invalid-count-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Count Hero", is_hero=True)
+    hero = _create_card(name="Count Hero", hero=True)
     mainboard_cards = _build_mainboard_cards()
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2905,8 +2907,8 @@ def test_deck_create_marks_deck_invalid_without_enough_mana_type_cards() -> None
     username = "deck-invalid-mana-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Mana Count Hero", is_hero=True)
-    non_mana_cards = [_create_card(name=f"Non Mana Card {index}", is_hero=False) for index in range(20)]
+    hero = _create_card(name="Mana Count Hero", hero=True)
+    non_mana_cards = [_create_card(name=f"Non Mana Card {index}", hero=False) for index in range(20)]
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -2934,7 +2936,7 @@ def test_hero_override_allows_deck_without_mana_type_cards() -> None:
     _create_user(username, password)
     hero = _create_card(
         name="Mana Override Hero",
-        is_hero=True,
+        hero=True,
         deck_building_config={
             "overrides": {
                 "mana_type_count": {
@@ -2943,7 +2945,7 @@ def test_hero_override_allows_deck_without_mana_type_cards() -> None:
             }
         },
     )
-    non_mana_cards = [_create_card(name=f"Override Non Mana Card {index}", is_hero=False) for index in range(20)]
+    non_mana_cards = [_create_card(name=f"Override Non Mana Card {index}", hero=False) for index in range(20)]
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -2969,7 +2971,7 @@ def test_deck_create_rejects_hero_in_mainboard() -> None:
     username = "deck-invalid-duplicate-hero-user"
     password = "password"
     _create_user(username, password)
-    hero = _create_card(name="Duplicate Hero", is_hero=True)
+    hero = _create_card(name="Duplicate Hero", hero=True)
     mainboard_cards = _build_mainboard_cards(total_unique=14)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -2994,13 +2996,13 @@ def test_deck_create_rejects_hero_in_mainboard() -> None:
     assert response.json()["detail"] == "Hero cards cannot appear in mainboard entries."
 
 
-def test_cards_list_can_filter_by_is_hero() -> None:
-    hero_card = _create_card(name="Filter Hero", is_hero=True)
-    non_hero_card = _create_card(name="Filter Non Hero", is_hero=False)
+def test_cards_list_can_filter_by_card_role() -> None:
+    hero_card = _create_card(name="Filter Hero", hero=True)
+    non_hero_card = _create_card(name="Filter Non Hero", hero=False)
     client = Client(HTTP_HOST="localhost")
 
-    hero_response = client.get("/cards", {"is_hero": "true"})
-    non_hero_response = client.get("/cards", {"is_hero": "false"})
+    hero_response = client.get("/cards", {"card_roles": "hero"})
+    non_hero_response = client.get("/cards", {"card_roles": "standard"})
 
     assert hero_response.status_code == 200
     assert non_hero_response.status_code == 200
@@ -3009,11 +3011,125 @@ def test_cards_list_can_filter_by_is_hero() -> None:
     assert non_hero_card.id in {row["id"] for row in non_hero_response.json()["results"]}
 
 
+def test_card_role_filters_support_any_all_and_exclusions() -> None:
+    hero_card = _create_card(name="Role Matching Hero", hero=True)
+    boon_event_card = _create_card(name="Role Matching Boon Event", hero=False)
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=boon_event_card, role="boon"),
+            CardRoleAssignment(card=boon_event_card, role="event"),
+        ]
+    )
+    standard_card = _create_card(name="Role Matching Standard", hero=False)
+    client = Client(HTTP_HOST="localhost")
+
+    any_ids = {
+        row["id"]
+        for row in client.get(
+            "/cards",
+            {"card_roles": ["hero", "boon"], "card_role_match": "any"},
+        ).json()["results"]
+    }
+    all_ids = {
+        row["id"]
+        for row in client.get(
+            "/cards",
+            {"card_roles": ["boon", "event"], "card_role_match": "all"},
+        ).json()["results"]
+    }
+    excluded_ids = {
+        row["id"]
+        for row in client.get(
+            "/cards",
+            {"card_role_exclude": ["hero", "event"]},
+        ).json()["results"]
+    }
+
+    assert {hero_card.id, boon_event_card.id} <= any_ids
+    assert boon_event_card.id in all_ids
+    assert hero_card.id not in all_ids
+    assert standard_card.id in excluded_ids
+    assert hero_card.id not in excluded_ids
+    assert boon_event_card.id not in excluded_ids
+
+
+def test_game_master_cards_are_staff_scoped_for_lists_and_details() -> None:
+    gm_card = _create_card(name="Restricted Game Master Event", hero=False)
+    gm_card.card_pool = "game_master"
+    gm_card.save(update_fields=["card_pool"])
+    CardRoleAssignment.objects.create(card=gm_card, role="event")
+    anonymous = Client(HTTP_HOST="localhost")
+
+    assert anonymous.get("/cards", {"card_pool": "game_master"}).status_code == 403
+    assert anonymous.get(f"/cards/{gm_card.id}").status_code == 404
+    assert gm_card.id not in {row["id"] for row in anonymous.get("/cards").json()["results"]}
+
+    username = "gm-card-list-staff"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    staff = Client(HTTP_HOST="localhost")
+    assert staff.login(username=username, password=password)
+    response = staff.get("/cards", {"card_pool": "game_master", "card_roles": "event"})
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"]] == [gm_card.id]
+
+
+def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_staff() -> None:
+    owner = _create_user("gm-deck-owner", "password")
+    staff = _create_user("gm-deck-staff", "password", is_staff=True)
+    hero = _create_card(name="GM Deck Player Hero", hero=True)
+    reclassified = _create_card(name="Secret Reclassified Event", hero=False)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Reclassified Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=reclassified.id, quantity=1)],
+        sideboards=[],
+    )
+    reclassified.card_pool = "game_master"
+    reclassified.save(update_fields=["card_pool"])
+    CardRoleAssignment.objects.create(card=reclassified, role="event")
+
+    owner_client = Client(HTTP_HOST="localhost")
+    owner_client.force_login(owner)
+    owner_response = owner_client.get(f"/my/decks/{deck.id}")
+
+    assert owner_response.status_code == 200
+    owner_payload = owner_response.json()
+    assert owner_payload["status"]["is_valid"] is False
+    assert "Mainboard cards must belong to the Player pool." in owner_payload["status"]["issues"]
+    restricted_card = owner_payload["mainboard"]["entries"][0]["card"]
+    assert restricted_card["restricted"] is True
+    assert restricted_card["name"] == "Restricted Game Master card"
+    assert "Secret Reclassified Event" not in owner_response.content.decode()
+
+    staff_client = Client(HTTP_HOST="localhost")
+    staff_client.force_login(staff)
+    staff_response = staff_client.get(f"/my/decks/{deck.id}")
+
+    assert staff_response.status_code == 200
+    assert staff_response.json()["mainboard"]["entries"][0]["card"]["name"].startswith(
+        "Secret Reclassified Event"
+    )
+
+
+def test_standard_cannot_match_all_with_persisted_roles() -> None:
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"card_roles": ["standard", "hero"], "card_role_match": "all"},
+    )
+
+    assert response.status_code == 400
+
+
 def test_cards_list_hides_deprecated_cards_by_default_but_can_include_them() -> None:
-    active_card = _create_card(name="Active Lifecycle Card", is_hero=False)
+    active_card = _create_card(name="Active Lifecycle Card", hero=False)
     deprecated_card = _create_card(
         name="Deprecated Lifecycle Card",
-        is_hero=False,
+        hero=False,
         lifecycle_status="deprecated",
     )
     client = Client(HTTP_HOST="localhost")
@@ -3037,32 +3153,46 @@ def test_cards_list_hides_deprecated_cards_by_default_but_can_include_them() -> 
     assert detail_response.json()["lifecycle_status"] == "deprecated"
 
 
-def test_latest_version_patch_can_toggle_is_hero() -> None:
+def test_latest_version_patch_can_update_card_roles() -> None:
     username = "deck-card-hero-toggle-user"
     password = "password"
     _create_user(username, password, is_staff=True)
-    card = _create_card(name="Toggle Hero Card", is_hero=False)
+    card = _create_card(name="Toggle Hero Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
     response = client.patch(
         f"/cards/{card.id}/latest-version",
-        data={"is_hero": True},
+        data={"card_pool": "game_master", "card_roles": ["hero", "boon"]},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
     assert response.status_code == 200
+    assert set(card.role_assignments.values_list("role", flat=True)) == {"hero", "boon"}
     card.refresh_from_db()
-    assert card.is_hero is True
-    assert response.json()["is_hero"] is True
+    assert card.card_pool == "game_master"
+    assert response.json()["card_pool"] == "game_master"
+    assert set(response.json()["card_roles"]) == {"hero", "boon"}
+
+    replacement_response = client.patch(
+        f"/cards/{card.id}/latest-version",
+        data={"card_pool": "player", "card_roles": ["event"]},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert replacement_response.status_code == 200
+    card.refresh_from_db()
+    assert card.card_pool == "player"
+    assert list(card.role_assignments.values_list("role", flat=True)) == ["event"]
 
 
 def test_latest_version_patch_can_deprecate_card() -> None:
     username = "deck-card-lifecycle-toggle-user"
     password = "password"
     _create_user(username, password, is_staff=True)
-    card = _create_card(name="Toggle Lifecycle Card", is_hero=False)
+    card = _create_card(name="Toggle Lifecycle Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -3083,7 +3213,7 @@ def test_latest_version_patch_rejects_non_object_deck_building_overrides() -> No
     username = "deck-card-invalid-overrides-user"
     password = "password"
     _create_user(username, password, is_staff=True)
-    card = _create_card(name="Invalid Overrides Card", is_hero=False)
+    card = _create_card(name="Invalid Overrides Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -3102,7 +3232,7 @@ def test_latest_version_patch_rejects_boolean_deck_building_numeric_values() -> 
     username = "deck-card-boolean-rule-user"
     password = "password"
     _create_user(username, password, is_staff=True)
-    card = _create_card(name="Boolean Rule Card", is_hero=False)
+    card = _create_card(name="Boolean Rule Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -3121,7 +3251,7 @@ def test_latest_version_patch_rejects_duplicate_deck_building_numeric_aliases() 
     username = "deck-card-duplicate-rule-alias-user"
     password = "password"
     _create_user(username, password, is_staff=True)
-    card = _create_card(name="Duplicate Rule Alias Card", is_hero=False)
+    card = _create_card(name="Duplicate Rule Alias Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -3140,7 +3270,7 @@ def test_latest_version_patch_rejects_invalid_deck_building_applies_to() -> None
     username = "deck-card-invalid-applies-to-user"
     password = "password"
     _create_user(username, password, is_staff=True)
-    card = _create_card(name="Invalid Applies To Card", is_hero=False)
+    card = _create_card(name="Invalid Applies To Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -3159,7 +3289,7 @@ def test_latest_version_patch_rejects_self_applies_to_for_deck_aggregate_rules()
     username = "deck-card-self-applies-to-aggregate-user"
     password = "password"
     _create_user(username, password, is_staff=True)
-    card = _create_card(name="Invalid Self Aggregate Rule Card", is_hero=False)
+    card = _create_card(name="Invalid Self Aggregate Rule Card", hero=False)
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
 
@@ -3206,7 +3336,7 @@ def test_deck_tag_catalog_defaults_and_admin_permissions() -> None:
 
 def test_deck_tag_suggestions_are_owner_only_normalized_and_resolved_across_decks() -> None:
     owner = _create_user("deck-tag-owner", "password")
-    hero = _create_card(name="Deck Tag Hero", is_hero=True)
+    hero = _create_card(name="Deck Tag Hero", hero=True)
     cards = _build_mainboard_cards()
     role = DeckTag.objects.get(kind="role", key="damage")
     service = DeckService()
@@ -3349,7 +3479,7 @@ def test_deck_tag_suggestions_are_owner_only_normalized_and_resolved_across_deck
 
 def test_deck_tag_suggestion_resolution_is_terminal_and_target_changes_reject_it() -> None:
     owner = _create_user("deck-tag-transition-owner", "password")
-    hero = _create_card(name="Deck Tag Transition Hero", is_hero=True)
+    hero = _create_card(name="Deck Tag Transition Hero", hero=True)
     cards = _build_mainboard_cards()
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.pk),
@@ -3406,7 +3536,7 @@ def test_deck_tag_suggestion_resolution_is_terminal_and_target_changes_reject_it
 
 def test_public_and_owned_deck_lists_filter_deck_tags_with_any_and_all_matching() -> None:
     owner = _create_user("deck-tag-filter-owner", "password")
-    hero = _create_card(name="Deck Tag Filter Hero", is_hero=True)
+    hero = _create_card(name="Deck Tag Filter Hero", hero=True)
     cards = _build_mainboard_cards()
     role = DeckTag.objects.get(kind="role", key="control")
     type_tag = DeckTagService().create_tag(kind="type", label="Filter Test Type")

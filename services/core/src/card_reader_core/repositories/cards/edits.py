@@ -3,10 +3,13 @@ from __future__ import annotations
 from django.db import transaction
 
 from card_reader_core.models import (
+    CARD_ROLES,
     DEPRECATED_CARD_LIFECYCLE_STATUS,
     Card,
     CardAlias,
+    CardRoleAssignment,
     CardVersion,
+    is_card_pool,
     is_card_lifecycle_status,
     now_utc,
 )
@@ -117,8 +120,29 @@ def update_latest_card_version(
             )
             field_sources["metadata"]["symbols"] = FIELD_SOURCE_MANUAL
             symbol_links_changed = True
-        if "is_hero" in updates:
-            card.is_hero = bool(updates["is_hero"])
+        classification_changed = False
+        if "card_pool" in updates:
+            card_pool = str(updates["card_pool"])
+            if not is_card_pool(card_pool):
+                raise ValueError("Invalid card pool.")
+            card.card_pool = card_pool
+            classification_changed = True
+        if "card_roles" in updates:
+            raw_roles = updates["card_roles"]
+            if not isinstance(raw_roles, list):
+                raise ValueError("Card roles must be a list.")
+            requested_roles = {str(role) for role in raw_roles}
+            if not requested_roles.issubset(CARD_ROLES):
+                raise ValueError("Invalid card role.")
+            CardRoleAssignment.objects.filter(card_id=card.id).exclude(role__in=requested_roles).delete()
+            existing_roles = set(
+                CardRoleAssignment.objects.filter(card_id=card.id).values_list("role", flat=True)
+            )
+            CardRoleAssignment.objects.bulk_create(
+                [CardRoleAssignment(card=card, role=role) for role in CARD_ROLES if role in requested_roles - existing_roles],
+                ignore_conflicts=True,
+            )
+            classification_changed = True
         if "deck_building_config" in updates:
             card.deck_building_config_json = updates["deck_building_config"]
         if "lifecycle_status" in updates:
@@ -144,7 +168,7 @@ def update_latest_card_version(
         if (
             restored_name
             or "name" in updates
-            or "is_hero" in updates
+            or classification_changed
             or "deck_building_config" in updates
             or "lifecycle_status" in updates
         ):
@@ -152,8 +176,8 @@ def update_latest_card_version(
             update_fields = ["updated_at"]
             if restored_name or "name" in updates:
                 update_fields = ["label", "key", *update_fields]
-            if "is_hero" in updates:
-                update_fields = ["is_hero", *update_fields]
+            if "card_pool" in updates:
+                update_fields = ["card_pool", *update_fields]
             if "deck_building_config" in updates:
                 update_fields = ["deck_building_config_json", *update_fields]
             if "lifecycle_status" in updates:

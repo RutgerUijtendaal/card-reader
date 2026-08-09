@@ -30,6 +30,8 @@ class SuggestionOccurrencePreview(TypedDict):
     image_url: str | None
     source_text: str
     normalized_source_text: str
+    card_pool: str
+    card_roles: list[str]
 
 
 class LinkedCardPreview(TypedDict):
@@ -38,6 +40,8 @@ class LinkedCardPreview(TypedDict):
     card_version_id: str
     card_version_name: str
     image_url: str | None
+    card_pool: str
+    card_roles: list[str]
 
 
 class CatalogSuggestionDetail(TypedDict):

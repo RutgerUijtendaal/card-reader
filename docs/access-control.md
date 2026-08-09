@@ -12,7 +12,7 @@ Inactive users cannot authenticate or continue using protected capabilities. Sen
 
 The main access levels are:
 
-- Public visitors can browse public card and deck surfaces and load public card and symbol assets.
+- Public visitors can browse Player-card and public deck surfaces and load their public card and symbol assets.
 - Active authenticated users can use account-scoped features and other capabilities granted to ordinary members.
 - Staff users can access administrative workflows including imports, review, catalogs, templates, exports, user management, and developer-data publishing.
 - Superusers can access maintenance operations and the most sensitive administrative views.
@@ -20,9 +20,15 @@ The main access levels are:
 
 The developer flag is deliberately narrower than staff access: it supports project onboarding without granting import, catalog, user-management, or maintenance permissions. See [Developer data](developer-data.md) for its download and publishing flows.
 
+## Game Master cards
+
+Game Master card access is represented by the named `can_access_game_master_cards` capability. Its current policy grants access to staff only, leaving one policy seam that can be relaxed later without rewriting card queries or views.
+
+An unauthorized collection request that explicitly selects the Game Master pool returns `403`. Direct Game Master card, version, image, and immutable-asset lookups return `404` so they do not disclose whether an identity exists. The same policy applies to grouped cards, exports, selectors, and card-derived public data. If a Player card already referenced by an ordinary user's deck is reclassified, the deck reference and invalid-state warning remain, but the embedded Game Master card content and image are replaced by a restricted placeholder.
+
 ## Capability-driven UI
 
-The authenticated session payload exposes named capabilities such as developer-data access. Pages and navigation should consume these values instead of duplicating role checks in the frontend.
+The authenticated session payload exposes named capabilities such as developer-data and Game Master card access. Pages and navigation should consume these values instead of duplicating role checks in the frontend.
 
 The server still authorizes every request. Hiding an unavailable control improves the interface but is never treated as the security boundary.
 
@@ -45,4 +51,3 @@ Requests and staff actions remain auditable. Approval does not bypass normal act
 - Preserve ownership and audit history when access is revoked.
 - Re-check active status for long-lived or bearer-token workflows.
 - Keep credentials and local user seed files out of committed source.
-

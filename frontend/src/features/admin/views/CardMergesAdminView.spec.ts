@@ -31,7 +31,7 @@ const buildCard = (id: string, name: string): CardListItem => ({
   result_type: 'card',
   image_url: `/${id}.png`,
   label: name,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   template_id: 'template-1',
   version_id: `${id}-version`,
   version_number: 1,

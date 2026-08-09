@@ -68,7 +68,8 @@ export const useCardDetailState = () => {
     attack: '',
     health: '',
     rules_text: '',
-    is_hero: false,
+    card_pool: 'player',
+    card_roles: [],
     deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
@@ -183,7 +184,8 @@ export const useCardDetailState = () => {
     form.attack = version.attack === null ? '' : String(version.attack);
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
-    form.is_hero = version.is_hero;
+    form.card_pool = version.card_pool;
+    form.card_roles = [...version.card_roles];
     form.deck_building_config = formatDeckBuildingConfigJson(
       Object.keys(version.deck_building_config ?? {}).length > 0
         ? version.deck_building_config
@@ -553,8 +555,11 @@ const buildCardUpdatePayload = (
 ): Record<string, unknown> => {
   const updates: Record<string, unknown> = {};
 
-  if (form.is_hero !== version.is_hero) {
-    updates.is_hero = form.is_hero;
+  if (form.card_pool !== version.card_pool) {
+    updates.card_pool = form.card_pool;
+  }
+  if (JSON.stringify([...form.card_roles].sort()) !== JSON.stringify([...version.card_roles].sort())) {
+    updates.card_roles = form.card_roles;
   }
   const deckBuildingConfig = parseJsonObject(form.deck_building_config);
   if (JSON.stringify(deckBuildingConfig) !== JSON.stringify(version.deck_building_config ?? {})) {

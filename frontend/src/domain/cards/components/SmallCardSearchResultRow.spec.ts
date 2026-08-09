@@ -13,7 +13,7 @@ const buildCard = (overrides: Partial<CardListItem> = {}): CardListItem => ({
   result_type: 'card',
   image_url: '/card.png',
   label: 'Card 1',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   template_id: 'template-1',
   version_id: 'version-1',
   version_number: 1,

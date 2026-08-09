@@ -1,6 +1,7 @@
 import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/types';
 import type { CardGroupSummary, MetadataGroupName, ScalarFieldName } from '@/domain/cards/types';
 import type { CardLifecycleStatus } from '@/domain/cards/utils/filters/cardLifecycle';
+import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
 
 export type CardDetail = {
   id: string;
@@ -20,7 +21,8 @@ export type EditorForm = {
   attack: string;
   health: string;
   rules_text: string;
-  is_hero: boolean;
+  card_pool: CardPool;
+  card_roles: CardRole[];
   deck_building_config: string;
   lifecycle_status: CardLifecycleStatus;
   keyword_ids: string[];

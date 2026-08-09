@@ -19,9 +19,19 @@ from card_reader_core.repositories.cards import get_card_image, resolve_image_fi
 from card_reader_core.services.cards import get_card_version_metadata
 
 
-def card_group_visible_members(group: CardGroup, lifecycle_status: CardLifecycleFilter) -> list[CardGroupMember]:
+def card_group_visible_members(
+    group: CardGroup,
+    lifecycle_status: CardLifecycleFilter,
+    *,
+    card_pool: str | None = None,
+) -> list[CardGroupMember]:
     members = sorted(group.members.all(), key=lambda member: (member.position, member.id))
-    return [member for member in members if card_is_visible_for_lifecycle(member.card, lifecycle_status)]
+    return [
+        member
+        for member in members
+        if card_is_visible_for_lifecycle(member.card, lifecycle_status)
+        and (card_pool is None or member.card.card_pool == card_pool)
+    ]
 
 
 def _get_card_version_image(version: CardVersion) -> CardVersionImage | None:
@@ -42,8 +52,9 @@ def card_group_gallery_payload(
     group: CardGroup,
     *,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+    card_pool: str | None = None,
 ) -> dict[str, object]:
-    members = card_group_visible_members(group, lifecycle_status)
+    members = card_group_visible_members(group, lifecycle_status, card_pool=card_pool)
     anchor_card_id = group.anchor_card.id
     preview_cards = []
     for member in members:
@@ -77,11 +88,12 @@ def card_group_detail_payload(
     group: CardGroup,
     *,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+    card_pool: str | None = None,
     anchor_deck_references: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     anchor_card_id = group.anchor_card.id
     members_payload = []
-    for member in card_group_visible_members(group, lifecycle_status):
+    for member in card_group_visible_members(group, lifecycle_status, card_pool=card_pool):
         version = member.card.latest_version
         if version is None:
             continue

@@ -1,4 +1,5 @@
 import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/domain/cards/types/cardModels';
+import type { CardPool, CardRoleFilter } from '@/domain/cards/types/cardModels';
 
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';
@@ -24,12 +25,21 @@ export type ManaFamilyOption = {
   affinity_symbol: SymbolFilterOption | null;
 };
 
+export type CardClassificationOption<T extends string = string> = {
+  key: T;
+  label: string;
+  rank: number;
+  derived?: boolean;
+};
+
 export type CardFiltersResponse = {
   keywords: MetadataOption[];
   tags: MetadataOption[];
   symbols: SymbolFilterOption[];
   types: MetadataOption[];
   mana_families?: ManaFamilyOption[];
+  card_pools?: CardClassificationOption<CardPool>[];
+  card_roles?: CardClassificationOption<CardRoleFilter>[];
 };
 
 export type FieldSourceValue = 'auto' | 'manual';

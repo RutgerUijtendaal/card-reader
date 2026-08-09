@@ -7,11 +7,13 @@ from django.contrib.auth import get_user_model
 
 from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
+    HERO_CARD_ROLE,
     NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
     Card,
     CardVersion,
     Deck,
     UserNotification,
+    card_has_role,
 )
 from card_reader_core.services.decks import DeckEntryInput, DeckService, DeckUpdateInput
 from card_reader_core.services.notifications import (
@@ -128,11 +130,11 @@ def _reference_version() -> CardVersion | None:
 
 
 def _hero_card(comparison_version: CardVersion | None) -> Card | None:
-    if comparison_version is not None and comparison_version.card.is_hero:
+    if comparison_version is not None and card_has_role(comparison_version.card, HERO_CARD_ROLE):
         return comparison_version.card
     return (
         Card.objects.filter(
-            is_hero=True,
+            role_assignments__role=HERO_CARD_ROLE,
             lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
             latest_version__images__isnull=False,
         )

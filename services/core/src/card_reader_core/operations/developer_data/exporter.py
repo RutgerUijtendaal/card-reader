@@ -6,7 +6,7 @@ import re
 import shutil
 import tarfile
 import tempfile
-from typing import Any
+from typing import Any, cast
 
 from django.db.migrations.recorder import MigrationRecorder
 
@@ -22,6 +22,8 @@ from card_reader_core.models import (
     Tag,
     Template,
     Type,
+    CardPool,
+    card_role_keys,
 )
 from card_reader_core.storage import relativize_image_storage_path, relativize_storage_path
 
@@ -127,6 +129,7 @@ def _resolve_selection(
         card_queryset
         .prefetch_related(
             "aliases",
+            "role_assignments",
             "versions__template",
             "versions__content_version",
             "versions__images",
@@ -215,7 +218,8 @@ def _card_record(card: Card) -> CardRecord:
     return CardRecord(
         key=card.key,
         label=card.label,
-        is_hero=card.is_hero,
+        card_pool=cast(CardPool, card.card_pool),
+        card_roles=list(card_role_keys(card)),
         deck_building_config=dict(card.deck_building_config_json),
         lifecycle_status=card.lifecycle_status,
         latest_version_number=latest_number,
@@ -306,8 +310,17 @@ def _validate_coverage(
     errors: list[str] = []
     if len(payload.cards) < coverage.min_cards:
         errors.append(f"requires at least {coverage.min_cards} cards")
-    if sum(card.is_hero for card in payload.cards) < coverage.min_heroes:
-        errors.append(f"requires at least {coverage.min_heroes} heroes")
+    for card_pool, minimum in coverage.min_cards_by_pool.items():
+        count = sum(card.card_pool == card_pool for card in payload.cards)
+        if count < minimum:
+            errors.append(f"requires at least {minimum} {card_pool} cards")
+    for card_role, minimum in coverage.min_cards_by_role.items():
+        count = sum(
+            (not card.card_roles if card_role == "standard" else card_role in card.card_roles)
+            for card in payload.cards
+        )
+        if count < minimum:
+            errors.append(f"requires at least {minimum} cards with role {card_role}")
     if sum(card.lifecycle_status == "deprecated" for card in payload.cards) < coverage.min_deprecated_cards:
         errors.append(f"requires at least {coverage.min_deprecated_cards} deprecated cards")
     if len(payload.card_groups) < coverage.min_card_groups:

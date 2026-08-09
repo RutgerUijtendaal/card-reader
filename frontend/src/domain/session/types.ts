@@ -6,6 +6,7 @@ export type CurrentUser = {
   is_staff?: boolean;
   is_superuser?: boolean;
   can_access_admin?: boolean;
+  can_access_game_master_cards?: boolean;
   can_manage_users?: boolean;
   can_access_maintenance?: boolean;
   can_download_developer_data?: boolean;

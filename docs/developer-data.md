@@ -13,7 +13,18 @@ build time; the explicit keys remain regression anchors that must still exist. T
 
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and
-Playtester workflows.
+Playtester workflows. Version 2 card records include the required `card_pool` and canonical
+`card_roles` fields; they never emit the removed Hero boolean.
+
+The importer supports both current Version 2 archives and explicitly adopts pinned Version 1
+archives. Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to
+the Hero role before strict current-schema validation. This compatibility keeps older immutable
+bundles usable without making Version 2 classification optional.
+
+Selection coverage is evaluated by pool and by role through `min_cards_by_pool` and
+`min_cards_by_role`. The existing Hero minimum is retained under the Hero role, while Game Master,
+Boon, and Event may remain at zero until reviewed source data is available. The lock file is still
+generated only by publishing a validated immutable bundle and must not be edited by hand.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.

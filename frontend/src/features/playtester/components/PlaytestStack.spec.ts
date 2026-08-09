@@ -14,7 +14,7 @@ const baseCard = {
   label: 'Card 1',
   result_type: 'card',
   image_url: null,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   lifecycle_status: 'active',
   template_id: '',
   version_id: 'card-1-version',

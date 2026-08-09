@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from card_reader_core.models import Deck, card_is_deprecated
+from card_reader_core.models import HERO_CARD_ROLE, PLAYER_CARD_POOL, Deck, card_has_role, card_is_deprecated
 
 from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
 from .types import DeckTotals, DeckValidationSummary
@@ -15,8 +15,10 @@ class DeckValidationService:
         deprecated_card_ids: set[str] = set()
         constraint_entries: list[DeckConstraintEntry] = []
 
-        if not deck.hero_card.is_hero:
+        if not card_has_role(deck.hero_card, HERO_CARD_ROLE):
             issues.append("Hero card must be marked as a hero.")
+        if deck.hero_card.card_pool != PLAYER_CARD_POOL:
+            issues.append("Hero card must belong to the Player pool.")
         if card_is_deprecated(deck.hero_card):
             issues.append("Hero card is deprecated.")
             deprecated_card_ids.add(deck.hero_card.id)
@@ -27,7 +29,9 @@ class DeckValidationService:
             if card_is_deprecated(entry.card):
                 deprecated_card_ids.add(entry.card.id)
             constraint_entries.append(DeckConstraintEntry(card=entry.card, quantity=quantity, board="mainboard"))
-            if entry.card.is_hero:
+            if entry.card.card_pool != PLAYER_CARD_POOL:
+                issues.append("Mainboard cards must belong to the Player pool.")
+            if card_has_role(entry.card, HERO_CARD_ROLE):
                 issues.append("Hero cards cannot appear in mainboard entries.")
                 break
             if entry.card.id == deck.hero_card.id:
@@ -36,6 +40,8 @@ class DeckValidationService:
 
         for sideboard in deck.sideboards.all():
             for sideboard_entry in sideboard.entries.all():
+                if sideboard_entry.card.card_pool != PLAYER_CARD_POOL:
+                    issues.append("Sideboard cards must belong to the Player pool.")
                 if card_is_deprecated(sideboard_entry.card):
                     deprecated_card_ids.add(sideboard_entry.card.id)
                 constraint_entries.append(

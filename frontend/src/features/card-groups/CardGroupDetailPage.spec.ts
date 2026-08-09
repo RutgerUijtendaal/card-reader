@@ -70,7 +70,7 @@ const buildCard = (id: string, name: string): CardVersionDetail => ({
   id,
   key: id,
   label: name,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   deck_building_config: {},
   lifecycle_status: 'active',
   template_id: 'template-1',
@@ -139,7 +139,7 @@ const buildCard = (id: string, name: string): CardVersionDetail => ({
 const deckReference = {
   id: 'deck-1',
   card_reference: {
-    is_hero: true,
+      as_hero: true,
     mainboard_quantity: 0,
     sideboard_quantity: 0,
   },

@@ -5,6 +5,9 @@ import io
 from typing import TYPE_CHECKING
 
 from card_reader_core.models import (
+    DEFAULT_CARD_POOL,
+    CardPool,
+    CardRoleFilter,
     Symbol,
 )
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC
@@ -49,6 +52,10 @@ def export_cards_csv(
     mana_cost_min: int | None = None,
     mana_cost_max: int | None = None,
     template_id: str | None = None,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    card_roles: list[CardRoleFilter] | None = None,
+    card_role_exclude: list[CardRoleFilter] | None = None,
+    card_role_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -109,6 +116,10 @@ def export_cards_csv(
             mana_cost_min=mana_cost_min,
             mana_cost_max=mana_cost_max,
             template_id=template_id,
+            card_pool=card_pool,
+            card_roles=card_roles,
+            card_role_exclude=card_role_exclude,
+            card_role_match=card_role_match,
             attack_min=attack_min,
             attack_max=attack_max,
             health_min=health_min,

@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-DEVELOPER_DATA_FORMAT_VERSION = 1
+DEVELOPER_DATA_FORMAT_VERSION = 2
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, DEVELOPER_DATA_FORMAT_VERSION)
+
+
+def _default_pool_coverage() -> dict[Literal["player", "game_master"], int]:
+    return {"player": 1, "game_master": 0}
+
+
+def _default_role_coverage() -> dict[Literal["standard", "hero", "boon", "event"], int]:
+    return {"standard": 1, "hero": 1, "boon": 0, "event": 0}
 
 
 class StrictModel(BaseModel):
@@ -14,7 +23,12 @@ class StrictModel(BaseModel):
 
 class CoverageRequirements(StrictModel):
     min_cards: int = Field(default=1, ge=0)
-    min_heroes: int = Field(default=1, ge=0)
+    min_cards_by_pool: dict[Literal["player", "game_master"], int] = Field(
+        default_factory=_default_pool_coverage
+    )
+    min_cards_by_role: dict[Literal["standard", "hero", "boon", "event"], int] = Field(
+        default_factory=_default_role_coverage
+    )
     min_deprecated_cards: int = Field(default=1, ge=0)
     min_card_groups: int = Field(default=1, ge=0)
     min_cards_with_multiple_versions: int = Field(default=1, ge=0)
@@ -111,7 +125,8 @@ class CardAliasRecord(StrictModel):
 class CardRecord(StrictModel):
     key: str
     label: str
-    is_hero: bool
+    card_pool: Literal["player", "game_master"]
+    card_roles: list[Literal["hero", "boon", "event"]]
     deck_building_config: dict[str, Any]
     lifecycle_status: str
     latest_version_number: int | None
@@ -183,3 +198,25 @@ class DeveloperDataLock(StrictModel):
     format_version: int
     sha256: str
     api_base_url: str
+
+
+def adopt_payload_for_format(value: object, *, format_version: int) -> object:
+    """Adopt older bundle payloads into the current strict schema."""
+    if format_version != 1 or not isinstance(value, dict):
+        return value
+    adopted = dict(value)
+    cards = adopted.get("cards")
+    if not isinstance(cards, list):
+        return adopted
+    adopted_cards: list[object] = []
+    for card in cards:
+        if not isinstance(card, dict):
+            adopted_cards.append(card)
+            continue
+        adopted_card = dict(card)
+        was_hero = adopted_card.pop("is_hero", False)
+        adopted_card["card_pool"] = "player"
+        adopted_card["card_roles"] = ["hero"] if was_hero is True else []
+        adopted_cards.append(adopted_card)
+    adopted["cards"] = adopted_cards
+    return adopted

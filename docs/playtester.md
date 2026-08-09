@@ -8,6 +8,8 @@ The deck selector lives at `/playtester`; an active session lives at `/playteste
 
 Starting a playtest expands mainboard quantities into distinct `PlaytestCardInstance` copies. Sideboards remain reference-only, and the hero begins in its dedicated stack outside the library.
 
+Playtester consumes Player-pool decks only. Its hero-zone behavior follows the card's Hero role through the shared deck contract; it does not maintain a separate Hero boolean or infer classification from card text.
+
 ## Opening setup
 
 New sessions begin in an opening phase. The player can reserve exact physical mana or setup cards across mulligans, inspect an opening-hand preview, and keep a hand when ready. Keeping the hand establishes the starting draft and transitions the table into normal play.
@@ -44,4 +46,3 @@ Playtester keeps its responsibilities separated:
 - storage migration and serialization live in `playtestDraftPersistence.ts`.
 
 This boundary matters when extending the feature: deck and card business logic belongs in the shared domain layers, while manual table interactions and local play state remain Playtester-owned.
-

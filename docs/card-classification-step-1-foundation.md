@@ -1,6 +1,6 @@
 # Card Classification Step 1: Foundation
 
-Status: approved implementation plan; not yet implemented.
+Status: implemented and validated.
 
 This is the first of three ordered plans:
 

@@ -26,11 +26,17 @@ export type CardContentVersionSummary = {
   description: string;
 };
 
+export type CardPool = 'player' | 'game_master';
+export type CardRole = 'hero' | 'boon' | 'event';
+export type CardRoleFilter = 'standard' | CardRole;
+
 export type CardHoverTooltipModel = {
   id: string;
   key: string;
   label: string;
-  is_hero: boolean;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  restricted?: boolean;
   deck_building_config?: DeckBuildingConfig;
   lifecycle_status?: CardLifecycleStatus;
   template_id: string;

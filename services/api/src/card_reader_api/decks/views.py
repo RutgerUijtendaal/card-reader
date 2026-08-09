@@ -8,7 +8,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.common.auth_access import can_access_admin, is_authenticated
+from card_reader_api.common.auth_access import can_access_admin, can_access_game_master_cards, is_authenticated
 from card_reader_api.common.permissions import AuthenticatedAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.decks.serializers import (
@@ -40,15 +40,24 @@ def _deck_list_response(
     decks: list[Deck],
     *,
     include_pending_suggestions: bool = False,
+    allow_game_master_cards: bool = False,
 ) -> Response:
     if serializer.wants_summary():
         results = [
-            deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
+            deck_summary_payload(
+                deck,
+                include_pending_suggestions=include_pending_suggestions,
+                allow_game_master_cards=allow_game_master_cards,
+            )
             for deck in decks
         ]
     else:
         results = [
-            deck_payload(deck, include_pending_suggestions=include_pending_suggestions)
+            deck_payload(
+                deck,
+                include_pending_suggestions=include_pending_suggestions,
+                allow_game_master_cards=allow_game_master_cards,
+            )
             for deck in decks
         ]
     return Response(results)
@@ -58,6 +67,7 @@ def _deck_summary_page_response(
     summary_page: DeckSummaryPage,
     *,
     include_pending_suggestions: bool = False,
+    allow_game_master_cards: bool = False,
 ) -> Response:
     next_cursor = None
     if summary_page.has_more and summary_page.results:
@@ -76,7 +86,11 @@ def _deck_summary_page_response(
             "page_size": summary_page.page_size,
             "snapshot_at": summary_page.snapshot_at.isoformat(),
             "results": [
-                deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
+                deck_summary_payload(
+                    deck,
+                    include_pending_suggestions=include_pending_suggestions,
+                    allow_game_master_cards=allow_game_master_cards,
+                )
                 for deck in summary_page.results
             ],
         }
@@ -155,7 +169,13 @@ class PublicDeckDetailView(APIView):
         if deck is None:
             return not_found("Deck not found")
         is_owner = viewer_id is not None and str(getattr(deck.owner, "pk", "")) == viewer_id
-        return Response(deck_payload(deck, include_pending_suggestions=is_owner))
+        return Response(
+            deck_payload(
+                deck,
+                include_pending_suggestions=is_owner,
+                allow_game_master_cards=can_access_game_master_cards(request.user),
+            )
+        )
 
 
 class OwnerDeckListCreateView(APIView):
@@ -207,7 +227,11 @@ class OwnerDeckListCreateView(APIView):
                 deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
                 deck_tag_match=filters["deck_tag_match"],
             )
-            return _deck_summary_page_response(summary_page, include_pending_suggestions=True)
+            return _deck_summary_page_response(
+                summary_page,
+                include_pending_suggestions=True,
+                allow_game_master_cards=can_access_game_master_cards(request.user),
+            )
         list_decks = service.list_owner_deck_summaries if serializer.wants_summary() else service.list_owner_decks
         decks = list_decks(
             owner_id,
@@ -221,7 +245,12 @@ class OwnerDeckListCreateView(APIView):
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
-        return _deck_list_response(serializer, decks, include_pending_suggestions=True)
+        return _deck_list_response(
+            serializer,
+            decks,
+            include_pending_suggestions=True,
+            allow_game_master_cards=can_access_game_master_cards(request.user),
+        )
 
     def post(self, request: Request) -> Response:
         raw_creation_id = request.headers.get("Idempotency-Key")
@@ -240,7 +269,13 @@ class OwnerDeckListCreateView(APIView):
                 client_creation_id,
             )
             if existing is not None:
-                return Response(deck_payload(existing, include_pending_suggestions=True))
+                return Response(
+                    deck_payload(
+                        existing,
+                        include_pending_suggestions=True,
+                        allow_game_master_cards=can_access_game_master_cards(request.user),
+                    )
+                )
             if key_used:
                 return Response(
                     {"detail": "The deck created by this key has been deleted."},
@@ -287,7 +322,11 @@ class OwnerDeckListCreateView(APIView):
             )
         except ValueError as exc:
             return bad_request(str(exc))
-        payload = deck_payload(deck, include_pending_suggestions=True)
+        payload = deck_payload(
+            deck,
+            include_pending_suggestions=True,
+            allow_game_master_cards=can_access_game_master_cards(request.user),
+        )
         payload["tag_suggestion_results"] = deck_tag_suggestion_results_payload(
             tag_service.describe_suggestion_results(serializer.validated_data.get("suggested_type_labels", []))
         )
@@ -310,7 +349,13 @@ class OwnerDeckCreationLookupView(APIView):
                     status=status.HTTP_410_GONE,
                 )
             return not_found("Deck not found")
-        return Response(deck_payload(deck, include_pending_suggestions=True))
+        return Response(
+            deck_payload(
+                deck,
+                include_pending_suggestions=True,
+                allow_game_master_cards=can_access_game_master_cards(request.user),
+            )
+        )
 
 
 class OwnerDeckDetailView(APIView):
@@ -323,7 +368,13 @@ class OwnerDeckDetailView(APIView):
             deck = service.get_deck(deck_id)
         if deck is None:
             return not_found("Deck not found")
-        return Response(deck_payload(deck, include_pending_suggestions=True))
+        return Response(
+            deck_payload(
+                deck,
+                include_pending_suggestions=True,
+                allow_game_master_cards=can_access_game_master_cards(request.user),
+            )
+        )
 
     def patch(self, request: Request, deck_id: str) -> Response:
         service = DeckService()
@@ -332,7 +383,6 @@ class OwnerDeckDetailView(APIView):
             accessible_deck = service.get_deck(deck_id)
         if accessible_deck is None:
             return not_found("Deck not found")
-
         serializer = DeckWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return serializer_error(serializer)
@@ -392,7 +442,11 @@ class OwnerDeckDetailView(APIView):
             return bad_request(str(exc))
         if deck is None:
             return not_found("Deck not found")
-        payload = deck_payload(deck, include_pending_suggestions=True)
+        payload = deck_payload(
+            deck,
+            include_pending_suggestions=True,
+            allow_game_master_cards=can_access_game_master_cards(request.user),
+        )
         submitted_suggestions = (
             serializer.validated_data.get("suggested_type_labels", [])
             if "suggested_type_labels" in serializer.validated_data

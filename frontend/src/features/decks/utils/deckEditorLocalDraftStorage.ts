@@ -177,7 +177,8 @@ const isCardSnapshot = (value: unknown): value is DeckCardSummary =>
   && typeof value.id === 'string'
   && typeof value.key === 'string'
   && typeof value.label === 'string'
-  && typeof value.is_hero === 'boolean'
+  && (value.card_pool === 'player' || value.card_pool === 'game_master')
+  && isStringArray(value.card_roles)
   && typeof value.template_id === 'string'
   && typeof value.version_id === 'string'
   && typeof value.version_number === 'number'

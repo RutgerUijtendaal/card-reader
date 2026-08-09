@@ -18,7 +18,7 @@ const { editorState, publicState, routerPushMock } = vi.hoisted(() => {
     attack: '',
     health: '',
     rules_text: '',
-    is_hero: false,
+    card_pool: 'player' as const, card_roles: [],
     deck_building_config: '{}',
     lifecycle_status: 'active',
     keyword_ids: [],

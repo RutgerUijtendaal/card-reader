@@ -33,6 +33,10 @@ def card_filter_query_data(request: Request, *, include_list_controls: bool = Fa
         "mana_cost_min": request.query_params.get("mana_cost_min"),
         "mana_cost_max": request.query_params.get("mana_cost_max"),
         "template_id": request.query_params.get("template_id"),
+        "card_pool": request.query_params.get("card_pool") or "player",
+        "card_roles": request.query_params.getlist("card_roles"),
+        "card_role_exclude": request.query_params.getlist("card_role_exclude"),
+        "card_role_match": request.query_params.get("card_role_match") or "any",
         "attack_min": request.query_params.get("attack_min"),
         "attack_max": request.query_params.get("attack_max"),
         "health_min": request.query_params.get("health_min"),
@@ -47,7 +51,6 @@ def card_filter_query_data(request: Request, *, include_list_controls: bool = Fa
 
     if include_list_controls:
         data["card_ids"] = request.query_params.getlist("card_ids")
-        data["is_hero"] = request.query_params.get("is_hero")
         show_groups = request.query_params.get("show_groups")
         if show_groups is not None:
             data["show_groups"] = show_groups

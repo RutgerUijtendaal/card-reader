@@ -33,7 +33,12 @@ export const useDeckEditorGallery = ({
   const collection = useCardCollection<CardListItem>({
     buildSearchParams: () => {
       const params = buildSearchParams();
-      params.set('is_hero', isHeroStep.value ? 'true' : 'false');
+      params.set('card_pool', 'player');
+      params.delete('card_roles');
+      params.delete('card_role_exclude');
+      params.delete('card_role_match');
+      if (isHeroStep.value) params.append('card_roles', 'hero');
+      else params.append('card_role_exclude', 'hero');
       return params;
     },
     filtersLoaded,

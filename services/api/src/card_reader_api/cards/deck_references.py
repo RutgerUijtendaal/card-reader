@@ -11,11 +11,12 @@ def card_deck_references_payload(
     card_id: str,
     *,
     viewer_id: str | None,
+    allow_game_master_cards: bool,
     limit: int = CARD_DETAIL_DECK_REFERENCE_LIMIT,
 ) -> list[dict[str, object]]:
     return [
         {
-            **deck_payload(deck),
+            **deck_payload(deck, allow_game_master_cards=allow_game_master_cards),
             "card_reference": card_deck_reference_payload(deck, card_id=card_id),
         }
         for deck in DeckService().list_card_decks_for_viewer(card_id, viewer_id=viewer_id)[:limit]

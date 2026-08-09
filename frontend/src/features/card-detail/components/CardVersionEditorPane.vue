@@ -44,26 +44,54 @@
         class="space-y-4"
       >
         <div class="theme-muted-panel p-3">
-          <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="space-y-4">
             <div class="min-w-0">
               <p class="theme-section-title text-sm font-semibold">
-                Hero Card
+                Card Classification
               </p>
               <p class="theme-section-muted text-xs">
-                Manual card-level deckbuilding flag.
+                Pool controls audience access. Roles may be combined; no selected roles means Standard.
               </p>
             </div>
-
-            <label class="theme-section-title flex shrink-0 items-center gap-3 text-sm font-semibold">
-              <input
-                :checked="form.is_hero"
-                type="checkbox"
-                class="theme-checkbox h-4 w-4"
-                :disabled="!version.editable || isBusy"
-                @change="$emit('update-hero', ($event.target as HTMLInputElement).checked)"
-              >
-              <span>{{ form.is_hero ? 'Marked as hero' : 'Not marked as hero' }}</span>
-            </label>
+            <div class="grid gap-4 md:grid-cols-[minmax(0,12rem)_1fr]">
+              <label class="space-y-1">
+                <span class="theme-section-title text-xs font-semibold">Pool</span>
+                <select
+                  :value="form.card_pool"
+                  class="input-base w-full"
+                  :disabled="!version.editable || isBusy"
+                  @change="$emit('update-card-pool', ($event.target as HTMLSelectElement).value as CardPool)"
+                >
+                  <option value="player">Player</option>
+                  <option value="game_master">Game Master</option>
+                </select>
+              </label>
+              <fieldset class="space-y-2">
+                <legend class="theme-section-title text-xs font-semibold">
+                  Roles
+                </legend>
+                <div class="flex flex-wrap gap-2">
+                  <label
+                    v-for="option in cardRoleOptions"
+                    :key="option.value"
+                    class="theme-pill theme-pill-neutral flex items-center gap-2 px-3 py-2 text-xs font-semibold"
+                  >
+                    <input
+                      :checked="form.card_roles.includes(option.value)"
+                      type="checkbox"
+                      class="theme-checkbox h-4 w-4"
+                      :disabled="!version.editable || isBusy"
+                      @change="$emit('toggle-card-role', option.value, ($event.target as HTMLInputElement).checked)"
+                    >
+                    {{ option.label }}
+                  </label>
+                  <span
+                    v-if="form.card_roles.length === 0"
+                    class="theme-pill theme-pill-accent px-3 py-2 text-xs font-semibold"
+                  >Standard</span>
+                </div>
+              </fieldset>
+            </div>
           </div>
         </div>
 
@@ -546,6 +574,7 @@ import type {
   SymbolFilterOption,
 } from '@/domain/cards/types';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
+import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
 import type { EditorForm, MetadataSearchState, ReparseTemplateOption } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 
@@ -591,7 +620,8 @@ const emit = defineEmits<{
   (e: 'toggle-additional-symbol', optionId: string, checked: boolean): void;
   (e: 'update-group-search', groupName: MetadataGroupName, value: string): void;
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
-  (e: 'update-hero', value: boolean): void;
+  (e: 'update-card-pool', value: CardPool): void;
+  (e: 'toggle-card-role', role: CardRole, checked: boolean): void;
   (e: 'update-deck-building-config', value: string): void;
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
@@ -607,6 +637,11 @@ const lifecycleOptions = [
   { value: ACTIVE_CARD_LIFECYCLE_STATUS, label: 'Active' },
   { value: DEPRECATED_CARD_LIFECYCLE_STATUS, label: 'Deprecated' },
 ] as const;
+const cardRoleOptions: Array<{ value: CardRole; label: string }> = [
+  { value: 'hero', label: 'Hero' },
+  { value: 'boon', label: 'Boon' },
+  { value: 'event', label: 'Event' },
+];
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
 const additionalSymbolIds = computed(() => props.additionalSymbolIds);
