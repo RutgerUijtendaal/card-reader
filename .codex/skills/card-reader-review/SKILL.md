@@ -29,6 +29,8 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Request try/catch scopes that also catch post-success routing or callback failures and incorrectly re-enter request reconciliation
 - Terminal outcomes whose failed navigation leaves no retry path, whose retry repeats the authoritative mutation, or whose editor unlocks before terminal navigation succeeds
 - Background reconciliation that can navigate after route leave, or auxiliary recovery failures that unlock an unresolved authoritative request
+- Immutable attempts captured before an awaited sealing write while the editor remains mutable, including Retry paths that permit duplicate submissions during persistence
+- Recovered pending attempts whose hydration phase permits route leave before reconciliation takes ownership of navigation
 - Reload recovery that treats repeated lookup misses as proof of mutation failure without a definitive rejection from the originating request, or code that treats every HTTP response (including gateway errors) as definitive
 - Ambiguous network responses without idempotent lookup/retry behavior, retries whose key or payload can change, or used keys that become reusable when their created resource is deleted
 - Local and server sources of truth that can silently drift, especially across tabs or after partial persistence failures

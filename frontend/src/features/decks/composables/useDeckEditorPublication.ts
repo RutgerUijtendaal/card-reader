@@ -230,24 +230,29 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
       return;
     }
     if (!await options.validate()) return;
+    if (creationState.value.status !== 'idle') return;
+    setCreationState({ status: 'creating' });
     const currentAttempt = immutableAttempt(
       options.draftId.value,
       options.buildPayload(),
       options.payloadSignature.value,
       new Date().toISOString(),
     );
-    const persistResult = await options.persistAttempt(storedAttempt(currentAttempt));
-    if (persistResult === 'conflict' || persistResult === 'paused') return;
     attempt.value = currentAttempt;
-    setCreationState({ status: 'creating' });
+    const persistResult = await options.persistAttempt(storedAttempt(currentAttempt));
+    if (persistResult === 'conflict' || persistResult === 'paused') {
+      attempt.value = null;
+      setCreationState({ status: 'idle' });
+      return;
+    }
     await executeAttempt(currentAttempt);
   };
 
   const retry = async (): Promise<void> => {
     if (creationState.value.status !== 'unknown' || !attempt.value || publicationSucceeded) return;
     const currentAttempt = attempt.value;
-    await options.persistAttempt(storedAttempt(currentAttempt));
     setCreationState({ status: 'creating' });
+    await options.persistAttempt(storedAttempt(currentAttempt));
     await executeAttempt(currentAttempt);
   };
 

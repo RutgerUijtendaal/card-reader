@@ -500,6 +500,56 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('blocks route changes while a recovered Create attempt is still hydrating', async () => {
+    let resolveFilters!: () => void;
+    loadFiltersMock.mockReturnValueOnce(new Promise<void>((resolve) => {
+      resolveFilters = resolve;
+    }));
+    const form = {
+      ...createEmptyDeckForm(),
+      name: 'Recovered Pending Create',
+      hero_card_id: 'hero-recovered',
+    };
+    await saveLocalDraft('user-1', form, {
+      'hero-recovered': buildHero('hero-recovered', 'Recovered Hero'),
+    }, {
+      payload: {
+        name: form.name,
+        description: null,
+        long_description: null,
+        difficulty: null,
+        visibility: 'private',
+        hero_card_id: form.hero_card_id,
+        entries: [],
+        sideboards: [],
+        tag_ids: [],
+        suggested_type_labels: [],
+      },
+      signature: 'recovered-pending-signature',
+      startedAt: '2026-08-09T04:00:00Z',
+    });
+    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({
+      status: 'found',
+      record: { id: 'deck-recovered', status: { is_valid: true } },
+    });
+    const mounted = await mountController('/my/decks/new');
+
+    const resumePromise = mounted.controller.resumeLocalDraft();
+    await nextTick();
+
+    await mounted.router.push('/cards');
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    expect(mounted.controller.discardChangesModalOpen.value).toBe(false);
+
+    resolveFilters();
+    await resumePromise;
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-recovered/edit?editor_mode=cards',
+    );
+    mounted.unmount();
+  });
+
   test('removes recovered tag IDs that are no longer in the current catalog', async () => {
     fetchDeckTagsMock.mockResolvedValueOnce({
       roles: [{ id: 'role-current', key: 'current', label: 'Current', kind: 'role' }],
@@ -891,6 +941,48 @@ describe('useDeckEditor', () => {
 
     expect(mounted.router.currentRoute.value.fullPath).toBe(
       '/my/decks/deck-new/edit?editor_mode=cards',
+    );
+    mounted.unmount();
+  });
+
+  test('locks and coalesces Create while its immutable attempt is being persisted', async () => {
+    const lockManager = createTestLockManager();
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: lockManager,
+    });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Sealed Before Persistence');
+    await flushAsyncEditorWork();
+
+    let releaseLock!: () => void;
+    const heldLock = lockManager.request(
+      'test-held-deck-draft-lock',
+      { mode: 'exclusive' },
+      async () => await new Promise<void>((resolve) => {
+        releaseLock = resolve;
+      }),
+    );
+    await Promise.resolve();
+
+    const firstCreate = mounted.controller.saveDeck();
+    await flushAsyncEditorWork();
+
+    expect(mounted.controller.isCreating.value).toBe(true);
+    expect(mounted.controller.isMutationLocked.value).toBe(true);
+    expect(createDeckMock).not.toHaveBeenCalled();
+
+    const duplicateCreate = mounted.controller.saveDeck();
+    releaseLock();
+    await heldLock;
+    await Promise.all([firstCreate, duplicateCreate]);
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(createDeckMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Sealed Before Persistence' }),
+      expect.any(String),
     );
     mounted.unmount();
   });

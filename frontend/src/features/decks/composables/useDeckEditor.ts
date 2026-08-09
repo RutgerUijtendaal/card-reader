@@ -601,6 +601,13 @@ export const useDeckEditor = () => {
   const localDraftConflictModalOpen = computed(
     () => localDraft.conflict.value !== null && !conflictActionsLocked.value,
   );
+  const recoveryHydrationInFlight = computed(
+    () => recoveryActionPending.value
+      || (
+        localDraft.persistenceState.value.status === 'recovery'
+        && pendingLocalDraft.value === null
+      ),
+  );
 
   const saveDeck = async (options: { silent?: boolean } = {}): Promise<void> => {
     if (!isPublished.value) {
@@ -853,7 +860,11 @@ export const useDeckEditor = () => {
     if (bypassNextUnsavedPrompt) {
       return true;
     }
-    if (isCreating.value || publication.isReconciling.value) {
+    if (
+      isCreating.value
+      || publication.isReconciling.value
+      || recoveryHydrationInFlight.value
+    ) {
       return false;
     }
     if (hasNonDurableUnknownAttempt.value) {
@@ -867,7 +878,11 @@ export const useDeckEditor = () => {
   });
 
   useEventListener(window, 'beforeunload', (event) => {
-    if (!hasUnsavedChanges.value && !hasNonDurableUnknownAttempt.value) {
+    if (
+      !hasUnsavedChanges.value
+      && !hasNonDurableUnknownAttempt.value
+      && !recoveryHydrationInFlight.value
+    ) {
       return;
     }
     persistLocalDraft();
