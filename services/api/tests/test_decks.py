@@ -415,6 +415,20 @@ def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
     assert "sideboards" not in summary
     assert "deck_building_rules" not in summary
 
+    page_response = Client(HTTP_HOST="localhost").get(
+        "/decks",
+        {"view": "summary", "q": "Summary Public", "page": 1, "page_size": 10},
+    )
+    assert page_response.status_code == 200
+    assert page_response.json() == {
+        "count": 1,
+        "next_page": None,
+        "previous_page": None,
+        "page": 1,
+        "page_size": 10,
+        "results": payload,
+    }
+
 
 def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     owner = _create_user("deck-summary-owner-user", "password")
@@ -451,6 +465,17 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     assert response.status_code == 200
     payload_ids = {row["id"] for row in response.json()}
     assert payload_ids == {deck.id for deck in owned_decks}
+
+    page_response = client.get("/my/decks", {"view": "summary", "page": 2, "page_size": 2})
+    assert page_response.status_code == 200
+    page_payload = page_response.json()
+    assert page_payload["count"] == 3
+    assert page_payload["page"] == 2
+    assert page_payload["page_size"] == 2
+    assert page_payload["previous_page"] == 1
+    assert page_payload["next_page"] is None
+    assert len(page_payload["results"]) == 1
+    assert page_payload["results"][0]["id"] in {deck.id for deck in owned_decks}
 
 
 def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:

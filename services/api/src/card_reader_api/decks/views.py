@@ -18,6 +18,7 @@ from card_reader_api.decks.serializers import (
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
+from card_reader_core.models import Deck
 from card_reader_core.services.decks import (
     DeckEntryInput,
     DeckCreationDeletedError,
@@ -31,6 +32,46 @@ from card_reader_core.services.deck_tags import DeckTagService
 
 def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
+
+
+def _deck_list_response(
+    serializer: DeckListQuerySerializer,
+    decks: list[Deck],
+    *,
+    include_pending_suggestions: bool = False,
+) -> Response:
+    count = len(decks)
+    page = 1
+    page_size = count or 10
+    page_decks = decks
+    if serializer.wants_pagination():
+        page, page_size = serializer.pagination()
+        offset = (page - 1) * page_size
+        page_decks = decks[offset : offset + page_size]
+
+    if serializer.wants_summary():
+        results = [
+            deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
+            for deck in page_decks
+        ]
+    else:
+        results = [
+            deck_payload(deck, include_pending_suggestions=include_pending_suggestions)
+            for deck in page_decks
+        ]
+
+    if not serializer.wants_pagination():
+        return Response(results)
+    return Response(
+        {
+            "count": count,
+            "next_page": page + 1 if page * page_size < count else None,
+            "previous_page": page - 1 if page > 1 else None,
+            "page": page,
+            "page_size": page_size,
+            "results": results,
+        }
+    )
 
 
 class DeckRulesMetadataView(APIView):
@@ -49,6 +90,8 @@ class PublicDeckListView(APIView):
                 "hero_q": request.query_params.get("hero_q"),
                 "q": request.query_params.get("q"),
                 "view": request.query_params.get("view"),
+                "page": request.query_params.get("page"),
+                "page_size": request.query_params.get("page_size"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -76,9 +119,7 @@ class PublicDeckListView(APIView):
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
-        if serializer.wants_summary():
-            return Response([deck_summary_payload(deck) for deck in decks])
-        return Response([deck_payload(deck) for deck in decks])
+        return _deck_list_response(serializer, decks)
 
 
 class PublicDeckDetailView(APIView):
@@ -102,6 +143,8 @@ class OwnerDeckListCreateView(APIView):
                 "hero_q": request.query_params.get("hero_q"),
                 "q": request.query_params.get("q"),
                 "view": request.query_params.get("view"),
+                "page": request.query_params.get("page"),
+                "page_size": request.query_params.get("page_size"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -130,9 +173,7 @@ class OwnerDeckListCreateView(APIView):
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
-        if serializer.wants_summary():
-            return Response([deck_summary_payload(deck, include_pending_suggestions=True) for deck in decks])
-        return Response([deck_payload(deck, include_pending_suggestions=True) for deck in decks])
+        return _deck_list_response(serializer, decks, include_pending_suggestions=True)
 
     def post(self, request: Request) -> Response:
         raw_creation_id = request.headers.get("Idempotency-Key")

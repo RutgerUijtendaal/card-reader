@@ -42,8 +42,8 @@ vi.mock('@/domain/decks/api', () => ({
   deleteDeck: deleteDeckMock,
   fetchDeckTags: fetchDeckTagsMock,
   fetchMyDeck: fetchMyDeckMock,
-  fetchMyDeckSummaries: fetchMyDeckSummariesMock,
-  fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
+  fetchMyDeckSummaryPage: fetchMyDeckSummariesMock,
+  fetchPublicDeckSummaryPage: fetchPublicDeckSummariesMock,
   updateDeck: updateDeckMock,
 }));
 
@@ -278,6 +278,25 @@ const deckTagCatalog = {
   types: [],
 };
 
+const deckPage = (
+  results: Array<typeof deckRecord> = [deckRecord],
+  overrides: Partial<{
+    count: number;
+    next_page: number | null;
+    previous_page: number | null;
+    page: number;
+    page_size: number;
+  }> = {},
+) => ({
+  count: results.length,
+  next_page: null,
+  previous_page: null,
+  page: 1,
+  page_size: 10,
+  results,
+  ...overrides,
+});
+
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((innerResolve) => {
@@ -350,8 +369,8 @@ describe('DeckIndexPage', () => {
     apiGetMock.mockResolvedValue({ data: filtersPayload });
     fetchDeckTagsMock.mockResolvedValue(deckTagCatalog);
     fetchMyDeckMock.mockResolvedValue(deckRecord);
-    fetchMyDeckSummariesMock.mockResolvedValue([deckRecord]);
-    fetchPublicDeckSummariesMock.mockResolvedValue([deckRecord]);
+    fetchMyDeckSummariesMock.mockResolvedValue(deckPage());
+    fetchPublicDeckSummariesMock.mockResolvedValue(deckPage());
     updateDeckMock.mockResolvedValue(deckRecord);
   });
 
@@ -396,28 +415,60 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
+  test('loads the requested deck page and keeps pagination in the route', async () => {
+    fetchPublicDeckSummariesMock.mockResolvedValueOnce(
+      deckPage([deckRecord], {
+        count: 11,
+        page: 2,
+        previous_page: 1,
+      }),
+    );
+    const mounted = await mountPage('/decks?page=2');
+
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledWith(expect.any(URLSearchParams), 2, 10);
+    expect(mounted.container.textContent).toContain('Page 2 of 2 · 11 decks');
+    expect(mounted.container.textContent).toContain('Total 11');
+
+    const previousButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Previous',
+    );
+    expect(previousButton).toBeDefined();
+    previousButton?.click();
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.query.page).toBeUndefined();
+    });
+
+    expect(mounted.router.currentRoute.value.path).toBe('/decks');
+
+    mounted.unmount();
+  });
+
   test('ignores stale deck responses after switching between public and owned modes', async () => {
-    const publicDeferred = createDeferred<Array<typeof deckRecord>>();
+    const publicDeferred = createDeferred<ReturnType<typeof deckPage>>();
     fetchPublicDeckSummariesMock.mockReturnValueOnce(publicDeferred.promise);
-    fetchMyDeckSummariesMock.mockResolvedValueOnce([
-      {
-        ...deckRecord,
-        id: 'owned-deck',
-        name: 'Owned Deck',
-      },
-    ]);
+    fetchMyDeckSummariesMock.mockResolvedValueOnce(
+      deckPage([
+        {
+          ...deckRecord,
+          id: 'owned-deck',
+          name: 'Owned Deck',
+        },
+      ]),
+    );
     const mounted = await mountPage('/decks');
 
     await mounted.router.push('/my/decks');
     await flushPage();
 
-    publicDeferred.resolve([
-      {
-        ...deckRecord,
-        id: 'public-deck',
-        name: 'Public Deck',
-      },
-    ]);
+    publicDeferred.resolve(
+      deckPage([
+        {
+          ...deckRecord,
+          id: 'public-deck',
+          name: 'Public Deck',
+        },
+      ]),
+    );
     await flushPage();
 
     expect(mounted.container.textContent).toContain('Owned Deck');

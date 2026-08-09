@@ -5,6 +5,8 @@ import {
   exportDeckTts,
   fetchDeckRulesMetadata,
   fetchMyDeckByCreationKey,
+  fetchMyDeckSummaryPage,
+  fetchPublicDeckSummaryPage,
 } from '@/domain/decks/api';
 import {
   fallbackDeckBuildingConfigExample,
@@ -36,6 +38,30 @@ describe('deck API', () => {
 
     await expect(fetchDeckRulesMetadata()).resolves.toEqual(metadata);
     expect(api.get).toHaveBeenCalledWith('/decks/rules');
+  });
+
+  test.each([
+    ['/decks', fetchPublicDeckSummaryPage],
+    ['/my/decks', fetchMyDeckSummaryPage],
+  ])('loads a paginated summary page from %s', async (path, fetchPage) => {
+    const page = {
+      count: 66,
+      next_page: 3,
+      previous_page: 1,
+      page: 2,
+      page_size: 10,
+      results: [],
+    };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: page });
+
+    await expect(fetchPage(new URLSearchParams({ q: 'tempo' }), 2)).resolves.toEqual(page);
+    const config = vi.mocked(api.get).mock.calls.at(-1)?.[1] as { params?: URLSearchParams };
+
+    expect(api.get).toHaveBeenCalledWith(path, { params: expect.any(URLSearchParams) });
+    expect(config.params?.get('q')).toBe('tempo');
+    expect(config.params?.get('view')).toBe('summary');
+    expect(config.params?.get('page')).toBe('2');
+    expect(config.params?.get('page_size')).toBe('10');
   });
 
   test('maps the structured TTS deck export response', async () => {

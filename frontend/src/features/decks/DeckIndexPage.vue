@@ -22,7 +22,7 @@
       <template #aside>
         <DeckBrowseFiltersPanel
           :controller="filterController"
-          :total-count="decks.length"
+          :total-count="totalDeckCount"
           :description="filterDescription"
           :mode="isOwnedMode ? 'owned' : 'public'"
           :can-use-owned-decks="canUseOwnedDecks"
@@ -203,6 +203,32 @@
           </template>
         </DeckListCard>
       </div>
+
+      <nav
+        v-if="!loading && filtersLoaded && totalPages > 1"
+        class="theme-divider mt-5 flex items-center justify-between gap-3 border-t pt-4"
+        aria-label="Deck pages"
+      >
+        <button
+          type="button"
+          class="btn-secondary px-3 py-2 text-xs"
+          :disabled="currentPage <= 1"
+          @click="goToPage(currentPage - 1)"
+        >
+          Previous
+        </button>
+        <span class="theme-section-muted text-xs">
+          Page {{ currentPage }} of {{ totalPages }} · {{ totalDeckCount }} decks
+        </span>
+        <button
+          type="button"
+          class="btn-secondary px-3 py-2 text-xs"
+          :disabled="currentPage >= totalPages"
+          @click="goToPage(currentPage + 1)"
+        >
+          Next
+        </button>
+      </nav>
     </AppPageLayout>
 
     <ConfirmModal
@@ -241,6 +267,7 @@ import { BookOpen, Folders, Gamepad2, Hammer, Pencil, Share2, Tags, Trash2 } fro
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
+import type { LocationQueryRaw } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
@@ -253,8 +280,8 @@ import {
   deleteDeck,
   fetchDeckTags,
   fetchMyDeck,
-  fetchMyDeckSummaries,
-  fetchPublicDeckSummaries,
+  fetchMyDeckSummaryPage,
+  fetchPublicDeckSummaryPage,
   updateDeck,
 } from '@/domain/decks/api';
 import DeckBrowseFiltersPanel from '@/features/decks/components/DeckBrowseFiltersPanel.vue';
@@ -290,6 +317,8 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const decks = ref<DeckSummaryRecord[]>([]);
+const totalDeckCount = ref(0);
+const pageSize = ref(10);
 const loading = ref(false);
 const deleting = ref(false);
 const deleteTarget = ref<DeckSummaryRecord | null>(null);
@@ -330,6 +359,12 @@ const filterDescription = computed(() =>
 const loadingSkeletonCount = 10;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
 const effectiveRouteFilterState = computed(() => currentRouteFilterState.value);
+const currentPage = computed(() => {
+  const rawPage = Array.isArray(route.query.page) ? route.query.page[0] : route.query.page;
+  const parsedPage = Number.parseInt(rawPage ?? '', 10);
+  return Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+});
+const totalPages = computed(() => Math.max(1, Math.ceil(totalDeckCount.value / pageSize.value)));
 const publicFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
 const ownedFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
 const currentRouteSignature = computed(() => getDeckBrowseFilterSignature(effectiveRouteFilterState.value));
@@ -348,18 +383,51 @@ let tagManagerLoadRequestId = 0;
 const loadDecks = async (): Promise<void> => {
   const requestId = ++deckLoadRequestId;
   const requestedPath = currentDeckPath.value;
+  const requestedPage = currentPage.value;
   loading.value = true;
   try {
     const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
-    const nextDecks = requestedPath === '/my/decks' ? await fetchMyDeckSummaries(params) : await fetchPublicDeckSummaries(params);
-    if (requestId === deckLoadRequestId && currentDeckPath.value === requestedPath) {
-      decks.value = nextDecks;
+    const response =
+      requestedPath === '/my/decks'
+        ? await fetchMyDeckSummaryPage(params, requestedPage, pageSize.value)
+        : await fetchPublicDeckSummaryPage(params, requestedPage, pageSize.value);
+    if (
+      requestId === deckLoadRequestId &&
+      currentDeckPath.value === requestedPath &&
+      currentPage.value === requestedPage
+    ) {
+      const lastPage = Math.max(1, Math.ceil(response.count / response.page_size));
+      if (requestedPage > lastPage) {
+        void router.replace({
+          path: requestedPath,
+          query: buildPageRouteQuery(lastPage),
+        });
+        return;
+      }
+      decks.value = response.results;
+      totalDeckCount.value = response.count;
+      pageSize.value = response.page_size;
     }
   } finally {
     if (requestId === deckLoadRequestId) {
       loading.value = false;
     }
   }
+};
+
+const buildPageRouteQuery = (page: number): LocationQueryRaw => ({
+  ...buildDeckBrowseFilterRouteQuery(effectiveRouteFilterState.value),
+  ...(page > 1 ? { page: String(page) } : {}),
+});
+
+const goToPage = (page: number): void => {
+  if (loading.value || page < 1 || page > totalPages.value || page === currentPage.value) {
+    return;
+  }
+  void router.push({
+    path: currentDeckPath.value,
+    query: buildPageRouteQuery(page),
+  });
 };
 
 const debouncedUpdateRoute = useDebounceFn(() => {
@@ -386,8 +454,8 @@ watch(
 );
 
 watch(
-  [currentDeckPath, currentRouteSignature, filtersLoaded],
-  async ([, , ready]) => {
+  [currentDeckPath, currentRouteSignature, currentPage, filtersLoaded],
+  async ([, , , ready]) => {
     if (!ready) {
       return;
     }
@@ -582,10 +650,17 @@ const confirmDelete = async (): Promise<void> => {
   if (!deleteTarget.value) return;
   deleting.value = true;
   try {
-    await deleteDeck(deleteTarget.value.id);
-    decks.value = decks.value.filter((deck) => deck.id !== deleteTarget.value?.id);
+    const deletedDeckId = deleteTarget.value.id;
+    await deleteDeck(deletedDeckId);
     deleteTarget.value = null;
+    decks.value = decks.value.filter((deck) => deck.id !== deletedDeckId);
+    totalDeckCount.value = Math.max(0, totalDeckCount.value - 1);
     toast.success('Deck deleted.');
+    try {
+      await loadDecks();
+    } catch {
+      toast.error('Deck deleted, but the deck list could not be refreshed.');
+    }
   } finally {
     deleting.value = false;
   }

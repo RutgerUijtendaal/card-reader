@@ -125,6 +125,15 @@ export type DeckSummaryRecord = {
   updated_at: string;
 };
 
+export type PaginatedDeckSummariesResponse = {
+  count: number;
+  next_page: number | null;
+  previous_page: number | null;
+  page: number;
+  page_size: number;
+  results: DeckSummaryRecord[];
+};
+
 export type DeckListRecord = DeckRecord | DeckSummaryRecord;
 
 export type DeckEntryInput = {

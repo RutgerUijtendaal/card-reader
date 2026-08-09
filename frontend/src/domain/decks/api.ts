@@ -4,6 +4,7 @@ import type {
   DeckRecord,
   DeckRulesMetadata,
   DeckSummaryRecord,
+  PaginatedDeckSummariesResponse,
   DeckTagCatalog,
   DeckUpdateRequest,
   DeckUpsertRequest,
@@ -35,11 +36,33 @@ const withSummaryView = (params?: URLSearchParams): URLSearchParams => {
   return nextParams;
 };
 
+const withSummaryPagination = (
+  params: URLSearchParams | undefined,
+  page: number,
+  pageSize: number,
+): URLSearchParams => {
+  const nextParams = withSummaryView(params);
+  nextParams.set('page', String(page));
+  nextParams.set('page_size', String(pageSize));
+  return nextParams;
+};
+
 export const fetchPublicDeckSummaries = async (
   params?: URLSearchParams,
 ): Promise<DeckSummaryRecord[]> => {
   const response = await api.get<DeckSummaryRecord[]>('/decks', {
     params: withSummaryView(params),
+  });
+  return response.data;
+};
+
+export const fetchPublicDeckSummaryPage = async (
+  params: URLSearchParams | undefined,
+  page: number,
+  pageSize = 10,
+): Promise<PaginatedDeckSummariesResponse> => {
+  const response = await api.get<PaginatedDeckSummariesResponse>('/decks', {
+    params: withSummaryPagination(params, page, pageSize),
   });
   return response.data;
 };
@@ -59,6 +82,17 @@ export const fetchMyDeckSummaries = async (
 ): Promise<DeckSummaryRecord[]> => {
   const response = await api.get<DeckSummaryRecord[]>('/my/decks', {
     params: withSummaryView(params),
+  });
+  return response.data;
+};
+
+export const fetchMyDeckSummaryPage = async (
+  params: URLSearchParams | undefined,
+  page: number,
+  pageSize = 10,
+): Promise<PaginatedDeckSummariesResponse> => {
+  const response = await api.get<PaginatedDeckSummariesResponse>('/my/decks', {
+    params: withSummaryPagination(params, page, pageSize),
   });
   return response.data;
 };

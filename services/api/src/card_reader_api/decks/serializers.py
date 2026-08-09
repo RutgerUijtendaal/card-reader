@@ -347,6 +347,8 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
 class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     view = serializers.ChoiceField(choices=['summary'], required=False, allow_null=True)
+    page = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    page_size = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=100)
     hero_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     author_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     card_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -373,6 +375,17 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
 
     def wants_summary(self) -> bool:
         return self._string_or_none("view") == "summary"
+
+    def wants_pagination(self) -> bool:
+        return self.validated_data.get("page") is not None or self.validated_data.get("page_size") is not None
+
+    def pagination(self) -> tuple[int, int]:
+        page = self.validated_data.get("page")
+        page_size = self.validated_data.get("page_size")
+        return (
+            page if isinstance(page, int) else 1,
+            page_size if isinstance(page_size, int) else 10,
+        )
 
     def _string_or_none(self, key: str) -> str | None:
         value = self.validated_data.get(key)
