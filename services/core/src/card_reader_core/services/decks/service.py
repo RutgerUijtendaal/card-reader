@@ -168,6 +168,7 @@ class DeckService:
             deck_tag_match=deck_tag_match,
         )
 
+    @transaction.atomic
     def list_public_deck_summary_page(
         self,
         *,
