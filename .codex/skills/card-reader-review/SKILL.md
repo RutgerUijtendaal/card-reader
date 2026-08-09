@@ -27,6 +27,7 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Stateful workflows encoded as interacting flags without an explicit transition model
 - Cleanup failures that block or undo an already confirmed authoritative success
 - Request try/catch scopes that also catch post-success routing or callback failures and incorrectly re-enter request reconciliation
+- Terminal outcomes whose failed navigation leaves no retry path, or whose retry repeats the authoritative mutation
 - Background reconciliation that can navigate after route leave, or auxiliary recovery failures that unlock an unresolved authoritative request
 - Reload recovery that treats repeated lookup misses as proof of mutation failure without a definitive rejection from the originating request, or code that treats every HTTP response (including gateway errors) as definitive
 - Ambiguous network responses without idempotent lookup/retry behavior, retries whose key or payload can change, or used keys that become reusable when their created resource is deleted
@@ -36,6 +37,8 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Conditional browser writes implemented as a non-atomic read-then-write instead of a cross-tab lock or transactional primitive
 - Storage adapters that expose recoverable reads when the locking or transaction capability required for all corresponding mutations is unavailable
 - Queued destructive actions that derive their expected revision after waiting, or unresolved requests that can navigate away when their immutable attempt exists only in memory
+- Equality shortcuts that prevent memory-only state from becoming durable after storage recovers
+- Conflict actions that erase another tab's pending request, stale confirmation modals that survive a conflict, or retirement links that navigate without rechecking server outcome
 
 ## Review Workflow
 

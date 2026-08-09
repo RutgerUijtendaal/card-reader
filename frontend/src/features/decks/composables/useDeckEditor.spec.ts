@@ -1031,6 +1031,16 @@ describe('useDeckEditor', () => {
     expect(mounted.controller.discardChangesModalOpen.value).toBe(false);
 
     setItemSpy.mockRestore();
+    const navigationPromise = mounted.router.push('/cards');
+    await flushAsyncEditorWork();
+    await flushAsyncEditorWork();
+    expect(mounted.controller.discardChangesModalOpen.value).toBe(true);
+    mounted.controller.confirmDiscardChanges();
+    await navigationPromise;
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
+    expect(loadLocalDraft('user-1')?.pendingCreateAttempt?.payload.name)
+      .toBe('Memory-only Attempt');
     mounted.unmount();
   });
 
@@ -1179,8 +1189,41 @@ describe('useDeckEditor', () => {
     expect(fetchMyDeckByCreationKeyMock).not.toHaveBeenCalled();
     expect(mounted.controller.creationState.value).toEqual({ status: 'idle' });
     expect(toastErrorMock).toHaveBeenCalledWith(
-      'The deck was created, but its editor could not be opened. Open it from My Decks.',
+      'The deck was created, but its editor could not be opened. Click Create to try again.',
     );
+
+    await mounted.controller.saveDeck();
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
+
+    replaceSpy.mockRestore();
+    mounted.unmount();
+  });
+
+  test('retries deleted-outcome navigation without repeating the Create request', async () => {
+    createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
+    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({ status: 'deleted' });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Deleted Before Navigation');
+    const replaceSpy = vi.spyOn(mounted.router, 'replace').mockRejectedValueOnce(
+      new Error('Router unavailable'),
+    );
+
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.creationState.value).toEqual({ status: 'idle' });
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'The deleted deck was confirmed, but navigation failed. Click Create to try again.',
+    );
+
+    await mounted.controller.saveDeck();
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks');
 
     replaceSpy.mockRestore();
     mounted.unmount();
@@ -1209,6 +1252,66 @@ describe('useDeckEditor', () => {
     expect(createDeckMock).toHaveBeenCalledTimes(1);
     expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/deck-new/edit?editor_mode=cards');
 
+    mounted.unmount();
+  });
+
+  test('does not overwrite another tab pending Create attempt', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.deck.setDeckName('Keep This Tab');
+    await flushAsyncEditorWork();
+    const remoteForm = {
+      ...createEmptyDeckForm(),
+      name: 'Remote Pending Create',
+      hero_card_id: 'hero-remote',
+    };
+    const remoteAttempt: StoredCreateAttempt = {
+      payload: {
+        name: remoteForm.name,
+        description: null,
+        long_description: null,
+        difficulty: null,
+        visibility: 'private',
+        hero_card_id: remoteForm.hero_card_id,
+        entries: [],
+        sideboards: [],
+        tag_ids: [],
+        suggested_type_labels: [],
+      },
+      signature: 'remote-pending-signature',
+      startedAt: '2026-08-09T05:00:00Z',
+    };
+    await saveLocalDraft('user-1', remoteForm, {}, remoteAttempt);
+    dispatchDraftStorageEvent('user-1');
+
+    await mounted.controller.keepThisConflictDraft();
+
+    expect(mounted.controller.persistenceState.value.status).toBe('conflict');
+    expect(mounted.controller.deck.form.name).toBe('Keep This Tab');
+    expect(loadLocalDraft('user-1')?.pendingCreateAttempt?.signature)
+      .toBe('remote-pending-signature');
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      'The stored draft has an unconfirmed Create request. Load it before replacing it.',
+    );
+    mounted.unmount();
+  });
+
+  test('closes a stale discard confirmation when a storage conflict arrives', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.deck.setDeckName('Discard Prompt Draft');
+    await flushAsyncEditorWork();
+    mounted.controller.requestDiscardLocalDraft();
+    expect(mounted.controller.discardLocalDraftModalOpen.value).toBe(true);
+
+    const remoteForm = createEmptyDeckForm();
+    remoteForm.name = 'Remote Draft After Prompt';
+    await saveLocalDraft('user-1', remoteForm, {});
+    dispatchDraftStorageEvent('user-1');
+    await nextTick();
+
+    expect(mounted.controller.discardLocalDraftModalOpen.value).toBe(false);
+    expect(mounted.controller.localDraftConflictModalOpen.value).toBe(true);
+    await mounted.controller.confirmDiscardLocalDraft();
+    expect(loadLocalDraft('user-1')?.form.name).toBe('Remote Draft After Prompt');
     mounted.unmount();
   });
 
@@ -1367,6 +1470,37 @@ describe('useDeckEditor', () => {
     expect(keptDraft?.draftId).not.toBe(activeDraft.draftId);
     expect(keptDraft?.form.name).toBe('Keep Separate');
     expect(mounted.controller.persistenceState.value.status).toBe('synced');
+    mounted.unmount();
+  });
+
+  test('keeps local contents under a new key when the created deck was deleted', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.deck.setDeckName('Keep After Created Deck Deletion');
+    await flushAsyncEditorWork();
+    const activeDraft = loadLocalDraft('user-1');
+    if (!activeDraft) throw new Error('Expected an active local draft');
+    const storage = createDeckEditorLocalDraftStorage();
+    const retirement = await storage.retire(
+      'user-1',
+      activeDraft.draftId,
+      'deck-deleted-elsewhere',
+      { kind: 'draft', revision: activeDraft.revision },
+    );
+    expect(retirement.status).toBe('retired');
+    dispatchDraftStorageEvent('user-1');
+    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({ status: 'deleted' });
+
+    await mounted.controller.openCreatedConflictDeck();
+    const keptDraft = loadLocalDraft('user-1');
+
+    expect(fetchMyDeckByCreationKeyMock).toHaveBeenCalledWith(activeDraft.draftId);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    expect(keptDraft?.draftId).not.toBe(activeDraft.draftId);
+    expect(keptDraft?.form.name).toBe('Keep After Created Deck Deletion');
+    expect(mounted.controller.persistenceState.value.status).toBe('synced');
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      'The created deck was deleted. This tab was kept as a new local draft.',
+    );
     mounted.unmount();
   });
 

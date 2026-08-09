@@ -98,19 +98,33 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
   const creationState = ref<DeckCreationState>({ status: 'idle' });
   const attempt = ref<CreateAttempt | null>(null);
   let publicationSucceeded = false;
+  let terminalNavigationRetry: (() => Promise<void>) | null = null;
 
   const setCreationState = (next: DeckCreationState): void => {
     creationState.value = transitionDeckCreation(creationState.value, next);
+  };
+
+  const runTerminalNavigation = async (errorMessage: string): Promise<void> => {
+    const navigation = terminalNavigationRetry;
+    if (!navigation) return;
+    terminalNavigationRetry = null;
+    try {
+      await navigation();
+    } catch {
+      terminalNavigationRetry = navigation;
+      toast.error(errorMessage);
+    }
   };
 
   const completeSuccess = async (record: DeckRecord, currentAttempt: CreateAttempt): Promise<void> => {
     if (publicationSucceeded) return;
     publicationSucceeded = true;
     options.retireAfterCreation(currentAttempt.draftId, record.id);
+    terminalNavigationRetry = async () => await options.onSuccess(record, currentAttempt);
     try {
-      await options.onSuccess(record, currentAttempt);
-    } catch {
-      toast.error('The deck was created, but its editor could not be opened. Open it from My Decks.');
+      await runTerminalNavigation(
+        'The deck was created, but its editor could not be opened. Click Create to try again.',
+      );
     } finally {
       if (creationState.value.status === 'creating' || creationState.value.status === 'unknown') {
         setCreationState({ status: 'idle' });
@@ -122,8 +136,11 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     if (publicationSucceeded) return;
     publicationSucceeded = true;
     options.discardAfterDeletedCreation(currentAttempt.draftId);
+    terminalNavigationRetry = async () => await options.onDeleted(currentAttempt);
     try {
-      await options.onDeleted(currentAttempt);
+      await runTerminalNavigation(
+        'The deleted deck was confirmed, but navigation failed. Click Create to try again.',
+      );
     } finally {
       if (creationState.value.status === 'creating' || creationState.value.status === 'unknown') {
         setCreationState({ status: 'idle' });
@@ -198,7 +215,13 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
   };
 
   const create = async (): Promise<void> => {
-    if (creationState.value.status !== 'idle' || publicationSucceeded) return;
+    if (creationState.value.status !== 'idle') return;
+    if (publicationSucceeded) {
+      await runTerminalNavigation(
+        'The confirmed deck outcome could not be opened. Click Create to try again.',
+      );
+      return;
+    }
     if (!canCreateFromPersistenceState(options.persistenceState.value)) {
       toast.error('Resolve the local draft conflict before creating this deck.');
       return;
@@ -220,8 +243,14 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
   const retry = async (): Promise<void> => {
     if (creationState.value.status !== 'unknown' || !attempt.value || publicationSucceeded) return;
     const currentAttempt = attempt.value;
+    await options.persistAttempt(storedAttempt(currentAttempt));
     setCreationState({ status: 'creating' });
     await executeAttempt(currentAttempt);
+  };
+
+  const persistCurrentAttempt = async (): Promise<void> => {
+    if (!attempt.value) return;
+    await options.persistAttempt(storedAttempt(attempt.value));
   };
 
   const recoverPendingAttempt = async (
@@ -262,6 +291,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     ),
     create,
     retry,
+    persistCurrentAttempt,
     recoverPendingAttempt,
   };
 };

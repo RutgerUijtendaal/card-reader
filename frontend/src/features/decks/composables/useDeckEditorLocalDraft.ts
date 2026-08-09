@@ -213,8 +213,12 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
       options.cardLookup.value,
       effectiveAttempt,
     );
-    if (storedDraft.value && draftContentSignature(storedDraft.value) === draftContentSignature(nextDraft)) {
-      return persistenceState.value.status === 'memory-only' ? 'memory-only' : 'saved';
+    if (
+      persistenceState.value.status === 'synced'
+      && storedDraft.value
+      && draftContentSignature(storedDraft.value) === draftContentSignature(nextDraft)
+    ) {
+      return 'saved';
     }
     const result = await storage.save(nextDraft, deckEditorDraftSlotToken(observedSlot.value));
     if (result.status === 'unavailable') {
@@ -314,6 +318,13 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
 
   const overwriteConflict = async (asNewDraft: boolean): Promise<boolean> => {
     if (!conflict.value) return false;
+    if (
+      conflict.value.kind === 'active-draft'
+      && conflict.value.slot.draft.pendingCreateAttempt
+    ) {
+      toast.info('The stored draft has an unconfirmed Create request. Load it before replacing it.');
+      return false;
+    }
     if (asNewDraft && storedDraft.value?.pendingCreateAttempt) return false;
     if (asNewDraft) draftId.value = createDeckEditorDraftId();
     const nextDraft = buildStoredDeckEditorDraft(

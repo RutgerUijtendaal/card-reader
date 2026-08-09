@@ -9,6 +9,7 @@ import {
   fetchDeckRulesMetadata,
   fetchDeckTags,
   fetchMyDeck,
+  fetchMyDeckByCreationKey,
   updateDeck,
 } from '@/domain/decks/api';
 import { useDeckEditorDraft } from '@/features/decks/composables/useDeckEditorDraft';
@@ -430,6 +431,12 @@ export const useDeckEditor = () => {
     })();
   });
 
+  watch(localDraft.conflict, (currentConflict) => {
+    if (currentConflict) {
+      discardLocalDraftModalOpen.value = false;
+    }
+  });
+
   const persistDeck = async (): Promise<DeckRecord> =>
     await updateDeck(deckId.value, deck.buildPayload());
 
@@ -654,6 +661,8 @@ export const useDeckEditor = () => {
   };
 
   const confirmDiscardLocalDraft = async (): Promise<void> => {
+    if (!discardLocalDraftModalOpen.value) return;
+    discardLocalDraftModalOpen.value = false;
     if (!await localDraft.discardActiveDraft()) return;
     deck.resetLocalDraft();
     cardLookup.value = {};
@@ -661,7 +670,6 @@ export const useDeckEditor = () => {
     shouldApplyHeroCardPreset.value = false;
     originalHeroId.value = null;
     editorMode.value = 'cards';
-    discardLocalDraftModalOpen.value = false;
     markSavedPayload();
     void gallery.searchCards();
   };
@@ -713,15 +721,33 @@ export const useDeckEditor = () => {
     if (conflictActionsLocked.value) return;
     const currentConflict = localDraft.conflict.value;
     if (currentConflict?.kind !== 'created-elsewhere') return;
-    bypassNextUnsavedPrompt = true;
+    recoveryActionPending.value = true;
     try {
-      await router.replace({
-        path: `/my/decks/${currentConflict.slot.marker.createdDeckId}/edit`,
-        query: withDeckEditorMode(route.query, 'cards'),
-        hash: route.hash,
-      });
+      const result = await fetchMyDeckByCreationKey(currentConflict.slot.marker.draftId);
+      if (result.status === 'deleted') {
+        if (await localDraft.overwriteConflict(true)) {
+          toast.info('The created deck was deleted. This tab was kept as a new local draft.');
+        }
+        return;
+      }
+      if (result.status !== 'found') {
+        toast.error('The created deck could not be confirmed. This local draft was kept.');
+        return;
+      }
+      bypassNextUnsavedPrompt = true;
+      try {
+        await router.replace({
+          path: `/my/decks/${result.record.id}/edit`,
+          query: withDeckEditorMode(route.query, 'cards'),
+          hash: route.hash,
+        });
+      } finally {
+        bypassNextUnsavedPrompt = false;
+      }
+    } catch {
+      toast.error('The created deck could not be confirmed. This local draft was kept.');
     } finally {
-      bypassNextUnsavedPrompt = false;
+      recoveryActionPending.value = false;
     }
   };
 
@@ -822,12 +848,12 @@ export const useDeckEditor = () => {
     if (bypassNextUnsavedPrompt) {
       return true;
     }
-    if (
-      isCreating.value
-      || publication.isReconciling.value
-      || hasNonDurableUnknownAttempt.value
-    ) {
+    if (isCreating.value || publication.isReconciling.value) {
       return false;
+    }
+    if (hasNonDurableUnknownAttempt.value) {
+      await publication.persistCurrentAttempt();
+      if (hasNonDurableUnknownAttempt.value) return false;
     }
     if (!isPublished.value && hasUnsavedChanges.value) {
       persistLocalDraft();
