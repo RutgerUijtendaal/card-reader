@@ -14,48 +14,21 @@
     >
       <template #aside>
         <AppStickyAside scroll-class="space-y-4">
-          <div class="px-1">
-            <h3 class="theme-section-title text-sm font-semibold">
-              Notification filters
-            </h3>
-            <p class="theme-section-muted mt-1 text-xs">
-              Show the updates that matter right now. {{ unreadNotificationCount }} new.
-            </p>
-          </div>
-
-          <nav
-            class="flex flex-col gap-2"
-            aria-label="Notification type filters"
+          <AppSideNav
+            title="Notification filters"
+            :description="`Show the updates that matter right now. ${unreadNotificationCount} new.`"
+            navigation-label="Notification type filters"
           >
-            <button
+            <AppSideNavItem
               v-for="option in typeOptions"
               :key="option.value"
-              type="button"
-              class="rounded-lg border px-3 py-3 text-left transition"
-              :class="typeFilter === option.value
-                ? 'theme-selected-surface-strong'
-                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+              :label="option.label"
+              :description="option.description"
+              :icon="option.icon"
+              :active="typeFilter === option.value"
               @click="selectType(option.value)"
-            >
-              <div class="flex items-start gap-3">
-                <component
-                  :is="option.icon"
-                  class="mt-0.5 h-4 w-4 shrink-0"
-                />
-                <span class="flex min-w-0 flex-1 items-start justify-between gap-3">
-                  <span class="min-w-0">
-                    <span class="block truncate text-sm font-semibold">{{ option.label }}</span>
-                    <span
-                      class="mt-1 block truncate text-xs"
-                      :class="typeFilter === option.value ? 'theme-section-title' : 'theme-section-muted'"
-                    >
-                      {{ option.description }}
-                    </span>
-                  </span>
-                </span>
-              </div>
-            </button>
-          </nav>
+            />
+          </AppSideNav>
 
           <template #footer>
             <GalleryOptionsMenu
@@ -191,6 +164,8 @@ import type { Component } from 'vue';
 import { toast } from 'vue-sonner';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import AppSideNav from '@/shared/components/app/AppSideNav.vue';
+import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import GalleryOptionsMenu from '@/domain/cards/components/GalleryOptionsMenu.vue';
 import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions';

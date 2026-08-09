@@ -38,11 +38,7 @@ export const useOperationsOverview = () => {
     if (activeRequestCount === 0) void loadOverview();
   };
 
-  const { pause, resume } = useIntervalFn(
-    pollOverview,
-    5000,
-    { immediate: false },
-  );
+  const { pause, resume } = useIntervalFn(pollOverview, 5000, { immediate: false });
 
   watch(
     documentVisibility,

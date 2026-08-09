@@ -1,3 +1,3 @@
-from .overview import OperationsOverviewService
+from .overview import OperationsOverviewService, OperationsQueueNotFoundError
 
-__all__ = ["OperationsOverviewService"]
+__all__ = ["OperationsOverviewService", "OperationsQueueNotFoundError"]

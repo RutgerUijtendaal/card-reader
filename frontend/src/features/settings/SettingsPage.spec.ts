@@ -64,6 +64,8 @@ describe('SettingsPage developer-data capability', () => {
     await vi.waitFor(() => {
       expect(mounted.router.currentRoute.value.query.settings_tab).toBe('developer-data');
     });
+    expect(developerLink?.getAttribute('aria-current')).toBe('page');
+    expect(developerLink?.classList.contains('theme-selected-surface-strong')).toBe(true);
     expect(mounted.container.querySelector('[data-testid="developer-data-section"]')).not.toBeNull();
     mounted.unmount();
   });
