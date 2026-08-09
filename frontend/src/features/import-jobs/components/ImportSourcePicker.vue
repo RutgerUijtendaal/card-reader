@@ -163,9 +163,6 @@ const formatFileSize = (bytes: number): string => {
 };
 
 const isSupportedImage = (file: File): boolean => {
-  if (file.type === 'image/png' || file.type === 'image/jpeg' || file.type === 'image/webp') {
-    return true;
-  }
   const normalizedName = file.name.toLowerCase();
   return SUPPORTED_IMAGE_EXTENSIONS.some((extension) => normalizedName.endsWith(extension));
 };

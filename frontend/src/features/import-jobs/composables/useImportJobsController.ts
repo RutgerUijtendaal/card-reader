@@ -159,6 +159,11 @@ export const useImportJobsController = () => {
     }
   };
 
+  const historyHasActiveWorkMissingFromSnapshot = (): boolean =>
+    historyItems.value.some(
+      (item) => !isTerminalImportStatus(item.status) && !activeJobIds.value.has(item.id),
+    );
+
   const refreshActivity = async (): Promise<void> => {
     activityActionErrorMessage.value = '';
     const [activeResult, historyResult] = await Promise.allSettled([
@@ -167,15 +172,29 @@ export const useImportJobsController = () => {
     ]);
     if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
 
-    const historyHasMissingActiveWork = historyItems.value.some(
-      (item) => !isTerminalImportStatus(item.status) && !activeJobIds.value.has(item.id),
-    );
-    if (activeResult.value || historyHasMissingActiveWork) {
+    if (activeResult.value) {
       try {
         await loadRecentJobs();
       } catch (error) {
         console.error('Reconcile import history after activity refresh failed', error);
+        return;
       }
+    }
+
+    if (!historyHasActiveWorkMissingFromSnapshot()) return;
+
+    try {
+      const activeJobFinished = await loadActiveJobs();
+      if (!activeJobFinished && !historyHasActiveWorkMissingFromSnapshot()) return;
+    } catch (error) {
+      console.error('Reconcile active imports after activity refresh failed', error);
+      return;
+    }
+
+    try {
+      await loadRecentJobs();
+    } catch (error) {
+      console.error('Reconcile import history after active refresh failed', error);
     }
   };
 

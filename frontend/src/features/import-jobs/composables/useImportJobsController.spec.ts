@@ -188,6 +188,9 @@ describe('useImportJobsController', () => {
       .mockResolvedValueOnce([activeJob('new-job')]);
     const mounted = mountController();
     await vi.waitFor(() => expect(fetchImportJobs).toHaveBeenCalledOnce());
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
+      historyPage([historyItem('new-job', 'running')]),
+    );
 
     await mounted.controller.refreshActivity();
     expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['new-job']);
@@ -252,6 +255,31 @@ describe('useImportJobsController', () => {
     expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(3);
     expect(mounted.controller.activeJobs.value).toEqual([]);
     expect(mounted.controller.recentJobs.value.map((job) => job.id)).toEqual(['active-job']);
+
+    mounted.app.unmount();
+  });
+
+  test('reloads active jobs when history observes newly queued work', async () => {
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([]);
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(historyPage([]));
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+
+    vi.mocked(fetchImportJobs)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([activeJob('new-job')]);
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
+      historyPage([historyItem('new-job', 'running')]),
+    );
+
+    await mounted.controller.refreshActivity();
+
+    expect(fetchImportJobs).toHaveBeenCalledTimes(3);
+    expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(2);
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['new-job']);
 
     mounted.app.unmount();
   });

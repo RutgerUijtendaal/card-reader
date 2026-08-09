@@ -108,6 +108,25 @@ describe('ImportSourcePicker', () => {
     mounted.app.unmount();
   });
 
+  test('rejects image MIME types without a server-supported filename suffix', async () => {
+    const mounted = mountPicker();
+    const validImage = new File(['image'], 'card.png', { type: 'image/png' });
+    const missingSuffix = new File(['image'], 'card', { type: 'image/png' });
+    const dropTarget = mounted.host.querySelector('.border-dashed');
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      configurable: true,
+      value: { files: [validImage, missingSuffix] },
+    });
+    dropTarget?.dispatchEvent(dropEvent);
+    await nextTick();
+
+    expect(mounted.onSelect).toHaveBeenCalledWith([validImage]);
+    expect(mounted.host.textContent).toContain('1 unsupported file was ignored.');
+
+    mounted.app.unmount();
+  });
+
   test('clears a previous selection when its replacement has no supported images', async () => {
     const mounted = mountPicker();
     const previousImage = new File(['image'], 'previous.png', { type: 'image/png' });
