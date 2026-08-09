@@ -39,6 +39,7 @@ type UseDeckEditorPublicationOptions = {
 export type PendingCreateResolution = 'created' | 'deleted' | 'unknown';
 
 const AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS = [0, 250, 750, 2_000] as const;
+const AMBIGUOUS_CLIENT_RESPONSE_STATUSES = new Set([408, 499]);
 
 const wait = async (delayMs: number): Promise<void> => {
   if (delayMs === 0) return;
@@ -83,6 +84,14 @@ const immutableAttempt = (
   Object.freeze(clonedPayload.suggested_type_labels);
   Object.freeze(clonedPayload);
   return Object.freeze({ draftId, payload: clonedPayload, signature, startedAt });
+};
+
+const isDefinitiveCreateRejection = (error: unknown): boolean => {
+  if (!isAxiosError(error) || error.response === undefined) return false;
+  const { status } = error.response;
+  return status >= 400
+    && status < 500
+    && !AMBIGUOUS_CLIENT_RESPONSE_STATUSES.has(status);
 };
 
 export const useDeckEditorPublication = (options: UseDeckEditorPublicationOptions) => {
@@ -154,7 +163,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     requestError: unknown,
   ): Promise<void> => {
     setCreationState({ status: 'unknown', reconciliation: 'checking' });
-    const requestDefinitelyFinished = isAxiosError(requestError) && requestError.response !== undefined;
+    const requestDefinitelyFinished = isDefinitiveCreateRejection(requestError);
     const lookup = await lookupAttempt(
       currentAttempt,
       requestDefinitelyFinished ? [0] : AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS,

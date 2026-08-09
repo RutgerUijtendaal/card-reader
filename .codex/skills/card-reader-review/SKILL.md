@@ -27,10 +27,11 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Stateful workflows encoded as interacting flags without an explicit transition model
 - Cleanup failures that block or undo an already confirmed authoritative success
 - Background reconciliation that can navigate after route leave, or auxiliary recovery failures that unlock an unresolved authoritative request
-- Reload recovery that treats repeated lookup misses as proof of mutation failure without a definitive response from the originating request
+- Reload recovery that treats repeated lookup misses as proof of mutation failure without a definitive rejection from the originating request, or code that treats every HTTP response (including gateway errors) as definitive
 - Ambiguous network responses without idempotent lookup/retry behavior, retries whose key or payload can change, or used keys that become reusable when their created resource is deleted
 - Local and server sources of truth that can silently drift, especially across tabs or after partial persistence failures
 - Recovery and conflict prompts that can overlap, or conflict resolution that substitutes an unhydrated blank form for the recoverable local candidate
+- Eager cleanup of cross-tab retirement markers, or conflict transitions that forget a local draft key was already consumed when the shared slot changes again
 - Conditional browser writes implemented as a non-atomic read-then-write instead of a cross-tab lock or transactional primitive
 
 ## Review Workflow

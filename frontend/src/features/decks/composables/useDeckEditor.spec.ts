@@ -957,6 +957,31 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('treats gateway timeout responses as ambiguous creation outcomes', async () => {
+    createDeckMock.mockRejectedValueOnce(Object.assign(new Error('Gateway timeout'), {
+      isAxiosError: true,
+      response: { status: 504 },
+    }));
+    fetchMyDeckByCreationKeyMock.mockResolvedValue({ status: 'missing' });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Timed Out Upstream');
+
+    const createPromise = mounted.controller.saveDeck();
+    await vi.runAllTimersAsync();
+    await createPromise;
+
+    expect(fetchMyDeckByCreationKeyMock).toHaveBeenCalledTimes(4);
+    expect(mounted.controller.creationState.value).toEqual({
+      status: 'unknown',
+      reconciliation: 'awaiting-retry',
+    });
+    expect(loadLocalDraft('user-1')?.pendingCreateAttempt?.payload.name)
+      .toBe('Timed Out Upstream');
+    mounted.unmount();
+  });
+
   test('blocks route changes while an ambiguous Create is actively reconciling', async () => {
     createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
     let resolveLookup!: (result: { status: 'missing' }) => void;
@@ -1194,12 +1219,60 @@ describe('useDeckEditor', () => {
     dispatchDraftStorageEvent('user-1');
 
     expect(mounted.controller.localDraftConflict.value?.kind).toBe('created-elsewhere');
+
+    const replacementForm = createEmptyDeckForm();
+    replacementForm.name = 'New Draft in Creating Tab';
+    const replacementDraft = buildStoredDeckEditorDraft(
+      'user-1',
+      'replacement-draft-id',
+      replacementForm,
+      {},
+    );
+    const replacement = await storage.save(
+      replacementDraft,
+      retirement.status === 'retired'
+        ? { kind: 'retired', revision: retirement.marker.revision }
+        : { kind: 'empty' },
+    );
+    expect(replacement.status).toBe('saved');
+    dispatchDraftStorageEvent('user-1');
+
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('created-elsewhere');
     await mounted.controller.keepConflictAsNewDraft();
     const keptDraft = loadLocalDraft('user-1');
 
     expect(keptDraft?.draftId).not.toBe(activeDraft.draftId);
     expect(keptDraft?.form.name).toBe('Keep Separate');
     expect(mounted.controller.persistenceState.value.status).toBe('synced');
+    mounted.unmount();
+  });
+
+  test('retains a retired marker until a new local draft replaces it', async () => {
+    const retiredForm = createEmptyDeckForm();
+    retiredForm.name = 'Already Created';
+    const activeDraft = await saveLocalDraft('user-1', retiredForm, {});
+    const storage = createDeckEditorLocalDraftStorage();
+    const retirement = await storage.retire(
+      'user-1',
+      activeDraft.draftId,
+      'deck-already-created',
+      { kind: 'draft', revision: activeDraft.revision },
+    );
+    expect(retirement.status).toBe('retired');
+
+    const mounted = await mountController('/my/decks/new');
+    await flushAsyncEditorWork();
+
+    const retained = storage.read('user-1');
+    expect(retained.status === 'loaded' ? retained.slot.kind : null).toBe('retired');
+    expect(mounted.controller.localDraftRecoveryModalOpen.value).toBe(false);
+
+    mounted.controller.deck.setDeckName('Replacement Draft');
+    await flushAsyncEditorWork();
+
+    const replacement = loadLocalDraft('user-1');
+    expect(replacement?.draftId).not.toBe(activeDraft.draftId);
+    expect(replacement?.form.name).toBe('Replacement Draft');
     mounted.unmount();
   });
 

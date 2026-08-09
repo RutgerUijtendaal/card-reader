@@ -91,13 +91,16 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   };
 
   const enterConflict = (slot: DeckEditorDraftSlot): void => {
+    const existingCreatedElsewhere = conflict.value?.kind === 'created-elsewhere'
+      ? conflict.value
+      : null;
     if (pendingRecovery.value) {
       recoveryConflictCandidate.value = pendingRecovery.value;
       storedDraft.value = pendingRecovery.value;
       pendingRecovery.value = null;
     }
     observedSlot.value = slot;
-    conflict.value = conflictFromSlot(slot);
+    conflict.value = existingCreatedElsewhere ?? conflictFromSlot(slot);
     setPersistenceState({ status: 'conflict' });
   };
 
@@ -114,21 +117,6 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
       draftId.value = result.slot.draft.draftId;
       setPersistenceState({ status: 'recovery' });
       return;
-    }
-    if (result.slot.kind === 'retired') {
-      const discarded = await storage.discard(
-        options.ownerId,
-        deckEditorDraftSlotToken(result.slot),
-      );
-      if (discarded.status === 'unavailable') {
-        setMemoryOnly('Local draft recovery is unavailable in this browser.');
-        return;
-      }
-      if (discarded.status === 'conflict') {
-        enterConflict(discarded.slot);
-        return;
-      }
-      observedSlot.value = { kind: 'empty' };
     }
     setPersistenceState({ status: 'synced' });
   };

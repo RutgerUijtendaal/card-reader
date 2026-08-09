@@ -40,9 +40,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Capture an immutable request payload and idempotency key before uncertain mutations; retries must reuse both exactly.
 - Treat browser persistence, server mutation, and cleanup as independent failure domains. Confirmed server success is terminal even when local cleanup fails.
 - Run authoritative pending-request reconciliation even when auxiliary recovery work such as filters, snapshots, or metadata hydration fails; those failures must not unlock mutation first.
-- A lookup miss is definitive only when paired with authoritative evidence that the originating mutation failed. On reload, timeout-only misses must retain the immutable pending request for idempotent retry.
+- A lookup miss is definitive only when paired with authoritative evidence that the originating mutation failed. The presence of an HTTP response is insufficient: gateway errors and request timeouts can race an upstream commit. On reload, timeout-only misses must retain the immutable pending request for idempotent retry.
 - Use revision-conditional writes plus native storage events for cross-tab state. A `localStorage` read followed by a write is not atomic; serialize the comparison and mutation with Web Locks or use a transactional persistence primitive, falling back to memory-only when atomicity is unavailable. Pause mutation and require an explicit conflict resolution instead of silently choosing a source of truth.
 - Recovery and cross-tab conflict UI must be mutually exclusive. If a conflict interrupts recovery, preserve the recovered draft as the local conflict candidate before closing the recovery decision surface.
+- Keep local retirement markers until conditionally replaced by a new draft. Once a tab learns that its draft key was created elsewhere, preserve that fact through later slot changes so the Keep action must assign a fresh key.
 
 ## Implementation Workflow
 
