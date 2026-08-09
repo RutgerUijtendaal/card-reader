@@ -420,12 +420,15 @@ def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
         {"view": "summary", "q": "Summary Public", "page": 1, "page_size": 10},
     )
     assert page_response.status_code == 200
-    assert page_response.json() == {
+    page_payload = page_response.json()
+    assert isinstance(page_payload["snapshot_at"], str)
+    assert page_payload == {
         "count": 1,
         "next_page": None,
         "previous_page": None,
         "page": 1,
         "page_size": 10,
+        "snapshot_at": page_payload["snapshot_at"],
         "results": payload,
     }
 
@@ -472,6 +475,7 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     assert page_payload["count"] == 3
     assert page_payload["page"] == 2
     assert page_payload["page_size"] == 2
+    assert isinstance(page_payload["snapshot_at"], str)
     assert page_payload["previous_page"] == 1
     assert page_payload["next_page"] is None
     assert len(page_payload["results"]) == 1
@@ -488,6 +492,56 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     assert out_of_range_payload["previous_page"] == 1
     assert out_of_range_payload["next_page"] is None
     assert len(out_of_range_payload["results"]) == 1
+
+    stable_first_response = client.get(
+        "/my/decks",
+        {"view": "summary", "page": 1, "page_size": 2},
+    )
+    assert stable_first_response.status_code == 200
+    stable_first_payload = stable_first_response.json()
+    stable_first_ids = {row["id"] for row in stable_first_payload["results"]}
+    remaining_deck = next(deck for deck in owned_decks if deck.id not in stable_first_ids)
+    DeckService().update_deck(
+        deck_id=remaining_deck.id,
+        updates=DeckUpdateInput(difficulty="easy", update_difficulty=True),
+    )
+
+    stable_second_response = client.get(
+        "/my/decks",
+        {
+            "view": "summary",
+            "page": 2,
+            "page_size": 2,
+            "snapshot_at": stable_first_payload["snapshot_at"],
+        },
+    )
+    assert stable_second_response.status_code == 200
+    stable_second_payload = stable_second_response.json()
+    stable_second_ids = {row["id"] for row in stable_second_payload["results"]}
+    assert stable_first_ids | stable_second_ids == {deck.id for deck in owned_decks}
+
+    newer_deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Summary Owned After Snapshot",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    snapshot_response = client.get(
+        "/my/decks",
+        {
+            "view": "summary",
+            "page": 1,
+            "page_size": 10,
+            "snapshot_at": stable_first_payload["snapshot_at"],
+        },
+    )
+    assert snapshot_response.status_code == 200
+    snapshot_payload = snapshot_response.json()
+    assert snapshot_payload["count"] == 3
+    assert newer_deck.id not in {row["id"] for row in snapshot_payload["results"]}
 
 
 def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:

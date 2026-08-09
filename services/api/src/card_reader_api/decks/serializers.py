@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime
 from typing import TypedDict, cast
 
 from rest_framework import serializers
@@ -349,6 +350,7 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     view = serializers.ChoiceField(choices=['summary'], required=False, allow_null=True)
     page = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     page_size = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=100)
+    snapshot_at = serializers.DateTimeField(required=False, allow_null=True)
     hero_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     author_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     card_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -360,7 +362,11 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     deck_tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
-        if (attrs.get("page") is not None or attrs.get("page_size") is not None) and attrs.get("view") != "summary":
+        pagination_requested = any(
+            attrs.get(key) is not None
+            for key in ("page", "page_size", "snapshot_at")
+        )
+        if pagination_requested and attrs.get("view") != "summary":
             raise serializers.ValidationError({"view": "Pagination is only available for summary deck lists."})
         return attrs
 
@@ -391,6 +397,10 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
             page if isinstance(page, int) else 1,
             page_size if isinstance(page_size, int) else 10,
         )
+
+    def pagination_snapshot(self) -> datetime | None:
+        value = self.validated_data.get("snapshot_at")
+        return value if isinstance(value, datetime) else None
 
     def _string_or_none(self, key: str) -> str | None:
         value = self.validated_data.get(key)

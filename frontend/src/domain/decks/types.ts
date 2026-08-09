@@ -131,6 +131,7 @@ export type PaginatedDeckSummariesResponse = {
   previous_page: number | null;
   page: number;
   page_size: number;
+  snapshot_at: string;
   results: DeckSummaryRecord[];
 };
 

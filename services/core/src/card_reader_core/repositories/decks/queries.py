@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
+from django.utils import timezone
 
 from card_reader_core.models import Deck, DeckCreation, DeckVisibility
 
@@ -11,6 +13,7 @@ from .prefetch import deck_queryset, deck_summary_queryset, deck_validation_quer
 from .types import DeckSummaryPage
 
 PUBLIC_DECK_VISIBILITIES: tuple[DeckVisibility, DeckVisibility] = ("public", "unlisted")
+PAGINATED_DECK_ORDERING = ("-created_at", "id")
 
 
 def list_public_decks(
@@ -135,6 +138,7 @@ def list_owner_deck_summaries(
 
 def list_public_deck_summary_candidates(
     *,
+    snapshot_at: datetime,
     search_query: str | None = None,
     hero_query: str | None = None,
     author_query: str | None = None,
@@ -148,7 +152,10 @@ def list_public_deck_summary_candidates(
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
-            deck_validation_queryset().filter(visibility="public"),
+            deck_validation_queryset().filter(
+                visibility="public",
+                created_at__lte=snapshot_at,
+            ),
             search_query=search_query,
             hero_query=hero_query,
             author_query=author_query,
@@ -159,7 +166,7 @@ def list_public_deck_summary_candidates(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
-        ).order_by("-updated_at", "-created_at", "id")
+        ).order_by(*PAGINATED_DECK_ORDERING)
     )
 
 
@@ -168,6 +175,7 @@ def get_deck_summary_page_by_ids(
     *,
     page: int,
     page_size: int,
+    snapshot_at: datetime,
 ) -> DeckSummaryPage:
     count = len(ordered_deck_ids)
     normalized_page, normalized_page_size, offset = _pagination_bounds(
@@ -195,6 +203,7 @@ def get_deck_summary_page_by_ids(
         count=count,
         page=normalized_page,
         page_size=normalized_page_size,
+        snapshot_at=snapshot_at,
         results=results,
     )
 
@@ -204,6 +213,7 @@ def list_owner_deck_summary_page(
     *,
     page: int,
     page_size: int,
+    snapshot_at: datetime | None = None,
     search_query: str | None = None,
     hero_query: str | None = None,
     card_query: str | None = None,
@@ -214,8 +224,12 @@ def list_owner_deck_summary_page(
     deck_tag_exclude_ids: list[str] | None = None,
     deck_tag_match: str | None = None,
 ) -> DeckSummaryPage:
+    effective_snapshot_at = snapshot_at or timezone.now()
     queryset = apply_deck_filters(
-        deck_summary_queryset().filter(owner_id=owner_id),
+        deck_summary_queryset().filter(
+            owner_id=owner_id,
+            created_at__lte=effective_snapshot_at,
+        ),
         search_query=search_query,
         hero_query=hero_query,
         author_query=None,
@@ -226,8 +240,13 @@ def list_owner_deck_summary_page(
         deck_tag_ids=deck_tag_ids,
         deck_tag_exclude_ids=deck_tag_exclude_ids,
         deck_tag_match=deck_tag_match,
-    ).order_by("-updated_at", "-created_at", "id")
-    return _paginate_deck_summary_queryset(queryset, page=page, page_size=page_size)
+    ).order_by(*PAGINATED_DECK_ORDERING)
+    return _paginate_deck_summary_queryset(
+        queryset,
+        page=page,
+        page_size=page_size,
+        snapshot_at=effective_snapshot_at,
+    )
 
 
 def _paginate_deck_summary_queryset(
@@ -235,6 +254,7 @@ def _paginate_deck_summary_queryset(
     *,
     page: int,
     page_size: int,
+    snapshot_at: datetime,
 ) -> DeckSummaryPage:
     count = queryset.count()
     normalized_page, normalized_page_size, offset = _pagination_bounds(
@@ -246,6 +266,7 @@ def _paginate_deck_summary_queryset(
         count=count,
         page=normalized_page,
         page_size=normalized_page_size,
+        snapshot_at=snapshot_at,
         results=list(queryset[offset : offset + normalized_page_size]),
     )
 

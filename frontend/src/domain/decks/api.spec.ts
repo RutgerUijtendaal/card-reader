@@ -50,11 +50,14 @@ describe('deck API', () => {
       previous_page: 1,
       page: 2,
       page_size: 10,
+      snapshot_at: '2026-08-09T17:00:00Z',
       results: [],
     };
     vi.mocked(api.get).mockResolvedValueOnce({ data: page });
 
-    await expect(fetchPage(new URLSearchParams({ q: 'tempo' }), 2)).resolves.toEqual(page);
+    await expect(
+      fetchPage(new URLSearchParams({ q: 'tempo' }), 2, 10, '2026-08-09T17:00:00Z'),
+    ).resolves.toEqual(page);
     const config = vi.mocked(api.get).mock.calls.at(-1)?.[1] as { params?: URLSearchParams };
 
     expect(api.get).toHaveBeenCalledWith(path, { params: expect.any(URLSearchParams) });
@@ -62,6 +65,7 @@ describe('deck API', () => {
     expect(config.params?.get('view')).toBe('summary');
     expect(config.params?.get('page')).toBe('2');
     expect(config.params?.get('page_size')).toBe('10');
+    expect(config.params?.get('snapshot_at')).toBe('2026-08-09T17:00:00Z');
   });
 
   test('maps the structured TTS deck export response', async () => {

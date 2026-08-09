@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from card_reader_core.models import Deck
 
@@ -10,4 +11,5 @@ class DeckSummaryPage:
     count: int
     page: int
     page_size: int
+    snapshot_at: datetime
     results: list[Deck]

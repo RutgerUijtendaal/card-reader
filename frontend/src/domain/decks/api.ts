@@ -40,10 +40,14 @@ const withSummaryPagination = (
   params: URLSearchParams | undefined,
   page: number,
   pageSize: number,
+  snapshotAt?: string | null,
 ): URLSearchParams => {
   const nextParams = withSummaryView(params);
   nextParams.set('page', String(page));
   nextParams.set('page_size', String(pageSize));
+  if (snapshotAt) {
+    nextParams.set('snapshot_at', snapshotAt);
+  }
   return nextParams;
 };
 
@@ -60,9 +64,10 @@ export const fetchPublicDeckSummaryPage = async (
   params: URLSearchParams | undefined,
   page: number,
   pageSize = 10,
+  snapshotAt?: string | null,
 ): Promise<PaginatedDeckSummariesResponse> => {
   const response = await api.get<PaginatedDeckSummariesResponse>('/decks', {
-    params: withSummaryPagination(params, page, pageSize),
+    params: withSummaryPagination(params, page, pageSize, snapshotAt),
   });
   return response.data;
 };
@@ -90,9 +95,10 @@ export const fetchMyDeckSummaryPage = async (
   params: URLSearchParams | undefined,
   page: number,
   pageSize = 10,
+  snapshotAt?: string | null,
 ): Promise<PaginatedDeckSummariesResponse> => {
   const response = await api.get<PaginatedDeckSummariesResponse>('/my/decks', {
-    params: withSummaryPagination(params, page, pageSize),
+    params: withSummaryPagination(params, page, pageSize, snapshotAt),
   });
   return response.data;
 };

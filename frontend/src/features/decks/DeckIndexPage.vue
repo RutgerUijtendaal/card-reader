@@ -289,7 +289,7 @@
 <script setup lang="ts">
 import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
 import { BookOpen, Folders, Gamepad2, Hammer, Pencil, Share2, Tags, Trash2 } from 'lucide-vue-next';
-import { computed, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
@@ -329,6 +329,7 @@ import { deckDifficultyLabels, deckDifficultyOptions } from '@/domain/decks/util
 import { buildDeckShareUrl, canShareDeck } from '@/domain/decks/utils/share';
 import type {
   DeckDifficulty,
+  DeckRecord,
   DeckSummaryRecord,
   DeckUpdateRequest,
   DeckVisibility,
@@ -349,12 +350,14 @@ const deckPageState = shallowRef(createEmptyGalleryPageState<DeckSummaryRecord>(
 const decks = computed(() => deckPageState.value.cards);
 const totalDeckCount = computed(() => deckPageState.value.count);
 const nextPage = computed(() => deckPageState.value.nextPage);
+const deckSnapshotAt = ref<string | null>(null);
 const pageSize = 10;
 const loading = ref(false);
 const loadingNextPage = ref(false);
 const initialLoadError = ref<string | null>(null);
 const loadMoreError = ref<string | null>(null);
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
+const loadMoreSentinelIsIntersecting = ref(false);
 const deleting = ref(false);
 const deleteTarget = ref<DeckSummaryRecord | null>(null);
 const savingDeckIds = ref(new Set<string>());
@@ -413,9 +416,12 @@ const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<
   const requestId = ++deckLoadRequestId;
   const requestedPath = currentDeckPath.value;
   const requestedSignature = currentRouteSignature.value;
+  const requestedSnapshotAt = mode === 'append' ? deckSnapshotAt.value : null;
   if (mode === 'replace') {
     loading.value = true;
+    loadingNextPage.value = false;
     initialLoadError.value = null;
+    loadMoreError.value = null;
   } else {
     loadingNextPage.value = true;
     loadMoreError.value = null;
@@ -424,8 +430,8 @@ const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<
     const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
     const response =
       requestedPath === '/my/decks'
-        ? await fetchMyDeckSummaryPage(params, page, pageSize)
-        : await fetchPublicDeckSummaryPage(params, page, pageSize);
+        ? await fetchMyDeckSummaryPage(params, page, pageSize, requestedSnapshotAt)
+        : await fetchPublicDeckSummaryPage(params, page, pageSize, requestedSnapshotAt);
     if (
       requestId === deckLoadRequestId &&
       currentDeckPath.value === requestedPath &&
@@ -434,6 +440,7 @@ const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<
       deckPageState.value = mode === 'replace'
         ? replaceGalleryPage(response)
         : appendGalleryPage(deckPageState.value, response);
+      deckSnapshotAt.value = response.snapshot_at;
       return true;
     }
   } catch {
@@ -458,13 +465,29 @@ const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<
   return false;
 };
 
-const refreshDecks = async (): Promise<boolean> => loadDecksPage(1, 'replace');
+const scheduleNextPageIfVisible = (): void => {
+  void nextTick().then(() => {
+    if (loadMoreSentinelIsIntersecting.value && nextPage.value !== null) {
+      void loadNextPage();
+    }
+  });
+};
+
+const refreshDecks = async (): Promise<boolean> => {
+  const loaded = await loadDecksPage(1, 'replace');
+  if (loaded) {
+    scheduleNextPageIfVisible();
+  }
+  return loaded;
+};
 
 const loadNextPage = async (): Promise<void> => {
   if (loading.value || loadingNextPage.value || loadMoreError.value || nextPage.value === null) {
     return;
   }
-  await loadDecksPage(nextPage.value, 'append');
+  if (await loadDecksPage(nextPage.value, 'append')) {
+    scheduleNextPageIfVisible();
+  }
 };
 
 const retryNextPage = (): void => {
@@ -475,7 +498,8 @@ const retryNextPage = (): void => {
 useIntersectionObserver(
   loadMoreSentinelRef,
   (entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) {
+    loadMoreSentinelIsIntersecting.value = entries.some((entry) => entry.isIntersecting);
+    if (loadMoreSentinelIsIntersecting.value) {
       void loadNextPage();
     }
   },
@@ -516,6 +540,7 @@ watch(
       applyRouteFilterState(routeState);
     }
     deckPageState.value = createEmptyGalleryPageState<DeckSummaryRecord>();
+    deckSnapshotAt.value = null;
     initialLoadError.value = null;
     loadMoreError.value = null;
     await refreshDecks();
@@ -586,6 +611,29 @@ const closeTagManager = (force = false): void => {
   tagManagerLoading.value = false;
 };
 
+const applyUpdatedDeckRecord = (nextDeck: DeckRecord): void => {
+  deckPageState.value = {
+    ...deckPageState.value,
+    cards: deckPageState.value.cards.map((entry) =>
+      entry.id === nextDeck.id
+        ? {
+            ...entry,
+            difficulty: nextDeck.difficulty,
+            visibility: nextDeck.visibility,
+            tags: nextDeck.tags,
+            pending_tag_suggestions: nextDeck.pending_tag_suggestions,
+            status: {
+              is_valid: nextDeck.status.is_valid,
+              label: nextDeck.status.label,
+              deprecated_card_count: nextDeck.status.deprecated_card_count,
+            },
+            updated_at: nextDeck.updated_at,
+          }
+        : entry,
+    ),
+  };
+};
+
 const saveManagedDeckTags = async (): Promise<void> => {
   const target = tagManagerTarget.value;
   if (!target || tagManagerLoading.value || tagManagerSaving.value || tagManagerError.value) {
@@ -601,6 +649,7 @@ const saveManagedDeckTags = async (): Promise<void> => {
     if (feedback) {
       toast.info(feedback);
     }
+    applyUpdatedDeckRecord(record);
     closeTagManager(true);
     toast.success('Deck tags updated.');
     if (!(await refreshDecks())) {
@@ -621,7 +670,8 @@ const updateDeckQuickMetadata = async (
 ): Promise<void> => {
   savingDeckIds.value = new Set(savingDeckIds.value).add(deck.id);
   try {
-    await updateDeck(deck.id, payload);
+    const nextDeck = await updateDeck(deck.id, payload);
+    applyUpdatedDeckRecord(nextDeck);
     toast.success(successMessage);
     if (!(await refreshDecks())) {
       toast.error('The deck was updated, but the deck list could not be refreshed.');

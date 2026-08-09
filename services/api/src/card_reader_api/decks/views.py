@@ -67,6 +67,7 @@ def _deck_summary_page_response(
             "previous_page": summary_page.page - 1 if summary_page.page > 1 else None,
             "page": summary_page.page,
             "page_size": summary_page.page_size,
+            "snapshot_at": summary_page.snapshot_at.isoformat(),
             "results": [
                 deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
                 for deck in summary_page.results
@@ -93,6 +94,7 @@ class PublicDeckListView(APIView):
                 "view": request.query_params.get("view"),
                 "page": request.query_params.get("page"),
                 "page_size": request.query_params.get("page_size"),
+                "snapshot_at": request.query_params.get("snapshot_at"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -112,6 +114,7 @@ class PublicDeckListView(APIView):
             summary_page = service.list_public_deck_summary_page(
                 page=page,
                 page_size=page_size,
+                snapshot_at=serializer.pagination_snapshot(),
                 **filters,
             )
             return _deck_summary_page_response(summary_page)
@@ -154,6 +157,7 @@ class OwnerDeckListCreateView(APIView):
                 "view": request.query_params.get("view"),
                 "page": request.query_params.get("page"),
                 "page_size": request.query_params.get("page_size"),
+                "snapshot_at": request.query_params.get("snapshot_at"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -175,6 +179,7 @@ class OwnerDeckListCreateView(APIView):
                 owner_id,
                 page=page,
                 page_size=page_size,
+                snapshot_at=serializer.pagination_snapshot(),
                 search_query=filters["search_query"],
                 hero_query=filters["hero_query"],
                 card_query=filters["card_query"],
