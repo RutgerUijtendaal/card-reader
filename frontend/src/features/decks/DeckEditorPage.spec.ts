@@ -39,6 +39,7 @@ const { controller } = vi.hoisted(() => {
       localDraftConflict: refValue<null | {
         kind: 'active-draft' | 'remote-deletion' | 'created-elsewhere';
       }>(null),
+      localDraftConflictModalOpen: refValue(false),
       conflictActionsLocked: refValue(false),
       deckBuildingRules: refValue({
         mainboard_card_count: { min: 40, max: 60 },
@@ -535,6 +536,21 @@ describe('DeckEditorPage', () => {
     expect(controller.resumeLocalDraft).toHaveBeenCalledTimes(1);
     expect(controller.discardPendingLocalDraft).toHaveBeenCalledTimes(1);
     mounted.unmount();
+  });
+
+  test('shows a draft conflict only after recovery or creation locking finishes', async () => {
+    controller.localDraftConflict.value = { kind: 'active-draft' };
+    controller.localDraftConflictModalOpen.value = false;
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[data-testid="draft-conflict-modal"]')).toBeNull();
+    mounted.unmount();
+
+    controller.localDraftConflictModalOpen.value = true;
+    const remounted = await mountPage();
+
+    expect(remounted.container.querySelector('[data-testid="draft-conflict-modal"]')).not.toBeNull();
+    remounted.unmount();
   });
 
   test('does not change the save button label during autosync saves', async () => {

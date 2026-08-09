@@ -709,8 +709,13 @@ describe('useDeckEditor', () => {
     await vi.runAllTimersAsync();
     await resumePromise;
 
-    expect(mounted.controller.creationState.value.status).toBe('idle');
-    expect(loadLocalDraft('user-1')?.pendingCreateAttempt).toBeNull();
+    expect(mounted.controller.creationState.value).toEqual({
+      status: 'unknown',
+      reconciliation: 'awaiting-retry',
+    });
+    expect(mounted.controller.isMutationLocked.value).toBe(true);
+    expect(loadLocalDraft('user-1')?.pendingCreateAttempt?.signature)
+      .toBe('pending-hydration-signature');
     mounted.unmount();
   });
 
@@ -1073,6 +1078,87 @@ describe('useDeckEditor', () => {
 
     expect(mounted.controller.deck.form.name).toBe('Stored Tab');
     expect(mounted.controller.persistenceState.value.status).toBe('synced');
+    mounted.unmount();
+  });
+
+  test('uses the pending recovery as the local candidate when storage changes', async () => {
+    const recoverableForm = createEmptyDeckForm();
+    recoverableForm.name = 'Recover This Draft';
+    await saveLocalDraft('user-1', recoverableForm, {});
+    const mounted = await mountController('/my/decks/new');
+
+    expect(mounted.controller.localDraftRecoveryModalOpen.value).toBe(true);
+
+    const remoteForm = createEmptyDeckForm();
+    remoteForm.name = 'Changed in Another Tab';
+    await saveLocalDraft('user-1', remoteForm, {});
+    dispatchDraftStorageEvent('user-1');
+    await flushAsyncEditorWork();
+    await flushAsyncEditorWork();
+
+    expect(mounted.controller.localDraftRecoveryModalOpen.value).toBe(false);
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('active-draft');
+    expect(mounted.controller.localDraftConflictModalOpen.value).toBe(true);
+    expect(mounted.controller.deck.form.name).toBe('Recover This Draft');
+
+    await mounted.controller.keepThisConflictDraft();
+
+    expect(loadLocalDraft('user-1')?.form.name).toBe('Recover This Draft');
+    expect(mounted.controller.persistenceState.value.status).toBe('synced');
+    mounted.unmount();
+  });
+
+  test('keeps an interrupted recovered Create locked and retries its original payload', async () => {
+    const recoverableForm = {
+      ...createEmptyDeckForm(),
+      name: 'Pending Local Create',
+      hero_card_id: 'hero-pending-conflict',
+    };
+    const pendingAttempt: StoredCreateAttempt = {
+      payload: {
+        name: recoverableForm.name,
+        description: null,
+        long_description: null,
+        difficulty: null,
+        visibility: 'private',
+        hero_card_id: recoverableForm.hero_card_id,
+        entries: [],
+        sideboards: [],
+        tag_ids: [],
+        suggested_type_labels: [],
+      },
+      signature: 'pending-conflict-signature',
+      startedAt: '2026-08-09T04:00:00Z',
+    };
+    await saveLocalDraft('user-1', recoverableForm, {}, pendingAttempt);
+    const mounted = await mountController('/my/decks/new');
+
+    const remoteForm = createEmptyDeckForm();
+    remoteForm.name = 'Remote Draft During Recovery';
+    await saveLocalDraft('user-1', remoteForm, {});
+    dispatchDraftStorageEvent('user-1');
+    await vi.runAllTimersAsync();
+    await flushAsyncEditorWork();
+
+    expect(mounted.controller.localDraftRecoveryModalOpen.value).toBe(false);
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('active-draft');
+    expect(mounted.controller.localDraftConflictModalOpen.value).toBe(false);
+    expect(mounted.controller.creationState.value).toEqual({
+      status: 'unknown',
+      reconciliation: 'awaiting-retry',
+    });
+    expect(mounted.controller.deck.form.name).toBe('Pending Local Create');
+
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledWith(
+      pendingAttempt.payload,
+      'draft-user-1',
+    );
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
+    expect(loadLocalDraft('user-1')?.form.name).toBe('Remote Draft During Recovery');
     mounted.unmount();
   });
 

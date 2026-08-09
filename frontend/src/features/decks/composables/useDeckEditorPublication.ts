@@ -36,7 +36,7 @@ type UseDeckEditorPublicationOptions = {
   onDeleted: (attempt: CreateAttempt) => Promise<void>;
 };
 
-export type PendingCreateResolution = 'created' | 'deleted' | 'missing' | 'unknown';
+export type PendingCreateResolution = 'created' | 'deleted' | 'unknown';
 
 const AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS = [0, 250, 750, 2_000] as const;
 
@@ -232,12 +232,6 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     if (lookup.status === 'deleted') {
       await completeDeleted(recoveredAttempt);
       return 'deleted';
-    }
-    if (lookup.status === 'missing') {
-      attempt.value = null;
-      setCreationState({ status: 'idle' });
-      await options.persistAttempt(null);
-      return 'missing';
     }
     setCreationState({ status: 'unknown', reconciliation: 'awaiting-retry' });
     toast.error('Creation could not be confirmed. Retry will safely use the same deck request.');

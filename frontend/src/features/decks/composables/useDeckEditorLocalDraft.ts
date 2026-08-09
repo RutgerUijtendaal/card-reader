@@ -52,6 +52,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     options.enabled ? { status: 'checking' } : { status: 'synced' },
   );
   const pendingRecovery = ref<StoredDeckEditorDraft | null>(null);
+  const recoveryConflictCandidate = ref<StoredDeckEditorDraft | null>(null);
   const conflict = ref<DeckEditorDraftConflict | null>(null);
   const draftId = ref(createDeckEditorDraftId());
   const observedSlot = ref<DeckEditorDraftSlot>({ kind: 'empty' });
@@ -90,6 +91,11 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   };
 
   const enterConflict = (slot: DeckEditorDraftSlot): void => {
+    if (pendingRecovery.value) {
+      recoveryConflictCandidate.value = pendingRecovery.value;
+      storedDraft.value = pendingRecovery.value;
+      pendingRecovery.value = null;
+    }
     observedSlot.value = slot;
     conflict.value = conflictFromSlot(slot);
     setPersistenceState({ status: 'conflict' });
@@ -129,6 +135,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
 
   const beginRecoveredDraft = (draft: StoredDeckEditorDraft): void => {
     pendingRecovery.value = null;
+    recoveryConflictCandidate.value = null;
     storedDraft.value = draft;
     draftId.value = draft.draftId;
     observedSlot.value = { kind: 'draft', draft };
@@ -170,7 +177,19 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     pendingCreateAttempt?: StoredCreateAttempt | null,
   ): Promise<PersistResult> => await enqueueMutation(async () => {
     if (!options.enabled) return 'paused';
-    if (['checking', 'recovery', 'conflict'].includes(persistenceState.value.status)) return 'paused';
+    if (persistenceState.value.status === 'conflict') {
+      if (pendingCreateAttempt !== undefined && storedDraft.value) {
+        storedDraft.value = {
+          ...storedDraft.value,
+          pendingCreateAttempt,
+        };
+        if (recoveryConflictCandidate.value) {
+          recoveryConflictCandidate.value = storedDraft.value;
+        }
+      }
+      return 'paused';
+    }
+    if (['checking', 'recovery'].includes(persistenceState.value.status)) return 'paused';
     const effectiveAttempt = pendingCreateAttempt === undefined
       ? storedDraft.value?.pendingCreateAttempt ?? null
       : pendingCreateAttempt;
@@ -290,6 +309,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     if (conflict.value?.kind !== 'active-draft' || storedDraft.value?.pendingCreateAttempt) return null;
     const draft = conflict.value.slot.draft;
     conflict.value = null;
+    recoveryConflictCandidate.value = null;
     beginRecoveredDraft(draft);
     return draft;
   };
@@ -311,6 +331,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     ));
     if (result.status === 'unavailable') {
       conflict.value = null;
+      recoveryConflictCandidate.value = null;
       storedDraft.value = nextDraft;
       setPersistenceState({ status: 'memory-only' });
       warnStorageUnavailable('This deck could not be saved to local browser storage.');
@@ -324,6 +345,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     storedDraft.value = result.draft;
     observedSlot.value = { kind: 'draft', draft: result.draft };
     conflict.value = null;
+    recoveryConflictCandidate.value = null;
     setPersistenceState({ status: 'synced' });
     return true;
   };
@@ -331,6 +353,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   const discardThisTab = (): boolean => {
     if (storedDraft.value?.pendingCreateAttempt) return false;
     conflict.value = null;
+    recoveryConflictCandidate.value = null;
     storedDraft.value = null;
     draftId.value = createDeckEditorDraftId();
     setPersistenceState({ status: 'synced' });
@@ -362,6 +385,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   return {
     persistenceState,
     pendingRecovery,
+    recoveryConflictCandidate,
     conflict,
     draftId: computed(() => draftId.value),
     storageUnavailable: computed(() => persistenceState.value.status === 'memory-only'),

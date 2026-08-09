@@ -400,17 +400,35 @@ export const useDeckEditor = () => {
           storedDraft.pendingCreateAttempt,
         );
         if (resolution === 'created' || resolution === 'deleted') return;
-        if (resolution === 'unknown') {
-          await resumeLocalDraft(false);
-          toast.info('The previous Create request is still unconfirmed. Retry it before discarding.');
-          return;
-        }
+        await resumeLocalDraft(false);
+        toast.info('The previous Create request is still unconfirmed. Retry it before discarding.');
+        return;
       }
       await localDraft.discardRecovery();
     } finally {
       recoveryActionPending.value = false;
     }
   };
+
+  watch(localDraft.recoveryConflictCandidate, (storedDraft) => {
+    if (!storedDraft) return;
+    deck.hydrateFromLocalDraft(storedDraft.form);
+    cardLookup.value = { ...cardLookup.value, ...storedDraft.cards };
+    shouldApplyHeroCardPreset.value = Boolean(deck.form.hero_card_id);
+    editorMode.value = 'cards';
+    recoveryActionPending.value = true;
+    void (async () => {
+      try {
+        await refreshRecoveredDraftDependencies();
+        activateCards();
+        if (storedDraft.pendingCreateAttempt) {
+          await publication.recoverPendingAttempt(storedDraft.pendingCreateAttempt);
+        }
+      } finally {
+        recoveryActionPending.value = false;
+      }
+    })();
+  });
 
   const persistDeck = async (): Promise<DeckRecord> =>
     await updateDeck(deckId.value, deck.buildPayload());
@@ -556,7 +574,10 @@ export const useDeckEditor = () => {
   ));
   const isCreating = publication.isCreating;
   const conflictActionsLocked = computed(
-    () => publication.creationState.value.status !== 'idle',
+    () => publication.creationState.value.status !== 'idle' || recoveryActionPending.value,
+  );
+  const localDraftConflictModalOpen = computed(
+    () => localDraft.conflict.value !== null && !conflictActionsLocked.value,
   );
 
   const saveDeck = async (options: { silent?: boolean } = {}): Promise<void> => {
@@ -838,6 +859,7 @@ export const useDeckEditor = () => {
     localDraftRecoveryModalOpen,
     recoveryActionPending,
     localDraftConflict: localDraft.conflict,
+    localDraftConflictModalOpen,
     conflictActionsLocked,
     pendingLocalDraft,
     focusDeckNameRequest,

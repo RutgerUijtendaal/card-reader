@@ -477,7 +477,7 @@
       @discard="controller.discardPendingLocalDraft"
     />
     <DeckDraftConflictModal
-      :open="controller.localDraftConflict.value !== null"
+      :open="controller.localDraftConflictModalOpen.value"
       :kind="controller.localDraftConflict.value?.kind"
       :busy="controller.conflictActionsLocked.value"
       @use-stored="handleUseStoredConflict"
