@@ -8,7 +8,11 @@ The deck selector lives at `/playtester`; an active session lives at `/playteste
 
 Starting a playtest expands mainboard quantities into distinct `PlaytestCardInstance` copies. Sideboards remain reference-only, and the hero begins in its dedicated stack outside the library.
 
-Playtester consumes Player-pool decks only. Its hero-zone behavior follows the card's Hero role through the shared deck contract; it does not maintain a separate Hero boolean or infer classification from card text.
+Playtester consumes Player-pool decks only. Until decks persist their own classification, every deck supported by the current builder is treated as a Player deck. Once explicit deck pools exist, the selector and direct play route must omit or reject Game Master decks rather than inferring eligibility from their current card contents.
+
+The Player/Game Master workspace must not show Playtester in Game Master navigation. A direct Playtester route remains Player-scoped and may switch to the Player workspace or return to a safe Game Master route according to the workspace guard. A future Game Master testing workflow would be a separate design; the current hero, opening-hand, and mainboard assumptions must not be generalized into one automatically.
+
+Hero-zone behavior follows the card's Hero role through the shared deck contract; Playtester does not maintain a separate Hero boolean or infer classification from card text.
 
 ## Opening setup
 

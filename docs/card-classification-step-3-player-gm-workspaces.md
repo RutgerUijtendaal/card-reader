@@ -1,6 +1,6 @@
 # Card Classification Step 3: Player and Game Master Workspaces
 
-Status: approved implementation plan; blocked on [Step 1](card-classification-step-1-foundation.md) and [Step 2](card-classification-step-2-import-inference.md).
+Status: approved implementation plan; blocked on [Step 2](card-classification-step-2-import-inference.md).
 
 This step turns the card pool into a site-level browsing context. It does not change the classification model or infer new data.
 
@@ -20,7 +20,9 @@ The active workspace scopes navigation and card collections so Player and Game M
 - Ordinary card collections are hard-scoped to one pool. An `all pools` option is reserved for explicit staff management tools and must not become a normal workspace.
 - Hero is excluded by default in each workspace. Boon and Event are not globally excluded.
 - Cross-pool links do not automatically change the active workspace. A linked Player Hero opened from a Game Master card is visibly labeled Player, while Back/return navigation preserves the Game Master workspace.
-- Player deck building and Playtester remain Player-only unless a later feature explicitly defines Game Master equivalents.
+- Treat every deck supported by the current deck builder as a **Player deck**. A later deck-design project is expected to add an explicit Player/Game Master classification to stable deck identities, but this workspace step must not infer that classification from a deck's cards or force Game Master decks into the current hero/mainboard/sideboard model.
+- Playtester remains Player-only. It is hidden from Game Master navigation and must accept only explicitly Player-classified decks once deck classification exists.
+- A future **Scenario** is a higher-level composition, not a mixed-pool deck: it may group one or more Player decks with Game Master Boons, Events, and other scenario material. This step must preserve that direction without introducing a scenario schema prematurely.
 
 ## Authoritative success condition
 
@@ -74,6 +76,8 @@ Game Master workspace navigation initially contains:
 - Notifications and Settings under their existing access rules
 - future Game Master-specific entries only when implemented
 
+Decks, My Decks, Build a deck, and Playtester are intentionally absent from the Game Master workspace. The existing deck routes remain Player-workspace routes until the future deck classification and Game Master deck model are designed.
+
 Staff operational navigation such as Imports, Operations, Review Queue, and Admin stays separated below the existing divider and remains accessible from either workspace. Imports should prefill their pool from the active workspace, while still displaying and requiring the pool field specified in Step 2.
 
 ## Collection and route scoping
@@ -89,7 +93,7 @@ Apply the active pool explicitly to every relevant frontend request:
 - Playtester deck/card preview surfaces;
 - any app-wide card counts or suggestions.
 
-Player deck, deck-builder, and Playtester requests always send `card_pool=player`, even if a staff user has Game Master as the shell workspace. If those routes are not offered in Game Master navigation but are reached directly, keep their Player classification explicit and show the Player workspace or route back to a safe Game Master page according to the route guard.
+Player deck, deck-builder, and Playtester requests always send `card_pool=player`, even if a staff user has Game Master as the shell workspace. If those routes are not offered in Game Master navigation but are reached directly, keep their Player classification explicit and show the Player workspace or route back to a safe Game Master page according to the route guard. Once decks have their own explicit pool, Playtester must reject or omit Game Master decks independently of the cards currently embedded in them.
 
 On a workspace switch, discard the outgoing collection result before fetching the incoming pool. Do not show stale Player cards under a Game Master heading or vice versa.
 
@@ -136,6 +140,20 @@ For any existing or future relationship serializer:
 
 This step does not create a new link model. It establishes behavior for relationships that already exist or are added later.
 
+## Deferred deck and scenario model
+
+The current deck domain is Player-focused. Its Hero, mainboard, sideboard, validation, export, and Playtester assumptions must not be treated as the definition of a future Game Master deck.
+
+When deck classification is designed later:
+
+- classify the stable deck identity explicitly as Player or Game Master instead of deriving its pool from contained cards;
+- keep Player deck validation limited to Player-pool cards;
+- define Game Master deck structure and validation deliberately before exposing Game Master deck routes;
+- keep Playtester limited to Player decks unless a separate Game Master testing workflow is designed;
+- model scenarios above decks and cards/groups so a scenario can reference Player decks together with Game Master Boons, Events, and future scenario material without weakening ordinary deck pool rules.
+
+The field name, migration, Game Master deck contents, scenario cardinalities, ownership, visibility, and authoring UI are all deferred. Step 3 only reserves the navigation and scoping boundaries needed to avoid coupling them to the Player deck implementation.
+
 ## Frontend ownership
 
 - Card pool contracts, request parameters, labels, and reusable preference helpers belong in `frontend/src/domain/cards`.
@@ -155,7 +173,7 @@ All visible changes must use semantic theme primitives and be verified in light 
 5. Make nav item composition workspace-aware.
 6. Synchronize workspace, route query, auth changes, and safe landing routes.
 7. Scope gallery and all reusable card collection clients.
-8. Lock deck building and Playtester to Player explicitly.
+8. Keep existing deck routes Player-scoped, hide them and Playtester from Game Master navigation, and lock Playtester to Player decks explicitly.
 9. Prefill, but do not hide, the import pool from the active workspace.
 10. Audit all backend card-derived payloads and assets for capability enforcement.
 11. Update current-state card, import, access, deck, and Playtester documentation.
@@ -201,7 +219,7 @@ Do not run prohibited service/integration suites. Run affected permitted fronten
 
 ## Explicit non-goals
 
-- Game Master deck building or Playtester behavior.
+- Deck classification, Game Master deck structure/building, scenario persistence, or Game Master Playtester behavior.
 - New Game Master-specific tools beyond the scoped Gallery.
 - A new card-to-card relationship model.
 - Public or ordinary authenticated Game Master access in the initial release.
