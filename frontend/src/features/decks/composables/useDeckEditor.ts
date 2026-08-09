@@ -561,6 +561,9 @@ export const useDeckEditor = () => {
         await gallery.searchCards();
       } else if (editorMode.value === 'cards') {
         activateCards();
+        if (!isPublished.value) {
+          await gallery.searchCards();
+        }
       }
     } finally {
       loading.value = false;

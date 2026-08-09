@@ -278,6 +278,7 @@ describe('useDeckEditor', () => {
     expect(mounted.controller.editorMode.value).toBe('cards');
     expect(mounted.controller.isPublished.value).toBe(false);
     expect(mounted.controller.canAutosync.value).toBe(false);
+    expect(searchCardsMock).toHaveBeenCalledTimes(1);
 
     mounted.controller.openHero();
     mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
