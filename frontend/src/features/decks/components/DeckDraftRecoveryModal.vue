@@ -18,8 +18,13 @@
         :id="descriptionId"
         class="theme-section-muted text-sm"
       >
-        This browser has an unpublished deck draft. Resume where you left off or discard it and
-        start a new deck.
+        <template v-if="busy">
+          Checking whether this draft was already created. Keep this page open for a moment.
+        </template>
+        <template v-else>
+          This browser has an unpublished deck draft. Resume where you left off or discard it and
+          start a new deck.
+        </template>
       </p>
       <p
         v-if="savedAtLabel"
@@ -33,6 +38,7 @@
       <button
         class="btn-danger-secondary"
         type="button"
+        :disabled="busy"
         @click="emit('discard')"
       >
         Discard Draft
@@ -40,6 +46,7 @@
       <button
         class="btn-primary"
         type="button"
+        :disabled="busy"
         @click="emit('resume')"
       >
         Resume Draft
@@ -55,6 +62,7 @@ import AppModal from '@/shared/components/modals/AppModal.vue';
 const props = defineProps<{
   open: boolean;
   savedAt?: string;
+  busy?: boolean;
 }>();
 
 const emit = defineEmits<{

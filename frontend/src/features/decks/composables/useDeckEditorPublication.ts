@@ -1,4 +1,5 @@
 import { computed, ref, type Ref } from 'vue';
+import { isAxiosError } from 'axios';
 import { toast } from 'vue-sonner';
 import {
   createDeck,
@@ -26,9 +27,22 @@ type UseDeckEditorPublicationOptions = {
   payloadSignature: Ref<string>;
   buildPayload: () => DeckUpsertRequest;
   validate: () => Promise<boolean>;
-  persistAttempt: (attempt: StoredCreateAttempt | null) => 'saved' | 'memory-only' | 'conflict' | 'paused';
+  persistAttempt: (
+    attempt: StoredCreateAttempt | null,
+  ) => Promise<'saved' | 'memory-only' | 'conflict' | 'paused'>;
   retireAfterCreation: (createdDeckId: string) => void;
   onSuccess: (record: DeckRecord, attempt: CreateAttempt) => Promise<void>;
+};
+
+export type PendingCreateResolution = 'created' | 'missing' | 'unknown';
+
+const AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS = [0, 250, 750, 2_000] as const;
+
+const wait = async (delayMs: number): Promise<void> => {
+  if (delayMs === 0) return;
+  await new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, delayMs);
+  });
 };
 
 const clonePayload = (payload: DeckUpsertRequest): DeckUpsertRequest => ({
@@ -91,29 +105,57 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     }
   };
 
-  const resolveFailedRequest = async (currentAttempt: CreateAttempt): Promise<void> => {
-    try {
-      const record = await fetchMyDeckByCreationKey(currentAttempt.draftId);
-      if (record) {
-        await completeSuccess(record, currentAttempt);
-        return;
+  const lookupAttempt = async (
+    currentAttempt: CreateAttempt,
+    delays: readonly number[],
+  ): Promise<{ status: 'found'; record: DeckRecord } | { status: 'missing' } | { status: 'unknown' }> => {
+    let lookupFailed = false;
+    for (const delayMs of delays) {
+      await wait(delayMs);
+      try {
+        const record = await fetchMyDeckByCreationKey(currentAttempt.draftId);
+        if (record) return { status: 'found', record };
+      } catch {
+        lookupFailed = true;
       }
-      attempt.value = null;
-      setCreationState({ status: 'idle' });
-      options.persistAttempt(null);
-      toast.error('The deck could not be created. Your local draft is still available.');
-    } catch {
-      setCreationState({ status: 'unknown' });
-      toast.error('Creation could not be confirmed. Retry will safely use the same deck request.');
     }
+    return lookupFailed ? { status: 'unknown' } : { status: 'missing' };
+  };
+
+  const clearAttemptAfterDefinitiveFailure = async (): Promise<void> => {
+    attempt.value = null;
+    setCreationState({ status: 'idle' });
+    await options.persistAttempt(null);
+    toast.error('The deck could not be created. Your local draft is still available.');
+  };
+
+  const resolveFailedRequest = async (
+    currentAttempt: CreateAttempt,
+    requestError: unknown,
+  ): Promise<void> => {
+    setCreationState({ status: 'unknown' });
+    const requestDefinitelyFinished = isAxiosError(requestError) && requestError.response !== undefined;
+    const lookup = await lookupAttempt(
+      currentAttempt,
+      requestDefinitelyFinished ? [0] : AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS,
+    );
+    if (lookup.status === 'found') {
+      await completeSuccess(lookup.record, currentAttempt);
+      return;
+    }
+    if (lookup.status === 'missing' && requestDefinitelyFinished) {
+      await clearAttemptAfterDefinitiveFailure();
+      return;
+    }
+    toast.error('Creation could not be confirmed. Retry will safely use the same deck request.');
   };
 
   const executeAttempt = async (currentAttempt: CreateAttempt): Promise<void> => {
     try {
       const result = await createDeck(currentAttempt.payload, currentAttempt.draftId);
       await completeSuccess(result.record, currentAttempt);
-    } catch {
-      await resolveFailedRequest(currentAttempt);
+    } catch (error) {
+      await resolveFailedRequest(currentAttempt, error);
     }
   };
 
@@ -130,7 +172,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
       options.payloadSignature.value,
       new Date().toISOString(),
     );
-    const persistResult = options.persistAttempt(storedAttempt(currentAttempt));
+    const persistResult = await options.persistAttempt(storedAttempt(currentAttempt));
     if (persistResult === 'conflict' || persistResult === 'paused') return;
     attempt.value = currentAttempt;
     setCreationState({ status: 'creating' });
@@ -144,8 +186,11 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     await executeAttempt(currentAttempt);
   };
 
-  const recoverPendingAttempt = async (pending: StoredCreateAttempt): Promise<void> => {
-    if (publicationSucceeded || creationState.value.status !== 'idle') return;
+  const recoverPendingAttempt = async (
+    pending: StoredCreateAttempt,
+  ): Promise<PendingCreateResolution> => {
+    if (publicationSucceeded) return 'created';
+    if (creationState.value.status !== 'idle') return 'unknown';
     const recoveredAttempt = immutableAttempt(
       options.draftId.value,
       pending.payload,
@@ -154,18 +199,19 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     );
     attempt.value = recoveredAttempt;
     setCreationState({ status: 'unknown' });
-    try {
-      const record = await fetchMyDeckByCreationKey(recoveredAttempt.draftId);
-      if (record) {
-        await completeSuccess(record, recoveredAttempt);
-        return;
-      }
+    const lookup = await lookupAttempt(recoveredAttempt, AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS);
+    if (lookup.status === 'found') {
+      await completeSuccess(lookup.record, recoveredAttempt);
+      return 'created';
+    }
+    if (lookup.status === 'missing') {
       attempt.value = null;
       setCreationState({ status: 'idle' });
-      options.persistAttempt(null);
-    } catch {
-      toast.error('Creation could not be confirmed. Retry will safely use the same deck request.');
+      await options.persistAttempt(null);
+      return 'missing';
     }
+    toast.error('Creation could not be confirmed. Retry will safely use the same deck request.');
+    return 'unknown';
   };
 
   return {

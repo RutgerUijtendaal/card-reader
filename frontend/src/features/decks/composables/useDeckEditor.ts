@@ -55,6 +55,7 @@ export const useDeckEditor = () => {
   const autosyncFailedSignature = ref('');
   const discardChangesModalOpen = ref(false);
   const discardLocalDraftModalOpen = ref(false);
+  const recoveryActionPending = ref(false);
   const focusDeckNameRequest = ref(0);
   let bypassNextUnsavedPrompt = false;
   let pendingDiscardConfirmation: ((confirmed: boolean) => void) | null = null;
@@ -343,7 +344,7 @@ export const useDeckEditor = () => {
     deck.setDeckTagIds(deck.form.tag_ids.filter((tagId) => currentTagIds.has(tagId)));
   };
 
-  const resumeLocalDraft = async (): Promise<void> => {
+  const resumeLocalDraft = async (reconcilePendingCreation = true): Promise<void> => {
     const storedDraft = pendingLocalDraft.value;
     if (storedDraft === null) {
       return;
@@ -370,8 +371,8 @@ export const useDeckEditor = () => {
         activateCards();
       }
       localDraft.completeRecovery();
-      localDraft.persist();
-      if (storedDraft.pendingCreateAttempt) {
+      await localDraft.persist();
+      if (reconcilePendingCreation && storedDraft.pendingCreateAttempt) {
         await publication.recoverPendingAttempt(storedDraft.pendingCreateAttempt);
       }
     } finally {
@@ -380,8 +381,26 @@ export const useDeckEditor = () => {
     }
   };
 
-  const discardPendingLocalDraft = (): void => {
-    localDraft.discardRecovery();
+  const discardPendingLocalDraft = async (): Promise<void> => {
+    const storedDraft = pendingLocalDraft.value;
+    if (!storedDraft || recoveryActionPending.value) return;
+    recoveryActionPending.value = true;
+    try {
+      if (storedDraft.pendingCreateAttempt) {
+        const resolution = await publication.recoverPendingAttempt(
+          storedDraft.pendingCreateAttempt,
+        );
+        if (resolution === 'created') return;
+        if (resolution === 'unknown') {
+          await resumeLocalDraft(false);
+          toast.info('The previous Create request is still unconfirmed. Retry it before discarding.');
+          return;
+        }
+      }
+      await localDraft.discardRecovery();
+    } finally {
+      recoveryActionPending.value = false;
+    }
   };
 
   const persistDeck = async (): Promise<DeckRecord> =>
@@ -579,8 +598,8 @@ export const useDeckEditor = () => {
     discardLocalDraftModalOpen.value = false;
   };
 
-  const confirmDiscardLocalDraft = (): void => {
-    if (!localDraft.discardActiveDraft()) return;
+  const confirmDiscardLocalDraft = async (): Promise<void> => {
+    if (!await localDraft.discardActiveDraft()) return;
     deck.resetLocalDraft();
     cardLookup.value = {};
     filters.resetFilters();
@@ -593,7 +612,7 @@ export const useDeckEditor = () => {
   };
 
   const persistLocalDraft = (): void => {
-    localDraft.persist();
+    void localDraft.persist();
   };
 
   const loadStoredConflictDraft = async (): Promise<void> => {
@@ -612,7 +631,7 @@ export const useDeckEditor = () => {
       if (tagsLoaded) reconcileRecoveredTagIds();
       activateCards();
       localDraft.completeRecovery();
-      localDraft.persist();
+      await localDraft.persist();
       if (storedDraft.pendingCreateAttempt) {
         await publication.recoverPendingAttempt(storedDraft.pendingCreateAttempt);
       }
@@ -621,8 +640,8 @@ export const useDeckEditor = () => {
     }
   };
 
-  const keepThisConflictDraft = (): void => {
-    localDraft.overwriteConflict(false);
+  const keepThisConflictDraft = async (): Promise<void> => {
+    await localDraft.overwriteConflict(false);
   };
 
   const discardThisConflictedTab = (): void => {
@@ -652,8 +671,8 @@ export const useDeckEditor = () => {
     }
   };
 
-  const keepConflictAsNewDraft = (): void => {
-    localDraft.overwriteConflict(true);
+  const keepConflictAsNewDraft = async (): Promise<void> => {
+    await localDraft.overwriteConflict(true);
   };
 
   const autosyncDeck = useDebounceFn(async () => {
@@ -785,6 +804,7 @@ export const useDeckEditor = () => {
     discardChangesModalOpen,
     discardLocalDraftModalOpen,
     localDraftRecoveryModalOpen,
+    recoveryActionPending,
     localDraftConflict: localDraft.conflict,
     pendingLocalDraft,
     focusDeckNameRequest,

@@ -472,6 +472,7 @@
     <DeckDraftRecoveryModal
       :open="controller.localDraftRecoveryModalOpen.value"
       :saved-at="controller.pendingLocalDraft.value?.savedAt"
+      :busy="controller.recoveryActionPending.value"
       @resume="controller.resumeLocalDraft"
       @discard="controller.discardPendingLocalDraft"
     />

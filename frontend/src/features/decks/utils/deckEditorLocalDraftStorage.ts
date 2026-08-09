@@ -67,17 +67,25 @@ export type DeckEditorLocalDraftStorage = {
   save: (
     draft: StoredDeckEditorDraft,
     expected: DeckEditorDraftSlotToken,
-  ) => DeckEditorDraftSaveResult;
+  ) => Promise<DeckEditorDraftSaveResult>;
   discard: (
     ownerId: string,
     expected: DeckEditorDraftSlotToken,
-  ) => DeckEditorDraftMutationResult;
+  ) => Promise<DeckEditorDraftMutationResult>;
   retire: (
     ownerId: string,
     draftId: string,
     createdDeckId: string,
     expected: DeckEditorDraftSlotToken,
-  ) => DeckEditorDraftMutationResult;
+  ) => Promise<DeckEditorDraftMutationResult>;
+};
+
+export type DeckEditorDraftLockManager = {
+  request: <Result>(
+    name: string,
+    options: { mode: 'exclusive' },
+    callback: () => Result | PromiseLike<Result>,
+  ) => Promise<Result>;
 };
 
 export const deckEditorDraftStorageKey = (ownerId: string): string =>
@@ -392,10 +400,39 @@ const resolveBrowserStorage = (): Storage | null => {
   }
 };
 
+const resolveBrowserLockManager = (): DeckEditorDraftLockManager | null => {
+  try {
+    if (typeof globalThis.navigator === 'undefined' || !globalThis.navigator.locks) return null;
+    return globalThis.navigator.locks;
+  } catch {
+    return null;
+  }
+};
+
+const deckEditorDraftLockName = (ownerId: string): string =>
+  `${deckEditorDraftStorageKey(ownerId)}.mutation`;
+
 export const createDeckEditorLocalDraftStorage = (
   storage?: Storage | null,
+  lockManager?: DeckEditorDraftLockManager | null,
 ): DeckEditorLocalDraftStorage => {
   const resolvedStorage = storage === undefined ? resolveBrowserStorage() : storage;
+  const resolvedLockManager = lockManager === undefined ? resolveBrowserLockManager() : lockManager;
+
+  const clearInvalidValue = (ownerId: string, key: string, invalidRaw: string): void => {
+    if (!resolvedStorage || !resolvedLockManager) return;
+    void resolvedLockManager.request(
+      deckEditorDraftLockName(ownerId),
+      { mode: 'exclusive' },
+      () => {
+        try {
+          if (resolvedStorage.getItem(key) === invalidRaw) resolvedStorage.removeItem(key);
+        } catch {
+          // Invalid-data cleanup is best effort; normal mutations report storage health.
+        }
+      },
+    ).catch(() => undefined);
+  };
 
   const read = (ownerId: string): DeckEditorDraftReadResult => {
     if (!resolvedStorage || !ownerId) return { status: 'unavailable' };
@@ -411,74 +448,91 @@ export const createDeckEditorLocalDraftStorage = (
     try {
       value = JSON.parse(raw) as unknown;
     } catch {
-      try { resolvedStorage.removeItem(key); } catch { return { status: 'unavailable' }; }
+      clearInvalidValue(ownerId, key, raw);
       return { status: 'loaded', slot: { kind: 'empty' } };
     }
     const slot = parseDeckEditorDraftSlotValue(value, ownerId);
     if (slot === null) {
-      try { resolvedStorage.removeItem(key); } catch { return { status: 'unavailable' }; }
+      clearInvalidValue(ownerId, key, raw);
       return { status: 'loaded', slot: { kind: 'empty' } };
-    }
-    if (slot.kind === 'draft' && isRecord(value) && value.version === 1) {
-      try { resolvedStorage.setItem(key, JSON.stringify(slot.draft)); } catch { /* recovered in memory */ }
     }
     return { status: 'loaded', slot };
   };
 
   const currentSlot = (ownerId: string): DeckEditorDraftReadResult => read(ownerId);
 
+  const withOwnerLock = async <Result extends DeckEditorDraftSaveResult | DeckEditorDraftMutationResult>(
+    ownerId: string,
+    operation: () => Result,
+  ): Promise<Result | { status: 'unavailable' }> => {
+    if (!resolvedStorage || !resolvedLockManager || !ownerId) return { status: 'unavailable' };
+    try {
+      return await resolvedLockManager.request(
+        deckEditorDraftLockName(ownerId),
+        { mode: 'exclusive' },
+        operation,
+      );
+    } catch {
+      return { status: 'unavailable' };
+    }
+  };
+
   return {
     read,
-    save(draft, expected) {
-      if (!resolvedStorage || !draft.ownerId) return { status: 'unavailable' };
-      const current = currentSlot(draft.ownerId);
-      if (current.status === 'unavailable') return current;
-      if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
-        return { status: 'conflict', slot: current.slot };
-      }
-      try {
-        resolvedStorage.setItem(deckEditorDraftStorageKey(draft.ownerId), JSON.stringify(draft));
-      } catch {
-        return { status: 'unavailable' };
-      }
-      return { status: 'saved', draft };
+    async save(draft, expected) {
+      return await withOwnerLock(draft.ownerId, () => {
+        const current = currentSlot(draft.ownerId);
+        if (current.status === 'unavailable') return current;
+        if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
+          return { status: 'conflict' as const, slot: current.slot };
+        }
+        try {
+          resolvedStorage?.setItem(deckEditorDraftStorageKey(draft.ownerId), JSON.stringify(draft));
+        } catch {
+          return { status: 'unavailable' as const };
+        }
+        return { status: 'saved' as const, draft };
+      });
     },
-    discard(ownerId, expected) {
-      if (!resolvedStorage || !ownerId) return { status: 'unavailable' };
-      const current = currentSlot(ownerId);
-      if (current.status === 'unavailable') return current;
-      if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
-        return { status: 'conflict', slot: current.slot };
-      }
-      try {
-        resolvedStorage.removeItem(deckEditorDraftStorageKey(ownerId));
-      } catch {
-        return { status: 'unavailable' };
-      }
-      return { status: 'empty' };
+    async discard(ownerId, expected) {
+      return await withOwnerLock(ownerId, () => {
+        const current = currentSlot(ownerId);
+        if (current.status === 'unavailable') return current;
+        if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
+          return { status: 'conflict' as const, slot: current.slot };
+        }
+        try {
+          resolvedStorage?.removeItem(deckEditorDraftStorageKey(ownerId));
+        } catch {
+          return { status: 'unavailable' as const };
+        }
+        return { status: 'empty' as const };
+      });
     },
-    retire(ownerId, draftId, createdDeckId, expected) {
-      if (!resolvedStorage || !ownerId || !createdDeckId) return { status: 'unavailable' };
-      const current = currentSlot(ownerId);
-      if (current.status === 'unavailable') return current;
-      if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
-        return { status: 'conflict', slot: current.slot };
-      }
-      const marker: RetiredDeckEditorDraft = {
-        version: 2,
-        kind: 'retired',
-        ownerId,
-        draftId,
-        revision: current.slot.kind === 'draft' ? current.slot.draft.revision : createUuid(),
-        retiredAt: new Date().toISOString(),
-        createdDeckId,
-      };
-      try {
-        resolvedStorage.setItem(deckEditorDraftStorageKey(ownerId), JSON.stringify(marker));
-      } catch {
-        return { status: 'unavailable' };
-      }
-      return { status: 'retired', marker };
+    async retire(ownerId, draftId, createdDeckId, expected) {
+      if (!createdDeckId) return { status: 'unavailable' };
+      return await withOwnerLock(ownerId, () => {
+        const current = currentSlot(ownerId);
+        if (current.status === 'unavailable') return current;
+        if (!deckEditorDraftSlotTokensEqual(deckEditorDraftSlotToken(current.slot), expected)) {
+          return { status: 'conflict' as const, slot: current.slot };
+        }
+        const marker: RetiredDeckEditorDraft = {
+          version: 2,
+          kind: 'retired',
+          ownerId,
+          draftId,
+          revision: current.slot.kind === 'draft' ? current.slot.draft.revision : createUuid(),
+          retiredAt: new Date().toISOString(),
+          createdDeckId,
+        };
+        try {
+          resolvedStorage?.setItem(deckEditorDraftStorageKey(ownerId), JSON.stringify(marker));
+        } catch {
+          return { status: 'unavailable' as const };
+        }
+        return { status: 'retired' as const, marker };
+      });
     },
   };
 };

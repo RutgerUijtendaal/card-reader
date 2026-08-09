@@ -13,6 +13,7 @@ describe('deckEditorLifecycle', () => {
     ['checking', 'recovery'],
     ['checking', 'synced'],
     ['checking', 'memory-only'],
+    ['checking', 'conflict'],
     ['recovery', 'synced'],
     ['recovery', 'memory-only'],
     ['recovery', 'conflict'],
@@ -31,7 +32,6 @@ describe('deckEditorLifecycle', () => {
   });
 
   test.each([
-    ['checking', 'conflict'],
     ['recovery', 'checking'],
     ['synced', 'checking'],
     ['memory-only', 'recovery'],

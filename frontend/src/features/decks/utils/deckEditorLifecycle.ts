@@ -14,7 +14,7 @@ const persistenceTransitions: Record<
   DeckDraftPersistenceState['status'],
   ReadonlySet<DeckDraftPersistenceState['status']>
 > = {
-  checking: new Set(['recovery', 'synced', 'memory-only']),
+  checking: new Set(['recovery', 'synced', 'memory-only', 'conflict']),
   recovery: new Set(['synced', 'memory-only', 'conflict']),
   synced: new Set(['synced', 'memory-only', 'conflict']),
   'memory-only': new Set(['memory-only', 'synced', 'conflict']),

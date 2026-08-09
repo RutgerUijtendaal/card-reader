@@ -30,6 +30,7 @@ const { controller } = vi.hoisted(() => {
       discardChangesModalOpen: refValue(false),
       discardLocalDraftModalOpen: refValue(false),
       localDraftRecoveryModalOpen: refValue(false),
+      recoveryActionPending: refValue(false),
       pendingLocalDraft: refValue<null | { savedAt: string }>(null),
       localDraftConflict: refValue<null | {
         kind: 'active-draft' | 'remote-deletion' | 'created-elsewhere';

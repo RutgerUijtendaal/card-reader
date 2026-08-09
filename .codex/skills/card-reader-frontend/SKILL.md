@@ -38,7 +38,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Model multi-phase workflows with tagged states rather than overlapping booleans, and cover their allowed transition table with tests.
 - Capture an immutable request payload and idempotency key before uncertain mutations; retries must reuse both exactly.
 - Treat browser persistence, server mutation, and cleanup as independent failure domains. Confirmed server success is terminal even when local cleanup fails.
-- Use revision-conditional writes plus native storage events for cross-tab state. Pause mutation and require an explicit conflict resolution instead of silently choosing a source of truth.
+- Use revision-conditional writes plus native storage events for cross-tab state. A `localStorage` read followed by a write is not atomic; serialize the comparison and mutation with Web Locks or use a transactional persistence primitive, falling back to memory-only when atomicity is unavailable. Pause mutation and require an explicit conflict resolution instead of silently choosing a source of truth.
 
 ## Implementation Workflow
 
