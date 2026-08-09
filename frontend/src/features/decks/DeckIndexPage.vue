@@ -22,7 +22,7 @@
       <template #aside>
         <DeckBrowseFiltersPanel
           :controller="filterController"
-          :total-count="decks.length"
+          :total-count="totalDeckCount"
           :description="filterDescription"
           :mode="isOwnedMode ? 'owned' : 'public'"
           :can-use-owned-decks="canUseOwnedDecks"
@@ -32,13 +32,27 @@
       </template>
 
       <div
-        v-if="loading || !filtersLoaded"
+        v-if="(loading && decks.length === 0) || !filtersLoaded"
         class="app-page-single-column deck-index-grid grid gap-4"
       >
         <DeckLoadingSkeleton
           v-for="index in loadingSkeletonCount"
           :key="`deck-loading-${index}`"
         />
+      </div>
+
+      <div
+        v-else-if="initialLoadError"
+        class="page-card theme-section-muted flex items-center justify-between gap-3 text-sm"
+      >
+        <span>{{ initialLoadError }}</span>
+        <button
+          type="button"
+          class="btn-secondary px-3 py-2 text-xs"
+          @click="refreshDecks"
+        >
+          Retry
+        </button>
       </div>
 
       <div
@@ -203,6 +217,43 @@
           </template>
         </DeckListCard>
       </div>
+
+      <div
+        v-if="filtersLoaded && decks.length > 0"
+        ref="loadMoreSentinelRef"
+        class="theme-divider mt-5 flex min-h-16 items-center justify-center border-t pt-4"
+        aria-live="polite"
+      >
+        <DeckLoadingSkeleton
+          v-if="loadingNextPage"
+          class="w-full"
+        />
+        <div
+          v-else-if="loadMoreError"
+          class="flex items-center gap-3"
+        >
+          <span class="theme-section-muted text-xs">{{ loadMoreError }}</span>
+          <button
+            type="button"
+            class="btn-secondary px-3 py-2 text-xs"
+            @click="retryNextPage"
+          >
+            Retry
+          </button>
+        </div>
+        <span
+          v-else-if="nextPage !== null"
+          class="theme-section-muted text-xs"
+        >
+          Loading more decks…
+        </span>
+        <span
+          v-else
+          class="theme-section-muted text-xs"
+        >
+          All {{ totalDeckCount }} decks loaded.
+        </span>
+      </div>
     </AppPageLayout>
 
     <ConfirmModal
@@ -236,9 +287,9 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core';
+import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
 import { BookOpen, Folders, Gamepad2, Hammer, Pencil, Share2, Tags, Trash2 } from 'lucide-vue-next';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
@@ -253,8 +304,8 @@ import {
   deleteDeck,
   fetchDeckTags,
   fetchMyDeck,
-  fetchMyDeckSummaries,
-  fetchPublicDeckSummaries,
+  fetchMyDeckSummaryPage,
+  fetchPublicDeckSummaryPage,
   updateDeck,
 } from '@/domain/decks/api';
 import DeckBrowseFiltersPanel from '@/features/decks/components/DeckBrowseFiltersPanel.vue';
@@ -278,6 +329,8 @@ import { deckDifficultyLabels, deckDifficultyOptions } from '@/domain/decks/util
 import { buildDeckShareUrl, canShareDeck } from '@/domain/decks/utils/share';
 import type {
   DeckDifficulty,
+  DeckRecord,
+  DeckSummaryCursor,
   DeckSummaryRecord,
   DeckUpdateRequest,
   DeckVisibility,
@@ -285,12 +338,28 @@ import type {
 import { useDeckExport } from '@/domain/decks/composables/useDeckExport';
 import { deckVisibilityLabels, deckVisibilityOptions } from '@/domain/decks/utils/visibility';
 import { getDeckTagSuggestionFeedback } from '@/domain/decks/utils/deckTagSuggestionFeedback';
+import {
+  appendGalleryPage,
+  createEmptyGalleryPageState,
+  replaceGalleryPage,
+} from '@/domain/cards/utils/gallery/galleryState';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
-const decks = ref<DeckSummaryRecord[]>([]);
+const deckPageState = shallowRef(createEmptyGalleryPageState<DeckSummaryRecord>());
+const decks = computed(() => deckPageState.value.cards);
+const totalDeckCount = computed(() => deckPageState.value.count);
+const nextPage = computed(() => deckPageState.value.nextPage);
+const deckSnapshotAt = ref<string | null>(null);
+const deckNextCursor = ref<DeckSummaryCursor | null>(null);
+const pageSize = 10;
 const loading = ref(false);
+const loadingNextPage = ref(false);
+const initialLoadError = ref<string | null>(null);
+const loadMoreError = ref<string | null>(null);
+const loadMoreSentinelRef = ref<HTMLElement | null>(null);
+const loadMoreSentinelIsIntersecting = ref(false);
 const deleting = ref(false);
 const deleteTarget = ref<DeckSummaryRecord | null>(null);
 const savingDeckIds = ref(new Set<string>());
@@ -345,22 +414,101 @@ const newDeckLocation = computed(() => buildNewDeckEditorLocation(isOwnedMode.va
 let deckLoadRequestId = 0;
 let tagManagerLoadRequestId = 0;
 
-const loadDecks = async (): Promise<void> => {
+const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<boolean> => {
   const requestId = ++deckLoadRequestId;
   const requestedPath = currentDeckPath.value;
-  loading.value = true;
+  const requestedSignature = currentRouteSignature.value;
+  const requestedSnapshotAt = mode === 'append' ? deckSnapshotAt.value : null;
+  const requestedCursor = mode === 'append' ? deckNextCursor.value : null;
+  if (mode === 'replace') {
+    loading.value = true;
+    loadingNextPage.value = false;
+    initialLoadError.value = null;
+    loadMoreError.value = null;
+  } else {
+    loadingNextPage.value = true;
+    loadMoreError.value = null;
+  }
   try {
     const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
-    const nextDecks = requestedPath === '/my/decks' ? await fetchMyDeckSummaries(params) : await fetchPublicDeckSummaries(params);
-    if (requestId === deckLoadRequestId && currentDeckPath.value === requestedPath) {
-      decks.value = nextDecks;
+    const response =
+      requestedPath === '/my/decks'
+        ? await fetchMyDeckSummaryPage(params, page, pageSize, requestedSnapshotAt, requestedCursor)
+        : await fetchPublicDeckSummaryPage(params, page, pageSize, requestedSnapshotAt, requestedCursor);
+    if (
+      requestId === deckLoadRequestId &&
+      currentDeckPath.value === requestedPath &&
+      currentRouteSignature.value === requestedSignature
+    ) {
+      deckPageState.value = mode === 'replace'
+        ? replaceGalleryPage(response)
+        : appendGalleryPage(deckPageState.value, response);
+      deckSnapshotAt.value = response.snapshot_at;
+      deckNextCursor.value = response.next_cursor;
+      return true;
+    }
+  } catch {
+    if (requestId === deckLoadRequestId) {
+      if (mode === 'replace') {
+        if (deckPageState.value.cards.length === 0) {
+          initialLoadError.value = 'Unable to load decks.';
+        }
+      } else {
+        loadMoreError.value = 'Unable to load more decks.';
+      }
     }
   } finally {
     if (requestId === deckLoadRequestId) {
-      loading.value = false;
+      if (mode === 'replace') {
+        loading.value = false;
+      } else {
+        loadingNextPage.value = false;
+      }
     }
   }
+  return false;
 };
+
+const scheduleNextPageIfVisible = (): void => {
+  void nextTick().then(() => {
+    if (loadMoreSentinelIsIntersecting.value && nextPage.value !== null) {
+      void loadNextPage();
+    }
+  });
+};
+
+const refreshDecks = async (): Promise<boolean> => {
+  const loaded = await loadDecksPage(1, 'replace');
+  if (loaded) {
+    scheduleNextPageIfVisible();
+  }
+  return loaded;
+};
+
+const loadNextPage = async (): Promise<void> => {
+  if (loading.value || loadingNextPage.value || loadMoreError.value || nextPage.value === null) {
+    return;
+  }
+  if (await loadDecksPage(nextPage.value, 'append')) {
+    scheduleNextPageIfVisible();
+  }
+};
+
+const retryNextPage = (): void => {
+  loadMoreError.value = null;
+  void loadNextPage();
+};
+
+useIntersectionObserver(
+  loadMoreSentinelRef,
+  (entries) => {
+    loadMoreSentinelIsIntersecting.value = entries.some((entry) => entry.isIntersecting);
+    if (loadMoreSentinelIsIntersecting.value) {
+      void loadNextPage();
+    }
+  },
+  { rootMargin: '400px 0px' },
+);
 
 const debouncedUpdateRoute = useDebounceFn(() => {
   if (!filtersLoaded.value) {
@@ -395,7 +543,12 @@ watch(
     if (!sameDeckBrowseFilterState(readFilterState(), routeState)) {
       applyRouteFilterState(routeState);
     }
-    await loadDecks();
+    deckPageState.value = createEmptyGalleryPageState<DeckSummaryRecord>();
+    deckSnapshotAt.value = null;
+    deckNextCursor.value = null;
+    initialLoadError.value = null;
+    loadMoreError.value = null;
+    await refreshDecks();
   },
   { immediate: true },
 );
@@ -463,6 +616,29 @@ const closeTagManager = (force = false): void => {
   tagManagerLoading.value = false;
 };
 
+const applyUpdatedDeckRecord = (nextDeck: DeckRecord): void => {
+  deckPageState.value = {
+    ...deckPageState.value,
+    cards: deckPageState.value.cards.map((entry) =>
+      entry.id === nextDeck.id
+        ? {
+            ...entry,
+            difficulty: nextDeck.difficulty,
+            visibility: nextDeck.visibility,
+            tags: nextDeck.tags,
+            pending_tag_suggestions: nextDeck.pending_tag_suggestions,
+            status: {
+              is_valid: nextDeck.status.is_valid,
+              label: nextDeck.status.label,
+              deprecated_card_count: nextDeck.status.deprecated_card_count,
+            },
+            updated_at: nextDeck.updated_at,
+          }
+        : entry,
+    ),
+  };
+};
+
 const saveManagedDeckTags = async (): Promise<void> => {
   const target = tagManagerTarget.value;
   if (!target || tagManagerLoading.value || tagManagerSaving.value || tagManagerError.value) {
@@ -478,11 +654,10 @@ const saveManagedDeckTags = async (): Promise<void> => {
     if (feedback) {
       toast.info(feedback);
     }
+    applyUpdatedDeckRecord(record);
     closeTagManager(true);
     toast.success('Deck tags updated.');
-    try {
-      await loadDecks();
-    } catch {
+    if (!(await refreshDecks())) {
       toast.error('Deck tags were updated, but the deck list could not be refreshed.');
     }
   } catch {
@@ -501,22 +676,11 @@ const updateDeckQuickMetadata = async (
   savingDeckIds.value = new Set(savingDeckIds.value).add(deck.id);
   try {
     const nextDeck = await updateDeck(deck.id, payload);
-    decks.value = decks.value.map((entry) =>
-      entry.id === nextDeck.id
-        ? {
-            ...entry,
-            difficulty: nextDeck.difficulty,
-            visibility: nextDeck.visibility,
-            status: {
-              is_valid: nextDeck.status.is_valid,
-              label: nextDeck.status.label,
-              deprecated_card_count: nextDeck.status.deprecated_card_count,
-            },
-            updated_at: nextDeck.updated_at,
-          }
-        : entry,
-    );
+    applyUpdatedDeckRecord(nextDeck);
     toast.success(successMessage);
+    if (!(await refreshDecks())) {
+      toast.error('The deck was updated, but the deck list could not be refreshed.');
+    }
   } catch {
     toast.error(errorMessage);
   } finally {
@@ -582,10 +746,18 @@ const confirmDelete = async (): Promise<void> => {
   if (!deleteTarget.value) return;
   deleting.value = true;
   try {
-    await deleteDeck(deleteTarget.value.id);
-    decks.value = decks.value.filter((deck) => deck.id !== deleteTarget.value?.id);
+    const deletedDeckId = deleteTarget.value.id;
+    await deleteDeck(deletedDeckId);
     deleteTarget.value = null;
+    deckPageState.value = {
+      ...deckPageState.value,
+      cards: deckPageState.value.cards.filter((deck) => deck.id !== deletedDeckId),
+      count: Math.max(0, deckPageState.value.count - 1),
+    };
     toast.success('Deck deleted.');
+    if (!(await refreshDecks())) {
+      toast.error('Deck deleted, but the deck list could not be refreshed.');
+    }
   } finally {
     deleting.value = false;
   }

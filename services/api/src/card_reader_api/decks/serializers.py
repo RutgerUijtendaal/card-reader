@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime
 from typing import TypedDict, cast
 
 from rest_framework import serializers
@@ -347,6 +348,11 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
 class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     view = serializers.ChoiceField(choices=['summary'], required=False, allow_null=True)
+    page = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    page_size = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=100)
+    snapshot_at = serializers.DateTimeField(required=False, allow_null=True)
+    cursor_created_at = serializers.DateTimeField(required=False, allow_null=True)
+    cursor_id = serializers.CharField(required=False, allow_null=True)
     hero_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     author_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     card_q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -356,6 +362,21 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     deck_tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     deck_tag_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     deck_tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        pagination_requested = any(
+            attrs.get(key) is not None
+            for key in ("page", "page_size", "snapshot_at", "cursor_created_at", "cursor_id")
+        )
+        if pagination_requested and attrs.get("view") != "summary":
+            raise serializers.ValidationError({"view": "Pagination is only available for summary deck lists."})
+        has_cursor_created_at = attrs.get("cursor_created_at") is not None
+        has_cursor_id = attrs.get("cursor_id") is not None
+        if has_cursor_created_at != has_cursor_id:
+            raise serializers.ValidationError(
+                {"cursor": "cursor_created_at and cursor_id must be provided together."}
+            )
+        return attrs
 
     def validated_list_filters(self) -> DeckListFilterParams:
         return {
@@ -373,6 +394,32 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
 
     def wants_summary(self) -> bool:
         return self._string_or_none("view") == "summary"
+
+    def wants_pagination(self) -> bool:
+        return any(
+            self.validated_data.get(key) is not None
+            for key in ("page", "page_size", "snapshot_at", "cursor_created_at", "cursor_id")
+        )
+
+    def pagination(self) -> tuple[int, int]:
+        page = self.validated_data.get("page")
+        page_size = self.validated_data.get("page_size")
+        return (
+            page if isinstance(page, int) else 1,
+            page_size if isinstance(page_size, int) else 10,
+        )
+
+    def pagination_snapshot(self) -> datetime | None:
+        value = self.validated_data.get("snapshot_at")
+        return value if isinstance(value, datetime) else None
+
+    def pagination_cursor(self) -> tuple[datetime | None, str | None]:
+        created_at = self.validated_data.get("cursor_created_at")
+        deck_id = self.validated_data.get("cursor_id")
+        return (
+            created_at if isinstance(created_at, datetime) else None,
+            deck_id if isinstance(deck_id, str) else None,
+        )
 
     def _string_or_none(self, key: str) -> str | None:
         value = self.validated_data.get(key)

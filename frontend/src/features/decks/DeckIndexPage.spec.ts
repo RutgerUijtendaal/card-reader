@@ -12,6 +12,7 @@ const {
   fetchMyDeckMock,
   fetchMyDeckSummariesMock,
   fetchPublicDeckSummariesMock,
+  intersectionState,
   updateDeckMock,
 } = vi.hoisted(() => ({
   authState: {
@@ -25,8 +26,25 @@ const {
   fetchMyDeckMock: vi.fn(),
   fetchMyDeckSummariesMock: vi.fn(),
   fetchPublicDeckSummariesMock: vi.fn(),
+  intersectionState: {
+    callback: null as null | ((entries: Array<{ isIntersecting: boolean }>) => void),
+  },
   updateDeckMock: vi.fn(),
 }));
+
+vi.mock('@vueuse/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@vueuse/core')>();
+  return {
+    ...actual,
+    useIntersectionObserver: (
+      _target: unknown,
+      callback: (entries: Array<{ isIntersecting: boolean }>) => void,
+    ) => {
+      intersectionState.callback = callback;
+      return { stop: vi.fn() };
+    },
+  };
+});
 
 vi.mock('@/shared/api/client', () => ({
   api: {
@@ -42,8 +60,8 @@ vi.mock('@/domain/decks/api', () => ({
   deleteDeck: deleteDeckMock,
   fetchDeckTags: fetchDeckTagsMock,
   fetchMyDeck: fetchMyDeckMock,
-  fetchMyDeckSummaries: fetchMyDeckSummariesMock,
-  fetchPublicDeckSummaries: fetchPublicDeckSummariesMock,
+  fetchMyDeckSummaryPage: fetchMyDeckSummariesMock,
+  fetchPublicDeckSummaryPage: fetchPublicDeckSummariesMock,
   updateDeck: updateDeckMock,
 }));
 
@@ -278,6 +296,32 @@ const deckTagCatalog = {
   types: [],
 };
 
+const deckPage = (
+  results: Array<typeof deckRecord> = [deckRecord],
+  overrides: Partial<{
+    count: number;
+    next_page: number | null;
+    previous_page: number | null;
+    page: number;
+    page_size: number;
+  }> = {},
+) => ({
+  count: results.length,
+  next_page: null,
+  next_cursor: overrides.next_page
+    ? {
+        created_at: results.at(-1)?.created_at ?? '2025-01-01T00:00:00Z',
+        id: results.at(-1)?.id ?? 'deck-cursor',
+      }
+    : null,
+  previous_page: null,
+  page: 1,
+  page_size: 10,
+  snapshot_at: '2026-08-09T17:00:00Z',
+  results,
+  ...overrides,
+});
+
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((innerResolve) => {
@@ -350,8 +394,9 @@ describe('DeckIndexPage', () => {
     apiGetMock.mockResolvedValue({ data: filtersPayload });
     fetchDeckTagsMock.mockResolvedValue(deckTagCatalog);
     fetchMyDeckMock.mockResolvedValue(deckRecord);
-    fetchMyDeckSummariesMock.mockResolvedValue([deckRecord]);
-    fetchPublicDeckSummariesMock.mockResolvedValue([deckRecord]);
+    fetchMyDeckSummariesMock.mockResolvedValue(deckPage());
+    fetchPublicDeckSummariesMock.mockResolvedValue(deckPage());
+    intersectionState.callback = null;
     updateDeckMock.mockResolvedValue(deckRecord);
   });
 
@@ -396,28 +441,184 @@ describe('DeckIndexPage', () => {
     mounted.unmount();
   });
 
+  test('appends the next deck page when the endless-scroll sentinel intersects', async () => {
+    const nextDeck = {
+      ...deckRecord,
+      id: 'deck-2',
+      name: 'Second Deck',
+    };
+    fetchPublicDeckSummariesMock
+      .mockResolvedValueOnce(
+      deckPage([deckRecord], {
+        count: 11,
+        next_page: 2,
+      }),
+      )
+      .mockResolvedValueOnce(
+        deckPage([nextDeck], {
+          count: 11,
+          page: 2,
+          previous_page: 1,
+        }),
+      );
+    const mounted = await mountPage('/decks');
+
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledWith(
+      expect.any(URLSearchParams),
+      1,
+      10,
+      null,
+      null,
+    );
+    expect(mounted.container.textContent).toContain('Total 11');
+    expect(mounted.container.textContent).not.toContain('Previous');
+
+    intersectionState.callback?.([{ isIntersecting: true }]);
+    await flushPage();
+
+    expect(fetchPublicDeckSummariesMock).toHaveBeenLastCalledWith(
+      expect.any(URLSearchParams),
+      2,
+      10,
+      '2026-08-09T17:00:00Z',
+      { created_at: '2025-01-01T00:00:00Z', id: 'deck-1' },
+    );
+    expect(mounted.container.textContent).toContain('Second Deck');
+    expect(mounted.container.textContent).toContain('All 11 decks loaded.');
+
+    mounted.unmount();
+  });
+
+  test('keeps loaded decks and offers a retry when loading the next page fails', async () => {
+    const nextDeck = {
+      ...deckRecord,
+      id: 'deck-2',
+      name: 'Recovered Deck',
+    };
+    fetchPublicDeckSummariesMock
+      .mockResolvedValueOnce(deckPage([deckRecord], { count: 11, next_page: 2 }))
+      .mockRejectedValueOnce(new Error('network failure'))
+      .mockResolvedValueOnce(
+        deckPage([nextDeck], {
+          count: 11,
+          page: 2,
+          previous_page: 1,
+        }),
+      );
+    const mounted = await mountPage('/decks');
+
+    intersectionState.callback?.([{ isIntersecting: true }]);
+    await flushPage();
+
+    expect(mounted.container.textContent).toContain('Starter Deck');
+    expect(mounted.container.textContent).toContain('Unable to load more decks.');
+    const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Retry',
+    );
+    retryButton?.click();
+    await flushPage();
+
+    expect(fetchPublicDeckSummariesMock).toHaveBeenLastCalledWith(
+      expect.any(URLSearchParams),
+      2,
+      10,
+      '2026-08-09T17:00:00Z',
+      { created_at: '2025-01-01T00:00:00Z', id: 'deck-1' },
+    );
+    expect(mounted.container.textContent).toContain('Recovered Deck');
+
+    mounted.unmount();
+  });
+
+  test('continues loading while the endless-scroll sentinel remains visible', async () => {
+    fetchPublicDeckSummariesMock
+      .mockResolvedValueOnce(deckPage([deckRecord], { count: 3, next_page: 2 }))
+      .mockResolvedValueOnce(
+        deckPage([{ ...deckRecord, id: 'deck-2', name: 'Second Deck' }], {
+          count: 3,
+          page: 2,
+          previous_page: 1,
+          next_page: 3,
+        }),
+      )
+      .mockResolvedValueOnce(
+        deckPage([{ ...deckRecord, id: 'deck-3', name: 'Third Deck' }], {
+          count: 3,
+          page: 3,
+          previous_page: 2,
+        }),
+      );
+    const mounted = await mountPage('/decks');
+
+    intersectionState.callback?.([{ isIntersecting: true }]);
+    await vi.waitFor(() => {
+      expect(fetchPublicDeckSummariesMock).toHaveBeenCalledTimes(3);
+    });
+    await flushPage();
+
+    expect(mounted.container.textContent).toContain('Second Deck');
+    expect(mounted.container.textContent).toContain('Third Deck');
+    expect(mounted.container.textContent).toContain('All 3 decks loaded.');
+
+    mounted.unmount();
+  });
+
+  test('clears a superseded next-page loading state when the deck mode changes', async () => {
+    const nextPageDeferred = createDeferred<ReturnType<typeof deckPage>>();
+    fetchPublicDeckSummariesMock
+      .mockResolvedValueOnce(deckPage([deckRecord], { count: 2, next_page: 2 }))
+      .mockReturnValueOnce(nextPageDeferred.promise);
+    fetchMyDeckSummariesMock.mockResolvedValueOnce(
+      deckPage([{ ...deckRecord, id: 'owned-deck', name: 'Owned Deck' }]),
+    );
+    const mounted = await mountPage('/decks');
+
+    intersectionState.callback?.([{ isIntersecting: true }]);
+    await nextTick();
+    await mounted.router.push('/my/decks');
+    await flushPage();
+    nextPageDeferred.resolve(
+      deckPage([{ ...deckRecord, id: 'stale-deck', name: 'Stale Deck' }], {
+        count: 2,
+        page: 2,
+        previous_page: 1,
+      }),
+    );
+    await flushPage();
+
+    expect(mounted.container.textContent).toContain('Owned Deck');
+    expect(mounted.container.textContent).not.toContain('Stale Deck');
+    expect(mounted.container.querySelector('.deck-loading-skeleton')).toBeNull();
+
+    mounted.unmount();
+  });
+
   test('ignores stale deck responses after switching between public and owned modes', async () => {
-    const publicDeferred = createDeferred<Array<typeof deckRecord>>();
+    const publicDeferred = createDeferred<ReturnType<typeof deckPage>>();
     fetchPublicDeckSummariesMock.mockReturnValueOnce(publicDeferred.promise);
-    fetchMyDeckSummariesMock.mockResolvedValueOnce([
-      {
-        ...deckRecord,
-        id: 'owned-deck',
-        name: 'Owned Deck',
-      },
-    ]);
+    fetchMyDeckSummariesMock.mockResolvedValueOnce(
+      deckPage([
+        {
+          ...deckRecord,
+          id: 'owned-deck',
+          name: 'Owned Deck',
+        },
+      ]),
+    );
     const mounted = await mountPage('/decks');
 
     await mounted.router.push('/my/decks');
     await flushPage();
 
-    publicDeferred.resolve([
-      {
-        ...deckRecord,
-        id: 'public-deck',
-        name: 'Public Deck',
-      },
-    ]);
+    publicDeferred.resolve(
+      deckPage([
+        {
+          ...deckRecord,
+          id: 'public-deck',
+          name: 'Public Deck',
+        },
+      ]),
+    );
     await flushPage();
 
     expect(mounted.container.textContent).toContain('Owned Deck');
@@ -549,6 +750,27 @@ describe('DeckIndexPage', () => {
     await flushPage();
 
     expect(updateDeckMock).toHaveBeenCalledWith('deck-1', { visibility: 'private' });
+    expect(fetchMyDeckSummariesMock).toHaveBeenCalledTimes(2);
+
+    mounted.unmount();
+  });
+
+  test('keeps confirmed metadata visible when the ordering refresh fails', async () => {
+    updateDeckMock.mockResolvedValueOnce({ ...deckRecord, visibility: 'private' });
+    fetchMyDeckSummariesMock
+      .mockResolvedValueOnce(deckPage())
+      .mockRejectedValueOnce(new Error('refresh failed'));
+    const mounted = await mountPage('/my/decks');
+    const select = mounted.container.querySelector<HTMLSelectElement>('[aria-label="Deck visibility"]');
+    if (!select) {
+      throw new Error('expected visibility select');
+    }
+
+    select.value = 'private';
+    select.dispatchEvent(new Event('change'));
+    await flushPage();
+
+    expect(select.value).toBe('private');
 
     mounted.unmount();
   });
@@ -568,6 +790,7 @@ describe('DeckIndexPage', () => {
     await flushPage();
 
     expect(updateDeckMock).toHaveBeenCalledWith('deck-1', { difficulty: 'medium' });
+    expect(fetchMyDeckSummariesMock).toHaveBeenCalledTimes(2);
 
     mounted.unmount();
   });

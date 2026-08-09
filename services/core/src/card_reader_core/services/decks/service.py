@@ -1,25 +1,31 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from card_reader_core.models import Deck, DeckDifficulty, DeckVisibility
 from card_reader_core.services.deck_tags import DeckTagService
 from card_reader_core.repositories.decks import (
+    DeckSummaryPage,
     create_deck,
     create_deck_creation,
     delete_deck,
     get_deck,
     get_deck_for_viewer,
+    get_public_deck_summary_page_by_candidates,
     get_owner_deck,
     get_owner_deck_by_creation_id,
     get_owner_deck_creation,
     get_public_deck,
     list_card_decks_for_viewer,
     list_owner_deck_summaries,
+    list_owner_deck_summary_page as list_owner_deck_summary_page_query,
     list_owner_decks,
     list_public_deck_summaries,
+    list_public_deck_summary_candidates,
     list_public_decks,
     replace_mainboard_entries,
     replace_sideboards,
@@ -151,6 +157,87 @@ class DeckService:
     ) -> list[Deck]:
         return list_owner_deck_summaries(
             owner_id,
+            search_query=search_query,
+            hero_query=hero_query,
+            card_query=card_query,
+            affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+            affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_exclude_ids=deck_tag_exclude_ids,
+            deck_tag_match=deck_tag_match,
+        )
+
+    @transaction.atomic
+    def list_public_deck_summary_page(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        snapshot_at: datetime | None = None,
+        cursor_created_at: datetime | None = None,
+        cursor_id: str | None = None,
+        search_query: str | None = None,
+        hero_query: str | None = None,
+        author_query: str | None = None,
+        card_query: str | None = None,
+        affinity_symbol_ids: list[str] | None = None,
+        affinity_symbol_exclude_ids: list[str] | None = None,
+        affinity_symbol_match: str | None = None,
+        deck_tag_ids: list[str] | None = None,
+        deck_tag_exclude_ids: list[str] | None = None,
+        deck_tag_match: str | None = None,
+    ) -> DeckSummaryPage:
+        effective_snapshot_at = snapshot_at or timezone.now()
+        candidates = list_public_deck_summary_candidates(
+            snapshot_at=effective_snapshot_at,
+            search_query=search_query,
+            hero_query=hero_query,
+            author_query=author_query,
+            card_query=card_query,
+            affinity_symbol_ids=affinity_symbol_ids,
+            affinity_symbol_exclude_ids=affinity_symbol_exclude_ids,
+            affinity_symbol_match=affinity_symbol_match,
+            deck_tag_ids=deck_tag_ids,
+            deck_tag_exclude_ids=deck_tag_exclude_ids,
+            deck_tag_match=deck_tag_match,
+        )
+        valid_decks = [deck for deck in candidates if self.get_deck_validation(deck).is_valid]
+        return get_public_deck_summary_page_by_candidates(
+            valid_decks,
+            page=page,
+            page_size=page_size,
+            snapshot_at=effective_snapshot_at,
+            cursor_created_at=cursor_created_at,
+            cursor_id=cursor_id,
+        )
+
+    def list_owner_deck_summary_page(
+        self,
+        owner_id: str,
+        *,
+        page: int,
+        page_size: int,
+        snapshot_at: datetime | None = None,
+        cursor_created_at: datetime | None = None,
+        cursor_id: str | None = None,
+        search_query: str | None = None,
+        hero_query: str | None = None,
+        card_query: str | None = None,
+        affinity_symbol_ids: list[str] | None = None,
+        affinity_symbol_exclude_ids: list[str] | None = None,
+        affinity_symbol_match: str | None = None,
+        deck_tag_ids: list[str] | None = None,
+        deck_tag_exclude_ids: list[str] | None = None,
+        deck_tag_match: str | None = None,
+    ) -> DeckSummaryPage:
+        return list_owner_deck_summary_page_query(
+            owner_id,
+            page=page,
+            page_size=page_size,
+            snapshot_at=snapshot_at,
+            cursor_created_at=cursor_created_at,
+            cursor_id=cursor_id,
             search_query=search_query,
             hero_query=hero_query,
             card_query=card_query,
