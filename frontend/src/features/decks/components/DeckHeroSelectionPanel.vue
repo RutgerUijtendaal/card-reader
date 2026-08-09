@@ -1,6 +1,7 @@
 <template>
   <AppStickyAside
     side="right"
+    :footer-visible="controller.isChangingHero.value"
   >
     <div class="space-y-5">
       <div class="space-y-1">
@@ -11,7 +12,7 @@
           {{
             controller.isChangingHero.value
               ? 'Choose a replacement, then apply it to your deck.'
-              : 'Choose a hero and name your deck to get started.'
+              : 'Choose or replace the hero for this local draft.'
           }}
         </p>
       </div>
@@ -79,7 +80,6 @@
           class="input-base"
           placeholder="Deck name"
           required
-          @keydown.enter.prevent="continueSetup"
         >
       </label>
     </div>
@@ -105,15 +105,6 @@
           Apply
         </button>
       </div>
-      <button
-        v-else
-        class="btn-primary w-full justify-center"
-        type="button"
-        :disabled="!canContinueSetup"
-        @click="continueSetup"
-      >
-        Continue
-      </button>
     </template>
   </AppStickyAside>
 </template>
@@ -137,13 +128,6 @@ const setupBlockingMessages = computed(() => [
   ...props.controller.deck.setupMessages.value,
   ...props.controller.deck.blockingMessages.value,
 ]);
-const canContinueSetup = computed(() =>
-  Boolean(
-    props.controller.deck.selectedHero.value
-      && deckName.value.trim()
-      && setupBlockingMessages.value.length === 0,
-  ),
-);
 const deckNameInputRef = ref<HTMLInputElement | null>(null);
 
 watch(
@@ -161,9 +145,4 @@ watch(
   },
 );
 
-const continueSetup = (): void => {
-  if (canContinueSetup.value) {
-    void props.controller.completeInitialHeroSelection();
-  }
-};
 </script>

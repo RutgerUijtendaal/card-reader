@@ -11,9 +11,18 @@
     >
       <template #actions>
         <div
-          v-if="controller.deckId.value && !controller.isChangingHero.value"
+          v-if="!controller.isChangingHero.value"
           class="flex items-center gap-1"
         >
+          <AppHeaderAction
+            v-if="!controller.isPublished.value"
+            :icon="Crown"
+            label="Open deck hero"
+            short-label="Hero"
+            variant="tab"
+            :active="controller.editorMode.value === 'hero'"
+            @click="controller.openHero()"
+          />
           <AppHeaderAction
             :icon="FileText"
             label="Open deck details"
@@ -32,7 +41,14 @@
           />
         </div>
         <AppHeaderAction
-          v-if="controller.editorMode.value !== 'hero'"
+          v-if="!controller.isPublished.value && controller.hasLocalDraft.value"
+          :icon="Trash2"
+          label="Discard local draft"
+          short-label="Discard"
+          @click="controller.requestDiscardLocalDraft()"
+        />
+        <AppHeaderAction
+          v-if="!controller.isChangingHero.value"
           :icon="deckSaveActionIcon"
           :label="deckSaveActionLabel"
           :short-label="deckSaveActionShortLabel"
@@ -188,7 +204,7 @@
                 type="checkbox"
                 :disabled="!controller.canAutosync.value"
               >
-              <span>Autosync</span>
+              <span>{{ controller.isPublished.value ? 'Autosync' : 'Autosync after creation' }}</span>
             </label>
           </div>
 
@@ -411,12 +427,31 @@
 
     <ConfirmModal
       :open="controller.discardChangesModalOpen.value"
-      title="Discard deck changes?"
-      message="You have unsaved deck changes. Leaving this page will discard them."
-      confirm-label="Discard Changes"
+      :title="controller.isPublished.value ? 'Discard deck changes?' : 'Leave local deck draft?'"
+      :message="
+        controller.isPublished.value
+          ? 'You have unsaved deck changes. Leaving this page will discard them.'
+          : 'Your unpublished deck will remain saved in this browser so you can resume it later.'
+      "
+      :confirm-label="controller.isPublished.value ? 'Discard Changes' : 'Leave Draft'"
       cancel-label="Stay Here"
       @confirm="controller.confirmDiscardChanges"
       @cancel="controller.cancelDiscardChanges"
+    />
+    <ConfirmModal
+      :open="controller.discardLocalDraftModalOpen.value"
+      title="Discard local deck draft?"
+      message="This permanently removes the unpublished deck from this browser."
+      confirm-label="Discard Draft"
+      cancel-label="Keep Draft"
+      @confirm="controller.confirmDiscardLocalDraft"
+      @cancel="controller.cancelDiscardLocalDraft"
+    />
+    <DeckDraftRecoveryModal
+      :open="controller.localDraftRecoveryModalOpen.value"
+      :saved-at="controller.pendingLocalDraft.value?.savedAt"
+      @resume="controller.resumeLocalDraft"
+      @discard="controller.discardPendingLocalDraft"
     />
   </section>
 </template>
@@ -428,11 +463,13 @@ import {
   CircleX,
   Cloud,
   CloudUpload,
+  Crown,
   FileText,
   Hammer,
   LayoutGrid,
   LoaderCircle,
   Save,
+  Trash2,
   TriangleAlert,
 } from 'lucide-vue-next';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
@@ -445,6 +482,7 @@ import DeckBuilderGallery from '@/features/decks/components/DeckBuilderGallery.v
 import DeckBuilderSummaryPanel from '@/features/decks/components/DeckBuilderSummaryPanel.vue';
 import DeckDetailsForm from '@/features/decks/components/DeckDetailsForm.vue';
 import DeckDetailsHeroPanel from '@/features/decks/components/DeckDetailsHeroPanel.vue';
+import DeckDraftRecoveryModal from '@/features/decks/components/DeckDraftRecoveryModal.vue';
 import DeckHeroSelectionPanel from '@/features/decks/components/DeckHeroSelectionPanel.vue';
 import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
@@ -476,15 +514,17 @@ const deckSaveActionIcon = computed(() => {
   if (controller.manualSaving.value) {
     return LoaderCircle;
   }
-  return Save;
+  return controller.isPublished.value ? Save : Hammer;
 });
 const deckSaveActionLabel = computed(() => {
   if (controller.manualSaving.value) {
-    return 'Saving deck';
+    return controller.isPublished.value ? 'Saving deck' : 'Creating deck';
   }
-  return 'Save deck';
+  return controller.isPublished.value ? 'Save deck' : 'Create deck';
 });
-const deckSaveActionShortLabel = 'Save';
+const deckSaveActionShortLabel = computed(() =>
+  controller.isPublished.value ? 'Save' : 'Create',
+);
 const deckChangeStatusIcon = computed(() => {
   if (controller.saving.value) {
     return LoaderCircle;
@@ -498,7 +538,7 @@ const deckEditorSubtitle = computed(() => {
   if (controller.editorMode.value === 'hero') {
     return controller.isChangingHero.value
       ? 'Choose a replacement hero, then apply or cancel the change.'
-      : 'Select a hero and name your deck to continue.';
+      : 'Choose the hero that will shape this deck.';
   }
   if (controller.editorMode.value === 'details') {
     return 'Edit the information people use to understand and discover this deck.';

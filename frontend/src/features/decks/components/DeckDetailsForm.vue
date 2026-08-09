@@ -17,6 +17,7 @@
         <span>Name <span class="theme-error-text">*</span></span>
         <input
           id="deck-name-field"
+          ref="deckNameInputRef"
           v-model="deckName"
           class="input-base"
           placeholder="Deck name"
@@ -137,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
 import DeckTagPicker from '@/domain/decks/components/DeckTagPicker.vue';
 import { deckDifficultyOptions } from '@/domain/decks/utils/difficulty';
@@ -152,6 +153,14 @@ const deckName = computed({
   get: () => props.controller.deck.form.name,
   set: props.controller.deck.setDeckName,
 });
+const deckNameInputRef = ref<HTMLInputElement | null>(null);
+watch(
+  () => props.controller.focusDeckNameRequest.value,
+  async () => {
+    await nextTick();
+    deckNameInputRef.value?.focus({ preventScroll: true });
+  },
+);
 const deckDescription = computed({
   get: () => props.controller.deck.form.description,
   set: props.controller.deck.setDeckDescription,

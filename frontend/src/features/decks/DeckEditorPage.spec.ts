@@ -9,6 +9,7 @@ const { controller } = vi.hoisted(() => {
   return {
     controller: {
       deckId: refValue('deck-1'),
+      isPublished: refValue(true),
       backLink: refValue('/my/decks'),
       backLabel: refValue('Back to My Decks'),
       editorMode: refValue<'hero' | 'details' | 'cards'>('cards'),
@@ -17,19 +18,29 @@ const { controller } = vi.hoisted(() => {
       manualSaving: refValue(false),
       loading: refValue(false),
       hasUnsavedChanges: refValue(true),
+      hasLocalDraft: refValue(false),
       canAutosync: refValue(true),
       changeStatusLabel: refValue('Unsaved'),
       autosyncEnabled: refValue(false),
       discardChangesModalOpen: refValue(false),
+      discardLocalDraftModalOpen: refValue(false),
+      localDraftRecoveryModalOpen: refValue(false),
+      pendingLocalDraft: refValue<null | { savedAt: string }>(null),
       deckBuildingRules: refValue({
         mainboard_card_count: { min: 40, max: 60 },
         mana_type_count: { min: 10 },
       }),
       saveDeck: vi.fn(),
+      openHero: vi.fn(),
       openDetails: vi.fn(),
       openCards: vi.fn(),
       confirmDiscardChanges: vi.fn(),
       cancelDiscardChanges: vi.fn(),
+      requestDiscardLocalDraft: vi.fn(),
+      confirmDiscardLocalDraft: vi.fn(),
+      cancelDiscardLocalDraft: vi.fn(),
+      resumeLocalDraft: vi.fn(),
+      discardPendingLocalDraft: vi.fn(),
       deck: {
         overallTotalCards: refValue(42),
         totalMainboardCards: refValue(40),
@@ -166,6 +177,22 @@ vi.mock('@/features/decks/components/DeckDetailsForm.vue', () => ({
   }),
 }));
 
+vi.mock('@/features/decks/components/DeckDraftRecoveryModal.vue', () => ({
+  default: defineComponent({
+    props: {
+      open: { type: Boolean, required: true },
+    },
+    setup(props, { emit }) {
+      return () => props.open
+        ? h('section', { 'data-testid': 'draft-recovery-modal' }, [
+            h('button', { onClick: () => emit('discard') }, 'Discard Draft'),
+            h('button', { onClick: () => emit('resume') }, 'Resume Draft'),
+          ])
+        : null;
+    },
+  }),
+}));
+
 const mountPage = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -185,6 +212,7 @@ const mountPage = async () => {
 describe('DeckEditorPage', () => {
   afterEach(() => {
     controller.deckId.value = 'deck-1';
+    controller.isPublished.value = true;
     controller.editorMode.value = 'cards';
     controller.isChangingHero.value = false;
     controller.loading.value = false;
@@ -192,9 +220,13 @@ describe('DeckEditorPage', () => {
     controller.manualSaving.value = false;
     controller.changeStatusLabel.value = 'Unsaved';
     controller.hasUnsavedChanges.value = true;
+    controller.hasLocalDraft.value = false;
     controller.canAutosync.value = true;
     controller.autosyncEnabled.value = false;
     controller.discardChangesModalOpen.value = false;
+    controller.discardLocalDraftModalOpen.value = false;
+    controller.localDraftRecoveryModalOpen.value = false;
+    controller.pendingLocalDraft.value = null;
     document.body.innerHTML = '';
     vi.clearAllMocks();
   });
@@ -227,6 +259,7 @@ describe('DeckEditorPage', () => {
 
   test('renders hero browsing without the cards status or board sidebar', async () => {
     controller.deckId.value = '';
+    controller.isPublished.value = false;
     controller.editorMode.value = 'hero';
 
     const mounted = await mountPage();
@@ -244,6 +277,7 @@ describe('DeckEditorPage', () => {
 
     mounted.unmount();
     controller.deckId.value = 'deck-1';
+    controller.isPublished.value = true;
   });
 
   test('renders the wide details layout without a gallery or board sidebar', async () => {
@@ -307,6 +341,40 @@ describe('DeckEditorPage', () => {
     mounted.unmount();
   });
 
+  test('shows Hero, Details, Cards, and Create for an unpublished draft', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.editorMode.value = 'cards';
+    controller.canAutosync.value = false;
+    controller.changeStatusLabel.value = 'Local Draft';
+
+    const mounted = await mountPage();
+    const heroTab = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Open deck hero"]',
+    );
+    const createButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Create deck"]',
+    );
+    const autosyncCheckbox = mounted.container.querySelector<HTMLInputElement>(
+      'input[type="checkbox"]',
+    );
+
+    expect(heroTab).not.toBeNull();
+    expect(mounted.container.querySelector('button[aria-label="Open deck details"]')).not.toBeNull();
+    expect(mounted.container.querySelector('button[aria-label="Open deck cards"]')).not.toBeNull();
+    expect(createButton?.textContent).toBe('Create');
+    expect(autosyncCheckbox?.disabled).toBe(true);
+    expect(mounted.container.textContent).toContain('Autosync after creation');
+
+    heroTab?.click();
+    createButton?.click();
+    await nextTick();
+
+    expect(controller.openHero).toHaveBeenCalledTimes(1);
+    expect(controller.saveDeck).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
   test('hides section tabs during explicit hero replacement', async () => {
     controller.editorMode.value = 'hero';
     controller.isChangingHero.value = true;
@@ -334,6 +402,24 @@ describe('DeckEditorPage', () => {
 
     expect(controller.cancelDiscardChanges).toHaveBeenCalledTimes(1);
     expect(controller.confirmDiscardChanges).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  test('offers resume and discard when a local draft is recovered', async () => {
+    controller.localDraftRecoveryModalOpen.value = true;
+    controller.pendingLocalDraft.value = { savedAt: '2026-08-09T10:00:00Z' };
+
+    const mounted = await mountPage();
+    const modal = mounted.container.querySelector<HTMLElement>(
+      '[data-testid="draft-recovery-modal"]',
+    );
+    const buttons = Array.from(modal?.querySelectorAll('button') ?? []);
+
+    buttons.find((button) => button.textContent === 'Resume Draft')?.click();
+    buttons.find((button) => button.textContent === 'Discard Draft')?.click();
+
+    expect(controller.resumeLocalDraft).toHaveBeenCalledTimes(1);
+    expect(controller.discardPendingLocalDraft).toHaveBeenCalledTimes(1);
     mounted.unmount();
   });
 

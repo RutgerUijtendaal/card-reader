@@ -111,6 +111,7 @@ const buildController = () => {
   const activeSideboard = () => sideboards.value.find((sideboard) => sideboard.id === activeBoardId.value) ?? null;
 
   const controller = {
+    openHero: vi.fn(),
     filters: {
       hoverMode: ref('details'),
     },
@@ -255,6 +256,21 @@ describe('DeckBuilderSummaryPanel', () => {
     expect(mounted.container.querySelector('[data-testid="mana-curve"]')).toBeNull();
     expect(mounted.container.querySelector('[data-testid="deck-summary-hero-details"]')).toBeNull();
 
+    mounted.unmount();
+  });
+
+  test('opens Hero selection from the empty summary header', async () => {
+    const mounted = await mountPanel((controller) => {
+      controller.deck.selectedHero.value = null;
+    });
+    const chooseHeroButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Choose hero"]',
+    );
+
+    chooseHeroButton?.click();
+
+    expect(chooseHeroButton).not.toBeNull();
+    expect(mounted.controller.openHero).toHaveBeenCalledTimes(1);
     mounted.unmount();
   });
 

@@ -9,7 +9,10 @@ import type {
   DeckRecord,
   DeckVisibility,
 } from '@/domain/decks/types';
-import type { DeckEditorMode } from '@/features/decks/composables/deckEditorDraftTypes';
+import type {
+  DeckEditorMode,
+  DeckForm,
+} from '@/features/decks/composables/deckEditorDraftTypes';
 import {
   buildDeckCardLookup,
   buildDeckUpsertPayload,
@@ -95,6 +98,23 @@ export const useDeckEditorDraft = ({
     hydrateDeckForm(form, deck);
     boards.activeBoardId.value = MAINBOARD_ID;
     cardLookup.value = buildDeckCardLookup(cardLookup.value, deck);
+  };
+  const hydrateFromLocalDraft = (draftForm: DeckForm): void => {
+    boards.clearPendingRemovedEntries();
+    Object.assign(form, {
+      ...draftForm,
+      entries: draftForm.entries.map((entry) => ({ ...entry })),
+      sideboards: draftForm.sideboards.map((sideboard) => ({
+        ...sideboard,
+        entries: sideboard.entries.map((entry) => ({ ...entry })),
+      })),
+      tag_ids: [...draftForm.tag_ids],
+      suggested_type_labels: [...draftForm.suggested_type_labels],
+    });
+    boards.activeBoardId.value = MAINBOARD_ID;
+  };
+  const resetLocalDraft = (): void => {
+    hydrateFromLocalDraft(createEmptyDeckForm());
   };
   const buildPayload = () => buildDeckUpsertPayload(form);
 
@@ -250,6 +270,8 @@ export const useDeckEditorDraft = ({
     renameSideboard: boards.renameSideboard,
     removeSideboard: boards.removeSideboard,
     hydrateFromDeck,
+    hydrateFromLocalDraft,
+    resetLocalDraft,
     buildPayload,
     getEntryQuantity: boards.getEntryQuantity,
     getCardQuantityLimit: constraints.getCardQuantityLimit,

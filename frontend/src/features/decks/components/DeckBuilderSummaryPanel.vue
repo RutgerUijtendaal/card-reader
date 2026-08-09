@@ -38,7 +38,7 @@
             <button
               type="button"
               class="flex min-w-0 flex-1 items-start gap-3 text-left"
-              @click="toggleHeroDetails()"
+              @click="handleHeroHeaderClick()"
             >
               <div class="min-w-0 space-y-1">
                 <p class="truncate text-lg font-semibold text-white">
@@ -55,6 +55,7 @@
                   >
                     {{ controller.deck.selectedHero.value.name }}
                   </span>
+                  <span v-else>Choose hero</span>
                 </div>
               </div>
             </button>
@@ -62,8 +63,14 @@
             <button
               type="button"
               class="theme-card-frame-muted theme-section-title inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition"
-              :aria-label="heroDetailsExpanded ? 'Collapse hero details' : 'Expand hero details'"
-              @click="toggleHeroDetails()"
+              :aria-label="
+                controller.deck.selectedHero.value
+                  ? heroDetailsExpanded
+                    ? 'Collapse hero details'
+                    : 'Expand hero details'
+                  : 'Choose hero'
+              "
+              @click="handleHeroHeaderClick()"
             >
               <ChevronDown
                 class="h-4 w-4 transition-transform"
@@ -462,6 +469,13 @@ const activeBoardCount = computed(() =>
 const heroHeaderObjectPosition = '30% 10%';
 const heroHeaderTransform = 'scale(1.28)';
 const heroHeaderOpacity = 0.75;
+const handleHeroHeaderClick = (): void => {
+  if (!props.controller.deck.selectedHero.value) {
+    props.controller.openHero();
+    return;
+  }
+  toggleHeroDetails();
+};
 
 watch(
   () => props.controller.deck.lastBoardEntryChange.value?.sequence,
