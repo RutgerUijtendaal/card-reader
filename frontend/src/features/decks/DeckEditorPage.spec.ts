@@ -17,6 +17,7 @@ const { controller } = vi.hoisted(() => {
       saving: refValue(false),
       manualSaving: refValue(false),
       isCreating: refValue(false),
+      creationCleanupPending: refValue(false),
       loading: refValue(false),
       hasUnsavedChanges: refValue(true),
       hasLocalDraft: refValue(false),
@@ -222,6 +223,7 @@ describe('DeckEditorPage', () => {
     controller.saving.value = false;
     controller.manualSaving.value = false;
     controller.isCreating.value = false;
+    controller.creationCleanupPending.value = false;
     controller.changeStatusLabel.value = 'Unsaved';
     controller.hasUnsavedChanges.value = true;
     controller.hasLocalDraft.value = false;
@@ -454,6 +456,25 @@ describe('DeckEditorPage', () => {
     expect(
       mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Discard local draft"]')?.disabled,
     ).toBe(true);
+
+    mounted.unmount();
+  });
+
+  test('offers a finish action when created-draft cleanup needs retrying', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isCreating.value = true;
+    controller.creationCleanupPending.value = true;
+
+    const mounted = await mountPage();
+    const finishButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Finish deck creation"]',
+    );
+
+    expect(finishButton?.textContent).toBe('Finish');
+    expect(finishButton?.disabled).toBe(false);
+    finishButton?.click();
+    expect(controller.saveDeck).toHaveBeenCalledTimes(1);
 
     mounted.unmount();
   });

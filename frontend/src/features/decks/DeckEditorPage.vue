@@ -533,14 +533,20 @@ const deckSaveActionIcon = computed(() => {
   return controller.isPublished.value ? Save : Hammer;
 });
 const deckSaveActionLabel = computed(() => {
+  if (controller.creationCleanupPending.value) {
+    return controller.manualSaving.value ? 'Finishing deck creation' : 'Finish deck creation';
+  }
   if (controller.manualSaving.value) {
     return controller.isPublished.value ? 'Saving deck' : 'Creating deck';
   }
   return controller.isPublished.value ? 'Save deck' : 'Create deck';
 });
-const deckSaveActionShortLabel = computed(() =>
-  controller.isPublished.value ? 'Save' : 'Create',
-);
+const deckSaveActionShortLabel = computed(() => {
+  if (controller.creationCleanupPending.value) {
+    return 'Finish';
+  }
+  return controller.isPublished.value ? 'Save' : 'Create';
+});
 const deckLeaveConfirmationMessage = computed(() => {
   if (controller.isPublished.value) {
     return 'You have unsaved deck changes. Leaving this page will discard them.';

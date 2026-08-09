@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { DeckCardSummary } from '@/domain/decks/types';
 import { createEmptyDeckForm } from '@/features/decks/composables/deckEditorDraftModel';
 import {
@@ -90,6 +90,33 @@ describe('deckEditorLocalDraftStorage', () => {
     storage.clear('user-1');
 
     expect(storage.load('user-1')).toBeNull();
+  });
+
+  test('replaces a created draft with a recovery-safe marker when removal fails', () => {
+    const removeItem = vi.fn(() => {
+      throw new DOMException('Removal blocked', 'SecurityError');
+    });
+    const values = new Map<string, string>();
+    const storageBackend = {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem,
+      clear: vi.fn(() => values.clear()),
+      key: vi.fn(() => null),
+      get length() {
+        return values.size;
+      },
+    } satisfies Storage;
+    const storage = createDeckEditorLocalDraftStorage(storageBackend);
+    storage.save('user-1', { ...createEmptyDeckForm(), name: 'Created Deck' }, {});
+
+    storage.retire('user-1', 'deck-created');
+
+    expect(removeItem).toHaveBeenCalled();
+    expect(storage.load('user-1')).toBeNull();
+    expect(values.get('card-reader.deck-editor.new-draft.user-1')).toContain(
+      '"createdDeckId":"deck-created"',
+    );
   });
 
   test('guards browser storage access when the property itself is blocked', () => {

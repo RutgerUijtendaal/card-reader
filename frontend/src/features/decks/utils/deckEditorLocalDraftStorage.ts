@@ -16,6 +16,13 @@ export type StoredDeckEditorDraft = {
   cards: Record<string, DeckCardSummary>;
 };
 
+type RetiredDeckEditorDraft = {
+  version: typeof DECK_EDITOR_LOCAL_DRAFT_VERSION;
+  ownerId: string;
+  retiredAt: string;
+  createdDeckId: string;
+};
+
 export type DeckEditorLocalDraftStorage = {
   load: (ownerId: string) => StoredDeckEditorDraft | null;
   save: (
@@ -24,6 +31,7 @@ export type DeckEditorLocalDraftStorage = {
     cardLookup: Record<string, DeckCardSummary>,
   ) => StoredDeckEditorDraft;
   clear: (ownerId: string) => void;
+  retire: (ownerId: string, createdDeckId: string) => void;
 };
 
 const storageKey = (ownerId: string): string => `${STORAGE_PREFIX}${ownerId}`;
@@ -33,6 +41,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isRetiredDraft = (value: unknown, ownerId: string): value is RetiredDeckEditorDraft =>
+  isRecord(value)
+  && value.version === DECK_EDITOR_LOCAL_DRAFT_VERSION
+  && value.ownerId === ownerId
+  && typeof value.retiredAt === 'string'
+  && typeof value.createdDeckId === 'string';
 
 const normalizeEntry = (value: unknown): DeckFormEntry | null => {
   if (!isRecord(value) || typeof value.card_id !== 'string') {
@@ -279,12 +294,9 @@ export const createDeckEditorLocalDraftStorage = (
       if (!raw) {
         return null;
       }
+      let storedValue: unknown;
       try {
-        const parsed = parseStoredDeckEditorDraft(JSON.parse(raw) as unknown, ownerId);
-        if (parsed === null) {
-          activeStorage.removeItem(key);
-        }
-        return parsed;
+        storedValue = JSON.parse(raw) as unknown;
       } catch {
         try {
           activeStorage.removeItem(key);
@@ -293,6 +305,19 @@ export const createDeckEditorLocalDraftStorage = (
         }
         return null;
       }
+      if (isRetiredDraft(storedValue, ownerId)) {
+        try {
+          activeStorage.removeItem(key);
+        } catch {
+          // A retirement marker is safe to leave behind because it is never recoverable as a draft.
+        }
+        return null;
+      }
+      const parsed = parseStoredDeckEditorDraft(storedValue, ownerId);
+      if (parsed === null) {
+        activeStorage.removeItem(key);
+      }
+      return parsed;
     },
     save(ownerId, form, cardLookup) {
       if (!ownerId) {
@@ -308,6 +333,24 @@ export const createDeckEditorLocalDraftStorage = (
         return;
       }
       requireStorage().removeItem(storageKey(ownerId));
+    },
+    retire(ownerId, createdDeckId) {
+      if (!ownerId || !createdDeckId) {
+        throw new Error('Local draft storage is unavailable.');
+      }
+      const activeStorage = requireStorage();
+      const key = storageKey(ownerId);
+      try {
+        activeStorage.removeItem(key);
+      } catch {
+        const marker: RetiredDeckEditorDraft = {
+          version: DECK_EDITOR_LOCAL_DRAFT_VERSION,
+          ownerId,
+          retiredAt: new Date().toISOString(),
+          createdDeckId,
+        };
+        activeStorage.setItem(key, JSON.stringify(marker));
+      }
     },
   };
 };

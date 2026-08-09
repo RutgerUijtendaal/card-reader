@@ -509,6 +509,44 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('retries draft retirement without creating a duplicate deck', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Created Once');
+    await nextTick();
+
+    const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('Removal blocked', 'SecurityError');
+    });
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Writes blocked', 'SecurityError');
+    });
+
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.creationCleanupPending.value).toBe(true);
+    expect(mounted.controller.isCreating.value).toBe(true);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'The deck was created, but its local draft could not be retired. Click Finish to retry.',
+    );
+
+    removeItemSpy.mockRestore();
+    setItemSpy.mockRestore();
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.creationCleanupPending.value).toBe(false);
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
+    expect(createDeckEditorLocalDraftStorage().load('user-1')).toBeNull();
+
+    mounted.unmount();
+  });
+
   test('switches Details and Cards without saving or losing draft metadata', async () => {
     const mounted = await mountController();
     mounted.controller.deck.setDeckLongDescription('Keep this strategy note.');

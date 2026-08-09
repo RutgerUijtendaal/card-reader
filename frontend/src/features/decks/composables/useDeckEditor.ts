@@ -32,6 +32,12 @@ import {
   type StoredDeckEditorDraft,
 } from '@/features/decks/utils/deckEditorLocalDraftStorage';
 
+type PendingCreatedDeck = {
+  record: DeckRecord;
+  savedSignature: string;
+  showSuccessToast: boolean;
+};
+
 export const useDeckEditor = () => {
   const route = useRoute();
   const router = useRouter();
@@ -58,6 +64,7 @@ export const useDeckEditor = () => {
   const discardLocalDraftModalOpen = ref(false);
   const localDraftRecoveryModalOpen = ref(false);
   const pendingLocalDraft = ref<StoredDeckEditorDraft | null>(null);
+  const pendingCreatedDeck = ref<PendingCreatedDeck | null>(null);
   const localDraftDecisionResolved = ref(Boolean(deckId.value) || !localDraftOwnerId);
   const localDraftPersistenceFailed = ref(false);
   const focusDeckNameRequest = ref(0);
@@ -360,7 +367,10 @@ export const useDeckEditor = () => {
   }
   const hasUnsavedChanges = computed(() => savedPayloadSignature.value !== '' && payloadSignature.value !== savedPayloadSignature.value);
   const hasLocalDraft = computed(() => !isPublished.value && hasUnsavedChanges.value);
-  const isCreating = computed(() => !isPublished.value && saving.value);
+  const creationCleanupPending = computed(() => pendingCreatedDeck.value !== null);
+  const isCreating = computed(
+    () => !isPublished.value && (saving.value || creationCleanupPending.value),
+  );
   const isChangingHero = computed(() => originalHeroId.value !== null);
   const canApplyHeroChange = computed(
     () => isChangingHero.value
@@ -373,6 +383,9 @@ export const useDeckEditor = () => {
       return 'Loading';
     }
     if (!isPublished.value) {
+      if (creationCleanupPending.value) {
+        return 'Finishing';
+      }
       if (saving.value) {
         return 'Creating';
       }
@@ -423,8 +436,58 @@ export const useDeckEditor = () => {
     return true;
   };
 
+  const retireLocalDraftAfterCreation = (createdDeckId: string): boolean => {
+    try {
+      localDraftStorage.retire(localDraftOwnerId, createdDeckId);
+      lastLocalDraftSignature = '';
+      localDraftPersistenceFailed.value = false;
+      return true;
+    } catch {
+      localDraftPersistenceFailed.value = true;
+      warnLocalDraftStorageUnavailable(
+        'The deck was created, but its local draft could not be retired. Click Finish to retry.',
+      );
+      return false;
+    }
+  };
+
+  const finishCreatedDeck = async (pending: PendingCreatedDeck): Promise<boolean> => {
+    if (!retireLocalDraftAfterCreation(pending.record.id)) {
+      return false;
+    }
+    pendingCreatedDeck.value = null;
+    shouldApplyHeroCardPreset.value = true;
+    activateCards();
+    bypassNextUnsavedPrompt = true;
+    try {
+      await router.replace({
+        path: `/my/decks/${pending.record.id}/edit`,
+        query: withDeckEditorMode(route.query, 'cards'),
+        hash: route.hash,
+      });
+    } finally {
+      bypassNextUnsavedPrompt = false;
+    }
+    markSavedPayload(pending.savedSignature);
+    if (pending.showSuccessToast) {
+      toast.success('Deck created.');
+    }
+    return true;
+  };
+
   const saveDeck = async (options: { silent?: boolean } = {}): Promise<void> => {
     if (saving.value) {
+      return;
+    }
+    if (pendingCreatedDeck.value) {
+      saving.value = true;
+      manualSaving.value = true;
+      try {
+        await finishCreatedDeck(pendingCreatedDeck.value);
+      } finally {
+        saving.value = false;
+        manualSaving.value = false;
+      }
       return;
     }
     const creating = !isPublished.value;
@@ -445,30 +508,18 @@ export const useDeckEditor = () => {
       const savedSignature = reconcilePersistedTagState(record, persistedSignature);
       showTagSuggestionFeedback(record);
       if (creating) {
-        clearLocalDraftStorage();
-        lastLocalDraftSignature = '';
-        localDraftPersistenceFailed.value = false;
-        shouldApplyHeroCardPreset.value = true;
-        activateCards();
-        bypassNextUnsavedPrompt = true;
-        try {
-          await router.replace({
-            path: `/my/decks/${record.id}/edit`,
-            query: withDeckEditorMode(route.query, 'cards'),
-            hash: route.hash,
-          });
-        } finally {
-          bypassNextUnsavedPrompt = false;
-        }
+        pendingCreatedDeck.value = {
+          record,
+          savedSignature,
+          showSuccessToast: !options.silent,
+        };
+        await finishCreatedDeck(pendingCreatedDeck.value);
+        return;
       }
       markSavedPayload(savedSignature);
       if (!options.silent) {
         toast.success(
-          creating
-            ? 'Deck created.'
-            : record.status.is_valid
-              ? 'Deck saved.'
-              : 'Draft saved.',
+          record.status.is_valid ? 'Deck saved.' : 'Draft saved.',
         );
       }
     } finally {
@@ -682,6 +733,7 @@ export const useDeckEditor = () => {
     saving,
     manualSaving,
     isCreating,
+    creationCleanupPending,
     hasUnsavedChanges,
     hasLocalDraft,
     localDraftPersistenceFailed,
