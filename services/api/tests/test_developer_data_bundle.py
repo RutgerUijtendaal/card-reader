@@ -203,9 +203,9 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
             payload = json.loads(data_member.read())
         assert {card["key"] for card in payload["cards"]} == {
             "additional-public-card",
-            "deprecated-card",
-            "hero-card",
-            "mainboard-card",
+            "synthetic-deprecated",
+            "synthetic-hero",
+            "synthetic-mainboard",
         }
         transaction.set_rollback(True)
 

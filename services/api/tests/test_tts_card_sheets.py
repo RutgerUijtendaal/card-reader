@@ -467,8 +467,17 @@ def test_current_layout_uses_canonical_images_without_resizing_or_letterboxing(
         raise AssertionError("Canonical card images must not be resized")
 
     monkeypatch.setattr(tts_sheet_renderer.ImageOps, "contain", reject_resize)
+    progress_messages: list[str] = []
 
-    assert service.render_sheets_now(sorted(sheet_ids)) == 1
+    assert service.render_sheets_now(
+        sorted(sheet_ids),
+        progress=progress_messages.append,
+    ) == 1
+    assert progress_messages == [
+        "Rendering TTS card sheet 1/1...",
+        "Rendered TTS card sheet 1/1.",
+        "TTS rendering complete: 1 sheet revisions rendered.",
+    ]
 
     sheet = TtsCardSheet.objects.get(id=next(iter(sheet_ids)))
     layout = tts_sheet_renderer.get_tts_card_sheet_layout(sheet.layout_version)

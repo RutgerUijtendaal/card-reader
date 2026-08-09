@@ -33,6 +33,17 @@ class Command(BaseCommand):
         parser.add_argument("--code", help="Bootstrap code; omit to enter it interactively.")
         parser.add_argument("--admin-username")
         parser.add_argument("--admin-password")
+        tts_group = parser.add_mutually_exclusive_group()
+        tts_group.add_argument(
+            "--generate-tts-sheets",
+            action="store_true",
+            help="Generate TTS sheets without prompting.",
+        )
+        tts_group.add_argument(
+            "--skip-tts-sheets",
+            action="store_true",
+            help="Skip TTS sheet generation without prompting.",
+        )
 
     def handle(self, *args: object, **options: object) -> None:
         if not settings.is_dev:
@@ -72,13 +83,29 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
         _create_or_update_local_admin(username=username, password=password)
         call_command("seed_notification_examples", "--username", username, stdout=self.stdout)
-        sheet_result = TtsCardSheetService().reconcile_all(render=True)
+        generate_tts_sheets = _should_generate_tts_sheets(options)
+        sheet_summary = " TTS sheet generation was skipped."
+        if generate_tts_sheets:
+            self.stdout.write("Preparing TTS card sheets. This may take several minutes...")
+            sheet_result = TtsCardSheetService().reconcile_all(
+                render=True,
+                progress=self.stdout.write,
+            )
+            sheet_summary = (
+                f" Rendered {sheet_result.rendered_sheets} TTS sheet revisions "
+                f"across {sheet_result.affected_sheets} affected sheets."
+            )
+        else:
+            self.stdout.write(
+                "Skipping TTS sheet generation. Run reconcile_tts_card_sheets --render later "
+                "to generate them."
+            )
         call_command("doctor_dev_data", stdout=self.stdout)
         self.stdout.write(
             self.style.SUCCESS(
                 f"Bootstrapped developer-data bundle {result.bundle_version} "
                 f"with {result.copied_assets} copied assets."
-                f" Generated {sheet_result.affected_sheets} TTS card sheets."
+                f"{sheet_summary}"
             )
         )
 
@@ -216,3 +243,17 @@ def _http_error_detail(exc: HTTPError) -> str:
 def _optional_string(value: object) -> str | None:
     compact = str(value or "").strip()
     return compact or None
+
+
+def _should_generate_tts_sheets(options: dict[str, object]) -> bool:
+    if bool(options.get("generate_tts_sheets")):
+        return True
+    if bool(options.get("skip_tts_sheets")):
+        return False
+    try:
+        answer = input(
+            "Generate TTS card sheets now? This may take several minutes. [y/N]: "
+        )
+    except EOFError:
+        return False
+    return answer.strip().lower() in {"y", "yes"}

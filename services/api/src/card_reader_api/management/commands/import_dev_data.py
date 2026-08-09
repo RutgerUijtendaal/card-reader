@@ -25,7 +25,10 @@ class Command(BaseCommand):
             )
         except (DeveloperDataError, OSError) as exc:
             raise CommandError(str(exc)) from exc
-        sheet_result = TtsCardSheetService().reconcile_all(render=True)
+        sheet_result = TtsCardSheetService().reconcile_all(
+            render=True,
+            progress=self.stdout.write,
+        )
         self.stdout.write(
             self.style.SUCCESS(
                 f"Imported developer-data bundle {result.bundle_version}; "

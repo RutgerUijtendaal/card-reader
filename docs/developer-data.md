@@ -55,6 +55,16 @@ admin credentials, creates development-only notification examples for that admin
 readiness doctor. The examples and their private demonstration deck are synthesized after import;
 they are not part of the published developer-data bundle.
 
+After the notification examples, bootstrap asks whether to generate the local TTS card sheets.
+The default is **No** because rendering each full sheet can take a while. Choose **Yes** to render
+them immediately with per-sheet progress, pass `--generate-tts-sheets` to opt in without a prompt,
+or pass `--skip-tts-sheets` for a non-interactive fast bootstrap. Skipped sheets can be generated
+later with:
+
+```bash
+uv run --project . --package card-reader-api python services/api/manage.py reconcile_tts_card_sheets --render
+```
+
 For an archive downloaded through the browser or provided offline:
 
 ```bash
