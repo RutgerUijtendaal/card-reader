@@ -1,4 +1,5 @@
-import type { ContentVersion, ImportJob, ImportJobStatus } from '@/features/import-jobs/types';
+import type { OperationsItemStatus, OperationsQueueItem } from '@/domain/operations/types';
+import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
 
 const CONTENT_VERSION_BASE_PATTERN = /^\d+\.\d+$/;
 
@@ -13,7 +14,7 @@ export const getImportJobProgressPercent = (job: ImportJob): number => {
   return Math.max(0, Math.min(100, Math.round((job.processed_items / job.total_items) * 100)));
 };
 
-export const getImportJobStatusClass = (status: ImportJobStatus): string => {
+export const getImportJobStatusClass = (status: OperationsItemStatus): string => {
   if (status === 'queued') return 'theme-pill-neutral';
   if (status === 'running') return 'theme-pill-warning';
   if (status === 'canceling') return 'theme-pill-warning';
@@ -22,7 +23,28 @@ export const getImportJobStatusClass = (status: ImportJobStatus): string => {
   return 'theme-pill-danger';
 };
 
-export const getImportJobProgressClass = (status: ImportJobStatus): string => {
+const TERMINAL_IMPORT_STATUSES: OperationsItemStatus[] = ['completed', 'failed', 'cancelled'];
+
+export const isTerminalImportStatus = (status: OperationsItemStatus): boolean =>
+  TERMINAL_IMPORT_STATUSES.includes(status);
+
+export const getRecentImportJobs = (
+  items: OperationsQueueItem[],
+  activeJobIds: Set<string>,
+  limit = 5,
+): OperationsQueueItem[] =>
+  items
+    .filter((item) => isTerminalImportStatus(item.status) && !activeJobIds.has(item.id))
+    .slice(0, limit);
+
+export const getOperationsItemProgressPercent = (item: OperationsQueueItem): number | null => {
+  if (item.progress_current === null || item.progress_total === null || item.progress_total <= 0) {
+    return null;
+  }
+  return Math.max(0, Math.min(100, Math.round((item.progress_current / item.progress_total) * 100)));
+};
+
+export const getImportJobProgressClass = (status: OperationsItemStatus): string => {
   if (status === 'failed') return 'bg-rose-500';
   if (status === 'cancelled' || status === 'canceling') return 'bg-amber-500';
   if (status === 'completed') return 'bg-emerald-500';

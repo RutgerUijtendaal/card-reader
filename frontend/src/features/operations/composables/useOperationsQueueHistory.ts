@@ -1,8 +1,8 @@
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import type { Ref } from 'vue';
-import { fetchOperationsQueuePage } from '@/features/operations/api';
-import type { OperationsQueuePage } from '@/features/operations/types';
+import { fetchOperationsQueuePage } from '@/domain/operations/api';
+import type { OperationsQueuePage } from '@/domain/operations/types';
 
 const HISTORY_PAGE_SIZE = 20;
 

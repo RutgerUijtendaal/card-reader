@@ -16,12 +16,21 @@ vi.mock('@/domain/decks/components/DeckTagPicker.vue', () => ({
         type: String,
         default: undefined,
       },
+      sectioned: {
+        type: Boolean,
+        default: false,
+      },
     },
     setup(props) {
-      return () => h('div', { 'data-testid': 'tag-picker' }, [
-        h('p', 'Tags'),
-        props.description ? h('p', props.description) : null,
-      ]);
+      return () => props.sectioned
+        ? h('fieldset', { 'data-testid': 'tag-picker', class: 'theme-divider border-t pt-3' }, [
+          h('legend', { class: 'pr-2' }, 'Tags'),
+          props.description ? h('p', { class: 'mt-1' }, props.description) : null,
+        ])
+        : h('div', { 'data-testid': 'tag-picker' }, [
+          h('p', 'Tags'),
+          props.description ? h('p', props.description) : null,
+        ]);
     },
   }),
 }));
@@ -150,6 +159,19 @@ describe('deck editor mode panels', () => {
     expect(organizationSection?.textContent).toContain('Make this deck easier to find');
     expect(organizationSection?.textContent).toContain('Visibility');
     expect(organizationSection?.textContent).toContain('Only you can view this deck.');
+    const organizationFieldsets = Array.from(
+      organizationSection?.querySelectorAll('fieldset') ?? [],
+    );
+    expect(organizationFieldsets).toHaveLength(3);
+    expect(
+      organizationFieldsets.map((fieldset) => fieldset.querySelector('legend')?.textContent?.trim()),
+    ).toEqual(['Tags', 'Difficulty', 'Visibility']);
+    expect(
+      organizationFieldsets.every((fieldset) =>
+        fieldset.classList.contains('theme-divider')
+        && fieldset.classList.contains('border-t'),
+      ),
+    ).toBe(true);
     const organizationLabels = Array.from(organizationSection?.querySelectorAll('p, legend') ?? [])
       .map((element) => element.textContent?.trim())
       .filter((label) => ['Tags', 'Difficulty', 'Visibility'].includes(label ?? ''));

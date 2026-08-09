@@ -3,12 +3,13 @@ import { createApp, h, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import DeckTagPicker from '@/domain/decks/components/DeckTagPicker.vue';
 import DeckTagPills from '@/domain/decks/components/DeckTagPills.vue';
+import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
 import type { DeckTagCatalog, PendingDeckTagSuggestion } from '@/domain/decks/types';
 
 vi.mock('@/shared/composables/useFloatingPopover', async () => {
   const { computed, ref: vueRef } = await import('vue');
   return {
-    useFloatingPopover: () => {
+    useFloatingPopover: vi.fn(() => {
       const isOpen = vueRef(false);
       return {
         isOpen,
@@ -24,7 +25,7 @@ vi.mock('@/shared/composables/useFloatingPopover', async () => {
           isOpen.value = false;
         },
       };
-    },
+    }),
   };
 });
 
@@ -38,9 +39,40 @@ const catalog: DeckTagCatalog = {
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.clearAllMocks();
 });
 
 describe('DeckTagPicker', () => {
+  test('uses the shared section treatment when embedded in deck details', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const app = createApp({
+      render: () =>
+        h(DeckTagPicker, {
+          catalog,
+          modelValue: [],
+          suggestedTypeLabels: [],
+          description: 'Make this deck easier to find and understand.',
+          sectioned: true,
+        }),
+    });
+    app.mount(container);
+    await nextTick();
+
+    const fieldset = container.querySelector('fieldset');
+    expect(fieldset?.querySelector('legend')?.textContent).toContain('Tags');
+    expect(fieldset?.textContent).toContain('Make this deck easier to find and understand.');
+    expect(fieldset?.querySelector('legend button')).toBeNull();
+    expect(fieldset?.querySelector('button[aria-label="Add deck tags"]')).not.toBeNull();
+    expect(container.querySelectorAll('fieldset')).toHaveLength(1);
+    expect(vi.mocked(useFloatingPopover)).toHaveBeenLastCalledWith({
+      fitAvailableHeight: true,
+      trackLayoutShift: false,
+    });
+
+    app.unmount();
+  });
+
   test('uses role quick-picks, grouped selection, and typed type suggestions', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -66,12 +98,40 @@ describe('DeckTagPicker', () => {
     const damageQuickPick = [...container.querySelectorAll('button')].find(
       (button) => button.textContent?.trim() === 'Damage',
     );
+    const controlQuickPick = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent?.trim() === 'Control',
+    );
+    const initialAddButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Add deck tags"]',
+    );
+    expect(
+      controlQuickPick !== undefined
+        && initialAddButton !== null
+        && Boolean(
+          controlQuickPick.compareDocumentPosition(initialAddButton)
+            & Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+    ).toBe(true);
     damageQuickPick?.click();
     await nextTick();
     expect(selectedIds.value).toEqual(['role-damage']);
     expect(container.textContent).not.toContain('Control');
+    const selectedDamage = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Remove Damage"]',
+    );
+    const selectedAddButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Add deck tags"]',
+    );
+    expect(
+      selectedDamage !== null
+        && selectedAddButton !== null
+        && Boolean(
+          selectedDamage.compareDocumentPosition(selectedAddButton)
+            & Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+    ).toBe(true);
 
-    container.querySelector<HTMLButtonElement>('button[aria-label="Add deck tags"]')?.click();
+    selectedAddButton?.click();
     await nextTick();
     const popover = document.body.querySelector<HTMLElement>('[data-testid="deck-tag-picker-popover"]');
     const options = document.body.querySelector<HTMLElement>('[data-testid="deck-tag-picker-options"]');

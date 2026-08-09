@@ -141,8 +141,8 @@
 <script setup lang="ts">
 import { AlertTriangle, ChevronDown, ExternalLink } from 'lucide-vue-next';
 import { computed } from 'vue';
-import { operationsLinkUrl } from '@/features/operations/api';
-import type { OperationsQueueItem } from '@/features/operations/types';
+import { operationsLinkUrl } from '@/domain/operations/api';
+import type { OperationsQueueItem } from '@/domain/operations/types';
 import {
   formatOperationsTimestamp,
   operationsProgressPercent,

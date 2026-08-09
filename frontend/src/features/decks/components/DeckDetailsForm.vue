@@ -62,6 +62,7 @@
         </p>
       </div>
       <DeckTagPicker
+        sectioned
         :catalog="controller.deckTagCatalog.value"
         :model-value="controller.deck.form.tag_ids"
         :suggested-type-labels="controller.deck.form.suggested_type_labels"
@@ -69,13 +70,10 @@
         @update:model-value="controller.deck.setDeckTagIds"
         @update:suggested-type-labels="controller.deck.setSuggestedTypeLabels"
       />
-      <fieldset class="space-y-3">
-        <legend class="theme-section-title text-sm font-medium">
-          Difficulty
-        </legend>
-        <p class="theme-section-muted text-sm">
-          Give players a broad sense of how demanding this deck is to play.
-        </p>
+      <AppFormSection
+        title="Difficulty"
+        description="Give players a broad sense of how demanding this deck is to play."
+      >
         <div class="flex flex-wrap items-center gap-2">
           <button
             v-for="option in difficultyOptions"
@@ -97,14 +95,11 @@
             Clear
           </button>
         </div>
-      </fieldset>
-      <fieldset class="space-y-3">
-        <legend class="theme-section-title text-sm font-medium">
-          Visibility
-        </legend>
-        <p class="theme-section-muted text-sm">
-          {{ selectedVisibilityDescription }}
-        </p>
+      </AppFormSection>
+      <AppFormSection
+        title="Visibility"
+        :description="selectedVisibilityDescription"
+      >
         <div class="flex flex-wrap gap-2">
           <button
             v-for="option in visibilityOptions"
@@ -118,7 +113,7 @@
             {{ option.label }}
           </button>
         </div>
-      </fieldset>
+      </AppFormSection>
     </section>
 
     <div class="theme-divider flex justify-end border-t pt-6">
@@ -141,6 +136,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { ArrowRight } from 'lucide-vue-next';
 import DeckTagPicker from '@/domain/decks/components/DeckTagPicker.vue';
+import AppFormSection from '@/shared/components/app/AppFormSection.vue';
 import { deckDifficultyOptions } from '@/domain/decks/utils/difficulty';
 import { deckVisibilityDescriptions, deckVisibilityOptions } from '@/domain/decks/utils/visibility';
 import type { DeckEditorController } from '@/features/decks/composables/useDeckEditor';

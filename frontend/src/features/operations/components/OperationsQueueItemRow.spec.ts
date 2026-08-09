@@ -1,8 +1,8 @@
 /* eslint-disable vue/one-component-per-file */
 import { createApp, nextTick } from 'vue';
 import { afterEach, describe, expect, test } from 'vitest';
+import type { OperationsQueueItem } from '@/domain/operations/types';
 import OperationsQueueItemRow from '@/features/operations/components/OperationsQueueItemRow.vue';
-import type { OperationsQueueItem } from '@/features/operations/types';
 
 const item: OperationsQueueItem = {
   id: 'build-1',

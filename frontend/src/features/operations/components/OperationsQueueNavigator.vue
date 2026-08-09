@@ -86,11 +86,8 @@ import { computed } from 'vue';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
-import type {
-  OperationsItemStatus,
-  OperationsQueue,
-  WorkerOverview,
-} from '@/features/operations/types';
+import type { OperationsItemStatus } from '@/domain/operations/types';
+import type { OperationsQueue, WorkerOverview } from '@/features/operations/types';
 import {
   formatOperationsTimestamp,
   operationsStatusClass,

@@ -56,6 +56,7 @@ describe('importJobs api', () => {
     expect(formData.get('template_id')).toBe('mtg-like-v1');
     expect(formData.get('content_version_base')).toBe('14.1');
     expect(formData.get('content_version_description')).toBe('Current release.');
+    expect(formData.get('options_json')).toBe('{}');
     expect(formData.getAll('files')).toEqual([file]);
   });
 });

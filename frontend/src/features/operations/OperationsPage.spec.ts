@@ -1,16 +1,21 @@
 import { createApp } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { fetchOperationsOverview, fetchOperationsQueuePage } from '@/features/operations/api';
+import { fetchOperationsQueuePage } from '@/domain/operations/api';
+import type { OperationsQueuePage } from '@/domain/operations/types';
+import { fetchOperationsOverview } from '@/features/operations/api';
 import OperationsPage from '@/features/operations/OperationsPage.vue';
-import type { OperationsOverview, OperationsQueuePage } from '@/features/operations/types';
+import type { OperationsOverview } from '@/features/operations/types';
+
+vi.mock('@/domain/operations/api', () => ({
+  fetchOperationsQueuePage: vi.fn(),
+}));
 
 vi.mock('@/features/operations/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/features/operations/api')>();
   return {
     ...original,
     fetchOperationsOverview: vi.fn(),
-    fetchOperationsQueuePage: vi.fn(),
   };
 });
 
