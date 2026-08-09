@@ -35,6 +35,25 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Avoid overusing containers and card shells. Prefer letting controls and content float on the app background when hierarchy remains clear, using dividers, spacing, accent lines, and selected states for visual separation between sections.
 - Keep user-facing page and section descriptions focused on the enduring purpose and end result of the screen; avoid copy that calls out specific implementation details, temporary workflow mechanics, or design decisions that may look out of place as the page grows.
 - Verify visible UI in both light and dark modes.
+- Model multi-phase workflows with tagged states rather than overlapping booleans, and cover their allowed transition table with tests.
+- When an uncertain state includes active reconciliation and a later user-decision phase, encode that phase in the tagged state so route guards block only while background completion may still navigate.
+- Capture an immutable request payload and idempotency key before uncertain mutations; retries must reuse both exactly.
+- Enter the mutation-locked request state before awaiting persistence of an immutable attempt, and coalesce repeated actions while that sealing write waits. An explicit retry of an already captured attempt may continue when best-effort persistence is conflict-paused, but it must remain non-navigable unless the exact attempt is durable.
+- Treat browser persistence, server mutation, and cleanup as independent failure domains. Confirmed server success is terminal even when local cleanup fails.
+- Catch request failures only around the request itself. Post-success routing, callbacks, or cleanup errors must not re-enter request reconciliation or replace confirmed success with an uncertain state.
+- If terminal-success navigation can fail, retain a single-flight navigation retry that never repeats the server mutation. Keep mutations locked until navigation succeeds while leaving only that retry action available.
+- Run authoritative pending-request reconciliation even when auxiliary recovery work such as filters, snapshots, or metadata hydration fails; those failures must not unlock mutation first.
+- Block route leave while a recovered pending request is still hydrating, so its later reconciliation cannot route from an abandoned component.
+- A lookup miss is definitive only when paired with authoritative evidence that the originating mutation failed. The presence of an HTTP response is insufficient: gateway errors and request timeouts can race an upstream commit. On reload, timeout-only misses must retain the immutable pending request for idempotent retry.
+- Use revision-conditional writes plus native storage events for cross-tab state. A `localStorage` read followed by a write is not atomic; serialize the comparison and mutation with Web Locks or use a transactional persistence primitive, falling back to memory-only when atomicity is unavailable. Pause mutation and require an explicit conflict resolution instead of silently choosing a source of truth.
+- Keep persistence capability consistent across reads and writes: do not offer recovery from a storage backend when the locks or transactions required to mutate that recovered state are unavailable.
+- Memory-only persistence must keep probing on later saves; content equality is not a no-op while the latest state is not durable.
+- For queued destructive actions and explicit conflict resolutions, preserve the decision-time revision or re-check conflict state inside the queued callback. Never derive permission from a newer remote revision observed while waiting.
+- Bind destructive confirmations to the state that opened them and close them when a conflict replaces that state. Never overwrite a remote draft while it contains an unresolved immutable request.
+- Recovery and cross-tab conflict UI must be mutually exclusive. If a conflict interrupts recovery, preserve the recovered draft as the local conflict candidate before closing the recovery decision surface.
+- Keep local retirement knowledge separate from the currently observed storage slot. Once a tab learns that its draft key was created elsewhere, preserve that fact through later slot changes so Keep assigns a fresh key, but always derive the visible conflict and overwrite preconditions from the latest slot.
+- Before routing from a retirement marker, resolve its creation key against the server. A deleted outcome must preserve the local contents under a fresh key instead of navigating to a stale resource.
+- Allow an unresolved request to leave only when its exact immutable key and payload are durably recoverable. Memory-only or conflict-displaced attempts must remain on the page until resolved.
 
 ## Implementation Workflow
 
@@ -70,6 +89,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Unnecessary framed containers where divider-separated, background-floating content would be clearer and more consistent
 - UI changes verified in one theme only
 - Missing validation for touched frontend behavior
+- Flag combinations that encode hidden workflow phases, mutable retry payloads, cleanup that gates confirmed success, or tabs that silently overwrite storage
 - Deck-building defaults or example JSON copied into UI code without a backend metadata source or fallback test
 
 ## File Hotspots

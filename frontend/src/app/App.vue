@@ -53,7 +53,7 @@
         ref="scrollContainerRef"
         class="app-main-scroll app-scrollbar min-h-0 flex-1 overflow-y-auto"
       >
-        <RouterView />
+        <RouterView :key="routeViewKey" />
       </main>
     </div>
   </div>
@@ -98,6 +98,7 @@ import { provideScrollContainer } from '@/shared/composables/useScrollContainer'
 import { usePrimarySearchHotkeys } from '@/shared/composables/usePrimarySearch';
 import { useAuthStore } from '@/domain/session/store';
 import { buildContextualNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState';
+import { resolveRouteViewKey } from '@/app/router/routeViewKey';
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
 import {
   handleHoverPreviewScaleWheel,
@@ -137,6 +138,7 @@ const hoverModeOverrides = {
   notifications: hoverModePreferences.getOverrideHoverMode('notifications'),
 } satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
 const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
+const routeViewKey = computed(() => resolveRouteViewKey(route.path));
 const hoverModeHotkeyActions = computed(() => {
   if (!globalHotkeysEnabled.value) {
     return null;

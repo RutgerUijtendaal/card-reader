@@ -38,7 +38,7 @@
             <button
               type="button"
               class="flex min-w-0 flex-1 items-start gap-3 text-left"
-              @click="toggleHeroDetails()"
+              @click="handleHeroHeaderClick()"
             >
               <div class="min-w-0 space-y-1">
                 <p class="truncate text-lg font-semibold text-white">
@@ -55,6 +55,7 @@
                   >
                     {{ controller.deck.selectedHero.value.name }}
                   </span>
+                  <span v-else>Choose hero</span>
                 </div>
               </div>
             </button>
@@ -62,8 +63,14 @@
             <button
               type="button"
               class="theme-card-frame-muted theme-section-title inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition"
-              :aria-label="heroDetailsExpanded ? 'Collapse hero details' : 'Expand hero details'"
-              @click="toggleHeroDetails()"
+              :aria-label="
+                controller.deck.selectedHero.value
+                  ? heroDetailsExpanded
+                    ? 'Collapse hero details'
+                    : 'Expand hero details'
+                  : 'Choose hero'
+              "
+              @click="handleHeroHeaderClick()"
             >
               <ChevronDown
                 class="h-4 w-4 transition-transform"
@@ -167,7 +174,7 @@
 
     <Teleport to="body">
       <div
-        v-if="sideboardActionsOpen && sideboardActionsTargetId"
+        v-if="sideboardActionsOpen && sideboardActionsTargetId && !controller.isMutationLocked.value"
         ref="sideboardActionsPanelRef"
         class="theme-popover z-40 w-44 p-2"
         :style="{
@@ -180,6 +187,7 @@
           <button
             type="button"
             class="btn-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
+            :disabled="controller.isMutationLocked.value"
             @click="
               beginRenameSideboard(
                 sideboardActionsTargetId,
@@ -195,6 +203,7 @@
           <button
             type="button"
             class="btn-danger-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
+            :disabled="controller.isMutationLocked.value"
             @click="
               promptDeleteSideboard(
                 sideboardActionsTargetId,
@@ -280,6 +289,7 @@
           :class="{ 'deck-board-entry-pop': poppedBoardEntryCardId === entry.card.id }"
           :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
           :move-destinations="getMoveDestinations(entry.card.id)"
+          :mutation-disabled="controller.isMutationLocked.value"
           :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
           :row-secondary-action-disabled="
             controller.deck.boardRowSecondaryActionDisabled(entry.card.id)
@@ -380,6 +390,9 @@ const sortableController = useSortable(boardEntriesSortableRef, sortableEntries,
     sortableController.option('bubbleScroll', false);
   },
   onUpdate: (event: { item: HTMLElement; newIndex?: number }): void => {
+    if (props.controller.isMutationLocked.value) {
+      return;
+    }
     const movedCardId = event.item.dataset.cardId;
     if (!movedCardId || event.newIndex === undefined) {
       return;
@@ -462,6 +475,13 @@ const activeBoardCount = computed(() =>
 const heroHeaderObjectPosition = '30% 10%';
 const heroHeaderTransform = 'scale(1.28)';
 const heroHeaderOpacity = 0.75;
+const handleHeroHeaderClick = (): void => {
+  if (!props.controller.deck.selectedHero.value) {
+    props.controller.openHero();
+    return;
+  }
+  toggleHeroDetails();
+};
 
 watch(
   () => props.controller.deck.lastBoardEntryChange.value?.sequence,
@@ -496,7 +516,10 @@ watch(
   (entries) => {
     sortableEntries.value = [...entries];
     void nextTick(() => {
-      sortableController.option('disabled', entries.length < 2);
+      sortableController.option(
+        'disabled',
+        props.controller.isMutationLocked.value || entries.length < 2,
+      );
     });
   },
   { immediate: true },
@@ -509,7 +532,7 @@ onBeforeUnmount(() => {
 });
 
 const selectSideboard = (sideboardId: string): void => {
-  if (editingSideboardId.value === sideboardId) {
+  if (props.controller.isMutationLocked.value || editingSideboardId.value === sideboardId) {
     return;
   }
   props.controller.deck.selectBoard(sideboardId);
@@ -519,6 +542,9 @@ const getMoveDestinations = (cardId: string): DeckBoardMoveDestination[] =>
   props.controller.deck.getBoardMoveDestinations(cardId);
 
 const handleMoveToBoard = (cardId: string, destinationBoardId: string): void => {
+  if (props.controller.isMutationLocked.value) {
+    return;
+  }
   props.controller.deck.moveEntryToBoard(cardId, destinationBoardId);
 };
 
@@ -528,6 +554,9 @@ const setEditingSideboardInputRef = (element: unknown): void => {
 
 const openSideboardActions = (event: MouseEvent, sideboardId: string): void => {
   event.stopPropagation();
+  if (props.controller.isMutationLocked.value) {
+    return;
+  }
   sideboardActionsTriggerRef.value = event.currentTarget as HTMLElement | null;
   if (sideboardActionsOpen.value && sideboardActionsTargetId.value === sideboardId) {
     closeSideboardActions();
@@ -573,6 +602,9 @@ const shouldShowSideboardActions = (sideboardId: string): boolean => {
 };
 
 const beginRenameSideboard = async (sideboardId: string, name: string): Promise<void> => {
+  if (props.controller.isMutationLocked.value) {
+    return;
+  }
   closeSideboardActions();
   sideboardActionsTargetId.value = null;
   editingSideboardId.value = sideboardId;
@@ -588,7 +620,7 @@ const cancelRenameSideboard = (): void => {
 };
 
 const commitRenameSideboard = (): void => {
-  if (!editingSideboardId.value) {
+  if (props.controller.isMutationLocked.value || !editingSideboardId.value) {
     return;
   }
   const nextName = editingSideboardName.value.trim();
@@ -602,13 +634,16 @@ const commitRenameSideboard = (): void => {
 };
 
 const promptDeleteSideboard = (sideboardId: string, name: string): void => {
+  if (props.controller.isMutationLocked.value) {
+    return;
+  }
   closeSideboardActions();
   sideboardActionsTargetId.value = null;
   deleteSideboardTarget.value = { id: sideboardId, name };
 };
 
 const confirmDeleteSideboard = (): void => {
-  if (!deleteSideboardTarget.value) {
+  if (props.controller.isMutationLocked.value || !deleteSideboardTarget.value) {
     return;
   }
   if (props.controller.deck.activeBoardId.value === deleteSideboardTarget.value.id) {
@@ -617,6 +652,23 @@ const confirmDeleteSideboard = (): void => {
   props.controller.deck.removeSideboard(deleteSideboardTarget.value.id);
   deleteSideboardTarget.value = null;
 };
+
+watch(
+  () => props.controller.isMutationLocked.value,
+  (creating) => {
+    sortableController.option(
+      'disabled',
+      creating || props.controller.deck.detailedActiveBoardEntries.value.length < 2,
+    );
+    if (!creating) {
+      return;
+    }
+    closeSideboardActions();
+    sideboardActionsTargetId.value = null;
+    deleteSideboardTarget.value = null;
+    cancelRenameSideboard();
+  },
+);
 </script>
 
 <style scoped>

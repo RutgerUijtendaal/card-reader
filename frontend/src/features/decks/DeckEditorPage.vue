@@ -1,25 +1,69 @@
 <template>
-  <section class="flex flex-col gap-6">
+  <section
+    class="flex flex-col gap-6"
+    :aria-busy="controller.isCreating.value"
+  >
     <AppPageHeader
       :icon="Hammer"
       :title="controller.deckId.value ? 'Edit Deck' : 'Build Deck'"
       :subtitle="deckEditorSubtitle"
-      :back-to="controller.backLink.value"
+      :back-to="controller.isCreating.value ? null : controller.backLink.value"
       :back-label="controller.backLabel.value"
       title-tag="h2"
       title-class="text-xl"
     >
       <template #actions>
         <div
-          v-if="controller.deckId.value && !controller.isChangingHero.value"
-          class="flex items-center gap-1"
+          v-if="!controller.isChangingHero.value"
+          class="deck-editor-header-divider theme-divider hidden h-6 border-l lg:block"
+          aria-hidden="true"
+        />
+        <div
+          v-if="!controller.isChangingHero.value"
+          class="flex items-center gap-2"
         >
+          <AppHeaderAction
+            v-if="!controller.isPublished.value && controller.hasLocalDraft.value"
+            :icon="Trash2"
+            label="Discard local draft"
+            short-label="Discard"
+            :disabled="controller.isMutationLocked.value"
+            @click="controller.requestDiscardLocalDraft()"
+          />
+          <AppHeaderAction
+            :icon="deckSaveActionIcon"
+            :label="deckSaveActionLabel"
+            :short-label="deckSaveActionShortLabel"
+            variant="primary"
+            :icon-class="deckSaveActionPending ? 'animate-spin' : ''"
+            :disabled="deckSaveActionDisabled"
+            @click="() => controller.saveDeck()"
+          />
+        </div>
+      </template>
+      <template #center>
+        <nav
+          v-if="!controller.isChangingHero.value"
+          class="deck-editor-section-tabs theme-tablist max-w-xl flex-nowrap justify-center"
+          aria-label="Deck editor sections"
+        >
+          <AppHeaderAction
+            v-if="!controller.isPublished.value"
+            :icon="Crown"
+            label="Open deck hero"
+            short-label="Hero"
+            variant="tab"
+            :active="controller.editorMode.value === 'hero'"
+            :disabled="controller.isMutationLocked.value"
+            @click="controller.openHero()"
+          />
           <AppHeaderAction
             :icon="FileText"
             label="Open deck details"
             short-label="Details"
             variant="tab"
             :active="controller.editorMode.value === 'details'"
+            :disabled="controller.isMutationLocked.value"
             @click="controller.openDetails()"
           />
           <AppHeaderAction
@@ -28,24 +72,16 @@
             short-label="Cards"
             variant="tab"
             :active="controller.editorMode.value === 'cards'"
+            :disabled="controller.isMutationLocked.value"
             @click="controller.openCards()"
           />
-        </div>
-        <AppHeaderAction
-          v-if="controller.editorMode.value !== 'hero'"
-          :icon="deckSaveActionIcon"
-          :label="deckSaveActionLabel"
-          :short-label="deckSaveActionShortLabel"
-          variant="primary"
-          :icon-class="controller.manualSaving.value ? 'animate-spin' : ''"
-          :disabled="controller.manualSaving.value"
-          @click="() => controller.saveDeck()"
-        />
+        </nav>
       </template>
     </AppPageHeader>
 
     <AppPageLayout
       v-if="controller.loading.value && controller.editorMode.value !== 'cards'"
+      :inert="controller.isMutationLocked.value"
       columns="sidebar"
       aria-label="Loading deck details"
     >
@@ -85,6 +121,7 @@
 
     <AppPageLayout
       v-if="!controller.loading.value && controller.editorMode.value === 'hero'"
+      :inert="controller.isMutationLocked.value"
       columns="three"
       root-class="deck-builder-layout"
       main-class="deck-builder-main-column"
@@ -104,6 +141,7 @@
 
     <AppPageLayout
       v-if="!controller.loading.value && controller.editorMode.value === 'details'"
+      :inert="controller.isMutationLocked.value"
       columns="sidebar"
     >
       <template #aside>
@@ -114,6 +152,7 @@
 
     <AppPageLayout
       v-if="controller.editorMode.value === 'cards'"
+      :inert="controller.isMutationLocked.value"
       columns="three"
       root-class="deck-builder-layout"
       main-class="deck-builder-main-column"
@@ -172,7 +211,10 @@
               <component
                 :is="deckChangeStatusIcon"
                 class="h-4 w-4 shrink-0"
-                :class="{ 'animate-spin': controller.saving.value }"
+                :class="{
+                  'animate-spin': controller.saving.value
+                    || controller.creationState.value.status === 'creating',
+                }"
               />
               <span class="theme-section-title text-sm font-semibold">{{
                 controller.changeStatusLabel.value
@@ -188,7 +230,7 @@
                 type="checkbox"
                 :disabled="!controller.canAutosync.value"
               >
-              <span>Autosync</span>
+              <span>{{ controller.isPublished.value ? 'Autosync' : 'Autosync after creation' }}</span>
             </label>
           </div>
 
@@ -411,12 +453,35 @@
 
     <ConfirmModal
       :open="controller.discardChangesModalOpen.value"
-      title="Discard deck changes?"
-      message="You have unsaved deck changes. Leaving this page will discard them."
-      confirm-label="Discard Changes"
+      :title="controller.isPublished.value ? 'Discard deck changes?' : 'Leave local deck draft?'"
+      :message="deckLeaveConfirmationMessage"
+      :confirm-label="deckLeaveConfirmationLabel"
       cancel-label="Stay Here"
       @confirm="controller.confirmDiscardChanges"
       @cancel="controller.cancelDiscardChanges"
+    />
+    <ConfirmModal
+      :open="controller.discardLocalDraftModalOpen.value"
+      title="Discard local deck draft?"
+      message="This permanently removes the unpublished deck from this browser."
+      confirm-label="Discard Draft"
+      cancel-label="Keep Draft"
+      @confirm="controller.confirmDiscardLocalDraft"
+      @cancel="controller.cancelDiscardLocalDraft"
+    />
+    <DeckDraftRecoveryModal
+      :open="controller.localDraftRecoveryModalOpen.value"
+      :saved-at="controller.pendingLocalDraft.value?.savedAt"
+      :busy="controller.recoveryActionPending.value"
+      @resume="controller.resumeLocalDraft"
+      @discard="controller.discardPendingLocalDraft"
+    />
+    <DeckDraftConflictModal
+      :open="controller.localDraftConflictModalOpen.value"
+      :kind="controller.localDraftConflict.value?.kind"
+      :busy="controller.conflictActionsLocked.value"
+      @use-stored="handleUseStoredConflict"
+      @keep-local="handleKeepLocalConflict"
     />
   </section>
 </template>
@@ -428,11 +493,13 @@ import {
   CircleX,
   Cloud,
   CloudUpload,
+  Crown,
   FileText,
   Hammer,
   LayoutGrid,
   LoaderCircle,
   Save,
+  Trash2,
   TriangleAlert,
 } from 'lucide-vue-next';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
@@ -445,6 +512,8 @@ import DeckBuilderGallery from '@/features/decks/components/DeckBuilderGallery.v
 import DeckBuilderSummaryPanel from '@/features/decks/components/DeckBuilderSummaryPanel.vue';
 import DeckDetailsForm from '@/features/decks/components/DeckDetailsForm.vue';
 import DeckDetailsHeroPanel from '@/features/decks/components/DeckDetailsHeroPanel.vue';
+import DeckDraftRecoveryModal from '@/features/decks/components/DeckDraftRecoveryModal.vue';
+import DeckDraftConflictModal from '@/features/decks/components/DeckDraftConflictModal.vue';
 import DeckHeroSelectionPanel from '@/features/decks/components/DeckHeroSelectionPanel.vue';
 import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
@@ -473,20 +542,65 @@ const mainboardMaxCards = computed(
 const manaMinCards = computed(() => controller.deckBuildingRules.value.mana_type_count.min ?? 0);
 const hardIssueMessages = computed(() => controller.deck.validationMessages.value);
 const deckSaveActionIcon = computed(() => {
-  if (controller.manualSaving.value) {
+  if (controller.manualSaving.value || controller.creationState.value.status === 'creating') {
     return LoaderCircle;
   }
-  return Save;
+  return controller.isPublished.value ? Save : Hammer;
 });
 const deckSaveActionLabel = computed(() => {
-  if (controller.manualSaving.value) {
-    return 'Saving deck';
+  if (controller.terminalNavigationPending.value) {
+    return 'Continue after confirmed deck outcome';
   }
-  return 'Save deck';
+  if (controller.creationState.value.status === 'unknown') {
+    return 'Retry deck creation';
+  }
+  if (controller.manualSaving.value || controller.creationState.value.status === 'creating') {
+    return controller.isPublished.value ? 'Saving deck' : 'Creating deck';
+  }
+  return controller.isPublished.value ? 'Save deck' : 'Create deck';
 });
-const deckSaveActionShortLabel = 'Save';
+const deckSaveActionShortLabel = computed(() => {
+  if (controller.terminalNavigationPending.value) return 'Continue';
+  if (controller.creationState.value.status === 'unknown') return 'Retry';
+  return controller.isPublished.value ? 'Save' : 'Create';
+});
+const deckSaveActionPending = computed(
+  () => controller.manualSaving.value
+    || controller.creationState.value.status === 'creating'
+    || controller.terminalNavigationInFlight.value,
+);
+const deckSaveActionDisabled = computed(() => {
+  if (controller.isPublished.value) return controller.manualSaving.value;
+  if (controller.terminalNavigationPending.value) {
+    return controller.terminalNavigationInFlight.value;
+  }
+  if (controller.creationState.value.status === 'unknown') return false;
+  return controller.isMutationLocked.value;
+});
+const deckLeaveConfirmationMessage = computed(() => {
+  if (controller.isPublished.value) {
+    return 'You have unsaved deck changes. Leaving this page will discard them.';
+  }
+  if (controller.localDraftPersistenceFailed.value) {
+    return 'This draft could not be saved in this browser. Leaving now will discard your current progress.';
+  }
+  if (controller.localDraftConflict.value) {
+    return 'Another tab changed the browser draft. Leaving now discards this tab and keeps the stored version.';
+  }
+  if (controller.creationState.value.status === 'unknown') {
+    return 'Deck creation could not be confirmed. Leaving keeps the attempted draft in this browser; Retry will use the same request.';
+  }
+  return 'Your unpublished deck will remain saved in this browser so you can resume it later.';
+});
+const deckLeaveConfirmationLabel = computed(() => {
+  if (controller.isPublished.value) {
+    return 'Discard Changes';
+  }
+  if (controller.localDraftConflict.value) return 'Discard This Tab';
+  return controller.localDraftPersistenceFailed.value ? 'Discard & Leave' : 'Leave Draft';
+});
 const deckChangeStatusIcon = computed(() => {
-  if (controller.saving.value) {
+  if (controller.saving.value || controller.creationState.value.status === 'creating') {
     return LoaderCircle;
   }
   if (controller.hasUnsavedChanges.value) {
@@ -494,11 +608,28 @@ const deckChangeStatusIcon = computed(() => {
   }
   return Cloud;
 });
+const handleUseStoredConflict = (): void => {
+  const conflict = controller.localDraftConflict.value;
+  if (conflict?.kind === 'active-draft') {
+    void controller.loadStoredConflictDraft();
+  } else if (conflict?.kind === 'created-elsewhere') {
+    void controller.openCreatedConflictDeck();
+  } else if (conflict?.kind === 'remote-deletion') {
+    controller.discardThisConflictedTab();
+  }
+};
+const handleKeepLocalConflict = (): void => {
+  if (controller.localDraftConflict.value?.kind === 'created-elsewhere') {
+    controller.keepConflictAsNewDraft();
+  } else {
+    controller.keepThisConflictDraft();
+  }
+};
 const deckEditorSubtitle = computed(() => {
   if (controller.editorMode.value === 'hero') {
     return controller.isChangingHero.value
       ? 'Choose a replacement hero, then apply or cancel the change.'
-      : 'Select a hero and name your deck to continue.';
+      : 'Choose the hero that will shape this deck.';
   }
   if (controller.editorMode.value === 'details') {
     return 'Edit the information people use to understand and discover this deck.';

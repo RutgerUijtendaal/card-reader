@@ -111,11 +111,13 @@ const buildController = () => {
   const activeSideboard = () => sideboards.value.find((sideboard) => sideboard.id === activeBoardId.value) ?? null;
 
   const controller = {
+    openHero: vi.fn(),
     filters: {
       hoverMode: ref('details'),
     },
     loading: ref(false),
     saving: ref(false),
+    isMutationLocked: ref(false),
     deckId: ref('deck-1'),
     backLink: ref('/my/decks'),
     backLabel: ref('Back'),
@@ -258,6 +260,21 @@ describe('DeckBuilderSummaryPanel', () => {
     mounted.unmount();
   });
 
+  test('opens Hero selection from the empty summary header', async () => {
+    const mounted = await mountPanel((controller) => {
+      controller.deck.selectedHero.value = null;
+    });
+    const chooseHeroButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Choose hero"]',
+    );
+
+    chooseHeroButton?.click();
+
+    expect(chooseHeroButton).not.toBeNull();
+    expect(mounted.controller.openHero).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
   test('does not duplicate validation messages in the build sidebar', async () => {
     const mounted = await mountPanel();
     mounted.controller.deck.validationMessages.value = ['Deck must contain at least 20 mainboard cards.'];
@@ -345,6 +362,23 @@ describe('DeckBuilderSummaryPanel', () => {
     expect(mounted.controller.deck.selectBoard).not.toHaveBeenCalledWith('side-1');
     expect(document.body.textContent ?? '').toContain('Rename');
     expect(document.body.textContent ?? '').toContain('Delete');
+
+    mounted.unmount();
+  });
+
+  test('closes teleported sideboard actions and disables sorting when creation starts', async () => {
+    const mounted = await mountPanel();
+    const sideboardActionsButton = await showSideboardActionsTrigger(mounted.container);
+    sideboardActionsButton.click();
+    await nextTick();
+    expect(document.body.textContent ?? '').toContain('Rename');
+
+    mounted.controller.isMutationLocked.value = true;
+    await nextTick();
+
+    expect(document.body.textContent ?? '').not.toContain('Rename');
+    expect(document.body.textContent ?? '').not.toContain('Delete');
+    expect(sortableMock.option).toHaveBeenCalledWith('disabled', true);
 
     mounted.unmount();
   });

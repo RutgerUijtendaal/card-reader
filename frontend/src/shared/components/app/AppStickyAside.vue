@@ -10,7 +10,7 @@
       <slot />
     </div>
     <div
-      v-if="$slots.footer"
+      v-if="$slots.footer && footerVisible"
       class="app-sticky-aside-footer theme-divider mt-4 shrink-0 border-t pt-4"
       :class="footerClass"
     >
@@ -26,12 +26,14 @@ withDefaults(
     rootClass?: string;
     scrollClass?: string;
     footerClass?: string;
+    footerVisible?: boolean;
   }>(),
   {
     side: 'left',
     rootClass: '',
     scrollClass: '',
     footerClass: '',
+    footerVisible: true,
   },
 );
 </script>

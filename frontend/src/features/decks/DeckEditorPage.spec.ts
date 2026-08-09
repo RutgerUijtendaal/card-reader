@@ -9,27 +9,60 @@ const { controller } = vi.hoisted(() => {
   return {
     controller: {
       deckId: refValue('deck-1'),
+      isPublished: refValue(true),
       backLink: refValue('/my/decks'),
       backLabel: refValue('Back to My Decks'),
       editorMode: refValue<'hero' | 'details' | 'cards'>('cards'),
       isChangingHero: refValue(false),
       saving: refValue(false),
       manualSaving: refValue(false),
+      isCreating: refValue(false),
+      isMutationLocked: refValue(false),
+      terminalNavigationPending: refValue(false),
+      terminalNavigationInFlight: refValue(false),
+      creationState: refValue<
+        | { status: 'idle' }
+        | { status: 'creating' }
+        | { status: 'unknown'; reconciliation: 'checking' | 'awaiting-retry' }
+      >({ status: 'idle' }),
+      persistenceState: refValue({ status: 'synced' }),
       loading: refValue(false),
       hasUnsavedChanges: refValue(true),
+      hasLocalDraft: refValue(false),
+      localDraftPersistenceFailed: refValue(false),
       canAutosync: refValue(true),
       changeStatusLabel: refValue('Unsaved'),
       autosyncEnabled: refValue(false),
       discardChangesModalOpen: refValue(false),
+      discardLocalDraftModalOpen: refValue(false),
+      localDraftRecoveryModalOpen: refValue(false),
+      recoveryActionPending: refValue(false),
+      pendingLocalDraft: refValue<null | { savedAt: string }>(null),
+      localDraftConflict: refValue<null | {
+        kind: 'active-draft' | 'remote-deletion' | 'created-elsewhere';
+      }>(null),
+      localDraftConflictModalOpen: refValue(false),
+      conflictActionsLocked: refValue(false),
       deckBuildingRules: refValue({
         mainboard_card_count: { min: 40, max: 60 },
         mana_type_count: { min: 10 },
       }),
       saveDeck: vi.fn(),
+      openHero: vi.fn(),
       openDetails: vi.fn(),
       openCards: vi.fn(),
       confirmDiscardChanges: vi.fn(),
       cancelDiscardChanges: vi.fn(),
+      requestDiscardLocalDraft: vi.fn(),
+      confirmDiscardLocalDraft: vi.fn(),
+      cancelDiscardLocalDraft: vi.fn(),
+      resumeLocalDraft: vi.fn(),
+      discardPendingLocalDraft: vi.fn(),
+      loadStoredConflictDraft: vi.fn(),
+      keepThisConflictDraft: vi.fn(),
+      discardThisConflictedTab: vi.fn(),
+      openCreatedConflictDeck: vi.fn(),
+      keepConflictAsNewDraft: vi.fn(),
       deck: {
         overallTotalCards: refValue(42),
         totalMainboardCards: refValue(40),
@@ -62,6 +95,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
       return () =>
         h('header', [
           h('h1', props.title),
+          slots.center?.(),
           slots.actions?.(),
         ]);
     },
@@ -70,9 +104,9 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
 
 vi.mock('@/shared/components/app/AppPageLayout.vue', () => ({
   default: defineComponent({
-    setup(_, { slots }) {
+    setup(_, { attrs, slots }) {
       return () =>
-        h('main', { 'data-testid': 'builder-layout' }, [
+        h('main', { ...attrs, 'data-testid': 'builder-layout' }, [
           slots.aside?.(),
           slots.default?.(),
           slots.endAside?.(),
@@ -166,6 +200,41 @@ vi.mock('@/features/decks/components/DeckDetailsForm.vue', () => ({
   }),
 }));
 
+vi.mock('@/features/decks/components/DeckDraftRecoveryModal.vue', () => ({
+  default: defineComponent({
+    props: {
+      open: { type: Boolean, required: true },
+    },
+    setup(props, { emit }) {
+      return () => props.open
+        ? h('section', { 'data-testid': 'draft-recovery-modal' }, [
+            h('button', { onClick: () => emit('discard') }, 'Discard Draft'),
+            h('button', { onClick: () => emit('resume') }, 'Resume Draft'),
+          ])
+        : null;
+    },
+  }),
+}));
+
+vi.mock('@/features/decks/components/DeckDraftConflictModal.vue', () => ({
+  default: defineComponent({
+    props: {
+      open: { type: Boolean, required: true },
+      kind: { type: String, default: undefined },
+      busy: { type: Boolean, default: false },
+    },
+    setup(props, { emit }) {
+      return () => props.open
+        ? h('section', { 'data-testid': 'draft-conflict-modal' }, [
+            h('span', props.kind),
+            h('button', { disabled: props.busy, onClick: () => emit('useStored') }, 'Use stored'),
+            h('button', { disabled: props.busy, onClick: () => emit('keepLocal') }, 'Keep local'),
+          ])
+        : null;
+    },
+  }),
+}));
+
 const mountPage = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -185,16 +254,28 @@ const mountPage = async () => {
 describe('DeckEditorPage', () => {
   afterEach(() => {
     controller.deckId.value = 'deck-1';
+    controller.isPublished.value = true;
     controller.editorMode.value = 'cards';
     controller.isChangingHero.value = false;
     controller.loading.value = false;
     controller.saving.value = false;
     controller.manualSaving.value = false;
+    controller.isCreating.value = false;
+    controller.isMutationLocked.value = false;
+    controller.terminalNavigationPending.value = false;
+    controller.terminalNavigationInFlight.value = false;
+    controller.creationState.value = { status: 'idle' };
     controller.changeStatusLabel.value = 'Unsaved';
     controller.hasUnsavedChanges.value = true;
+    controller.hasLocalDraft.value = false;
+    controller.localDraftPersistenceFailed.value = false;
     controller.canAutosync.value = true;
     controller.autosyncEnabled.value = false;
     controller.discardChangesModalOpen.value = false;
+    controller.discardLocalDraftModalOpen.value = false;
+    controller.localDraftRecoveryModalOpen.value = false;
+    controller.pendingLocalDraft.value = null;
+    controller.localDraftConflict.value = null;
     document.body.innerHTML = '';
     vi.clearAllMocks();
   });
@@ -227,6 +308,7 @@ describe('DeckEditorPage', () => {
 
   test('renders hero browsing without the cards status or board sidebar', async () => {
     controller.deckId.value = '';
+    controller.isPublished.value = false;
     controller.editorMode.value = 'hero';
 
     const mounted = await mountPage();
@@ -244,6 +326,7 @@ describe('DeckEditorPage', () => {
 
     mounted.unmount();
     controller.deckId.value = 'deck-1';
+    controller.isPublished.value = true;
   });
 
   test('renders the wide details layout without a gallery or board sidebar', async () => {
@@ -307,6 +390,44 @@ describe('DeckEditorPage', () => {
     mounted.unmount();
   });
 
+  test('shows Hero, Details, Cards, and Create for an unpublished draft', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.editorMode.value = 'cards';
+    controller.canAutosync.value = false;
+    controller.changeStatusLabel.value = 'Local Draft';
+
+    const mounted = await mountPage();
+    const heroTab = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Open deck hero"]',
+    );
+    const createButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Create deck"]',
+    );
+    const autosyncCheckbox = mounted.container.querySelector<HTMLInputElement>(
+      'input[type="checkbox"]',
+    );
+
+    expect(heroTab).not.toBeNull();
+    expect(mounted.container.querySelector('button[aria-label="Open deck details"]')).not.toBeNull();
+    expect(mounted.container.querySelector('button[aria-label="Open deck cards"]')).not.toBeNull();
+    expect(mounted.container.querySelectorAll('.deck-editor-header-divider')).toHaveLength(1);
+    expect(
+      mounted.container.querySelector('nav[aria-label="Deck editor sections"]'),
+    ).not.toBeNull();
+    expect(createButton?.textContent).toBe('Create');
+    expect(autosyncCheckbox?.disabled).toBe(true);
+    expect(mounted.container.textContent).toContain('Autosync after creation');
+
+    heroTab?.click();
+    createButton?.click();
+    await nextTick();
+
+    expect(controller.openHero).toHaveBeenCalledTimes(1);
+    expect(controller.saveDeck).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
   test('hides section tabs during explicit hero replacement', async () => {
     controller.editorMode.value = 'hero';
     controller.isChangingHero.value = true;
@@ -335,6 +456,142 @@ describe('DeckEditorPage', () => {
     expect(controller.cancelDiscardChanges).toHaveBeenCalledTimes(1);
     expect(controller.confirmDiscardChanges).toHaveBeenCalledTimes(1);
     mounted.unmount();
+  });
+
+  test('warns when leaving would discard an unpersisted local draft', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.localDraftPersistenceFailed.value = true;
+    controller.discardChangesModalOpen.value = true;
+
+    const mounted = await mountPage();
+    const modal = mounted.container.querySelector<HTMLElement>('[data-testid="confirm-modal"]');
+
+    expect(modal?.textContent).toContain('could not be saved in this browser');
+    expect(modal?.textContent).toContain('Discard & Leave');
+
+    mounted.unmount();
+  });
+
+  test('disables deck editing controls during initial creation', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isCreating.value = true;
+    controller.isMutationLocked.value = true;
+    controller.creationState.value = { status: 'creating' };
+    controller.saving.value = true;
+    controller.manualSaving.value = true;
+    controller.hasLocalDraft.value = true;
+
+    const mounted = await mountPage();
+    const page = mounted.container.querySelector('section');
+    const layout = mounted.container.querySelector<HTMLElement>('[data-testid="builder-layout"]');
+
+    expect(layout?.hasAttribute('inert')).toBe(true);
+    expect(page?.getAttribute('aria-busy')).toBe('true');
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck hero"]')?.disabled,
+    ).toBe(true);
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck details"]')?.disabled,
+    ).toBe(true);
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck cards"]')?.disabled,
+    ).toBe(true);
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Discard local draft"]')?.disabled,
+    ).toBe(true);
+
+    mounted.unmount();
+  });
+
+  test('offers Retry with the editor locked when creation is unconfirmed', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isMutationLocked.value = true;
+    controller.creationState.value = { status: 'unknown', reconciliation: 'awaiting-retry' };
+
+    const mounted = await mountPage();
+    const retryButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Retry deck creation"]',
+    );
+
+    expect(retryButton?.textContent).toBe('Retry');
+    expect(retryButton?.disabled).toBe(false);
+    retryButton?.click();
+    expect(controller.saveDeck).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
+
+  test('offers Continue while a confirmed outcome is waiting for navigation', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isMutationLocked.value = true;
+    controller.terminalNavigationPending.value = true;
+
+    const mounted = await mountPage();
+    const continueButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Continue after confirmed deck outcome"]',
+    );
+
+    expect(continueButton?.textContent).toBe('Continue');
+    expect(continueButton?.disabled).toBe(false);
+    continueButton?.click();
+    expect(controller.saveDeck).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
+
+  test('disables Continue while terminal navigation is in flight', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isMutationLocked.value = true;
+    controller.terminalNavigationPending.value = true;
+    controller.terminalNavigationInFlight.value = true;
+
+    const mounted = await mountPage();
+    const continueButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Continue after confirmed deck outcome"]',
+    );
+
+    expect(continueButton?.disabled).toBe(true);
+    expect(continueButton?.querySelector('svg')?.classList.contains('animate-spin')).toBe(true);
+
+    mounted.unmount();
+  });
+
+  test('offers resume and discard when a local draft is recovered', async () => {
+    controller.localDraftRecoveryModalOpen.value = true;
+    controller.pendingLocalDraft.value = { savedAt: '2026-08-09T10:00:00Z' };
+
+    const mounted = await mountPage();
+    const modal = mounted.container.querySelector<HTMLElement>(
+      '[data-testid="draft-recovery-modal"]',
+    );
+    const buttons = Array.from(modal?.querySelectorAll('button') ?? []);
+
+    buttons.find((button) => button.textContent === 'Resume Draft')?.click();
+    buttons.find((button) => button.textContent === 'Discard Draft')?.click();
+
+    expect(controller.resumeLocalDraft).toHaveBeenCalledTimes(1);
+    expect(controller.discardPendingLocalDraft).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  test('shows a draft conflict only after recovery or creation locking finishes', async () => {
+    controller.localDraftConflict.value = { kind: 'active-draft' };
+    controller.localDraftConflictModalOpen.value = false;
+    const mounted = await mountPage();
+
+    expect(mounted.container.querySelector('[data-testid="draft-conflict-modal"]')).toBeNull();
+    mounted.unmount();
+
+    controller.localDraftConflictModalOpen.value = true;
+    const remounted = await mountPage();
+
+    expect(remounted.container.querySelector('[data-testid="draft-conflict-modal"]')).not.toBeNull();
+    remounted.unmount();
   });
 
   test('does not change the save button label during autosync saves', async () => {

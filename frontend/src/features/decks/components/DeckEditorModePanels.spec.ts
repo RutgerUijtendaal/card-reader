@@ -40,7 +40,8 @@ const buildController = () => {
   return {
     isChangingHero: ref(false),
     canApplyHeroChange: ref(false),
-    completeInitialHeroSelection: vi.fn(),
+    focusDeckNameRequest: ref(0),
+    openHero: vi.fn(),
     openCards: vi.fn(),
     beginHeroChange: vi.fn(),
     applyHeroChange: vi.fn(),
@@ -105,7 +106,7 @@ describe('deck editor mode panels', () => {
 
     expect(text).toContain('Selected Hero');
     expect(text).toContain('Name *');
-    expect(text).toContain('Continue');
+    expect(text).not.toContain('Continue');
     expect(text).not.toContain('Summary');
     expect(text).not.toContain('Long description');
     expect(text).not.toContain('Visibility');
@@ -198,7 +199,7 @@ describe('deck editor mode panels', () => {
     expect(mounted.container.textContent).toContain('Aurora Hero');
     expect(mounted.container.querySelector('img')?.parentElement?.className).toContain('max-w-48');
     button?.click();
-    expect(mounted.controller.beginHeroChange).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.openHero).toHaveBeenCalledTimes(1);
 
     mounted.unmount();
   });

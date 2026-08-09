@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     )
     from .deck import (
         Deck,
+        DeckCreation,
         DeckDifficulty,
         DeckEntry,
         DeckSideboard,
@@ -167,6 +168,7 @@ _EXPORTS = {
     "CardVersionParseFlag": ".parse_flag",
     "CardVersionParseFlagItem": ".parse_flag",
     "Deck": ".deck",
+    "DeckCreation": ".deck",
     "DeckDifficulty": ".deck",
     "DeckVisibility": ".deck",
     "DeckEntry": ".deck",
@@ -258,6 +260,7 @@ __all__ = [
     "CardVersionParseFlag",
     "CardVersionParseFlagItem",
     "Deck",
+    "DeckCreation",
     "DeckDifficulty",
     "DeckVisibility",
     "DeckEntry",

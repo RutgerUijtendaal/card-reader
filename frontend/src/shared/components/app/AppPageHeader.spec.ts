@@ -112,4 +112,31 @@ describe('AppPageHeader', () => {
     app.unmount();
     container.remove();
   });
+
+  test('renders optional navigation in the center of the main header row', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const Root = defineComponent({
+      setup() {
+        return () => h(
+          AppPageHeader,
+          { icon: TestIcon, title: 'Deck title' },
+          {
+            center: () => h('nav', { 'aria-label': 'Deck sections' }, 'Sections'),
+          },
+        );
+      },
+    });
+    const app = createApp(Root);
+    app.mount(container);
+    await nextTick();
+
+    const navigation = container.querySelector('nav[aria-label="Deck sections"]');
+    expect(navigation).not.toBeNull();
+    expect(navigation?.parentElement?.classList.contains('app-page-header-center')).toBe(true);
+    expect(navigation?.closest('.theme-subheader-row')).toBeNull();
+
+    app.unmount();
+    container.remove();
+  });
 });

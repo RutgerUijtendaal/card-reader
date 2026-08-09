@@ -8,7 +8,7 @@ from .constraints import (
     effective_deck_building_rules_json,
     normalize_deck_building_config,
 )
-from .service import DeckService
+from .service import DeckCreationDeletedError, DeckService
 from .types import (
     DeckEntryInput,
     DeckSideboardInput,
@@ -23,6 +23,7 @@ __all__ = [
     "DeckConstraintViolation",
     "DeckEntryInput",
     "DeckService",
+    "DeckCreationDeletedError",
     "DeckSideboardInput",
     "DeckTotals",
     "DeckUpdateInput",

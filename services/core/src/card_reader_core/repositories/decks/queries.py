@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from django.db.models import Q
 
-from card_reader_core.models import Deck, DeckVisibility
+from card_reader_core.models import Deck, DeckCreation, DeckVisibility
 
 from .filters import apply_deck_filters
 from .prefetch import deck_queryset, deck_summary_queryset
@@ -155,6 +157,17 @@ def get_deck(deck_id: str) -> Deck | None:
 
 def get_owner_deck(deck_id: str, owner_id: str) -> Deck | None:
     return deck_queryset().filter(id=deck_id, owner_id=owner_id).first()
+
+
+def get_owner_deck_by_creation_id(owner_id: str, client_creation_id: UUID) -> Deck | None:
+    return deck_queryset().filter(owner_id=owner_id, client_creation_id=client_creation_id).first()
+
+
+def get_owner_deck_creation(owner_id: str, client_creation_id: UUID) -> DeckCreation | None:
+    return DeckCreation.objects.filter(
+        owner_id=owner_id,
+        client_creation_id=client_creation_id,
+    ).first()
 
 
 def get_deck_for_viewer(deck_id: str, *, viewer_id: str | None = None) -> Deck | None:

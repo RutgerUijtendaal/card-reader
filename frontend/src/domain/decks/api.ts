@@ -1,4 +1,5 @@
 import { api } from '@/shared/api/client';
+import { isAxiosError } from 'axios';
 import type {
   DeckRecord,
   DeckRulesMetadata,
@@ -67,9 +68,36 @@ export const fetchMyDeck = async (deckId: string): Promise<DeckRecord> => {
   return response.data;
 };
 
-export const createDeck = async (payload: DeckUpsertRequest): Promise<DeckRecord> => {
-  const response = await api.post<DeckRecord>('/my/decks', payload);
-  return response.data;
+export type DeckCreationResult = {
+  record: DeckRecord;
+  replayed: boolean;
+};
+
+export const createDeck = async (
+  payload: DeckUpsertRequest,
+  creationKey?: string,
+): Promise<DeckCreationResult> => {
+  const response = await api.post<DeckRecord>('/my/decks', payload, {
+    headers: creationKey ? { 'Idempotency-Key': creationKey } : undefined,
+  });
+  return { record: response.data, replayed: response.status === 200 };
+};
+
+export const fetchMyDeckByCreationKey = async (
+  creationKey: string,
+): Promise<
+  | { status: 'found'; record: DeckRecord }
+  | { status: 'deleted' }
+  | { status: 'missing' }
+> => {
+  try {
+    const response = await api.get<DeckRecord>(`/my/decks/by-creation-key/${creationKey}`);
+    return { status: 'found', record: response.data };
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) return { status: 'missing' };
+    if (isAxiosError(error) && error.response?.status === 410) return { status: 'deleted' };
+    throw error;
+  }
 };
 
 export const updateDeck = async (

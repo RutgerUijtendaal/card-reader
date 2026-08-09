@@ -69,17 +69,22 @@
 
   <rect class="box left" x="95" y="445" width="210" height="154"/>
   <text class="title" x="150" y="476">Deck</text>
-  <text class="field" x="122" y="499">name</text>
-  <text class="field" x="122" y="521">description (nullable)</text>
-  <text class="field" x="122" y="543">long_description (nullable)</text>
-  <text class="field" x="122" y="565">difficulty (nullable)</text>
-  <text class="field" x="122" y="587">hero_card, owner, visibility</text>
+  <text class="field" x="122" y="493">name</text>
+  <text class="field" x="122" y="512">description (nullable)</text>
+  <text class="field" x="122" y="531">long_description (nullable)</text>
+  <text class="field" x="122" y="550">difficulty (nullable)</text>
+  <text class="field" x="122" y="569">hero_card, owner, visibility</text>
+  <text class="field" x="122" y="588">client_creation_id (nullable)</text>
 
   <rect class="box left" x="360" y="445" width="210" height="116"/>
   <text class="title" x="410" y="482">DeckEntry</text>
   <text class="field" x="388" y="508">deck + card</text>
   <text class="field" x="388" y="532">quantity</text>
   <text class="field" x="388" y="556">position</text>
+
+  <rect class="box left" x="360" y="570" width="210" height="40"/>
+  <text class="title-small" x="410" y="587">DeckCreation</text>
+  <text class="field" x="378" y="604">owner + key, deck (nullable)</text>
 
   <rect class="box left" x="95" y="619" width="210" height="86"/>
   <text class="title" x="140" y="656">DeckSideboard</text>
@@ -244,6 +249,7 @@
   <text class="label" x="1652" y="190">notification recipient/actor</text>
 
   <path class="line" d="M305 493 L360 493"/>
+  <path class="thin" d="M305 588 L360 588"/>
   <path class="line" d="M305 662 L360 662"/>
   <path class="line" d="M305 803 L360 803"/>
   <path class="line" d="M305 973 L360 973"/>

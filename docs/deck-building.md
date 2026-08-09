@@ -8,6 +8,16 @@ A deck can contain a hero, a mainboard, and supported sideboard sections. Entrie
 
 Decks are owned by users and may be private or publicly listed according to their visibility state. List surfaces use compact summary records; detail, editing, export, and playtest flows load the full deck only when board entries are required.
 
+## Local-first creation
+
+New decks remain unpublished browser drafts until the owner explicitly selects **Create**. Hero, Details, and Cards are peer editor screens during this phase, and autosync remains unavailable because no server deck exists yet.
+
+One versioned draft is stored per authenticated user. It includes the complete form, board ordering and quantities, sideboards, and snapshots of referenced cards. On recovery, snapshots are shown immediately while current cards, merged identities, tags, ordering, and quantities are reconciled before editing resumes. Browser storage is best-effort: if it is unavailable, the in-memory draft and leave warning remain active, but a confirmed server creation is never reversed or blocked by browser cleanup.
+
+Each unpublished draft has a stable UUID. Create sends that UUID as an owner-scoped idempotency key, so a retry returns the same deck instead of creating a duplicate. A durable creation record retains used keys after deck deletion, allowing retries and lookups to report the deleted outcome without recreating the deck. If the initial response is ambiguous, the editor reconciles the UUID with delayed retries; a found deck completes navigation, a deleted result retires the stale local attempt, and repeated misses or unavailable lookups keep the exact attempted payload locked for a safe Retry. A miss unlocks the draft only when the failed Create returned a definitive HTTP response.
+
+Conditional storage revisions and an owner-scoped browser lock make each compare-and-write mutation atomic across tabs. Browsers without that lock support retain the draft in memory instead of risking an overwrite. When another tab changes, removes, or creates the same draft, persistence and Create pause until the user explicitly loads the stored draft, keeps the current tab, discards it, opens the created deck, or keeps the contents under a new draft UUID.
+
 ## Constraint model
 
 The backend exposes the current constraint definitions through `GET /decks/rules`. The frontend uses that response for limits, descriptions, examples, and action behavior, retaining local defaults only as load-error resilience.
@@ -41,4 +51,3 @@ If a card in an existing deck becomes deprecated, the reference is retained. The
 ## Related features
 
 Decks can be exported and opened in the [Playtester](playtester.md). Card identity, lifecycle, and per-card configuration are described in [Card management](card-management.md).
-

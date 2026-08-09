@@ -16,7 +16,7 @@
         Setup
       </p>
       <p class="theme-section-muted text-sm">
-        Select a hero to continue. Use mana type or unmatched affinity to narrow the hero pool.
+        Choose a hero for this deck. Use mana type or unmatched affinity to narrow the hero pool.
       </p>
     </div>
 

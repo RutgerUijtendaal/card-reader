@@ -19,6 +19,7 @@
       type="button"
       aria-label="Drag to reorder card"
       title="Drag to reorder card"
+      :disabled="mutationDisabled"
       @click.stop
       @contextmenu.stop
     >
@@ -42,7 +43,7 @@
           <button
             class="inline-flex h-8 w-8 items-center justify-center text-sm font-semibold transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
             type="button"
-            :disabled="entry.quantity <= 1"
+            :disabled="mutationDisabled || entry.quantity <= 1"
             aria-label="Remove one copy"
             @click.stop="handleDecrementClick"
             @contextmenu.stop
@@ -52,7 +53,7 @@
           <button
             class="theme-divider inline-flex h-8 w-8 items-center justify-center border-l text-sm font-semibold transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
             type="button"
-            :disabled="quantityMax !== undefined && entry.quantity >= quantityMax"
+            :disabled="mutationDisabled || (quantityMax !== undefined && entry.quantity >= quantityMax)"
             aria-label="Add one copy"
             @click.stop="handleIncrementClick"
             @contextmenu.stop
@@ -73,7 +74,7 @@
             class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 items-center justify-center rounded-lg transition"
             aria-label="Move card to another board"
             title="Move card to another board"
-            :disabled="singleMoveDestination?.disabled"
+            :disabled="mutationDisabled || singleMoveDestination?.disabled"
             @click.stop="handleMoveAction"
             @contextmenu.stop
           >
@@ -82,7 +83,7 @@
 
           <Teleport to="body">
             <div
-              v-if="moveMenuOpen && moveDestinations.length > 1"
+              v-if="moveMenuOpen && moveDestinations.length > 1 && !mutationDisabled"
               ref="movePanelRef"
               class="theme-popover z-40 w-[15rem] p-3"
               :style="{ position: 'fixed', left: `${moveMenuX}px`, top: `${moveMenuY}px` }"
@@ -97,7 +98,7 @@
                     :key="destination.boardId"
                     type="button"
                     class="theme-divider w-full border-t px-3 py-2 text-left first:border-t-0 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="destination.disabled"
+                    :disabled="mutationDisabled || destination.disabled"
                     @click.stop="handleMoveToBoard(destination.boardId)"
                   >
                     <p class="theme-section-title text-sm font-semibold">
@@ -120,6 +121,7 @@
           class="theme-card-frame-muted theme-icon-button theme-section-title inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition hover:text-rose-300"
           type="button"
           aria-label="Remove card from board"
+          :disabled="mutationDisabled"
           @click.stop="handleRemoveClick"
           @contextmenu.stop
         >
@@ -178,7 +180,7 @@
 
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ArrowRightLeft, GripVertical, Trash2 } from 'lucide-vue-next';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import CardHoverTooltip from '@/domain/cards/components/CardHoverTooltip.vue';
@@ -198,6 +200,7 @@ const props = defineProps<{
   hoverMode: HoverMode;
   quantityMax?: number;
   moveDestinations: DeckBoardMoveDestination[];
+  mutationDisabled?: boolean;
   rowActionDisabled?: boolean;
   rowSecondaryActionDisabled?: boolean;
 }>();
@@ -255,7 +258,10 @@ const sharedElementHover = useSharedElementHover({
   x: hoverPanelX,
   y: hoverPanelY,
 });
-const rowClickable = computed(() => !props.rowActionDisabled || !props.rowSecondaryActionDisabled);
+const rowClickable = computed(
+  () => !props.mutationDisabled
+    && (!props.rowActionDisabled || !props.rowSecondaryActionDisabled),
+);
 const controlsVisible = computed(() => hovered.value || focusedWithin.value || moveMenuOpen.value);
 const singleMoveDestination = computed(() =>
   props.moveDestinations.length === 1 ? props.moveDestinations[0] : null,
@@ -264,48 +270,63 @@ const rowQuantityWidth = '2.25rem';
 const rowControlsRightOffset = `calc(${rowQuantityWidth} + 0.25rem)`;
 
 const handleRowClick = (): void => {
-  if (props.rowActionDisabled) {
+  if (props.mutationDisabled || props.rowActionDisabled) {
     return;
   }
   emit('row-action', props.entry.card.id);
 };
 
 const handleRowKeydown = (): void => {
-  if (props.rowActionDisabled) {
+  if (props.mutationDisabled || props.rowActionDisabled) {
     return;
   }
   emit('row-action', props.entry.card.id);
 };
 
 const handleDecrementClick = (event: MouseEvent): void => {
+  if (props.mutationDisabled) {
+    return;
+  }
   emit('decrement', props.entry.card.id);
   blurAfterFinePointerActivation(event);
 };
 
 const handleIncrementClick = (event: MouseEvent): void => {
+  if (props.mutationDisabled) {
+    return;
+  }
   emit('increment', props.entry.card.id);
   blurAfterFinePointerActivation(event);
 };
 
 const handleRemoveClick = (event: MouseEvent): void => {
+  if (props.mutationDisabled) {
+    return;
+  }
   emit('remove', props.entry.card.id);
   blurAfterFinePointerActivation(event);
 };
 
 const handleContextMenu = (event: MouseEvent): void => {
   event.preventDefault();
-  if (props.rowSecondaryActionDisabled) {
+  if (props.mutationDisabled || props.rowSecondaryActionDisabled) {
     return;
   }
   emit('row-secondary-action', props.entry.card.id);
 };
 
 const handleMoveToBoard = (destinationBoardId: string): void => {
+  if (props.mutationDisabled) {
+    return;
+  }
   emit('move-to-board', props.entry.card.id, destinationBoardId);
   closeMoveMenu();
 };
 
 const handleMoveAction = (): void => {
+  if (props.mutationDisabled) {
+    return;
+  }
   if (singleMoveDestination.value) {
     if (singleMoveDestination.value.disabled) {
       return;
@@ -328,4 +349,13 @@ const handleMouseLeave = (): void => {
   hovered.value = false;
   blurFocusedDescendantAfterFinePointerLeave(triggerRef.value);
 };
+
+watch(
+  () => props.mutationDisabled,
+  (disabled) => {
+    if (disabled) {
+      closeMoveMenu();
+    }
+  },
+);
 </script>

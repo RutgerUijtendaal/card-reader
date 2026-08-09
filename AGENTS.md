@@ -7,6 +7,8 @@
 - Write scalable, readable code. Fix underlying issues cleanly instead of layering quick fixes.
 - Never write absolute local filesystem paths into committed repository files or docs; use repo-relative paths instead.
 - Run lint and typecheck before finishing tasks that touch related source, config, generated code, or typed contracts. For docs-only, diagram-only, or skill-only changes, validate the changed artifact directly instead.
+- Codex reviews are triggered automatically by every commit pushed to a non-draft PR. Never request a Codex review manually or post `@codex review`. Track an active review through the original Codex PR comment/check, which is updated while reviewing. The absence of a newly submitted review does not mean no review is running. After pushing, wait for the automatic review to finish, then inspect and address any new threads.
+- Before implementing a stateful workflow across browser and server mutations, define its authoritative success condition, idempotency boundary, independent failure domains, and cleanup semantics. Cleanup failures must never reverse or block an already confirmed authoritative success.
 
 ## Purpose
 Card Reader is a Django-backed card parsing platform with a Vue web UI and a

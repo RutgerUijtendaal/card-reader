@@ -36,13 +36,19 @@
           {{ controller.deck.selectedHero.value.name }}
         </p>
       </div>
+      <div
+        v-else
+        class="theme-empty-state flex aspect-[63/88] w-full items-center justify-center rounded-xl text-sm"
+      >
+        No hero selected
+      </div>
 
       <button
         class="btn-secondary w-full justify-center"
         type="button"
-        @click="controller.beginHeroChange()"
+        @click="controller.openHero()"
       >
-        Change hero
+        {{ controller.deck.selectedHero.value ? 'Change hero' : 'Choose hero' }}
       </button>
     </div>
   </AppStickyAside>
