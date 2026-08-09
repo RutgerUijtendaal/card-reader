@@ -14,76 +14,50 @@
     >
       <template #aside>
         <AppStickyAside>
-          <div class="mb-3 px-1">
-            <h3 class="theme-section-title text-sm font-semibold">
-              Queue Views
-            </h3>
-            <p class="theme-section-muted mt-1 text-xs">
-              Choose the review work to show.
-            </p>
-          </div>
-
-          <nav
-            class="flex flex-col gap-2"
-            aria-label="Review queue views"
+          <AppSideNav
+            title="Queue Views"
+            description="Choose the review work to show."
+            navigation-label="Review queue views"
           >
-            <button
-              type="button"
-              class="rounded-lg border px-3 py-3 text-left transition"
-              :class="activeView === 'flags'
-                ? 'theme-selected-surface-strong'
-                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+            <AppSideNavItem
+              label="Flagged Parses"
+              description="User-submitted parse reports."
+              :active="activeView === 'flags'"
               @click="setActiveView('flags')"
-            >
-              <span class="block text-sm font-semibold">Flagged Parses</span>
-              <span
-                class="mt-1 block text-xs"
-                :class="activeView === 'flags' ? 'theme-section-title' : 'theme-section-muted'"
-              >
-                User-submitted parse reports.
-              </span>
-            </button>
+            />
 
-            <button
-              type="button"
-              class="rounded-lg border px-3 py-3 text-left transition"
-              :class="activeView === 'confidence'
-                ? 'theme-selected-surface-strong'
-                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+            <AppSideNavItem
+              label="Low Confidence"
+              description="Parser results below the confidence threshold."
+              :active="activeView === 'confidence'"
               @click="setActiveView('confidence')"
-            >
-              <span class="block text-sm font-semibold">Low Confidence</span>
-              <span
-                class="mt-1 block text-xs"
-                :class="activeView === 'confidence' ? 'theme-section-title' : 'theme-section-muted'"
-              >
-                Parser results below the confidence threshold.
-              </span>
-            </button>
-          </nav>
+            />
 
-          <div
-            v-if="activeView === 'flags'"
-            class="theme-divider space-y-2 border-t pt-4"
-          >
-            <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
-              Report Status
-            </p>
-            <div class="grid gap-2">
-              <button
-                v-for="status in flagStatuses"
-                :key="status.value"
-                class="rounded-lg border px-3 py-2 text-left text-sm font-semibold transition"
-                :class="flagStatus === status.value
-                  ? 'theme-selected-surface'
-                  : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
-                type="button"
-                @click="setFlagStatus(status.value)"
+            <template #after>
+              <div
+                v-if="activeView === 'flags'"
+                class="theme-divider space-y-2 border-t pt-4"
               >
-                {{ status.label }}
-              </button>
-            </div>
-          </div>
+                <p class="theme-kicker text-xs font-semibold uppercase tracking-[0.16em]">
+                  Report Status
+                </p>
+                <div class="grid gap-2">
+                  <button
+                    v-for="status in flagStatuses"
+                    :key="status.value"
+                    class="rounded-lg border px-3 py-2 text-left text-sm font-semibold transition"
+                    :class="flagStatus === status.value
+                      ? 'theme-selected-surface'
+                      : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
+                    type="button"
+                    @click="setFlagStatus(status.value)"
+                  >
+                    {{ status.label }}
+                  </button>
+                </div>
+              </div>
+            </template>
+          </AppSideNav>
         </AppStickyAside>
       </template>
 
@@ -403,6 +377,8 @@ import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import AppSideNav from '@/shared/components/app/AppSideNav.vue';
+import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import { buildReviewCardEditorLocation } from '@/domain/card-navigation/cardReturnState';
 import { useCardCollection } from '@/domain/cards/composables/useCardCollection';

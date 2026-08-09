@@ -1,5 +1,5 @@
 <template>
-  <section class="flex flex-col gap-8">
+  <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="ServerCog"
       title="Operations"
@@ -11,47 +11,63 @@
         <button
           class="btn-secondary inline-flex items-center gap-2"
           type="button"
-          :disabled="refreshing"
-          @click="loadOverview"
+          :disabled="refreshing || historyRefreshing"
+          @click="refreshWorkspace"
         >
           <RefreshCw
             class="h-4 w-4"
-            :class="refreshing ? 'animate-spin' : ''"
+            :class="refreshing || historyRefreshing ? 'animate-spin' : ''"
           />
-          {{ refreshing ? 'Refreshing…' : 'Refresh' }}
+          {{ refreshing || historyRefreshing ? 'Refreshing…' : 'Refresh' }}
         </button>
       </template>
     </AppPageHeader>
 
-    <AppPageLayout
-      columns="one"
-      main-class="space-y-8"
-    >
+    <AppPageLayout columns="sidebar">
+      <template #aside>
+        <AppStickyAside>
+          <OperationsQueueNavigator
+            v-if="overview"
+            :queues="overview.queues"
+            :workers="overview.workers"
+            :selected-queue-key="selectedQueueKey"
+            :generated-at="overview.generated_at"
+            @select="selectQueue"
+          />
+          <div
+            v-else-if="loading"
+            class="space-y-3"
+          >
+            <div class="h-5 w-24 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+            <div class="h-4 w-full animate-pulse rounded bg-[var(--color-surface-muted)]" />
+            <div
+              v-for="index in 3"
+              :key="`queue-navigation-loading-${index}`"
+              class="h-24 animate-pulse rounded-xl bg-[var(--color-surface-muted)]"
+            />
+          </div>
+        </AppStickyAside>
+      </template>
+
       <div
         v-if="loading && !overview"
-        class="space-y-8"
+        class="space-y-6"
       >
-        <div class="grid gap-4 md:grid-cols-3">
-          <div
-            v-for="index in 3"
-            :key="`worker-skeleton-${index}`"
-            class="theme-card-frame-muted space-y-4 rounded-xl border p-5"
-          >
-            <div class="h-5 w-1/2 animate-pulse rounded bg-[var(--color-surface-muted)]" />
-            <div class="h-7 w-28 animate-pulse rounded-full bg-[var(--color-surface-muted)]" />
-            <div class="h-4 w-3/4 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+        <section class="space-y-4">
+          <div class="h-7 w-56 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+          <div class="h-4 w-72 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+          <div class="h-20 animate-pulse rounded-xl bg-[var(--color-surface-muted)]" />
+        </section>
+        <section class="theme-divider border-t pt-5">
+          <div class="h-6 w-40 animate-pulse rounded bg-[var(--color-surface-muted)]" />
+          <div class="mt-4 divide-y divide-[var(--color-border)]">
+            <div
+              v-for="index in 6"
+              :key="`queue-history-loading-${index}`"
+              class="h-20 animate-pulse bg-[var(--color-surface-soft)]"
+            />
           </div>
-        </div>
-        <div class="grid items-start gap-5 lg:grid-cols-3">
-          <div
-            v-for="index in 3"
-            :key="`queue-skeleton-${index}`"
-            class="theme-card-frame-muted space-y-4 rounded-2xl border p-5 sm:p-6"
-          >
-            <div class="h-6 w-48 animate-pulse rounded bg-[var(--color-surface-muted)]" />
-            <div class="h-24 w-full animate-pulse rounded-xl bg-[var(--color-surface-muted)]" />
-          </div>
-        </div>
+        </section>
       </div>
 
       <div
@@ -69,258 +85,292 @@
         </button>
       </div>
 
-      <template v-else-if="overview">
-        <section>
-          <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h3 class="theme-section-title text-lg font-semibold">
-                Workers
-              </h3>
-              <p class="theme-section-muted mt-1 text-sm">
-                A worker is stale after {{ overview.stale_after_seconds }} seconds without a
-                heartbeat.
-              </p>
-            </div>
-            <p class="theme-section-muted text-sm">
-              Updated {{ formatTimestamp(overview.generated_at) }}
-            </p>
-          </div>
-
-          <div class="grid gap-4 md:grid-cols-3">
-            <article
-              v-for="worker in overview.workers"
-              :key="worker.key"
-              class="theme-card-frame-muted rounded-xl border p-5"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <h4 class="theme-section-title font-semibold">
-                    {{ worker.display_name }}
-                  </h4>
-                  <p class="theme-section-muted mt-1 text-xs">
-                    {{ worker.active_instances }} active instance{{
-                      worker.active_instances === 1 ? '' : 's'
-                    }}
-                  </p>
-                </div>
-                <span
-                  class="theme-pill shrink-0 px-2.5 py-1 text-xs font-semibold"
-                  :class="healthClass(worker)"
-                >
-                  {{ workerStatusLabel(worker) }}
-                </span>
-              </div>
-              <dl class="theme-section-muted mt-5 space-y-3 text-sm">
-                <div>
-                  <dt class="theme-kicker text-[11px] uppercase tracking-[0.16em]">
-                    Last heartbeat
-                  </dt>
-                  <dd class="theme-section-title mt-1">
-                    {{ formatTimestamp(worker.last_seen_at) }}
-                  </dd>
-                </div>
-                <div v-if="worker.current_work_ids.length > 0">
-                  <dt class="theme-kicker text-[11px] uppercase tracking-[0.16em]">
-                    Current work
-                  </dt>
-                  <dd class="theme-section-title mt-1 truncate font-mono text-xs">
-                    {{ worker.current_work_ids.join(', ') }}
-                  </dd>
-                </div>
-              </dl>
-            </article>
-          </div>
-        </section>
-
+      <div
+        v-else-if="overview && selectedQueue"
+        :id="`queue-${selectedQueue.key}`"
+        class="scroll-mt-24 space-y-6"
+      >
         <p
           v-if="errorMessage"
           class="theme-alert-warning"
           role="status"
         >
-          {{ errorMessage }} Showing the last successful update.
+          {{ errorMessage }} Showing the last successful worker and queue summary.
         </p>
 
         <section>
-          <div>
-            <h3 class="theme-section-title text-lg font-semibold">
-              Queues
-            </h3>
-            <p class="theme-section-muted mt-1 text-sm">
-              Recent work grouped by the worker responsible for processing it.
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <p class="theme-kicker text-[11px] font-semibold uppercase tracking-[0.16em]">
+                Selected queue
+              </p>
+              <h3 class="theme-section-title mt-1 text-xl font-semibold">
+                {{ selectedQueue.display_name }}
+              </h3>
+              <p class="theme-section-muted mt-1 text-sm">
+                {{ selectedQueue.total_count }} total records · Recent work ordered by last update
+              </p>
+            </div>
+            <div class="flex max-w-2xl flex-wrap gap-2 sm:justify-end">
+              <span
+                v-for="entry in statusEntries(selectedQueue)"
+                :key="entry.status"
+                class="theme-pill px-2.5 py-1 text-xs font-semibold capitalize"
+                :class="statusClass(entry.status)"
+              >
+                {{ entry.status }} {{ entry.count }}
+              </span>
+            </div>
+          </div>
+
+          <OperationsWorkerPool
+            class="mt-5"
+            :worker="selectedWorker"
+            :stale-after-seconds="overview.stale_after_seconds"
+          />
+        </section>
+
+        <section>
+          <div
+            class="theme-divider flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between"
+          >
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h4 class="theme-section-title text-base font-semibold">
+                  Recent work
+                </h4>
+                <RefreshCw
+                  v-if="historyRefreshing"
+                  class="theme-section-muted h-3.5 w-3.5 animate-spin"
+                  aria-label="Refreshing queue history"
+                />
+              </div>
+              <p class="theme-section-muted mt-1 text-sm">
+                <template v-if="historyPage">
+                  {{ historyPage.count }} records · Page {{ historyPage.page }} of {{ totalPages }}
+                </template>
+                <template v-else>
+                  Queue history
+                </template>
+              </p>
+            </div>
+            <button
+              v-if="pageNumber > 1"
+              type="button"
+              class="btn-secondary px-3 py-2 text-xs"
+              @click="goToPage(1)"
+            >
+              Back to latest
+            </button>
+            <p
+              v-else
+              class="theme-section-muted text-xs"
+            >
+              Latest history refreshes automatically
             </p>
           </div>
 
-          <div class="mt-5 grid items-start gap-5 lg:grid-cols-3">
-            <article
-              v-for="queue in overview.queues"
-              :id="`queue-${queue.key}`"
-              :key="queue.key"
-              class="theme-card-frame-muted scroll-mt-24 rounded-2xl border p-5 sm:p-6"
+          <div
+            v-if="historyErrorMessage"
+            class="theme-alert-danger mt-4"
+            role="alert"
+          >
+            <p>{{ historyErrorMessage }}</p>
+            <button
+              class="btn-secondary mt-3"
+              type="button"
+              @click="loadHistory()"
             >
-              <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="min-w-0">
-                  <h4 class="theme-section-title text-base font-semibold">
-                    {{ queue.display_name }}
-                  </h4>
-                  <p class="theme-section-muted mt-1 text-sm">
-                    {{ queue.total_count }} total records
-                  </p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <span
-                    v-for="entry in statusEntries(queue)"
-                    :key="entry.status"
-                    class="theme-pill px-2.5 py-1 text-xs font-semibold capitalize"
-                    :class="statusClass(entry.status)"
-                  >
-                    {{ entry.status }} {{ entry.count }}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                v-if="queue.items.length === 0"
-                class="theme-section-muted mt-5 rounded-xl border border-dashed px-4 py-8 text-center text-sm"
-              >
-                No queue activity yet.
-              </div>
-
-              <div
-                v-else
-                class="theme-divider mt-5 border-t"
-              >
-                <article
-                  v-for="item in queue.items"
-                  :key="item.id"
-                  class="theme-divider border-b py-5 last:border-b-0 last:pb-0"
-                >
-                  <div class="min-w-0 space-y-4">
-                    <div class="space-y-2">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <span
-                          class="theme-pill px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em]"
-                          :class="statusClass(item.status)"
-                        >
-                          {{ item.status }}
-                        </span>
-                        <h5 class="theme-section-title min-w-0 break-words text-sm font-semibold">
-                          {{ item.title }}
-                        </h5>
-                      </div>
-                      <p class="theme-section-muted text-xs">
-                        Updated {{ formatTimestamp(item.updated_at) }}
-                      </p>
-                    </div>
-
-                    <dl
-                      class="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2"
-                    >
-                      <div
-                        v-for="metadata in item.metadata"
-                        :key="`${item.id}-${metadata.label}`"
-                        class="min-w-0"
-                      >
-                        <dt class="theme-kicker text-[11px] uppercase tracking-[0.14em]">
-                          {{ metadata.label }}
-                        </dt>
-                        <dd class="theme-section-muted mt-0.5 break-all">
-                          {{ metadata.value }}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <p
-                      v-if="item.error_message"
-                      class="theme-alert-danger text-sm"
-                    >
-                      {{ item.error_message }}
-                    </p>
-
-                    <div
-                      v-if="progressPercent(item) !== null"
-                      class="flex items-center gap-3"
-                    >
-                      <span class="theme-section-muted shrink-0 text-sm">
-                        {{ item.progress_current }}/{{ item.progress_total }}
-                      </span>
-                      <div class="theme-card-frame-muted h-2 flex-1 rounded-full">
-                        <div
-                          class="h-full rounded-full bg-[var(--color-accent)] transition-all"
-                          :style="{ width: `${progressPercent(item)}%` }"
-                        />
-                      </div>
-                    </div>
-
-                    <div
-                      v-if="item.links.length > 0"
-                      class="flex flex-wrap gap-2"
-                    >
-                      <a
-                        v-for="link in item.links"
-                        :key="link.href"
-                        class="btn-secondary"
-                        :href="operationsLinkUrl(link.href)"
-                      >
-                        {{ link.label }}
-                      </a>
-                    </div>
-                  </div>
-                </article>
-              </div>
-            </article>
+              Retry history
+            </button>
           </div>
+
+          <div
+            v-else-if="historyLoading"
+            class="theme-divider divide-y"
+          >
+            <div
+              v-for="index in 6"
+              :key="`selected-queue-loading-${index}`"
+              class="grid min-h-20 animate-pulse items-center gap-3 px-3 py-3 sm:grid-cols-[7.5rem_minmax(0,1fr)_9rem_2.5rem]"
+            >
+              <div class="h-6 w-24 rounded-full bg-[var(--color-surface-muted)]" />
+              <div class="space-y-2">
+                <div class="h-4 w-2/5 rounded bg-[var(--color-surface-muted)]" />
+                <div class="h-3 w-48 rounded bg-[var(--color-surface-muted)]" />
+              </div>
+              <div class="h-4 w-20 rounded bg-[var(--color-surface-muted)]" />
+              <div class="h-5 w-5 rounded bg-[var(--color-surface-muted)]" />
+            </div>
+          </div>
+
+          <div
+            v-else-if="historyItems.length === 0"
+            class="theme-section-muted flex min-h-48 items-center justify-center py-10 text-center text-sm"
+          >
+            <div class="space-y-1">
+              <h5 class="theme-section-title text-sm font-semibold">
+                No queue activity yet
+              </h5>
+              <p>New work will appear here when this queue receives it.</p>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="theme-divider"
+          >
+            <OperationsQueueItemRow
+              v-for="item in historyItems"
+              :key="item.id"
+              :item="item"
+              :expanded="expandedItemIds.has(item.id)"
+              @toggle="toggleItem(item.id)"
+            />
+          </div>
+
+          <nav
+            v-if="historyPage && totalPages > 1"
+            class="theme-divider mt-4 flex items-center justify-between gap-3 border-t pt-4"
+            aria-label="Queue history pages"
+          >
+            <button
+              type="button"
+              class="btn-secondary px-3 py-2 text-xs"
+              :disabled="historyPage.previous_page === null"
+              @click="goToPage(historyPage.previous_page ?? 1)"
+            >
+              Previous
+            </button>
+            <span class="theme-section-muted text-xs">
+              Page {{ historyPage.page }} of {{ totalPages }}
+            </span>
+            <button
+              type="button"
+              class="btn-secondary px-3 py-2 text-xs"
+              :disabled="historyPage.next_page === null"
+              @click="goToPage(historyPage.next_page ?? historyPage.page)"
+            >
+              Next
+            </button>
+          </nav>
         </section>
-      </template>
+      </div>
     </AppPageLayout>
   </section>
 </template>
 
 <script setup lang="ts">
 import { RefreshCw, ServerCog } from 'lucide-vue-next';
-import { nextTick, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
-import { operationsLinkUrl } from '@/features/operations/api';
+import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
+import OperationsQueueItemRow from '@/features/operations/components/OperationsQueueItemRow.vue';
+import OperationsQueueNavigator from '@/features/operations/components/OperationsQueueNavigator.vue';
+import OperationsWorkerPool from '@/features/operations/components/OperationsWorkerPool.vue';
 import { useOperationsOverview } from '@/features/operations/composables/useOperationsOverview';
+import { useOperationsQueueHistory } from '@/features/operations/composables/useOperationsQueueHistory';
 import type { OperationsItemStatus } from '@/features/operations/types';
 import {
-  formatOperationsTimestamp,
-  operationsProgressPercent,
+  defaultOperationsQueueKey,
+  operationsPageCount,
   operationsStatusClass,
   operationsStatusEntries,
-  workerHealthClass,
-  workerStatusLabel,
+  parseOperationsPage,
 } from '@/features/operations/utils/operationsUtils';
 
-const { overview, loading, refreshing, errorMessage, loadOverview } = useOperationsOverview();
 const route = useRoute();
-let pendingHash = route.hash;
+const router = useRouter();
+const { overview, loading, refreshing, errorMessage, loadOverview } = useOperationsOverview();
 
-const scrollToPendingHash = async (): Promise<void> => {
-  if (!overview.value || !pendingHash) return;
-  const hash = pendingHash;
-  await nextTick();
-  if (pendingHash !== hash) return;
-  const target = document.getElementById(hash.slice(1));
-  if (!target) return;
-  target.scrollIntoView({ block: 'start' });
-  pendingHash = '';
-};
+const requestedQueueKey = computed(() => {
+  const prefix = '#queue-';
+  return route.hash.startsWith(prefix) ? route.hash.slice(prefix.length) : null;
+});
+const selectedQueueKey = computed(() => {
+  const queues = overview.value?.queues ?? [];
+  const requested = requestedQueueKey.value;
+  if (requested && queues.some((queue) => queue.key === requested)) return requested;
+  return defaultOperationsQueueKey(queues);
+});
+const selectedQueue = computed(
+  () => overview.value?.queues.find((queue) => queue.key === selectedQueueKey.value) ?? null,
+);
+const selectedWorker = computed(
+  () =>
+    overview.value?.workers.find((worker) => worker.key === selectedQueue.value?.worker_key) ??
+    null,
+);
+const pageNumber = computed(() => parseOperationsPage(route.query.page));
+
+const {
+  page: historyPage,
+  items: historyItems,
+  loading: historyLoading,
+  refreshing: historyRefreshing,
+  errorMessage: historyErrorMessage,
+  loadHistory,
+} = useOperationsQueueHistory(selectedQueueKey, pageNumber);
+
+const expandedItemIds = ref(new Set<string>());
+const totalPages = computed(() =>
+  historyPage.value ? operationsPageCount(historyPage.value.count, historyPage.value.page_size) : 1,
+);
 
 watch(
-  () => route.hash,
-  (hash) => {
-    pendingHash = hash;
-    void scrollToPendingHash();
+  selectedQueueKey,
+  (queueKey) => {
+    if (!queueKey || route.hash === `#queue-${queueKey}`) return;
+    void router.replace({
+      hash: `#queue-${queueKey}`,
+      query: route.query,
+    });
   },
   { immediate: true },
 );
-watch(overview, () => void scrollToPendingHash());
 
-const formatTimestamp = formatOperationsTimestamp;
+watch([selectedQueueKey, pageNumber], () => {
+  expandedItemIds.value = new Set();
+});
+
+watch(historyItems, (items) => {
+  const visibleIds = new Set(items.map((item) => item.id));
+  expandedItemIds.value = new Set(
+    [...expandedItemIds.value].filter((itemId) => visibleIds.has(itemId)),
+  );
+});
+
+const selectQueue = (queueKey: string): void => {
+  if (queueKey === selectedQueueKey.value) return;
+  const query = { ...route.query };
+  delete query.page;
+  void router.replace({ query, hash: `#queue-${queueKey}` });
+};
+
+const goToPage = (page: number): void => {
+  if (page < 1 || page === pageNumber.value) return;
+  void router.push({
+    hash: route.hash,
+    query: {
+      ...route.query,
+      page: page === 1 ? undefined : String(page),
+    },
+  });
+};
+
+const toggleItem = (itemId: string): void => {
+  const nextIds = new Set(expandedItemIds.value);
+  if (nextIds.has(itemId)) nextIds.delete(itemId);
+  else nextIds.add(itemId);
+  expandedItemIds.value = nextIds;
+};
+
+const refreshWorkspace = async (): Promise<void> => {
+  await Promise.all([loadOverview(), loadHistory({ preserve: true })]);
+};
+
 const statusEntries = operationsStatusEntries;
-const healthClass = workerHealthClass;
-const progressPercent = operationsProgressPercent;
 const statusClass = (status: OperationsItemStatus): string => operationsStatusClass(status);
 </script>

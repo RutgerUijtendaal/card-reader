@@ -10,7 +10,7 @@ vi.mock('@/features/operations/api', () => ({
 
 const mockedFetchOperationsOverview = vi.mocked(fetchOperationsOverview);
 
-const createDeferred = <T,>() => {
+const createDeferred = <T>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((innerResolve) => {
     resolve = innerResolve;

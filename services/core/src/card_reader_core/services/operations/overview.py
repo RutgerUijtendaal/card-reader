@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -8,15 +10,20 @@ from card_reader_core.models import (
     ImportJob,
     TtsCardSheet,
     WorkerActivity,
+    WorkerHeartbeat,
     now_utc,
 )
 from card_reader_core.operations.workers import WORKER_HEARTBEAT_STALE_AFTER
 from card_reader_core.repositories.operations import (
+    PaginatedOperationsRows,
     developer_data_build_status_counts,
     import_job_status_counts,
     list_import_jobs_for_operations,
     list_recent_developer_data_builds,
     list_tts_card_sheets_for_operations,
+    paginate_developer_data_builds_for_operations,
+    paginate_import_jobs_for_operations,
+    paginate_tts_card_sheets_for_operations,
     tts_card_sheet_status_counts,
 )
 from card_reader_core.repositories.tts_card_sheets import (
@@ -27,12 +34,6 @@ from card_reader_core.repositories.worker_heartbeats import (
 )
 
 _RECENT_ITEM_LIMIT = 20
-
-_EXPECTED_WORKERS = (
-    ("parser", "Parser worker", "imports"),
-    ("tts-sheet-renderer", "TTS card-sheet renderer", "tts-card-sheets"),
-    ("developer-data-builder", "Developer-data builder", "developer-data-builds"),
-)
 
 _ALL_ITEM_STATUSES = (
     "scheduled",
@@ -45,29 +46,128 @@ _ALL_ITEM_STATUSES = (
     "cancelled",
 )
 
+CountBuilder = Callable[[datetime], dict[str, int]]
+RecentLoader = Callable[[int], list[Any]]
+PageLoader = Callable[[int, int], PaginatedOperationsRows[Any]]
+ItemBuilder = Callable[[Any, datetime], dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class OperationsQueueDefinition:
+    key: str
+    display_name: str
+    worker_key: str
+    worker_display_name: str
+    build_counts: CountBuilder
+    load_recent: RecentLoader
+    load_page: PageLoader
+    build_item: ItemBuilder
+
+
+class OperationsQueueNotFoundError(ValueError):
+    pass
+
+
+_QUEUE_DEFINITIONS = (
+    OperationsQueueDefinition(
+        key="imports",
+        display_name="Card imports",
+        worker_key="parser",
+        worker_display_name="Parser worker",
+        build_counts=lambda _now: _normalized_counts(
+            import_job_status_counts(),
+            _normalize_import_status,
+        ),
+        load_recent=lambda limit: list_import_jobs_for_operations(limit=limit),
+        load_page=lambda page, page_size: paginate_import_jobs_for_operations(
+            page=page,
+            page_size=page_size,
+        ),
+        build_item=lambda row, _now: _import_item_payload(row),
+    ),
+    OperationsQueueDefinition(
+        key="tts-card-sheets",
+        display_name="TTS card sheets",
+        worker_key="tts-sheet-renderer",
+        worker_display_name="TTS card-sheet renderer",
+        build_counts=lambda now: _tts_counts(now=now),
+        load_recent=lambda limit: list_tts_card_sheets_for_operations(limit=limit),
+        load_page=lambda page, page_size: paginate_tts_card_sheets_for_operations(
+            page=page,
+            page_size=page_size,
+        ),
+        build_item=lambda row, now: _tts_item_payload(row, now=now),
+    ),
+    OperationsQueueDefinition(
+        key="developer-data-builds",
+        display_name="Developer-data builds",
+        worker_key="developer-data-builder",
+        worker_display_name="Developer-data builder",
+        build_counts=lambda _now: _normalized_counts(
+            developer_data_build_status_counts(),
+            _normalize_developer_data_status,
+        ),
+        load_recent=lambda limit: list_recent_developer_data_builds(limit=limit),
+        load_page=lambda page, page_size: paginate_developer_data_builds_for_operations(
+            page=page,
+            page_size=page_size,
+        ),
+        build_item=lambda row, _now: _developer_data_item_payload(row),
+    ),
+)
+
+_QUEUE_DEFINITIONS_BY_KEY = {definition.key: definition for definition in _QUEUE_DEFINITIONS}
+
 
 class OperationsOverviewService:
-    def build(self) -> dict[str, Any]:
+    def build(self, *, include_items: bool = True) -> dict[str, Any]:
         now = now_utc()
         return {
             "generated_at": _iso(now),
             "stale_after_seconds": int(WORKER_HEARTBEAT_STALE_AFTER.total_seconds()),
             "workers": self._worker_payloads(now=now),
             "queues": [
-                self._import_queue_payload(),
-                self._tts_queue_payload(now=now),
-                self._developer_data_queue_payload(),
+                self._queue_payload(
+                    definition=definition,
+                    now=now,
+                    include_items=include_items,
+                )
+                for definition in _QUEUE_DEFINITIONS
             ],
+        }
+
+    def build_queue_page(
+        self,
+        *,
+        queue_key: str,
+        page: int,
+        page_size: int,
+    ) -> dict[str, Any]:
+        definition = _QUEUE_DEFINITIONS_BY_KEY.get(queue_key)
+        if definition is None:
+            raise OperationsQueueNotFoundError(queue_key)
+        now = now_utc()
+        rows = definition.load_page(page, page_size)
+        return {
+            "count": rows.count,
+            "next_page": rows.page + 1 if rows.page * rows.page_size < rows.count else None,
+            "previous_page": rows.page - 1 if rows.page > 1 else None,
+            "page": rows.page,
+            "page_size": rows.page_size,
+            "results": [definition.build_item(row, now) for row in rows.results],
         }
 
     def _worker_payloads(self, *, now: datetime) -> list[dict[str, Any]]:
         stale_before = now - WORKER_HEARTBEAT_STALE_AFTER
+        worker_definitions = {
+            definition.worker_key: definition for definition in _QUEUE_DEFINITIONS
+        }
         snapshots = fetch_worker_heartbeat_snapshots(
-            worker_keys=(worker_key for worker_key, _display_name, _queue_key in _EXPECTED_WORKERS),
+            worker_keys=worker_definitions,
             stale_before=stale_before,
         )
         payloads: list[dict[str, Any]] = []
-        for worker_key, display_name, queue_key in _EXPECTED_WORKERS:
+        for worker_key, definition in worker_definitions.items():
             snapshot = snapshots[worker_key]
             live = snapshot.live_instances
             fallback = snapshot.fallback
@@ -79,20 +179,23 @@ class OperationsOverviewService:
                 )
                 health = "online"
                 last_seen_at = max(row.last_heartbeat_at for row in live)
+                visible_instances = live
             elif fallback is None:
                 activity = WorkerActivity.stopped.value
                 health = "never_seen"
                 last_seen_at = None
+                visible_instances = ()
             else:
                 activity = str(fallback.activity)
                 health = "stale" if fallback.stopped_at is None else "stopped"
                 last_seen_at = fallback.last_heartbeat_at
+                visible_instances = (fallback,)
 
             payloads.append(
                 {
                     "key": worker_key,
-                    "display_name": display_name,
-                    "queue_key": queue_key,
+                    "display_name": definition.worker_display_name,
+                    "queue_key": definition.key,
                     "health": health,
                     "activity": activity,
                     "active_instances": len(live),
@@ -102,75 +205,60 @@ class OperationsOverviewService:
                         for row in live
                         if row.current_work_id is not None
                     ],
+                    "instances": [
+                        _worker_instance_payload(row=row, stale_before=stale_before)
+                        for row in visible_instances
+                    ],
                 }
             )
         return payloads
 
-    def _import_queue_payload(self) -> dict[str, Any]:
-        native_counts = import_job_status_counts()
-        counts = _empty_counts()
-        for status, count in native_counts.items():
-            counts[_normalize_import_status(status)] += count
-        items = [
-            _import_item_payload(job)
-            for job in list_import_jobs_for_operations(limit=_RECENT_ITEM_LIMIT)
-        ]
-        return _queue_payload(
-            key="imports",
-            display_name="Card imports",
-            worker_key="parser",
-            counts=counts,
-            items=items,
+    def _queue_payload(
+        self,
+        *,
+        definition: OperationsQueueDefinition,
+        now: datetime,
+        include_items: bool,
+    ) -> dict[str, Any]:
+        counts = definition.build_counts(now)
+        items = (
+            [
+                definition.build_item(row, now)
+                for row in definition.load_recent(_RECENT_ITEM_LIMIT)
+            ]
+            if include_items
+            else []
         )
-
-    def _tts_queue_payload(self, *, now: datetime) -> dict[str, Any]:
-        counts = _empty_counts()
-        counts.update(tts_card_sheet_status_counts(now=now))
-        items = [
-            _tts_item_payload(sheet, now=now)
-            for sheet in list_tts_card_sheets_for_operations(limit=_RECENT_ITEM_LIMIT)
-        ]
-        return _queue_payload(
-            key="tts-card-sheets",
-            display_name="TTS card sheets",
-            worker_key="tts-sheet-renderer",
-            counts=counts,
-            items=items,
-        )
-
-    def _developer_data_queue_payload(self) -> dict[str, Any]:
-        native_counts = developer_data_build_status_counts()
-        counts = _empty_counts()
-        for status, count in native_counts.items():
-            counts[_normalize_developer_data_status(status)] += count
-        items = [
-            _developer_data_item_payload(build)
-            for build in list_recent_developer_data_builds(limit=_RECENT_ITEM_LIMIT)
-        ]
-        return _queue_payload(
-            key="developer-data-builds",
-            display_name="Developer-data builds",
-            worker_key="developer-data-builder",
-            counts=counts,
-            items=items,
-        )
+        return {
+            "key": definition.key,
+            "display_name": definition.display_name,
+            "worker_key": definition.worker_key,
+            "total_count": sum(counts.values()),
+            "status_counts": counts,
+            "items": items,
+        }
 
 
-def _queue_payload(
+def _worker_instance_payload(
     *,
-    key: str,
-    display_name: str,
-    worker_key: str,
-    counts: dict[str, int],
-    items: list[dict[str, Any]],
+    row: WorkerHeartbeat,
+    stale_before: datetime,
 ) -> dict[str, Any]:
+    if row.stopped_at is not None:
+        health = "stopped"
+    elif row.last_heartbeat_at < stale_before:
+        health = "stale"
+    else:
+        health = "online"
     return {
-        "key": key,
-        "display_name": display_name,
-        "worker_key": worker_key,
-        "total_count": sum(counts.values()),
-        "status_counts": counts,
-        "items": items,
+        "id": row.id,
+        "display_name": row.display_name,
+        "health": health,
+        "activity": str(row.activity),
+        "started_at": _iso(row.started_at),
+        "last_seen_at": _iso(row.last_heartbeat_at),
+        "stopped_at": _iso(row.stopped_at),
+        "current_work_id": row.current_work_id,
     }
 
 
@@ -275,6 +363,22 @@ def _normalize_developer_data_status(status: str) -> str:
     if status == "succeeded":
         return "completed"
     return status if status in _ALL_ITEM_STATUSES else "failed"
+
+
+def _normalized_counts(
+    native_counts: dict[str, int],
+    normalize: Callable[[str], str],
+) -> dict[str, int]:
+    counts = _empty_counts()
+    for status, count in native_counts.items():
+        counts[normalize(status)] += count
+    return counts
+
+
+def _tts_counts(*, now: datetime) -> dict[str, int]:
+    counts = _empty_counts()
+    counts.update(tts_card_sheet_status_counts(now=now))
+    return counts
 
 
 def _empty_counts() -> dict[str, int]:

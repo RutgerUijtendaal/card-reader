@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Generic, TypeVar
 
-from django.db.models import Count, F, Q
+from django.db import models
+from django.db.models import Count, F, Q, QuerySet
 
 from card_reader_core.models import (
     DeveloperDataBuild,
@@ -12,6 +15,16 @@ from card_reader_core.models import (
 from card_reader_core.repositories.tts_card_sheets import (
     TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT,
 )
+
+OperationsRow = TypeVar("OperationsRow", bound=models.Model)
+
+
+@dataclass(frozen=True)
+class PaginatedOperationsRows(Generic[OperationsRow]):
+    count: int
+    page: int
+    page_size: int
+    results: list[OperationsRow]
 
 
 def import_job_status_counts() -> dict[str, int]:
@@ -24,14 +37,38 @@ def import_job_status_counts() -> dict[str, int]:
 def list_import_jobs_for_operations(*, limit: int) -> list[ImportJob]:
     return list(
         ImportJob.objects.select_related("content_version", "template")
-        .order_by("-updated_at")[:limit]
+        .order_by("-updated_at", "id")[:limit]
     )
+
+
+def paginate_import_jobs_for_operations(
+    *,
+    page: int,
+    page_size: int,
+) -> PaginatedOperationsRows[ImportJob]:
+    queryset = ImportJob.objects.select_related("content_version", "template").order_by(
+        "-updated_at",
+        "id",
+    )
+    return _paginate(queryset=queryset, page=page, page_size=page_size)
 
 
 def list_recent_developer_data_builds(*, limit: int) -> list[DeveloperDataBuild]:
     return list(
-        DeveloperDataBuild.objects.select_related("requested_by").order_by("-updated_at")[:limit]
+        DeveloperDataBuild.objects.select_related("requested_by").order_by("-updated_at", "id")[:limit]
     )
+
+
+def paginate_developer_data_builds_for_operations(
+    *,
+    page: int,
+    page_size: int,
+) -> PaginatedOperationsRows[DeveloperDataBuild]:
+    queryset = DeveloperDataBuild.objects.select_related("requested_by").order_by(
+        "-updated_at",
+        "id",
+    )
+    return _paginate(queryset=queryset, page=page, page_size=page_size)
 
 
 def developer_data_build_status_counts() -> dict[str, int]:
@@ -42,7 +79,16 @@ def developer_data_build_status_counts() -> dict[str, int]:
 
 
 def list_tts_card_sheets_for_operations(*, limit: int) -> list[TtsCardSheet]:
-    return list(TtsCardSheet.objects.order_by("-updated_at")[:limit])
+    return list(TtsCardSheet.objects.order_by("-updated_at", "id")[:limit])
+
+
+def paginate_tts_card_sheets_for_operations(
+    *,
+    page: int,
+    page_size: int,
+) -> PaginatedOperationsRows[TtsCardSheet]:
+    queryset = TtsCardSheet.objects.order_by("-updated_at", "id")
+    return _paginate(queryset=queryset, page=page, page_size=page_size)
 
 
 def tts_card_sheet_status_counts(*, now: datetime) -> dict[str, int]:
@@ -70,3 +116,21 @@ def tts_card_sheet_status_counts(*, now: datetime) -> dict[str, int]:
         ),
     )
     return {key: int(value or 0) for key, value in result.items()}
+
+
+def _paginate(
+    *,
+    queryset: QuerySet[OperationsRow],
+    page: int,
+    page_size: int,
+) -> PaginatedOperationsRows[OperationsRow]:
+    normalized_page = max(page, 1)
+    normalized_page_size = max(1, min(page_size, 100))
+    count = queryset.count()
+    offset = (normalized_page - 1) * normalized_page_size
+    return PaginatedOperationsRows(
+        count=count,
+        page=normalized_page,
+        page_size=normalized_page_size,
+        results=list(queryset[offset : offset + normalized_page_size]),
+    )

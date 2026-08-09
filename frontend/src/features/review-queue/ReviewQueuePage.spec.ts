@@ -110,6 +110,7 @@ const mountPage = async () => {
 
   return {
     container,
+    router,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -168,6 +169,25 @@ describe('ReviewQueuePage parse flags', () => {
     expect(decrementOpenParseFlagItemCount).toHaveBeenCalledOnce();
     expect(mounted.container.textContent).not.toContain('Give this card a clearer role.');
     expect(mounted.container.textContent).toContain('The parsed name is wrong.');
+    mounted.unmount();
+  });
+
+  test('uses the shared sidenav state while switching review views', async () => {
+    const mounted = await mountPage();
+    const lowConfidenceButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('Low Confidence'),
+    );
+
+    lowConfidenceButton?.click();
+    await flushPromises();
+
+    await vi.waitFor(() => {
+      expect(mounted.router.currentRoute.value.query.view).toBe('confidence');
+    });
+
+    expect(lowConfidenceButton?.getAttribute('aria-current')).toBe('page');
+    expect(lowConfidenceButton?.classList.contains('theme-selected-surface-strong')).toBe(true);
+    expect(mounted.container.textContent).not.toContain('Report Status');
     mounted.unmount();
   });
 });

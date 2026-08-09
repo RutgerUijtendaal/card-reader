@@ -21,10 +21,11 @@ Claiming is coordinated through the shared core layer. This prevents the API, pa
 
 The API and parser share the database and storage root. In the standard development and production layouts they run as separate processes, so both must be running for queued items to advance.
 
-The staff-only `/operations` page shows the parser worker heartbeat alongside queued, running, and
-recent import jobs. `/imports` remains the place to create imports and interrupt active work. Worker
-heartbeats distinguish an idle parser from a process that has stopped reporting; they are
-operational telemetry and do not replace durable import job state.
+The staff-only `/operations` page groups monitoring around each durable queue. Select Card imports
+to see its aggregate parser health, expand the pool to inspect individual worker instances, and page
+through recent import jobs in newest-update order. `/imports` remains the place to create imports
+and interrupt active work. Worker heartbeats distinguish an idle parser from a process that has
+stopped reporting; they are operational telemetry and do not replace durable import job state.
 
 ## Templates and catalogs
 
@@ -37,10 +38,11 @@ Templates and catalogs are read at processing time. Changing them affects future
 An import job is the user-facing batch, while import items are the individual units claimed by workers. Item state is durable, allowing the UI to show queued, processing, completed, failed, or cancelled work even if a process restarts.
 
 Cancellation stops work that has not yet completed. Active imports can be interrupted from
-`/imports`, while complete queue history remains visible under `/operations`. Failed or cancelled
-items can be retried through supported API and UI flows rather than by manually editing database
-state. Worker claims and state transitions are designed to avoid two workers completing the same
-queued item.
+`/imports`, while paged queue history remains visible under `/operations`. The latest history page
+refreshes automatically; older pages remain stable while they are being inspected. Failed or
+cancelled items can be retried through supported API and UI flows rather than by manually editing
+database state. Worker claims and state transitions are designed to avoid two workers completing
+the same queued item.
 
 ## Review and card history
 

@@ -299,6 +299,8 @@ describe('NotificationsPage', () => {
     await flushPromises();
     await nextTick();
 
+    expect(flagButton?.getAttribute('aria-current')).toBe('page');
+    expect(flagButton?.classList.contains('theme-selected-surface-strong')).toBe(true);
     expect(mounted.container.textContent).toContain('No flag review notifications');
     const lastParams = fetchNotifications.mock.calls.at(-1)?.[0] as URLSearchParams;
     expect(lastParams.get('event_type')).toBe('parse_flag_item.reviewed');

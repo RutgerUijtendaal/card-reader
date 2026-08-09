@@ -10,6 +10,17 @@ export type OperationsItemStatus =
   | 'failed'
   | 'cancelled';
 
+export type WorkerInstanceOverview = {
+  id: string;
+  display_name: string;
+  health: Exclude<WorkerHealth, 'never_seen'>;
+  activity: WorkerActivity;
+  started_at: string;
+  last_seen_at: string;
+  stopped_at: string | null;
+  current_work_id: string | null;
+};
+
 export type WorkerOverview = {
   key: string;
   display_name: string;
@@ -19,6 +30,7 @@ export type WorkerOverview = {
   active_instances: number;
   last_seen_at: string | null;
   current_work_ids: string[];
+  instances: WorkerInstanceOverview[];
 };
 export type OperationsItemMetadata = {
   label: string;
@@ -60,4 +72,13 @@ export type OperationsOverview = {
   stale_after_seconds: number;
   workers: WorkerOverview[];
   queues: OperationsQueue[];
+};
+
+export type OperationsQueuePage = {
+  count: number;
+  next_page: number | null;
+  previous_page: number | null;
+  page: number;
+  page_size: number;
+  results: OperationsQueueItem[];
 };

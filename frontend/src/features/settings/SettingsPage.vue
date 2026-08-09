@@ -14,45 +14,21 @@
     >
       <template #aside>
         <AppStickyAside>
-          <div class="mb-3 px-1">
-            <h3 class="theme-section-title text-sm font-semibold">
-              Preferences
-            </h3>
-            <p class="theme-section-muted mt-1 text-xs">
-              Personal preferences and developer tools.
-            </p>
-          </div>
-
-          <nav
-            class="flex flex-col gap-2"
-            aria-label="Settings sections"
+          <AppSideNav
+            title="Preferences"
+            description="Personal preferences and developer tools."
+            navigation-label="Settings sections"
           >
-            <RouterLink
+            <AppSideNavItem
               v-for="section in settingsSections"
               :key="section.id"
               :to="settingsSectionLocation(section.id)"
-              class="rounded-lg border px-3 py-3 text-left transition"
-              :class="activeSection === section.id
-                ? 'theme-selected-surface-strong'
-                : 'theme-card-frame theme-section-title hover:border-[var(--theme-border-strong)]'"
-            >
-              <div class="flex items-start gap-3">
-                <component
-                  :is="section.icon"
-                  class="mt-0.5 h-4 w-4 shrink-0"
-                />
-                <span class="min-w-0">
-                  <span class="block truncate text-sm font-semibold">{{ section.label }}</span>
-                  <span
-                    class="mt-1 block truncate text-xs"
-                    :class="activeSection === section.id ? 'theme-section-title' : 'theme-section-muted'"
-                  >
-                    {{ section.summary }}
-                  </span>
-                </span>
-              </div>
-            </RouterLink>
-          </nav>
+              :label="section.label"
+              :description="section.summary"
+              :icon="section.icon"
+              :active="activeSection === section.id"
+            />
+          </AppSideNav>
         </AppStickyAside>
       </template>
 
@@ -269,6 +245,8 @@ import { useRoute } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
+import AppSideNav from '@/shared/components/app/AppSideNav.vue';
+import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import { useAuthStore } from '@/domain/session/store';
 import DeveloperDataSettingsSection from './components/DeveloperDataSettingsSection.vue';
