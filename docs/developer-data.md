@@ -38,7 +38,9 @@ pnpm bootstrap:dev
 
 The command installs dependencies, migrates the empty local database, exchanges the code, downloads
 the pinned bundle, verifies its checksum and manifest, imports records and media, prompts for local
-admin credentials, and runs the readiness doctor.
+admin credentials, creates development-only notification examples for that admin, and runs the
+readiness doctor. The examples and their private demonstration deck are synthesized after import;
+they are not part of the published developer-data bundle.
 
 For an archive downloaded through the browser or provided offline:
 

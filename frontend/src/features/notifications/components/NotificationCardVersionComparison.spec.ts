@@ -137,18 +137,50 @@ describe('NotificationCardVersionComparison', () => {
     await nextTick();
 
     expect(apiGet).toHaveBeenCalledWith('/cards/card-1/generations');
-    expect(container.textContent).toContain('Version change');
+    expect(container.textContent).toContain('Visual comparison');
     expect(container.textContent).toContain('Before');
     expect(container.textContent).toContain('Printing 1');
     expect(container.textContent).toContain('After');
     expect(container.textContent).toContain('Printing 2');
-    expect(container.querySelector('[data-testid="version-change-arrow"]')).not.toBeNull();
+    expect(container.textContent).toContain('Drag across the card to reveal each printing');
 
-    const cards = container.querySelectorAll<HTMLButtonElement>('button');
-    expect(cards).toHaveLength(2);
-    expect(cards[0]?.parentElement?.style.width).toBe('23.195rem');
-    cards[0]?.click();
-    cards[1]?.click();
+    const beforeLink = container.querySelector<HTMLButtonElement>('[data-testid="comparison-before-link"]');
+    const afterLink = container.querySelector<HTMLButtonElement>('[data-testid="comparison-after-link"]');
+    const viewer = container.querySelector<HTMLElement>('[data-testid="version-comparison-viewer"]');
+    const slider = container.querySelector<HTMLInputElement>('[data-testid="version-comparison-slider"]');
+    expect(viewer?.parentElement?.style.width).toBe('23.195rem');
+    expect(viewer?.querySelectorAll('img')).toHaveLength(2);
+    expect(viewer?.textContent?.trim()).toBe('');
+    expect(slider?.value).toBe('50');
+    expect(slider?.getAttribute('aria-valuetext')).toBe('50% before, 50% after');
+
+    const showAfter = container.querySelector<HTMLButtonElement>('[aria-label="Show only the after version"]');
+    const showSplit = container.querySelector<HTMLButtonElement>('[aria-label="Show a split comparison"]');
+    const showBefore = container.querySelector<HTMLButtonElement>('[aria-label="Show only the before version"]');
+    showAfter?.click();
+    await nextTick();
+    expect(slider?.value).toBe('0');
+    expect(showAfter?.getAttribute('aria-pressed')).toBe('true');
+    showBefore?.click();
+    await nextTick();
+    expect(slider?.value).toBe('100');
+    expect(showBefore?.getAttribute('aria-pressed')).toBe('true');
+    showSplit?.click();
+    await nextTick();
+    expect(slider?.value).toBe('50');
+    expect(showSplit?.getAttribute('aria-pressed')).toBe('true');
+
+    if (slider) {
+      slider.value = '72';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      await nextTick();
+    }
+
+    expect(viewer?.style.getPropertyValue('--comparison-position')).toBe('72%');
+    expect(slider?.getAttribute('aria-valuetext')).toBe('72% before, 28% after');
+
+    beforeLink?.click();
+    afterLink?.click();
     expect(openedVersions).toEqual(['version-1', 'version-2']);
 
     app.unmount();
