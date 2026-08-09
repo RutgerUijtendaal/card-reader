@@ -17,6 +17,7 @@ from card_reader_core.models import (
     CardVersionTag,
     CardVersionType,
     Deck,
+    DeckCreation,
     DeckTag,
     DeckTagAssignment,
     DeckTagSuggestion,
@@ -1623,6 +1624,7 @@ def test_deck_create_is_idempotent_per_owner_and_creation_key() -> None:
     assert "client_creation_id" not in first_response.json()
     assert "client_creation_id" not in replay_response.json()
     assert Deck.objects.filter(owner=owner, client_creation_id=creation_key).count() == 1
+    assert DeckCreation.objects.filter(owner=owner, client_creation_id=creation_key).count() == 1
 
 
 def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
@@ -1674,6 +1676,54 @@ def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
     assert first_lookup.status_code == 200
     assert first_lookup.json()["id"] == first_create.json()["id"]
     assert anonymous_lookup.status_code == 403
+
+
+def test_deleted_deck_keeps_creation_key_as_a_tombstone() -> None:
+    username = "deck-idempotency-deleted-user"
+    password = "password"
+    owner = _create_user(username, password)
+    hero = _create_card(name="Deleted Idempotency Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    creation_key = "503055a8-26e0-440d-a094-f90b4b9bb788"
+    payload = {
+        "name": "Deleted Idempotency Deck",
+        "description": None,
+        "visibility": "private",
+        "hero_card_id": hero.id,
+        "entries": _valid_entries(mainboard_cards),
+        "sideboards": [],
+    }
+
+    create_response = client.post(
+        "/my/decks",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+    deck_id = create_response.json()["id"]
+    delete_response = client.delete(
+        f"/my/decks/{deck_id}",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    lookup_response = client.get(f"/my/decks/by-creation-key/{creation_key}")
+    retry_response = client.post(
+        "/my/decks",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+
+    assert create_response.status_code == 201
+    assert delete_response.status_code == 204
+    assert lookup_response.status_code == 410
+    assert retry_response.status_code == 410
+    assert Deck.objects.filter(owner=owner, client_creation_id=creation_key).count() == 0
+    creation = DeckCreation.objects.get(owner=owner, client_creation_id=creation_key)
+    assert creation.deck_id is None
 
 
 def test_deck_create_rejects_malformed_idempotency_key() -> None:

@@ -479,6 +479,7 @@
     <DeckDraftConflictModal
       :open="controller.localDraftConflict.value !== null"
       :kind="controller.localDraftConflict.value?.kind"
+      :busy="controller.conflictActionsLocked.value"
       @use-stored="handleUseStoredConflict"
       @keep-local="handleKeepLocalConflict"
     />

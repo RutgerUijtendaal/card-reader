@@ -20,6 +20,7 @@ from card_reader_api.decks.serializers import (
 )
 from card_reader_core.services.decks import (
     DeckEntryInput,
+    DeckCreationDeletedError,
     DeckService,
     DeckSideboardInput,
     DeckUpdateInput,
@@ -145,9 +146,17 @@ class OwnerDeckListCreateView(APIView):
         owner_id = _user_id(request)
         service = DeckService()
         if client_creation_id is not None:
-            existing = service.get_owner_deck_by_creation_id(owner_id, client_creation_id)
+            existing, key_used = service.get_owner_deck_creation_result(
+                owner_id,
+                client_creation_id,
+            )
             if existing is not None:
                 return Response(deck_payload(existing, include_pending_suggestions=True))
+            if key_used:
+                return Response(
+                    {"detail": "The deck created by this key has been deleted."},
+                    status=status.HTTP_410_GONE,
+                )
 
         serializer = DeckWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -182,6 +191,11 @@ class OwnerDeckListCreateView(APIView):
                     client_creation_id=client_creation_id,
                     **create_arguments,
                 )
+        except DeckCreationDeletedError:
+            return Response(
+                {"detail": "The deck created by this key has been deleted."},
+                status=status.HTTP_410_GONE,
+            )
         except ValueError as exc:
             return bad_request(str(exc))
         payload = deck_payload(deck, include_pending_suggestions=True)
@@ -196,8 +210,16 @@ class OwnerDeckCreationLookupView(APIView):
     permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request, client_creation_id: UUID) -> Response:
-        deck = DeckService().get_owner_deck_by_creation_id(_user_id(request), client_creation_id)
+        deck, key_used = DeckService().get_owner_deck_creation_result(
+            _user_id(request),
+            client_creation_id,
+        )
         if deck is None:
+            if key_used:
+                return Response(
+                    {"detail": "The deck created by this key has been deleted."},
+                    status=status.HTTP_410_GONE,
+                )
             return not_found("Deck not found")
         return Response(deck_payload(deck, include_pending_suggestions=True))
 

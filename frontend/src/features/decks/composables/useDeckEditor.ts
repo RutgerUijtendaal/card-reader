@@ -390,7 +390,7 @@ export const useDeckEditor = () => {
         const resolution = await publication.recoverPendingAttempt(
           storedDraft.pendingCreateAttempt,
         );
-        if (resolution === 'created') return;
+        if (resolution === 'created' || resolution === 'deleted') return;
         if (resolution === 'unknown') {
           await resumeLocalDraft(false);
           toast.info('The previous Create request is still unconfirmed. Retry it before discarding.');
@@ -518,6 +518,16 @@ export const useDeckEditor = () => {
     toast.success('Deck created.');
   };
 
+  const finishDeletedDeckCreation = async (): Promise<void> => {
+    bypassNextUnsavedPrompt = true;
+    try {
+      await router.replace('/my/decks');
+    } finally {
+      bypassNextUnsavedPrompt = false;
+    }
+    toast.info('This deck was already created and has since been deleted.');
+  };
+
   const publication = useDeckEditorPublication({
     persistenceState: localDraft.persistenceState,
     draftId: localDraft.draftId,
@@ -526,7 +536,9 @@ export const useDeckEditor = () => {
     validate: validateLocalDraftForCreation,
     persistAttempt: localDraft.persist,
     retireAfterCreation: localDraft.retireAfterCreation,
+    discardAfterDeletedCreation: localDraft.discardAfterDeletedCreation,
     onSuccess: async (record, attempt) => await finishCreatedDeck(record, attempt.signature),
+    onDeleted: finishDeletedDeckCreation,
   });
 
   const isMutationLocked = computed(() => !isPublished.value && isDeckMutationLocked(
@@ -534,6 +546,9 @@ export const useDeckEditor = () => {
     publication.creationState.value,
   ));
   const isCreating = publication.isCreating;
+  const conflictActionsLocked = computed(
+    () => publication.creationState.value.status !== 'idle',
+  );
 
   const saveDeck = async (options: { silent?: boolean } = {}): Promise<void> => {
     if (!isPublished.value) {
@@ -616,6 +631,7 @@ export const useDeckEditor = () => {
   };
 
   const loadStoredConflictDraft = async (): Promise<void> => {
+    if (conflictActionsLocked.value) return;
     const storedDraft = localDraft.loadConflictDraft();
     if (!storedDraft) return;
     deck.hydrateFromLocalDraft(storedDraft.form);
@@ -641,11 +657,13 @@ export const useDeckEditor = () => {
   };
 
   const keepThisConflictDraft = async (): Promise<void> => {
+    if (conflictActionsLocked.value) return;
     await localDraft.overwriteConflict(false);
   };
 
   const discardThisConflictedTab = (): void => {
-    localDraft.discardThisTab();
+    if (conflictActionsLocked.value) return;
+    if (!localDraft.discardThisTab()) return;
     deck.resetLocalDraft();
     cardLookup.value = {};
     filters.resetFilters();
@@ -657,6 +675,7 @@ export const useDeckEditor = () => {
   };
 
   const openCreatedConflictDeck = async (): Promise<void> => {
+    if (conflictActionsLocked.value) return;
     const currentConflict = localDraft.conflict.value;
     if (currentConflict?.kind !== 'created-elsewhere') return;
     bypassNextUnsavedPrompt = true;
@@ -672,6 +691,7 @@ export const useDeckEditor = () => {
   };
 
   const keepConflictAsNewDraft = async (): Promise<void> => {
+    if (conflictActionsLocked.value) return;
     await localDraft.overwriteConflict(true);
   };
 
@@ -806,6 +826,7 @@ export const useDeckEditor = () => {
     localDraftRecoveryModalOpen,
     recoveryActionPending,
     localDraftConflict: localDraft.conflict,
+    conflictActionsLocked,
     pendingLocalDraft,
     focusDeckNameRequest,
     deckBuildingRules,

@@ -35,6 +35,7 @@ const { controller } = vi.hoisted(() => {
       localDraftConflict: refValue<null | {
         kind: 'active-draft' | 'remote-deletion' | 'created-elsewhere';
       }>(null),
+      conflictActionsLocked: refValue(false),
       deckBuildingRules: refValue({
         mainboard_card_count: { min: 40, max: 60 },
         mana_type_count: { min: 10 },
@@ -213,13 +214,14 @@ vi.mock('@/features/decks/components/DeckDraftConflictModal.vue', () => ({
     props: {
       open: { type: Boolean, required: true },
       kind: { type: String, default: undefined },
+      busy: { type: Boolean, default: false },
     },
     setup(props, { emit }) {
       return () => props.open
         ? h('section', { 'data-testid': 'draft-conflict-modal' }, [
             h('span', props.kind),
-            h('button', { onClick: () => emit('useStored') }, 'Use stored'),
-            h('button', { onClick: () => emit('keepLocal') }, 'Keep local'),
+            h('button', { disabled: props.busy, onClick: () => emit('useStored') }, 'Use stored'),
+            h('button', { disabled: props.busy, onClick: () => emit('keepLocal') }, 'Keep local'),
           ])
         : null;
     },

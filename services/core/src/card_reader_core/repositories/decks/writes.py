@@ -7,6 +7,7 @@ from django.db import transaction
 from card_reader_core.models import (
     Card,
     Deck,
+    DeckCreation,
     DeckDifficulty,
     DeckEntry,
     DeckSideboard,
@@ -36,6 +37,19 @@ def create_deck(
         visibility=visibility,
         hero_card=hero_card,
         client_creation_id=client_creation_id,
+    )
+
+
+def create_deck_creation(
+    *,
+    owner_id: str,
+    client_creation_id: UUID,
+    deck: Deck,
+) -> DeckCreation:
+    return DeckCreation.objects.create(
+        owner_id=owner_id,
+        client_creation_id=client_creation_id,
+        deck=deck,
     )
 
 

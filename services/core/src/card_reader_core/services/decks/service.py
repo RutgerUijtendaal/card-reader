@@ -8,11 +8,13 @@ from card_reader_core.models import Deck, DeckDifficulty, DeckVisibility
 from card_reader_core.services.deck_tags import DeckTagService
 from card_reader_core.repositories.decks import (
     create_deck,
+    create_deck_creation,
     delete_deck,
     get_deck,
     get_deck_for_viewer,
     get_owner_deck,
     get_owner_deck_by_creation_id,
+    get_owner_deck_creation,
     get_public_deck,
     list_card_decks_for_viewer,
     list_owner_deck_summaries,
@@ -26,6 +28,10 @@ from card_reader_core.repositories.decks import (
 from .normalization import DeckPayloadNormalizer
 from .types import DeckEntryInput, DeckSideboardInput, DeckTotals, DeckUpdateInput, DeckValidationSummary
 from .validation import DeckValidationService
+
+
+class DeckCreationDeletedError(Exception):
+    """Raised when an idempotency key belongs to a deck that was deleted."""
 
 
 class DeckService:
@@ -175,7 +181,21 @@ class DeckService:
         return get_owner_deck(deck_id, owner_id)
 
     def get_owner_deck_by_creation_id(self, owner_id: str, client_creation_id: UUID) -> Deck | None:
-        return get_owner_deck_by_creation_id(owner_id, client_creation_id)
+        deck, _ = self.get_owner_deck_creation_result(owner_id, client_creation_id)
+        return deck
+
+    def get_owner_deck_creation_result(
+        self,
+        owner_id: str,
+        client_creation_id: UUID,
+    ) -> tuple[Deck | None, bool]:
+        creation = get_owner_deck_creation(owner_id, client_creation_id)
+        if creation is None:
+            legacy_deck = get_owner_deck_by_creation_id(owner_id, client_creation_id)
+            return legacy_deck, legacy_deck is not None
+        if creation.deck_id is None:
+            return None, True
+        return self.get_owner_deck(str(creation.deck_id), owner_id), True
 
     def get_deck(self, deck_id: str) -> Deck | None:
         return get_deck(deck_id)
@@ -236,7 +256,9 @@ class DeckService:
         tag_ids: list[str] | None = None,
         suggested_type_labels: list[str] | None = None,
     ) -> tuple[Deck, bool]:
-        existing = self.get_owner_deck_by_creation_id(owner_id, client_creation_id)
+        existing, key_used = self.get_owner_deck_creation_result(owner_id, client_creation_id)
+        if key_used and existing is None:
+            raise DeckCreationDeletedError
         if existing is not None:
             return existing, False
         try:
@@ -255,8 +277,15 @@ class DeckService:
                     tag_ids=tag_ids,
                     suggested_type_labels=suggested_type_labels,
                 )
+                create_deck_creation(
+                    owner_id=owner_id,
+                    client_creation_id=client_creation_id,
+                    deck=deck,
+                )
         except IntegrityError:
-            existing = self.get_owner_deck_by_creation_id(owner_id, client_creation_id)
+            existing, key_used = self.get_owner_deck_creation_result(owner_id, client_creation_id)
+            if key_used and existing is None:
+                raise DeckCreationDeletedError from None
             if existing is None:
                 raise
             return existing, False

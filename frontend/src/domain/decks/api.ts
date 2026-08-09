@@ -85,12 +85,17 @@ export const createDeck = async (
 
 export const fetchMyDeckByCreationKey = async (
   creationKey: string,
-): Promise<DeckRecord | null> => {
+): Promise<
+  | { status: 'found'; record: DeckRecord }
+  | { status: 'deleted' }
+  | { status: 'missing' }
+> => {
   try {
     const response = await api.get<DeckRecord>(`/my/decks/by-creation-key/${creationKey}`);
-    return response.data;
+    return { status: 'found', record: response.data };
   } catch (error) {
-    if (isAxiosError(error) && error.response?.status === 404) return null;
+    if (isAxiosError(error) && error.response?.status === 404) return { status: 'missing' };
+    if (isAxiosError(error) && error.response?.status === 410) return { status: 'deleted' };
     throw error;
   }
 };

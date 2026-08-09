@@ -76,6 +76,37 @@ class Deck(TimestampedModel):
         ]
 
 
+class DeckCreation(TimestampedModel):
+    if TYPE_CHECKING:
+        deck_id: str | None
+
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    owner: models.ForeignKey[AbstractBaseUser, AbstractBaseUser] = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="deck_creations",
+        db_column="owner_id",
+    )
+    client_creation_id: models.UUIDField[UUID, UUID] = models.UUIDField()
+    deck: models.OneToOneField[Deck | None, Deck | None] = models.OneToOneField(
+        "Deck",
+        on_delete=models.SET_NULL,
+        related_name="creation_record",
+        db_column="deck_id",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "deck_creation"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("owner", "client_creation_id"),
+                name="ux_deck_creation_owner_key",
+            )
+        ]
+
+
 DeckVisibility = Literal["private", "unlisted", "public"]
 DeckDifficulty = Literal["easy", "medium", "hard"]
 

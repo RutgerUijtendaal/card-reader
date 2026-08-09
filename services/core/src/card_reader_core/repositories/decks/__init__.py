@@ -10,6 +10,7 @@ from .queries import (
     get_deck,
     get_deck_for_viewer,
     get_owner_deck,
+    get_owner_deck_creation,
     get_owner_deck_by_creation_id,
     get_public_deck,
     list_card_decks_for_viewer,
@@ -18,11 +19,19 @@ from .queries import (
     list_public_deck_summaries,
     list_public_decks,
 )
-from .writes import create_deck, delete_deck, replace_mainboard_entries, replace_sideboards, update_deck
+from .writes import (
+    create_deck,
+    create_deck_creation,
+    delete_deck,
+    replace_mainboard_entries,
+    replace_sideboards,
+    update_deck,
+)
 
 __all__ = [
     "PUBLIC_DECK_VISIBILITIES",
     "create_deck",
+    "create_deck_creation",
     "delete_deck",
     "DeckExportEntrySnapshot",
     "DeckExportSnapshot",
@@ -33,6 +42,7 @@ __all__ = [
     "get_deck_export_snapshot",
     "get_deck_for_viewer",
     "get_owner_deck",
+    "get_owner_deck_creation",
     "get_owner_deck_by_creation_id",
     "get_public_deck",
     "list_card_decks_for_viewer",

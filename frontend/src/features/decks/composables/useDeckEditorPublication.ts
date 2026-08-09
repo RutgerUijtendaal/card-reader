@@ -30,11 +30,13 @@ type UseDeckEditorPublicationOptions = {
   persistAttempt: (
     attempt: StoredCreateAttempt | null,
   ) => Promise<'saved' | 'memory-only' | 'conflict' | 'paused'>;
-  retireAfterCreation: (createdDeckId: string) => void;
+  retireAfterCreation: (attemptDraftId: string, createdDeckId: string) => void;
+  discardAfterDeletedCreation: (attemptDraftId: string) => void;
   onSuccess: (record: DeckRecord, attempt: CreateAttempt) => Promise<void>;
+  onDeleted: (attempt: CreateAttempt) => Promise<void>;
 };
 
-export type PendingCreateResolution = 'created' | 'missing' | 'unknown';
+export type PendingCreateResolution = 'created' | 'deleted' | 'missing' | 'unknown';
 
 const AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS = [0, 250, 750, 2_000] as const;
 
@@ -95,9 +97,22 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
   const completeSuccess = async (record: DeckRecord, currentAttempt: CreateAttempt): Promise<void> => {
     if (publicationSucceeded) return;
     publicationSucceeded = true;
-    options.retireAfterCreation(record.id);
+    options.retireAfterCreation(currentAttempt.draftId, record.id);
     try {
       await options.onSuccess(record, currentAttempt);
+    } finally {
+      if (creationState.value.status === 'creating' || creationState.value.status === 'unknown') {
+        setCreationState({ status: 'idle' });
+      }
+    }
+  };
+
+  const completeDeleted = async (currentAttempt: CreateAttempt): Promise<void> => {
+    if (publicationSucceeded) return;
+    publicationSucceeded = true;
+    options.discardAfterDeletedCreation(currentAttempt.draftId);
+    try {
+      await options.onDeleted(currentAttempt);
     } finally {
       if (creationState.value.status === 'creating' || creationState.value.status === 'unknown') {
         setCreationState({ status: 'idle' });
@@ -108,13 +123,18 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
   const lookupAttempt = async (
     currentAttempt: CreateAttempt,
     delays: readonly number[],
-  ): Promise<{ status: 'found'; record: DeckRecord } | { status: 'missing' } | { status: 'unknown' }> => {
+  ): Promise<
+    | { status: 'found'; record: DeckRecord }
+    | { status: 'deleted' }
+    | { status: 'missing' }
+    | { status: 'unknown' }
+  > => {
     let lookupFailed = false;
     for (const delayMs of delays) {
       await wait(delayMs);
       try {
-        const record = await fetchMyDeckByCreationKey(currentAttempt.draftId);
-        if (record) return { status: 'found', record };
+        const result = await fetchMyDeckByCreationKey(currentAttempt.draftId);
+        if (result.status === 'found' || result.status === 'deleted') return result;
       } catch {
         lookupFailed = true;
       }
@@ -141,6 +161,10 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     );
     if (lookup.status === 'found') {
       await completeSuccess(lookup.record, currentAttempt);
+      return;
+    }
+    if (lookup.status === 'deleted') {
+      await completeDeleted(currentAttempt);
       return;
     }
     if (lookup.status === 'missing' && requestDefinitelyFinished) {
@@ -203,6 +227,10 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     if (lookup.status === 'found') {
       await completeSuccess(lookup.record, recoveredAttempt);
       return 'created';
+    }
+    if (lookup.status === 'deleted') {
+      await completeDeleted(recoveredAttempt);
+      return 'deleted';
     }
     if (lookup.status === 'missing') {
       attempt.value = null;

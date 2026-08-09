@@ -228,6 +228,7 @@ const mountController = async (path = '/my/decks/deck-1/edit') => {
           },
         }),
       },
+      { path: '/my/decks', component: { template: '<div />' } },
       {
         path: '/my/decks/:id/edit',
         component: defineComponent({
@@ -276,7 +277,7 @@ describe('useDeckEditor', () => {
     });
     fetchCardMock.mockRejectedValue(new Error('Card not found'));
     fetchDeckTagsMock.mockResolvedValue({ roles: [], types: [] });
-    fetchMyDeckByCreationKeyMock.mockResolvedValue(null);
+    fetchMyDeckByCreationKeyMock.mockResolvedValue({ status: 'missing' });
     localStorage.setItem('card-reader.deck-editor.autosync', 'true');
     fetchMyDeckMock.mockResolvedValue({
       id: 'deck-1',
@@ -613,8 +614,11 @@ describe('useDeckEditor', () => {
       startedAt: '2026-08-09T04:00:00Z',
     });
     fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({
-      id: 'deck-created-before-reload',
-      status: { is_valid: true },
+      status: 'found',
+      record: {
+        id: 'deck-created-before-reload',
+        status: { is_valid: true },
+      },
     });
     const mounted = await mountController('/my/decks/new');
 
@@ -660,6 +664,42 @@ describe('useDeckEditor', () => {
     expect(mounted.controller.deck.form.name).toBe('Unconfirmed Create');
     expect(mounted.controller.creationState.value.status).toBe('unknown');
     expect(loadLocalDraft('user-1')?.pendingCreateAttempt?.signature).toBe('unknown-signature');
+    mounted.unmount();
+  });
+
+  test('retires a pending local attempt when its created deck was deleted', async () => {
+    const form = {
+      ...createEmptyDeckForm(),
+      name: 'Deleted After Create',
+      hero_card_id: 'hero-deleted',
+    };
+    await saveLocalDraft('user-1', form, {}, {
+      payload: {
+        name: form.name,
+        description: null,
+        long_description: null,
+        difficulty: null,
+        visibility: 'private',
+        hero_card_id: form.hero_card_id,
+        entries: [],
+        sideboards: [],
+        tag_ids: [],
+        suggested_type_labels: [],
+      },
+      signature: 'deleted-signature',
+      startedAt: '2026-08-09T04:00:00Z',
+    });
+    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({ status: 'deleted' });
+    const mounted = await mountController('/my/decks/new');
+
+    await mounted.controller.discardPendingLocalDraft();
+    await flushAsyncEditorWork();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks');
+    expect(loadLocalDraft('user-1')).toBeNull();
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      'This deck was already created and has since been deleted.',
+    );
     mounted.unmount();
   });
 
@@ -774,6 +814,10 @@ describe('useDeckEditor', () => {
     await saveLocalDraft('user-1', otherTabForm, {});
     dispatchDraftStorageEvent('user-1');
 
+    expect(mounted.controller.conflictActionsLocked.value).toBe(true);
+    await mounted.controller.loadStoredConflictDraft();
+    expect(mounted.controller.deck.form.name).toBe('Creating Here');
+
     resolveCreate({
       record: { id: 'deck-new', status: { is_valid: true } },
       replayed: false,
@@ -793,8 +837,11 @@ describe('useDeckEditor', () => {
   test('treats a failed POST as success when creation-key lookup finds the deck', async () => {
     createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
     fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({
-      id: 'deck-found',
-      status: { is_valid: true },
+      status: 'found',
+      record: {
+        id: 'deck-found',
+        status: { is_valid: true },
+      },
     });
     const mounted = await mountController('/my/decks/new');
     mounted.controller.openHero();
@@ -841,7 +888,7 @@ describe('useDeckEditor', () => {
 
   test('keeps an ambiguous Create locked after every backoff lookup misses', async () => {
     createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
-    fetchMyDeckByCreationKeyMock.mockResolvedValue(null);
+    fetchMyDeckByCreationKeyMock.mockResolvedValue({ status: 'missing' });
     const mounted = await mountController('/my/decks/new');
     mounted.controller.openHero();
     mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
@@ -863,7 +910,7 @@ describe('useDeckEditor', () => {
       isAxiosError: true,
       response: { status: 400 },
     }));
-    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce(null);
+    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({ status: 'missing' });
     const mounted = await mountController('/my/decks/new');
     mounted.controller.openHero();
     mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));

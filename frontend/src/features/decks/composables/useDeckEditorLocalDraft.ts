@@ -220,13 +220,13 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     return 'saved';
   });
 
-  const retireAfterCreation = (createdDeckId: string): void => {
+  const retireAfterCreation = (attemptDraftId: string, createdDeckId: string): void => {
     void enqueueMutation(async () => {
       if (
         !options.enabled
         || persistenceState.value.status === 'conflict'
         || observedSlot.value.kind !== 'draft'
-        || observedSlot.value.draft.draftId !== draftId.value
+        || observedSlot.value.draft.draftId !== attemptDraftId
       ) {
         if (persistenceState.value.status === 'conflict') {
           toast.info('A different local deck draft remains available in this browser.');
@@ -235,12 +235,32 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
       }
       const result = await storage.retire(
         options.ownerId,
-        draftId.value,
+        attemptDraftId,
         createdDeckId,
         deckEditorDraftSlotToken(observedSlot.value),
       );
       if (result.status === 'unavailable') {
         warnStorageUnavailable('The deck was created, but its browser draft could not be retired.');
+      } else if (result.status === 'conflict') {
+        toast.info('A different local deck draft remains available in this browser.');
+      }
+    });
+  };
+
+  const discardAfterDeletedCreation = (attemptDraftId: string): void => {
+    void enqueueMutation(async () => {
+      if (
+        !options.enabled
+        || persistenceState.value.status === 'conflict'
+        || observedSlot.value.kind !== 'draft'
+        || observedSlot.value.draft.draftId !== attemptDraftId
+      ) return;
+      const result = await storage.discard(
+        options.ownerId,
+        deckEditorDraftSlotToken(observedSlot.value),
+      );
+      if (result.status === 'unavailable') {
+        warnStorageUnavailable('The deleted deck was confirmed, but its browser draft could not be removed.');
       } else if (result.status === 'conflict') {
         toast.info('A different local deck draft remains available in this browser.');
       }
@@ -267,7 +287,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   };
 
   const loadConflictDraft = (): StoredDeckEditorDraft | null => {
-    if (conflict.value?.kind !== 'active-draft') return null;
+    if (conflict.value?.kind !== 'active-draft' || storedDraft.value?.pendingCreateAttempt) return null;
     const draft = conflict.value.slot.draft;
     conflict.value = null;
     beginRecoveredDraft(draft);
@@ -276,12 +296,14 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
 
   const overwriteConflict = async (asNewDraft: boolean): Promise<boolean> => {
     if (!conflict.value) return false;
+    if (asNewDraft && storedDraft.value?.pendingCreateAttempt) return false;
     if (asNewDraft) draftId.value = createDeckEditorDraftId();
     const nextDraft = buildStoredDeckEditorDraft(
       options.ownerId,
       draftId.value,
       options.form,
       options.cardLookup.value,
+      asNewDraft ? null : storedDraft.value?.pendingCreateAttempt ?? null,
     );
     const result = await enqueueMutation(async () => await storage.save(
       nextDraft,
@@ -306,11 +328,13 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     return true;
   };
 
-  const discardThisTab = (): void => {
+  const discardThisTab = (): boolean => {
+    if (storedDraft.value?.pendingCreateAttempt) return false;
     conflict.value = null;
     storedDraft.value = null;
     draftId.value = createDeckEditorDraftId();
     setPersistenceState({ status: 'synced' });
+    return true;
   };
 
   if (options.enabled && typeof window !== 'undefined') {
@@ -346,6 +370,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     discardRecovery,
     persist,
     retireAfterCreation,
+    discardAfterDeletedCreation,
     discardActiveDraft,
     loadConflictDraft,
     overwriteConflict,

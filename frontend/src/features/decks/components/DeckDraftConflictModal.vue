@@ -12,12 +12,13 @@
       {{ copy.title }}
     </h3>
     <p class="theme-section-muted mt-2 text-sm">
-      {{ copy.message }}
+      {{ busy ? 'Finish confirming the current Create request before resolving this conflict.' : copy.message }}
     </p>
     <div class="mt-5 flex flex-wrap justify-end gap-2">
       <button
         class="btn-secondary"
         type="button"
+        :disabled="busy"
         @click="emit('useStored')"
       >
         {{ copy.storedLabel }}
@@ -25,6 +26,7 @@
       <button
         class="btn-primary"
         type="button"
+        :disabled="busy"
         @click="emit('keepLocal')"
       >
         {{ copy.localLabel }}
@@ -41,6 +43,7 @@ import type { DeckEditorDraftConflict } from '@/features/decks/composables/useDe
 const props = defineProps<{
   open: boolean;
   kind?: DeckEditorDraftConflict['kind'];
+  busy?: boolean;
 }>();
 
 const emit = defineEmits<{

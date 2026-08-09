@@ -15,7 +15,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing API changes and 
 - Preserve the current session-auth and CSRF model unless the task explicitly requires a contract change.
 - Keep API compatibility stable unless the requested work requires a deliberate change.
 - Keep deck-building constraint defaults, validation, and metadata in core deck services; expose them through API views without duplicating rule definitions in serializers or frontend code.
-- For idempotent creates, scope keys to the authenticated owner, return an existing result before revalidating a replayed body, and enforce race-safe uniqueness in the database as well as the service lookup path.
+- For idempotent creates, scope keys to the authenticated owner, return an existing result before revalidating a replayed body, and enforce race-safe uniqueness in the database as well as the service lookup path. Keep a durable used-key outcome when the created resource can be deleted, so an old retry cannot recreate an intentionally deleted resource.
 
 ## Implementation Workflow
 

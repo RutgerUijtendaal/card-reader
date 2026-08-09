@@ -88,7 +88,23 @@ describe('deck API', () => {
     const record = { id: 'deck-1', status: { is_valid: true } };
     vi.mocked(api.get).mockResolvedValueOnce({ data: record });
 
-    await expect(fetchMyDeckByCreationKey('creation-key')).resolves.toEqual(record);
+    await expect(fetchMyDeckByCreationKey('creation-key')).resolves.toEqual({
+      status: 'found',
+      record,
+    });
     expect(api.get).toHaveBeenCalledWith('/my/decks/by-creation-key/creation-key');
+  });
+
+  test('distinguishes a deleted creation result from an unused key', async () => {
+    vi.mocked(api.get)
+      .mockRejectedValueOnce({ isAxiosError: true, response: { status: 410 } })
+      .mockRejectedValueOnce({ isAxiosError: true, response: { status: 404 } });
+
+    await expect(fetchMyDeckByCreationKey('deleted-key')).resolves.toEqual({
+      status: 'deleted',
+    });
+    await expect(fetchMyDeckByCreationKey('missing-key')).resolves.toEqual({
+      status: 'missing',
+    });
   });
 });
