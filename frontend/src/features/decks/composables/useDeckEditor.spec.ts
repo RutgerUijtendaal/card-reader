@@ -3,6 +3,7 @@ import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createPinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { CardListItem } from '@/domain/cards/types';
 import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 import { createEmptyDeckForm } from '@/features/decks/composables/deckEditorDraftModel';
 import { createDeckEditorLocalDraftStorage } from '@/features/decks/utils/deckEditorLocalDraftStorage';
@@ -16,6 +17,7 @@ const {
   toastInfoMock,
   resetFiltersMock,
   applyHeroAffinityManaPresetMock,
+  loadFiltersMock,
   searchCardsMock,
   fetchCardsMock,
 } = vi.hoisted(() => ({
@@ -32,6 +34,7 @@ const {
   toastInfoMock: vi.fn(),
   resetFiltersMock: vi.fn(),
   applyHeroAffinityManaPresetMock: vi.fn(),
+  loadFiltersMock: vi.fn(async (): Promise<void> => undefined),
   searchCardsMock: vi.fn(async () => undefined),
   fetchCardsMock: vi.fn(async () => ({
     count: 0,
@@ -39,7 +42,7 @@ const {
     previous_page: null,
     page: 1,
     page_size: 100,
-    results: [],
+    results: [] as CardListItem[],
   })),
 }));
 
@@ -71,7 +74,7 @@ vi.mock('@/features/decks/composables/useDeckEditorFilters', () => ({
     sort: { value: null },
     effectiveSort: { value: null },
     cardScale: { value: 'normal' },
-    loadFilters: vi.fn(async () => undefined),
+    loadFilters: loadFiltersMock,
     resetFilters: resetFiltersMock,
     applyHeroAffinityManaPreset: applyHeroAffinityManaPresetMock,
   }),
@@ -351,8 +354,7 @@ describe('useDeckEditor', () => {
     expect(mounted.controller.localDraftRecoveryModalOpen.value).toBe(true);
     expect(mounted.controller.deck.form.name).toBe('');
 
-    mounted.controller.resumeLocalDraft();
-    await nextTick();
+    await mounted.controller.resumeLocalDraft();
 
     expect(mounted.controller.localDraftRecoveryModalOpen.value).toBe(false);
     expect(mounted.controller.deck.form.name).toBe('Recovered Deck');
@@ -362,6 +364,43 @@ describe('useDeckEditor', () => {
     ]);
     expect(mounted.controller.deck.selectedHero.value?.name).toBe('Recovered Hero');
     expect(fetchCardsMock).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
+
+  test('waits for refreshed recovery inputs before applying the hero card preset', async () => {
+    let resolveFilters!: () => void;
+    loadFiltersMock.mockReturnValueOnce(new Promise<void>((resolve) => {
+      resolveFilters = resolve;
+    }));
+    const form = createEmptyDeckForm();
+    form.name = 'Recovered Deck';
+    form.hero_card_id = 'hero-recovered';
+    createDeckEditorLocalDraftStorage().save('user-1', form, {
+      'hero-recovered': buildHero('hero-recovered', 'Stored Hero'),
+    });
+    fetchCardsMock.mockResolvedValueOnce({
+      count: 1,
+      next_page: null,
+      previous_page: null,
+      page: 1,
+      page_size: 100,
+      results: [buildHero('hero-recovered', 'Refreshed Hero')],
+    });
+    const mounted = await mountController('/my/decks/new');
+
+    const resumePromise = mounted.controller.resumeLocalDraft();
+    await nextTick();
+
+    expect(applyHeroAffinityManaPresetMock).not.toHaveBeenCalled();
+
+    resolveFilters();
+    await resumePromise;
+
+    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledTimes(1);
+    expect(applyHeroAffinityManaPresetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Refreshed Hero' }),
+    );
 
     mounted.unmount();
   });
@@ -420,6 +459,53 @@ describe('useDeckEditor', () => {
       'Resume After Leaving',
     );
 
+    mounted.unmount();
+  });
+
+  test('marks the current local draft as unsafe when browser persistence fails', async () => {
+    const mounted = await mountController('/my/decks/new');
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage unavailable', 'QuotaExceededError');
+    });
+
+    mounted.controller.deck.setDeckName('Only in memory');
+    await nextTick();
+
+    expect(mounted.controller.localDraftPersistenceFailed.value).toBe(true);
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'This deck could not be saved to local browser storage.',
+    );
+
+    setItemSpy.mockRestore();
+    mounted.unmount();
+  });
+
+  test('blocks route changes while the initial create request is pending', async () => {
+    let resolveCreate!: (value: { id: string; status: { is_valid: boolean } }) => void;
+    createDeckMock.mockReturnValueOnce(new Promise((resolve) => {
+      resolveCreate = resolve;
+    }));
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Creating Deck');
+
+    const createPromise = mounted.controller.saveDeck();
+    await nextTick();
+
+    expect(mounted.controller.isCreating.value).toBe(true);
+    const navigationPromise = mounted.router.push('/cards');
+    await nextTick();
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    expect(mounted.controller.discardChangesModalOpen.value).toBe(false);
+
+    resolveCreate({ id: 'deck-new', status: { is_valid: true } });
+    await navigationPromise;
+    await createPromise;
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
     mounted.unmount();
   });
 

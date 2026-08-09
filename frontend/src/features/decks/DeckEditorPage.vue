@@ -1,10 +1,14 @@
 <template>
-  <section class="flex flex-col gap-6">
+  <section
+    class="flex flex-col gap-6"
+    :inert="controller.isCreating.value"
+    :aria-busy="controller.isCreating.value"
+  >
     <AppPageHeader
       :icon="Hammer"
       :title="controller.deckId.value ? 'Edit Deck' : 'Build Deck'"
       :subtitle="deckEditorSubtitle"
-      :back-to="controller.backLink.value"
+      :back-to="controller.isCreating.value ? null : controller.backLink.value"
       :back-label="controller.backLabel.value"
       title-tag="h2"
       title-class="text-xl"
@@ -24,6 +28,7 @@
             :icon="Trash2"
             label="Discard local draft"
             short-label="Discard"
+            :disabled="controller.isCreating.value"
             @click="controller.requestDiscardLocalDraft()"
           />
           <AppHeaderAction
@@ -50,6 +55,7 @@
             short-label="Hero"
             variant="tab"
             :active="controller.editorMode.value === 'hero'"
+            :disabled="controller.isCreating.value"
             @click="controller.openHero()"
           />
           <AppHeaderAction
@@ -58,6 +64,7 @@
             short-label="Details"
             variant="tab"
             :active="controller.editorMode.value === 'details'"
+            :disabled="controller.isCreating.value"
             @click="controller.openDetails()"
           />
           <AppHeaderAction
@@ -66,6 +73,7 @@
             short-label="Cards"
             variant="tab"
             :active="controller.editorMode.value === 'cards'"
+            :disabled="controller.isCreating.value"
             @click="controller.openCards()"
           />
         </nav>
@@ -440,12 +448,8 @@
     <ConfirmModal
       :open="controller.discardChangesModalOpen.value"
       :title="controller.isPublished.value ? 'Discard deck changes?' : 'Leave local deck draft?'"
-      :message="
-        controller.isPublished.value
-          ? 'You have unsaved deck changes. Leaving this page will discard them.'
-          : 'Your unpublished deck will remain saved in this browser so you can resume it later.'
-      "
-      :confirm-label="controller.isPublished.value ? 'Discard Changes' : 'Leave Draft'"
+      :message="deckLeaveConfirmationMessage"
+      :confirm-label="deckLeaveConfirmationLabel"
       cancel-label="Stay Here"
       @confirm="controller.confirmDiscardChanges"
       @cancel="controller.cancelDiscardChanges"
@@ -537,6 +541,21 @@ const deckSaveActionLabel = computed(() => {
 const deckSaveActionShortLabel = computed(() =>
   controller.isPublished.value ? 'Save' : 'Create',
 );
+const deckLeaveConfirmationMessage = computed(() => {
+  if (controller.isPublished.value) {
+    return 'You have unsaved deck changes. Leaving this page will discard them.';
+  }
+  if (controller.localDraftPersistenceFailed.value) {
+    return 'This draft could not be saved in this browser. Leaving now will discard your current progress.';
+  }
+  return 'Your unpublished deck will remain saved in this browser so you can resume it later.';
+});
+const deckLeaveConfirmationLabel = computed(() => {
+  if (controller.isPublished.value) {
+    return 'Discard Changes';
+  }
+  return controller.localDraftPersistenceFailed.value ? 'Discard & Leave' : 'Leave Draft';
+});
 const deckChangeStatusIcon = computed(() => {
   if (controller.saving.value) {
     return LoaderCircle;

@@ -16,9 +16,11 @@ const { controller } = vi.hoisted(() => {
       isChangingHero: refValue(false),
       saving: refValue(false),
       manualSaving: refValue(false),
+      isCreating: refValue(false),
       loading: refValue(false),
       hasUnsavedChanges: refValue(true),
       hasLocalDraft: refValue(false),
+      localDraftPersistenceFailed: refValue(false),
       canAutosync: refValue(true),
       changeStatusLabel: refValue('Unsaved'),
       autosyncEnabled: refValue(false),
@@ -219,9 +221,11 @@ describe('DeckEditorPage', () => {
     controller.loading.value = false;
     controller.saving.value = false;
     controller.manualSaving.value = false;
+    controller.isCreating.value = false;
     controller.changeStatusLabel.value = 'Unsaved';
     controller.hasUnsavedChanges.value = true;
     controller.hasLocalDraft.value = false;
+    controller.localDraftPersistenceFailed.value = false;
     controller.canAutosync.value = true;
     controller.autosyncEnabled.value = false;
     controller.discardChangesModalOpen.value = false;
@@ -407,6 +411,50 @@ describe('DeckEditorPage', () => {
 
     expect(controller.cancelDiscardChanges).toHaveBeenCalledTimes(1);
     expect(controller.confirmDiscardChanges).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  test('warns when leaving would discard an unpersisted local draft', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.localDraftPersistenceFailed.value = true;
+    controller.discardChangesModalOpen.value = true;
+
+    const mounted = await mountPage();
+    const modal = mounted.container.querySelector<HTMLElement>('[data-testid="confirm-modal"]');
+
+    expect(modal?.textContent).toContain('could not be saved in this browser');
+    expect(modal?.textContent).toContain('Discard & Leave');
+
+    mounted.unmount();
+  });
+
+  test('disables deck editing controls during initial creation', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isCreating.value = true;
+    controller.saving.value = true;
+    controller.manualSaving.value = true;
+    controller.hasLocalDraft.value = true;
+
+    const mounted = await mountPage();
+    const page = mounted.container.querySelector('section');
+
+    expect(page?.hasAttribute('inert')).toBe(true);
+    expect(page?.getAttribute('aria-busy')).toBe('true');
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck hero"]')?.disabled,
+    ).toBe(true);
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck details"]')?.disabled,
+    ).toBe(true);
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck cards"]')?.disabled,
+    ).toBe(true);
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Discard local draft"]')?.disabled,
+    ).toBe(true);
+
     mounted.unmount();
   });
 
