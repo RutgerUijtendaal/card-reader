@@ -153,7 +153,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     currentAttempt: CreateAttempt,
     requestError: unknown,
   ): Promise<void> => {
-    setCreationState({ status: 'unknown' });
+    setCreationState({ status: 'unknown', reconciliation: 'checking' });
     const requestDefinitelyFinished = isAxiosError(requestError) && requestError.response !== undefined;
     const lookup = await lookupAttempt(
       currentAttempt,
@@ -171,6 +171,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
       await clearAttemptAfterDefinitiveFailure();
       return;
     }
+    setCreationState({ status: 'unknown', reconciliation: 'awaiting-retry' });
     toast.error('Creation could not be confirmed. Retry will safely use the same deck request.');
   };
 
@@ -222,7 +223,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
       pending.startedAt,
     );
     attempt.value = recoveredAttempt;
-    setCreationState({ status: 'unknown' });
+    setCreationState({ status: 'unknown', reconciliation: 'checking' });
     const lookup = await lookupAttempt(recoveredAttempt, AMBIGUOUS_CREATE_LOOKUP_DELAYS_MS);
     if (lookup.status === 'found') {
       await completeSuccess(lookup.record, recoveredAttempt);
@@ -238,6 +239,7 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
       await options.persistAttempt(null);
       return 'missing';
     }
+    setCreationState({ status: 'unknown', reconciliation: 'awaiting-retry' });
     toast.error('Creation could not be confirmed. Retry will safely use the same deck request.');
     return 'unknown';
   };
@@ -247,6 +249,10 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     attempt,
     isCreating: computed(() => creationState.value.status === 'creating'),
     isCreationUnknown: computed(() => creationState.value.status === 'unknown'),
+    isReconciling: computed(
+      () => creationState.value.status === 'unknown'
+        && creationState.value.reconciliation === 'checking',
+    ),
     create,
     retry,
     recoverPendingAttempt,

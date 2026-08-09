@@ -8,6 +8,11 @@ import {
   type DeckDraftPersistenceState,
 } from '@/features/decks/utils/deckEditorLifecycle';
 
+const creationState = (status: DeckCreationState['status']): DeckCreationState =>
+  status === 'unknown'
+    ? { status, reconciliation: 'awaiting-retry' }
+    : { status };
+
 describe('deckEditorLifecycle', () => {
   test.each([
     ['checking', 'recovery'],
@@ -50,13 +55,20 @@ describe('deckEditorLifecycle', () => {
     ['unknown', 'unknown'],
     ['unknown', 'idle'],
   ] as const)('allows creation transition %s -> %s', (from, to) => {
-    expect(transitionDeckCreation({ status: from }, { status: to })).toEqual({ status: to });
+    expect(transitionDeckCreation(creationState(from), creationState(to))).toEqual(creationState(to));
+  });
+
+  test('preserves the unknown reconciliation phase in same-state transitions', () => {
+    expect(transitionDeckCreation(
+      { status: 'unknown', reconciliation: 'checking' },
+      { status: 'unknown', reconciliation: 'awaiting-retry' },
+    )).toEqual({ status: 'unknown', reconciliation: 'awaiting-retry' });
   });
 
   test.each([
     ['creating', 'creating'],
   ] as const)('rejects creation transition %s -> %s', (from, to) => {
-    expect(() => transitionDeckCreation({ status: from }, { status: to })).toThrow();
+    expect(() => transitionDeckCreation(creationState(from), creationState(to))).toThrow();
   });
 
   test('derives creation and mutation permissions from both axes', () => {
@@ -75,6 +87,9 @@ describe('deckEditorLifecycle', () => {
       true, true, false, false, true,
     ]);
     expect(isDeckMutationLocked({ status: 'synced' }, { status: 'creating' })).toBe(true);
-    expect(isDeckMutationLocked({ status: 'memory-only' }, { status: 'unknown' })).toBe(true);
+    expect(isDeckMutationLocked(
+      { status: 'memory-only' },
+      { status: 'unknown', reconciliation: 'awaiting-retry' },
+    )).toBe(true);
   });
 });

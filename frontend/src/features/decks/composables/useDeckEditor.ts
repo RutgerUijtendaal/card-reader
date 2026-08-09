@@ -344,6 +344,24 @@ export const useDeckEditor = () => {
     deck.setDeckTagIds(deck.form.tag_ids.filter((tagId) => currentTagIds.has(tagId)));
   };
 
+  const refreshRecoveredDraftDependencies = async (): Promise<void> => {
+    const [filtersResult, tagsResult, cardsResult] = await Promise.allSettled([
+      loadEditorFilters(),
+      loadDeckTags(),
+      refreshLocalDraftCards(),
+    ]);
+    if (tagsResult.status === 'fulfilled' && tagsResult.value) {
+      reconcileRecoveredTagIds();
+    }
+    if (
+      filtersResult.status === 'rejected'
+      || tagsResult.status === 'rejected'
+      || cardsResult.status === 'rejected'
+    ) {
+      toast.error('Some local draft details could not be refreshed.');
+    }
+  };
+
   const resumeLocalDraft = async (reconcilePendingCreation = true): Promise<void> => {
     const storedDraft = pendingLocalDraft.value;
     if (storedDraft === null) {
@@ -355,28 +373,19 @@ export const useDeckEditor = () => {
     shouldApplyHeroCardPreset.value = Boolean(deck.form.hero_card_id);
     editorMode.value = 'cards';
 
-    localDraftResumePromise = (async () => {
-      const [, tagsLoaded] = await Promise.all([
-        loadEditorFilters(),
-        loadDeckTags(),
-        refreshLocalDraftCards(),
-      ]);
-      if (tagsLoaded) {
-        reconcileRecoveredTagIds();
-      }
-    })();
+    localDraftResumePromise = refreshRecoveredDraftDependencies();
     try {
       await localDraftResumePromise;
       if (editorMode.value === 'cards') {
         activateCards();
       }
-      localDraft.completeRecovery();
-      await localDraft.persist();
-      if (reconcilePendingCreation && storedDraft.pendingCreateAttempt) {
-        await publication.recoverPendingAttempt(storedDraft.pendingCreateAttempt);
-      }
     } finally {
       localDraft.completeRecovery();
+      if (reconcilePendingCreation && storedDraft.pendingCreateAttempt) {
+        await publication.recoverPendingAttempt(storedDraft.pendingCreateAttempt);
+      } else {
+        await localDraft.persist();
+      }
       localDraftResumePromise = null;
     }
   };
@@ -639,20 +648,15 @@ export const useDeckEditor = () => {
     shouldApplyHeroCardPreset.value = Boolean(deck.form.hero_card_id);
     editorMode.value = 'cards';
     try {
-      const [, tagsLoaded] = await Promise.all([
-        loadEditorFilters(),
-        loadDeckTags(),
-        refreshLocalDraftCards(),
-      ]);
-      if (tagsLoaded) reconcileRecoveredTagIds();
+      await refreshRecoveredDraftDependencies();
       activateCards();
-      localDraft.completeRecovery();
-      await localDraft.persist();
-      if (storedDraft.pendingCreateAttempt) {
-        await publication.recoverPendingAttempt(storedDraft.pendingCreateAttempt);
-      }
     } finally {
       localDraft.completeRecovery();
+      if (storedDraft.pendingCreateAttempt) {
+        await publication.recoverPendingAttempt(storedDraft.pendingCreateAttempt);
+      } else {
+        await localDraft.persist();
+      }
     }
   };
 
@@ -717,7 +721,15 @@ export const useDeckEditor = () => {
 
   onMounted(async () => {
     try {
-      await Promise.all([loadEditorFilters(), loadDeckRules(), loadDeckTags(), loadDeck()]);
+      const initialLoads = await Promise.allSettled([
+        loadEditorFilters(),
+        loadDeckRules(),
+        loadDeckTags(),
+        loadDeck(),
+      ]);
+      if (initialLoads.some((result) => result.status === 'rejected')) {
+        toast.error('Some deck editor data could not be loaded.');
+      }
       if (localDraftResumePromise) {
         await localDraftResumePromise;
       }
@@ -779,7 +791,7 @@ export const useDeckEditor = () => {
     if (bypassNextUnsavedPrompt) {
       return true;
     }
-    if (isCreating.value) {
+    if (isCreating.value || publication.isReconciling.value) {
       return false;
     }
     if (!isPublished.value && hasUnsavedChanges.value) {

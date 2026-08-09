@@ -36,8 +36,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Keep user-facing page and section descriptions focused on the enduring purpose and end result of the screen; avoid copy that calls out specific implementation details, temporary workflow mechanics, or design decisions that may look out of place as the page grows.
 - Verify visible UI in both light and dark modes.
 - Model multi-phase workflows with tagged states rather than overlapping booleans, and cover their allowed transition table with tests.
+- When an uncertain state includes active reconciliation and a later user-decision phase, encode that phase in the tagged state so route guards block only while background completion may still navigate.
 - Capture an immutable request payload and idempotency key before uncertain mutations; retries must reuse both exactly.
 - Treat browser persistence, server mutation, and cleanup as independent failure domains. Confirmed server success is terminal even when local cleanup fails.
+- Run authoritative pending-request reconciliation even when auxiliary recovery work such as filters, snapshots, or metadata hydration fails; those failures must not unlock mutation first.
 - Use revision-conditional writes plus native storage events for cross-tab state. A `localStorage` read followed by a write is not atomic; serialize the comparison and mutation with Web Locks or use a transactional persistence primitive, falling back to memory-only when atomicity is unavailable. Pause mutation and require an explicit conflict resolution instead of silently choosing a source of truth.
 
 ## Implementation Workflow

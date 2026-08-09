@@ -8,7 +8,7 @@ export type DeckDraftPersistenceState =
 export type DeckCreationState =
   | { status: 'idle' }
   | { status: 'creating' }
-  | { status: 'unknown' };
+  | { status: 'unknown'; reconciliation: 'checking' | 'awaiting-retry' };
 
 const persistenceTransitions: Record<
   DeckDraftPersistenceState['status'],
@@ -52,9 +52,10 @@ export const transitionDeckDraftPersistence = (
 export const transitionDeckCreation = (
   current: DeckCreationState,
   next: DeckCreationState,
-): DeckCreationState => ({
-  status: transition('deck creation', current.status, next.status, creationTransitions),
-});
+): DeckCreationState => {
+  transition('deck creation', current.status, next.status, creationTransitions);
+  return next;
+};
 
 export const canCreateFromPersistenceState = (state: DeckDraftPersistenceState): boolean =>
   state.status === 'synced' || state.status === 'memory-only';

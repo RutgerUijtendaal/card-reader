@@ -18,7 +18,11 @@ const { controller } = vi.hoisted(() => {
       manualSaving: refValue(false),
       isCreating: refValue(false),
       isMutationLocked: refValue(false),
-      creationState: refValue<{ status: 'idle' | 'creating' | 'unknown' }>({ status: 'idle' }),
+      creationState: refValue<
+        | { status: 'idle' }
+        | { status: 'creating' }
+        | { status: 'unknown'; reconciliation: 'checking' | 'awaiting-retry' }
+      >({ status: 'idle' }),
       persistenceState: refValue({ status: 'synced' }),
       loading: refValue(false),
       hasUnsavedChanges: refValue(true),
@@ -500,7 +504,7 @@ describe('DeckEditorPage', () => {
     controller.deckId.value = '';
     controller.isPublished.value = false;
     controller.isMutationLocked.value = true;
-    controller.creationState.value = { status: 'unknown' };
+    controller.creationState.value = { status: 'unknown', reconciliation: 'awaiting-retry' };
 
     const mounted = await mountPage();
     const retryButton = mounted.container.querySelector<HTMLButtonElement>(

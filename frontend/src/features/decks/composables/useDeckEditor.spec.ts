@@ -667,6 +667,53 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('keeps a pending attempt locked when auxiliary recovery hydration fails', async () => {
+    const form = {
+      ...createEmptyDeckForm(),
+      name: 'Pending Through Hydration Failure',
+      hero_card_id: 'hero-pending',
+    };
+    await saveLocalDraft('user-1', form, {}, {
+      payload: {
+        name: form.name,
+        description: null,
+        long_description: null,
+        difficulty: null,
+        visibility: 'private',
+        hero_card_id: form.hero_card_id,
+        entries: [],
+        sideboards: [],
+        tag_ids: [],
+        suggested_type_labels: [],
+      },
+      signature: 'pending-hydration-signature',
+      startedAt: '2026-08-09T04:00:00Z',
+    });
+    loadFiltersMock.mockRejectedValueOnce(new Error('Filters unavailable'));
+    let resolveLookup!: (result: { status: 'missing' }) => void;
+    fetchMyDeckByCreationKeyMock.mockReturnValueOnce(new Promise((resolve) => {
+      resolveLookup = resolve;
+    }));
+    const mounted = await mountController('/my/decks/new');
+
+    const resumePromise = mounted.controller.resumeLocalDraft();
+    await flushAsyncEditorWork();
+
+    expect(mounted.controller.creationState.value).toEqual({
+      status: 'unknown',
+      reconciliation: 'checking',
+    });
+    expect(mounted.controller.isMutationLocked.value).toBe(true);
+
+    resolveLookup({ status: 'missing' });
+    await vi.runAllTimersAsync();
+    await resumePromise;
+
+    expect(mounted.controller.creationState.value.status).toBe('idle');
+    expect(loadLocalDraft('user-1')?.pendingCreateAttempt).toBeNull();
+    mounted.unmount();
+  });
+
   test('retires a pending local attempt when its created deck was deleted', async () => {
     const form = {
       ...createEmptyDeckForm(),
@@ -902,6 +949,38 @@ describe('useDeckEditor', () => {
     expect(mounted.controller.creationState.value.status).toBe('unknown');
     expect(mounted.controller.isMutationLocked.value).toBe(true);
     expect(loadLocalDraft('user-1')?.pendingCreateAttempt?.payload.name).toBe('Still Processing');
+    mounted.unmount();
+  });
+
+  test('blocks route changes while an ambiguous Create is actively reconciling', async () => {
+    createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
+    let resolveLookup!: (result: { status: 'missing' }) => void;
+    fetchMyDeckByCreationKeyMock.mockReturnValueOnce(new Promise((resolve) => {
+      resolveLookup = resolve;
+    }));
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Reconciliation In Flight');
+
+    const createPromise = mounted.controller.saveDeck();
+    await flushAsyncEditorWork();
+    expect(mounted.controller.creationState.value).toEqual({
+      status: 'unknown',
+      reconciliation: 'checking',
+    });
+
+    await mounted.router.push('/cards');
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    expect(mounted.controller.discardChangesModalOpen.value).toBe(false);
+
+    resolveLookup({ status: 'missing' });
+    await vi.runAllTimersAsync();
+    await createPromise;
+    expect(mounted.controller.creationState.value).toEqual({
+      status: 'unknown',
+      reconciliation: 'awaiting-retry',
+    });
     mounted.unmount();
   });
 

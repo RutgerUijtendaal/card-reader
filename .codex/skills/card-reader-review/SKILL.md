@@ -26,6 +26,7 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Missing lint, typing, or test coverage for touched behavior
 - Stateful workflows encoded as interacting flags without an explicit transition model
 - Cleanup failures that block or undo an already confirmed authoritative success
+- Background reconciliation that can navigate after route leave, or auxiliary recovery failures that unlock an unresolved authoritative request
 - Ambiguous network responses without idempotent lookup/retry behavior, retries whose key or payload can change, or used keys that become reusable when their created resource is deleted
 - Local and server sources of truth that can silently drift, especially across tabs or after partial persistence failures
 - Conditional browser writes implemented as a non-atomic read-then-write instead of a cross-tab lock or transactional primitive
