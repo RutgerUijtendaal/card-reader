@@ -47,6 +47,10 @@ describe('deck API', () => {
     const page = {
       count: 66,
       next_page: 3,
+      next_cursor: {
+        created_at: '2026-08-08T17:00:00Z',
+        id: 'deck-20',
+      },
       previous_page: 1,
       page: 2,
       page_size: 10,
@@ -56,7 +60,13 @@ describe('deck API', () => {
     vi.mocked(api.get).mockResolvedValueOnce({ data: page });
 
     await expect(
-      fetchPage(new URLSearchParams({ q: 'tempo' }), 2, 10, '2026-08-09T17:00:00Z'),
+      fetchPage(
+        new URLSearchParams({ q: 'tempo' }),
+        2,
+        10,
+        '2026-08-09T17:00:00Z',
+        { created_at: '2026-08-08T17:00:00Z', id: 'deck-20' },
+      ),
     ).resolves.toEqual(page);
     const config = vi.mocked(api.get).mock.calls.at(-1)?.[1] as { params?: URLSearchParams };
 
@@ -66,6 +76,8 @@ describe('deck API', () => {
     expect(config.params?.get('page')).toBe('2');
     expect(config.params?.get('page_size')).toBe('10');
     expect(config.params?.get('snapshot_at')).toBe('2026-08-09T17:00:00Z');
+    expect(config.params?.get('cursor_created_at')).toBe('2026-08-08T17:00:00Z');
+    expect(config.params?.get('cursor_id')).toBe('deck-20');
   });
 
   test('maps the structured TTS deck export response', async () => {

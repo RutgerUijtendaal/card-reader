@@ -59,11 +59,18 @@ def _deck_summary_page_response(
     *,
     include_pending_suggestions: bool = False,
 ) -> Response:
-    last_page = max(1, (summary_page.count + summary_page.page_size - 1) // summary_page.page_size)
+    next_cursor = None
+    if summary_page.has_more and summary_page.results:
+        last_result = summary_page.results[-1]
+        next_cursor = {
+            "created_at": last_result.created_at.isoformat(),
+            "id": last_result.id,
+        }
     return Response(
         {
             "count": summary_page.count,
-            "next_page": summary_page.page + 1 if summary_page.page < last_page else None,
+            "next_page": summary_page.page + 1 if summary_page.has_more else None,
+            "next_cursor": next_cursor,
             "previous_page": summary_page.page - 1 if summary_page.page > 1 else None,
             "page": summary_page.page,
             "page_size": summary_page.page_size,
@@ -95,6 +102,8 @@ class PublicDeckListView(APIView):
                 "page": request.query_params.get("page"),
                 "page_size": request.query_params.get("page_size"),
                 "snapshot_at": request.query_params.get("snapshot_at"),
+                "cursor_created_at": request.query_params.get("cursor_created_at"),
+                "cursor_id": request.query_params.get("cursor_id"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -111,10 +120,13 @@ class PublicDeckListView(APIView):
         service = DeckService()
         if serializer.wants_summary() and serializer.wants_pagination():
             page, page_size = serializer.pagination()
+            cursor_created_at, cursor_id = serializer.pagination_cursor()
             summary_page = service.list_public_deck_summary_page(
                 page=page,
                 page_size=page_size,
                 snapshot_at=serializer.pagination_snapshot(),
+                cursor_created_at=cursor_created_at,
+                cursor_id=cursor_id,
                 **filters,
             )
             return _deck_summary_page_response(summary_page)
@@ -158,6 +170,8 @@ class OwnerDeckListCreateView(APIView):
                 "page": request.query_params.get("page"),
                 "page_size": request.query_params.get("page_size"),
                 "snapshot_at": request.query_params.get("snapshot_at"),
+                "cursor_created_at": request.query_params.get("cursor_created_at"),
+                "cursor_id": request.query_params.get("cursor_id"),
                 "author_q": request.query_params.get("author_q"),
                 "card_q": request.query_params.get("card_q"),
                 "affinity_symbol_ids": request.query_params.getlist("affinity_symbol_ids"),
@@ -175,11 +189,14 @@ class OwnerDeckListCreateView(APIView):
         service = DeckService()
         if serializer.wants_summary() and serializer.wants_pagination():
             page, page_size = serializer.pagination()
+            cursor_created_at, cursor_id = serializer.pagination_cursor()
             summary_page = service.list_owner_deck_summary_page(
                 owner_id,
                 page=page,
                 page_size=page_size,
                 snapshot_at=serializer.pagination_snapshot(),
+                cursor_created_at=cursor_created_at,
+                cursor_id=cursor_id,
                 search_query=filters["search_query"],
                 hero_query=filters["hero_query"],
                 card_query=filters["card_query"],

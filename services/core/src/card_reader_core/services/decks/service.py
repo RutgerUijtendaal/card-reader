@@ -15,7 +15,7 @@ from card_reader_core.repositories.decks import (
     delete_deck,
     get_deck,
     get_deck_for_viewer,
-    get_public_deck_summary_page_by_ids,
+    get_public_deck_summary_page_by_candidates,
     get_owner_deck,
     get_owner_deck_by_creation_id,
     get_owner_deck_creation,
@@ -174,6 +174,8 @@ class DeckService:
         page: int,
         page_size: int,
         snapshot_at: datetime | None = None,
+        cursor_created_at: datetime | None = None,
+        cursor_id: str | None = None,
         search_query: str | None = None,
         hero_query: str | None = None,
         author_query: str | None = None,
@@ -199,12 +201,14 @@ class DeckService:
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
         )
-        valid_deck_ids = [deck.id for deck in candidates if self.get_deck_validation(deck).is_valid]
-        return get_public_deck_summary_page_by_ids(
-            valid_deck_ids,
+        valid_decks = [deck for deck in candidates if self.get_deck_validation(deck).is_valid]
+        return get_public_deck_summary_page_by_candidates(
+            valid_decks,
             page=page,
             page_size=page_size,
             snapshot_at=effective_snapshot_at,
+            cursor_created_at=cursor_created_at,
+            cursor_id=cursor_id,
         )
 
     def list_owner_deck_summary_page(
@@ -214,6 +218,8 @@ class DeckService:
         page: int,
         page_size: int,
         snapshot_at: datetime | None = None,
+        cursor_created_at: datetime | None = None,
+        cursor_id: str | None = None,
         search_query: str | None = None,
         hero_query: str | None = None,
         card_query: str | None = None,
@@ -229,6 +235,8 @@ class DeckService:
             page=page,
             page_size=page_size,
             snapshot_at=snapshot_at,
+            cursor_created_at=cursor_created_at,
+            cursor_id=cursor_id,
             search_query=search_query,
             hero_query=hero_query,
             card_query=card_query,

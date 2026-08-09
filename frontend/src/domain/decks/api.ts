@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import type {
   DeckRecord,
   DeckRulesMetadata,
+  DeckSummaryCursor,
   DeckSummaryRecord,
   PaginatedDeckSummariesResponse,
   DeckTagCatalog,
@@ -41,12 +42,17 @@ const withSummaryPagination = (
   page: number,
   pageSize: number,
   snapshotAt?: string | null,
+  cursor?: DeckSummaryCursor | null,
 ): URLSearchParams => {
   const nextParams = withSummaryView(params);
   nextParams.set('page', String(page));
   nextParams.set('page_size', String(pageSize));
   if (snapshotAt) {
     nextParams.set('snapshot_at', snapshotAt);
+  }
+  if (cursor) {
+    nextParams.set('cursor_created_at', cursor.created_at);
+    nextParams.set('cursor_id', cursor.id);
   }
   return nextParams;
 };
@@ -65,9 +71,10 @@ export const fetchPublicDeckSummaryPage = async (
   page: number,
   pageSize = 10,
   snapshotAt?: string | null,
+  cursor?: DeckSummaryCursor | null,
 ): Promise<PaginatedDeckSummariesResponse> => {
   const response = await api.get<PaginatedDeckSummariesResponse>('/decks', {
-    params: withSummaryPagination(params, page, pageSize, snapshotAt),
+    params: withSummaryPagination(params, page, pageSize, snapshotAt, cursor),
   });
   return response.data;
 };
@@ -96,9 +103,10 @@ export const fetchMyDeckSummaryPage = async (
   page: number,
   pageSize = 10,
   snapshotAt?: string | null,
+  cursor?: DeckSummaryCursor | null,
 ): Promise<PaginatedDeckSummariesResponse> => {
   const response = await api.get<PaginatedDeckSummariesResponse>('/my/decks', {
-    params: withSummaryPagination(params, page, pageSize, snapshotAt),
+    params: withSummaryPagination(params, page, pageSize, snapshotAt, cursor),
   });
   return response.data;
 };

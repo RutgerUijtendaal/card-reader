@@ -425,6 +425,7 @@ def test_public_deck_summary_list_excludes_private_and_invalid_decks() -> None:
     assert page_payload == {
         "count": 1,
         "next_page": None,
+        "next_cursor": None,
         "previous_page": None,
         "page": 1,
         "page_size": 10,
@@ -513,6 +514,8 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
             "page": 2,
             "page_size": 2,
             "snapshot_at": stable_first_payload["snapshot_at"],
+            "cursor_created_at": stable_first_payload["next_cursor"]["created_at"],
+            "cursor_id": stable_first_payload["next_cursor"]["id"],
         },
     )
     assert stable_second_response.status_code == 200
@@ -555,6 +558,23 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     assert snapshot_only_payload["page"] == 1
     assert snapshot_only_payload["page_size"] == 10
     assert snapshot_only_payload["snapshot_at"] == stable_first_payload["snapshot_at"]
+
+    consumed_deck_id = next(iter(stable_first_ids))
+    assert DeckService().delete_owner_deck(deck_id=consumed_deck_id, owner_id=str(owner.id))
+    after_delete_response = client.get(
+        "/my/decks",
+        {
+            "view": "summary",
+            "page": 2,
+            "page_size": 2,
+            "snapshot_at": stable_first_payload["snapshot_at"],
+            "cursor_created_at": stable_first_payload["next_cursor"]["created_at"],
+            "cursor_id": stable_first_payload["next_cursor"]["id"],
+        },
+    )
+    assert after_delete_response.status_code == 200
+    after_delete_ids = {row["id"] for row in after_delete_response.json()["results"]}
+    assert after_delete_ids == {deck.id for deck in owned_decks} - stable_first_ids
 
 
 def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:

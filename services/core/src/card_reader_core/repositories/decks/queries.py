@@ -170,20 +170,32 @@ def list_public_deck_summary_candidates(
     )
 
 
-def get_public_deck_summary_page_by_ids(
-    ordered_deck_ids: list[str],
+def get_public_deck_summary_page_by_candidates(
+    ordered_decks: list[Deck],
     *,
     page: int,
     page_size: int,
     snapshot_at: datetime,
+    cursor_created_at: datetime | None = None,
+    cursor_id: str | None = None,
 ) -> DeckSummaryPage:
-    count = len(ordered_deck_ids)
+    count = len(ordered_decks)
     normalized_page, normalized_page_size, offset = _pagination_bounds(
         count=count,
         page=page,
         page_size=page_size,
     )
-    page_ids = ordered_deck_ids[offset : offset + normalized_page_size]
+    remaining_decks = _decks_after_cursor(
+        ordered_decks,
+        cursor_created_at=cursor_created_at,
+        cursor_id=cursor_id,
+    )
+    page_offset = 0 if cursor_created_at is not None and cursor_id is not None else offset
+    page_candidates = remaining_decks[
+        page_offset : page_offset + normalized_page_size + 1
+    ]
+    has_more = len(page_candidates) > normalized_page_size
+    page_ids = [deck.id for deck in page_candidates[:normalized_page_size]]
     if not page_ids:
         results: list[Deck] = []
     else:
@@ -201,6 +213,7 @@ def get_public_deck_summary_page_by_ids(
         )
     return DeckSummaryPage(
         count=count,
+        has_more=has_more,
         page=normalized_page,
         page_size=normalized_page_size,
         snapshot_at=snapshot_at,
@@ -214,6 +227,8 @@ def list_owner_deck_summary_page(
     page: int,
     page_size: int,
     snapshot_at: datetime | None = None,
+    cursor_created_at: datetime | None = None,
+    cursor_id: str | None = None,
     search_query: str | None = None,
     hero_query: str | None = None,
     card_query: str | None = None,
@@ -246,6 +261,8 @@ def list_owner_deck_summary_page(
         page=page,
         page_size=page_size,
         snapshot_at=effective_snapshot_at,
+        cursor_created_at=cursor_created_at,
+        cursor_id=cursor_id,
     )
 
 
@@ -255,6 +272,8 @@ def _paginate_deck_summary_queryset(
     page: int,
     page_size: int,
     snapshot_at: datetime,
+    cursor_created_at: datetime | None = None,
+    cursor_id: str | None = None,
 ) -> DeckSummaryPage:
     count = queryset.count()
     normalized_page, normalized_page_size, offset = _pagination_bounds(
@@ -262,13 +281,38 @@ def _paginate_deck_summary_queryset(
         page=page,
         page_size=page_size,
     )
+    page_queryset = queryset
+    if cursor_created_at is not None and cursor_id is not None:
+        page_queryset = page_queryset.filter(
+            Q(created_at__lt=cursor_created_at)
+            | Q(created_at=cursor_created_at, id__gt=cursor_id)
+        )
+        offset = 0
+    page_results = list(page_queryset[offset : offset + normalized_page_size + 1])
     return DeckSummaryPage(
         count=count,
+        has_more=len(page_results) > normalized_page_size,
         page=normalized_page,
         page_size=normalized_page_size,
         snapshot_at=snapshot_at,
-        results=list(queryset[offset : offset + normalized_page_size]),
+        results=page_results[:normalized_page_size],
     )
+
+
+def _decks_after_cursor(
+    decks: list[Deck],
+    *,
+    cursor_created_at: datetime | None,
+    cursor_id: str | None,
+) -> list[Deck]:
+    if cursor_created_at is None or cursor_id is None:
+        return decks
+    return [
+        deck
+        for deck in decks
+        if deck.created_at < cursor_created_at
+        or (deck.created_at == cursor_created_at and deck.id > cursor_id)
+    ]
 
 
 def _pagination_bounds(*, count: int, page: int, page_size: int) -> tuple[int, int, int]:

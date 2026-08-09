@@ -330,6 +330,7 @@ import { buildDeckShareUrl, canShareDeck } from '@/domain/decks/utils/share';
 import type {
   DeckDifficulty,
   DeckRecord,
+  DeckSummaryCursor,
   DeckSummaryRecord,
   DeckUpdateRequest,
   DeckVisibility,
@@ -351,6 +352,7 @@ const decks = computed(() => deckPageState.value.cards);
 const totalDeckCount = computed(() => deckPageState.value.count);
 const nextPage = computed(() => deckPageState.value.nextPage);
 const deckSnapshotAt = ref<string | null>(null);
+const deckNextCursor = ref<DeckSummaryCursor | null>(null);
 const pageSize = 10;
 const loading = ref(false);
 const loadingNextPage = ref(false);
@@ -417,6 +419,7 @@ const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<
   const requestedPath = currentDeckPath.value;
   const requestedSignature = currentRouteSignature.value;
   const requestedSnapshotAt = mode === 'append' ? deckSnapshotAt.value : null;
+  const requestedCursor = mode === 'append' ? deckNextCursor.value : null;
   if (mode === 'replace') {
     loading.value = true;
     loadingNextPage.value = false;
@@ -430,8 +433,8 @@ const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<
     const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
     const response =
       requestedPath === '/my/decks'
-        ? await fetchMyDeckSummaryPage(params, page, pageSize, requestedSnapshotAt)
-        : await fetchPublicDeckSummaryPage(params, page, pageSize, requestedSnapshotAt);
+        ? await fetchMyDeckSummaryPage(params, page, pageSize, requestedSnapshotAt, requestedCursor)
+        : await fetchPublicDeckSummaryPage(params, page, pageSize, requestedSnapshotAt, requestedCursor);
     if (
       requestId === deckLoadRequestId &&
       currentDeckPath.value === requestedPath &&
@@ -441,6 +444,7 @@ const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<
         ? replaceGalleryPage(response)
         : appendGalleryPage(deckPageState.value, response);
       deckSnapshotAt.value = response.snapshot_at;
+      deckNextCursor.value = response.next_cursor;
       return true;
     }
   } catch {
@@ -541,6 +545,7 @@ watch(
     }
     deckPageState.value = createEmptyGalleryPageState<DeckSummaryRecord>();
     deckSnapshotAt.value = null;
+    deckNextCursor.value = null;
     initialLoadError.value = null;
     loadMoreError.value = null;
     await refreshDecks();

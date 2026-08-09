@@ -308,6 +308,12 @@ const deckPage = (
 ) => ({
   count: results.length,
   next_page: null,
+  next_cursor: overrides.next_page
+    ? {
+        created_at: results.at(-1)?.created_at ?? '2025-01-01T00:00:00Z',
+        id: results.at(-1)?.id ?? 'deck-cursor',
+      }
+    : null,
   previous_page: null,
   page: 1,
   page_size: 10,
@@ -457,7 +463,13 @@ describe('DeckIndexPage', () => {
       );
     const mounted = await mountPage('/decks');
 
-    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledWith(expect.any(URLSearchParams), 1, 10, null);
+    expect(fetchPublicDeckSummariesMock).toHaveBeenCalledWith(
+      expect.any(URLSearchParams),
+      1,
+      10,
+      null,
+      null,
+    );
     expect(mounted.container.textContent).toContain('Total 11');
     expect(mounted.container.textContent).not.toContain('Previous');
 
@@ -469,6 +481,7 @@ describe('DeckIndexPage', () => {
       2,
       10,
       '2026-08-09T17:00:00Z',
+      { created_at: '2025-01-01T00:00:00Z', id: 'deck-1' },
     );
     expect(mounted.container.textContent).toContain('Second Deck');
     expect(mounted.container.textContent).toContain('All 11 decks loaded.');
@@ -510,6 +523,7 @@ describe('DeckIndexPage', () => {
       2,
       10,
       '2026-08-09T17:00:00Z',
+      { created_at: '2025-01-01T00:00:00Z', id: 'deck-1' },
     );
     expect(mounted.container.textContent).toContain('Recovered Deck');
 
