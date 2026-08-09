@@ -24,6 +24,10 @@ import {
   PLAYTEST_STACK_DEFINITIONS,
   PLAYTEST_STACK_PLAY_BUDGET_RATIO,
 } from '@/features/playtester/utils/stacks';
+import {
+  isPlaytestDeckEligible,
+  isPlaytestDeckSummaryEligible,
+} from '@/features/playtester/utils/deckEligibility';
 
 export type PreparedPlaytestDeckSelection = {
   path: string;
@@ -64,7 +68,9 @@ export const usePlaytestDeckSelection = ({
     selectedPlaytest.value ? getZoneInstances(selectedPlaytest.value, zoneId) : [];
 
   const selectorHandInstances = computed(() => selectorZoneInstances('hand'));
-  const filteredSuggestions = computed(() => suggestions.value);
+  const filteredSuggestions = computed(() => suggestions.value.filter((suggestion) =>
+    isPlaytestDeckSummaryEligible(suggestion.deck),
+  ));
   const ownedSuggestions = computed(() =>
     filteredSuggestions.value.filter((suggestion) => suggestion.source === 'owned').slice(0, 6),
   );
@@ -220,6 +226,10 @@ export const usePlaytestDeckSelection = ({
     try {
       const loadedDeck = await loadVisibleDeck(suggestion.deck.id);
       if (requestId !== selectedDeckLoadRequestId || selectedSuggestionKey.value !== suggestionKey(suggestion)) {
+        return;
+      }
+      if (!isPlaytestDeckEligible(loadedDeck)) {
+        clearSelectedDeckPreview();
         return;
       }
       const draft = storage.load(loadedDeck.id);

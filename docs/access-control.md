@@ -26,6 +26,10 @@ Game Master card access is represented by the named `can_access_game_master_card
 
 An unauthorized collection request that explicitly selects the Game Master pool returns `403`. Direct Game Master card, version, image, and immutable-asset lookups return `404` so they do not disclose whether an identity exists. The same policy applies to grouped cards, exports, selectors, and card-derived public data. If a Player card already referenced by an ordinary user's deck is reclassified, the deck reference and invalid-state warning remain, but the embedded Game Master card content and image are replaced by a restricted placeholder.
 
+Unauthenticated TTS sheets and developer-data bundles are public derived artifacts and therefore
+contain Player-pool cards only. That artifact scope is separate from the access capability: changing
+who may receive Game Master access does not implicitly publish Game Master card data.
+
 ## Capability-driven UI
 
 The authenticated session payload exposes named capabilities such as developer-data and Game Master card access. Pages and navigation should consume these values instead of duplicating role checks in the frontend.

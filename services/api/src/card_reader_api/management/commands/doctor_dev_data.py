@@ -40,7 +40,10 @@ class Command(BaseCommand):
             if not model.objects.exists():
                 issues.append(f"{label} are missing")
         active_cards = Card.objects.filter(lifecycle_status="active")
-        if not active_cards.filter(role_assignments__role="hero").exists():
+        if not active_cards.filter(
+            card_pool="player",
+            role_assignments__role="hero",
+        ).exists():
             issues.append("an active hero card is missing")
         if active_cards.filter(card_pool="player", role_assignments__isnull=True).count() < 15:
             issues.append("at least 15 unique active mainboard cards are required")

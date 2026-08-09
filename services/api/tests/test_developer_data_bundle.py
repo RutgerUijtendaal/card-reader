@@ -174,6 +174,11 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
         Card.objects.create(key="additional-public-card", label="Additional Public Card")
+        Card.objects.create(
+            key="restricted-game-master-card",
+            label="Restricted Game Master Card",
+            card_pool="game_master",
+        )
         selection.update(
             {
                 "include_all_cards": True,
@@ -192,6 +197,16 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
 
         assert manifest.counts["cards"] == 4
         assert manifest.counts["card_groups"] == 1
+        with tarfile.open(archive_path, "r:gz") as archive:
+            data_member = archive.extractfile("data.json")
+            assert data_member is not None
+            payload = json.loads(data_member.read())
+        assert {card["key"] for card in payload["cards"]} == {
+            "additional-public-card",
+            "deprecated-card",
+            "hero-card",
+            "mainboard-card",
+        }
         transaction.set_rollback(True)
 
 

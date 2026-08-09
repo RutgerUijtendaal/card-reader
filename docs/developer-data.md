@@ -7,8 +7,9 @@ website.
 ## Contents and exclusions
 
 The reviewed `dev-data/selection.json` contains stable must-include keys, inclusion policy, and
-coverage requirements. The current policy includes the complete card and card-group catalog at
-build time; the explicit keys remain regression anchors that must still exist. The committed
+coverage requirements. The current policy includes the complete Player card and Player card-group
+catalog at build time; Game Master cards are excluded while that pool is restricted. The explicit
+keys remain regression anchors that must still exist. The committed
 `dev-data.lock.json` pins the required bundle version, format, checksum, and website API.
 
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
@@ -22,8 +23,9 @@ the Hero role before strict current-schema validation. This compatibility keeps 
 bundles usable without making Version 2 classification optional.
 
 Selection coverage is evaluated by pool and by role through `min_cards_by_pool` and
-`min_cards_by_role`. The existing Hero minimum is retained under the Hero role, while Game Master,
-Boon, and Event may remain at zero until reviewed source data is available. The lock file is still
+`min_cards_by_role`. The existing Hero minimum is retained under the Hero role. Game Master pool
+coverage remains zero while that pool is excluded; Boon and Event may remain at zero until reviewed
+Player source data is available. The lock file is still
 generated only by publishing a validated immutable bundle and must not be edited by hand.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw

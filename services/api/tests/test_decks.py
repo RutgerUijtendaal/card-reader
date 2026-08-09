@@ -3105,6 +3105,12 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert restricted_card["restricted"] is True
     assert restricted_card["name"] == "Restricted Game Master card"
     assert "Secret Reclassified Event" not in owner_response.content.decode()
+    owner_search_response = owner_client.get(
+        "/my/decks",
+        {"view": "summary", "q": "Secret Reclassified Event"},
+    )
+    assert owner_search_response.status_code == 200
+    assert owner_search_response.json() == []
 
     staff_client = Client(HTTP_HOST="localhost")
     staff_client.force_login(staff)
@@ -3114,6 +3120,15 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert staff_response.json()["mainboard"]["entries"][0]["card"]["name"].startswith(
         "Secret Reclassified Event"
     )
+    owner.is_staff = True
+    owner.save(update_fields=["is_staff"])
+    staff_owner_client = Client(HTTP_HOST="localhost")
+    staff_owner_client.force_login(owner)
+    staff_search_response = staff_owner_client.get(
+        "/my/decks",
+        {"view": "summary", "q": "Secret Reclassified Event"},
+    )
+    assert [row["id"] for row in staff_search_response.json()] == [deck.id]
 
 
 def test_standard_cannot_match_all_with_persisted_roles() -> None:

@@ -171,14 +171,26 @@ const isSymbolOption = (value: unknown): boolean =>
   && typeof value.text_token === 'string'
   && (value.asset_url === null || typeof value.asset_url === 'string');
 
-const isCardSnapshot = (value: unknown): value is DeckCardSummary =>
-  isRecord(value)
-  && value.result_type === 'card'
+const normalizeCardSnapshot = (value: unknown): DeckCardSummary | null => {
+  if (!isRecord(value)) return null;
+  let cardPool: DeckCardSummary['card_pool'];
+  let cardRoles: DeckCardSummary['card_roles'];
+  if (
+    (value.card_pool === 'player' || value.card_pool === 'game_master')
+    && isStringArray(value.card_roles)
+  ) {
+    cardPool = value.card_pool;
+    cardRoles = [...value.card_roles] as DeckCardSummary['card_roles'];
+  } else if (typeof value.is_hero === 'boolean') {
+    cardPool = 'player';
+    cardRoles = value.is_hero ? ['hero'] : [];
+  } else {
+    return null;
+  }
+  if (!(value.result_type === 'card'
   && typeof value.id === 'string'
   && typeof value.key === 'string'
   && typeof value.label === 'string'
-  && (value.card_pool === 'player' || value.card_pool === 'game_master')
-  && isStringArray(value.card_roles)
   && typeof value.template_id === 'string'
   && typeof value.version_id === 'string'
   && typeof value.version_number === 'number'
@@ -199,14 +211,24 @@ const isCardSnapshot = (value: unknown): value is DeckCardSummary =>
   && Array.isArray(value.tags) && value.tags.every(isMetadataOption)
   && Array.isArray(value.symbols) && value.symbols.every(isSymbolOption)
   && Array.isArray(value.types) && value.types.every(isMetadataOption)
-  && (value.image_url === null || typeof value.image_url === 'string');
+  && (value.image_url === null || typeof value.image_url === 'string'))) return null;
+
+  const normalized: Record<string, unknown> = {
+    ...value,
+    card_pool: cardPool,
+    card_roles: cardRoles,
+  };
+  delete normalized.is_hero;
+  return normalized as DeckCardSummary;
+};
 
 const normalizeCards = (value: unknown): Record<string, DeckCardSummary> | null => {
   if (!isRecord(value)) return null;
   const cards: Record<string, DeckCardSummary> = {};
   for (const card of Object.values(value)) {
-    if (!isCardSnapshot(card)) return null;
-    cards[card.id] = card;
+    const normalized = normalizeCardSnapshot(card);
+    if (normalized === null) return null;
+    cards[normalized.id] = normalized;
   }
   return cards;
 };

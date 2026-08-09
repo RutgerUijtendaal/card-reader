@@ -29,6 +29,7 @@ The existing Player experience must continue to work, Hero behavior must use the
 - Typical pool/role combinations such as Player Hero and Game Master Boon/Event are conventions, not database constraints. Any restrictions or warnings belong in core code.
 - Cross-pool relationships are allowed. Do not add same-pool database constraints to groups, future card links, or other card relationships.
 - Game Master access is controlled through a named backend capability whose initial policy is `is_staff`. Do not scatter direct `is_staff` checks through card queries and views.
+- Public derived artifacts such as developer-data bundles and unauthenticated TTS card sheets are Player-pool scoped. They must not encode the current staff policy; changing who receives the Game Master capability must remain independent from deciding which artifacts are public.
 - Unauthorized list/filter requests that explicitly request the Game Master pool return `403`. Unauthorized direct access to a Game Master card, version, or image returns `404` to avoid disclosing the object.
 - The ordinary gallery defaults to Player cards with Hero excluded. This is a frontend default, not a hidden backend default for every card query.
 

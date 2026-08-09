@@ -21,6 +21,8 @@ const buildDeck = (overrides: Partial<DeckSummaryRecord> = {}): DeckSummaryRecor
     id: 'hero-1',
     key: 'hero-1',
     label: 'Azure Hero',
+    card_pool: 'player',
+    card_roles: ['hero'],
     image_url: '/media/cards/hero.png',
     name: 'Azure Hero',
     symbols: [

@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.cards.file_views import (
-    card_for_immutable_image,
+    cards_for_immutable_image,
     file_response,
     immutable_card_image_response,
     symbol_asset_response,
@@ -311,6 +311,10 @@ class CardVersionParseFlagView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, card_id: str, version_id: str) -> Response:
+        card = get_card(card_id)
+        if card is None:
+            return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
+        _raise_if_card_hidden(request, card)
         serializer = CardVersionParseFlagCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
@@ -408,10 +412,13 @@ class ImmutableCardImageView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, relative_path: str) -> FileResponse:
-        card = card_for_immutable_image(relative_path)
-        if card is None:
+        cards = cards_for_immutable_image(relative_path)
+        if not cards:
             raise Http404("Card image not found")
-        _raise_if_card_hidden(request, card)
+        if not can_access_game_master_cards(request.user) and all(
+            card.card_pool == GAME_MASTER_CARD_POOL for card in cards
+        ):
+            raise Http404("Card image not found")
         return immutable_card_image_response(relative_path)
 
 

@@ -99,12 +99,16 @@ describe('deckEditorLocalDraftStorage', () => {
 
   test('migrates a valid v1 draft to v2 on read and conditionally persists it', async () => {
     const form = { ...createEmptyDeckForm(), name: 'Legacy Draft' };
+    form.hero_card_id = 'hero-1';
+    const legacyHero = { ...buildCard('hero-1', true), is_hero: true } as Record<string, unknown>;
+    delete legacyHero.card_pool;
+    delete legacyHero.card_roles;
     localStorage.setItem('card-reader.deck-editor.new-draft.user-1', JSON.stringify({
       version: 1,
       ownerId: 'user-1',
       savedAt: '2026-01-01T00:00:00Z',
       form,
-      cards: {},
+      cards: { 'hero-1': legacyHero },
     }));
 
     const result = createDeckEditorLocalDraftStorage().read('user-1');
@@ -113,6 +117,10 @@ describe('deckEditorLocalDraftStorage', () => {
     if (result.status !== 'loaded' || result.slot.kind !== 'draft') throw new Error('Expected draft');
     expect(result.slot.draft.version).toBe(DECK_EDITOR_LOCAL_DRAFT_VERSION);
     expect(result.slot.draft.form.name).toBe('Legacy Draft');
+    expect(result.slot.draft.cards['hero-1']).toMatchObject({
+      card_pool: 'player',
+      card_roles: ['hero'],
+    });
     expect(result.slot.draft.pendingCreateAttempt).toBeNull();
     expect(JSON.parse(localStorage.getItem('card-reader.deck-editor.new-draft.user-1') ?? '{}'))
       .toMatchObject({ version: 1 });
@@ -122,6 +130,33 @@ describe('deckEditorLocalDraftStorage', () => {
     )).resolves.toMatchObject({ status: 'saved' });
     expect(JSON.parse(localStorage.getItem('card-reader.deck-editor.new-draft.user-1') ?? '{}'))
       .toMatchObject({ version: 2, kind: 'draft' });
+  });
+
+  test('adopts pre-classification v2 card snapshots without discarding the draft', () => {
+    const form = { ...createEmptyDeckForm(), hero_card_id: 'hero-1' };
+    const legacyHero = { ...buildCard('hero-1', true), is_hero: true } as Record<string, unknown>;
+    delete legacyHero.card_pool;
+    delete legacyHero.card_roles;
+    localStorage.setItem('card-reader.deck-editor.new-draft.user-1', JSON.stringify({
+      version: 2,
+      kind: 'draft',
+      ownerId: 'user-1',
+      draftId: 'draft-1',
+      revision: 'revision-1',
+      savedAt: '2026-01-01T00:00:00Z',
+      form,
+      cards: { 'hero-1': legacyHero },
+      pendingCreateAttempt: null,
+    }));
+
+    const result = createDeckEditorLocalDraftStorage().read('user-1');
+
+    expect(result.status).toBe('loaded');
+    if (result.status !== 'loaded' || result.slot.kind !== 'draft') throw new Error('Expected draft');
+    expect(result.slot.draft.cards['hero-1']).toMatchObject({
+      card_pool: 'player',
+      card_roles: ['hero'],
+    });
   });
 
   test('conditionally clears malformed and owner-mismatched data', async () => {

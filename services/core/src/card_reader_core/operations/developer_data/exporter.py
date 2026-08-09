@@ -12,6 +12,8 @@ from django.db.migrations.recorder import MigrationRecorder
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    GAME_MASTER_CARD_POOL,
+    PLAYER_CARD_POOL,
     Card,
     CardBack,
     CardGroup,
@@ -106,7 +108,9 @@ def _resolve_selection(
     selection: DeveloperDataSelection,
 ) -> tuple[list[Card], list[CardGroup]]:
     selected_keys = set(selection.card_keys)
-    group_queryset = CardGroup.objects.all()
+    group_queryset = CardGroup.objects.filter(
+        anchor_card__card_pool=PLAYER_CARD_POOL,
+    ).exclude(members__card__card_pool=GAME_MASTER_CARD_POOL)
     if not selection.include_all_card_groups:
         group_queryset = group_queryset.filter(key__in=selection.card_group_keys)
     groups = list(
@@ -122,7 +126,18 @@ def _resolve_selection(
         selected_keys.add(group.anchor_card.key)
         selected_keys.update(member.card.key for member in group.members.all())
 
-    card_queryset = Card.objects.all()
+    restricted_card_keys = set(
+        Card.objects.filter(key__in=selected_keys)
+        .exclude(card_pool=PLAYER_CARD_POOL)
+        .values_list("key", flat=True)
+    )
+    if restricted_card_keys:
+        raise DeveloperDataError(
+            "Developer-data bundles cannot include Game Master cards: "
+            + ", ".join(sorted(restricted_card_keys))
+        )
+
+    card_queryset = Card.objects.filter(card_pool=PLAYER_CARD_POOL)
     if not selection.include_all_cards:
         card_queryset = card_queryset.filter(key__in=selected_keys)
     cards = list(

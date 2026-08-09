@@ -94,7 +94,12 @@ def validate_import_readiness(payload: DeveloperDataPayload) -> list[str]:
         issues.append("deck-tag catalog is empty")
     if not payload.cards:
         issues.append("card selection is empty")
-    if not any("hero" in card.card_roles and card.lifecycle_status == "active" for card in payload.cards):
+    if not any(
+        card.card_pool == "player"
+        and "hero" in card.card_roles
+        and card.lifecycle_status == "active"
+        for card in payload.cards
+    ):
         issues.append("no active hero is included")
     if not any(
         not card.card_roles and card.card_pool == "player" and card.lifecycle_status == "active"

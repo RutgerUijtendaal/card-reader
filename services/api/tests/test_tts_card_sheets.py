@@ -75,6 +75,18 @@ def test_unreadable_images_are_not_assigned_to_sheets() -> None:
     assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
 
 
+def test_game_master_cards_are_not_allocated_to_public_tts_sheets() -> None:
+    TtsCardSheet.objects.all().delete()
+    card = _create_sheet_card("game-master-source", color=(20, 30, 40))
+    card.card_pool = "game_master"
+    card.save(update_fields=["card_pool"])
+
+    sheet_ids = TtsCardSheetService().sync_cards([card.id])
+
+    assert sheet_ids == set()
+    assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
+
+
 def test_assignment_snapshots_the_readable_source_file_fallback() -> None:
     TtsCardSheet.objects.all().delete()
     card = _create_sheet_card("source-fallback", color=(30, 40, 50))
@@ -242,6 +254,31 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
     assert not_modified.status_code == 304
     assert not_modified["ETag"] == second["ETag"]
     not_modified.close()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerendered() -> None:
+    TtsCardSheet.objects.all().delete()
+    card = _create_sheet_card("reclassified", color=(120, 40, 60))
+    service = TtsCardSheetService()
+    sheet_ids = service.sync_cards([card.id])
+    service.render_sheets_now(sorted(sheet_ids))
+    sheet_id = next(iter(sheet_ids))
+    client = Client(HTTP_HOST="localhost")
+
+    card.card_pool = "game_master"
+    card.save(update_fields=["card_pool"])
+    service.sync_cards([card.id])
+
+    preparing = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
+    assert preparing.status_code == 503
+
+    service.render_sheets_now([sheet_id])
+    response = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
+    body = b"".join(response.streaming_content)
+    response.close()
+    with Image.open(BytesIO(body)) as rendered:
+        assert rendered.getpixel((10, 10)) == (0, 0, 0)
 
 
 @pytest.mark.django_db(transaction=True)

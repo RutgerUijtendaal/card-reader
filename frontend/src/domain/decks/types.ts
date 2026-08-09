@@ -98,7 +98,15 @@ export type DeckRecord = {
 
 export type DeckHeroSummary = Pick<
   DeckCardSummary,
-  'id' | 'key' | 'label' | 'name' | 'image_url' | 'symbols' | 'restricted'
+  | 'id'
+  | 'key'
+  | 'label'
+  | 'name'
+  | 'image_url'
+  | 'symbols'
+  | 'restricted'
+  | 'card_pool'
+  | 'card_roles'
 >;
 
 export type DeckSummaryRecord = {

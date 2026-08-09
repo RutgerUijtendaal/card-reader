@@ -80,6 +80,8 @@ const buildDeck = (id: string, name: string, heroName: string, owner = 'owner') 
     id: `${id}-hero`,
     key: `${id}-hero`,
     label: heroName,
+    card_pool: 'player' as const,
+    card_roles: ['hero' as const],
     result_type: 'card' as const,
     image_url: null,
     name: heroName,

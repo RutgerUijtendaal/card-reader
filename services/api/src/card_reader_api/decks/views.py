@@ -18,7 +18,7 @@ from card_reader_api.decks.serializers import (
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
-from card_reader_core.models import Deck
+from card_reader_core.models import PLAYER_CARD_POOL, Deck
 from card_reader_core.services.decks import (
     DeckCreationDeletedError,
     DeckEntryInput,
@@ -206,6 +206,8 @@ class OwnerDeckListCreateView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
         owner_id = _user_id(request)
+        allow_game_master_cards = can_access_game_master_cards(request.user)
+        filter_card_pool = None if allow_game_master_cards else PLAYER_CARD_POOL
         service = DeckService()
         if serializer.wants_summary() and serializer.wants_pagination():
             page, page_size = serializer.pagination()
@@ -226,11 +228,12 @@ class OwnerDeckListCreateView(APIView):
                 deck_tag_ids=filters["deck_tag_ids"],
                 deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
                 deck_tag_match=filters["deck_tag_match"],
+                card_pool=filter_card_pool,
             )
             return _deck_summary_page_response(
                 summary_page,
                 include_pending_suggestions=True,
-                allow_game_master_cards=can_access_game_master_cards(request.user),
+                allow_game_master_cards=allow_game_master_cards,
             )
         list_decks = service.list_owner_deck_summaries if serializer.wants_summary() else service.list_owner_decks
         decks = list_decks(
@@ -244,12 +247,13 @@ class OwnerDeckListCreateView(APIView):
             deck_tag_ids=filters["deck_tag_ids"],
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
+            card_pool=filter_card_pool,
         )
         return _deck_list_response(
             serializer,
             decks,
             include_pending_suggestions=True,
-            allow_game_master_cards=can_access_game_master_cards(request.user),
+            allow_game_master_cards=allow_game_master_cards,
         )
 
     def post(self, request: Request) -> Response:

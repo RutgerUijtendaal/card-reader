@@ -869,6 +869,30 @@ def test_game_master_card_images_are_hidden_from_non_staff_across_all_routes() -
             response.close()
 
 
+def test_shared_immutable_image_remains_public_when_any_owning_card_is_player() -> None:
+    player_card, player_version = _create_editable_card_version(name="Shared Player Image")
+    player_image = _create_card_image(player_version)
+    game_master_card, game_master_version = _create_editable_card_version(
+        name="Shared Game Master Image"
+    )
+    game_master_card.card_pool = "game_master"
+    game_master_card.save(update_fields=["card_pool"])
+    CardVersionImage.objects.create(
+        card_version=game_master_version,
+        source_file=player_image.source_file,
+        stored_path=player_image.stored_path,
+        checksum=player_image.checksum,
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        f"/card-images/{player_image.stored_path}"
+    )
+
+    assert response.status_code == 200
+    assert player_card.id
+    response.close()
+
+
 def test_card_payloads_use_immutable_image_urls() -> None:
     card, version = _create_editable_card_version(name="Immutable Payload Card")
     image = _create_card_image(version)

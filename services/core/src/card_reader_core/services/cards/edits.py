@@ -24,7 +24,7 @@ def update_latest_card_version_with_notifications(
     unlock_metadata_groups: list[str],
     actor_id: str | None = None,
 ) -> tuple[Card, CardVersion] | None:
-    return update_latest_card_version(
+    updated = update_latest_card_version(
         card_id=card_id,
         updates=updates,
         restore_fields=restore_fields,
@@ -32,6 +32,10 @@ def update_latest_card_version_with_notifications(
         unlock_fields=unlock_fields,
         unlock_metadata_groups=unlock_metadata_groups,
     )
+    if updated is not None and "card_pool" in updates:
+        card, _version = updated
+        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card.id]))
+    return updated
 
 
 def promote_card_version_with_notifications(

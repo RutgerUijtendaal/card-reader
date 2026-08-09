@@ -20,9 +20,10 @@ def immutable_card_image_response(relative_path: str) -> FileResponse:
     return file_response(requested_path, "Card image not found")
 
 
-def card_for_immutable_image(relative_path: str) -> Card | None:
+def cards_for_immutable_image(relative_path: str) -> list[Card]:
     normalized = Path(relative_path).as_posix().strip("/")
     filename = Path(normalized).name
+    cards: dict[str, Card] = {}
     for image in CardVersionImage.objects.select_related("card_version__card").filter(
         stored_path__endswith=filename
     ):
@@ -31,8 +32,9 @@ def card_for_immutable_image(relative_path: str) -> Card | None:
         except ValueError:
             continue
         if stored_path == normalized:
-            return image.card_version.card
-    return None
+            card = image.card_version.card
+            cards[card.id] = card
+    return list(cards.values())
 
 
 def symbol_asset_response(asset_path: str) -> FileResponse:
