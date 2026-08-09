@@ -23,7 +23,10 @@
       </template>
     </AppPageHeader>
 
-    <AppPageLayout columns="sidebar">
+    <AppPageLayout
+      columns="one"
+      root-class="app-page-layout-standard"
+    >
       <template #aside>
         <AppStickyAside>
           <OperationsQueueNavigator
