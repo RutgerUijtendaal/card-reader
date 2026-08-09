@@ -17,7 +17,31 @@
         />
         <div
           v-if="!controller.isChangingHero.value"
-          class="flex items-center gap-1"
+          class="flex items-center gap-2"
+        >
+          <AppHeaderAction
+            v-if="!controller.isPublished.value && controller.hasLocalDraft.value"
+            :icon="Trash2"
+            label="Discard local draft"
+            short-label="Discard"
+            @click="controller.requestDiscardLocalDraft()"
+          />
+          <AppHeaderAction
+            :icon="deckSaveActionIcon"
+            :label="deckSaveActionLabel"
+            :short-label="deckSaveActionShortLabel"
+            variant="primary"
+            :icon-class="controller.manualSaving.value ? 'animate-spin' : ''"
+            :disabled="controller.manualSaving.value"
+            @click="() => controller.saveDeck()"
+          />
+        </div>
+      </template>
+      <template #center>
+        <nav
+          v-if="!controller.isChangingHero.value"
+          class="deck-editor-section-tabs theme-tablist max-w-xl flex-nowrap justify-center"
+          aria-label="Deck editor sections"
         >
           <AppHeaderAction
             v-if="!controller.isPublished.value"
@@ -44,33 +68,7 @@
             :active="controller.editorMode.value === 'cards'"
             @click="controller.openCards()"
           />
-        </div>
-        <div
-          v-if="!controller.isChangingHero.value"
-          class="deck-editor-header-divider theme-divider hidden h-6 border-l lg:block"
-          aria-hidden="true"
-        />
-        <div
-          v-if="!controller.isChangingHero.value"
-          class="flex items-center gap-2"
-        >
-          <AppHeaderAction
-            v-if="!controller.isPublished.value && controller.hasLocalDraft.value"
-            :icon="Trash2"
-            label="Discard local draft"
-            short-label="Discard"
-            @click="controller.requestDiscardLocalDraft()"
-          />
-          <AppHeaderAction
-            :icon="deckSaveActionIcon"
-            :label="deckSaveActionLabel"
-            :short-label="deckSaveActionShortLabel"
-            variant="primary"
-            :icon-class="controller.manualSaving.value ? 'animate-spin' : ''"
-            :disabled="controller.manualSaving.value"
-            @click="() => controller.saveDeck()"
-          />
-        </div>
+        </nav>
       </template>
     </AppPageHeader>
 

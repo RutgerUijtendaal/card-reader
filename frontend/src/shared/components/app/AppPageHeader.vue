@@ -8,8 +8,13 @@
       :style="headerStyle"
     >
       <div
-        class="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-stretch lg:justify-between"
-        :class="topRowClass"
+        class="flex flex-col gap-4 px-5 py-5"
+        :class="[
+          topRowClass,
+          hasCenterContent
+            ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center'
+            : 'lg:flex-row lg:items-stretch lg:justify-between',
+        ]"
       >
         <div
           class="app-page-header-primary flex min-w-0 flex-1 gap-3"
@@ -55,8 +60,15 @@
         </div>
 
         <div
+          v-if="hasCenterContent"
+          class="app-page-header-center flex min-w-0 justify-center"
+        >
+          <slot name="center" />
+        </div>
+
+        <div
           v-if="hasHeaderActions"
-          class="lg:flex lg:self-stretch lg:items-center lg:justify-end"
+          class="lg:flex lg:self-stretch lg:items-center lg:justify-end lg:justify-self-end"
         >
           <div class="flex flex-wrap items-center gap-2 lg:justify-end">
             <AppHeaderAction
@@ -128,7 +140,7 @@ const props = withDefaults(
 const slots = useSlots();
 const hasShellHeaderOutlet = ref(false);
 const hasRenderableSlot = (
-  name: 'actions' | 'bottomLeft' | 'bottomRight' | 'details' | 'subtitle' | 'titleMeta',
+  name: 'actions' | 'bottomLeft' | 'bottomRight' | 'center' | 'details' | 'subtitle' | 'titleMeta',
 ): boolean => {
   const slot = slots[name];
   if (!slot) {
@@ -141,6 +153,7 @@ const hasSubtitle = computed(() => props.subtitle.trim().length > 0);
 const hasSubtitleContent = computed(() => hasSubtitle.value || hasRenderableSlot('subtitle'));
 const hasSupportingContent = computed(() => hasSubtitleContent.value || hasRenderableSlot('details'));
 const hasHeaderActions = computed(() => hasBackLink.value || hasRenderableSlot('actions'));
+const hasCenterContent = computed(() => hasRenderableSlot('center'));
 const hasBottomLeft = computed(() => hasRenderableSlot('bottomLeft'));
 const hasBottomRight = computed(() => hasRenderableSlot('bottomRight'));
 const hasBottomRow = computed(() => hasBottomLeft.value || hasBottomRight.value);

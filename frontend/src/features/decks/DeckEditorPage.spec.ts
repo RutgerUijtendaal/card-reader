@@ -73,6 +73,7 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
       return () =>
         h('header', [
           h('h1', props.title),
+          slots.center?.(),
           slots.actions?.(),
         ]);
     },
@@ -362,7 +363,10 @@ describe('DeckEditorPage', () => {
     expect(heroTab).not.toBeNull();
     expect(mounted.container.querySelector('button[aria-label="Open deck details"]')).not.toBeNull();
     expect(mounted.container.querySelector('button[aria-label="Open deck cards"]')).not.toBeNull();
-    expect(mounted.container.querySelectorAll('.deck-editor-header-divider')).toHaveLength(2);
+    expect(mounted.container.querySelectorAll('.deck-editor-header-divider')).toHaveLength(1);
+    expect(
+      mounted.container.querySelector('nav[aria-label="Deck editor sections"]'),
+    ).not.toBeNull();
     expect(createButton?.textContent).toBe('Create');
     expect(autosyncCheckbox?.disabled).toBe(true);
     expect(mounted.container.textContent).toContain('Autosync after creation');
