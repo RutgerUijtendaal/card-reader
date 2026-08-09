@@ -2,7 +2,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useDebounceFn, useEventListener, useLocalStorage } from '@vueuse/core';
 import { toast } from 'vue-sonner';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
-import { fetchCards } from '@/domain/cards/api';
+import { fetchCard, fetchCards } from '@/domain/cards/api';
 import type { CardListItem } from '@/domain/cards/types';
 import { MANAGEMENT_CARD_LIFECYCLE_FILTER } from '@/domain/cards/utils/filters/cardLifecycle';
 import {
@@ -13,7 +13,10 @@ import {
   updateDeck,
 } from '@/domain/decks/api';
 import { useDeckEditorDraft } from '@/features/decks/composables/useDeckEditorDraft';
-import type { DeckEditorMode } from '@/features/decks/composables/deckEditorDraftTypes';
+import type {
+  DeckEditorMode,
+  DeckFormEntry,
+} from '@/features/decks/composables/deckEditorDraftTypes';
 import { useDeckEditorFilters } from '@/features/decks/composables/useDeckEditorFilters';
 import { useDeckEditorGallery } from '@/features/decks/composables/useDeckEditorGallery';
 import {
@@ -79,7 +82,9 @@ export const useDeckEditor = () => {
   let pendingDiscardConfirmation: ((confirmed: boolean) => void) | null = null;
   let pendingDiscardConfirmationPromise: Promise<boolean> | null = null;
   let filtersLoadPromise: Promise<void> | null = null;
+  let deckTagsLoadPromise: Promise<boolean> | null = null;
   let localDraftResumePromise: Promise<void> | null = null;
+  let lastPersistedLocalDraft: StoredDeckEditorDraft | null = null;
   const backLink = computed(() => buildDeckEditorReturnLocation(route.query));
   const backLabel = computed(() => `Back to ${getDeckEditorReturnLabel(route.query)}`);
   const autosyncEnabled = useLocalStorage('card-reader.deck-editor.autosync', false, {
@@ -228,12 +233,17 @@ export const useDeckEditor = () => {
     }
   };
 
-  const loadDeckTags = async (): Promise<void> => {
-    try {
-      deckTagCatalog.value = await fetchDeckTags();
-    } catch {
-      deckTagCatalog.value = { roles: [], types: [] };
-    }
+  const loadDeckTags = (): Promise<boolean> => {
+    deckTagsLoadPromise ??= (async () => {
+      try {
+        deckTagCatalog.value = await fetchDeckTags();
+        return true;
+      } catch {
+        deckTagCatalog.value = { roles: [], types: [] };
+        return false;
+      }
+    })();
+    return deckTagsLoadPromise;
   };
 
   const referencedLocalDraftCardIds = (): string[] => [
@@ -242,6 +252,40 @@ export const useDeckEditor = () => {
       ...deck.allCardIds.value,
     ]),
   ];
+
+  const remapRecoveredEntries = (
+    entries: DeckFormEntry[],
+    redirectedCardIds: ReadonlyMap<string, string>,
+  ): DeckFormEntry[] => {
+    const remappedEntries: DeckFormEntry[] = [];
+    const entryIndexByCardId = new Map<string, number>();
+    for (const entry of entries) {
+      const cardId = redirectedCardIds.get(entry.card_id) ?? entry.card_id;
+      const existingIndex = entryIndexByCardId.get(cardId);
+      if (existingIndex === undefined) {
+        entryIndexByCardId.set(cardId, remappedEntries.length);
+        remappedEntries.push({ card_id: cardId, quantity: entry.quantity });
+      } else {
+        const existingEntry = remappedEntries[existingIndex];
+        if (existingEntry) {
+          existingEntry.quantity += entry.quantity;
+        }
+      }
+    }
+    return remappedEntries;
+  };
+
+  const applyRecoveredCardRedirects = (redirectedCardIds: ReadonlyMap<string, string>): void => {
+    if (redirectedCardIds.size === 0) {
+      return;
+    }
+    deck.form.hero_card_id = redirectedCardIds.get(deck.form.hero_card_id)
+      ?? deck.form.hero_card_id;
+    deck.form.entries = remapRecoveredEntries(deck.form.entries, redirectedCardIds);
+    for (const sideboard of deck.form.sideboards) {
+      sideboard.entries = remapRecoveredEntries(sideboard.entries, redirectedCardIds);
+    }
+  };
 
   const refreshLocalDraftCards = async (): Promise<void> => {
     const cardIds = referencedLocalDraftCardIds();
@@ -257,19 +301,59 @@ export const useDeckEditor = () => {
       params.append('card_ids', cardId);
     }
     let page = 1;
+    const refreshedCardIds = new Set<string>();
     try {
       while (true) {
         params.set('page', String(page));
         const response = await fetchCards<CardListItem>(params);
         rememberCards(response.results);
+        response.results.forEach((card) => refreshedCardIds.add(card.id));
         if (response.next_page === null) {
-          return;
+          break;
         }
         page = response.next_page;
       }
     } catch {
       toast.error('Some local draft card details could not be refreshed.');
+      return;
     }
+
+    const unresolvedCardIds = cardIds.filter((cardId) => !refreshedCardIds.has(cardId));
+    if (unresolvedCardIds.length === 0) {
+      return;
+    }
+    const detailResults = await Promise.allSettled(
+      unresolvedCardIds.map(async (cardId) => ({
+        cardId,
+        card: await fetchCard<CardListItem>(cardId),
+      })),
+    );
+    const redirectedCardIds = new Map<string, string>();
+    const resolvedCards: CardListItem[] = [];
+    let refreshFailed = false;
+    for (const result of detailResults) {
+      if (result.status === 'rejected') {
+        refreshFailed = true;
+        continue;
+      }
+      resolvedCards.push(result.value.card);
+      if (result.value.card.id !== result.value.cardId) {
+        redirectedCardIds.set(result.value.cardId, result.value.card.id);
+      }
+    }
+    rememberCards(resolvedCards);
+    applyRecoveredCardRedirects(redirectedCardIds);
+    if (refreshFailed) {
+      toast.error('Some local draft card details could not be refreshed.');
+    }
+  };
+
+  const reconcileRecoveredTagIds = (): void => {
+    const currentTagIds = new Set([
+      ...deckTagCatalog.value.roles.map((tag) => tag.id),
+      ...deckTagCatalog.value.types.map((tag) => tag.id),
+    ]);
+    deck.setDeckTagIds(deck.form.tag_ids.filter((tagId) => currentTagIds.has(tagId)));
   };
 
   const localDraftContentSignature = (draft: StoredDeckEditorDraft): string =>
@@ -309,15 +393,22 @@ export const useDeckEditor = () => {
     localDraftRecoveryModalOpen.value = false;
     localDraftDecisionResolved.value = true;
     lastLocalDraftSignature = localDraftContentSignature(storedDraft);
+    lastPersistedLocalDraft = storedDraft;
     localDraftPresence = 'present';
     localDraftPersistenceFailed.value = false;
     shouldApplyHeroCardPreset.value = Boolean(deck.form.hero_card_id);
     editorMode.value = 'cards';
 
-    localDraftResumePromise = Promise.all([
-      loadEditorFilters(),
-      refreshLocalDraftCards(),
-    ]).then(() => undefined);
+    localDraftResumePromise = (async () => {
+      const [, tagsLoaded] = await Promise.all([
+        loadEditorFilters(),
+        loadDeckTags(),
+        refreshLocalDraftCards(),
+      ]);
+      if (tagsLoaded) {
+        reconcileRecoveredTagIds();
+      }
+    })();
     try {
       await localDraftResumePromise;
       if (editorMode.value === 'cards') {
@@ -336,6 +427,7 @@ export const useDeckEditor = () => {
     localDraftRecoveryModalOpen.value = false;
     localDraftDecisionResolved.value = true;
     lastLocalDraftSignature = '';
+    lastPersistedLocalDraft = null;
     localDraftPresence = 'absent';
     localDraftPersistenceFailed.value = false;
   };
@@ -446,14 +538,23 @@ export const useDeckEditor = () => {
 
   const retireLocalDraftAfterCreation = (createdDeckId: string): boolean => {
     if (localDraftPresence === 'absent') {
+      lastPersistedLocalDraft = null;
       localDraftPersistenceFailed.value = false;
       return true;
     }
     try {
-      localDraftStorage.retire(localDraftOwnerId, createdDeckId);
+      const retirement = localDraftStorage.retire(
+        localDraftOwnerId,
+        createdDeckId,
+        lastPersistedLocalDraft,
+      );
       lastLocalDraftSignature = '';
+      lastPersistedLocalDraft = null;
       localDraftPresence = 'absent';
       localDraftPersistenceFailed.value = false;
+      if (retirement === 'conflict') {
+        toast.info('A different local deck draft remains available in this browser.');
+      }
       return true;
     } catch {
       localDraftPersistenceFailed.value = true;
@@ -577,6 +678,7 @@ export const useDeckEditor = () => {
       return;
     }
     lastLocalDraftSignature = '';
+    lastPersistedLocalDraft = null;
     localDraftPresence = 'absent';
     localDraftPersistenceFailed.value = false;
     deck.resetLocalDraft();
@@ -602,6 +704,7 @@ export const useDeckEditor = () => {
       if (lastLocalDraftSignature) {
         if (clearLocalDraftStorage()) {
           lastLocalDraftSignature = '';
+          lastPersistedLocalDraft = null;
           localDraftPresence = 'absent';
           localDraftPersistenceFailed.value = false;
         } else {
@@ -622,8 +725,9 @@ export const useDeckEditor = () => {
       return true;
     }
     try {
-      localDraftStorage.save(localDraftOwnerId, deck.form, cardLookup.value);
-      lastLocalDraftSignature = signature;
+      const storedDraft = localDraftStorage.save(localDraftOwnerId, deck.form, cardLookup.value);
+      lastLocalDraftSignature = localDraftContentSignature(storedDraft);
+      lastPersistedLocalDraft = storedDraft;
       localDraftPresence = 'present';
       localDraftPersistenceFailed.value = false;
       return true;

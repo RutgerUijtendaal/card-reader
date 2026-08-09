@@ -108,15 +108,36 @@ describe('deckEditorLocalDraftStorage', () => {
       },
     } satisfies Storage;
     const storage = createDeckEditorLocalDraftStorage(storageBackend);
-    storage.save('user-1', { ...createEmptyDeckForm(), name: 'Created Deck' }, {});
+    const draft = storage.save(
+      'user-1',
+      { ...createEmptyDeckForm(), name: 'Created Deck' },
+      {},
+    );
 
-    storage.retire('user-1', 'deck-created');
+    expect(storage.retire('user-1', 'deck-created', draft)).toBe('retired');
 
     expect(removeItem).toHaveBeenCalled();
     expect(storage.load('user-1')).toBeNull();
     expect(values.get('card-reader.deck-editor.new-draft.user-1')).toContain(
       '"createdDeckId":"deck-created"',
     );
+  });
+
+  test('does not retire a different tab\'s saved draft', () => {
+    const storage = createDeckEditorLocalDraftStorage();
+    const firstTabDraft = storage.save(
+      'user-1',
+      { ...createEmptyDeckForm(), name: 'First tab deck' },
+      {},
+    );
+    const secondTabDraft = storage.save(
+      'user-1',
+      { ...createEmptyDeckForm(), name: 'Second tab deck' },
+      {},
+    );
+
+    expect(storage.retire('user-1', 'deck-created', firstTabDraft)).toBe('conflict');
+    expect(storage.load('user-1')).toEqual(secondTabDraft);
   });
 
   test('guards browser storage access when the property itself is blocked', () => {

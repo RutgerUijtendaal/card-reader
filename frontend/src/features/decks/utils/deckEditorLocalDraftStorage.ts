@@ -31,7 +31,11 @@ export type DeckEditorLocalDraftStorage = {
     cardLookup: Record<string, DeckCardSummary>,
   ) => StoredDeckEditorDraft;
   clear: (ownerId: string) => void;
-  retire: (ownerId: string, createdDeckId: string) => void;
+  retire: (
+    ownerId: string,
+    createdDeckId: string,
+    expectedDraft: StoredDeckEditorDraft | null,
+  ) => 'absent' | 'conflict' | 'retired';
 };
 
 const storageKey = (ownerId: string): string => `${STORAGE_PREFIX}${ownerId}`;
@@ -238,6 +242,12 @@ const cloneForm = (form: DeckForm): DeckForm => ({
   suggested_type_labels: [...form.suggested_type_labels],
 });
 
+const storedDraftIdentity = (draft: StoredDeckEditorDraft): string => JSON.stringify({
+  savedAt: draft.savedAt,
+  form: draft.form,
+  cards: draft.cards,
+});
+
 export const buildStoredDeckEditorDraft = (
   ownerId: string,
   form: DeckForm,
@@ -334,12 +344,38 @@ export const createDeckEditorLocalDraftStorage = (
       }
       requireStorage().removeItem(storageKey(ownerId));
     },
-    retire(ownerId, createdDeckId) {
+    retire(ownerId, createdDeckId, expectedDraft) {
       if (!ownerId || !createdDeckId) {
         throw new Error('Local draft storage is unavailable.');
       }
       const activeStorage = requireStorage();
       const key = storageKey(ownerId);
+      let raw: string | null;
+      try {
+        raw = activeStorage.getItem(key);
+      } catch {
+        throw new Error('Local draft storage is unavailable.');
+      }
+      if (!raw) {
+        return 'absent';
+      }
+      let storedValue: unknown;
+      try {
+        storedValue = JSON.parse(raw) as unknown;
+      } catch {
+        return 'conflict';
+      }
+      if (isRetiredDraft(storedValue, ownerId)) {
+        return 'absent';
+      }
+      const currentDraft = parseStoredDeckEditorDraft(storedValue, ownerId);
+      if (
+        currentDraft === null
+        || expectedDraft === null
+        || storedDraftIdentity(currentDraft) !== storedDraftIdentity(expectedDraft)
+      ) {
+        return 'conflict';
+      }
       try {
         activeStorage.removeItem(key);
       } catch {
@@ -351,6 +387,7 @@ export const createDeckEditorLocalDraftStorage = (
         };
         activeStorage.setItem(key, JSON.stringify(marker));
       }
+      return 'retired';
     },
   };
 };

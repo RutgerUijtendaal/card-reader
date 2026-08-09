@@ -19,7 +19,9 @@ const {
   applyHeroAffinityManaPresetMock,
   loadFiltersMock,
   searchCardsMock,
+  fetchCardMock,
   fetchCardsMock,
+  fetchDeckTagsMock,
 } = vi.hoisted(() => ({
   createDeckMock: vi.fn(),
   fetchDeckRulesMetadataMock: vi.fn(async () => ({
@@ -36,6 +38,7 @@ const {
   applyHeroAffinityManaPresetMock: vi.fn(),
   loadFiltersMock: vi.fn(async (): Promise<void> => undefined),
   searchCardsMock: vi.fn(async () => undefined),
+  fetchCardMock: vi.fn(),
   fetchCardsMock: vi.fn(async () => ({
     count: 0,
     next_page: null,
@@ -44,15 +47,18 @@ const {
     page_size: 100,
     results: [] as CardListItem[],
   })),
+  fetchDeckTagsMock: vi.fn(),
 }));
 
 vi.mock('@/domain/cards/api', () => ({
+  fetchCard: fetchCardMock,
   fetchCards: fetchCardsMock,
 }));
 
 vi.mock('@/domain/decks/api', () => ({
   createDeck: createDeckMock,
   fetchDeckRulesMetadata: fetchDeckRulesMetadataMock,
+  fetchDeckTags: fetchDeckTagsMock,
   fetchMyDeck: fetchMyDeckMock,
   updateDeck: updateDeckMock,
 }));
@@ -187,6 +193,8 @@ const mountController = async (path = '/my/decks/deck-1/edit') => {
 describe('useDeckEditor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    fetchCardMock.mockRejectedValue(new Error('Card not found'));
+    fetchDeckTagsMock.mockResolvedValue({ roles: [], types: [] });
     localStorage.setItem('card-reader.deck-editor.autosync', 'true');
     fetchMyDeckMock.mockResolvedValue({
       id: 'deck-1',
@@ -406,6 +414,79 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('removes recovered tag IDs that are no longer in the current catalog', async () => {
+    fetchDeckTagsMock.mockResolvedValueOnce({
+      roles: [{ id: 'role-current', key: 'current', label: 'Current', kind: 'role' }],
+      types: [],
+    });
+    const form = createEmptyDeckForm();
+    form.name = 'Recovered Deck';
+    form.tag_ids = ['role-current', 'role-deleted'];
+    createDeckEditorLocalDraftStorage().save('user-1', form, {});
+    const mounted = await mountController('/my/decks/new');
+
+    await mounted.controller.resumeLocalDraft();
+    await nextTick();
+
+    expect(mounted.controller.deck.form.tag_ids).toEqual(['role-current']);
+    expect(createDeckEditorLocalDraftStorage().load('user-1')?.form.tag_ids).toEqual([
+      'role-current',
+    ]);
+
+    mounted.unmount();
+  });
+
+  test('resolves merged card IDs and coalesces recovered entries', async () => {
+    const form = createEmptyDeckForm();
+    form.name = 'Recovered Deck';
+    form.hero_card_id = 'hero-merged';
+    form.entries = [
+      { card_id: 'card-merged', quantity: 2 },
+      { card_id: 'card-target', quantity: 1 },
+    ];
+    form.sideboards = [{
+      id: 'sideboard-1',
+      name: 'Maybeboard',
+      entries: [{ card_id: 'card-merged', quantity: 4 }],
+    }];
+    createDeckEditorLocalDraftStorage().save('user-1', form, {
+      'hero-merged': buildHero('hero-merged', 'Stored Hero'),
+      'card-merged': buildCard('card-merged', 'Stored Card'),
+      'card-target': buildCard('card-target', 'Target Card'),
+    });
+    fetchCardsMock.mockResolvedValueOnce({
+      count: 1,
+      next_page: null,
+      previous_page: null,
+      page: 1,
+      page_size: 100,
+      results: [buildCard('card-target', 'Target Card')],
+    });
+    fetchCardMock.mockImplementation(async (cardId: string) => {
+      if (cardId === 'hero-merged') {
+        return buildHero('hero-target', 'Target Hero');
+      }
+      if (cardId === 'card-merged') {
+        return buildCard('card-target', 'Target Card');
+      }
+      throw new Error('Card not found');
+    });
+    const mounted = await mountController('/my/decks/new');
+
+    await mounted.controller.resumeLocalDraft();
+
+    expect(mounted.controller.deck.form.hero_card_id).toBe('hero-target');
+    expect(mounted.controller.deck.form.entries).toEqual([
+      { card_id: 'card-target', quantity: 3 },
+    ]);
+    expect(mounted.controller.deck.form.sideboards[0]?.entries).toEqual([
+      { card_id: 'card-target', quantity: 4 },
+    ]);
+    expect(mounted.controller.deck.selectedHero.value?.name).toBe('Target Hero');
+
+    mounted.unmount();
+  });
+
   test('discards a pending local draft and starts with an empty Cards screen', async () => {
     createDeckEditorLocalDraftStorage().save(
       'user-1',
@@ -548,6 +629,33 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('preserves another tab\'s newer local draft after creation', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Created in first tab');
+    await nextTick();
+
+    const otherTabForm = createEmptyDeckForm();
+    otherTabForm.name = 'Keep from second tab';
+    createDeckEditorLocalDraftStorage().save('user-1', otherTabForm, {});
+
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
+    expect(createDeckEditorLocalDraftStorage().load('user-1')?.form.name).toBe(
+      'Keep from second tab',
+    );
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      'A different local deck draft remains available in this browser.',
+    );
+
+    mounted.unmount();
+  });
+
   test('finishes creation when draft storage was confirmed empty before writes failed', async () => {
     const draftStorageKey = 'card-reader.deck-editor.new-draft.user-1';
     const originalGetItem = Storage.prototype.getItem;
@@ -588,7 +696,7 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
-  test('does not skip retirement when an older draft was unreadable during creation', async () => {
+  test('preserves a conflicting draft when storage becomes readable after creation', async () => {
     const staleForm = createEmptyDeckForm();
     staleForm.name = 'Hidden Older Draft';
     createDeckEditorLocalDraftStorage().save('user-1', staleForm, {});
@@ -636,7 +744,9 @@ describe('useDeckEditor', () => {
     expect(mounted.router.currentRoute.value.fullPath).toBe(
       '/my/decks/deck-new/edit?editor_mode=cards',
     );
-    expect(createDeckEditorLocalDraftStorage().load('user-1')).toBeNull();
+    expect(createDeckEditorLocalDraftStorage().load('user-1')?.form.name).toBe(
+      'Hidden Older Draft',
+    );
 
     mounted.unmount();
   });
