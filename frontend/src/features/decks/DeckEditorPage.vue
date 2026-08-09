@@ -12,6 +12,11 @@
       <template #actions>
         <div
           v-if="!controller.isChangingHero.value"
+          class="deck-editor-header-divider theme-divider hidden h-6 border-l lg:block"
+          aria-hidden="true"
+        />
+        <div
+          v-if="!controller.isChangingHero.value"
           class="flex items-center gap-1"
         >
           <AppHeaderAction
@@ -40,23 +45,32 @@
             @click="controller.openCards()"
           />
         </div>
-        <AppHeaderAction
-          v-if="!controller.isPublished.value && controller.hasLocalDraft.value"
-          :icon="Trash2"
-          label="Discard local draft"
-          short-label="Discard"
-          @click="controller.requestDiscardLocalDraft()"
-        />
-        <AppHeaderAction
+        <div
           v-if="!controller.isChangingHero.value"
-          :icon="deckSaveActionIcon"
-          :label="deckSaveActionLabel"
-          :short-label="deckSaveActionShortLabel"
-          variant="primary"
-          :icon-class="controller.manualSaving.value ? 'animate-spin' : ''"
-          :disabled="controller.manualSaving.value"
-          @click="() => controller.saveDeck()"
+          class="deck-editor-header-divider theme-divider hidden h-6 border-l lg:block"
+          aria-hidden="true"
         />
+        <div
+          v-if="!controller.isChangingHero.value"
+          class="flex items-center gap-2"
+        >
+          <AppHeaderAction
+            v-if="!controller.isPublished.value && controller.hasLocalDraft.value"
+            :icon="Trash2"
+            label="Discard local draft"
+            short-label="Discard"
+            @click="controller.requestDiscardLocalDraft()"
+          />
+          <AppHeaderAction
+            :icon="deckSaveActionIcon"
+            :label="deckSaveActionLabel"
+            :short-label="deckSaveActionShortLabel"
+            variant="primary"
+            :icon-class="controller.manualSaving.value ? 'animate-spin' : ''"
+            :disabled="controller.manualSaving.value"
+            @click="() => controller.saveDeck()"
+          />
+        </div>
       </template>
     </AppPageHeader>
 

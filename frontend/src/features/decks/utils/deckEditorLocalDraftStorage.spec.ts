@@ -91,4 +91,23 @@ describe('deckEditorLocalDraftStorage', () => {
 
     expect(storage.load('user-1')).toBeNull();
   });
+
+  test('guards browser storage access when the property itself is blocked', () => {
+    const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => {
+        throw new DOMException('Storage is blocked.', 'SecurityError');
+      },
+    });
+
+    try {
+      const storage = createDeckEditorLocalDraftStorage();
+      expect(() => storage.load('user-1')).toThrow('Local draft storage is unavailable.');
+    } finally {
+      if (localStorageDescriptor) {
+        Object.defineProperty(globalThis, 'localStorage', localStorageDescriptor);
+      }
+    }
+  });
 });

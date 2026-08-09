@@ -244,44 +244,70 @@ export const buildStoredDeckEditorDraft = (
   };
 };
 
+const resolveBrowserStorage = (): Storage | null => {
+  try {
+    return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage;
+  } catch {
+    return null;
+  }
+};
+
 export const createDeckEditorLocalDraftStorage = (
-  storage: Storage | null = typeof localStorage === 'undefined' ? null : localStorage,
-): DeckEditorLocalDraftStorage => ({
-  load(ownerId) {
-    if (!storage || !ownerId) {
-      return null;
+  storage?: Storage | null,
+): DeckEditorLocalDraftStorage => {
+  const resolvedStorage = storage === undefined ? resolveBrowserStorage() : storage;
+  const requireStorage = (): Storage => {
+    if (!resolvedStorage) {
+      throw new Error('Local draft storage is unavailable.');
     }
-    const key = storageKey(ownerId);
-    try {
-      const raw = storage.getItem(key);
+    return resolvedStorage;
+  };
+
+  return {
+    load(ownerId) {
+      if (!ownerId) {
+        return null;
+      }
+      const activeStorage = requireStorage();
+      const key = storageKey(ownerId);
+      let raw: string | null;
+      try {
+        raw = activeStorage.getItem(key);
+      } catch {
+        throw new Error('Local draft storage is unavailable.');
+      }
       if (!raw) {
         return null;
       }
-      const parsed = parseStoredDeckEditorDraft(JSON.parse(raw) as unknown, ownerId);
-      if (parsed === null) {
-        storage.removeItem(key);
-      }
-      return parsed;
-    } catch {
       try {
-        storage.removeItem(key);
+        const parsed = parseStoredDeckEditorDraft(JSON.parse(raw) as unknown, ownerId);
+        if (parsed === null) {
+          activeStorage.removeItem(key);
+        }
+        return parsed;
       } catch {
-        // The caller will surface storage write failures if the browser blocks access.
+        try {
+          activeStorage.removeItem(key);
+        } catch {
+          throw new Error('Local draft storage is unavailable.');
+        }
+        return null;
       }
-      return null;
-    }
-  },
-  save(ownerId, form, cardLookup) {
-    if (!storage || !ownerId) {
-      throw new Error('Local draft storage is unavailable.');
-    }
-    const draft = buildStoredDeckEditorDraft(ownerId, form, cardLookup);
-    storage.setItem(storageKey(ownerId), JSON.stringify(draft));
-    return draft;
-  },
-  clear(ownerId) {
-    if (storage && ownerId) {
-      storage.removeItem(storageKey(ownerId));
-    }
-  },
-});
+    },
+    save(ownerId, form, cardLookup) {
+      if (!ownerId) {
+        throw new Error('Local draft storage is unavailable.');
+      }
+      const activeStorage = requireStorage();
+      const draft = buildStoredDeckEditorDraft(ownerId, form, cardLookup);
+      activeStorage.setItem(storageKey(ownerId), JSON.stringify(draft));
+      return draft;
+    },
+    clear(ownerId) {
+      if (!ownerId) {
+        return;
+      }
+      requireStorage().removeItem(storageKey(ownerId));
+    },
+  };
+};

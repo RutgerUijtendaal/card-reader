@@ -362,6 +362,7 @@ describe('DeckEditorPage', () => {
     expect(heroTab).not.toBeNull();
     expect(mounted.container.querySelector('button[aria-label="Open deck details"]')).not.toBeNull();
     expect(mounted.container.querySelector('button[aria-label="Open deck cards"]')).not.toBeNull();
+    expect(mounted.container.querySelectorAll('.deck-editor-header-divider')).toHaveLength(2);
     expect(createButton?.textContent).toBe('Create');
     expect(autosyncCheckbox?.disabled).toBe(true);
     expect(mounted.container.textContent).toContain('Autosync after creation');
