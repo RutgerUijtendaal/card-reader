@@ -40,7 +40,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Capture an immutable request payload and idempotency key before uncertain mutations; retries must reuse both exactly.
 - Treat browser persistence, server mutation, and cleanup as independent failure domains. Confirmed server success is terminal even when local cleanup fails.
 - Catch request failures only around the request itself. Post-success routing, callbacks, or cleanup errors must not re-enter request reconciliation or replace confirmed success with an uncertain state.
-- If terminal-success navigation can fail, retain a single-flight navigation retry that never repeats the server mutation.
+- If terminal-success navigation can fail, retain a single-flight navigation retry that never repeats the server mutation. Keep mutations locked until navigation succeeds while leaving only that retry action available.
 - Run authoritative pending-request reconciliation even when auxiliary recovery work such as filters, snapshots, or metadata hydration fails; those failures must not unlock mutation first.
 - A lookup miss is definitive only when paired with authoritative evidence that the originating mutation failed. The presence of an HTTP response is insufficient: gateway errors and request timeouts can race an upstream commit. On reload, timeout-only misses must retain the immutable pending request for idempotent retry.
 - Use revision-conditional writes plus native storage events for cross-tab state. A `localStorage` read followed by a write is not atomic; serialize the comparison and mutation with Web Locks or use a transactional persistence primitive, falling back to memory-only when atomicity is unavailable. Pause mutation and require an explicit conflict resolution instead of silently choosing a source of truth.
@@ -49,7 +49,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - For queued destructive actions and explicit conflict resolutions, preserve the decision-time revision or re-check conflict state inside the queued callback. Never derive permission from a newer remote revision observed while waiting.
 - Bind destructive confirmations to the state that opened them and close them when a conflict replaces that state. Never overwrite a remote draft while it contains an unresolved immutable request.
 - Recovery and cross-tab conflict UI must be mutually exclusive. If a conflict interrupts recovery, preserve the recovered draft as the local conflict candidate before closing the recovery decision surface.
-- Keep local retirement markers until conditionally replaced by a new draft. Once a tab learns that its draft key was created elsewhere, preserve that fact through later slot changes so the Keep action must assign a fresh key.
+- Keep local retirement knowledge separate from the currently observed storage slot. Once a tab learns that its draft key was created elsewhere, preserve that fact through later slot changes so Keep assigns a fresh key, but always derive the visible conflict and overwrite preconditions from the latest slot.
 - Before routing from a retirement marker, resolve its creation key against the server. A deleted outcome must preserve the local contents under a fresh key instead of navigating to a stale resource.
 - Allow an unresolved request to leave only when its exact immutable key and payload are durably recoverable. Memory-only or conflict-displaced attempts must remain on the page until resolved.
 

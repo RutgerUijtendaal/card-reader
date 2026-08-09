@@ -548,6 +548,9 @@ const deckSaveActionIcon = computed(() => {
   return controller.isPublished.value ? Save : Hammer;
 });
 const deckSaveActionLabel = computed(() => {
+  if (controller.terminalNavigationPending.value) {
+    return 'Continue after confirmed deck outcome';
+  }
   if (controller.creationState.value.status === 'unknown') {
     return 'Retry deck creation';
   }
@@ -557,14 +560,20 @@ const deckSaveActionLabel = computed(() => {
   return controller.isPublished.value ? 'Save deck' : 'Create deck';
 });
 const deckSaveActionShortLabel = computed(() => {
+  if (controller.terminalNavigationPending.value) return 'Continue';
   if (controller.creationState.value.status === 'unknown') return 'Retry';
   return controller.isPublished.value ? 'Save' : 'Create';
 });
 const deckSaveActionPending = computed(
-  () => controller.manualSaving.value || controller.creationState.value.status === 'creating',
+  () => controller.manualSaving.value
+    || controller.creationState.value.status === 'creating'
+    || controller.terminalNavigationInFlight.value,
 );
 const deckSaveActionDisabled = computed(() => {
   if (controller.isPublished.value) return controller.manualSaving.value;
+  if (controller.terminalNavigationPending.value) {
+    return controller.terminalNavigationInFlight.value;
+  }
   if (controller.creationState.value.status === 'unknown') return false;
   return controller.isMutationLocked.value;
 });

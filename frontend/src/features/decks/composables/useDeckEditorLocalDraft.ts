@@ -12,6 +12,7 @@ import {
   deckEditorDraftStorageKey,
   parseDeckEditorDraftSlotValue,
   type DeckEditorDraftSlot,
+  type RetiredDeckEditorDraft,
   type StoredCreateAttempt,
   type StoredDeckEditorDraft,
 } from '@/features/decks/utils/deckEditorLocalDraftStorage';
@@ -57,6 +58,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   const draftId = ref(createDeckEditorDraftId());
   const observedSlot = ref<DeckEditorDraftSlot>({ kind: 'empty' });
   const storedDraft = ref<StoredDeckEditorDraft | null>(null);
+  const knownRetirement = ref<RetiredDeckEditorDraft | null>(null);
   let warningShown = false;
   let mutationQueue = Promise.resolve();
 
@@ -91,16 +93,16 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   };
 
   const enterConflict = (slot: DeckEditorDraftSlot): void => {
-    const existingCreatedElsewhere = conflict.value?.kind === 'created-elsewhere'
-      ? conflict.value
-      : null;
+    if (slot.kind === 'retired' && slot.marker.draftId === draftId.value) {
+      knownRetirement.value = slot.marker;
+    }
     if (pendingRecovery.value) {
       recoveryConflictCandidate.value = pendingRecovery.value;
       storedDraft.value = pendingRecovery.value;
       pendingRecovery.value = null;
     }
     observedSlot.value = slot;
-    conflict.value = existingCreatedElsewhere ?? conflictFromSlot(slot);
+    conflict.value = conflictFromSlot(slot);
     setPersistenceState({ status: 'conflict' });
   };
 
@@ -125,6 +127,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     pendingRecovery.value = null;
     recoveryConflictCandidate.value = null;
     storedDraft.value = draft;
+    knownRetirement.value = null;
     draftId.value = draft.draftId;
     observedSlot.value = { kind: 'draft', draft };
     if (persistenceState.value.status === 'conflict') {
@@ -312,6 +315,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     const draft = conflict.value.slot.draft;
     conflict.value = null;
     recoveryConflictCandidate.value = null;
+    knownRetirement.value = null;
     beginRecoveredDraft(draft);
     return draft;
   };
@@ -325,14 +329,16 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
       toast.info('The stored draft has an unconfirmed Create request. Load it before replacing it.');
       return false;
     }
-    if (asNewDraft && storedDraft.value?.pendingCreateAttempt) return false;
-    if (asNewDraft) draftId.value = createDeckEditorDraftId();
+    const mustRekey = knownRetirement.value?.draftId === draftId.value;
+    const shouldRekey = asNewDraft || mustRekey;
+    if (shouldRekey && storedDraft.value?.pendingCreateAttempt && !mustRekey) return false;
+    if (shouldRekey) draftId.value = createDeckEditorDraftId();
     const nextDraft = buildStoredDeckEditorDraft(
       options.ownerId,
       draftId.value,
       options.form,
       options.cardLookup.value,
-      asNewDraft ? null : storedDraft.value?.pendingCreateAttempt ?? null,
+      shouldRekey ? null : storedDraft.value?.pendingCreateAttempt ?? null,
     );
     const expectedSlot = deckEditorDraftSlotToken(observedSlot.value);
     const result = await enqueueMutation(async () => await storage.save(
@@ -343,6 +349,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
       conflict.value = null;
       recoveryConflictCandidate.value = null;
       storedDraft.value = nextDraft;
+      knownRetirement.value = null;
       setPersistenceState({ status: 'memory-only' });
       warnStorageUnavailable('This deck could not be saved to local browser storage.');
       return true;
@@ -356,6 +363,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     observedSlot.value = { kind: 'draft', draft: result.draft };
     conflict.value = null;
     recoveryConflictCandidate.value = null;
+    knownRetirement.value = null;
     setPersistenceState({ status: 'synced' });
     return true;
   };
@@ -365,6 +373,7 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     conflict.value = null;
     recoveryConflictCandidate.value = null;
     storedDraft.value = null;
+    knownRetirement.value = null;
     draftId.value = createDeckEditorDraftId();
     setPersistenceState({ status: 'synced' });
     return true;

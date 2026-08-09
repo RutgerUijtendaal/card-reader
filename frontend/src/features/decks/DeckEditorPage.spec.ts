@@ -18,6 +18,8 @@ const { controller } = vi.hoisted(() => {
       manualSaving: refValue(false),
       isCreating: refValue(false),
       isMutationLocked: refValue(false),
+      terminalNavigationPending: refValue(false),
+      terminalNavigationInFlight: refValue(false),
       creationState: refValue<
         | { status: 'idle' }
         | { status: 'creating' }
@@ -260,6 +262,8 @@ describe('DeckEditorPage', () => {
     controller.manualSaving.value = false;
     controller.isCreating.value = false;
     controller.isMutationLocked.value = false;
+    controller.terminalNavigationPending.value = false;
+    controller.terminalNavigationInFlight.value = false;
     controller.creationState.value = { status: 'idle' };
     controller.changeStatusLabel.value = 'Unsaved';
     controller.hasUnsavedChanges.value = true;
@@ -516,6 +520,43 @@ describe('DeckEditorPage', () => {
     expect(retryButton?.disabled).toBe(false);
     retryButton?.click();
     expect(controller.saveDeck).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
+
+  test('offers Continue while a confirmed outcome is waiting for navigation', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isMutationLocked.value = true;
+    controller.terminalNavigationPending.value = true;
+
+    const mounted = await mountPage();
+    const continueButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Continue after confirmed deck outcome"]',
+    );
+
+    expect(continueButton?.textContent).toBe('Continue');
+    expect(continueButton?.disabled).toBe(false);
+    continueButton?.click();
+    expect(controller.saveDeck).toHaveBeenCalledTimes(1);
+
+    mounted.unmount();
+  });
+
+  test('disables Continue while terminal navigation is in flight', async () => {
+    controller.deckId.value = '';
+    controller.isPublished.value = false;
+    controller.isMutationLocked.value = true;
+    controller.terminalNavigationPending.value = true;
+    controller.terminalNavigationInFlight.value = true;
+
+    const mounted = await mountPage();
+    const continueButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Continue after confirmed deck outcome"]',
+    );
+
+    expect(continueButton?.disabled).toBe(true);
+    expect(continueButton?.querySelector('svg')?.classList.contains('animate-spin')).toBe(true);
 
     mounted.unmount();
   });

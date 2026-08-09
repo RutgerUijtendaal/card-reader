@@ -1179,17 +1179,29 @@ describe('useDeckEditor', () => {
     mounted.controller.openHero();
     mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
     mounted.controller.deck.setDeckName('Created Before Route Failure');
-    const replaceSpy = vi.spyOn(mounted.router, 'replace').mockRejectedValueOnce(
-      new Error('Router unavailable'),
+    let rejectNavigation: (reason?: unknown) => void = () => undefined;
+    const replaceSpy = vi.spyOn(mounted.router, 'replace').mockImplementationOnce(
+      async () => await new Promise<never>((_resolve, reject) => {
+        rejectNavigation = reject;
+      }),
     );
 
-    await mounted.controller.saveDeck();
+    const savePromise = mounted.controller.saveDeck();
+    await vi.waitFor(() => expect(replaceSpy).toHaveBeenCalledTimes(1));
+
+    expect(mounted.controller.isMutationLocked.value).toBe(true);
+    expect(mounted.controller.terminalNavigationPending.value).toBe(true);
+
+    rejectNavigation(new Error('Router unavailable'));
+    await savePromise;
 
     expect(createDeckMock).toHaveBeenCalledTimes(1);
     expect(fetchMyDeckByCreationKeyMock).not.toHaveBeenCalled();
     expect(mounted.controller.creationState.value).toEqual({ status: 'idle' });
+    expect(mounted.controller.isMutationLocked.value).toBe(true);
+    expect(mounted.controller.terminalNavigationPending.value).toBe(true);
     expect(toastErrorMock).toHaveBeenCalledWith(
-      'The deck was created, but its editor could not be opened. Click Create to try again.',
+      'The deck was created, but its editor could not be opened. Click Continue to try again.',
     );
 
     await mounted.controller.saveDeck();
@@ -1197,6 +1209,7 @@ describe('useDeckEditor', () => {
     expect(mounted.router.currentRoute.value.fullPath).toBe(
       '/my/decks/deck-new/edit?editor_mode=cards',
     );
+    expect(mounted.controller.terminalNavigationPending.value).toBe(false);
 
     replaceSpy.mockRestore();
     mounted.unmount();
@@ -1217,13 +1230,16 @@ describe('useDeckEditor', () => {
 
     expect(createDeckMock).toHaveBeenCalledTimes(1);
     expect(mounted.controller.creationState.value).toEqual({ status: 'idle' });
+    expect(mounted.controller.isMutationLocked.value).toBe(true);
+    expect(mounted.controller.terminalNavigationPending.value).toBe(true);
     expect(toastErrorMock).toHaveBeenCalledWith(
-      'The deleted deck was confirmed, but navigation failed. Click Create to try again.',
+      'The deleted deck was confirmed, but navigation failed. Click Continue to try again.',
     );
 
     await mounted.controller.saveDeck();
     expect(createDeckMock).toHaveBeenCalledTimes(1);
     expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks');
+    expect(mounted.controller.terminalNavigationPending.value).toBe(false);
 
     replaceSpy.mockRestore();
     mounted.unmount();
@@ -1463,11 +1479,12 @@ describe('useDeckEditor', () => {
     expect(replacement.status).toBe('saved');
     dispatchDraftStorageEvent('user-1');
 
-    expect(mounted.controller.localDraftConflict.value?.kind).toBe('created-elsewhere');
-    await mounted.controller.keepConflictAsNewDraft();
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('active-draft');
+    await mounted.controller.keepThisConflictDraft();
     const keptDraft = loadLocalDraft('user-1');
 
     expect(keptDraft?.draftId).not.toBe(activeDraft.draftId);
+    expect(keptDraft?.draftId).not.toBe(replacementDraft.draftId);
     expect(keptDraft?.form.name).toBe('Keep Separate');
     expect(mounted.controller.persistenceState.value.status).toBe('synced');
     mounted.unmount();

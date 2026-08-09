@@ -575,9 +575,12 @@ export const useDeckEditor = () => {
     onDeleted: finishDeletedDeckCreation,
   });
 
-  const isMutationLocked = computed(() => !isPublished.value && isDeckMutationLocked(
-    localDraft.persistenceState.value,
-    publication.creationState.value,
+  const isMutationLocked = computed(() => !isPublished.value && (
+    publication.hasTerminalNavigationRetry.value
+    || isDeckMutationLocked(
+      localDraft.persistenceState.value,
+      publication.creationState.value,
+    )
   ));
   const isCreating = publication.isCreating;
   const hasNonDurableUnknownAttempt = computed(() => {
@@ -591,7 +594,9 @@ export const useDeckEditor = () => {
     });
   });
   const conflictActionsLocked = computed(
-    () => publication.creationState.value.status !== 'idle' || recoveryActionPending.value,
+    () => publication.creationState.value.status !== 'idle'
+      || publication.hasTerminalNavigationRetry.value
+      || recoveryActionPending.value,
   );
   const localDraftConflictModalOpen = computed(
     () => localDraft.conflict.value !== null && !conflictActionsLocked.value,
@@ -884,6 +889,8 @@ export const useDeckEditor = () => {
     manualSaving,
     isCreating,
     isMutationLocked,
+    terminalNavigationPending: publication.hasTerminalNavigationRetry,
+    terminalNavigationInFlight: publication.terminalNavigationInFlight,
     creationState: publication.creationState,
     persistenceState: localDraft.persistenceState,
     hasUnsavedChanges,

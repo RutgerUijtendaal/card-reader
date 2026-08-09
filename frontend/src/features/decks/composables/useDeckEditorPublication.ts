@@ -97,22 +97,25 @@ const isDefinitiveCreateRejection = (error: unknown): boolean => {
 export const useDeckEditorPublication = (options: UseDeckEditorPublicationOptions) => {
   const creationState = ref<DeckCreationState>({ status: 'idle' });
   const attempt = ref<CreateAttempt | null>(null);
+  const terminalNavigationRetry = ref<(() => Promise<void>) | null>(null);
+  const terminalNavigationInFlight = ref(false);
   let publicationSucceeded = false;
-  let terminalNavigationRetry: (() => Promise<void>) | null = null;
 
   const setCreationState = (next: DeckCreationState): void => {
     creationState.value = transitionDeckCreation(creationState.value, next);
   };
 
   const runTerminalNavigation = async (errorMessage: string): Promise<void> => {
-    const navigation = terminalNavigationRetry;
-    if (!navigation) return;
-    terminalNavigationRetry = null;
+    const navigation = terminalNavigationRetry.value;
+    if (!navigation || terminalNavigationInFlight.value) return;
+    terminalNavigationInFlight.value = true;
     try {
       await navigation();
+      if (terminalNavigationRetry.value === navigation) terminalNavigationRetry.value = null;
     } catch {
-      terminalNavigationRetry = navigation;
       toast.error(errorMessage);
+    } finally {
+      terminalNavigationInFlight.value = false;
     }
   };
 
@@ -120,10 +123,10 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     if (publicationSucceeded) return;
     publicationSucceeded = true;
     options.retireAfterCreation(currentAttempt.draftId, record.id);
-    terminalNavigationRetry = async () => await options.onSuccess(record, currentAttempt);
+    terminalNavigationRetry.value = async () => await options.onSuccess(record, currentAttempt);
     try {
       await runTerminalNavigation(
-        'The deck was created, but its editor could not be opened. Click Create to try again.',
+        'The deck was created, but its editor could not be opened. Click Continue to try again.',
       );
     } finally {
       if (creationState.value.status === 'creating' || creationState.value.status === 'unknown') {
@@ -136,10 +139,10 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     if (publicationSucceeded) return;
     publicationSucceeded = true;
     options.discardAfterDeletedCreation(currentAttempt.draftId);
-    terminalNavigationRetry = async () => await options.onDeleted(currentAttempt);
+    terminalNavigationRetry.value = async () => await options.onDeleted(currentAttempt);
     try {
       await runTerminalNavigation(
-        'The deleted deck was confirmed, but navigation failed. Click Create to try again.',
+        'The deleted deck was confirmed, but navigation failed. Click Continue to try again.',
       );
     } finally {
       if (creationState.value.status === 'creating' || creationState.value.status === 'unknown') {
@@ -283,6 +286,8 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
   return {
     creationState,
     attempt,
+    hasTerminalNavigationRetry: computed(() => terminalNavigationRetry.value !== null),
+    terminalNavigationInFlight: computed(() => terminalNavigationInFlight.value),
     isCreating: computed(() => creationState.value.status === 'creating'),
     isCreationUnknown: computed(() => creationState.value.status === 'unknown'),
     isReconciling: computed(
