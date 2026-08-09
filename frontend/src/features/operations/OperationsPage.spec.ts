@@ -26,6 +26,31 @@ const emptyPage: OperationsQueuePage = {
   results: [],
 };
 
+const historyPage: OperationsQueuePage = {
+  count: 1,
+  next_page: null,
+  previous_page: null,
+  page: 1,
+  page_size: 20,
+  results: [
+    {
+      id: 'sheet-1',
+      title: 'Card sheet 1',
+      status: 'running',
+      native_status: 'rendering',
+      created_at: '2026-08-08T02:00:00Z',
+      updated_at: '2026-08-08T03:00:00Z',
+      started_at: '2026-08-08T02:30:00Z',
+      finished_at: null,
+      progress_current: 4,
+      progress_total: 10,
+      error_message: null,
+      metadata: [],
+      links: [],
+    },
+  ],
+};
+
 const overview: OperationsOverview = {
   generated_at: '2026-08-08T03:00:00Z',
   stale_after_seconds: 30,
@@ -91,10 +116,10 @@ const overview: OperationsOverview = {
   ],
 };
 
-const mountPage = async (location: string) => {
+const mountPage = async (location: string, initialPage = emptyPage) => {
   mockedFetchOperationsOverview.mockResolvedValue(overview);
   mockedFetchOperationsQueuePage.mockImplementation(async (_queueKey, page, pageSize) => ({
-    ...emptyPage,
+    ...initialPage,
     page,
     page_size: pageSize,
     previous_page: page > 1 ? page - 1 : null,
@@ -145,6 +170,29 @@ describe('OperationsPage', () => {
     expect(selectedQueueButton?.getAttribute('aria-current')).toBe('page');
     expect(selectedQueueButton?.classList.contains('rounded-lg')).toBe(true);
     expect(selectedQueueButton?.textContent).toContain('running 1');
+
+    mounted.app.unmount();
+  });
+
+  test('keeps existing history visible when a manual refresh fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const mounted = await mountPage('/operations#queue-tts-card-sheets', historyPage);
+
+    await vi.waitFor(() => {
+      expect(mounted.container.textContent).toContain('Card sheet 1');
+    });
+    mockedFetchOperationsQueuePage.mockRejectedValueOnce(new Error('History unavailable'));
+
+    const refreshButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Refresh',
+    );
+    refreshButton?.click();
+
+    await vi.waitFor(() => {
+      expect(mounted.container.textContent).toContain('Queue history could not be loaded.');
+      expect(mounted.container.textContent).toContain('Card sheet 1');
+    });
+    expect(consoleError).toHaveBeenCalled();
 
     mounted.app.unmount();
   });

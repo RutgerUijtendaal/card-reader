@@ -124,9 +124,10 @@ def _paginate(
     page: int,
     page_size: int,
 ) -> PaginatedOperationsRows[OperationsRow]:
-    normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
     count = queryset.count()
+    last_page = max(1, (count + normalized_page_size - 1) // normalized_page_size)
+    normalized_page = min(max(page, 1), last_page)
     offset = (normalized_page - 1) * normalized_page_size
     return PaginatedOperationsRows(
         count=count,

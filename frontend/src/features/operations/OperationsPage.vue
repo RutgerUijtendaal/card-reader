@@ -186,7 +186,7 @@
           </div>
 
           <div
-            v-else-if="historyLoading"
+            v-if="historyLoading"
             class="theme-divider divide-y"
           >
             <div
@@ -205,7 +205,7 @@
           </div>
 
           <div
-            v-else-if="historyItems.length === 0"
+            v-else-if="historyItems.length === 0 && !historyErrorMessage"
             class="theme-section-muted flex min-h-48 items-center justify-center py-10 text-center text-sm"
           >
             <div class="space-y-1">
@@ -217,7 +217,7 @@
           </div>
 
           <div
-            v-else
+            v-else-if="historyItems.length > 0"
             class="theme-divider"
           >
             <OperationsQueueItemRow

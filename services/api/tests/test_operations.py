@@ -262,6 +262,15 @@ def test_operations_queue_history_is_paginated_and_deterministically_ordered() -
         "paged-import-05",
     ]
 
+    response = client.get("/operations/queues/imports", {"page": 999, "page_size": 3})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 3
+    assert payload["previous_page"] == 2
+    assert payload["next_page"] is None
+    assert [item["id"] for item in payload["results"]] == ["paged-import-06"]
+
 
 def test_operations_queue_history_validates_queue_and_pagination() -> None:
     user_model = get_user_model()
