@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file */
-import { createApp, defineComponent, h, nextTick } from 'vue';
+import { createApp, defineComponent, h, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { DeckBoardMoveDestination } from '@/features/decks/composables/deckEditorDraftTypes';
 import type { DeckEntrySummary } from '@/domain/decks/types';
@@ -85,36 +85,49 @@ const mountRow = async ({
   moveDestinations = [] as DeckBoardMoveDestination[],
   rowActionDisabled = false,
   rowSecondaryActionDisabled = false,
+  mutationDisabled = false,
 }: {
   entry?: DeckEntrySummary;
   moveDestinations?: DeckBoardMoveDestination[];
   rowActionDisabled?: boolean;
   rowSecondaryActionDisabled?: boolean;
+  mutationDisabled?: boolean;
 } = {}) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
 
   const events: string[] = [];
-  const app = createApp(DeckBuilderBoardEntryRow, {
-    entry,
-    sortableCardId: entry.card.id,
-    hoverMode: 'details',
-    moveDestinations,
-    rowActionDisabled,
-    rowSecondaryActionDisabled,
-    onRowAction: (cardId: string) => events.push(`row:${cardId}`),
-    onRowSecondaryAction: (cardId: string) => events.push(`row-secondary:${cardId}`),
-    onIncrement: (cardId: string) => events.push(`increment:${cardId}`),
-    onDecrement: (cardId: string) => events.push(`decrement:${cardId}`),
-    onRemove: (cardId: string) => events.push(`remove:${cardId}`),
-    onMoveToBoard: (cardId: string, destinationBoardId: string) => events.push(`move:${cardId}:${destinationBoardId}`),
+  const mutationDisabledState = ref(mutationDisabled);
+  const Root = defineComponent({
+    setup() {
+      return () => h(DeckBuilderBoardEntryRow, {
+        entry,
+        sortableCardId: entry.card.id,
+        hoverMode: 'details',
+        moveDestinations,
+        rowActionDisabled,
+        rowSecondaryActionDisabled,
+        mutationDisabled: mutationDisabledState.value,
+        onRowAction: (cardId: string) => events.push(`row:${cardId}`),
+        onRowSecondaryAction: (cardId: string) => events.push(`row-secondary:${cardId}`),
+        onIncrement: (cardId: string) => events.push(`increment:${cardId}`),
+        onDecrement: (cardId: string) => events.push(`decrement:${cardId}`),
+        onRemove: (cardId: string) => events.push(`remove:${cardId}`),
+        onMoveToBoard: (cardId: string, destinationBoardId: string) => events.push(`move:${cardId}:${destinationBoardId}`),
+      });
+    },
   });
+  const app = createApp(Root);
   app.mount(container);
   await nextTick();
 
   return {
     container,
     events,
+    setMutationDisabled: async (disabled: boolean): Promise<void> => {
+      mutationDisabledState.value = disabled;
+      await nextTick();
+    },
     unmount: () => {
       app.unmount();
       container.remove();
@@ -246,6 +259,33 @@ describe('DeckBuilderBoardEntryRow', () => {
 
     expect(mounted.events).toEqual(['move:card-1:mainboard']);
     expect(document.body.textContent ?? '').not.toContain('Move To Board');
+
+    mounted.unmount();
+  });
+
+  test('closes an open move menu and blocks mutations when creation starts', async () => {
+    const mounted = await mountRow({ moveDestinations: buildMoveDestinations() });
+    await showRowControls(mounted.container);
+    const moveButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Move card to another board"]',
+    );
+    moveButton?.click();
+    await nextTick();
+    expect(document.body.textContent ?? '').toContain('Move To Board');
+
+    await mounted.setMutationDisabled(true);
+
+    expect(document.body.textContent ?? '').not.toContain('Move To Board');
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('[aria-label="Add one copy"]')?.disabled,
+    ).toBe(true);
+    expect(
+      mounted.container.querySelector<HTMLButtonElement>('[aria-label="Remove card from board"]')?.disabled,
+    ).toBe(true);
+
+    mounted.container.querySelector<HTMLButtonElement>('[aria-label="Add one copy"]')?.click();
+    mounted.container.querySelector<HTMLButtonElement>('[aria-label="Remove card from board"]')?.click();
+    expect(mounted.events).toEqual([]);
 
     mounted.unmount();
   });

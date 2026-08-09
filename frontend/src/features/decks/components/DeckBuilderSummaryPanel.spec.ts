@@ -117,6 +117,7 @@ const buildController = () => {
     },
     loading: ref(false),
     saving: ref(false),
+    isCreating: ref(false),
     deckId: ref('deck-1'),
     backLink: ref('/my/decks'),
     backLabel: ref('Back'),
@@ -361,6 +362,23 @@ describe('DeckBuilderSummaryPanel', () => {
     expect(mounted.controller.deck.selectBoard).not.toHaveBeenCalledWith('side-1');
     expect(document.body.textContent ?? '').toContain('Rename');
     expect(document.body.textContent ?? '').toContain('Delete');
+
+    mounted.unmount();
+  });
+
+  test('closes teleported sideboard actions and disables sorting when creation starts', async () => {
+    const mounted = await mountPanel();
+    const sideboardActionsButton = await showSideboardActionsTrigger(mounted.container);
+    sideboardActionsButton.click();
+    await nextTick();
+    expect(document.body.textContent ?? '').toContain('Rename');
+
+    mounted.controller.isCreating.value = true;
+    await nextTick();
+
+    expect(document.body.textContent ?? '').not.toContain('Rename');
+    expect(document.body.textContent ?? '').not.toContain('Delete');
+    expect(sortableMock.option).toHaveBeenCalledWith('disabled', true);
 
     mounted.unmount();
   });

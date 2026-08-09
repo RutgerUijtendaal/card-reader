@@ -174,7 +174,7 @@
 
     <Teleport to="body">
       <div
-        v-if="sideboardActionsOpen && sideboardActionsTargetId"
+        v-if="sideboardActionsOpen && sideboardActionsTargetId && !controller.isCreating.value"
         ref="sideboardActionsPanelRef"
         class="theme-popover z-40 w-44 p-2"
         :style="{
@@ -187,6 +187,7 @@
           <button
             type="button"
             class="btn-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
+            :disabled="controller.isCreating.value"
             @click="
               beginRenameSideboard(
                 sideboardActionsTargetId,
@@ -202,6 +203,7 @@
           <button
             type="button"
             class="btn-danger-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
+            :disabled="controller.isCreating.value"
             @click="
               promptDeleteSideboard(
                 sideboardActionsTargetId,
@@ -287,6 +289,7 @@
           :class="{ 'deck-board-entry-pop': poppedBoardEntryCardId === entry.card.id }"
           :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
           :move-destinations="getMoveDestinations(entry.card.id)"
+          :mutation-disabled="controller.isCreating.value"
           :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
           :row-secondary-action-disabled="
             controller.deck.boardRowSecondaryActionDisabled(entry.card.id)
@@ -387,6 +390,9 @@ const sortableController = useSortable(boardEntriesSortableRef, sortableEntries,
     sortableController.option('bubbleScroll', false);
   },
   onUpdate: (event: { item: HTMLElement; newIndex?: number }): void => {
+    if (props.controller.isCreating.value) {
+      return;
+    }
     const movedCardId = event.item.dataset.cardId;
     if (!movedCardId || event.newIndex === undefined) {
       return;
@@ -510,7 +516,10 @@ watch(
   (entries) => {
     sortableEntries.value = [...entries];
     void nextTick(() => {
-      sortableController.option('disabled', entries.length < 2);
+      sortableController.option(
+        'disabled',
+        props.controller.isCreating.value || entries.length < 2,
+      );
     });
   },
   { immediate: true },
@@ -523,7 +532,7 @@ onBeforeUnmount(() => {
 });
 
 const selectSideboard = (sideboardId: string): void => {
-  if (editingSideboardId.value === sideboardId) {
+  if (props.controller.isCreating.value || editingSideboardId.value === sideboardId) {
     return;
   }
   props.controller.deck.selectBoard(sideboardId);
@@ -533,6 +542,9 @@ const getMoveDestinations = (cardId: string): DeckBoardMoveDestination[] =>
   props.controller.deck.getBoardMoveDestinations(cardId);
 
 const handleMoveToBoard = (cardId: string, destinationBoardId: string): void => {
+  if (props.controller.isCreating.value) {
+    return;
+  }
   props.controller.deck.moveEntryToBoard(cardId, destinationBoardId);
 };
 
@@ -542,6 +554,9 @@ const setEditingSideboardInputRef = (element: unknown): void => {
 
 const openSideboardActions = (event: MouseEvent, sideboardId: string): void => {
   event.stopPropagation();
+  if (props.controller.isCreating.value) {
+    return;
+  }
   sideboardActionsTriggerRef.value = event.currentTarget as HTMLElement | null;
   if (sideboardActionsOpen.value && sideboardActionsTargetId.value === sideboardId) {
     closeSideboardActions();
@@ -587,6 +602,9 @@ const shouldShowSideboardActions = (sideboardId: string): boolean => {
 };
 
 const beginRenameSideboard = async (sideboardId: string, name: string): Promise<void> => {
+  if (props.controller.isCreating.value) {
+    return;
+  }
   closeSideboardActions();
   sideboardActionsTargetId.value = null;
   editingSideboardId.value = sideboardId;
@@ -602,7 +620,7 @@ const cancelRenameSideboard = (): void => {
 };
 
 const commitRenameSideboard = (): void => {
-  if (!editingSideboardId.value) {
+  if (props.controller.isCreating.value || !editingSideboardId.value) {
     return;
   }
   const nextName = editingSideboardName.value.trim();
@@ -616,13 +634,16 @@ const commitRenameSideboard = (): void => {
 };
 
 const promptDeleteSideboard = (sideboardId: string, name: string): void => {
+  if (props.controller.isCreating.value) {
+    return;
+  }
   closeSideboardActions();
   sideboardActionsTargetId.value = null;
   deleteSideboardTarget.value = { id: sideboardId, name };
 };
 
 const confirmDeleteSideboard = (): void => {
-  if (!deleteSideboardTarget.value) {
+  if (props.controller.isCreating.value || !deleteSideboardTarget.value) {
     return;
   }
   if (props.controller.deck.activeBoardId.value === deleteSideboardTarget.value.id) {
@@ -631,6 +652,23 @@ const confirmDeleteSideboard = (): void => {
   props.controller.deck.removeSideboard(deleteSideboardTarget.value.id);
   deleteSideboardTarget.value = null;
 };
+
+watch(
+  () => props.controller.isCreating.value,
+  (creating) => {
+    sortableController.option(
+      'disabled',
+      creating || props.controller.deck.detailedActiveBoardEntries.value.length < 2,
+    );
+    if (!creating) {
+      return;
+    }
+    closeSideboardActions();
+    sideboardActionsTargetId.value = null;
+    deleteSideboardTarget.value = null;
+    cancelRenameSideboard();
+  },
+);
 </script>
 
 <style scoped>

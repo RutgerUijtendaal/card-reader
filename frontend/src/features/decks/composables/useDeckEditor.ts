@@ -437,6 +437,10 @@ export const useDeckEditor = () => {
   };
 
   const retireLocalDraftAfterCreation = (createdDeckId: string): boolean => {
+    if (!lastLocalDraftSignature) {
+      localDraftPersistenceFailed.value = false;
+      return true;
+    }
     try {
       localDraftStorage.retire(localDraftOwnerId, createdDeckId);
       lastLocalDraftSignature = '';
