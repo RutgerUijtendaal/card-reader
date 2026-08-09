@@ -10,7 +10,7 @@ import {
   fetchImportJobs,
 } from '@/features/import-jobs/api';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
-import type { ImportJob } from '@/features/import-jobs/types';
+import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
 
 vi.mock('@/domain/operations/api', () => ({
   fetchOperationsQueuePage: vi.fn(),
@@ -141,6 +141,31 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
+  test('shows the form before a slow version prefill and preserves user input', async () => {
+    const currentVersionRequest = deferred<ContentVersion>();
+    vi.mocked(fetchCurrentContentVersion).mockImplementationOnce(
+      () => currentVersionRequest.promise,
+    );
+    const mounted = mountController();
+
+    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
+    expect(mounted.controller.currentContentVersionLoaded.value).toBe(false);
+    expect(mounted.controller.templates.value).toHaveLength(1);
+
+    mounted.controller.contentVersionBase.value = '20.1';
+    mounted.controller.contentVersionDescription.value = 'User-entered release.';
+    currentVersionRequest.resolve(currentVersion);
+    await vi.waitFor(() => {
+      expect(mounted.controller.currentContentVersionLoaded.value).toBe(true);
+    });
+
+    expect(mounted.controller.currentContentVersion.value).toEqual(currentVersion);
+    expect(mounted.controller.contentVersionBase.value).toBe('20.1');
+    expect(mounted.controller.contentVersionDescription.value).toBe('User-entered release.');
+
+    mounted.app.unmount();
+  });
+
   test('keeps activity data when a manual refresh fails', async () => {
     const mounted = mountController();
     await vi.waitFor(() => {
@@ -172,11 +197,11 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.historyLoaded.value).toBe(false);
     expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['active-job']);
 
-    vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob('polled-job')]);
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob()]);
     await mounted.controller.pollJobs();
 
     expect(fetchImportJobs).toHaveBeenCalledTimes(2);
-    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['polled-job']);
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['active-job']);
 
     mounted.app.unmount();
   });
@@ -325,6 +350,32 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.activeJobs.value).toEqual([]);
     expect(mounted.controller.recentJobs.value.map((job) => job.id)).toEqual(['active-job']);
     expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(2);
+
+    mounted.app.unmount();
+  });
+
+  test('reconciles unseen active work discovered by polling history', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+
+    vi.mocked(fetchImportJobs)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([activeJob('new-job')]);
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
+      historyPage([
+        historyItem('active-job', 'completed'),
+        historyItem('new-job', 'running'),
+      ]),
+    );
+
+    await mounted.controller.pollJobs();
+
+    expect(fetchImportJobs).toHaveBeenCalledTimes(3);
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['new-job']);
+    expect(mounted.controller.recentJobs.value.map((job) => job.id)).toEqual(['active-job']);
 
     mounted.app.unmount();
   });

@@ -92,7 +92,11 @@
                       Current release
                     </span>
                     <span class="theme-section-title text-sm font-semibold">
-                      {{ currentContentVersion?.version_number ?? 'No version yet' }}
+                      {{
+                        currentContentVersionLoaded
+                          ? currentContentVersion?.version_number ?? 'No version yet'
+                          : 'Loading…'
+                      }}
                     </span>
                   </div>
                   <p
@@ -258,6 +262,7 @@ const {
   activeJobs,
   recentJobs,
   formLoaded,
+  currentContentVersionLoaded,
   activeJobsLoaded,
   historyLoaded,
   isRefreshing,

@@ -46,6 +46,7 @@ export const useImportJobsController = () => {
   const activeJobs = ref<ImportJob[]>([]);
   const historyItems = ref<OperationsQueueItem[]>([]);
   const formLoaded = ref(false);
+  const currentContentVersionLoaded = ref(false);
   const activeJobsLoaded = ref(false);
   const historyLoaded = ref(false);
   const activeJobsRefreshing = ref(false);
@@ -164,23 +165,7 @@ export const useImportJobsController = () => {
       (item) => !isTerminalImportStatus(item.status) && !activeJobIds.value.has(item.id),
     );
 
-  const refreshActivity = async (): Promise<void> => {
-    activityActionErrorMessage.value = '';
-    const [activeResult, historyResult] = await Promise.allSettled([
-      loadActiveJobs(),
-      loadRecentJobs(),
-    ]);
-    if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
-
-    if (activeResult.value) {
-      try {
-        await loadRecentJobs();
-      } catch (error) {
-        console.error('Reconcile import history after activity refresh failed', error);
-        return;
-      }
-    }
-
+  const reconcileMissingActiveWork = async (): Promise<void> => {
     if (!historyHasActiveWorkMissingFromSnapshot()) return;
 
     try {
@@ -198,6 +183,26 @@ export const useImportJobsController = () => {
     }
   };
 
+  const refreshActivity = async (): Promise<void> => {
+    activityActionErrorMessage.value = '';
+    const [activeResult, historyResult] = await Promise.allSettled([
+      loadActiveJobs(),
+      loadRecentJobs(),
+    ]);
+    if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
+
+    if (activeResult.value) {
+      try {
+        await loadRecentJobs();
+      } catch (error) {
+        console.error('Reconcile import history after activity refresh failed', error);
+        return;
+      }
+    }
+
+    await reconcileMissingActiveWork();
+  };
+
   const loadTemplates = async (): Promise<void> => {
     templates.value = await fetchTemplates();
     if (templates.value.length === 0) {
@@ -209,19 +214,39 @@ export const useImportJobsController = () => {
   };
 
   const loadCurrentContentVersion = async (): Promise<void> => {
-    currentContentVersion.value = await fetchCurrentContentVersion();
-    contentVersionBase.value = getContentVersionBasePrefill(currentContentVersion.value);
-    contentVersionDescription.value = getContentVersionDescriptionPrefill(
-      currentContentVersion.value,
-    );
+    const initialBase = contentVersionBase.value;
+    const initialDescription = contentVersionDescription.value;
+    const nextVersion = await fetchCurrentContentVersion();
+    currentContentVersion.value = nextVersion;
+    if (contentVersionBase.value === initialBase) {
+      contentVersionBase.value = getContentVersionBasePrefill(nextVersion);
+    }
+    if (contentVersionDescription.value === initialDescription) {
+      contentVersionDescription.value = getContentVersionDescriptionPrefill(nextVersion);
+    }
   };
 
   const loadFormOptions = async (): Promise<void> => {
     formErrorMessage.value = '';
-    const results = await Promise.allSettled([loadTemplates(), loadCurrentContentVersion()]);
-    formLoaded.value = true;
-    if (results.some((result) => result.status === 'rejected')) {
+    const currentVersionResult = loadCurrentContentVersion()
+      .then(() => true)
+      .catch(() => false)
+      .finally(() => {
+        currentContentVersionLoaded.value = true;
+      });
+    let templatesLoaded = true;
+    try {
+      await loadTemplates();
+    } catch {
+      templatesLoaded = false;
       formErrorMessage.value = 'Import options could not be loaded.';
+    } finally {
+      formLoaded.value = true;
+    }
+
+    if (!(await currentVersionResult) && templatesLoaded) {
+      formErrorMessage.value =
+        'Current content version could not be loaded. Enter the version details manually.';
     }
   };
 
@@ -307,6 +332,7 @@ export const useImportJobsController = () => {
     try {
       const activeJobFinished = await loadActiveJobs();
       if (activeJobFinished) await loadRecentJobs();
+      await reconcileMissingActiveWork();
     } catch (error) {
       console.error('Polling imports failed', error);
     }
@@ -349,6 +375,7 @@ export const useImportJobsController = () => {
     activeJobs,
     recentJobs,
     formLoaded,
+    currentContentVersionLoaded,
     activeJobsLoaded,
     historyLoaded,
     activeJobsRefreshing,

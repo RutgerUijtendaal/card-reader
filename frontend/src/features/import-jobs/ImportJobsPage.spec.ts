@@ -35,6 +35,7 @@ describe('ImportJobsPage', () => {
       activeJobs: ref([]),
       recentJobs: computed(() => []),
       formLoaded: ref(true),
+      currentContentVersionLoaded: ref(true),
       activeJobsLoaded: ref(true),
       historyLoaded: ref(true),
       activeJobsRefreshing: ref(false),
