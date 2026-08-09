@@ -71,6 +71,7 @@ class Command(BaseCommand):
         except (DeveloperDataError, OSError) as exc:
             raise CommandError(str(exc)) from exc
         _create_or_update_local_admin(username=username, password=password)
+        call_command("seed_notification_examples", "--username", username, stdout=self.stdout)
         sheet_result = TtsCardSheetService().reconcile_all(render=True)
         call_command("doctor_dev_data", stdout=self.stdout)
         self.stdout.write(

@@ -114,39 +114,60 @@ class NotificationService:
         )
         notifications: list[UserNotification] = []
         for deck in decks:
-            owner_id = str(getattr(deck.owner, "pk", ""))
-            if not owner_id or owner_id == actor_id:
-                continue
-            card_name = card.label
-            title = f"Card version changed in {deck.name}"
-            message = _deck_card_version_change_message(card_name, cause)
-            notifications.append(
-                self.notify(
-                    NotificationEvent(
-                        recipient_id=owner_id,
-                        actor_id=actor_id,
-                        event_type=NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
-                        subject_type="deck_card",
-                        subject_id=f"{deck.id}:{card.id}",
-                        target_url=f"/my/decks/{deck.id}",
-                        title=title,
-                        message=message,
-                        metadata=DeckCardVersionChangedMetadata(
-                            deck_id=deck.id,
-                            deck_name=deck.name,
-                            card_id=card.id,
-                            card_name=card_name,
-                            card_version_id=card_version_id,
-                            previous_card_version_id=previous_card_version_id,
-                            change_cause=cause,
-                            import_job_id=import_job_id,
-                            import_item_id=import_item_id,
-                        ).as_dict(),
-                        dedupe_key=f"{NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED}:{deck.id}:{card.id}",
-                    )
-                )
+            notification = self.notify_deck_owner_card_version_changed(
+                deck=deck,
+                card=card,
+                card_version_id=card_version_id,
+                previous_card_version_id=previous_card_version_id,
+                cause=cause,
+                actor_id=actor_id,
+                import_job_id=import_job_id,
+                import_item_id=import_item_id,
             )
+            if notification is not None:
+                notifications.append(notification)
         return notifications
+
+    def notify_deck_owner_card_version_changed(
+        self,
+        *,
+        deck: Deck,
+        card: Card,
+        card_version_id: str,
+        previous_card_version_id: str | None,
+        cause: DeckCardVersionChangeCause,
+        actor_id: str | None = None,
+        import_job_id: str | None = None,
+        import_item_id: str | None = None,
+    ) -> UserNotification | None:
+        owner_id = str(getattr(deck.owner, "pk", ""))
+        if not owner_id or owner_id == actor_id:
+            return None
+        card_name = card.label
+        return self.notify(
+            NotificationEvent(
+                recipient_id=owner_id,
+                actor_id=actor_id,
+                event_type=NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
+                subject_type="deck_card",
+                subject_id=f"{deck.id}:{card.id}",
+                target_url=f"/my/decks/{deck.id}",
+                title=f"Card version changed in {deck.name}",
+                message=_deck_card_version_change_message(card_name, cause),
+                metadata=DeckCardVersionChangedMetadata(
+                    deck_id=deck.id,
+                    deck_name=deck.name,
+                    card_id=card.id,
+                    card_name=card_name,
+                    card_version_id=card_version_id,
+                    previous_card_version_id=previous_card_version_id,
+                    change_cause=cause,
+                    import_job_id=import_job_id,
+                    import_item_id=import_item_id,
+                ).as_dict(),
+                dedupe_key=f"{NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED}:{deck.id}:{card.id}",
+            )
+        )
 
 
 def _username(user: AbstractUser | None) -> str:

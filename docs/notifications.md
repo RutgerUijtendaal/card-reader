@@ -22,10 +22,24 @@ The inbox is one chronological feed. New rows retain an unread indicator until o
 - Trigger: a newly imported card version becomes current, or a different existing version is explicitly promoted to current.
 - Subject: the affected deck and card pair.
 - Targets: the affected deck and the card detail page.
-- Metadata: deck, card, the before and after card versions, and the typed import or promotion cause. The inbox loads those exact versions on demand for its hoverable comparison.
+- Metadata: deck, card, the before and after card versions, and the typed import or promotion cause. The inbox loads those exact versions on demand for an interactive image comparison whose divider reveals each printing in place.
 - Coalescing: repeated current-version changes for the same unread deck/card pair increment the existing row.
 
 Ordinary edits to the current version, reparses that reuse the existing version, and no-op promotions are intentionally silent.
+
+## Development examples
+
+Local API startup and `pnpm bootstrap:dev` idempotently seed representative notifications for active
+staff users. The examples include an expanded flag-review response and a card-version change backed
+by two real image-bearing printings. A private `Notification Layout Examples` deck is created so the
+deck and card actions remain valid. These rows are synthesized locally through `NotificationService`;
+notifications and decks remain excluded from published developer-data bundles.
+
+To refresh missing examples without restarting the API, run:
+
+```bash
+uv run --project . --package card-reader-api python services/api/manage.py seed_notification_examples
+```
 
 ## Ownership and delivery
 

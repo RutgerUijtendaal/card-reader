@@ -4,6 +4,7 @@ from .types import (
     DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
     DeckCardVersionChangeCause,
     NotificationEvent,
+    ParseFlagItemReviewedMetadata,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "DeckCardVersionChangeCause",
     "NotificationEvent",
     "NotificationService",
+    "ParseFlagItemReviewedMetadata",
 ]
