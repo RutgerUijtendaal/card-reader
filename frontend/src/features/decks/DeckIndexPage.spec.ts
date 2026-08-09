@@ -463,6 +463,11 @@ describe('DeckIndexPage', () => {
       );
     const mounted = await mountPage('/decks');
 
+    expect(
+      mounted.container
+        .querySelector('[data-testid="deck-load-more-sentinel"]')
+        ?.classList.contains('app-page-single-column'),
+    ).toBe(true);
     expect(fetchPublicDeckSummariesMock).toHaveBeenCalledWith(
       expect.any(URLSearchParams),
       1,

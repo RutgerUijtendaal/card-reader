@@ -221,7 +221,8 @@
       <div
         v-if="filtersLoaded && decks.length > 0"
         ref="loadMoreSentinelRef"
-        class="theme-divider mt-5 flex min-h-16 items-center justify-center border-t pt-4"
+        class="app-page-single-column theme-divider mt-5 flex min-h-16 items-center justify-center border-t pt-4"
+        data-testid="deck-load-more-sentinel"
         aria-live="polite"
       >
         <DeckLoadingSkeleton
