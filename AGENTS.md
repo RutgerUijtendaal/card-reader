@@ -105,6 +105,18 @@ Core stack:
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
+- Card pool and multi-role work has three approved, dependency-ordered implementation plans. Execute them in order and keep each step independently reviewable and verified:
+  1. `docs/card-classification-step-1-foundation.md`
+  2. `docs/card-classification-step-2-import-inference.md`
+  3. `docs/card-classification-step-3-player-gm-workspaces.md`
+- The target card classification model has two independent card-level dimensions:
+  - `card_pool` is exactly one of `player` or `game_master`.
+  - `card_roles` is a set of zero or more code-owned roles, initially `hero`, `boon`, and `event`; roles may coexist.
+  - Standard is the derived empty-role state and must not be persisted as a role.
+  - Pool/role conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
+  - Pool and roles belong to stable `Card` identity; template remains version/parser configuration.
+- Game Master card access must use a named backend capability whose initial policy is staff-only. Enforce it on direct objects, collections, embedded payloads, exports, and image/assets; frontend visibility is not the security boundary. Keep the policy centralized so it can later expand without card-data migration.
+- Until the three card-classification plans are complete, preserve their step boundaries: Step 1 owns schema/migration/manual editing/filtering and Hero replacement; Step 2 owns import inference and overrides; Step 3 owns the global sidenav workspace and site-level scoping.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.
@@ -135,7 +147,8 @@ Core stack:
   - Frontend code should consume `/decks/rules` for defaults and examples, keeping local fallback defaults only for load/error resilience.
 - Deck list surfaces that only need listing metadata should use summary deck records/endpoints and `DeckListRecord`-compatible shared components; fetch full `DeckRecord` only for detail, editor, export, or playtest flows that need full board entries.
 - The card detail editor separates card-level and version-level edits:
-  - `Card` tab owns Hero Card, Card Status, and Deck-Building Config.
+  - Currently, the `Card` tab owns Hero Card, Card Status, and Deck-Building Config.
+  - After card-classification Step 1, the `Card` tab owns Card Pool, multi-valued Card Roles, Card Status, and Deck-Building Config; Standard is shown when no roles are selected.
   - `Card Version` tab owns parsed scalar fields, symbols, metadata groups, template selection, reset, and reparse actions.
 - User notifications are durable, core-owned in-app records.
   - `NotificationService` is the only public creation API; API views, frontend code, and feature call sites must not write notification rows directly.
@@ -148,6 +161,7 @@ Core stack:
 - Auth is enabled by default.
 - Card gallery and card assets are public. Deck TTS exports follow deck visibility; gallery and
   content-version TTS exports require staff access.
+- Player cards remain the public/default pool. Game Master cards and their direct details, embedded payloads, exports, and assets are staff-only until the centralized Game Master capability policy is deliberately expanded.
 - Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - Developer-data metadata, browser downloads, and bootstrap-code creation require an active
