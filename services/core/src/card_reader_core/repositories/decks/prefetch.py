@@ -80,7 +80,12 @@ def deck_summary_queryset() -> QuerySet[Deck]:
             queryset=DeckEntry.objects.select_related(
                 "card",
                 "card__latest_version",
-            ).prefetch_related(*summary_version_type_prefetches("card__latest_version")).order_by("position", "card_id"),
+            )
+            .prefetch_related(
+                "card__role_assignments",
+                *summary_version_type_prefetches("card__latest_version"),
+            )
+            .order_by("position", "card_id"),
         ),
         Prefetch(
             "sideboards",
@@ -91,7 +96,10 @@ def deck_summary_queryset() -> QuerySet[Deck]:
                         "card",
                         "card__latest_version",
                     )
-                    .prefetch_related(*summary_version_type_prefetches("card__latest_version"))
+                    .prefetch_related(
+                        "card__role_assignments",
+                        *summary_version_type_prefetches("card__latest_version"),
+                    )
                     .order_by("position", "card_id"),
                 )
             ).order_by("created_at", "id"),

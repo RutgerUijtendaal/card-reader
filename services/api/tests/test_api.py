@@ -861,10 +861,12 @@ def test_game_master_card_images_are_hidden_from_non_staff_across_all_routes() -
         assert anonymous.get(path).status_code == 404
 
     staff = _staff_client("game-master-image-staff")
-    for path in paths:
-        response = staff.get(path)
-        assert response.status_code == 200
-        response.close()
+    responses = [staff.get(path) for path in paths]
+    try:
+        assert [response.status_code for response in responses] == [200, 200, 200]
+    finally:
+        for response in responses:
+            response.close()
 
 
 def test_card_payloads_use_immutable_image_urls() -> None:

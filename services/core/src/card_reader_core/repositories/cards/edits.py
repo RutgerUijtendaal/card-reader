@@ -142,6 +142,9 @@ def update_latest_card_version(
                 [CardRoleAssignment(card=card, role=role) for role in CARD_ROLES if role in requested_roles - existing_roles],
                 ignore_conflicts=True,
             )
+            prefetched_objects = getattr(card, "_prefetched_objects_cache", None)
+            if prefetched_objects is not None:
+                prefetched_objects.pop("role_assignments", None)
             classification_changed = True
         if "deck_building_config" in updates:
             card.deck_building_config_json = updates["deck_building_config"]
