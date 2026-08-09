@@ -38,6 +38,8 @@ type PendingCreatedDeck = {
   showSuccessToast: boolean;
 };
 
+type LocalDraftPresence = 'absent' | 'present' | 'unknown';
+
 export const useDeckEditor = () => {
   const route = useRoute();
   const router = useRouter();
@@ -71,6 +73,9 @@ export const useDeckEditor = () => {
   let bypassNextUnsavedPrompt = false;
   let localDraftStorageWarningShown = false;
   let lastLocalDraftSignature = '';
+  let localDraftPresence: LocalDraftPresence = localDraftOwnerId && !deckId.value
+    ? 'unknown'
+    : 'absent';
   let pendingDiscardConfirmation: ((confirmed: boolean) => void) | null = null;
   let pendingDiscardConfirmationPromise: Promise<boolean> | null = null;
   let filtersLoadPromise: Promise<void> | null = null;
@@ -84,6 +89,7 @@ export const useDeckEditor = () => {
   if (!deckId.value && localDraftOwnerId) {
     try {
       pendingLocalDraft.value = localDraftStorage.load(localDraftOwnerId);
+      localDraftPresence = pendingLocalDraft.value === null ? 'absent' : 'present';
       localDraftRecoveryModalOpen.value = pendingLocalDraft.value !== null;
       localDraftDecisionResolved.value = pendingLocalDraft.value === null;
     } catch {
@@ -303,6 +309,7 @@ export const useDeckEditor = () => {
     localDraftRecoveryModalOpen.value = false;
     localDraftDecisionResolved.value = true;
     lastLocalDraftSignature = localDraftContentSignature(storedDraft);
+    localDraftPresence = 'present';
     localDraftPersistenceFailed.value = false;
     shouldApplyHeroCardPreset.value = Boolean(deck.form.hero_card_id);
     editorMode.value = 'cards';
@@ -329,6 +336,7 @@ export const useDeckEditor = () => {
     localDraftRecoveryModalOpen.value = false;
     localDraftDecisionResolved.value = true;
     lastLocalDraftSignature = '';
+    localDraftPresence = 'absent';
     localDraftPersistenceFailed.value = false;
   };
 
@@ -437,13 +445,14 @@ export const useDeckEditor = () => {
   };
 
   const retireLocalDraftAfterCreation = (createdDeckId: string): boolean => {
-    if (!lastLocalDraftSignature) {
+    if (localDraftPresence === 'absent') {
       localDraftPersistenceFailed.value = false;
       return true;
     }
     try {
       localDraftStorage.retire(localDraftOwnerId, createdDeckId);
       lastLocalDraftSignature = '';
+      localDraftPresence = 'absent';
       localDraftPersistenceFailed.value = false;
       return true;
     } catch {
@@ -568,6 +577,7 @@ export const useDeckEditor = () => {
       return;
     }
     lastLocalDraftSignature = '';
+    localDraftPresence = 'absent';
     localDraftPersistenceFailed.value = false;
     deck.resetLocalDraft();
     cardLookup.value = {};
@@ -592,6 +602,7 @@ export const useDeckEditor = () => {
       if (lastLocalDraftSignature) {
         if (clearLocalDraftStorage()) {
           lastLocalDraftSignature = '';
+          localDraftPresence = 'absent';
           localDraftPersistenceFailed.value = false;
         } else {
           localDraftPersistenceFailed.value = true;
@@ -613,6 +624,7 @@ export const useDeckEditor = () => {
     try {
       localDraftStorage.save(localDraftOwnerId, deck.form, cardLookup.value);
       lastLocalDraftSignature = signature;
+      localDraftPresence = 'present';
       localDraftPersistenceFailed.value = false;
       return true;
     } catch {

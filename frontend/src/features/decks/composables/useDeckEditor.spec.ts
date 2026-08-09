@@ -548,15 +548,12 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
-  test('finishes creation when browser storage was never writable', async () => {
+  test('finishes creation when draft storage was confirmed empty before writes failed', async () => {
     const draftStorageKey = 'card-reader.deck-editor.new-draft.user-1';
     const originalGetItem = Storage.prototype.getItem;
     const originalSetItem = Storage.prototype.setItem;
     const originalRemoveItem = Storage.prototype.removeItem;
     const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key) {
-      if (key === draftStorageKey) {
-        throw new DOMException('Reads blocked', 'SecurityError');
-      }
       return originalGetItem.call(this, key);
     });
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
@@ -588,6 +585,59 @@ describe('useDeckEditor', () => {
     getItemSpy.mockRestore();
     setItemSpy.mockRestore();
     removeItemSpy.mockRestore();
+    mounted.unmount();
+  });
+
+  test('does not skip retirement when an older draft was unreadable during creation', async () => {
+    const staleForm = createEmptyDeckForm();
+    staleForm.name = 'Hidden Older Draft';
+    createDeckEditorLocalDraftStorage().save('user-1', staleForm, {});
+    const draftStorageKey = 'card-reader.deck-editor.new-draft.user-1';
+    const originalGetItem = Storage.prototype.getItem;
+    const originalSetItem = Storage.prototype.setItem;
+    const originalRemoveItem = Storage.prototype.removeItem;
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key) {
+      if (key === draftStorageKey) {
+        throw new DOMException('Reads blocked', 'SecurityError');
+      }
+      return originalGetItem.call(this, key);
+    });
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (key === draftStorageKey) {
+        throw new DOMException('Writes blocked', 'SecurityError');
+      }
+      originalSetItem.call(this, key, value);
+    });
+    const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, key) {
+      if (key === draftStorageKey) {
+        throw new DOMException('Removal blocked', 'SecurityError');
+      }
+      originalRemoveItem.call(this, key);
+    });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Created While Storage Was Hidden');
+    await nextTick();
+
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.creationCleanupPending.value).toBe(true);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+
+    getItemSpy.mockRestore();
+    setItemSpy.mockRestore();
+    removeItemSpy.mockRestore();
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.controller.creationCleanupPending.value).toBe(false);
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
+    expect(createDeckEditorLocalDraftStorage().load('user-1')).toBeNull();
+
     mounted.unmount();
   });
 
