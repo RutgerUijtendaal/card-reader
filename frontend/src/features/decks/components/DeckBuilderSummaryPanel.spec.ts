@@ -117,7 +117,7 @@ const buildController = () => {
     },
     loading: ref(false),
     saving: ref(false),
-    isCreating: ref(false),
+    isMutationLocked: ref(false),
     deckId: ref('deck-1'),
     backLink: ref('/my/decks'),
     backLabel: ref('Back'),
@@ -373,7 +373,7 @@ describe('DeckBuilderSummaryPanel', () => {
     await nextTick();
     expect(document.body.textContent ?? '').toContain('Rename');
 
-    mounted.controller.isCreating.value = true;
+    mounted.controller.isMutationLocked.value = true;
     await nextTick();
 
     expect(document.body.textContent ?? '').not.toContain('Rename');

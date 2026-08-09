@@ -1584,6 +1584,117 @@ def test_authenticated_owner_can_create_deck_with_sideboards() -> None:
     assert payload["status"]["is_valid"] is True
 
 
+def test_deck_create_is_idempotent_per_owner_and_creation_key() -> None:
+    username = "deck-idempotency-user"
+    password = "password"
+    owner = _create_user(username, password)
+    hero = _create_card(name="Idempotency Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    creation_key = "7cb8ed4d-83ca-46c2-9b76-b33cc89188de"
+    payload = {
+        "name": "Idempotent Deck",
+        "description": None,
+        "visibility": "private",
+        "hero_card_id": hero.id,
+        "entries": _valid_entries(mainboard_cards),
+        "sideboards": [],
+    }
+
+    first_response = client.post(
+        "/my/decks",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+    replay_response = client.post(
+        "/my/decks",
+        data={"name": "invalid replay body"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+
+    assert first_response.status_code == 201
+    assert replay_response.status_code == 200
+    assert replay_response.json()["id"] == first_response.json()["id"]
+    assert "client_creation_id" not in first_response.json()
+    assert "client_creation_id" not in replay_response.json()
+    assert Deck.objects.filter(owner=owner, client_creation_id=creation_key).count() == 1
+
+
+def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
+    creation_key = "b08b9444-9b79-4878-aef2-38bbf357578f"
+    first_username = "deck-idempotency-first-user"
+    second_username = "deck-idempotency-second-user"
+    password = "password"
+    _create_user(first_username, password)
+    _create_user(second_username, password)
+    hero = _create_card(name="Scoped Idempotency Hero", is_hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    payload = {
+        "name": "Scoped Idempotency Deck",
+        "description": None,
+        "visibility": "private",
+        "hero_card_id": hero.id,
+        "entries": _valid_entries(mainboard_cards),
+        "sideboards": [],
+    }
+    first_client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    first_csrf = _login_and_get_csrf_token(first_client, first_username, password)
+    second_client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    second_csrf = _login_and_get_csrf_token(second_client, second_username, password)
+
+    first_create = first_client.post(
+        "/my/decks",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=first_csrf,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+    missing_lookup = second_client.get(f"/my/decks/by-creation-key/{creation_key}")
+    second_create = second_client.post(
+        "/my/decks",
+        data={**payload, "name": "Other Owner Deck"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=second_csrf,
+        HTTP_IDEMPOTENCY_KEY=creation_key,
+    )
+    first_lookup = first_client.get(f"/my/decks/by-creation-key/{creation_key}")
+    anonymous_lookup = Client(HTTP_HOST="localhost").get(
+        f"/my/decks/by-creation-key/{creation_key}"
+    )
+
+    assert first_create.status_code == 201
+    assert missing_lookup.status_code == 404
+    assert second_create.status_code == 201
+    assert second_create.json()["id"] != first_create.json()["id"]
+    assert first_lookup.status_code == 200
+    assert first_lookup.json()["id"] == first_create.json()["id"]
+    assert anonymous_lookup.status_code == 401
+
+
+def test_deck_create_rejects_malformed_idempotency_key() -> None:
+    username = "deck-invalid-idempotency-user"
+    password = "password"
+    _create_user(username, password)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+
+    response = client.post(
+        "/my/decks",
+        data={},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_IDEMPOTENCY_KEY="not-a-uuid",
+    )
+
+    assert response.status_code == 400
+    assert Deck.objects.count() == 0
+
+
 def test_deck_create_preserves_submitted_board_entry_order() -> None:
     username = "deck-create-entry-order-user"
     password = "password"

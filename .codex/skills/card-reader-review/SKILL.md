@@ -24,6 +24,10 @@ Follow `AGENTS.md` first. Use this skill when reviewing pull requests, local dif
 - Auth regressions around public vs staff/superuser behavior
 - Import pipeline regressions in async job creation, claiming, and persistence
 - Missing lint, typing, or test coverage for touched behavior
+- Stateful workflows encoded as interacting flags without an explicit transition model
+- Cleanup failures that block or undo an already confirmed authoritative success
+- Ambiguous network responses without idempotent lookup/retry behavior, or retries whose key or payload can change
+- Local and server sources of truth that can silently drift, especially across tabs or after partial persistence failures
 
 ## Review Workflow
 

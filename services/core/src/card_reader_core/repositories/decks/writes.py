@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from django.db import transaction
 
 from card_reader_core.models import (
@@ -23,6 +25,7 @@ def create_deck(
     difficulty: DeckDifficulty | None,
     visibility: DeckVisibility,
     hero_card: Card,
+    client_creation_id: UUID | None = None,
 ) -> Deck:
     return Deck.objects.create(
         owner_id=owner_id,
@@ -32,6 +35,7 @@ def create_deck(
         difficulty=difficulty,
         visibility=visibility,
         hero_card=hero_card,
+        client_creation_id=client_creation_id,
     )
 
 

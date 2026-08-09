@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -132,13 +134,29 @@ class OwnerDeckListCreateView(APIView):
         return Response([deck_payload(deck, include_pending_suggestions=True) for deck in decks])
 
     def post(self, request: Request) -> Response:
+        raw_creation_id = request.headers.get("Idempotency-Key")
+        client_creation_id: UUID | None = None
+        if raw_creation_id is not None:
+            try:
+                client_creation_id = UUID(raw_creation_id)
+            except ValueError:
+                return bad_request("Idempotency-Key must be a valid UUID.")
+
+        owner_id = _user_id(request)
+        service = DeckService()
+        if client_creation_id is not None:
+            existing = service.get_owner_deck_by_creation_id(owner_id, client_creation_id)
+            if existing is not None:
+                return Response(deck_payload(existing, include_pending_suggestions=True))
+
         serializer = DeckWriteSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
         tag_service = DeckTagService()
         try:
-            deck = DeckService(tag_service=tag_service).create_owner_deck(
-                owner_id=_user_id(request),
+            service = DeckService(tag_service=tag_service)
+            create_arguments = dict(
+                owner_id=owner_id,
                 name=serializer.validated_data["name"],
                 description=serializer.validated_data.get("description"),
                 long_description=serializer.validated_data.get("long_description"),
@@ -156,13 +174,32 @@ class OwnerDeckListCreateView(APIView):
                 tag_ids=serializer.validated_data.get("tag_ids", []),
                 suggested_type_labels=serializer.validated_data.get("suggested_type_labels", []),
             )
+            if client_creation_id is None:
+                deck = service.create_owner_deck(**create_arguments)
+                created = True
+            else:
+                deck, created = service.create_owner_deck_idempotently(
+                    client_creation_id=client_creation_id,
+                    **create_arguments,
+                )
         except ValueError as exc:
             return bad_request(str(exc))
         payload = deck_payload(deck, include_pending_suggestions=True)
         payload["tag_suggestion_results"] = deck_tag_suggestion_results_payload(
             tag_service.describe_suggestion_results(serializer.validated_data.get("suggested_type_labels", []))
         )
-        return Response(payload, status=status.HTTP_201_CREATED)
+        response_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(payload, status=response_status)
+
+
+class OwnerDeckCreationLookupView(APIView):
+    permission_classes = [AuthenticatedAllowed]
+
+    def get(self, request: Request, client_creation_id: UUID) -> Response:
+        deck = DeckService().get_owner_deck_by_creation_id(_user_id(request), client_creation_id)
+        if deck is None:
+            return not_found("Deck not found")
+        return Response(deck_payload(deck, include_pending_suggestions=True))
 
 
 class OwnerDeckDetailView(APIView):

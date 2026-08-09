@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import type { DeckCardSummary } from '@/domain/decks/types';
 import { createEmptyDeckForm } from '@/features/decks/composables/deckEditorDraftModel';
 import {
+  buildStoredDeckEditorDraft,
   createDeckEditorLocalDraftStorage,
+  deckEditorDraftSlotToken,
   DECK_EDITOR_LOCAL_DRAFT_VERSION,
 } from '@/features/decks/utils/deckEditorLocalDraftStorage';
 
@@ -36,9 +38,7 @@ const buildCard = (id: string, isHero = false): DeckCardSummary => ({
 });
 
 describe('deckEditorLocalDraftStorage', () => {
-  afterEach(() => {
-    localStorage.clear();
-  });
+  afterEach(() => localStorage.clear());
 
   test('stores the complete form and only referenced card snapshots', () => {
     const storage = createDeckEditorLocalDraftStorage();
@@ -51,111 +51,119 @@ describe('deckEditorLocalDraftStorage', () => {
       name: 'Maybeboard',
       entries: [{ card_id: 'card-2', quantity: 1 }],
     }];
-    const draft = storage.save('user-1', form, {
+    const draft = buildStoredDeckEditorDraft('user-1', 'draft-1', form, {
       'hero-1': buildCard('hero-1', true),
       'card-1': buildCard('card-1'),
       'card-2': buildCard('card-2'),
       'browsed-only': buildCard('browsed-only'),
     });
 
-    expect(draft.version).toBe(DECK_EDITOR_LOCAL_DRAFT_VERSION);
+    expect(storage.save(draft, { kind: 'empty' })).toEqual({ status: 'saved', draft });
     expect(Object.keys(draft.cards).sort()).toEqual(['card-1', 'card-2', 'hero-1']);
-    expect(storage.load('user-1')).toEqual(draft);
-    expect(draft.form.sideboards[0]?.id).toBe('sideboard-local-1');
+    expect(storage.read('user-1')).toEqual({
+      status: 'loaded',
+      slot: { kind: 'draft', draft },
+    });
   });
 
-  test('clears malformed and owner-mismatched drafts', () => {
-    const storage = createDeckEditorLocalDraftStorage();
-    localStorage.setItem('card-reader.deck-editor.new-draft.user-1', '{broken');
-
-    expect(storage.load('user-1')).toBeNull();
-    expect(localStorage.getItem('card-reader.deck-editor.new-draft.user-1')).toBeNull();
-
+  test('migrates a valid v1 draft to v2 on read', () => {
+    const form = { ...createEmptyDeckForm(), name: 'Legacy Draft' };
     localStorage.setItem('card-reader.deck-editor.new-draft.user-1', JSON.stringify({
-      version: DECK_EDITOR_LOCAL_DRAFT_VERSION,
-      ownerId: 'user-2',
+      version: 1,
+      ownerId: 'user-1',
       savedAt: '2026-01-01T00:00:00Z',
-      form: createEmptyDeckForm(),
+      form,
       cards: {},
     }));
 
-    expect(storage.load('user-1')).toBeNull();
+    const result = createDeckEditorLocalDraftStorage().read('user-1');
+
+    expect(result.status).toBe('loaded');
+    if (result.status !== 'loaded' || result.slot.kind !== 'draft') throw new Error('Expected draft');
+    expect(result.slot.draft.version).toBe(DECK_EDITOR_LOCAL_DRAFT_VERSION);
+    expect(result.slot.draft.form.name).toBe('Legacy Draft');
+    expect(result.slot.draft.pendingCreateAttempt).toBeNull();
+    expect(JSON.parse(localStorage.getItem('card-reader.deck-editor.new-draft.user-1') ?? '{}'))
+      .toMatchObject({ version: 2, kind: 'draft' });
+  });
+
+  test('clears malformed and owner-mismatched data', () => {
+    const storage = createDeckEditorLocalDraftStorage();
+    localStorage.setItem('card-reader.deck-editor.new-draft.user-1', '{broken');
+    expect(storage.read('user-1')).toEqual({ status: 'loaded', slot: { kind: 'empty' } });
+
+    localStorage.setItem('card-reader.deck-editor.new-draft.user-1', JSON.stringify({
+      version: 2,
+      kind: 'draft',
+      ownerId: 'user-2',
+    }));
+    expect(storage.read('user-1')).toEqual({ status: 'loaded', slot: { kind: 'empty' } });
     expect(localStorage.getItem('card-reader.deck-editor.new-draft.user-1')).toBeNull();
   });
 
-  test('clears a stored draft explicitly', () => {
+  test('rejects stale conditional saves and discards', () => {
     const storage = createDeckEditorLocalDraftStorage();
-    storage.save('user-1', { ...createEmptyDeckForm(), name: 'Local Deck' }, {});
-
-    storage.clear('user-1');
-
-    expect(storage.load('user-1')).toBeNull();
-  });
-
-  test('replaces a created draft with a recovery-safe marker when removal fails', () => {
-    const removeItem = vi.fn(() => {
-      throw new DOMException('Removal blocked', 'SecurityError');
-    });
-    const values = new Map<string, string>();
-    const storageBackend = {
-      getItem: vi.fn((key: string) => values.get(key) ?? null),
-      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
-      removeItem,
-      clear: vi.fn(() => values.clear()),
-      key: vi.fn(() => null),
-      get length() {
-        return values.size;
-      },
-    } satisfies Storage;
-    const storage = createDeckEditorLocalDraftStorage(storageBackend);
-    const draft = storage.save(
+    const first = buildStoredDeckEditorDraft(
       'user-1',
-      { ...createEmptyDeckForm(), name: 'Created Deck' },
+      'draft-1',
+      { ...createEmptyDeckForm(), name: 'First' },
       {},
     );
-
-    expect(storage.retire('user-1', 'deck-created', draft)).toBe('retired');
-
-    expect(removeItem).toHaveBeenCalled();
-    expect(storage.load('user-1')).toBeNull();
-    expect(values.get('card-reader.deck-editor.new-draft.user-1')).toContain(
-      '"createdDeckId":"deck-created"',
+    expect(storage.save(first, { kind: 'empty' }).status).toBe('saved');
+    const second = buildStoredDeckEditorDraft(
+      'user-1',
+      'draft-1',
+      { ...createEmptyDeckForm(), name: 'Second' },
+      {},
     );
+    expect(storage.save(second, deckEditorDraftSlotToken({ kind: 'draft', draft: first })).status)
+      .toBe('saved');
+
+    expect(storage.discard('user-1', { kind: 'draft', revision: first.revision }).status)
+      .toBe('conflict');
+    expect(storage.save(first, { kind: 'empty' }).status).toBe('conflict');
   });
 
-  test('does not retire a different tab\'s saved draft', () => {
+  test('retires only the exact observed revision with a meaningful marker', () => {
     const storage = createDeckEditorLocalDraftStorage();
-    const firstTabDraft = storage.save(
+    const draft = buildStoredDeckEditorDraft(
       'user-1',
-      { ...createEmptyDeckForm(), name: 'First tab deck' },
+      'draft-1',
+      { ...createEmptyDeckForm(), name: 'Created' },
       {},
     );
-    const secondTabDraft = storage.save(
+    storage.save(draft, { kind: 'empty' });
+
+    const result = storage.retire(
       'user-1',
-      { ...createEmptyDeckForm(), name: 'Second tab deck' },
-      {},
+      draft.draftId,
+      'deck-created',
+      { kind: 'draft', revision: draft.revision },
     );
 
-    expect(storage.retire('user-1', 'deck-created', firstTabDraft)).toBe('conflict');
-    expect(storage.load('user-1')).toEqual(secondTabDraft);
+    expect(result.status).toBe('retired');
+    expect(storage.read('user-1')).toEqual(result.status === 'retired'
+      ? { status: 'loaded', slot: { kind: 'retired', marker: result.marker } }
+      : null);
+    if (result.status === 'retired') {
+      expect(result.marker).toMatchObject({
+        draftId: 'draft-1',
+        revision: draft.revision,
+        createdDeckId: 'deck-created',
+      });
+    }
   });
 
-  test('guards browser storage access when the property itself is blocked', () => {
+  test('returns unavailable instead of throwing when browser storage is blocked', () => {
     const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
-      get: () => {
-        throw new DOMException('Storage is blocked.', 'SecurityError');
-      },
+      get: () => { throw new DOMException('Storage is blocked.', 'SecurityError'); },
     });
-
     try {
-      const storage = createDeckEditorLocalDraftStorage();
-      expect(() => storage.load('user-1')).toThrow('Local draft storage is unavailable.');
+      expect(createDeckEditorLocalDraftStorage().read('user-1')).toEqual({ status: 'unavailable' });
     } finally {
-      if (localStorageDescriptor) {
-        Object.defineProperty(globalThis, 'localStorage', localStorageDescriptor);
-      }
+      if (localStorageDescriptor) Object.defineProperty(globalThis, 'localStorage', localStorageDescriptor);
     }
   });
 });

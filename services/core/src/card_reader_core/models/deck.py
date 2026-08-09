@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
+from uuid import UUID
 
 from django.conf import settings
 from django.db import models
@@ -59,10 +60,20 @@ class Deck(TimestampedModel):
         related_name="hero_decks",
         db_column="hero_card_id",
     )
+    client_creation_id: models.UUIDField[UUID | None, UUID | None] = models.UUIDField(
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         db_table = "deck"
         indexes = [models.Index(fields=["owner", "updated_at"], name="ix_deck_owner_updated")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("owner", "client_creation_id"),
+                name="ux_deck_owner_creation_id",
+            )
+        ]
 
 
 DeckVisibility = Literal["private", "unlisted", "public"]

@@ -17,7 +17,9 @@ const { controller } = vi.hoisted(() => {
       saving: refValue(false),
       manualSaving: refValue(false),
       isCreating: refValue(false),
-      creationCleanupPending: refValue(false),
+      isMutationLocked: refValue(false),
+      creationState: refValue<{ status: 'idle' | 'creating' | 'unknown' }>({ status: 'idle' }),
+      persistenceState: refValue({ status: 'synced' }),
       loading: refValue(false),
       hasUnsavedChanges: refValue(true),
       hasLocalDraft: refValue(false),
@@ -29,6 +31,9 @@ const { controller } = vi.hoisted(() => {
       discardLocalDraftModalOpen: refValue(false),
       localDraftRecoveryModalOpen: refValue(false),
       pendingLocalDraft: refValue<null | { savedAt: string }>(null),
+      localDraftConflict: refValue<null | {
+        kind: 'active-draft' | 'remote-deletion' | 'created-elsewhere';
+      }>(null),
       deckBuildingRules: refValue({
         mainboard_card_count: { min: 40, max: 60 },
         mana_type_count: { min: 10 },
@@ -44,6 +49,11 @@ const { controller } = vi.hoisted(() => {
       cancelDiscardLocalDraft: vi.fn(),
       resumeLocalDraft: vi.fn(),
       discardPendingLocalDraft: vi.fn(),
+      loadStoredConflictDraft: vi.fn(),
+      keepThisConflictDraft: vi.fn(),
+      discardThisConflictedTab: vi.fn(),
+      openCreatedConflictDeck: vi.fn(),
+      keepConflictAsNewDraft: vi.fn(),
       deck: {
         overallTotalCards: refValue(42),
         totalMainboardCards: refValue(40),
@@ -85,9 +95,9 @@ vi.mock('@/shared/components/app/AppPageHeader.vue', () => ({
 
 vi.mock('@/shared/components/app/AppPageLayout.vue', () => ({
   default: defineComponent({
-    setup(_, { slots }) {
+    setup(_, { attrs, slots }) {
       return () =>
-        h('main', { 'data-testid': 'builder-layout' }, [
+        h('main', { ...attrs, 'data-testid': 'builder-layout' }, [
           slots.aside?.(),
           slots.default?.(),
           slots.endAside?.(),
@@ -197,6 +207,24 @@ vi.mock('@/features/decks/components/DeckDraftRecoveryModal.vue', () => ({
   }),
 }));
 
+vi.mock('@/features/decks/components/DeckDraftConflictModal.vue', () => ({
+  default: defineComponent({
+    props: {
+      open: { type: Boolean, required: true },
+      kind: { type: String, default: undefined },
+    },
+    setup(props, { emit }) {
+      return () => props.open
+        ? h('section', { 'data-testid': 'draft-conflict-modal' }, [
+            h('span', props.kind),
+            h('button', { onClick: () => emit('useStored') }, 'Use stored'),
+            h('button', { onClick: () => emit('keepLocal') }, 'Keep local'),
+          ])
+        : null;
+    },
+  }),
+}));
+
 const mountPage = async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -223,7 +251,8 @@ describe('DeckEditorPage', () => {
     controller.saving.value = false;
     controller.manualSaving.value = false;
     controller.isCreating.value = false;
-    controller.creationCleanupPending.value = false;
+    controller.isMutationLocked.value = false;
+    controller.creationState.value = { status: 'idle' };
     controller.changeStatusLabel.value = 'Unsaved';
     controller.hasUnsavedChanges.value = true;
     controller.hasLocalDraft.value = false;
@@ -234,6 +263,7 @@ describe('DeckEditorPage', () => {
     controller.discardLocalDraftModalOpen.value = false;
     controller.localDraftRecoveryModalOpen.value = false;
     controller.pendingLocalDraft.value = null;
+    controller.localDraftConflict.value = null;
     document.body.innerHTML = '';
     vi.clearAllMocks();
   });
@@ -435,14 +465,17 @@ describe('DeckEditorPage', () => {
     controller.deckId.value = '';
     controller.isPublished.value = false;
     controller.isCreating.value = true;
+    controller.isMutationLocked.value = true;
+    controller.creationState.value = { status: 'creating' };
     controller.saving.value = true;
     controller.manualSaving.value = true;
     controller.hasLocalDraft.value = true;
 
     const mounted = await mountPage();
     const page = mounted.container.querySelector('section');
+    const layout = mounted.container.querySelector<HTMLElement>('[data-testid="builder-layout"]');
 
-    expect(page?.hasAttribute('inert')).toBe(true);
+    expect(layout?.hasAttribute('inert')).toBe(true);
     expect(page?.getAttribute('aria-busy')).toBe('true');
     expect(
       mounted.container.querySelector<HTMLButtonElement>('button[aria-label="Open deck hero"]')?.disabled,
@@ -460,20 +493,20 @@ describe('DeckEditorPage', () => {
     mounted.unmount();
   });
 
-  test('offers a finish action when created-draft cleanup needs retrying', async () => {
+  test('offers Retry with the editor locked when creation is unconfirmed', async () => {
     controller.deckId.value = '';
     controller.isPublished.value = false;
-    controller.isCreating.value = true;
-    controller.creationCleanupPending.value = true;
+    controller.isMutationLocked.value = true;
+    controller.creationState.value = { status: 'unknown' };
 
     const mounted = await mountPage();
-    const finishButton = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Finish deck creation"]',
+    const retryButton = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Retry deck creation"]',
     );
 
-    expect(finishButton?.textContent).toBe('Finish');
-    expect(finishButton?.disabled).toBe(false);
-    finishButton?.click();
+    expect(retryButton?.textContent).toBe('Retry');
+    expect(retryButton?.disabled).toBe(false);
+    retryButton?.click();
     expect(controller.saveDeck).toHaveBeenCalledTimes(1);
 
     mounted.unmount();

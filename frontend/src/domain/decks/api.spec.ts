@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { api } from '@/shared/api/client';
-import { exportDeckTts, fetchDeckRulesMetadata } from '@/domain/decks/api';
+import {
+  createDeck,
+  exportDeckTts,
+  fetchDeckRulesMetadata,
+  fetchMyDeckByCreationKey,
+} from '@/domain/decks/api';
 import {
   fallbackDeckBuildingConfigExample,
   fallbackDeckBuildingDefaultConfig,
@@ -9,7 +14,7 @@ import {
 import type { DeckRulesMetadata } from '@/domain/decks/types';
 
 vi.mock('@/shared/api/client', () => ({
-  api: { get: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn() },
 }));
 
 describe('deck API', () => {
@@ -52,5 +57,38 @@ describe('deck API', () => {
     expect(api.get).toHaveBeenCalledWith('/decks/deck-1/exports/tts', {
       params: { sideboard_id: 'sideboard-1' },
     });
+  });
+
+  test('sends the creation key separately and reports an idempotent replay', async () => {
+    const record = { id: 'deck-1', status: { is_valid: true } };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: record, status: 200 });
+    const payload = {
+      name: 'Deck',
+      description: null,
+      long_description: null,
+      difficulty: null,
+      visibility: 'private' as const,
+      hero_card_id: 'hero-1',
+      entries: [],
+      sideboards: [],
+      tag_ids: [],
+      suggested_type_labels: [],
+    };
+
+    await expect(createDeck(payload, 'creation-key')).resolves.toEqual({
+      record,
+      replayed: true,
+    });
+    expect(api.post).toHaveBeenCalledWith('/my/decks', payload, {
+      headers: { 'Idempotency-Key': 'creation-key' },
+    });
+  });
+
+  test('looks up an owned deck by its creation key', async () => {
+    const record = { id: 'deck-1', status: { is_valid: true } };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: record });
+
+    await expect(fetchMyDeckByCreationKey('creation-key')).resolves.toEqual(record);
+    expect(api.get).toHaveBeenCalledWith('/my/decks/by-creation-key/creation-key');
   });
 });

@@ -35,6 +35,10 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Avoid overusing containers and card shells. Prefer letting controls and content float on the app background when hierarchy remains clear, using dividers, spacing, accent lines, and selected states for visual separation between sections.
 - Keep user-facing page and section descriptions focused on the enduring purpose and end result of the screen; avoid copy that calls out specific implementation details, temporary workflow mechanics, or design decisions that may look out of place as the page grows.
 - Verify visible UI in both light and dark modes.
+- Model multi-phase workflows with tagged states rather than overlapping booleans, and cover their allowed transition table with tests.
+- Capture an immutable request payload and idempotency key before uncertain mutations; retries must reuse both exactly.
+- Treat browser persistence, server mutation, and cleanup as independent failure domains. Confirmed server success is terminal even when local cleanup fails.
+- Use revision-conditional writes plus native storage events for cross-tab state. Pause mutation and require an explicit conflict resolution instead of silently choosing a source of truth.
 
 ## Implementation Workflow
 
@@ -70,6 +74,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Unnecessary framed containers where divider-separated, background-floating content would be clearer and more consistent
 - UI changes verified in one theme only
 - Missing validation for touched frontend behavior
+- Flag combinations that encode hidden workflow phases, mutable retry payloads, cleanup that gates confirmed success, or tabs that silently overwrite storage
 - Deck-building defaults or example JSON copied into UI code without a backend metadata source or fallback test
 
 ## File Hotspots

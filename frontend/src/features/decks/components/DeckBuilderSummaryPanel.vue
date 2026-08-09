@@ -174,7 +174,7 @@
 
     <Teleport to="body">
       <div
-        v-if="sideboardActionsOpen && sideboardActionsTargetId && !controller.isCreating.value"
+        v-if="sideboardActionsOpen && sideboardActionsTargetId && !controller.isMutationLocked.value"
         ref="sideboardActionsPanelRef"
         class="theme-popover z-40 w-44 p-2"
         :style="{
@@ -187,7 +187,7 @@
           <button
             type="button"
             class="btn-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
-            :disabled="controller.isCreating.value"
+            :disabled="controller.isMutationLocked.value"
             @click="
               beginRenameSideboard(
                 sideboardActionsTargetId,
@@ -203,7 +203,7 @@
           <button
             type="button"
             class="btn-danger-secondary w-full justify-start gap-2 px-3 py-2 text-xs"
-            :disabled="controller.isCreating.value"
+            :disabled="controller.isMutationLocked.value"
             @click="
               promptDeleteSideboard(
                 sideboardActionsTargetId,
@@ -289,7 +289,7 @@
           :class="{ 'deck-board-entry-pop': poppedBoardEntryCardId === entry.card.id }"
           :quantity-max="controller.deck.getCardQuantityLimit(entry.card.id)"
           :move-destinations="getMoveDestinations(entry.card.id)"
-          :mutation-disabled="controller.isCreating.value"
+          :mutation-disabled="controller.isMutationLocked.value"
           :row-action-disabled="controller.deck.boardRowActionDisabled(entry.card.id)"
           :row-secondary-action-disabled="
             controller.deck.boardRowSecondaryActionDisabled(entry.card.id)
@@ -390,7 +390,7 @@ const sortableController = useSortable(boardEntriesSortableRef, sortableEntries,
     sortableController.option('bubbleScroll', false);
   },
   onUpdate: (event: { item: HTMLElement; newIndex?: number }): void => {
-    if (props.controller.isCreating.value) {
+    if (props.controller.isMutationLocked.value) {
       return;
     }
     const movedCardId = event.item.dataset.cardId;
@@ -518,7 +518,7 @@ watch(
     void nextTick(() => {
       sortableController.option(
         'disabled',
-        props.controller.isCreating.value || entries.length < 2,
+        props.controller.isMutationLocked.value || entries.length < 2,
       );
     });
   },
@@ -532,7 +532,7 @@ onBeforeUnmount(() => {
 });
 
 const selectSideboard = (sideboardId: string): void => {
-  if (props.controller.isCreating.value || editingSideboardId.value === sideboardId) {
+  if (props.controller.isMutationLocked.value || editingSideboardId.value === sideboardId) {
     return;
   }
   props.controller.deck.selectBoard(sideboardId);
@@ -542,7 +542,7 @@ const getMoveDestinations = (cardId: string): DeckBoardMoveDestination[] =>
   props.controller.deck.getBoardMoveDestinations(cardId);
 
 const handleMoveToBoard = (cardId: string, destinationBoardId: string): void => {
-  if (props.controller.isCreating.value) {
+  if (props.controller.isMutationLocked.value) {
     return;
   }
   props.controller.deck.moveEntryToBoard(cardId, destinationBoardId);
@@ -554,7 +554,7 @@ const setEditingSideboardInputRef = (element: unknown): void => {
 
 const openSideboardActions = (event: MouseEvent, sideboardId: string): void => {
   event.stopPropagation();
-  if (props.controller.isCreating.value) {
+  if (props.controller.isMutationLocked.value) {
     return;
   }
   sideboardActionsTriggerRef.value = event.currentTarget as HTMLElement | null;
@@ -602,7 +602,7 @@ const shouldShowSideboardActions = (sideboardId: string): boolean => {
 };
 
 const beginRenameSideboard = async (sideboardId: string, name: string): Promise<void> => {
-  if (props.controller.isCreating.value) {
+  if (props.controller.isMutationLocked.value) {
     return;
   }
   closeSideboardActions();
@@ -620,7 +620,7 @@ const cancelRenameSideboard = (): void => {
 };
 
 const commitRenameSideboard = (): void => {
-  if (props.controller.isCreating.value || !editingSideboardId.value) {
+  if (props.controller.isMutationLocked.value || !editingSideboardId.value) {
     return;
   }
   const nextName = editingSideboardName.value.trim();
@@ -634,7 +634,7 @@ const commitRenameSideboard = (): void => {
 };
 
 const promptDeleteSideboard = (sideboardId: string, name: string): void => {
-  if (props.controller.isCreating.value) {
+  if (props.controller.isMutationLocked.value) {
     return;
   }
   closeSideboardActions();
@@ -643,7 +643,7 @@ const promptDeleteSideboard = (sideboardId: string, name: string): void => {
 };
 
 const confirmDeleteSideboard = (): void => {
-  if (props.controller.isCreating.value || !deleteSideboardTarget.value) {
+  if (props.controller.isMutationLocked.value || !deleteSideboardTarget.value) {
     return;
   }
   if (props.controller.deck.activeBoardId.value === deleteSideboardTarget.value.id) {
@@ -654,7 +654,7 @@ const confirmDeleteSideboard = (): void => {
 };
 
 watch(
-  () => props.controller.isCreating.value,
+  () => props.controller.isMutationLocked.value,
   (creating) => {
     sortableController.option(
       'disabled',

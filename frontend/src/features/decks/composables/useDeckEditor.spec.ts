@@ -4,9 +4,16 @@ import { createPinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { CardListItem } from '@/domain/cards/types';
+import type { DeckCardSummary } from '@/domain/decks/types';
 import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 import { createEmptyDeckForm } from '@/features/decks/composables/deckEditorDraftModel';
-import { createDeckEditorLocalDraftStorage } from '@/features/decks/utils/deckEditorLocalDraftStorage';
+import type { DeckForm } from '@/features/decks/composables/deckEditorDraftTypes';
+import {
+  buildStoredDeckEditorDraft,
+  createDeckEditorLocalDraftStorage,
+  deckEditorDraftSlotToken,
+  type StoredDeckEditorDraft,
+} from '@/features/decks/utils/deckEditorLocalDraftStorage';
 
 const {
   createDeckMock,
@@ -22,6 +29,7 @@ const {
   fetchCardMock,
   fetchCardsMock,
   fetchDeckTagsMock,
+  fetchMyDeckByCreationKeyMock,
 } = vi.hoisted(() => ({
   createDeckMock: vi.fn(),
   fetchDeckRulesMetadataMock: vi.fn(async () => ({
@@ -48,6 +56,7 @@ const {
     results: [] as CardListItem[],
   })),
   fetchDeckTagsMock: vi.fn(),
+  fetchMyDeckByCreationKeyMock: vi.fn(),
 }));
 
 vi.mock('@/domain/cards/api', () => ({
@@ -60,6 +69,7 @@ vi.mock('@/domain/decks/api', () => ({
   fetchDeckRulesMetadata: fetchDeckRulesMetadataMock,
   fetchDeckTags: fetchDeckTagsMock,
   fetchMyDeck: fetchMyDeckMock,
+  fetchMyDeckByCreationKey: fetchMyDeckByCreationKeyMock,
   updateDeck: updateDeckMock,
 }));
 
@@ -129,6 +139,35 @@ const buildHero = (id: string, name: string) => ({
   types: [],
 });
 
+const saveLocalDraft = (
+  ownerId: string,
+  form: DeckForm,
+  cards: Record<string, DeckCardSummary>,
+): StoredDeckEditorDraft => {
+  const storage = createDeckEditorLocalDraftStorage();
+  const current = storage.read(ownerId);
+  const expected = current.status === 'loaded'
+    ? deckEditorDraftSlotToken(current.slot)
+    : { kind: 'empty' as const };
+  const draft = buildStoredDeckEditorDraft(ownerId, `draft-${ownerId}`, form, cards);
+  const result = storage.save(draft, expected);
+  if (result.status !== 'saved') throw new Error(`Could not save test draft: ${result.status}`);
+  return result.draft;
+};
+
+const loadLocalDraft = (ownerId: string): StoredDeckEditorDraft | null => {
+  const result = createDeckEditorLocalDraftStorage().read(ownerId);
+  return result.status === 'loaded' && result.slot.kind === 'draft' ? result.slot.draft : null;
+};
+
+const dispatchDraftStorageEvent = (ownerId: string): void => {
+  const key = `card-reader.deck-editor.new-draft.${ownerId}`;
+  window.dispatchEvent(new StorageEvent('storage', {
+    key,
+    newValue: localStorage.getItem(key),
+  }));
+};
+
 const buildCard = (id: string, name: string) => ({
   ...buildHero(id, name),
   is_hero: false,
@@ -195,6 +234,7 @@ describe('useDeckEditor', () => {
     vi.useFakeTimers();
     fetchCardMock.mockRejectedValue(new Error('Card not found'));
     fetchDeckTagsMock.mockResolvedValue({ roles: [], types: [] });
+    fetchMyDeckByCreationKeyMock.mockResolvedValue(null);
     localStorage.setItem('card-reader.deck-editor.autosync', 'true');
     fetchMyDeckMock.mockResolvedValue({
       id: 'deck-1',
@@ -238,8 +278,8 @@ describe('useDeckEditor', () => {
       status: { is_valid: true },
     });
     createDeckMock.mockResolvedValue({
-      id: 'deck-new',
-      status: { is_valid: true },
+      record: { id: 'deck-new', status: { is_valid: true } },
+      replayed: false,
     });
   });
 
@@ -307,22 +347,25 @@ describe('useDeckEditor', () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(createDeckMock).not.toHaveBeenCalled();
 
-    const storedDraft = createDeckEditorLocalDraftStorage().load('user-1');
+    const storedDraft = loadLocalDraft('user-1');
     expect(storedDraft?.form.name).toBe('New Deck');
     expect(storedDraft?.form.hero_card_id).toBe('hero-new');
 
     await mounted.controller.saveDeck();
 
-    expect(createDeckMock).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'New Deck',
-      hero_card_id: 'hero-new',
-    }));
+    expect(createDeckMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'New Deck',
+        hero_card_id: 'hero-new',
+      }),
+      expect.any(String),
+    );
     expect(mounted.router.currentRoute.value.fullPath).toBe(
       '/my/decks/deck-new/edit?editor_mode=cards',
     );
     expect(mounted.controller.editorMode.value).toBe('cards');
     expect(mounted.controller.isPublished.value).toBe(true);
-    expect(createDeckEditorLocalDraftStorage().load('user-1')).toBeNull();
+    expect(loadLocalDraft('user-1')).toBeNull();
 
     mounted.unmount();
   });
@@ -354,7 +397,7 @@ describe('useDeckEditor', () => {
     form.name = 'Recovered Deck';
     form.hero_card_id = 'hero-recovered';
     form.entries = [{ card_id: 'card-recovered', quantity: 3 }];
-    createDeckEditorLocalDraftStorage().save('user-1', form, {
+    saveLocalDraft('user-1', form, {
       'hero-recovered': buildHero('hero-recovered', 'Recovered Hero'),
       'card-recovered': buildCard('card-recovered', 'Recovered Card'),
     });
@@ -385,7 +428,7 @@ describe('useDeckEditor', () => {
     const form = createEmptyDeckForm();
     form.name = 'Recovered Deck';
     form.hero_card_id = 'hero-recovered';
-    createDeckEditorLocalDraftStorage().save('user-1', form, {
+    saveLocalDraft('user-1', form, {
       'hero-recovered': buildHero('hero-recovered', 'Stored Hero'),
     });
     fetchCardsMock.mockResolvedValueOnce({
@@ -422,14 +465,14 @@ describe('useDeckEditor', () => {
     const form = createEmptyDeckForm();
     form.name = 'Recovered Deck';
     form.tag_ids = ['role-current', 'role-deleted'];
-    createDeckEditorLocalDraftStorage().save('user-1', form, {});
+    saveLocalDraft('user-1', form, {});
     const mounted = await mountController('/my/decks/new');
 
     await mounted.controller.resumeLocalDraft();
     await nextTick();
 
     expect(mounted.controller.deck.form.tag_ids).toEqual(['role-current']);
-    expect(createDeckEditorLocalDraftStorage().load('user-1')?.form.tag_ids).toEqual([
+    expect(loadLocalDraft('user-1')?.form.tag_ids).toEqual([
       'role-current',
     ]);
 
@@ -449,7 +492,7 @@ describe('useDeckEditor', () => {
       name: 'Maybeboard',
       entries: [{ card_id: 'card-merged', quantity: 4 }],
     }];
-    createDeckEditorLocalDraftStorage().save('user-1', form, {
+    saveLocalDraft('user-1', form, {
       'hero-merged': buildHero('hero-merged', 'Stored Hero'),
       'card-merged': buildCard('card-merged', 'Stored Card'),
       'card-target': buildCard('card-target', 'Target Card'),
@@ -488,7 +531,7 @@ describe('useDeckEditor', () => {
   });
 
   test('discards a pending local draft and starts with an empty Cards screen', async () => {
-    createDeckEditorLocalDraftStorage().save(
+    saveLocalDraft(
       'user-1',
       { ...createEmptyDeckForm(), name: 'Discard Me' },
       {},
@@ -500,7 +543,7 @@ describe('useDeckEditor', () => {
     expect(mounted.controller.localDraftRecoveryModalOpen.value).toBe(false);
     expect(mounted.controller.editorMode.value).toBe('cards');
     expect(mounted.controller.deck.form.name).toBe('');
-    expect(createDeckEditorLocalDraftStorage().load('user-1')).toBeNull();
+    expect(loadLocalDraft('user-1')).toBeNull();
 
     mounted.unmount();
   });
@@ -519,7 +562,7 @@ describe('useDeckEditor', () => {
     expect(mounted.controller.deck.form.name).toBe('');
     expect(mounted.controller.editorMode.value).toBe('cards');
     expect(mounted.controller.hasLocalDraft.value).toBe(false);
-    expect(createDeckEditorLocalDraftStorage().load('user-1')).toBeNull();
+    expect(loadLocalDraft('user-1')).toBeNull();
 
     mounted.unmount();
   });
@@ -537,7 +580,7 @@ describe('useDeckEditor', () => {
     await navigationPromise;
 
     expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
-    expect(createDeckEditorLocalDraftStorage().load('user-1')?.form.name).toBe(
+    expect(loadLocalDraft('user-1')?.form.name).toBe(
       'Resume After Leaving',
     );
 
@@ -563,7 +606,10 @@ describe('useDeckEditor', () => {
   });
 
   test('blocks route changes while the initial create request is pending', async () => {
-    let resolveCreate!: (value: { id: string; status: { is_valid: boolean } }) => void;
+    let resolveCreate!: (value: {
+      record: { id: string; status: { is_valid: boolean } };
+      replayed: boolean;
+    }) => void;
     createDeckMock.mockReturnValueOnce(new Promise((resolve) => {
       resolveCreate = resolve;
     }));
@@ -581,7 +627,10 @@ describe('useDeckEditor', () => {
     expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
     expect(mounted.controller.discardChangesModalOpen.value).toBe(false);
 
-    resolveCreate({ id: 'deck-new', status: { is_valid: true } });
+    resolveCreate({
+      record: { id: 'deck-new', status: { is_valid: true } },
+      replayed: false,
+    });
     await navigationPromise;
     await createPromise;
 
@@ -591,45 +640,135 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
-  test('retries draft retirement without creating a duplicate deck', async () => {
+  test('does not retire a draft changed by another tab while creation is in flight', async () => {
+    let resolveCreate!: (value: {
+      record: { id: string; status: { is_valid: boolean } };
+      replayed: boolean;
+    }) => void;
+    createDeckMock.mockReturnValueOnce(new Promise((resolve) => {
+      resolveCreate = resolve;
+    }));
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Creating Here');
+    const createPromise = mounted.controller.saveDeck();
+    await nextTick();
+    const otherTabForm = createEmptyDeckForm();
+    otherTabForm.name = 'Changed Elsewhere During Create';
+    saveLocalDraft('user-1', otherTabForm, {});
+    dispatchDraftStorageEvent('user-1');
+
+    resolveCreate({
+      record: { id: 'deck-new', status: { is_valid: true } },
+      replayed: false,
+    });
+    await createPromise;
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
+    expect(loadLocalDraft('user-1')?.form.name).toBe('Changed Elsewhere During Create');
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      'A different local deck draft remains available in this browser.',
+    );
+    mounted.unmount();
+  });
+
+  test('treats a failed POST as success when creation-key lookup finds the deck', async () => {
+    createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
+    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce({
+      id: 'deck-found',
+      status: { is_valid: true },
+    });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Found After Failure');
+
+    await mounted.controller.saveDeck();
+
+    expect(fetchMyDeckByCreationKeyMock).toHaveBeenCalledWith(expect.any(String));
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-found/edit?editor_mode=cards',
+    );
+    mounted.unmount();
+  });
+
+  test('enters unknown after ambiguous create and retries the identical key and payload', async () => {
+    createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
+    fetchMyDeckByCreationKeyMock.mockRejectedValueOnce(new Error('Lookup unavailable'));
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Ambiguous Create');
+
+    await mounted.controller.saveDeck();
+
+    expect(mounted.controller.creationState.value.status).toBe('unknown');
+    expect(mounted.controller.isMutationLocked.value).toBe(true);
+    const firstCall = createDeckMock.mock.calls[0];
+    createDeckMock.mockResolvedValueOnce({
+      record: { id: 'deck-retried', status: { is_valid: true } },
+      replayed: true,
+    });
+
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock.mock.calls[1]).toEqual(firstCall);
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-retried/edit?editor_mode=cards',
+    );
+    mounted.unmount();
+  });
+
+  test('returns an unconfirmed request to editable state after a definitive lookup miss', async () => {
+    createDeckMock.mockRejectedValueOnce(new Error('Request rejected'));
+    fetchMyDeckByCreationKeyMock.mockResolvedValueOnce(null);
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Definitive Failure');
+
+    await mounted.controller.saveDeck();
+
+    expect(mounted.controller.creationState.value.status).toBe('idle');
+    expect(mounted.controller.isMutationLocked.value).toBe(false);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    mounted.unmount();
+  });
+
+  test('navigates after confirmed creation when draft retirement fails', async () => {
     const mounted = await mountController('/my/decks/new');
     mounted.controller.openHero();
     mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
     mounted.controller.deck.setDeckName('Created Once');
     await nextTick();
 
-    const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
-      throw new DOMException('Removal blocked', 'SecurityError');
-    });
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new DOMException('Writes blocked', 'SecurityError');
+    const originalSetItem = Storage.prototype.setItem;
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (value.includes('"kind":"retired"')) {
+        throw new DOMException('Retirement blocked', 'SecurityError');
+      }
+      originalSetItem.call(this, key, value);
     });
 
     await mounted.controller.saveDeck();
 
     expect(createDeckMock).toHaveBeenCalledTimes(1);
-    expect(mounted.controller.creationCleanupPending.value).toBe(true);
-    expect(mounted.controller.isCreating.value).toBe(true);
-    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
-    expect(toastErrorMock).toHaveBeenCalledWith(
-      'The deck was created, but its local draft could not be retired. Click Finish to retry.',
-    );
-
-    removeItemSpy.mockRestore();
-    setItemSpy.mockRestore();
-    await mounted.controller.saveDeck();
-
-    expect(createDeckMock).toHaveBeenCalledTimes(1);
-    expect(mounted.controller.creationCleanupPending.value).toBe(false);
+    expect(mounted.controller.isCreating.value).toBe(false);
     expect(mounted.router.currentRoute.value.fullPath).toBe(
       '/my/decks/deck-new/edit?editor_mode=cards',
     );
-    expect(createDeckEditorLocalDraftStorage().load('user-1')).toBeNull();
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'The deck was created, but its browser draft could not be retired.',
+    );
 
+    setItemSpy.mockRestore();
     mounted.unmount();
   });
 
-  test('preserves another tab\'s newer local draft after creation', async () => {
+  test('pauses creation when another tab has replaced the observed draft', async () => {
     const mounted = await mountController('/my/decks/new');
     mounted.controller.openHero();
     mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
@@ -638,21 +777,78 @@ describe('useDeckEditor', () => {
 
     const otherTabForm = createEmptyDeckForm();
     otherTabForm.name = 'Keep from second tab';
-    createDeckEditorLocalDraftStorage().save('user-1', otherTabForm, {});
+    saveLocalDraft('user-1', otherTabForm, {});
 
     await mounted.controller.saveDeck();
 
-    expect(createDeckMock).toHaveBeenCalledTimes(1);
-    expect(mounted.router.currentRoute.value.fullPath).toBe(
-      '/my/decks/deck-new/edit?editor_mode=cards',
-    );
-    expect(createDeckEditorLocalDraftStorage().load('user-1')?.form.name).toBe(
-      'Keep from second tab',
-    );
-    expect(toastInfoMock).toHaveBeenCalledWith(
-      'A different local deck draft remains available in this browser.',
-    );
+    expect(createDeckMock).not.toHaveBeenCalled();
+    expect(mounted.controller.persistenceState.value.status).toBe('conflict');
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('active-draft');
 
+    mounted.controller.keepThisConflictDraft();
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/deck-new/edit?editor_mode=cards');
+
+    mounted.unmount();
+  });
+
+  test('loads a newer stored draft after a cross-tab conflict', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.deck.setDeckName('This Tab');
+    await nextTick();
+    const remoteForm = createEmptyDeckForm();
+    remoteForm.name = 'Stored Tab';
+    saveLocalDraft('user-1', remoteForm, {});
+    dispatchDraftStorageEvent('user-1');
+
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('active-draft');
+    await mounted.controller.loadStoredConflictDraft();
+
+    expect(mounted.controller.deck.form.name).toBe('Stored Tab');
+    expect(mounted.controller.persistenceState.value.status).toBe('synced');
+    mounted.unmount();
+  });
+
+  test('discards this tab after a draft is removed elsewhere', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.deck.setDeckName('Removed Elsewhere');
+    await nextTick();
+    localStorage.removeItem('card-reader.deck-editor.new-draft.user-1');
+    dispatchDraftStorageEvent('user-1');
+
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('remote-deletion');
+    mounted.controller.discardThisConflictedTab();
+
+    expect(mounted.controller.deck.form.name).toBe('');
+    expect(mounted.controller.persistenceState.value.status).toBe('synced');
+    mounted.unmount();
+  });
+
+  test('keeps a draft created elsewhere as a new browser draft', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.deck.setDeckName('Keep Separate');
+    await nextTick();
+    const activeDraft = loadLocalDraft('user-1');
+    if (!activeDraft) throw new Error('Expected an active local draft');
+    const storage = createDeckEditorLocalDraftStorage();
+    const retirement = storage.retire(
+      'user-1',
+      activeDraft.draftId,
+      'deck-created-elsewhere',
+      { kind: 'draft', revision: activeDraft.revision },
+    );
+    expect(retirement.status).toBe('retired');
+    dispatchDraftStorageEvent('user-1');
+
+    expect(mounted.controller.localDraftConflict.value?.kind).toBe('created-elsewhere');
+    mounted.controller.keepConflictAsNewDraft();
+    const keptDraft = loadLocalDraft('user-1');
+
+    expect(keptDraft?.draftId).not.toBe(activeDraft.draftId);
+    expect(keptDraft?.form.name).toBe('Keep Separate');
+    expect(mounted.controller.persistenceState.value.status).toBe('synced');
     mounted.unmount();
   });
 
@@ -685,7 +881,6 @@ describe('useDeckEditor', () => {
     await mounted.controller.saveDeck();
 
     expect(createDeckMock).toHaveBeenCalledTimes(1);
-    expect(mounted.controller.creationCleanupPending.value).toBe(false);
     expect(mounted.router.currentRoute.value.fullPath).toBe(
       '/my/decks/deck-new/edit?editor_mode=cards',
     );
@@ -696,10 +891,10 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
-  test('preserves a conflicting draft when storage becomes readable after creation', async () => {
+  test('confirmed creation outranks an unreadable stale browser draft', async () => {
     const staleForm = createEmptyDeckForm();
     staleForm.name = 'Hidden Older Draft';
-    createDeckEditorLocalDraftStorage().save('user-1', staleForm, {});
+    saveLocalDraft('user-1', staleForm, {});
     const draftStorageKey = 'card-reader.deck-editor.new-draft.user-1';
     const originalGetItem = Storage.prototype.getItem;
     const originalSetItem = Storage.prototype.setItem;
@@ -731,20 +926,14 @@ describe('useDeckEditor', () => {
     await mounted.controller.saveDeck();
 
     expect(createDeckMock).toHaveBeenCalledTimes(1);
-    expect(mounted.controller.creationCleanupPending.value).toBe(true);
-    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/my/decks/deck-new/edit?editor_mode=cards',
+    );
 
     getItemSpy.mockRestore();
     setItemSpy.mockRestore();
     removeItemSpy.mockRestore();
-    await mounted.controller.saveDeck();
-
-    expect(createDeckMock).toHaveBeenCalledTimes(1);
-    expect(mounted.controller.creationCleanupPending.value).toBe(false);
-    expect(mounted.router.currentRoute.value.fullPath).toBe(
-      '/my/decks/deck-new/edit?editor_mode=cards',
-    );
-    expect(createDeckEditorLocalDraftStorage().load('user-1')?.form.name).toBe(
+    expect(loadLocalDraft('user-1')?.form.name).toBe(
       'Hidden Older Draft',
     );
 

@@ -1,7 +1,6 @@
 <template>
   <section
     class="flex flex-col gap-6"
-    :inert="controller.isCreating.value"
     :aria-busy="controller.isCreating.value"
   >
     <AppPageHeader
@@ -28,7 +27,7 @@
             :icon="Trash2"
             label="Discard local draft"
             short-label="Discard"
-            :disabled="controller.isCreating.value"
+            :disabled="controller.isMutationLocked.value"
             @click="controller.requestDiscardLocalDraft()"
           />
           <AppHeaderAction
@@ -36,8 +35,8 @@
             :label="deckSaveActionLabel"
             :short-label="deckSaveActionShortLabel"
             variant="primary"
-            :icon-class="controller.manualSaving.value ? 'animate-spin' : ''"
-            :disabled="controller.manualSaving.value"
+            :icon-class="deckSaveActionPending ? 'animate-spin' : ''"
+            :disabled="deckSaveActionDisabled"
             @click="() => controller.saveDeck()"
           />
         </div>
@@ -55,7 +54,7 @@
             short-label="Hero"
             variant="tab"
             :active="controller.editorMode.value === 'hero'"
-            :disabled="controller.isCreating.value"
+            :disabled="controller.isMutationLocked.value"
             @click="controller.openHero()"
           />
           <AppHeaderAction
@@ -64,7 +63,7 @@
             short-label="Details"
             variant="tab"
             :active="controller.editorMode.value === 'details'"
-            :disabled="controller.isCreating.value"
+            :disabled="controller.isMutationLocked.value"
             @click="controller.openDetails()"
           />
           <AppHeaderAction
@@ -73,7 +72,7 @@
             short-label="Cards"
             variant="tab"
             :active="controller.editorMode.value === 'cards'"
-            :disabled="controller.isCreating.value"
+            :disabled="controller.isMutationLocked.value"
             @click="controller.openCards()"
           />
         </nav>
@@ -82,6 +81,7 @@
 
     <AppPageLayout
       v-if="controller.loading.value && controller.editorMode.value !== 'cards'"
+      :inert="controller.isMutationLocked.value"
       columns="sidebar"
       aria-label="Loading deck details"
     >
@@ -121,6 +121,7 @@
 
     <AppPageLayout
       v-if="!controller.loading.value && controller.editorMode.value === 'hero'"
+      :inert="controller.isMutationLocked.value"
       columns="three"
       root-class="deck-builder-layout"
       main-class="deck-builder-main-column"
@@ -140,6 +141,7 @@
 
     <AppPageLayout
       v-if="!controller.loading.value && controller.editorMode.value === 'details'"
+      :inert="controller.isMutationLocked.value"
       columns="sidebar"
     >
       <template #aside>
@@ -150,6 +152,7 @@
 
     <AppPageLayout
       v-if="controller.editorMode.value === 'cards'"
+      :inert="controller.isMutationLocked.value"
       columns="three"
       root-class="deck-builder-layout"
       main-class="deck-builder-main-column"
@@ -208,7 +211,10 @@
               <component
                 :is="deckChangeStatusIcon"
                 class="h-4 w-4 shrink-0"
-                :class="{ 'animate-spin': controller.saving.value }"
+                :class="{
+                  'animate-spin': controller.saving.value
+                    || controller.creationState.value.status === 'creating',
+                }"
               />
               <span class="theme-section-title text-sm font-semibold">{{
                 controller.changeStatusLabel.value
@@ -469,6 +475,12 @@
       @resume="controller.resumeLocalDraft"
       @discard="controller.discardPendingLocalDraft"
     />
+    <DeckDraftConflictModal
+      :open="controller.localDraftConflict.value !== null"
+      :kind="controller.localDraftConflict.value?.kind"
+      @use-stored="handleUseStoredConflict"
+      @keep-local="handleKeepLocalConflict"
+    />
   </section>
 </template>
 
@@ -499,6 +511,7 @@ import DeckBuilderSummaryPanel from '@/features/decks/components/DeckBuilderSumm
 import DeckDetailsForm from '@/features/decks/components/DeckDetailsForm.vue';
 import DeckDetailsHeroPanel from '@/features/decks/components/DeckDetailsHeroPanel.vue';
 import DeckDraftRecoveryModal from '@/features/decks/components/DeckDraftRecoveryModal.vue';
+import DeckDraftConflictModal from '@/features/decks/components/DeckDraftConflictModal.vue';
 import DeckHeroSelectionPanel from '@/features/decks/components/DeckHeroSelectionPanel.vue';
 import { useDeckEditor } from '@/features/decks/composables/useDeckEditor';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
@@ -527,25 +540,31 @@ const mainboardMaxCards = computed(
 const manaMinCards = computed(() => controller.deckBuildingRules.value.mana_type_count.min ?? 0);
 const hardIssueMessages = computed(() => controller.deck.validationMessages.value);
 const deckSaveActionIcon = computed(() => {
-  if (controller.manualSaving.value) {
+  if (controller.manualSaving.value || controller.creationState.value.status === 'creating') {
     return LoaderCircle;
   }
   return controller.isPublished.value ? Save : Hammer;
 });
 const deckSaveActionLabel = computed(() => {
-  if (controller.creationCleanupPending.value) {
-    return controller.manualSaving.value ? 'Finishing deck creation' : 'Finish deck creation';
+  if (controller.creationState.value.status === 'unknown') {
+    return 'Retry deck creation';
   }
-  if (controller.manualSaving.value) {
+  if (controller.manualSaving.value || controller.creationState.value.status === 'creating') {
     return controller.isPublished.value ? 'Saving deck' : 'Creating deck';
   }
   return controller.isPublished.value ? 'Save deck' : 'Create deck';
 });
 const deckSaveActionShortLabel = computed(() => {
-  if (controller.creationCleanupPending.value) {
-    return 'Finish';
-  }
+  if (controller.creationState.value.status === 'unknown') return 'Retry';
   return controller.isPublished.value ? 'Save' : 'Create';
+});
+const deckSaveActionPending = computed(
+  () => controller.manualSaving.value || controller.creationState.value.status === 'creating',
+);
+const deckSaveActionDisabled = computed(() => {
+  if (controller.isPublished.value) return controller.manualSaving.value;
+  if (controller.creationState.value.status === 'unknown') return false;
+  return controller.isMutationLocked.value;
 });
 const deckLeaveConfirmationMessage = computed(() => {
   if (controller.isPublished.value) {
@@ -554,16 +573,23 @@ const deckLeaveConfirmationMessage = computed(() => {
   if (controller.localDraftPersistenceFailed.value) {
     return 'This draft could not be saved in this browser. Leaving now will discard your current progress.';
   }
+  if (controller.localDraftConflict.value) {
+    return 'Another tab changed the browser draft. Leaving now discards this tab and keeps the stored version.';
+  }
+  if (controller.creationState.value.status === 'unknown') {
+    return 'Deck creation could not be confirmed. Leaving keeps the attempted draft in this browser; Retry will use the same request.';
+  }
   return 'Your unpublished deck will remain saved in this browser so you can resume it later.';
 });
 const deckLeaveConfirmationLabel = computed(() => {
   if (controller.isPublished.value) {
     return 'Discard Changes';
   }
+  if (controller.localDraftConflict.value) return 'Discard This Tab';
   return controller.localDraftPersistenceFailed.value ? 'Discard & Leave' : 'Leave Draft';
 });
 const deckChangeStatusIcon = computed(() => {
-  if (controller.saving.value) {
+  if (controller.saving.value || controller.creationState.value.status === 'creating') {
     return LoaderCircle;
   }
   if (controller.hasUnsavedChanges.value) {
@@ -571,6 +597,23 @@ const deckChangeStatusIcon = computed(() => {
   }
   return Cloud;
 });
+const handleUseStoredConflict = (): void => {
+  const conflict = controller.localDraftConflict.value;
+  if (conflict?.kind === 'active-draft') {
+    void controller.loadStoredConflictDraft();
+  } else if (conflict?.kind === 'created-elsewhere') {
+    void controller.openCreatedConflictDeck();
+  } else if (conflict?.kind === 'remote-deletion') {
+    controller.discardThisConflictedTab();
+  }
+};
+const handleKeepLocalConflict = (): void => {
+  if (controller.localDraftConflict.value?.kind === 'created-elsewhere') {
+    controller.keepConflictAsNewDraft();
+  } else {
+    controller.keepThisConflictDraft();
+  }
+};
 const deckEditorSubtitle = computed(() => {
   if (controller.editorMode.value === 'hero') {
     return controller.isChangingHero.value

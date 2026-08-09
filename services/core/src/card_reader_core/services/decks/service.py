@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from django.db import transaction
+from uuid import UUID
+
+from django.db import IntegrityError, transaction
 
 from card_reader_core.models import Deck, DeckDifficulty, DeckVisibility
 from card_reader_core.services.deck_tags import DeckTagService
@@ -10,6 +12,7 @@ from card_reader_core.repositories.decks import (
     get_deck,
     get_deck_for_viewer,
     get_owner_deck,
+    get_owner_deck_by_creation_id,
     get_public_deck,
     list_card_decks_for_viewer,
     list_owner_deck_summaries,
@@ -171,6 +174,9 @@ class DeckService:
     def get_owner_deck(self, deck_id: str, owner_id: str) -> Deck | None:
         return get_owner_deck(deck_id, owner_id)
 
+    def get_owner_deck_by_creation_id(self, owner_id: str, client_creation_id: UUID) -> Deck | None:
+        return get_owner_deck_by_creation_id(owner_id, client_creation_id)
+
     def get_deck(self, deck_id: str) -> Deck | None:
         return get_deck(deck_id)
 
@@ -200,6 +206,79 @@ class DeckService:
         tag_ids: list[str] | None = None,
         suggested_type_labels: list[str] | None = None,
     ) -> Deck:
+        return self._create_owner_deck(
+            owner_id=owner_id,
+            name=name,
+            description=description,
+            visibility=visibility,
+            hero_card_id=hero_card_id,
+            entries=entries,
+            sideboards=sideboards,
+            long_description=long_description,
+            difficulty=difficulty,
+            tag_ids=tag_ids,
+            suggested_type_labels=suggested_type_labels,
+        )
+
+    def create_owner_deck_idempotently(
+        self,
+        *,
+        owner_id: str,
+        client_creation_id: UUID,
+        name: str,
+        description: str | None,
+        visibility: DeckVisibility,
+        hero_card_id: str,
+        entries: list[DeckEntryInput],
+        sideboards: list[DeckSideboardInput],
+        long_description: str | None = None,
+        difficulty: DeckDifficulty | None = None,
+        tag_ids: list[str] | None = None,
+        suggested_type_labels: list[str] | None = None,
+    ) -> tuple[Deck, bool]:
+        existing = self.get_owner_deck_by_creation_id(owner_id, client_creation_id)
+        if existing is not None:
+            return existing, False
+        try:
+            with transaction.atomic():
+                deck = self._create_owner_deck(
+                    owner_id=owner_id,
+                    client_creation_id=client_creation_id,
+                    name=name,
+                    description=description,
+                    visibility=visibility,
+                    hero_card_id=hero_card_id,
+                    entries=entries,
+                    sideboards=sideboards,
+                    long_description=long_description,
+                    difficulty=difficulty,
+                    tag_ids=tag_ids,
+                    suggested_type_labels=suggested_type_labels,
+                )
+        except IntegrityError:
+            existing = self.get_owner_deck_by_creation_id(owner_id, client_creation_id)
+            if existing is None:
+                raise
+            return existing, False
+        return deck, True
+
+    @transaction.atomic
+    def _create_owner_deck(
+        self,
+        *,
+        owner_id: str,
+        name: str,
+        description: str | None,
+        visibility: DeckVisibility,
+        hero_card_id: str,
+        entries: list[DeckEntryInput],
+        sideboards: list[DeckSideboardInput],
+        long_description: str | None = None,
+        difficulty: DeckDifficulty | None = None,
+        tag_ids: list[str] | None = None,
+        suggested_type_labels: list[str] | None = None,
+        client_creation_id: UUID | None = None,
+    ) -> Deck:
         normalized_name = self._normalizer.normalize_name(name)
         normalized_description = self._normalizer.normalize_description(description)
         normalized_long_description = self._normalizer.normalize_long_description(long_description)
@@ -216,6 +295,7 @@ class DeckService:
             difficulty=difficulty,
             visibility=visibility,
             hero_card=hero_card,
+            client_creation_id=client_creation_id,
         )
         replace_mainboard_entries(deck=deck, entries=normalized_entries)
         replace_sideboards(deck=deck, sideboards=normalized_sideboards)
