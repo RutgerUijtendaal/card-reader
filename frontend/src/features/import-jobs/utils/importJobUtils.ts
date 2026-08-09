@@ -25,13 +25,16 @@ export const getImportJobStatusClass = (status: OperationsItemStatus): string =>
 
 const TERMINAL_IMPORT_STATUSES: OperationsItemStatus[] = ['completed', 'failed', 'cancelled'];
 
+export const isTerminalImportStatus = (status: OperationsItemStatus): boolean =>
+  TERMINAL_IMPORT_STATUSES.includes(status);
+
 export const getRecentImportJobs = (
   items: OperationsQueueItem[],
   activeJobIds: Set<string>,
   limit = 5,
 ): OperationsQueueItem[] =>
   items
-    .filter((item) => TERMINAL_IMPORT_STATUSES.includes(item.status) && !activeJobIds.has(item.id))
+    .filter((item) => isTerminalImportStatus(item.status) && !activeJobIds.has(item.id))
     .slice(0, limit);
 
 export const getOperationsItemProgressPercent = (item: OperationsQueueItem): number | null => {

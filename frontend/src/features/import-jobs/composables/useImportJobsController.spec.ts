@@ -231,6 +231,56 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
+  test('reconciles history when concurrent activity snapshots miss a finished job', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+
+    const activeSnapshot = deferred<ImportJob[]>();
+    vi.mocked(fetchImportJobs).mockImplementationOnce(() => activeSnapshot.promise);
+    vi.mocked(fetchOperationsQueuePage)
+      .mockResolvedValueOnce(historyPage([historyItem('active-job', 'running')]))
+      .mockResolvedValueOnce(historyPage([historyItem('active-job', 'completed')]));
+
+    const refresh = mounted.controller.refreshActivity();
+    await vi.waitFor(() => expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(2));
+    activeSnapshot.resolve([]);
+    await refresh;
+
+    expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(3);
+    expect(mounted.controller.activeJobs.value).toEqual([]);
+    expect(mounted.controller.recentJobs.value.map((job) => job.id)).toEqual(['active-job']);
+
+    mounted.app.unmount();
+  });
+
+  test('preserves a history refresh failure after a successful active-only poll', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob()]);
+    vi.mocked(fetchOperationsQueuePage).mockRejectedValueOnce(new Error('History unavailable'));
+    await mounted.controller.refreshActivity();
+    expect(mounted.controller.activityErrorMessage.value).toBe(
+      'Import activity could not be refreshed.',
+    );
+
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob()]);
+    await mounted.controller.pollJobs();
+
+    expect(mounted.controller.activityErrorMessage.value).toBe(
+      'Import activity could not be refreshed.',
+    );
+    expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(2);
+
+    mounted.app.unmount();
+  });
+
   test('refreshes recent history when polling observes a finished active job', async () => {
     const mounted = mountController();
     await vi.waitFor(() => {

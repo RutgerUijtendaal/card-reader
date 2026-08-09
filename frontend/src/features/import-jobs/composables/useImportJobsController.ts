@@ -25,10 +25,12 @@ import {
   getOperationsItemProgressPercent,
   getRecentImportJobs,
   hasActiveImportJobs,
+  isTerminalImportStatus,
 } from '@/features/import-jobs/utils/importJobUtils';
 
 const IMPORT_HISTORY_PAGE_SIZE = 100;
 const RECENT_IMPORT_JOB_LIMIT = 5;
+const ACTIVITY_REFRESH_ERROR_MESSAGE = 'Import activity could not be refreshed.';
 
 export const useImportJobsController = () => {
   const pickerTemplateId = ref('mtg-like-v1');
@@ -38,7 +40,9 @@ export const useImportJobsController = () => {
   const pickedFiles = ref<File[]>([]);
   const fileInputKey = ref(0);
   const formErrorMessage = ref('');
-  const activityErrorMessage = ref('');
+  const activityActionErrorMessage = ref('');
+  const activeJobsErrorMessage = ref('');
+  const historyErrorMessage = ref('');
   const activeJobs = ref<ImportJob[]>([]);
   const historyItems = ref<OperationsQueueItem[]>([]);
   const formLoaded = ref(false);
@@ -71,6 +75,12 @@ export const useImportJobsController = () => {
   const isRefreshing = computed(
     () => activeJobsRefreshing.value || historyRefreshing.value,
   );
+  const activityErrorMessage = computed(
+    () =>
+      activityActionErrorMessage.value
+      || activeJobsErrorMessage.value
+      || historyErrorMessage.value,
+  );
   const contentVersionBaseError = computed(() =>
     getContentVersionBaseError(contentVersionBase.value),
   );
@@ -92,8 +102,14 @@ export const useImportJobsController = () => {
       const nextJobs = await fetchImportJobs();
       if (requestId !== activeJobsRequestId) return false;
       activeJobs.value = nextJobs;
+      activeJobsErrorMessage.value = '';
       lastRefreshedAt.value = new Date().toLocaleTimeString();
       return [...previousIds].some((jobId) => !nextJobs.some((job) => job.id === jobId));
+    } catch (error) {
+      if (requestId === activeJobsRequestId) {
+        activeJobsErrorMessage.value = ACTIVITY_REFRESH_ERROR_MESSAGE;
+      }
+      throw error;
     } finally {
       if (requestId === activeJobsRequestId) {
         activeJobsLoaded.value = true;
@@ -126,7 +142,15 @@ export const useImportJobsController = () => {
         nextPage = page.next_page;
       }
 
-      if (requestId === historyRequestId) historyItems.value = nextItems;
+      if (requestId === historyRequestId) {
+        historyItems.value = nextItems;
+        historyErrorMessage.value = '';
+      }
+    } catch (error) {
+      if (requestId === historyRequestId) {
+        historyErrorMessage.value = ACTIVITY_REFRESH_ERROR_MESSAGE;
+      }
+      throw error;
     } finally {
       if (requestId === historyRequestId) {
         historyLoaded.value = true;
@@ -136,10 +160,22 @@ export const useImportJobsController = () => {
   };
 
   const refreshActivity = async (): Promise<void> => {
-    activityErrorMessage.value = '';
-    const results = await Promise.allSettled([loadActiveJobs(), loadRecentJobs()]);
-    if (results.some((result) => result.status === 'rejected')) {
-      activityErrorMessage.value = 'Import activity could not be refreshed.';
+    activityActionErrorMessage.value = '';
+    const [activeResult, historyResult] = await Promise.allSettled([
+      loadActiveJobs(),
+      loadRecentJobs(),
+    ]);
+    if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
+
+    const historyHasMissingActiveWork = historyItems.value.some(
+      (item) => !isTerminalImportStatus(item.status) && !activeJobIds.value.has(item.id),
+    );
+    if (activeResult.value || historyHasMissingActiveWork) {
+      try {
+        await loadRecentJobs();
+      } catch (error) {
+        console.error('Reconcile import history after activity refresh failed', error);
+      }
     }
   };
 
@@ -226,13 +262,13 @@ export const useImportJobsController = () => {
     if (next.has(jobId)) return;
     next.add(jobId);
     cancellingJobIds.value = next;
-    activityErrorMessage.value = '';
+    activityActionErrorMessage.value = '';
 
     try {
       await cancelImportJob(jobId);
     } catch (error) {
       console.error('Cancel import job failed', error);
-      activityErrorMessage.value = extractImportJobErrorMessage(error);
+      activityActionErrorMessage.value = extractImportJobErrorMessage(error);
       return;
     } finally {
       const done = new Set(cancellingJobIds.value);
@@ -252,10 +288,8 @@ export const useImportJobsController = () => {
     try {
       const activeJobFinished = await loadActiveJobs();
       if (activeJobFinished) await loadRecentJobs();
-      activityErrorMessage.value = '';
     } catch (error) {
       console.error('Polling imports failed', error);
-      activityErrorMessage.value = 'Import activity could not be refreshed.';
     }
   };
 

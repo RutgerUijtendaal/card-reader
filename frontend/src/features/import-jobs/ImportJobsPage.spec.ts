@@ -31,7 +31,7 @@ describe('ImportJobsPage', () => {
       pickedFiles: ref([new File(['image'], 'card.png', { type: 'image/png' })]),
       fileInputKey: ref(0),
       formErrorMessage: ref(''),
-      activityErrorMessage: ref(''),
+      activityErrorMessage: computed(() => ''),
       activeJobs: ref([]),
       recentJobs: computed(() => []),
       formLoaded: ref(true),
