@@ -109,6 +109,8 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
     options.retireAfterCreation(currentAttempt.draftId, record.id);
     try {
       await options.onSuccess(record, currentAttempt);
+    } catch {
+      toast.error('The deck was created, but its editor could not be opened. Open it from My Decks.');
     } finally {
       if (creationState.value.status === 'creating' || creationState.value.status === 'unknown') {
         setCreationState({ status: 'idle' });
@@ -185,12 +187,14 @@ export const useDeckEditorPublication = (options: UseDeckEditorPublicationOption
   };
 
   const executeAttempt = async (currentAttempt: CreateAttempt): Promise<void> => {
+    let result: Awaited<ReturnType<typeof createDeck>>;
     try {
-      const result = await createDeck(currentAttempt.payload, currentAttempt.draftId);
-      await completeSuccess(result.record, currentAttempt);
+      result = await createDeck(currentAttempt.payload, currentAttempt.draftId);
     } catch (error) {
       await resolveFailedRequest(currentAttempt, error);
+      return;
     }
+    await completeSuccess(result.record, currentAttempt);
   };
 
   const create = async (): Promise<void> => {

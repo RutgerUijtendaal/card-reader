@@ -140,10 +140,15 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
 
   const discardRecovery = async (): Promise<boolean> => {
     if (!pendingRecovery.value) return true;
-    const result = await enqueueMutation(async () => await storage.discard(
-      options.ownerId,
-      deckEditorDraftSlotToken(observedSlot.value),
-    ));
+    const result = await enqueueMutation(async () => {
+      if (persistenceState.value.status === 'conflict') {
+        return { status: 'conflict' as const, slot: observedSlot.value };
+      }
+      return await storage.discard(
+        options.ownerId,
+        deckEditorDraftSlotToken(observedSlot.value),
+      );
+    });
     if (result.status === 'unavailable') {
       warnStorageUnavailable('The local deck draft could not be removed from this browser.');
       return false;
@@ -275,10 +280,15 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
   };
 
   const discardActiveDraft = async (): Promise<boolean> => {
-    const result = await enqueueMutation(async () => await storage.discard(
-      options.ownerId,
-      deckEditorDraftSlotToken(observedSlot.value),
-    ));
+    const result = await enqueueMutation(async () => {
+      if (persistenceState.value.status === 'conflict') {
+        return { status: 'conflict' as const, slot: observedSlot.value };
+      }
+      return await storage.discard(
+        options.ownerId,
+        deckEditorDraftSlotToken(observedSlot.value),
+      );
+    });
     if (result.status === 'unavailable') {
       setMemoryOnly('The local deck draft could not be removed from this browser.');
       return false;
@@ -313,9 +323,10 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
       options.cardLookup.value,
       asNewDraft ? null : storedDraft.value?.pendingCreateAttempt ?? null,
     );
+    const expectedSlot = deckEditorDraftSlotToken(observedSlot.value);
     const result = await enqueueMutation(async () => await storage.save(
       nextDraft,
-      deckEditorDraftSlotToken(observedSlot.value),
+      expectedSlot,
     ));
     if (result.status === 'unavailable') {
       conflict.value = null;
@@ -346,6 +357,24 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     draftId.value = createDeckEditorDraftId();
     setPersistenceState({ status: 'synced' });
     return true;
+  };
+
+  const isCreateAttemptDurable = (
+    attemptDraftId: string,
+    pendingAttempt: StoredCreateAttempt,
+  ): boolean => {
+    if (
+      persistenceState.value.status === 'memory-only'
+      || persistenceState.value.status === 'conflict'
+    ) return false;
+    const result = storage.read(options.ownerId);
+    if (result.status !== 'loaded' || result.slot.kind !== 'draft') return false;
+    const durableAttempt = result.slot.draft.pendingCreateAttempt;
+    return result.slot.draft.draftId === attemptDraftId
+      && durableAttempt !== null
+      && durableAttempt.signature === pendingAttempt.signature
+      && durableAttempt.startedAt === pendingAttempt.startedAt
+      && JSON.stringify(durableAttempt.payload) === JSON.stringify(pendingAttempt.payload);
   };
 
   if (options.enabled && typeof window !== 'undefined') {
@@ -387,5 +416,6 @@ export const useDeckEditorLocalDraft = (options: UseDeckEditorLocalDraftOptions)
     loadConflictDraft,
     overwriteConflict,
     discardThisTab,
+    isCreateAttemptDurable,
   };
 };

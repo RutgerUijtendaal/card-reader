@@ -435,7 +435,7 @@ export const createDeckEditorLocalDraftStorage = (
   };
 
   const read = (ownerId: string): DeckEditorDraftReadResult => {
-    if (!resolvedStorage || !ownerId) return { status: 'unavailable' };
+    if (!resolvedStorage || !resolvedLockManager || !ownerId) return { status: 'unavailable' };
     const key = deckEditorDraftStorageKey(ownerId);
     let raw: string | null;
     try {

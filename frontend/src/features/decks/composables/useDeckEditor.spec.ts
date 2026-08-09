@@ -774,6 +774,54 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('does not discard another tab draft after a queued save enters conflict', async () => {
+    const baseLockManager = createTestLockManager();
+    let blockNextRequest = false;
+    let releaseBlockedRequest: () => void = () => undefined;
+    const lockManager: DeckEditorDraftLockManager = {
+      async request<Result>(
+        name: string,
+        options: { mode: 'exclusive' },
+        callback: () => Result | PromiseLike<Result>,
+      ): Promise<Result> {
+        return await baseLockManager.request(name, options, async () => {
+          if (blockNextRequest) {
+            blockNextRequest = false;
+            await new Promise<void>((resolve) => {
+              releaseBlockedRequest = resolve;
+            });
+          }
+          return await callback();
+        });
+      },
+    };
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: lockManager,
+    });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.deck.setDeckName('This Tab');
+    await flushAsyncEditorWork();
+
+    const remoteForm = createEmptyDeckForm();
+    remoteForm.name = 'Another Tab';
+    await saveLocalDraft('user-1', remoteForm, {});
+
+    blockNextRequest = true;
+    mounted.controller.deck.setDeckName('Queued Local Save');
+    await nextTick();
+    await Promise.resolve();
+    mounted.controller.requestDiscardLocalDraft();
+    const discardPromise = mounted.controller.confirmDiscardLocalDraft();
+    releaseBlockedRequest();
+    await discardPromise;
+
+    expect(mounted.controller.persistenceState.value.status).toBe('conflict');
+    expect(mounted.controller.deck.form.name).toBe('Queued Local Save');
+    expect(loadLocalDraft('user-1')?.form.name).toBe('Another Tab');
+    mounted.unmount();
+  });
+
   test('retains a local draft after confirmed navigation away', async () => {
     const mounted = await mountController('/my/decks/new');
     mounted.controller.deck.setDeckName('Resume After Leaving');
@@ -957,6 +1005,59 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('blocks leaving when an ambiguous Create attempt is not durable', async () => {
+    createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
+    fetchMyDeckByCreationKeyMock.mockResolvedValue({ status: 'missing' });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Memory-only Attempt');
+    await flushAsyncEditorWork();
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage unavailable', 'QuotaExceededError');
+    });
+
+    const createPromise = mounted.controller.saveDeck();
+    await vi.runAllTimersAsync();
+    await createPromise;
+
+    expect(mounted.controller.creationState.value).toEqual({
+      status: 'unknown',
+      reconciliation: 'awaiting-retry',
+    });
+    expect(mounted.controller.persistenceState.value.status).toBe('memory-only');
+    await mounted.router.push('/cards');
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/my/decks/new');
+    expect(mounted.controller.discardChangesModalOpen.value).toBe(false);
+
+    setItemSpy.mockRestore();
+    mounted.unmount();
+  });
+
+  test('allows confirmed navigation when an ambiguous Create attempt is durable', async () => {
+    createDeckMock.mockRejectedValueOnce(new Error('Connection dropped'));
+    fetchMyDeckByCreationKeyMock.mockResolvedValue({ status: 'missing' });
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Durable Pending Attempt');
+
+    const createPromise = mounted.controller.saveDeck();
+    await vi.runAllTimersAsync();
+    await createPromise;
+
+    const navigationPromise = mounted.router.push('/cards');
+    await nextTick();
+    expect(mounted.controller.discardChangesModalOpen.value).toBe(true);
+    mounted.controller.confirmDiscardChanges();
+    await navigationPromise;
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
+    expect(loadLocalDraft('user-1')?.pendingCreateAttempt?.payload.name)
+      .toBe('Durable Pending Attempt');
+    mounted.unmount();
+  });
+
   test('treats gateway timeout responses as ambiguous creation outcomes', async () => {
     createDeckMock.mockRejectedValueOnce(Object.assign(new Error('Gateway timeout'), {
       isAxiosError: true,
@@ -1060,6 +1161,28 @@ describe('useDeckEditor', () => {
     );
 
     setItemSpy.mockRestore();
+    mounted.unmount();
+  });
+
+  test('does not reconcile a confirmed creation when editor routing fails', async () => {
+    const mounted = await mountController('/my/decks/new');
+    mounted.controller.openHero();
+    mounted.controller.deck.handleGalleryAction(buildHero('hero-new', 'New Hero'));
+    mounted.controller.deck.setDeckName('Created Before Route Failure');
+    const replaceSpy = vi.spyOn(mounted.router, 'replace').mockRejectedValueOnce(
+      new Error('Router unavailable'),
+    );
+
+    await mounted.controller.saveDeck();
+
+    expect(createDeckMock).toHaveBeenCalledTimes(1);
+    expect(fetchMyDeckByCreationKeyMock).not.toHaveBeenCalled();
+    expect(mounted.controller.creationState.value).toEqual({ status: 'idle' });
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'The deck was created, but its editor could not be opened. Open it from My Decks.',
+    );
+
+    replaceSpy.mockRestore();
     mounted.unmount();
   });
 

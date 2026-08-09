@@ -234,6 +234,26 @@ describe('deckEditorLocalDraftStorage', () => {
     }
   });
 
+  test('does not expose recoverable drafts when atomic locking is unavailable', async () => {
+    const draft = buildStoredDeckEditorDraft(
+      'user-1',
+      'draft-without-locks',
+      { ...createEmptyDeckForm(), name: 'Cannot Mutate Safely' },
+      {},
+    );
+    localStorage.setItem(
+      'card-reader.deck-editor.new-draft.user-1',
+      JSON.stringify(draft),
+    );
+    const storage = createDeckEditorLocalDraftStorage(localStorage, null);
+
+    expect(storage.read('user-1')).toEqual({ status: 'unavailable' });
+    await expect(storage.discard(
+      'user-1',
+      { kind: 'draft', revision: draft.revision },
+    )).resolves.toEqual({ status: 'unavailable' });
+  });
+
   test('uses memory-only persistence when atomic browser locks are unavailable', async () => {
     const storage = createDeckEditorLocalDraftStorage(localStorage, null);
     const draft = buildStoredDeckEditorDraft(

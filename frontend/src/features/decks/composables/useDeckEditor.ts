@@ -573,6 +573,16 @@ export const useDeckEditor = () => {
     publication.creationState.value,
   ));
   const isCreating = publication.isCreating;
+  const hasNonDurableUnknownAttempt = computed(() => {
+    if (publication.creationState.value.status !== 'unknown') return false;
+    const currentAttempt = publication.attempt.value;
+    if (!currentAttempt) return true;
+    return !localDraft.isCreateAttemptDurable(currentAttempt.draftId, {
+      payload: currentAttempt.payload,
+      signature: currentAttempt.signature,
+      startedAt: currentAttempt.startedAt,
+    });
+  });
   const conflictActionsLocked = computed(
     () => publication.creationState.value.status !== 'idle' || recoveryActionPending.value,
   );
@@ -812,7 +822,11 @@ export const useDeckEditor = () => {
     if (bypassNextUnsavedPrompt) {
       return true;
     }
-    if (isCreating.value || publication.isReconciling.value) {
+    if (
+      isCreating.value
+      || publication.isReconciling.value
+      || hasNonDurableUnknownAttempt.value
+    ) {
       return false;
     }
     if (!isPublished.value && hasUnsavedChanges.value) {
@@ -822,7 +836,7 @@ export const useDeckEditor = () => {
   });
 
   useEventListener(window, 'beforeunload', (event) => {
-    if (!hasUnsavedChanges.value) {
+    if (!hasUnsavedChanges.value && !hasNonDurableUnknownAttempt.value) {
       return;
     }
     persistLocalDraft();
