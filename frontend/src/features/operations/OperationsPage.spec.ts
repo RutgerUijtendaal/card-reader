@@ -149,6 +149,14 @@ describe('OperationsPage', () => {
     document.body.innerHTML = '';
   });
 
+  test('uses the standard constrained page layout', async () => {
+    const mounted = await mountPage('/operations');
+
+    expect(mounted.container.querySelector('.app-page-layout-standard')).not.toBeNull();
+
+    mounted.app.unmount();
+  });
+
   test('preserves an inbound queue hash and requested history page', async () => {
     const mounted = await mountPage('/operations?page=2#queue-imports');
 
