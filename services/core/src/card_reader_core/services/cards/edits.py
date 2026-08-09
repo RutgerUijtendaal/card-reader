@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
+
 from django.db import transaction
 
 from card_reader_core.models import GAME_MASTER_CARD_POOL, Card, CardVersion
@@ -12,6 +15,32 @@ from card_reader_core.services.notifications import (
     NotificationService,
 )
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
+
+logger = logging.getLogger(__name__)
+
+
+def _run_reconciliation_action(*, card_id: str, action_name: str, action: Callable[[], object]) -> None:
+    try:
+        action()
+    except Exception:
+        logger.exception(
+            "Card classification reconciliation failed",
+            extra={"card_id": card_id, "action": action_name},
+        )
+
+
+def _reconcile_card_classification(*, card_id: str, archive_notifications: bool) -> None:
+    if archive_notifications:
+        _run_reconciliation_action(
+            card_id=card_id,
+            action_name="archive_notifications",
+            action=lambda: NotificationService().archive_card_notifications(card_id),
+        )
+    _run_reconciliation_action(
+        card_id=card_id,
+        action_name="sync_tts_card_sheets",
+        action=lambda: TtsCardSheetService().sync_cards([card_id]),
+    )
 
 
 def update_latest_card_version_with_notifications(
@@ -34,9 +63,12 @@ def update_latest_card_version_with_notifications(
     )
     if updated is not None and "card_pool" in updates:
         card, _version = updated
-        if card.card_pool == GAME_MASTER_CARD_POOL:
-            transaction.on_commit(lambda: NotificationService().archive_card_notifications(card.id))
-        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card.id]))
+        transaction.on_commit(
+            lambda: _reconcile_card_classification(
+                card_id=card.id,
+                archive_notifications=card.card_pool == GAME_MASTER_CARD_POOL,
+            )
+        )
     return updated
 
 

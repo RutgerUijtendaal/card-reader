@@ -14,6 +14,7 @@ import {
 import type { GalleryPageState } from '@/domain/cards/utils/gallery/galleryState';
 import { DEFAULT_CARD_PAGE_SIZE } from '@/domain/cards/utils/gallery/pageSize';
 import type { GalleryItem } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 
 type GalleryNavigationCard = {
   id: string;
@@ -59,16 +60,30 @@ export const buildCardDetailLocation = (
   query: getGalleryRouteQuery(query),
 });
 
+export const buildCardGroupDetailLocation = (
+  groupId: string,
+  query: LocationQuery,
+  cardPool?: CardPool,
+): RouteLocationRaw => {
+  const groupQuery = getGalleryRouteQuery(query);
+  if (cardPool === 'game_master') {
+    groupQuery.card_pool = cardPool;
+  } else if (cardPool === 'player') {
+    delete groupQuery.card_pool;
+  }
+  return {
+    path: `/card-groups/${groupId}`,
+    query: groupQuery,
+  };
+};
+
 export const buildGalleryItemLocation = (
   item: Pick<GalleryItem, 'id' | 'result_type'>,
   query: LocationQuery,
   mode: 'detail' | 'edit',
 ): RouteLocationRaw => {
   if (item.result_type === 'card_group') {
-    return {
-      path: `/card-groups/${item.id}`,
-      query: getGalleryRouteQuery(query),
-    };
+    return buildCardGroupDetailLocation(item.id, query);
   }
   return buildCardDetailLocation(item.id, query, mode);
 };

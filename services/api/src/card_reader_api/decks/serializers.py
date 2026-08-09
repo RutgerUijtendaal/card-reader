@@ -386,7 +386,7 @@ def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
         "card_pool": card.card_pool,
         "card_roles": [],
         "deck_building_config": normalize_deck_building_config({}),
-        "lifecycle_status": card.lifecycle_status,
+        "lifecycle_status": "active",
         "template_id": "",
         "version_id": "",
         "version_number": 0,

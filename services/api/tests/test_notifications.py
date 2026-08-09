@@ -29,6 +29,7 @@ from card_reader_core.services.notifications import (
     DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
     NotificationService,
 )
+from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 from card_reader_core.storage import resolve_storage_path
 from test_decks import _create_card
 from test_parse_flags import _create_card_version
@@ -796,6 +797,60 @@ def test_game_master_reclassification_archives_card_notifications_and_stops_futu
         cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
     ) == []
     assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_game_master_reclassification_is_authoritative_when_cleanup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_notifications()
+    owner = _create_user("notification-cleanup-failure-owner", "password")
+    card = _create_card(name="Notification Cleanup Failure Card", hero=False)
+    version = card.latest_version
+    assert version is not None
+    notification = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="cleanup-failure-flag-item",
+            target_url=f"/cards/{card.id}?version_id={version.id}",
+            title=f"Flag resolved: {card.label}",
+            message="A card-linked flag was resolved.",
+            metadata={"card_id": card.id, "card_version_id": version.id},
+        )
+    )
+    synced_card_ids: list[str] = []
+
+    def fail_archive(_service: NotificationService, _card_id: str) -> int:
+        raise RuntimeError("simulated notification archival failure")
+
+    def record_sync(_service: TtsCardSheetService, card_ids: list[str]) -> set[str]:
+        synced_card_ids.extend(card_ids)
+        return set()
+
+    monkeypatch.setattr(NotificationService, "archive_card_notifications", fail_archive)
+    monkeypatch.setattr(TtsCardSheetService, "sync_cards", record_sync)
+
+    updated = update_latest_card_version_with_notifications(
+        card_id=card.id,
+        updates={"card_pool": "game_master"},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+
+    assert updated is not None
+    card.refresh_from_db()
+    notification.refresh_from_db()
+    assert card.card_pool == "game_master"
+    assert notification.archived_at is None
+    assert synced_card_ids == [card.id]
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    assert client.get("/notifications?status=all").json()["count"] == 0
+    assert client.get("/notifications/summary").json()["unread_count"] == 0
 
 
 def test_noop_card_promotion_does_not_notify_deck_owner() -> None:

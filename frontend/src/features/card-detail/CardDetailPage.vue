@@ -22,7 +22,7 @@
         <RouterLink
           v-for="group in card?.card_groups ?? []"
           :key="group.id"
-          :to="`/card-groups/${group.id}`"
+          :to="buildCardGroupDetailLocation(group.id, route.query, selectedVersion?.card_pool)"
           class="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
         >
           <span>{{ group.name }}</span>
@@ -157,6 +157,7 @@ import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import { buildAdminCardMergeSourceLocation } from '@/domain/cards/utils/cards/adminCardNavigation';
 import { buildCardReturnLocation } from '@/domain/card-navigation/cardReturnState';
+import { buildCardGroupDetailLocation } from '@/domain/cards/utils/gallery/galleryNavigation';
 import CardDetailLoadingSkeleton from '@/features/card-detail/components/CardDetailLoadingSkeleton.vue';
 import CardDetailPager from '@/domain/cards/components/CardResultPager.vue';
 import CardVersionEditorPane from '@/features/card-detail/components/CardVersionEditorPane.vue';

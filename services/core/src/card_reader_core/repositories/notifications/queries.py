@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from django.db.models import QuerySet
+from django.db.models import Exists, OuterRef, QuerySet
 
 from card_reader_core.models import (
+    GAME_MASTER_CARD_POOL,
     NOTIFICATION_STATUS_FILTERS,
     NOTIFICATION_STATUS_READ,
     NOTIFICATION_STATUS_UNREAD,
+    Card,
     UserNotification,
 )
 
@@ -50,8 +52,14 @@ def list_notifications(
 
 
 def notification_queryset(recipient_id: str) -> QuerySet[UserNotification]:
+    restricted_card = Card.objects.filter(
+        id=OuterRef("metadata_json__card_id"),
+        card_pool=GAME_MASTER_CARD_POOL,
+    )
     return (
         UserNotification.objects.select_related("recipient", "actor")
         .filter(recipient_id=recipient_id, archived_at__isnull=True)
+        .annotate(_references_restricted_card=Exists(restricted_card))
+        .filter(_references_restricted_card=False)
         .order_by("-last_event_at", "-created_at", "id")
     )

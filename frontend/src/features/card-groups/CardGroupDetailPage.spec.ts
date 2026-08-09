@@ -236,6 +236,26 @@ describe('CardGroupDetailPage', () => {
     mounted.unmount();
   });
 
+  test('passes the Game Master pool through to group detail request', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/card-groups/group-1') {
+        return Promise.resolve({ data: buildGroup() });
+      }
+      if (url === '/cards/filters') {
+        return Promise.resolve({ data: filters });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    const mounted = await mountView('/card-groups/group-1?card_pool=game_master');
+
+    expect(apiGet).toHaveBeenCalledWith('/card-groups/group-1', {
+      params: { card_pool: 'game_master' },
+    });
+
+    mounted.unmount();
+  });
+
   test('omits lifecycle query for default active group detail request', async () => {
     apiGet.mockImplementation((url: string) => {
       if (url === '/card-groups/group-1') {

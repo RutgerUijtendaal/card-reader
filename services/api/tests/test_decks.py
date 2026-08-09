@@ -3214,10 +3214,11 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
         sideboards=[],
     )
     reclassified.card_pool = "game_master"
+    reclassified.lifecycle_status = "deprecated"
     reclassified.deck_building_config_json = {
         "overrides": {"mainboard_copy_limit": {"max": 73}},
     }
-    reclassified.save(update_fields=["card_pool", "deck_building_config_json"])
+    reclassified.save(update_fields=["card_pool", "lifecycle_status", "deck_building_config_json"])
     CardRoleAssignment.objects.create(card=reclassified, role="event")
 
     owner_client = Client(HTTP_HOST="localhost")
@@ -3234,7 +3235,9 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     restricted_card = owner_payload["mainboard"]["entries"][0]["card"]
     assert restricted_card["restricted"] is True
     assert restricted_card["name"] == "Restricted Game Master card"
+    assert restricted_card["lifecycle_status"] == "active"
     assert "Secret Reclassified Event" not in owner_response.content.decode()
+    assert "deprecated" not in owner_response.content.decode()
     assert '"max": 73' not in owner_response.content.decode()
     owner_search_response = owner_client.get(
         "/my/decks",

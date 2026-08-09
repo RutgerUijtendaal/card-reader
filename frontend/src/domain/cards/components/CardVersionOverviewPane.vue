@@ -25,7 +25,7 @@
             <RouterLink
               v-for="group in cardGroups"
               :key="group.id"
-              :to="`/card-groups/${group.id}`"
+              :to="buildCardGroupDetailLocation(group.id, route.query, version.card_pool)"
               class="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
             >
               <span>{{ group.name }}</span>
@@ -204,8 +204,12 @@
 
 <script setup lang="ts">
 import { BookOpenText, Flag, Hash, HeartPulse, KeyRound, ScrollText, Sparkles, Swords, Tags } from 'lucide-vue-next';
+import { useRoute } from 'vue-router';
 import SymbolizedText from '@/domain/cards/components/SymbolizedText.vue';
 import { formatCardContentVersion, type CardGroupSummary, type CardVersionDetail, type SymbolLookupMap } from '@/domain/cards/types';
+import { buildCardGroupDetailLocation } from '@/domain/cards/utils/gallery/galleryNavigation';
+
+const route = useRoute();
 
 withDefaults(defineProps<{
   version: CardVersionDetail;
