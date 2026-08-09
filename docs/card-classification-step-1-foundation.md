@@ -2,13 +2,14 @@
 
 Status: implemented and validated.
 
-This is the first of three ordered plans:
+This is the first of four ordered checkpoints:
 
 1. Card classification foundation (this document)
-2. [Import inference](card-classification-step-2-import-inference.md)
-3. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
+2. [Authorization seam consolidation](card-classification-step-1-1-authorization-seam.md)
+3. [Import inference](card-classification-step-2-import-inference.md)
+4. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
 
-Do not begin Step 2 or Step 3 until this step's acceptance criteria are satisfied. Later steps may be implemented in the same branch only when each step remains independently reviewable and verified.
+Do not begin Step 1.1 until this step's acceptance criteria are satisfied. Do not begin Step 2 or Step 3 until Step 1.1 is complete. Later steps may be implemented in the same branch only when each checkpoint remains independently reviewable and verified.
 
 ## Outcome
 

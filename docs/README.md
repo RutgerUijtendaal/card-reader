@@ -23,8 +23,9 @@ This directory contains feature descriptions, operational guides, and technical 
 
 ## Implementation plans
 
-The approved card-pool and multi-role work is split into three dependency-ordered plans. These documents describe intended work and should not be read as current shipped behavior:
+The approved card-pool and multi-role work is split into four dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
 
 1. [Card classification Step 1: Foundation](card-classification-step-1-foundation.md) replaces the Hero flag with a Player/Game Master pool and multi-valued card roles, migrates existing data, preserves Hero behavior, adds editing/filtering, and establishes Game Master access protection.
-2. [Card classification Step 2: Import inference](card-classification-step-2-import-inference.md) adds explicit batch pools, automatic template/tag role inference, batch overrides, immutable job snapshots, and existing-card mismatch warnings.
-3. [Card classification Step 3: Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md) adds the staff-only Game Master sidenav context, route and collection scoping, workspace-aware navigation, and the final authorization audit.
+2. [Card classification Step 1.1: Authorization seam](card-classification-step-1-1-authorization-seam.md) consolidates user entitlement into an explicit core card-pool scope across queries, payloads, derived state, notifications, images, and published artifacts before the surface grows.
+3. [Card classification Step 2: Import inference](card-classification-step-2-import-inference.md) adds explicit batch pools, automatic template/tag role inference, batch overrides, immutable job snapshots, and existing-card mismatch warnings.
+4. [Card classification Step 3: Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md) adds the staff-only Game Master sidenav context, route and collection scoping, workspace-aware navigation, and the final authorization audit.

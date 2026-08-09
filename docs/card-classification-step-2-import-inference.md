@@ -1,6 +1,6 @@
 # Card Classification Step 2: Import Inference
 
-Status: approved implementation plan; blocked on [Step 1](card-classification-step-1-foundation.md).
+Status: approved implementation plan; blocked on [Step 1.1 authorization seam consolidation](card-classification-step-1-1-authorization-seam.md).
 
 This step adds reliable, explainable import classification on top of the pool and role model. It must not reintroduce Hero-specific persistence or allow an import to silently reclassify an existing card.
 
