@@ -20,6 +20,7 @@ export const useFloatingPopover = (
     placement?: Placement;
     allowFlip?: boolean;
     fitAvailableHeight?: boolean;
+    trackLayoutShift?: boolean;
   } = {},
 ): UseFloatingPopoverResult => {
   const isOpen = ref(false);
@@ -45,7 +46,10 @@ export const useFloatingPopover = (
     placement: options.placement ?? 'bottom-start',
     strategy: 'fixed',
     middleware,
-    whileElementsMounted: autoUpdate,
+    whileElementsMounted: (reference, floatingElement, update) =>
+      autoUpdate(reference, floatingElement, update, {
+        layoutShift: options.trackLayoutShift ?? true,
+      }),
   });
   const x = computed(() => floating.x.value ?? 0);
   const y = computed(() => floating.y.value ?? 0);

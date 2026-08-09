@@ -1,64 +1,117 @@
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
 import { computed, onMounted, ref, watch } from 'vue';
+import { fetchOperationsQueuePage } from '@/domain/operations/api';
+import type { OperationsQueueItem } from '@/domain/operations/types';
 import { fetchTemplates } from '@/domain/templates/api';
 import type { TemplateRecord } from '@/domain/templates/types';
-import { cancelImportJob, createImportJob, fetchCurrentContentVersion, fetchImportJobs } from '@/features/import-jobs/api';
+import {
+  cancelImportJob,
+  createImportJob,
+  fetchCurrentContentVersion,
+  fetchImportJobs,
+} from '@/features/import-jobs/api';
 import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
 import {
   canCancelImportJob,
   extractImportJobErrorMessage,
+  formatImportJobTimestamp,
   getContentVersionBaseError,
   getContentVersionBasePrefill,
   getContentVersionDescriptionPrefill,
-  getImportSubmitLabel,
-  formatImportJobTimestamp,
   getImportJobProgressClass,
   getImportJobProgressPercent,
   getImportJobStatusClass,
+  getImportSubmitLabel,
+  getOperationsItemProgressPercent,
+  getRecentImportJobs,
   hasActiveImportJobs,
 } from '@/features/import-jobs/utils/importJobUtils';
 
+const IMPORT_HISTORY_PAGE_SIZE = 20;
+
 export const useImportJobsController = () => {
   const pickerTemplateId = ref('mtg-like-v1');
-  const pickerMode = ref<'single' | 'directory'>('single');
   const contentVersionBase = ref('');
   const contentVersionDescription = ref('');
   const currentContentVersion = ref<ContentVersion | null>(null);
   const pickedFiles = ref<File[]>([]);
-  const errorMessage = ref('');
-  const jobs = ref<ImportJob[]>([]);
-  const jobsLoaded = ref(false);
-  const isRefreshing = ref(false);
+  const fileInputKey = ref(0);
+  const formErrorMessage = ref('');
+  const activityErrorMessage = ref('');
+  const activeJobs = ref<ImportJob[]>([]);
+  const historyItems = ref<OperationsQueueItem[]>([]);
+  const formLoaded = ref(false);
+  const activeJobsLoaded = ref(false);
+  const historyLoaded = ref(false);
+  const activeJobsRefreshing = ref(false);
+  const historyRefreshing = ref(false);
   const creatingJob = ref(false);
   const cancellingJobIds = ref<Set<string>>(new Set());
   const lastRefreshedAt = ref<string | null>(null);
   const templates = ref<TemplateRecord[]>([]);
   const documentVisibility = useDocumentVisibility();
 
-  const queuedCount = computed(() => jobs.value.filter((job) => job.status === 'queued').length);
-  const runningCount = computed(() => jobs.value.filter((job) => job.status === 'running').length);
-  const cancelingCount = computed(() => jobs.value.filter((job) => job.status === 'canceling').length);
-  const completedCount = computed(() => jobs.value.filter((job) => job.status === 'completed').length);
-  const failedCount = computed(() => jobs.value.filter((job) => job.status === 'failed').length);
-  const cancelledCount = computed(() => jobs.value.filter((job) => job.status === 'cancelled').length);
-  const hasActiveJobs = computed(() => hasActiveImportJobs(jobs.value));
-  const contentVersionBaseError = computed(() => getContentVersionBaseError(contentVersionBase.value));
+  const queuedCount = computed(
+    () => activeJobs.value.filter((job) => job.status === 'queued').length,
+  );
+  const runningCount = computed(
+    () => activeJobs.value.filter((job) => job.status === 'running').length,
+  );
+  const cancelingCount = computed(
+    () => activeJobs.value.filter((job) => job.status === 'canceling').length,
+  );
+  const hasActiveJobs = computed(() => hasActiveImportJobs(activeJobs.value));
+  const activeJobIds = computed(() => new Set(activeJobs.value.map((job) => job.id)));
+  const recentJobs = computed(() =>
+    getRecentImportJobs(historyItems.value, activeJobIds.value),
+  );
+  const activityLoaded = computed(() => activeJobsLoaded.value && historyLoaded.value);
+  const isRefreshing = computed(
+    () => activeJobsRefreshing.value || historyRefreshing.value,
+  );
+  const contentVersionBaseError = computed(() =>
+    getContentVersionBaseError(contentVersionBase.value),
+  );
   const hasValidVersionInput = computed(
-    () => contentVersionBaseError.value.length === 0 && contentVersionDescription.value.trim().length > 0,
+    () =>
+      contentVersionBaseError.value.length === 0 &&
+      contentVersionDescription.value.trim().length > 0,
   );
   const submitButtonLabel = computed(() => {
     if (creatingJob.value) return 'Queueing Import...';
     return getImportSubmitLabel(contentVersionBase.value, currentContentVersion.value);
   });
 
-  const loadJobs = async (): Promise<void> => {
-    isRefreshing.value = true;
+  const loadActiveJobs = async (): Promise<boolean> => {
+    activeJobsRefreshing.value = true;
+    const previousIds = new Set(activeJobs.value.map((job) => job.id));
     try {
-      jobs.value = await fetchImportJobs();
+      const nextJobs = await fetchImportJobs();
+      activeJobs.value = nextJobs;
       lastRefreshedAt.value = new Date().toLocaleTimeString();
+      return [...previousIds].some((jobId) => !nextJobs.some((job) => job.id === jobId));
     } finally {
-      jobsLoaded.value = true;
-      isRefreshing.value = false;
+      activeJobsLoaded.value = true;
+      activeJobsRefreshing.value = false;
+    }
+  };
+
+  const loadRecentJobs = async (): Promise<void> => {
+    historyRefreshing.value = true;
+    try {
+      const page = await fetchOperationsQueuePage('imports', 1, IMPORT_HISTORY_PAGE_SIZE);
+      historyItems.value = page.results;
+    } finally {
+      historyLoaded.value = true;
+      historyRefreshing.value = false;
+    }
+  };
+
+  const refreshActivity = async (): Promise<void> => {
+    activityErrorMessage.value = '';
+    const results = await Promise.allSettled([loadActiveJobs(), loadRecentJobs()]);
+    if (results.some((result) => result.status === 'rejected')) {
+      activityErrorMessage.value = 'Import activity could not be refreshed.';
     }
   };
 
@@ -69,29 +122,47 @@ export const useImportJobsController = () => {
       return;
     }
     const stillExists = templates.value.some((item) => item.key === pickerTemplateId.value);
-    if (!stillExists) {
-      pickerTemplateId.value = templates.value[0].key;
-    }
+    if (!stillExists) pickerTemplateId.value = templates.value[0].key;
   };
 
   const loadCurrentContentVersion = async (): Promise<void> => {
     currentContentVersion.value = await fetchCurrentContentVersion();
     contentVersionBase.value = getContentVersionBasePrefill(currentContentVersion.value);
-    contentVersionDescription.value = getContentVersionDescriptionPrefill(currentContentVersion.value);
+    contentVersionDescription.value = getContentVersionDescriptionPrefill(
+      currentContentVersion.value,
+    );
+  };
+
+  const loadFormOptions = async (): Promise<void> => {
+    formErrorMessage.value = '';
+    const results = await Promise.allSettled([loadTemplates(), loadCurrentContentVersion()]);
+    formLoaded.value = true;
+    if (results.some((result) => result.status === 'rejected')) {
+      formErrorMessage.value = 'Import options could not be loaded.';
+    }
+  };
+
+  const resetPickedFiles = (): void => {
+    pickedFiles.value = [];
+    fileInputKey.value += 1;
+  };
+
+  const setPickedFiles = (files: File[]): void => {
+    pickedFiles.value = files;
   };
 
   const createJobFromPicker = async (): Promise<void> => {
-    errorMessage.value = '';
+    formErrorMessage.value = '';
     if (pickedFiles.value.length === 0) {
-      errorMessage.value = 'Please select at least one file.';
+      formErrorMessage.value = 'Please select at least one file.';
       return;
     }
     if (contentVersionBaseError.value.length > 0) {
-      errorMessage.value = contentVersionBaseError.value;
+      formErrorMessage.value = contentVersionBaseError.value;
       return;
     }
     if (contentVersionDescription.value.trim().length === 0) {
-      errorMessage.value = 'Please enter a version description.';
+      formErrorMessage.value = 'Please enter a version description.';
       return;
     }
 
@@ -103,20 +174,22 @@ export const useImportJobsController = () => {
         contentVersionDescription: contentVersionDescription.value.trim(),
         files: pickedFiles.value,
       });
-      pickedFiles.value = [];
+      resetPickedFiles();
     } catch (error) {
       console.error('Create import from upload failed', error);
-      errorMessage.value = extractImportJobErrorMessage(error);
+      formErrorMessage.value = extractImportJobErrorMessage(error);
       return;
     } finally {
       creatingJob.value = false;
     }
 
-    try {
-      await Promise.all([loadCurrentContentVersion(), loadJobs()]);
-    } catch (error) {
-      console.error('Refresh imports after upload create failed', error);
-      errorMessage.value = 'Import was created, but refreshing the jobs list failed.';
+    const [versionResult] = await Promise.allSettled([
+      loadCurrentContentVersion(),
+      refreshActivity(),
+    ]);
+    if (versionResult.status === 'rejected') {
+      console.error('Refresh content version after upload create failed', versionResult.reason);
+      formErrorMessage.value = 'Import was created, but the content version could not be refreshed.';
     }
   };
 
@@ -125,73 +198,73 @@ export const useImportJobsController = () => {
     if (next.has(jobId)) return;
     next.add(jobId);
     cancellingJobIds.value = next;
-    errorMessage.value = '';
+    activityErrorMessage.value = '';
 
     try {
       await cancelImportJob(jobId);
-      await loadJobs();
     } catch (error) {
       console.error('Cancel import job failed', error);
-      errorMessage.value = extractImportJobErrorMessage(error);
+      activityErrorMessage.value = extractImportJobErrorMessage(error);
+      return;
     } finally {
       const done = new Set(cancellingJobIds.value);
       done.delete(jobId);
       cancellingJobIds.value = done;
     }
-  };
 
-  const onSingleFileSelected = (event: Event): void => {
-    const input = event.target as HTMLInputElement;
-    pickedFiles.value = input.files ? Array.from(input.files).slice(0, 1) : [];
-  };
-
-  const onDirectorySelected = (event: Event): void => {
-    const input = event.target as HTMLInputElement;
-    pickedFiles.value = input.files ? Array.from(input.files) : [];
+    await refreshActivity();
   };
 
   const pollJobs = async (): Promise<void> => {
-    if (documentVisibility.value !== 'visible') return;
-    if (!hasActiveJobs.value) return;
+    if (documentVisibility.value !== 'visible' || !hasActiveJobs.value || isRefreshing.value) return;
     try {
-      await loadJobs();
+      const activeJobFinished = await loadActiveJobs();
+      if (activeJobFinished) await loadRecentJobs();
+      activityErrorMessage.value = '';
     } catch (error) {
       console.error('Polling imports failed', error);
+      activityErrorMessage.value = 'Import activity could not be refreshed.';
     }
   };
 
-  const { pause: pausePolling, resume: resumePolling } = useIntervalFn(() => {
-    void pollJobs();
-  }, 2000, { immediate: false });
+  const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
+    () => {
+      void pollJobs();
+    },
+    2000,
+    { immediate: false },
+  );
 
   watch(
     [documentVisibility, hasActiveJobs],
     ([visibility, hasActive]) => {
       if (visibility === 'visible' && hasActive) {
         resumePolling();
-        void pollJobs();
         return;
       }
-
       pausePolling();
     },
     { immediate: true },
   );
 
-  onMounted(async () => {
-    await Promise.all([loadTemplates(), loadCurrentContentVersion(), loadJobs()]);
+  onMounted(() => {
+    void loadFormOptions();
+    void refreshActivity();
   });
 
   return {
     pickerTemplateId,
-    pickerMode,
     contentVersionBase,
     contentVersionDescription,
     currentContentVersion,
     pickedFiles,
-    errorMessage,
-    jobs,
-    jobsLoaded,
+    fileInputKey,
+    formErrorMessage,
+    activityErrorMessage,
+    activeJobs,
+    recentJobs,
+    formLoaded,
+    activityLoaded,
     isRefreshing,
     creatingJob,
     cancellingJobIds,
@@ -200,19 +273,18 @@ export const useImportJobsController = () => {
     queuedCount,
     runningCount,
     cancelingCount,
-    completedCount,
-    failedCount,
-    cancelledCount,
     contentVersionBaseError,
     hasValidVersionInput,
     submitButtonLabel,
-    loadJobs,
+    refreshActivity,
     createJobFromPicker,
     cancelJob,
-    onSingleFileSelected,
-    onDirectorySelected,
+    setPickedFiles,
+    clearPickedFiles: resetPickedFiles,
+    pollJobs,
     canCancel: canCancelImportJob,
     progressPercent: getImportJobProgressPercent,
+    recentProgressPercent: getOperationsItemProgressPercent,
     statusClass: getImportJobStatusClass,
     progressClass: getImportJobProgressClass,
     formatTimestamp: formatImportJobTimestamp,

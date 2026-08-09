@@ -1,9 +1,5 @@
-import type {
-  OperationsItemStatus,
-  OperationsQueue,
-  OperationsQueueItem,
-  WorkerOverview,
-} from '@/features/operations/types';
+import type { OperationsItemStatus, OperationsQueueItem } from '@/domain/operations/types';
+import type { OperationsQueue, WorkerOverview } from '@/features/operations/types';
 
 const STATUS_ORDER: OperationsItemStatus[] = [
   'running',

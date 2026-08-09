@@ -5,11 +5,8 @@ import {
   parseOperationsPage,
   workerStatusLabel,
 } from '@/features/operations/utils/operationsUtils';
-import type {
-  OperationsQueue,
-  OperationsQueueItem,
-  WorkerOverview,
-} from '@/features/operations/types';
+import type { OperationsQueueItem } from '@/domain/operations/types';
+import type { OperationsQueue, WorkerOverview } from '@/features/operations/types';
 
 describe('operations utils', () => {
   test('labels online worker activity', () => {

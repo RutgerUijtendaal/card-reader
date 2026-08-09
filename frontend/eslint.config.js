@@ -16,6 +16,7 @@ export const domainDependencies = {
   'developer-data': [],
   maintenance: [],
   notifications: ['session'],
+  operations: [],
   review: ['cards', 'session'],
   session: [],
   templates: ['maintenance'],

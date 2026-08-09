@@ -1,22 +1,17 @@
 <template>
-  <div class="space-y-3">
-    <div class="space-y-1">
-      <div class="flex items-center justify-between gap-3">
-        <p class="theme-section-title text-sm font-semibold">
-          Tags
-        </p>
-        <button
-          ref="triggerRef"
-          type="button"
-          class="theme-icon-button"
-          title="Add deck tags"
-          aria-label="Add deck tags"
-          :aria-expanded="isOpen"
-          @click="toggle"
-        >
-          <Plus class="h-4 w-4" />
-        </button>
-      </div>
+  <component
+    :is="sectioned ? AppFormSection : 'div'"
+    v-bind="sectioned
+      ? { title: 'Tags', description }
+      : { class: 'space-y-3' }"
+  >
+    <div
+      v-if="!sectioned"
+      class="space-y-1"
+    >
+      <p class="theme-section-title text-sm font-semibold">
+        Tags
+      </p>
       <p
         v-if="description"
         class="theme-section-muted text-sm"
@@ -25,47 +20,53 @@
       </p>
     </div>
 
-    <div
-      v-if="selectedTags.length > 0 || suggestedTypeLabels.length > 0"
-      class="flex flex-wrap gap-2"
-    >
+    <div class="flex flex-wrap items-center gap-2">
+      <template v-if="selectedTags.length > 0 || suggestedTypeLabels.length > 0">
+        <button
+          v-for="tag in selectedTags"
+          :key="tag.id"
+          type="button"
+          class="theme-pill inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold"
+          :class="tag.kind === 'role' ? 'theme-pill-accent' : 'theme-pill-keyword'"
+          :aria-label="`Remove ${tag.label}`"
+          @click="toggleTag(tag.id)"
+        >
+          {{ tag.label }}
+          <X class="h-3 w-3" />
+        </button>
+        <button
+          v-for="label in suggestedTypeLabels"
+          :key="label"
+          type="button"
+          class="theme-pill theme-pill-neutral inline-flex items-center gap-1 border border-dashed px-2 py-1 text-xs font-semibold"
+          :aria-label="`Remove pending suggestion ${label}`"
+          @click="removeSuggestion(label)"
+        >
+          {{ label }} · Pending
+          <X class="h-3 w-3" />
+        </button>
+      </template>
+      <template v-else>
+        <button
+          v-for="role in catalog.roles"
+          :key="role.id"
+          type="button"
+          class="theme-choice-chip px-3 py-1.5 text-xs font-semibold"
+          @click="toggleTag(role.id)"
+        >
+          {{ role.label }}
+        </button>
+      </template>
       <button
-        v-for="tag in selectedTags"
-        :key="tag.id"
+        ref="triggerRef"
         type="button"
-        class="theme-pill inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold"
-        :class="tag.kind === 'role' ? 'theme-pill-accent' : 'theme-pill-keyword'"
-        :aria-label="`Remove ${tag.label}`"
-        @click="toggleTag(tag.id)"
+        class="theme-choice-chip h-7 w-7 shrink-0 p-0"
+        title="Add deck tags"
+        aria-label="Add deck tags"
+        :aria-expanded="isOpen"
+        @click="toggle"
       >
-        {{ tag.label }}
-        <X class="h-3 w-3" />
-      </button>
-      <button
-        v-for="label in suggestedTypeLabels"
-        :key="label"
-        type="button"
-        class="theme-pill theme-pill-neutral inline-flex items-center gap-1 border border-dashed px-2 py-1 text-xs font-semibold"
-        :aria-label="`Remove pending suggestion ${label}`"
-        @click="removeSuggestion(label)"
-      >
-        {{ label }} · Pending
-        <X class="h-3 w-3" />
-      </button>
-    </div>
-
-    <div
-      v-if="selectedTags.length === 0"
-      class="flex flex-wrap gap-2"
-    >
-      <button
-        v-for="role in catalog.roles"
-        :key="role.id"
-        type="button"
-        class="theme-choice-chip px-3 py-1.5 text-xs font-semibold"
-        @click="toggleTag(role.id)"
-      >
-        {{ role.label }}
+        <Plus class="h-4 w-4" />
       </button>
     </div>
 
@@ -125,13 +126,14 @@
         </div>
       </div>
     </Teleport>
-  </div>
+  </component>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Check, Plus, X } from 'lucide-vue-next';
 import { useFloatingPopover } from '@/shared/composables/useFloatingPopover';
+import AppFormSection from '@/shared/components/app/AppFormSection.vue';
 import type { DeckTagCatalog, DeckTagOption } from '@/domain/decks/types';
 
 const props = defineProps<{
@@ -139,6 +141,7 @@ const props = defineProps<{
   modelValue: string[];
   suggestedTypeLabels: string[];
   description?: string;
+  sectioned?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -155,7 +158,7 @@ const {
   availableHeight,
   toggle,
   close,
-} = useFloatingPopover({ fitAvailableHeight: true });
+} = useFloatingPopover({ fitAvailableHeight: true, trackLayoutShift: false });
 const searchTerm = ref('');
 const popoverStyle = computed(() => ({
   position: 'fixed' as const,

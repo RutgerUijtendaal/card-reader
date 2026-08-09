@@ -272,7 +272,7 @@ import OperationsQueueNavigator from '@/features/operations/components/Operation
 import OperationsWorkerPool from '@/features/operations/components/OperationsWorkerPool.vue';
 import { useOperationsOverview } from '@/features/operations/composables/useOperationsOverview';
 import { useOperationsQueueHistory } from '@/features/operations/composables/useOperationsQueueHistory';
-import type { OperationsItemStatus } from '@/features/operations/types';
+import type { OperationsItemStatus } from '@/domain/operations/types';
 import {
   defaultOperationsQueueKey,
   operationsPageCount,

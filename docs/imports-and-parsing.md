@@ -37,12 +37,15 @@ Templates and catalogs are read at processing time. Changing them affects future
 
 An import job is the user-facing batch, while import items are the individual units claimed by workers. Item state is durable, allowing the UI to show queued, processing, completed, failed, or cancelled work even if a process restarts.
 
-Cancellation stops work that has not yet completed. Active imports can be interrupted from
-`/imports`, while paged queue history remains visible under `/operations`. The latest history page
-refreshes automatically; older pages remain stable while they are being inspected. Failed or
-cancelled items can be retried through supported API and UI flows rather than by manually editing
-database state. Worker claims and state transitions are designed to avoid two workers completing
-the same queued item.
+Cancellation stops work that has not yet completed. The centered `/imports` workspace groups card
+setup, content-version details, and image or folder selection in one form. Images can be dropped
+onto the source picker or selected with the native image and folder dialogs. A compact activity
+area beside the form on wide screens, and below it on smaller screens, shows cancellable
+active jobs and the five most recent finished jobs. Complete paged queue history remains available
+under `/operations`; its latest page refreshes automatically while older pages remain stable during
+inspection. Failed or cancelled items can be retried through supported API and UI flows rather than
+by manually editing database state. Worker claims and state transitions are designed to avoid two
+workers completing the same queued item.
 
 ## Review and card history
 

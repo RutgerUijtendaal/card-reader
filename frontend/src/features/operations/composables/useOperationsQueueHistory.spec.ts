@@ -1,10 +1,10 @@
 import { createApp, defineComponent, h, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { fetchOperationsQueuePage } from '@/features/operations/api';
+import { fetchOperationsQueuePage } from '@/domain/operations/api';
+import type { OperationsQueuePage } from '@/domain/operations/types';
 import { useOperationsQueueHistory } from '@/features/operations/composables/useOperationsQueueHistory';
-import type { OperationsQueuePage } from '@/features/operations/types';
 
-vi.mock('@/features/operations/api', () => ({
+vi.mock('@/domain/operations/api', () => ({
   fetchOperationsQueuePage: vi.fn(),
 }));
 
