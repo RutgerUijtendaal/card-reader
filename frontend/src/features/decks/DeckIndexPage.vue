@@ -32,13 +32,27 @@
       </template>
 
       <div
-        v-if="loading || !filtersLoaded"
+        v-if="(loading && decks.length === 0) || !filtersLoaded"
         class="app-page-single-column deck-index-grid grid gap-4"
       >
         <DeckLoadingSkeleton
           v-for="index in loadingSkeletonCount"
           :key="`deck-loading-${index}`"
         />
+      </div>
+
+      <div
+        v-else-if="initialLoadError"
+        class="page-card theme-section-muted flex items-center justify-between gap-3 text-sm"
+      >
+        <span>{{ initialLoadError }}</span>
+        <button
+          type="button"
+          class="btn-secondary px-3 py-2 text-xs"
+          @click="refreshDecks"
+        >
+          Retry
+        </button>
       </div>
 
       <div
@@ -204,31 +218,42 @@
         </DeckListCard>
       </div>
 
-      <nav
-        v-if="!loading && filtersLoaded && totalPages > 1"
-        class="theme-divider mt-5 flex items-center justify-between gap-3 border-t pt-4"
-        aria-label="Deck pages"
+      <div
+        v-if="filtersLoaded && decks.length > 0"
+        ref="loadMoreSentinelRef"
+        class="theme-divider mt-5 flex min-h-16 items-center justify-center border-t pt-4"
+        aria-live="polite"
       >
-        <button
-          type="button"
-          class="btn-secondary px-3 py-2 text-xs"
-          :disabled="currentPage <= 1"
-          @click="goToPage(currentPage - 1)"
+        <DeckLoadingSkeleton
+          v-if="loadingNextPage"
+          class="w-full"
+        />
+        <div
+          v-else-if="loadMoreError"
+          class="flex items-center gap-3"
         >
-          Previous
-        </button>
-        <span class="theme-section-muted text-xs">
-          Page {{ currentPage }} of {{ totalPages }} · {{ totalDeckCount }} decks
+          <span class="theme-section-muted text-xs">{{ loadMoreError }}</span>
+          <button
+            type="button"
+            class="btn-secondary px-3 py-2 text-xs"
+            @click="retryNextPage"
+          >
+            Retry
+          </button>
+        </div>
+        <span
+          v-else-if="nextPage !== null"
+          class="theme-section-muted text-xs"
+        >
+          Loading more decks…
         </span>
-        <button
-          type="button"
-          class="btn-secondary px-3 py-2 text-xs"
-          :disabled="currentPage >= totalPages"
-          @click="goToPage(currentPage + 1)"
+        <span
+          v-else
+          class="theme-section-muted text-xs"
         >
-          Next
-        </button>
-      </nav>
+          All {{ totalDeckCount }} decks loaded.
+        </span>
+      </div>
     </AppPageLayout>
 
     <ConfirmModal
@@ -262,12 +287,11 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core';
+import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
 import { BookOpen, Folders, Gamepad2, Hammer, Pencil, Share2, Tags, Trash2 } from 'lucide-vue-next';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
-import type { LocationQueryRaw } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
@@ -312,14 +336,25 @@ import type {
 import { useDeckExport } from '@/domain/decks/composables/useDeckExport';
 import { deckVisibilityLabels, deckVisibilityOptions } from '@/domain/decks/utils/visibility';
 import { getDeckTagSuggestionFeedback } from '@/domain/decks/utils/deckTagSuggestionFeedback';
+import {
+  appendGalleryPage,
+  createEmptyGalleryPageState,
+  replaceGalleryPage,
+} from '@/domain/cards/utils/gallery/galleryState';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
-const decks = ref<DeckSummaryRecord[]>([]);
-const totalDeckCount = ref(0);
-const pageSize = ref(10);
+const deckPageState = shallowRef(createEmptyGalleryPageState<DeckSummaryRecord>());
+const decks = computed(() => deckPageState.value.cards);
+const totalDeckCount = computed(() => deckPageState.value.count);
+const nextPage = computed(() => deckPageState.value.nextPage);
+const pageSize = 10;
 const loading = ref(false);
+const loadingNextPage = ref(false);
+const initialLoadError = ref<string | null>(null);
+const loadMoreError = ref<string | null>(null);
+const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const deleting = ref(false);
 const deleteTarget = ref<DeckSummaryRecord | null>(null);
 const savingDeckIds = ref(new Set<string>());
@@ -359,12 +394,6 @@ const filterDescription = computed(() =>
 const loadingSkeletonCount = 10;
 const currentRouteFilterState = computed(() => parseDeckBrowseFilterRouteQuery(route.query));
 const effectiveRouteFilterState = computed(() => currentRouteFilterState.value);
-const currentPage = computed(() => {
-  const rawPage = Array.isArray(route.query.page) ? route.query.page[0] : route.query.page;
-  const parsedPage = Number.parseInt(rawPage ?? '', 10);
-  return Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-});
-const totalPages = computed(() => Math.max(1, Math.ceil(totalDeckCount.value / pageSize.value)));
 const publicFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
 const ownedFilterRouteQuery = computed(() => buildDeckBrowseFilterRouteQuery(currentRouteFilterState.value));
 const currentRouteSignature = computed(() => getDeckBrowseFilterSignature(effectiveRouteFilterState.value));
@@ -380,55 +409,78 @@ const newDeckLocation = computed(() => buildNewDeckEditorLocation(isOwnedMode.va
 let deckLoadRequestId = 0;
 let tagManagerLoadRequestId = 0;
 
-const loadDecks = async (): Promise<void> => {
+const loadDecksPage = async (page: number, mode: 'replace' | 'append'): Promise<boolean> => {
   const requestId = ++deckLoadRequestId;
   const requestedPath = currentDeckPath.value;
-  const requestedPage = currentPage.value;
-  loading.value = true;
+  const requestedSignature = currentRouteSignature.value;
+  if (mode === 'replace') {
+    loading.value = true;
+    initialLoadError.value = null;
+  } else {
+    loadingNextPage.value = true;
+    loadMoreError.value = null;
+  }
   try {
     const params = buildDeckBrowseFilterApiSearchParams(selectionState.value);
     const response =
       requestedPath === '/my/decks'
-        ? await fetchMyDeckSummaryPage(params, requestedPage, pageSize.value)
-        : await fetchPublicDeckSummaryPage(params, requestedPage, pageSize.value);
+        ? await fetchMyDeckSummaryPage(params, page, pageSize)
+        : await fetchPublicDeckSummaryPage(params, page, pageSize);
     if (
       requestId === deckLoadRequestId &&
       currentDeckPath.value === requestedPath &&
-      currentPage.value === requestedPage
+      currentRouteSignature.value === requestedSignature
     ) {
-      const lastPage = Math.max(1, Math.ceil(response.count / response.page_size));
-      if (requestedPage > lastPage) {
-        void router.replace({
-          path: requestedPath,
-          query: buildPageRouteQuery(lastPage),
-        });
-        return;
+      deckPageState.value = mode === 'replace'
+        ? replaceGalleryPage(response)
+        : appendGalleryPage(deckPageState.value, response);
+      return true;
+    }
+  } catch {
+    if (requestId === deckLoadRequestId) {
+      if (mode === 'replace') {
+        if (deckPageState.value.cards.length === 0) {
+          initialLoadError.value = 'Unable to load decks.';
+        }
+      } else {
+        loadMoreError.value = 'Unable to load more decks.';
       }
-      decks.value = response.results;
-      totalDeckCount.value = response.count;
-      pageSize.value = response.page_size;
     }
   } finally {
     if (requestId === deckLoadRequestId) {
-      loading.value = false;
+      if (mode === 'replace') {
+        loading.value = false;
+      } else {
+        loadingNextPage.value = false;
+      }
     }
   }
+  return false;
 };
 
-const buildPageRouteQuery = (page: number): LocationQueryRaw => ({
-  ...buildDeckBrowseFilterRouteQuery(effectiveRouteFilterState.value),
-  ...(page > 1 ? { page: String(page) } : {}),
-});
+const refreshDecks = async (): Promise<boolean> => loadDecksPage(1, 'replace');
 
-const goToPage = (page: number): void => {
-  if (loading.value || page < 1 || page > totalPages.value || page === currentPage.value) {
+const loadNextPage = async (): Promise<void> => {
+  if (loading.value || loadingNextPage.value || loadMoreError.value || nextPage.value === null) {
     return;
   }
-  void router.push({
-    path: currentDeckPath.value,
-    query: buildPageRouteQuery(page),
-  });
+  await loadDecksPage(nextPage.value, 'append');
 };
+
+const retryNextPage = (): void => {
+  loadMoreError.value = null;
+  void loadNextPage();
+};
+
+useIntersectionObserver(
+  loadMoreSentinelRef,
+  (entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      void loadNextPage();
+    }
+  },
+  { rootMargin: '400px 0px' },
+);
 
 const debouncedUpdateRoute = useDebounceFn(() => {
   if (!filtersLoaded.value) {
@@ -454,8 +506,8 @@ watch(
 );
 
 watch(
-  [currentDeckPath, currentRouteSignature, currentPage, filtersLoaded],
-  async ([, , , ready]) => {
+  [currentDeckPath, currentRouteSignature, filtersLoaded],
+  async ([, , ready]) => {
     if (!ready) {
       return;
     }
@@ -463,7 +515,10 @@ watch(
     if (!sameDeckBrowseFilterState(readFilterState(), routeState)) {
       applyRouteFilterState(routeState);
     }
-    await loadDecks();
+    deckPageState.value = createEmptyGalleryPageState<DeckSummaryRecord>();
+    initialLoadError.value = null;
+    loadMoreError.value = null;
+    await refreshDecks();
   },
   { immediate: true },
 );
@@ -548,9 +603,7 @@ const saveManagedDeckTags = async (): Promise<void> => {
     }
     closeTagManager(true);
     toast.success('Deck tags updated.');
-    try {
-      await loadDecks();
-    } catch {
+    if (!(await refreshDecks())) {
       toast.error('Deck tags were updated, but the deck list could not be refreshed.');
     }
   } catch {
@@ -568,23 +621,11 @@ const updateDeckQuickMetadata = async (
 ): Promise<void> => {
   savingDeckIds.value = new Set(savingDeckIds.value).add(deck.id);
   try {
-    const nextDeck = await updateDeck(deck.id, payload);
-    decks.value = decks.value.map((entry) =>
-      entry.id === nextDeck.id
-        ? {
-            ...entry,
-            difficulty: nextDeck.difficulty,
-            visibility: nextDeck.visibility,
-            status: {
-              is_valid: nextDeck.status.is_valid,
-              label: nextDeck.status.label,
-              deprecated_card_count: nextDeck.status.deprecated_card_count,
-            },
-            updated_at: nextDeck.updated_at,
-          }
-        : entry,
-    );
+    await updateDeck(deck.id, payload);
     toast.success(successMessage);
+    if (!(await refreshDecks())) {
+      toast.error('The deck was updated, but the deck list could not be refreshed.');
+    }
   } catch {
     toast.error(errorMessage);
   } finally {
@@ -653,12 +694,13 @@ const confirmDelete = async (): Promise<void> => {
     const deletedDeckId = deleteTarget.value.id;
     await deleteDeck(deletedDeckId);
     deleteTarget.value = null;
-    decks.value = decks.value.filter((deck) => deck.id !== deletedDeckId);
-    totalDeckCount.value = Math.max(0, totalDeckCount.value - 1);
+    deckPageState.value = {
+      ...deckPageState.value,
+      cards: deckPageState.value.cards.filter((deck) => deck.id !== deletedDeckId),
+      count: Math.max(0, deckPageState.value.count - 1),
+    };
     toast.success('Deck deleted.');
-    try {
-      await loadDecks();
-    } catch {
+    if (!(await refreshDecks())) {
       toast.error('Deck deleted, but the deck list could not be refreshed.');
     }
   } finally {

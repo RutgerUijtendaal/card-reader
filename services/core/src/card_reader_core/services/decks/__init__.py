@@ -8,6 +8,8 @@ from .constraints import (
     effective_deck_building_rules_json,
     normalize_deck_building_config,
 )
+from card_reader_core.repositories.decks import DeckSummaryPage
+
 from .service import DeckCreationDeletedError, DeckService
 from .types import (
     DeckEntryInput,
@@ -23,6 +25,7 @@ __all__ = [
     "DeckConstraintViolation",
     "DeckEntryInput",
     "DeckService",
+    "DeckSummaryPage",
     "DeckCreationDeletedError",
     "DeckSideboardInput",
     "DeckTotals",

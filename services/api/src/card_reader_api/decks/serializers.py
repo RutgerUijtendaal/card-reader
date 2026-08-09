@@ -359,6 +359,11 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     deck_tag_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
     deck_tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
 
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        if (attrs.get("page") is not None or attrs.get("page_size") is not None) and attrs.get("view") != "summary":
+            raise serializers.ValidationError({"view": "Pagination is only available for summary deck lists."})
+        return attrs
+
     def validated_list_filters(self) -> DeckListFilterParams:
         return {
             "search_query": self._string_or_none("q"),

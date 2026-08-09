@@ -91,6 +91,33 @@ def deck_summary_queryset() -> QuerySet[Deck]:
     )
 
 
+def deck_validation_queryset() -> QuerySet[Deck]:
+    return Deck.objects.select_related(
+        "hero_card",
+        "hero_card__latest_version",
+    ).prefetch_related(
+        Prefetch(
+            "entries",
+            queryset=DeckEntry.objects.select_related(
+                "card",
+                "card__latest_version",
+            ).prefetch_related(*summary_version_type_prefetches("card__latest_version")),
+        ),
+        Prefetch(
+            "sideboards",
+            queryset=DeckSideboard.objects.prefetch_related(
+                Prefetch(
+                    "entries",
+                    queryset=DeckSideboardEntry.objects.select_related(
+                        "card",
+                        "card__latest_version",
+                    ).prefetch_related(*summary_version_type_prefetches("card__latest_version")),
+                )
+            ),
+        ),
+    )
+
+
 def deck_metadata_prefetches() -> tuple[Prefetch[str], ...]:
     return (
         Prefetch(

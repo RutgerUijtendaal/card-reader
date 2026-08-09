@@ -477,6 +477,18 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     assert len(page_payload["results"]) == 1
     assert page_payload["results"][0]["id"] in {deck.id for deck in owned_decks}
 
+    out_of_range_response = client.get(
+        "/my/decks",
+        {"view": "summary", "page": 99, "page_size": 2},
+    )
+    assert out_of_range_response.status_code == 200
+    out_of_range_payload = out_of_range_response.json()
+    assert out_of_range_payload["count"] == 3
+    assert out_of_range_payload["page"] == 2
+    assert out_of_range_payload["previous_page"] == 1
+    assert out_of_range_payload["next_page"] is None
+    assert len(out_of_range_payload["results"]) == 1
+
 
 def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:
     owner = _create_user("deck-summary-search-owner", "password")

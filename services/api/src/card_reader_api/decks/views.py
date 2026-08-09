@@ -20,10 +20,11 @@ from card_reader_api.decks.serializers import (
 )
 from card_reader_core.models import Deck
 from card_reader_core.services.decks import (
-    DeckEntryInput,
     DeckCreationDeletedError,
+    DeckEntryInput,
     DeckService,
     DeckSideboardInput,
+    DeckSummaryPage,
     DeckUpdateInput,
     deck_building_rules_metadata_json,
 )
@@ -40,36 +41,36 @@ def _deck_list_response(
     *,
     include_pending_suggestions: bool = False,
 ) -> Response:
-    count = len(decks)
-    page = 1
-    page_size = count or 10
-    page_decks = decks
-    if serializer.wants_pagination():
-        page, page_size = serializer.pagination()
-        offset = (page - 1) * page_size
-        page_decks = decks[offset : offset + page_size]
-
     if serializer.wants_summary():
         results = [
             deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
-            for deck in page_decks
+            for deck in decks
         ]
     else:
         results = [
             deck_payload(deck, include_pending_suggestions=include_pending_suggestions)
-            for deck in page_decks
+            for deck in decks
         ]
+    return Response(results)
 
-    if not serializer.wants_pagination():
-        return Response(results)
+
+def _deck_summary_page_response(
+    summary_page: DeckSummaryPage,
+    *,
+    include_pending_suggestions: bool = False,
+) -> Response:
+    last_page = max(1, (summary_page.count + summary_page.page_size - 1) // summary_page.page_size)
     return Response(
         {
-            "count": count,
-            "next_page": page + 1 if page * page_size < count else None,
-            "previous_page": page - 1 if page > 1 else None,
-            "page": page,
-            "page_size": page_size,
-            "results": results,
+            "count": summary_page.count,
+            "next_page": summary_page.page + 1 if summary_page.page < last_page else None,
+            "previous_page": summary_page.page - 1 if summary_page.page > 1 else None,
+            "page": summary_page.page,
+            "page_size": summary_page.page_size,
+            "results": [
+                deck_summary_payload(deck, include_pending_suggestions=include_pending_suggestions)
+                for deck in summary_page.results
+            ],
         }
     )
 
@@ -106,6 +107,14 @@ class PublicDeckListView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
         service = DeckService()
+        if serializer.wants_summary() and serializer.wants_pagination():
+            page, page_size = serializer.pagination()
+            summary_page = service.list_public_deck_summary_page(
+                page=page,
+                page_size=page_size,
+                **filters,
+            )
+            return _deck_summary_page_response(summary_page)
         list_decks = service.list_public_deck_summaries if serializer.wants_summary() else service.list_public_decks
         decks = list_decks(
             search_query=filters["search_query"],
@@ -160,6 +169,23 @@ class OwnerDeckListCreateView(APIView):
         filters = serializer.validated_list_filters()
         owner_id = _user_id(request)
         service = DeckService()
+        if serializer.wants_summary() and serializer.wants_pagination():
+            page, page_size = serializer.pagination()
+            summary_page = service.list_owner_deck_summary_page(
+                owner_id,
+                page=page,
+                page_size=page_size,
+                search_query=filters["search_query"],
+                hero_query=filters["hero_query"],
+                card_query=filters["card_query"],
+                affinity_symbol_ids=filters["affinity_symbol_ids"],
+                affinity_symbol_exclude_ids=filters["affinity_symbol_exclude_ids"],
+                affinity_symbol_match=filters["affinity_symbol_match"],
+                deck_tag_ids=filters["deck_tag_ids"],
+                deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
+                deck_tag_match=filters["deck_tag_match"],
+            )
+            return _deck_summary_page_response(summary_page, include_pending_suggestions=True)
         list_decks = service.list_owner_deck_summaries if serializer.wants_summary() else service.list_owner_decks
         decks = list_decks(
             owner_id,
