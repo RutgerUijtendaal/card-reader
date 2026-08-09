@@ -1673,7 +1673,7 @@ def test_deck_creation_key_is_owner_scoped_and_lookup_is_private() -> None:
     assert second_create.json()["id"] != first_create.json()["id"]
     assert first_lookup.status_code == 200
     assert first_lookup.json()["id"] == first_create.json()["id"]
-    assert anonymous_lookup.status_code == 401
+    assert anonymous_lookup.status_code == 403
 
 
 def test_deck_create_rejects_malformed_idempotency_key() -> None:
