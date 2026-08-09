@@ -15,7 +15,7 @@ from card_reader_core.repositories.decks import (
     delete_deck,
     get_deck,
     get_deck_for_viewer,
-    get_deck_summary_page_by_ids,
+    get_public_deck_summary_page_by_ids,
     get_owner_deck,
     get_owner_deck_by_creation_id,
     get_owner_deck_creation,
@@ -200,7 +200,7 @@ class DeckService:
             deck_tag_match=deck_tag_match,
         )
         valid_deck_ids = [deck.id for deck in candidates if self.get_deck_validation(deck).is_valid]
-        return get_deck_summary_page_by_ids(
+        return get_public_deck_summary_page_by_ids(
             valid_deck_ids,
             page=page,
             page_size=page_size,

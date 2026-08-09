@@ -170,7 +170,7 @@ def list_public_deck_summary_candidates(
     )
 
 
-def get_deck_summary_page_by_ids(
+def get_public_deck_summary_page_by_ids(
     ordered_deck_ids: list[str],
     *,
     page: int,
@@ -196,7 +196,7 @@ def get_deck_summary_page_by_ids(
         )
         results = list(
             deck_summary_queryset()
-            .filter(id__in=page_ids)
+            .filter(id__in=page_ids, visibility="public")
             .order_by(preserved_order)
         )
     return DeckSummaryPage(

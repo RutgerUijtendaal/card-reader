@@ -543,6 +543,19 @@ def test_owner_deck_summary_list_returns_all_owned_visibility_states() -> None:
     assert snapshot_payload["count"] == 3
     assert newer_deck.id not in {row["id"] for row in snapshot_payload["results"]}
 
+    snapshot_only_response = client.get(
+        "/my/decks",
+        {
+            "view": "summary",
+            "snapshot_at": stable_first_payload["snapshot_at"],
+        },
+    )
+    assert snapshot_only_response.status_code == 200
+    snapshot_only_payload = snapshot_only_response.json()
+    assert snapshot_only_payload["page"] == 1
+    assert snapshot_only_payload["page_size"] == 10
+    assert snapshot_only_payload["snapshot_at"] == stable_first_payload["snapshot_at"]
+
 
 def test_deck_summary_search_matches_overview_fields_without_leaking_private_decks() -> None:
     owner = _create_user("deck-summary-search-owner", "password")

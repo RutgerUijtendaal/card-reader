@@ -388,7 +388,10 @@ class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
         return self._string_or_none("view") == "summary"
 
     def wants_pagination(self) -> bool:
-        return self.validated_data.get("page") is not None or self.validated_data.get("page_size") is not None
+        return any(
+            self.validated_data.get(key) is not None
+            for key in ("page", "page_size", "snapshot_at")
+        )
 
     def pagination(self) -> tuple[int, int]:
         page = self.validated_data.get("page")
