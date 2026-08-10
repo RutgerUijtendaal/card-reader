@@ -30,6 +30,7 @@ from card_reader_core.models import (
     Template,
     Type,
 )
+from card_reader_core.repositories.cards import list_cards
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import (
@@ -3278,8 +3279,14 @@ def test_standard_cannot_match_all_with_persisted_roles() -> None:
         "/cards",
         {"card_roles": ["standard", "hero"], "card_role_match": "all"},
     )
+    repository_result = list_cards(
+        card_roles=["standard", "hero"],
+        card_role_match="all",
+    )
 
     assert response.status_code == 400
+    assert repository_result.count == 0
+    assert repository_result.results == []
 
 
 def test_cards_list_hides_deprecated_cards_by_default_but_can_include_them() -> None:

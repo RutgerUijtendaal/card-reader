@@ -79,12 +79,12 @@
 
           <label class="block">
             <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
-              Card pool
+              Search pool
             </span>
             <select
-              v-model="editorCardPool"
+              v-model="pickerCardPool"
               class="input-base w-full"
-              :disabled="!editor || editor.members.length > 0"
+              :disabled="!editor"
             >
               <option value="player">Player</option>
               <option value="game_master">Game Master</option>
@@ -333,7 +333,8 @@ import type { CardGroupWritePayload } from '@/features/admin/api/cardGroups';
 type CardGroupEditor = {
   id: string | null;
   name: string;
-  card_pool: CardPool;
+  anchor_card_pool: CardPool;
+  picker_card_pool: CardPool;
   anchor_card_id: string;
   members: CardGroupMemberRecord[];
 };
@@ -347,13 +348,15 @@ const pickerQuery = ref('');
 const pickerResults = ref<CardListItem[]>([]);
 const errorMessage = ref('');
 const dragIndex = ref<number | null>(null);
-const editorCardPool = computed<CardPool>({
-  get: () => editor.value?.card_pool ?? 'player',
+let pickerSearchGeneration = 0;
+const pickerCardPool = computed<CardPool>({
+  get: () => editor.value?.picker_card_pool ?? 'player',
   set: (cardPool) => {
-    if (!editor.value || editor.value.members.length > 0) {
+    if (!editor.value) {
       return;
     }
-    editor.value.card_pool = cardPool;
+    editor.value.picker_card_pool = cardPool;
+    pickerSearchGeneration += 1;
     pickerResults.value = [];
   },
 });
@@ -386,11 +389,14 @@ const loadGroups = async (): Promise<void> => {
 };
 
 const applyEditor = (group: CardGroupRecord): void => {
+  pickerSearchGeneration += 1;
+  pickerResults.value = [];
   selectedGroupId.value = group.id;
   editor.value = {
     id: group.id,
     name: group.name,
-    card_pool: group.card_pool,
+    anchor_card_pool: group.card_pool,
+    picker_card_pool: group.card_pool,
     anchor_card_id: group.anchor_card_id,
     members: group.members.map((member) => ({ ...member })),
   };
@@ -407,11 +413,13 @@ const selectGroup = (groupId: string): void => {
 };
 
 const startCreate = (): void => {
+  pickerSearchGeneration += 1;
   selectedGroupId.value = null;
   editor.value = {
     id: null,
     name: '',
-    card_pool: 'player',
+    anchor_card_pool: 'player',
+    picker_card_pool: 'player',
     anchor_card_id: '',
     members: [],
   };
@@ -433,15 +441,25 @@ const resetEditor = (): void => {
 const searchCards = async (): Promise<void> => {
   const query = pickerQuery.value.trim();
   if (!editor.value || !query) {
+    pickerSearchGeneration += 1;
     pickerResults.value = [];
     return;
   }
+  const searchGeneration = ++pickerSearchGeneration;
+  const cardPool = editor.value.picker_card_pool;
   const response = await fetchCards<CardListItem>({
     q: query,
-    card_pool: editor.value.card_pool,
+    card_pool: cardPool,
     ...managementCardSearchLifecycleParams(),
     page_size: 10,
   });
+  if (
+    searchGeneration !== pickerSearchGeneration
+    || editor.value?.picker_card_pool !== cardPool
+    || pickerQuery.value.trim() !== query
+  ) {
+    return;
+  }
   pickerResults.value = response.results.filter((row) => row.result_type === 'card');
 };
 
@@ -462,19 +480,21 @@ const pickerResultActionLabel = (card: CardListItem): string => {
 };
 
 const addMember = (card: CardListItem): void => {
-  if (!editor.value || memberIds.value.has(card.id) || card.card_pool !== editor.value.card_pool) {
+  if (!editor.value || memberIds.value.has(card.id)) {
     return;
   }
   editor.value.members.push({
     card_id: card.id,
     card_label: card.label,
     card_name: card.name,
+    card_pool: card.card_pool,
     position: editor.value.members.length + 1,
     is_anchor: editor.value.anchor_card_id === card.id,
     image_url: card.image_url,
   });
   if (!editor.value.anchor_card_id) {
     editor.value.anchor_card_id = card.id;
+    editor.value.anchor_card_pool = card.card_pool;
   }
   normalizeEditor();
 };
@@ -483,7 +503,12 @@ const setAnchor = (cardId: string): void => {
   if (!editor.value) {
     return;
   }
+  const anchorMember = editor.value.members.find((member) => member.card_id === cardId);
+  if (!anchorMember) {
+    return;
+  }
   editor.value.anchor_card_id = cardId;
+  editor.value.anchor_card_pool = anchorMember.card_pool;
   normalizeEditor();
 };
 
@@ -516,6 +541,9 @@ const normalizeEditor = (): void => {
   }
   const anchorId = editor.value.anchor_card_id;
   const anchorMember = editor.value.members.find((member) => member.card_id === anchorId) ?? null;
+  if (anchorMember) {
+    editor.value.anchor_card_pool = anchorMember.card_pool;
+  }
   const otherMembers = editor.value.members.filter((member) => member.card_id !== anchorId);
   const orderedMembers = anchorMember ? [anchorMember, ...otherMembers] : otherMembers;
   editor.value.members = orderedMembers.map((member, index) => ({
@@ -597,7 +625,7 @@ const openPublicView = (): void => {
   }
   void router.push({
     path: `/card-groups/${editor.value.id}`,
-    query: editor.value.card_pool === 'game_master' ? { card_pool: 'game_master' } : {},
+    query: editor.value.anchor_card_pool === 'game_master' ? { card_pool: 'game_master' } : {},
   });
 };
 
@@ -624,6 +652,13 @@ onMounted(() => {
 
 watch(
   pickerQuery,
+  () => {
+    debouncedSearchCards();
+  },
+);
+
+watch(
+  pickerCardPool,
   () => {
     debouncedSearchCards();
   },

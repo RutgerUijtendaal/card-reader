@@ -581,6 +581,8 @@ def filter_by_card_roles(
     persisted_roles = [role for role in roles if role != STANDARD_CARD_ROLE]
     if match_mode == "all":
         if includes_standard:
+            if persisted_roles:
+                return queryset.none()
             return queryset.filter(card__role_assignments__isnull=True)
         matching_cards = (
             CardRoleAssignment.objects.filter(role__in=persisted_roles)

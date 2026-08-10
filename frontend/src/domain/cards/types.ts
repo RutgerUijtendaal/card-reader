@@ -75,6 +75,7 @@ export type CardGroupSummary = {
   id: string;
   key: string;
   name: string;
+  card_pool: CardPool;
   anchor_card_id: string;
   member_count: number;
   card_ids: string[];

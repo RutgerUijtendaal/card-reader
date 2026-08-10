@@ -146,6 +146,7 @@ def card_group_member_admin_payload(member: CardGroupMember, anchor_card_id: str
         "card_id": card_id,
         "card_label": member.card.label,
         "card_name": version.name if version is not None else member.card.label,
+        "card_pool": member.card.card_pool,
         "position": member.position,
         "is_anchor": card_id == anchor_card_id,
         "image_url": card_image_asset_url(image, fallback_url=f"/cards/{card_id}/image") if version is not None else None,

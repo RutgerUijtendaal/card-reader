@@ -22,7 +22,7 @@
         <RouterLink
           v-for="group in card?.card_groups ?? []"
           :key="group.id"
-          :to="buildCardGroupDetailLocation(group.id, route.query, selectedVersion?.card_pool)"
+          :to="buildCardGroupDetailLocation(group.id, route.query, group.card_pool)"
           class="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
         >
           <span>{{ group.name }}</span>

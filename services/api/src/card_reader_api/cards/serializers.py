@@ -182,6 +182,7 @@ def card_group_summary_payload(
         "id": group.id,
         "key": group.key,
         "name": group.name,
+        "card_pool": group.anchor_card.card_pool,
         "anchor_card_id": anchor_card_id,
         "member_count": len(members),
         "card_ids": card_ids,

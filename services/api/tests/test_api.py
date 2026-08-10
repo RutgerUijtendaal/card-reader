@@ -2147,6 +2147,7 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     card_payload = card_response.json()
     group_payload = group_response.json()
     assert card_payload["card_groups"][0]["id"] == group.id
+    assert card_payload["card_groups"][0]["card_pool"] == "player"
     assert card_payload["card_groups"][0]["is_anchor"] is False
     assert group_payload["id"] == group.id
     assert [member["card"]["id"] for member in group_payload["members"]] == [anchor_card.id, member_card.id]
@@ -2401,6 +2402,8 @@ def test_staff_can_manage_card_groups() -> None:
     anchor_card, _anchor_version = _create_editable_card_version(name="Staff Group Anchor")
     member_card, _member_version = _create_editable_card_version(name="Staff Group Member")
     replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
+    member_card.card_pool = "game_master"
+    member_card.save(update_fields=["card_pool"])
 
     create_response = client.post(
         "/admin/card-groups",
@@ -2442,6 +2445,7 @@ def test_staff_can_manage_card_groups() -> None:
     assert delete_response.status_code == 204
     assert patch_response.json()["anchor_card_id"] == replacement_card.id
     assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
+    assert [member["card_pool"] for member in patch_response.json()["members"]] == ["player", "game_master"]
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 

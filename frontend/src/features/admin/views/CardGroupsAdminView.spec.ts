@@ -23,9 +23,12 @@ vi.mock('vue-sonner', () => ({
   },
 }));
 
-const buildCard = (cardPool: CardListItem['card_pool'] = 'player'): CardListItem => ({
-  id: 'card-1',
-  key: 'card-1',
+const buildCard = (
+  cardPool: CardListItem['card_pool'] = 'player',
+  cardId = 'card-1',
+): CardListItem => ({
+  id: cardId,
+  key: cardId,
   result_type: 'card',
   image_url: '/card.png',
   label: 'Card 1',
@@ -52,15 +55,28 @@ const buildCard = (cardPool: CardListItem['card_pool'] = 'player'): CardListItem
   types: [],
 });
 
-const buildGroup = (cardPool: CardGroupRecord['card_pool'] = 'player'): CardGroupRecord => ({
+const buildGroup = (
+  cardPool: CardGroupRecord['card_pool'] = 'player',
+  withAnchor = false,
+): CardGroupRecord => ({
   id: 'group-1',
   key: 'group-1',
   name: 'Group 1',
   card_pool: cardPool,
-  anchor_card_id: '',
-  anchor_card_name: 'No anchor',
-  member_count: 0,
-  members: [],
+  anchor_card_id: withAnchor ? 'anchor-card' : '',
+  anchor_card_name: withAnchor ? 'Anchor Card' : 'No anchor',
+  member_count: withAnchor ? 1 : 0,
+  members: withAnchor
+    ? [{
+        card_id: 'anchor-card',
+        card_label: 'Anchor Card',
+        card_name: 'Anchor Card',
+        card_pool: cardPool,
+        position: 1,
+        is_anchor: true,
+        image_url: '/anchor.png',
+      }]
+    : [],
 });
 
 const flushPromises = async (): Promise<void> => {
@@ -100,11 +116,11 @@ describe('CardGroupsAdminView', () => {
     document.body.innerHTML = '';
   });
 
-  test('adds a searched card to the active editor and keeps the result visible as added', async () => {
+  test('adds a cross-pool card and keeps the result visible as added', async () => {
     vi.useFakeTimers();
     apiGet.mockImplementation((url: string) => {
       if (url === '/admin/card-groups') {
-        return Promise.resolve({ data: [buildGroup('game_master')] });
+        return Promise.resolve({ data: [buildGroup('game_master', true)] });
       }
       if (url === '/cards') {
         return Promise.resolve({
@@ -114,7 +130,7 @@ describe('CardGroupsAdminView', () => {
             previous_page: null,
             page: 1,
             page_size: 10,
-            results: [buildCard('game_master')],
+            results: [buildCard('player', 'player-card')],
           },
         });
       }
@@ -129,6 +145,15 @@ describe('CardGroupsAdminView', () => {
       throw new Error('expected group button');
     }
     groupButton.click();
+    await nextTick();
+
+    const poolSelect = mounted.container.querySelector<HTMLSelectElement>('select');
+    if (!(poolSelect instanceof HTMLSelectElement)) {
+      throw new Error('expected search pool select');
+    }
+    expect(poolSelect.value).toBe('game_master');
+    poolSelect.value = 'player';
+    poolSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await nextTick();
 
     const searchInput = mounted.container.querySelector<HTMLInputElement>('input[placeholder="Search cards to add..."]');
@@ -148,12 +173,12 @@ describe('CardGroupsAdminView', () => {
     addButton.click();
     await nextTick();
 
-    expect(mounted.container.textContent).toContain('Position 1');
+    expect(mounted.container.textContent).toContain('Position 2');
     expect(mounted.container.querySelector('button[aria-label="Added Card 1"]')).not.toBeNull();
     expect(apiGet).toHaveBeenCalledWith('/cards', {
       params: expect.objectContaining({
         q: 'Card',
-        card_pool: 'game_master',
+        card_pool: 'player',
       }),
     });
 
