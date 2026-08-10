@@ -113,7 +113,7 @@ class CardVersionImage(TimestampedModel):
         db_column="card_version_id",
     )
     source_file: models.TextField[str, str] = models.TextField()
-    stored_path: models.TextField[str, str] = models.TextField()
+    stored_path: models.TextField[str, str] = models.TextField(db_index=True)
     width: models.IntegerField[int, int] = models.IntegerField(default=0)
     height: models.IntegerField[int, int] = models.IntegerField(default=0)
     checksum: models.TextField[str, str] = models.TextField(db_index=True)
