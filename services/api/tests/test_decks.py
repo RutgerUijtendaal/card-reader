@@ -3241,6 +3241,25 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert restricted_card["lifecycle_status"] == "active"
     assert "Secret Reclassified Event" not in owner_response.content.decode()
     assert '"max": 73' not in owner_response.content.decode()
+    tampered_response = owner_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "entries": [{"card_id": restricted_card["id"], "quantity": 2}],
+        },
+        content_type="application/json",
+    )
+    assert tampered_response.status_code == 400
+    round_trip_response = owner_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "name": "Renamed Reclassified Deck",
+            "entries": [{"card_id": restricted_card["id"], "quantity": 1}],
+        },
+        content_type="application/json",
+    )
+    assert round_trip_response.status_code == 200
+    assert round_trip_response.json()["name"] == "Renamed Reclassified Deck"
+    assert round_trip_response.json()["mainboard"]["entries"][0]["card"]["id"] == restricted_card["id"]
     owner_search_response = owner_client.get(
         "/my/decks",
         {"view": "summary", "q": "Secret Reclassified Event"},

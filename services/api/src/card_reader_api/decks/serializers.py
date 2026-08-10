@@ -422,6 +422,12 @@ def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
     }
 
 
+def deck_card_reference_id(card: Card, *, card_pool_scope: CardPoolScope) -> str:
+    if card_pool_scope.allows_card_pool(card.card_pool):
+        return card.id
+    return _restricted_deck_card_id(card)
+
+
 def _restricted_deck_card_id(card: Card) -> str:
     digest = salted_hmac(
         "card-reader.restricted-deck-card",
