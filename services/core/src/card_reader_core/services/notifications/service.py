@@ -11,7 +11,7 @@ from card_reader_core.models import (
     Card,
     CardVersionParseFlagItem,
     Deck,
-    PLAYER_CARD_POOL,
+    PLAYER_CARD_POOL_SCOPE,
     UserNotification,
 )
 from card_reader_core.repositories.notifications import (
@@ -60,7 +60,7 @@ class NotificationService:
 
         version = flag.card_version
         card = version.card
-        if card.card_pool != PLAYER_CARD_POOL:
+        if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool):
             return None
         status_label: ParseFlagReviewStatus = "resolved" if item.status == "resolved" else "dismissed"
         reviewer_name = _username(item.reviewed_by)
@@ -110,7 +110,7 @@ class NotificationService:
         import_item_id: str | None = None,
     ) -> list[UserNotification]:
         card = Card.objects.filter(id=card_id).first()
-        if card is None or card.card_pool != PLAYER_CARD_POOL:
+        if card is None or not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool):
             return []
 
         decks = (
@@ -151,7 +151,11 @@ class NotificationService:
         import_item_id: str | None = None,
     ) -> UserNotification | None:
         owner_id = str(getattr(deck.owner, "pk", ""))
-        if card.card_pool != PLAYER_CARD_POOL or not owner_id or owner_id == actor_id:
+        if (
+            not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool)
+            or not owner_id
+            or owner_id == actor_id
+        ):
             return None
         card_name = card.label
         return self.notify(

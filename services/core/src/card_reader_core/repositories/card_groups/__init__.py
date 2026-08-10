@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db import transaction
 from django.db.models import Prefetch, QuerySet
 
-from card_reader_core.models import Card, CardGroup, CardGroupMember, CardVersionImage
+from card_reader_core.models import Card, CardGroup, CardGroupMember, CardPool, CardVersionImage
 
 
 def card_group_key_exists(*, key: str, exclude_id: str | None = None) -> bool:
@@ -15,6 +15,10 @@ def card_group_key_exists(*, key: str, exclude_id: str | None = None) -> bool:
 
 def get_card_group(group_id: str) -> CardGroup | None:
     return _group_queryset().filter(id=group_id).first()
+
+
+def get_card_group_for_pool(group_id: str, *, card_pool: CardPool) -> CardGroup | None:
+    return _group_queryset().filter(id=group_id, anchor_card__card_pool=card_pool).first()
 
 
 def list_card_groups() -> list[CardGroup]:

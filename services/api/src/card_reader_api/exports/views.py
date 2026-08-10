@@ -9,20 +9,20 @@ from rest_framework.views import APIView
 
 from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
-from card_reader_api.common.auth_access import can_access_game_master_cards, is_authenticated
+from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
 from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import not_found, serializer_error
 from card_reader_api.common.urls import build_public_api_url
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts_cards import encode_tts_card_export
 from card_reader_core.repositories.exports import export_cards_csv
-from card_reader_core.services.decks import DeckService, deck_uses_card_pool
+from card_reader_core.services.decks import DeckService, deck_uses_out_of_scope_card
 from card_reader_core.services.exports import (
     TtsCardExportError,
     TtsCardExportErrorCode,
     TtsCardExportService,
 )
-from card_reader_core.models import GAME_MASTER_CARD_POOL
+from card_reader_core.models import PLAYER_CARD_POOL_SCOPE
 
 _TTS_CARD_EXPORT_ERROR_STATUS = {
     TtsCardExportErrorCode.CARD_BACK_UNAVAILABLE: 409,
@@ -39,11 +39,12 @@ _RETRYABLE_TTS_CARD_EXPORT_ERRORS = {
 
 class ExportCsvView(APIView):
     def get(self, request: Request) -> HttpResponse | Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = CardFiltersQuerySerializer(data=card_filter_query_data(request))
         if not serializer.is_valid():
             return serializer_error(serializer)
         filters = serializer.validated_filters()
-        if filters["card_pool"] == GAME_MASTER_CARD_POOL and not can_access_game_master_cards(request.user):
+        if not card_pool_scope.allows_card_pool(filters["card_pool"]):
             return Response({"detail": "Game Master cards require staff access."}, status=status.HTTP_403_FORBIDDEN)
         content = export_cards_csv(
             query=filters["query"],
@@ -140,10 +141,7 @@ class DeckTtsExportView(APIView):
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return not_found("Deck not found")
-        if (
-            not can_access_game_master_cards(request.user)
-            and deck_uses_card_pool(deck, GAME_MASTER_CARD_POOL)
-        ):
+        if deck_uses_out_of_scope_card(deck, PLAYER_CARD_POOL_SCOPE):
             return not_found("Deck not found")
 
         sideboard_id = request.query_params.get("sideboard_id")

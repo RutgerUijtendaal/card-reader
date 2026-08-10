@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from django.db import transaction
 
-from card_reader_core.models import GAME_MASTER_CARD_POOL, Card, CardVersion
+from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, Card, CardVersion
 from card_reader_core.repositories.cards import (
     promote_card_version,
     update_latest_card_version,
@@ -66,7 +66,7 @@ def update_latest_card_version_with_notifications(
         transaction.on_commit(
             lambda: _reconcile_card_classification(
                 card_id=card.id,
-                archive_notifications=card.card_pool == GAME_MASTER_CARD_POOL,
+                archive_notifications=not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool),
             )
         )
     return updated

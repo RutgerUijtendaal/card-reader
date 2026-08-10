@@ -28,22 +28,21 @@ from card_reader_api.cards.serializers import (
     metadata_option,
     symbol_option,
 )
-from card_reader_api.common.auth_access import can_access_game_master_cards, is_authenticated
+from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
 from card_reader_api.common.responses import serializer_error
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
-    get_card,
+    get_card_in_scope,
     get_card_image,
-    list_card_generations,
+    list_card_generations_in_scope,
     list_cards,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
-from card_reader_core.models import GAME_MASTER_CARD_POOL, PLAYER_CARD_POOL, Card
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
     get_card_version_metadata,
-    get_card_with_image,
+    get_card_with_image_in_scope,
     get_filter_metadata,
     promote_card_version_with_notifications,
     resolve_card_image_path,
@@ -56,11 +55,12 @@ class CardListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = CardFiltersQuerySerializer(data=card_filter_query_data(request, include_list_controls=True))
         if not serializer.is_valid():
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
-        if filters["card_pool"] == GAME_MASTER_CARD_POOL and not can_access_game_master_cards(request.user):
+        if not card_pool_scope.allows_card_pool(filters["card_pool"]):
             return Response({"detail": "Game Master cards require staff access."}, status=status.HTTP_403_FORBIDDEN)
         show_groups = filters["show_groups"]
         if show_groups:
@@ -139,9 +139,8 @@ class CardFiltersView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        metadata = get_filter_metadata(
-            card_pool=None if can_access_game_master_cards(request.user) else PLAYER_CARD_POOL,
-        )
+        card_pool_scope = card_pool_scope_for_user(request.user)
+        metadata = get_filter_metadata(card_pool_scope=card_pool_scope)
         symbols_by_key = {symbol.key: symbol for symbol in metadata["symbols"]}
         return Response(
             {
@@ -150,10 +149,14 @@ class CardFiltersView(APIView):
                 "symbols": [symbol_option(row) for row in metadata["symbols"]],
                 "types": [metadata_option(row) for row in metadata["types"]],
                 "card_pools": [
-                    {"key": "player", "label": "Player", "rank": 0},
+                    *(
+                        [{"key": "player", "label": "Player", "rank": 0}]
+                        if card_pool_scope.allows_card_pool("player")
+                        else []
+                    ),
                     *(
                         [{"key": "game_master", "label": "Game Master", "rank": 1}]
-                        if can_access_game_master_cards(request.user)
+                        if card_pool_scope.allows_card_pool("game_master")
                         else []
                     ),
                 ],
@@ -185,10 +188,13 @@ class CardDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, card_id: str) -> Response:
-        card, version, image = get_card_with_image(card_id)
+        card_pool_scope = card_pool_scope_for_user(request.user)
+        card, version, image = get_card_with_image_in_scope(
+            card_id,
+            card_pool_scope=card_pool_scope,
+        )
         if card is None or version is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
-        _raise_if_card_hidden(request, card)
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
         card_groups = [
@@ -200,7 +206,7 @@ class CardDetailView(APIView):
         deck_references = card_deck_references_payload(
             card.id,
             viewer_id=viewer_id,
-            allow_game_master_cards=can_access_game_master_cards(request.user),
+            card_pool_scope=card_pool_scope,
         )
         return Response(
             card_payload(
@@ -219,12 +225,14 @@ class CardGenerationsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, card_id: str) -> Response:
-        card = get_card(card_id)
+        card_pool_scope = card_pool_scope_for_user(request.user)
+        card = get_card_in_scope(card_id, card_pool_scope=card_pool_scope)
         if card is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
-        _raise_if_card_hidden(request, card)
-
-        versions = list_card_generations(card_id)
+        versions = list_card_generations_in_scope(
+            card_id,
+            card_pool_scope=card_pool_scope,
+        )
         if not versions:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -313,10 +321,10 @@ class CardVersionParseFlagView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request, card_id: str, version_id: str) -> Response:
-        card = get_card(card_id)
+        card_pool_scope = card_pool_scope_for_user(request.user)
+        card = get_card_in_scope(card_id, card_pool_scope=card_pool_scope)
         if card is None:
             return Response({"detail": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
-        _raise_if_card_hidden(request, card)
         serializer = CardVersionParseFlagCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
@@ -379,10 +387,13 @@ class CardImageView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, card_id: str) -> FileResponse:
-        card, _version, image = get_card_with_image(card_id)
+        card_pool_scope = card_pool_scope_for_user(request.user)
+        card, _version, image = get_card_with_image_in_scope(
+            card_id,
+            card_pool_scope=card_pool_scope,
+        )
         if card is None or image is None:
             raise Http404("Card image not found")
-        _raise_if_card_hidden(request, card)
         image_path = resolve_card_image_path(image)
         if image_path is None:
             raise Http404("Card image file is missing")
@@ -397,10 +408,10 @@ class CardVersionImageView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, card_id: str, version_id: str) -> FileResponse:
-        card = get_card(card_id)
+        card_pool_scope = card_pool_scope_for_user(request.user)
+        card = get_card_in_scope(card_id, card_pool_scope=card_pool_scope)
         if card is None:
             raise Http404("Card not found")
-        _raise_if_card_hidden(request, card)
         image = get_card_image(version_id)
         if image is None or image.card_version.card.id != card.id:
             raise Http404("Card image not found")
@@ -414,12 +425,12 @@ class ImmutableCardImageView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, relative_path: str) -> FileResponse:
-        cards = cards_for_immutable_image(relative_path)
+        card_pool_scope = card_pool_scope_for_user(request.user)
+        cards = cards_for_immutable_image(
+            relative_path,
+            card_pool_scope=card_pool_scope,
+        )
         if not cards:
-            raise Http404("Card image not found")
-        if not can_access_game_master_cards(request.user) and all(
-            card.card_pool == GAME_MASTER_CARD_POOL for card in cards
-        ):
             raise Http404("Card image not found")
         return immutable_card_image_response(relative_path)
 
@@ -429,8 +440,3 @@ class SymbolAssetView(APIView):
 
     def get(self, _request: Request, asset_path: str) -> FileResponse:
         return symbol_asset_response(asset_path)
-
-
-def _raise_if_card_hidden(request: Request, card: Card) -> None:
-    if card.card_pool == GAME_MASTER_CARD_POOL and not can_access_game_master_cards(request.user):
-        raise Http404("Card not found")

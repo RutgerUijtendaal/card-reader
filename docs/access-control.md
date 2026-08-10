@@ -22,13 +22,15 @@ The developer flag is deliberately narrower than staff access: it supports proje
 
 ## Game Master cards
 
-Game Master card access is represented by the named `can_access_game_master_cards` capability. Its current policy grants access to staff only, leaving one policy seam that can be relaxed later without rewriting card queries or views.
+Game Master card access is represented by the named `can_access_game_master_cards` capability. Its current policy grants access to staff only. At the API boundary, `card_pool_scope_for_user` translates that entitlement into the immutable core `CardPoolScope`: ordinary and anonymous viewers receive the canonical Player-only scope, while entitled viewers receive the canonical all-pools scope. Core repositories, services, and payload builders consume the scope without inspecting users or staff state, so changing the entitlement policy remains a single boundary edit.
 
 An unauthorized collection request that explicitly selects the Game Master pool returns `403`. Direct Game Master card, version, image, and immutable-asset lookups return `404` so they do not disclose whether an identity exists. The same policy applies to grouped cards, exports, selectors, filter counts, and other card-derived public data. If a Player card already referenced by an ordinary user's deck is reclassified, the deck reference and invalid-state warning remain, but the embedded Game Master card content and image are replaced by a restricted placeholder. Deck rules and validation details returned to that owner are computed from visible Player cards or replaced with a generic restricted-card issue, so restricted card configuration and type behavior are not exposed indirectly.
 
 Unauthenticated TTS sheets and developer-data bundles are public derived artifacts and therefore
 contain Player-pool cards only. That artifact scope is separate from the access capability: changing
 who may receive Game Master access does not implicitly publish Game Master card data.
+
+Card-derived search, counts, ordering, validation, previews, notifications, and generated outputs apply their scope before exposing results. Direct restricted identities still use the established `404` policy, while an explicitly forbidden Game Master collection selection remains `403`.
 
 ## Capability-driven UI
 

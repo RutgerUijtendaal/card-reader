@@ -10,7 +10,7 @@ from .constraints import (
 )
 from card_reader_core.repositories.decks import DeckSummaryPage
 
-from .classification import deck_uses_card_pool, iter_deck_cards
+from .classification import deck_uses_card_pool, deck_uses_out_of_scope_card, iter_deck_cards
 
 from .service import DeckCreationDeletedError, DeckService
 from .types import (
@@ -29,6 +29,7 @@ __all__ = [
     "DeckService",
     "DeckSummaryPage",
     "deck_uses_card_pool",
+    "deck_uses_out_of_scope_card",
     "DeckCreationDeletedError",
     "DeckSideboardInput",
     "DeckTotals",

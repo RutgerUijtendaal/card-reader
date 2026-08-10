@@ -8,7 +8,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.common.auth_access import can_access_admin, can_access_game_master_cards, is_authenticated
+from card_reader_api.common.auth_access import card_pool_scope_for_user, can_access_admin, is_authenticated
 from card_reader_api.common.permissions import AuthenticatedAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.decks.serializers import (
@@ -18,7 +18,7 @@ from card_reader_api.decks.serializers import (
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
-from card_reader_core.models import GAME_MASTER_CARD_POOL, PLAYER_CARD_POOL, Deck
+from card_reader_core.models import CardPoolScope, Deck
 from card_reader_core.services.decks import (
     DeckCreationDeletedError,
     DeckEntryInput,
@@ -27,7 +27,7 @@ from card_reader_core.services.decks import (
     DeckSummaryPage,
     DeckUpdateInput,
     deck_building_rules_metadata_json,
-    deck_uses_card_pool,
+    deck_uses_out_of_scope_card,
 )
 from card_reader_core.services.deck_tags import DeckTagService
 
@@ -36,11 +36,12 @@ def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
 
 
-def _restricted_creation_replay_response(request: Request, deck: Deck) -> Response | None:
-    if can_access_game_master_cards(request.user) or not deck_uses_card_pool(
-        deck,
-        GAME_MASTER_CARD_POOL,
-    ):
+def _restricted_creation_replay_response(
+    deck: Deck,
+    *,
+    card_pool_scope: CardPoolScope,
+) -> Response | None:
+    if not deck_uses_out_of_scope_card(deck, card_pool_scope):
         return None
     return Response(
         {"detail": "The deck created by this key is no longer eligible for replay."},
@@ -52,15 +53,15 @@ def _deck_list_response(
     serializer: DeckListQuerySerializer,
     decks: list[Deck],
     *,
+    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
-    allow_game_master_cards: bool = False,
 ) -> Response:
     if serializer.wants_summary():
         results = [
             deck_summary_payload(
                 deck,
+                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=include_pending_suggestions,
-                allow_game_master_cards=allow_game_master_cards,
             )
             for deck in decks
         ]
@@ -68,8 +69,8 @@ def _deck_list_response(
         results = [
             deck_payload(
                 deck,
+                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=include_pending_suggestions,
-                allow_game_master_cards=allow_game_master_cards,
             )
             for deck in decks
         ]
@@ -79,8 +80,8 @@ def _deck_list_response(
 def _deck_summary_page_response(
     summary_page: DeckSummaryPage,
     *,
+    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
-    allow_game_master_cards: bool = False,
 ) -> Response:
     next_cursor = None
     if summary_page.has_more and summary_page.results:
@@ -101,8 +102,8 @@ def _deck_summary_page_response(
             "results": [
                 deck_summary_payload(
                     deck,
+                    card_pool_scope=card_pool_scope,
                     include_pending_suggestions=include_pending_suggestions,
-                    allow_game_master_cards=allow_game_master_cards,
                 )
                 for deck in summary_page.results
             ],
@@ -121,6 +122,7 @@ class PublicDeckListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
@@ -149,6 +151,7 @@ class PublicDeckListView(APIView):
             page, page_size = serializer.pagination()
             cursor_created_at, cursor_id = serializer.pagination_cursor()
             summary_page = service.list_public_deck_summary_page(
+                card_pool_scope=card_pool_scope,
                 page=page,
                 page_size=page_size,
                 snapshot_at=serializer.pagination_snapshot(),
@@ -156,9 +159,13 @@ class PublicDeckListView(APIView):
                 cursor_id=cursor_id,
                 **filters,
             )
-            return _deck_summary_page_response(summary_page)
+            return _deck_summary_page_response(
+                summary_page,
+                card_pool_scope=card_pool_scope,
+            )
         list_decks = service.list_public_deck_summaries if serializer.wants_summary() else service.list_public_decks
         decks = list_decks(
+            card_pool_scope=card_pool_scope,
             search_query=filters["search_query"],
             hero_query=filters["hero_query"],
             author_query=filters["author_query"],
@@ -170,13 +177,18 @@ class PublicDeckListView(APIView):
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
         )
-        return _deck_list_response(serializer, decks)
+        return _deck_list_response(
+            serializer,
+            decks,
+            card_pool_scope=card_pool_scope,
+        )
 
 
 class PublicDeckDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, deck_id: str) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         viewer_id = _user_id(request) if is_authenticated(request.user) else None
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
@@ -185,8 +197,8 @@ class PublicDeckDetailView(APIView):
         return Response(
             deck_payload(
                 deck,
+                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=is_owner,
-                allow_game_master_cards=can_access_game_master_cards(request.user),
             )
         )
 
@@ -195,6 +207,7 @@ class OwnerDeckListCreateView(APIView):
     permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
@@ -219,8 +232,6 @@ class OwnerDeckListCreateView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
         owner_id = _user_id(request)
-        allow_game_master_cards = can_access_game_master_cards(request.user)
-        filter_card_pool = None if allow_game_master_cards else PLAYER_CARD_POOL
         service = DeckService()
         if serializer.wants_summary() and serializer.wants_pagination():
             page, page_size = serializer.pagination()
@@ -241,12 +252,12 @@ class OwnerDeckListCreateView(APIView):
                 deck_tag_ids=filters["deck_tag_ids"],
                 deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
                 deck_tag_match=filters["deck_tag_match"],
-                card_pool=filter_card_pool,
+                card_pool_scope=card_pool_scope,
             )
             return _deck_summary_page_response(
                 summary_page,
+                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=True,
-                allow_game_master_cards=allow_game_master_cards,
             )
         list_decks = service.list_owner_deck_summaries if serializer.wants_summary() else service.list_owner_decks
         decks = list_decks(
@@ -260,16 +271,17 @@ class OwnerDeckListCreateView(APIView):
             deck_tag_ids=filters["deck_tag_ids"],
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
-            card_pool=filter_card_pool,
+            card_pool_scope=card_pool_scope,
         )
         return _deck_list_response(
             serializer,
             decks,
+            card_pool_scope=card_pool_scope,
             include_pending_suggestions=True,
-            allow_game_master_cards=allow_game_master_cards,
         )
 
     def post(self, request: Request) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         raw_creation_id = request.headers.get("Idempotency-Key")
         client_creation_id: UUID | None = None
         if raw_creation_id is not None:
@@ -286,14 +298,17 @@ class OwnerDeckListCreateView(APIView):
                 client_creation_id,
             )
             if existing is not None:
-                restricted_response = _restricted_creation_replay_response(request, existing)
+                restricted_response = _restricted_creation_replay_response(
+                    existing,
+                    card_pool_scope=card_pool_scope,
+                )
                 if restricted_response is not None:
                     return restricted_response
                 return Response(
                     deck_payload(
                         existing,
+                        card_pool_scope=card_pool_scope,
                         include_pending_suggestions=True,
-                        allow_game_master_cards=can_access_game_master_cards(request.user),
                     )
                 )
             if key_used:
@@ -344,8 +359,8 @@ class OwnerDeckListCreateView(APIView):
             return bad_request(str(exc))
         payload = deck_payload(
             deck,
+            card_pool_scope=card_pool_scope,
             include_pending_suggestions=True,
-            allow_game_master_cards=can_access_game_master_cards(request.user),
         )
         payload["tag_suggestion_results"] = deck_tag_suggestion_results_payload(
             tag_service.describe_suggestion_results(serializer.validated_data.get("suggested_type_labels", []))
@@ -358,6 +373,7 @@ class OwnerDeckCreationLookupView(APIView):
     permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request, client_creation_id: UUID) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         deck, key_used = DeckService().get_owner_deck_creation_result(
             _user_id(request),
             client_creation_id,
@@ -369,14 +385,17 @@ class OwnerDeckCreationLookupView(APIView):
                     status=status.HTTP_410_GONE,
                 )
             return not_found("Deck not found")
-        restricted_response = _restricted_creation_replay_response(request, deck)
+        restricted_response = _restricted_creation_replay_response(
+            deck,
+            card_pool_scope=card_pool_scope,
+        )
         if restricted_response is not None:
             return restricted_response
         return Response(
             deck_payload(
                 deck,
+                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=True,
-                allow_game_master_cards=can_access_game_master_cards(request.user),
             )
         )
 
@@ -385,6 +404,7 @@ class OwnerDeckDetailView(APIView):
     permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request, deck_id: str) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         service = DeckService()
         deck = service.get_owner_deck(deck_id, _user_id(request))
         if deck is None and can_access_admin(request.user):
@@ -394,12 +414,13 @@ class OwnerDeckDetailView(APIView):
         return Response(
             deck_payload(
                 deck,
+                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=True,
-                allow_game_master_cards=can_access_game_master_cards(request.user),
             )
         )
 
     def patch(self, request: Request, deck_id: str) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         service = DeckService()
         accessible_deck = service.get_owner_deck(deck_id, _user_id(request))
         if accessible_deck is None and can_access_admin(request.user):
@@ -467,8 +488,8 @@ class OwnerDeckDetailView(APIView):
             return not_found("Deck not found")
         payload = deck_payload(
             deck,
+            card_pool_scope=card_pool_scope,
             include_pending_suggestions=True,
-            allow_game_master_cards=can_access_game_master_cards(request.user),
         )
         submitted_suggestions = (
             serializer.validated_data.get("suggested_type_labels", [])

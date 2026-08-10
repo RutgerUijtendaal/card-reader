@@ -10,6 +10,7 @@ from card_reader_core.models import (
     STANDARD_CARD_ROLE,
     Card,
     CardPool,
+    CardPoolScope,
     CardRoleAssignment,
     CardRoleFilter,
     CardMergeRedirect,
@@ -327,15 +328,32 @@ def list_matching_card_candidates(
 
 
 def get_card(card_id: str) -> Card | None:
-    card = Card.objects.prefetch_related("role_assignments").filter(id=card_id).first()
+    return _get_card(card_id)
+
+
+def get_card_in_scope(card_id: str, *, card_pool_scope: CardPoolScope) -> Card | None:
+    return _get_card(card_id, card_pool_scope=card_pool_scope)
+
+
+def _get_card(
+    card_id: str,
+    *,
+    card_pool_scope: CardPoolScope | None = None,
+) -> Card | None:
+    cards = Card.objects.prefetch_related("role_assignments").filter(id=card_id)
+    if card_pool_scope is not None:
+        cards = cards.filter(card_pool__in=card_pool_scope.allowed_pools)
+    card = cards.first()
     if card is not None:
         return card
-    redirect = (
+    redirects = (
         CardMergeRedirect.objects.select_related("target_card")
         .prefetch_related("target_card__role_assignments")
         .filter(old_card_id=card_id)
-        .first()
     )
+    if card_pool_scope is not None:
+        redirects = redirects.filter(target_card__card_pool__in=card_pool_scope.allowed_pools)
+    redirect = redirects.first()
     return redirect.target_card if redirect is not None else None
 
 
@@ -501,6 +519,25 @@ def list_card_generations(card_id: str) -> list[CardVersion]:
         return []
     return list(
         CardVersion.objects.filter(card_id=card.id)
+        .select_related("card", "template", "previous_version", "parse_result", "content_version")
+        .prefetch_related("card__role_assignments")
+        .order_by("-version_number")
+    )
+
+
+def list_card_generations_in_scope(
+    card_id: str,
+    *,
+    card_pool_scope: CardPoolScope,
+) -> list[CardVersion]:
+    card = get_card_in_scope(card_id, card_pool_scope=card_pool_scope)
+    if card is None:
+        return []
+    return list(
+        CardVersion.objects.filter(
+            card_id=card.id,
+            card__card_pool__in=card_pool_scope.allowed_pools,
+        )
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
         .prefetch_related("card__role_assignments")
         .order_by("-version_number")

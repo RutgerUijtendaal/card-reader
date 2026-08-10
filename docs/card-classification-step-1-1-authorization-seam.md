@@ -1,6 +1,6 @@
 # Card Classification Step 1.1: Authorization Seam Consolidation
 
-Status: approved implementation plan; execute after Step 1 is merged and stable, before Step 2 begins.
+Status: implemented and validated.
 
 This is a hardening checkpoint between the classification foundation and import inference:
 

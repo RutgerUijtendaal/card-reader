@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from card_reader_core.models import (
+    CardPoolScope,
     CardVersionMetadataSuggestion,
     MetadataSuggestion,
     now_utc,
@@ -91,13 +92,20 @@ def replace_card_version_metadata_suggestions(
 def list_metadata_suggestions(
     *,
     kind: str,
+    card_pool_scope: CardPoolScope,
     status: str | None = None,
 ) -> list[MetadataSuggestionListRow]:
     query = (
         MetadataSuggestion.objects.filter(kind=kind)
         .select_related("accepted_tag", "accepted_type")
         .annotate(
-            occurrence_count=Count("card_version_metadata_suggestions", distinct=True)
+            occurrence_count=Count(
+                "card_version_metadata_suggestions",
+                filter=Q(
+                    card_version_metadata_suggestions__card_version__card__card_pool__in=card_pool_scope.allowed_pools
+                ),
+                distinct=True,
+            )
         )
         .filter(occurrence_count__gt=0)
         .order_by("-occurrence_count", "display_value", "normalized_value")
@@ -115,9 +123,14 @@ def list_metadata_suggestions(
 
 def list_card_version_suggestion_occurrences(
     suggestion_id: str,
+    *,
+    card_pool_scope: CardPoolScope,
 ) -> list[CardVersionMetadataSuggestion]:
     return list(
-        CardVersionMetadataSuggestion.objects.filter(suggestion_id=suggestion_id)
+        CardVersionMetadataSuggestion.objects.filter(
+            suggestion_id=suggestion_id,
+            card_version__card__card_pool__in=card_pool_scope.allowed_pools,
+        )
         .select_related("card_version__card", "parse_result")
         .prefetch_related("card_version__images")
         .order_by("-created_at")

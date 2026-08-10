@@ -26,13 +26,16 @@ from card_reader_api.catalog.serializers import (
     type_payload,
 )
 from card_reader_api.catalog.assets import ALLOWED_SYMBOL_ASSET_SUFFIXES, store_symbol_asset
+from card_reader_api.common.auth_access import card_pool_scope_for_user
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.catalog import CatalogService
 
 
 class CatalogView(APIView):
-    def get(self, _request: Request) -> Response:
-        data = CatalogService().list_catalog()
+    def get(self, request: Request) -> Response:
+        data = CatalogService().list_catalog(
+            card_pool_scope=card_pool_scope_for_user(request.user)
+        )
         return Response(
             {
                 "known": {
@@ -55,8 +58,11 @@ class KeywordCreateView(APIView):
 
 
 class KeywordDetailView(APIView):
-    def get(self, _request: Request, entry_id: str) -> Response:
-        detail = CatalogService().get_keyword_detail(entry_id=entry_id)
+    def get(self, request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_keyword_detail(
+            entry_id=entry_id,
+            card_pool_scope=card_pool_scope_for_user(request.user),
+        )
         if detail is None:
             return not_found("Keyword not found")
         return Response(keyword_detail_payload(detail))
@@ -74,8 +80,11 @@ class TagCreateView(APIView):
 
 
 class TagDetailView(APIView):
-    def get(self, _request: Request, entry_id: str) -> Response:
-        detail = CatalogService().get_tag_detail(entry_id=entry_id)
+    def get(self, request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_tag_detail(
+            entry_id=entry_id,
+            card_pool_scope=card_pool_scope_for_user(request.user),
+        )
         if detail is None:
             return not_found("Tag not found")
         return Response(tag_detail_payload(detail))
@@ -93,8 +102,11 @@ class TypeCreateView(APIView):
 
 
 class TypeDetailView(APIView):
-    def get(self, _request: Request, entry_id: str) -> Response:
-        detail = CatalogService().get_type_detail(entry_id=entry_id)
+    def get(self, request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_type_detail(
+            entry_id=entry_id,
+            card_pool_scope=card_pool_scope_for_user(request.user),
+        )
         if detail is None:
             return not_found("Type not found")
         return Response(type_detail_payload(detail))
@@ -129,8 +141,11 @@ class SymbolCreateView(APIView):
 
 
 class SymbolDetailView(APIView):
-    def get(self, _request: Request, entry_id: str) -> Response:
-        detail = CatalogService().get_symbol_detail(entry_id=entry_id)
+    def get(self, request: Request, entry_id: str) -> Response:
+        detail = CatalogService().get_symbol_detail(
+            entry_id=entry_id,
+            card_pool_scope=card_pool_scope_for_user(request.user),
+        )
         if detail is None:
             return not_found("Symbol not found")
         return Response(symbol_detail_payload(detail))
@@ -198,18 +213,22 @@ class SuggestionListView(APIView):
             return bad_request(str(exc))
         suggestions = CatalogService().list_suggestions(
             kind=normalized_kind,
+            card_pool_scope=card_pool_scope_for_user(request.user),
             status=serializer.validated_data.get("status"),
         )
         return Response([suggestion_payload(item) for item in suggestions])
 
 
 class SuggestionDetailView(APIView):
-    def get(self, _request: Request, kind: str, entry_id: str) -> Response:
+    def get(self, request: Request, kind: str, entry_id: str) -> Response:
         try:
             normalized_kind = _normalize_suggestion_kind(kind)
         except ValueError as exc:
             return bad_request(str(exc))
-        suggestion = CatalogService().get_suggestion_detail(suggestion_id=entry_id)
+        suggestion = CatalogService().get_suggestion_detail(
+            suggestion_id=entry_id,
+            card_pool_scope=card_pool_scope_for_user(request.user),
+        )
         if suggestion is None or suggestion["kind"] != normalized_kind:
             return not_found("Suggestion not found")
         return Response(suggestion_payload(suggestion))
@@ -239,21 +258,35 @@ class SuggestionAcceptView(APIView):
                 )
         except ValueError as exc:
             return bad_request(str(exc))
-        detail = None if suggestion is None else service.get_suggestion_detail(suggestion_id=suggestion.id)
+        detail = (
+            None
+            if suggestion is None
+            else service.get_suggestion_detail(
+                suggestion_id=suggestion.id,
+                card_pool_scope=card_pool_scope_for_user(request.user),
+            )
+        )
         if detail is None or detail["kind"] != normalized_kind:
             return not_found("Suggestion not found")
         return Response(suggestion_payload(detail))
 
 
 class SuggestionRejectView(APIView):
-    def post(self, _request: Request, kind: str, entry_id: str) -> Response:
+    def post(self, request: Request, kind: str, entry_id: str) -> Response:
         try:
             normalized_kind = _normalize_suggestion_kind(kind)
         except ValueError as exc:
             return bad_request(str(exc))
         service = CatalogService()
         suggestion = service.reject_suggestion(suggestion_id=entry_id)
-        detail = None if suggestion is None else service.get_suggestion_detail(suggestion_id=suggestion.id)
+        detail = (
+            None
+            if suggestion is None
+            else service.get_suggestion_detail(
+                suggestion_id=suggestion.id,
+                card_pool_scope=card_pool_scope_for_user(request.user),
+            )
+        )
         if detail is None or detail["kind"] != normalized_kind:
             return not_found("Suggestion not found")
         return Response(suggestion_payload(detail))

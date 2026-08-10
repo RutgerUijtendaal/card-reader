@@ -6,7 +6,6 @@ from enum import StrEnum
 from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     ALL_CARD_LIFECYCLE_FILTER,
-    PLAYER_CARD_POOL,
     CardVersionImage,
 )
 from card_reader_core.repositories.cards import (
@@ -18,7 +17,10 @@ from card_reader_core.repositories.cards import (
 )
 from card_reader_core.repositories.content_versions import get_content_version
 from card_reader_core.repositories.decks import get_deck_export_snapshot
-from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
+from card_reader_core.repositories.tts_card_sheets import (
+    PUBLIC_TTS_CARD_POOL_SCOPE,
+    resolve_tts_card_image_path,
+)
 from card_reader_core.services.card_backs import (
     CardBackService,
     resolve_card_back_image_asset_path,
@@ -255,7 +257,7 @@ class TtsCardExportService:
         skipped = list(selection.skipped)
         for entry in selection.entries:
             row = entry.row
-            if row.version.card.card_pool != PLAYER_CARD_POOL:
+            if not PUBLIC_TTS_CARD_POOL_SCOPE.allows_card_pool(row.version.card.card_pool):
                 if entry.required:
                     raise _required_card_unavailable(
                         row.version.name,

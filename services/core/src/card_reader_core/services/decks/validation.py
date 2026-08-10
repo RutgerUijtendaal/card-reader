@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from card_reader_core.models import HERO_CARD_ROLE, PLAYER_CARD_POOL, Deck, card_has_role, card_is_deprecated
+from card_reader_core.models import HERO_CARD_ROLE, PLAYER_CARD_POOL_SCOPE, Deck, card_has_role, card_is_deprecated
 
 from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
 from .types import DeckTotals, DeckValidationSummary
@@ -17,7 +17,7 @@ class DeckValidationService:
 
         if not card_has_role(deck.hero_card, HERO_CARD_ROLE):
             issues.append("Hero card must be marked as a hero.")
-        if deck.hero_card.card_pool != PLAYER_CARD_POOL:
+        if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(deck.hero_card.card_pool):
             issues.append("Hero card must belong to the Player pool.")
         if card_is_deprecated(deck.hero_card):
             issues.append("Hero card is deprecated.")
@@ -29,7 +29,7 @@ class DeckValidationService:
             if card_is_deprecated(entry.card):
                 deprecated_card_ids.add(entry.card.id)
             constraint_entries.append(DeckConstraintEntry(card=entry.card, quantity=quantity, board="mainboard"))
-            if entry.card.card_pool != PLAYER_CARD_POOL:
+            if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool):
                 issues.append("Mainboard cards must belong to the Player pool.")
             if card_has_role(entry.card, HERO_CARD_ROLE):
                 issues.append("Hero cards cannot appear in mainboard entries.")
@@ -40,7 +40,7 @@ class DeckValidationService:
 
         for sideboard in deck.sideboards.all():
             for sideboard_entry in sideboard.entries.all():
-                if sideboard_entry.card.card_pool != PLAYER_CARD_POOL:
+                if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(sideboard_entry.card.card_pool):
                     issues.append("Sideboard cards must belong to the Player pool.")
                 if card_is_deprecated(sideboard_entry.card):
                     deprecated_card_ids.add(sideboard_entry.card.id)

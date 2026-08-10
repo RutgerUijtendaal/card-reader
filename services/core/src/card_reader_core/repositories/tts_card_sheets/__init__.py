@@ -14,8 +14,7 @@ from django.db.models import F, Max, Prefetch, Q, QuerySet
 from PIL import Image
 
 from card_reader_core.models import (
-    GAME_MASTER_CARD_POOL,
-    PLAYER_CARD_POOL,
+    PLAYER_CARD_POOL_SCOPE,
     TTS_CARD_SHEET_CAPACITY,
     TTS_CARD_SHEET_LAYOUT_VERSION,
     Card,
@@ -35,6 +34,7 @@ _RENDERER_FINGERPRINT_VERSION = 2
 _SQLITE_WRITE_RETRY_ATTEMPTS = 6
 _SLOT_RESERVATION_ATTEMPTS = 16
 _CLAIM_RESERVATION_ATTEMPTS = 16
+PUBLIC_TTS_CARD_POOL_SCOPE = PLAYER_CARD_POOL_SCOPE
 
 _RetryResult = TypeVar("_RetryResult")
 
@@ -89,7 +89,7 @@ def iter_usable_card_source_batches(
 
 def _card_source_queryset(card_ids: list[str] | None) -> QuerySet[Card]:
     cards = Card.objects.filter(
-        card_pool=PLAYER_CARD_POOL,
+        card_pool__in=PUBLIC_TTS_CARD_POOL_SCOPE.allowed_pools,
         latest_version__isnull=False,
     ).select_related("latest_version")
     if card_ids is not None:
@@ -415,8 +415,8 @@ def list_non_player_card_ids_on_sheet(sheet_id: str) -> list[str]:
     return list(
         TtsCardSheetSlot.objects.filter(
             sheet_id=sheet_id,
-            resolved_card__card_pool=GAME_MASTER_CARD_POOL,
         )
+        .exclude(resolved_card__card_pool__in=PUBLIC_TTS_CARD_POOL_SCOPE.allowed_pools)
         .order_by("slot_index")
         .values_list("resolved_card_id", flat=True)
     )

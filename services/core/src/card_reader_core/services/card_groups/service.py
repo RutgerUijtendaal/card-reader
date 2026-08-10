@@ -4,13 +4,14 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
-from card_reader_core.models import Card, CardGroup, card_is_deprecated
+from card_reader_core.models import Card, CardGroup, CardPool, card_is_deprecated
 from card_reader_core.repositories.cards import get_card
 from card_reader_core.repositories.card_groups import (
     card_group_key_exists,
     create_card_group,
     delete_card_group,
     get_card_group,
+    get_card_group_for_pool,
     get_cards,
     list_card_groups,
     list_card_groups_for_card,
@@ -33,6 +34,9 @@ class CardGroupService:
 
     def get_group(self, group_id: str) -> CardGroup | None:
         return get_card_group(group_id)
+
+    def get_group_for_pool(self, group_id: str, *, card_pool: CardPool) -> CardGroup | None:
+        return get_card_group_for_pool(group_id, card_pool=card_pool)
 
     def get_groups_for_card(self, card_id: str) -> list[CardGroup]:
         return list_card_groups_for_card(card_id)
