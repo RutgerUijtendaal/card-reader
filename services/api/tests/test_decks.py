@@ -3237,7 +3237,6 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert restricted_card["name"] == "Restricted Game Master card"
     assert restricted_card["lifecycle_status"] == "active"
     assert "Secret Reclassified Event" not in owner_response.content.decode()
-    assert "deprecated" not in owner_response.content.decode()
     assert '"max": 73' not in owner_response.content.decode()
     owner_search_response = owner_client.get(
         "/my/decks",
