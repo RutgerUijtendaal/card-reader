@@ -3280,6 +3280,8 @@ def test_standard_cannot_match_all_with_persisted_roles() -> None:
         {"card_roles": ["standard", "hero"], "card_role_match": "all"},
     )
     repository_result = list_cards(
+        query=None,
+        max_confidence=None,
         card_roles=["standard", "hero"],
         card_role_match="all",
     )
