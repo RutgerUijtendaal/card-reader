@@ -7,6 +7,7 @@ from card_reader_core.models import (
     NOTIFICATION_STATUS_READ,
     NOTIFICATION_STATUS_UNREAD,
     Card,
+    CardMergeRedirect,
     PLAYER_CARD_POOL_SCOPE,
     UserNotification,
 )
@@ -55,10 +56,19 @@ def notification_queryset(recipient_id: str) -> QuerySet[UserNotification]:
     restricted_card = Card.objects.filter(
         id=OuterRef("metadata_json__card_id"),
     ).exclude(card_pool__in=PLAYER_CARD_POOL_SCOPE.allowed_pools)
+    redirected_restricted_card = CardMergeRedirect.objects.filter(
+        old_card_id=OuterRef("metadata_json__card_id"),
+    ).exclude(target_card__card_pool__in=PLAYER_CARD_POOL_SCOPE.allowed_pools)
     return (
         UserNotification.objects.select_related("recipient", "actor")
         .filter(recipient_id=recipient_id, archived_at__isnull=True)
-        .annotate(_references_restricted_card=Exists(restricted_card))
-        .filter(_references_restricted_card=False)
+        .annotate(
+            _references_restricted_card=Exists(restricted_card),
+            _references_redirected_restricted_card=Exists(redirected_restricted_card),
+        )
+        .filter(
+            _references_restricted_card=False,
+            _references_redirected_restricted_card=False,
+        )
         .order_by("-last_event_at", "-created_at", "id")
     )

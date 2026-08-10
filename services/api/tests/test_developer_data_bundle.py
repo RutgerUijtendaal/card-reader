@@ -47,6 +47,7 @@ from card_reader_core.operations.developer_data import (
     sha256_file,
     validate_archive,
 )
+from card_reader_core.operations.developer_data.importer import validate_import_readiness
 from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
 
 
@@ -112,6 +113,15 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert manifest.counts["cards"] == 3
         assert manifest.counts["card_versions"] == 4
         assert manifest.format_version == 2
+
+        _, validated_payload = validate_archive(archive_path)
+        mainboard_record = next(
+            card for card in validated_payload.cards if card.key == "synthetic-mainboard"
+        )
+        mainboard_record.card_roles = ["boon"]
+        assert "no active mainboard cards are included" not in validate_import_readiness(
+            validated_payload
+        )
 
         with tarfile.open(archive_path, "r:gz") as archive:
             data_member = archive.extractfile("data.json")
@@ -416,6 +426,45 @@ def test_archive_validation_rejects_unsafe_paths(tmp_path: Path) -> None:
         validate_archive(archive_path)
 
 
+@pytest.mark.parametrize(
+    ("card_key", "expected_error"),
+    [
+        ("synthetic-deprecated", "non-Player cards: synthetic-deprecated"),
+        ("synthetic-mainboard", "cross-pool card groups: synthetic-group"),
+    ],
+)
+def test_archive_validation_rejects_restricted_cards_and_cross_pool_groups(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    card_key: str,
+    expected_error: str,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "synthetic-dev-data.tar.gz"
+    restricted_archive_path = tmp_path / "restricted-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection_path.write_text(json.dumps(_build_synthetic_source(source_storage)), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="restricted-archive-test-revision",
+        )
+        _build_reclassified_archive(
+            archive_path,
+            restricted_archive_path,
+            tmp_path / "restricted-archive",
+            card_key=card_key,
+        )
+
+        with pytest.raises(DeveloperDataError, match=expected_error):
+            validate_archive(restricted_archive_path)
+        transaction.set_rollback(True)
+
+
 def _build_alias_collision_archive(source: Path, target: Path, extraction_root: Path) -> None:
     extraction_root.mkdir()
     with tarfile.open(source, "r:gz") as archive:
@@ -424,6 +473,33 @@ def _build_alias_collision_archive(source: Path, target: Path, extraction_root: 
     payload = json.loads(data_path.read_text(encoding="utf-8"))
     mainboard = next(card for card in payload["cards"] if card["key"] == "synthetic-mainboard")
     mainboard["aliases"].append({"key": "synthetic-hero-alias", "label": "Collision"})
+    serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+    data_path.write_bytes(serialized)
+    manifest_path = extraction_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data_entry = next(entry for entry in manifest["files"] if entry["path"] == "data.json")
+    data_entry["sha256"] = hashlib.sha256(serialized).hexdigest()
+    data_entry["size_bytes"] = len(serialized)
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    with tarfile.open(target, "w:gz") as archive:
+        for path in sorted(extraction_root.rglob("*")):
+            archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
+
+
+def _build_reclassified_archive(
+    source: Path,
+    target: Path,
+    extraction_root: Path,
+    *,
+    card_key: str,
+) -> None:
+    extraction_root.mkdir()
+    with tarfile.open(source, "r:gz") as archive:
+        archive.extractall(extraction_root, filter="data")
+    data_path = extraction_root / "data.json"
+    payload = json.loads(data_path.read_text(encoding="utf-8"))
+    card = next(card for card in payload["cards"] if card["key"] == card_key)
+    card["card_pool"] = "game_master"
     serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     data_path.write_bytes(serialized)
     manifest_path = extraction_root / "manifest.json"

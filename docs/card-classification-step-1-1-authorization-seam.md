@@ -177,7 +177,7 @@ Add focused source-boundary tests or lint checks that fail when:
 
 - card-classification code outside `card_reader_api.common.auth_access` reads `user.is_staff` directly;
 - a first-party card-derived payload builder adds an `allow_game_master_cards` boolean;
-- public developer-data or TTS code requests the all-pools scope;
+- public developer-data or TTS code requests the all-pools scope, or archive validation accepts non-Player records or cross-pool groups;
 - secure API entry points call an unrestricted card lookup before applying the request scope.
 
 Keep these guards narrow enough to permit unrelated staff-only admin features. They protect the classification seam, not every authorization rule in the repository.
@@ -208,7 +208,8 @@ Also validate the authorization matrix in CI and manually inspect representative
 - No first-party `allow_game_master_cards` payload parameter remains.
 - Search, counts, ordering, validation, rules, notifications, replay, images, exports, TTS, and developer-data cannot expose out-of-scope card data.
 - Public derived artifacts remain Player-only regardless of which users receive the Game Master capability.
-- Current `403`, `404`, restricted-placeholder, reference-preservation, and invalid-state behavior remains compatible.
+- Current `403`, `404`, restricted-placeholder, reference-preservation, and invalid-state behavior remains compatible; restricted deck placeholders use opaque identifiers rather than stable Game Master card ids.
+- Notification retirement and query filtering resolve merged source identities before deciding whether a card-linked snapshot is visible.
 - The authorization matrix passes for anonymous, authenticated non-staff, and staff viewers.
 - Architecture guards prevent the seam from scattering again.
 - Lint, typecheck, Django checks, affected frontend tests, CI backend tests, and documentation validation pass.

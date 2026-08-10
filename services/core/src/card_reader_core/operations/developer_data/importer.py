@@ -102,7 +102,9 @@ def validate_import_readiness(payload: DeveloperDataPayload) -> list[str]:
     ):
         issues.append("no active hero is included")
     if not any(
-        not card.card_roles and card.card_pool == "player" and card.lifecycle_status == "active"
+        "hero" not in card.card_roles
+        and card.card_pool == "player"
+        and card.lifecycle_status == "active"
         for card in payload.cards
     ):
         issues.append("no active mainboard cards are included")

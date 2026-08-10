@@ -12,7 +12,7 @@ catalog at build time; Game Master cards are excluded while that pool is restric
 keys remain regression anchors that must still exist. The committed
 `dev-data.lock.json` pins the required bundle version, format, checksum, and website API.
 
-Selection, group validation, and archive construction use a fixed canonical Player-only `CardPoolScope`. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive Game Master eligibility cannot expand published bundles accidentally.
+Selection, group validation, archive construction, and archive loading use a fixed canonical Player-only `CardPoolScope`. Archive validation rejects non-Player card records and cross-pool groups even when an archive was produced outside the normal exporter. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive Game Master eligibility cannot expand published bundles accidentally.
 
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and

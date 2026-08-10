@@ -100,7 +100,36 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
         )
     except Exception as exc:
         raise DeveloperDataError("Developer-data payload is invalid.") from exc
+    _validate_public_payload_scope(payload)
     return manifest, payload
+
+
+def _validate_public_payload_scope(payload: DeveloperDataPayload) -> None:
+    card_pools_by_key = {card.key: card.card_pool for card in payload.cards}
+    cross_pool_groups = []
+    for group in payload.card_groups:
+        referenced_card_keys = {
+            group.anchor_card_key,
+            *(member.card_key for member in group.members),
+        }
+        referenced_pools = {
+            card_pools_by_key[card_key]
+            for card_key in referenced_card_keys
+            if card_key in card_pools_by_key
+        }
+        if len(referenced_pools) > 1:
+            cross_pool_groups.append(group.key)
+    if cross_pool_groups:
+        raise DeveloperDataError(
+            "Developer-data archive contains cross-pool card groups: "
+            + ", ".join(sorted(cross_pool_groups))
+        )
+
+    restricted_card_keys = sorted(card.key for card in payload.cards if card.card_pool != "player")
+    if restricted_card_keys:
+        raise DeveloperDataError(
+            "Developer-data archive contains non-Player cards: " + ", ".join(restricted_card_keys)
+        )
 
 
 def _validate_archive_member(value: str) -> str:

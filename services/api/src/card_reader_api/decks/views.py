@@ -14,11 +14,12 @@ from card_reader_api.common.responses import bad_request, not_found, serializer_
 from card_reader_api.decks.serializers import (
     DeckListQuerySerializer,
     DeckWriteSerializer,
+    deck_card_reference_id,
     deck_payload,
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
-from card_reader_core.models import CardPoolScope, Deck
+from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, CardPoolScope, Deck
 from card_reader_core.services.decks import (
     DeckCreationDeletedError,
     DeckEntryInput,
@@ -47,6 +48,46 @@ def _restricted_creation_replay_response(
         {"detail": "The deck created by this key is no longer eligible for replay."},
         status=status.HTTP_409_CONFLICT,
     )
+
+
+def _discard_unchanged_restricted_deck_references(
+    validated_data: dict[str, object],
+    *,
+    deck: Deck,
+    card_pool_scope: CardPoolScope,
+) -> None:
+    if not deck_uses_out_of_scope_card(deck, PLAYER_CARD_POOL_SCOPE):
+        return
+
+    expected_hero_id = deck_card_reference_id(deck.hero_card, card_pool_scope=card_pool_scope)
+    if validated_data.get("hero_card_id") == expected_hero_id:
+        validated_data.pop("hero_card_id")
+
+    expected_entries = [
+        {
+            "card_id": deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope),
+            "quantity": int(entry.quantity),
+        }
+        for entry in deck.entries.all()
+    ]
+    if validated_data.get("entries") == expected_entries:
+        validated_data.pop("entries")
+
+    expected_sideboards = [
+        {
+            "name": sideboard.name,
+            "entries": [
+                {
+                    "card_id": deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope),
+                    "quantity": int(entry.quantity),
+                }
+                for entry in sideboard.entries.all()
+            ],
+        }
+        for sideboard in deck.sideboards.all()
+    ]
+    if validated_data.get("sideboards") == expected_sideboards:
+        validated_data.pop("sideboards")
 
 
 def _deck_list_response(
@@ -430,6 +471,11 @@ class OwnerDeckDetailView(APIView):
         serializer = DeckWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return serializer_error(serializer)
+        _discard_unchanged_restricted_deck_references(
+            serializer.validated_data,
+            deck=accessible_deck,
+            card_pool_scope=card_pool_scope,
+        )
         tag_service = DeckTagService()
         service = DeckService(tag_service=tag_service)
         try:

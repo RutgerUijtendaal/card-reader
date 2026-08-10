@@ -3204,6 +3204,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     owner = _create_user("gm-deck-owner", "password")
     staff = _create_user("gm-deck-staff", "password", is_staff=True)
     hero = _create_card(name="GM Deck Player Hero", hero=True)
+    replacement_hero = _create_card(name="GM Deck Replacement Hero", hero=True)
     reclassified = _create_card(name="Secret Reclassified Event", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -3217,10 +3218,14 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     reclassified.card_pool = "game_master"
     reclassified.lifecycle_status = "deprecated"
     reclassified.deck_building_config_json = {
-        "overrides": {"mainboard_copy_limit": {"max": 73}},
+        "overrides": {
+            "mainboard_copy_limit": {"max": 73},
+            "mainboard_card_count": {"max": 0, "blocks_action": True},
+        },
     }
     reclassified.save(update_fields=["card_pool", "lifecycle_status", "deck_building_config_json"])
     CardRoleAssignment.objects.create(card=reclassified, role="event")
+    CardRoleAssignment.objects.create(card=reclassified, role="hero")
 
     owner_client = Client(HTTP_HOST="localhost")
     owner_client.force_login(owner)
@@ -3235,10 +3240,42 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert owner_payload["deck_building_rules"]["mainboard_copy_limit"]["max"] == 4
     restricted_card = owner_payload["mainboard"]["entries"][0]["card"]
     assert restricted_card["restricted"] is True
+    assert restricted_card["id"] != reclassified.id
+    assert restricted_card["id"].startswith("restricted-card-")
     assert restricted_card["name"] == "Restricted Game Master card"
     assert restricted_card["lifecycle_status"] == "active"
     assert "Secret Reclassified Event" not in owner_response.content.decode()
     assert '"max": 73' not in owner_response.content.decode()
+    tampered_response = owner_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "entries": [{"card_id": restricted_card["id"], "quantity": 2}],
+        },
+        content_type="application/json",
+    )
+    assert tampered_response.status_code == 400
+    round_trip_response = owner_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "name": "Renamed Reclassified Deck",
+            "entries": [{"card_id": restricted_card["id"], "quantity": 1}],
+        },
+        content_type="application/json",
+    )
+    assert round_trip_response.status_code == 200
+    assert round_trip_response.json()["name"] == "Renamed Reclassified Deck"
+    assert round_trip_response.json()["mainboard"]["entries"][0]["card"]["id"] == restricted_card["id"]
+    hero_update_response = owner_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "hero_card_id": replacement_hero.id,
+            "entries": [{"card_id": restricted_card["id"], "quantity": 1}],
+        },
+        content_type="application/json",
+    )
+    assert hero_update_response.status_code == 200
+    assert hero_update_response.json()["hero_card"]["id"] == replacement_hero.id
+    assert hero_update_response.json()["mainboard"]["entries"][0]["card"]["id"] == restricted_card["id"]
     owner_search_response = owner_client.get(
         "/my/decks",
         {"view": "summary", "q": "Secret Reclassified Event"},
@@ -3263,6 +3300,31 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
         "Secret Reclassified Event"
     )
     assert staff_response.json()["deck_building_rules"]["mainboard_copy_limit"]["max"] == 73
+    staff_move_response = staff_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "entries": [{"card_id": reclassified.id, "quantity": 1}],
+            "sideboards": [
+                {
+                    "name": "Moved restricted card",
+                    "entries": [{"card_id": reclassified.id, "quantity": 1}],
+                }
+            ],
+        },
+        content_type="application/json",
+    )
+    assert staff_move_response.status_code == 400
+    staff_round_trip_response = staff_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "name": "Staff Renamed Reclassified Deck",
+            "entries": [{"card_id": reclassified.id, "quantity": 1}],
+        },
+        content_type="application/json",
+    )
+    assert staff_round_trip_response.status_code == 200
+    assert staff_round_trip_response.json()["name"] == "Staff Renamed Reclassified Deck"
+    assert staff_round_trip_response.json()["mainboard"]["entries"][0]["card"]["id"] == reclassified.id
     owner.is_staff = True
     owner.save(update_fields=["is_staff"])
     staff_owner_client = Client(HTTP_HOST="localhost")
