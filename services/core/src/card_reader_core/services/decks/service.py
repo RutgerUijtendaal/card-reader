@@ -510,11 +510,19 @@ class DeckService:
         normalized_name = self._normalizer.normalize_name(effective_name)
         normalized_description = self._normalizer.normalize_description(effective_description)
         normalized_long_description = self._normalizer.normalize_long_description(effective_long_description)
-        hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_payload(
-            hero_card_id=effective_hero_card_id,
-            entries=effective_entries,
-            sideboards=effective_sideboards,
+        updates_card_references = (
+            updates.update_hero_card_id or updates.update_entries or updates.update_sideboards
         )
+        if updates_card_references:
+            hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_payload(
+                hero_card_id=effective_hero_card_id,
+                entries=effective_entries,
+                sideboards=effective_sideboards,
+            )
+        else:
+            hero_card = existing_deck.hero_card
+            normalized_entries = []
+            normalized_sideboards = []
         updated = update_deck(
             deck_id=deck_id,
             updates={
