@@ -65,7 +65,7 @@ def test_staff_upload_creates_current_card_back_with_canonical_webp(
 
     public_image_response = Client(HTTP_HOST="localhost").get(payload["image_url"])
     assert public_image_response.status_code == 200
-    public_image_response.close()
+    assert b"".join(public_image_response.streaming_content).startswith(b"RIFF")
 
     current_response = client.get("/card-backs/current")
     assert current_response.status_code == 200
