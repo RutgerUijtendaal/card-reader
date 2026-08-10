@@ -209,9 +209,7 @@ export const useCardDetailState = () => {
   const applyUpdatedVersion = (updated: CardVersionDetail): boolean => {
     const previousVersion = versions.value.find((version) => version.version_id === updated.version_id);
     const poolChanged = previousVersion?.card_pool !== updated.card_pool;
-    versions.value = versions.value.map((version) =>
-      version.version_id === updated.version_id ? updated : version,
-    );
+    versions.value = synchronizeCardClassification(versions.value, updated);
     if (card.value) {
       card.value = {
         ...card.value,
@@ -636,6 +634,27 @@ export const reconcileCardGroupsAfterPoolChange = (
   }
   return group.card_pool === cardPool ? [group] : [];
 });
+
+export type CardClassificationFields = Pick<
+  CardVersionDetail,
+  'version_id' | 'card_pool' | 'card_roles' | 'deck_building_config' | 'lifecycle_status'
+>;
+
+export const synchronizeCardClassification = <T extends CardClassificationFields>(
+  versions: T[],
+  updated: T,
+): T[] =>
+  versions.map((version) =>
+    version.version_id === updated.version_id
+      ? updated
+      : {
+          ...version,
+          card_pool: updated.card_pool,
+          card_roles: [...updated.card_roles],
+          deck_building_config: updated.deck_building_config,
+          lifecycle_status: updated.lifecycle_status,
+        },
+  );
 
 const parseJsonObject = (value: string): Record<string, unknown> => {
   const parsed = JSON.parse(value.trim() || '{}') as unknown;

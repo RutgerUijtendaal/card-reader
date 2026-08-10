@@ -7,6 +7,8 @@ from django.db import connection
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    HERO_CARD_ROLE,
+    PLAYER_CARD_POOL,
     Card,
     CardBack,
     CardGroup,
@@ -41,11 +43,17 @@ class Command(BaseCommand):
                 issues.append(f"{label} are missing")
         active_cards = Card.objects.filter(lifecycle_status="active")
         if not active_cards.filter(
-            card_pool="player",
-            role_assignments__role="hero",
+            card_pool=PLAYER_CARD_POOL,
+            role_assignments__role=HERO_CARD_ROLE,
         ).exists():
             issues.append("an active hero card is missing")
-        if active_cards.filter(card_pool="player", role_assignments__isnull=True).count() < 15:
+        mainboard_card_count = (
+            active_cards.filter(card_pool=PLAYER_CARD_POOL)
+            .exclude(role_assignments__role=HERO_CARD_ROLE)
+            .distinct()
+            .count()
+        )
+        if mainboard_card_count < 15:
             issues.append("at least 15 unique active mainboard cards are required")
         if not CardGroup.objects.exists():
             issues.append("representative card groups are missing")

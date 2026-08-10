@@ -5,7 +5,7 @@ from pathlib import Path
 from django.http import FileResponse, Http404
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import Card, CardVersionImage
+from card_reader_core.models import Card, CardBack, CardVersionImage
 from card_reader_core.storage import relativize_image_storage_path
 
 
@@ -35,6 +35,21 @@ def cards_for_immutable_image(relative_path: str) -> list[Card]:
             card = image.card_version.card
             cards[card.id] = card
     return list(cards.values())
+
+
+def card_back_owns_immutable_image(relative_path: str) -> bool:
+    normalized = Path(relative_path).as_posix().strip("/")
+    filename = Path(normalized).name
+    for stored_path in CardBack.objects.filter(stored_path__endswith=filename).values_list(
+        "stored_path", flat=True
+    ):
+        try:
+            card_back_path = Path(relativize_image_storage_path(stored_path)).as_posix().strip("/")
+        except ValueError:
+            continue
+        if card_back_path == normalized:
+            return True
+    return False
 
 
 def symbol_asset_response(asset_path: str) -> FileResponse:
