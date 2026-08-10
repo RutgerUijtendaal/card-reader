@@ -97,6 +97,7 @@ const buildDeck = (id: string, name: string, heroName: string, owner = 'owner') 
     label: 'Ready',
     deprecated_card_count: 0,
   },
+  has_restricted_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 });
@@ -109,6 +110,7 @@ const buildCard = (id: string, name: string, imageUrl: string | null = null) => 
   image_url: imageUrl,
   name,
   card_pool: 'player' as const, card_roles: [],
+  lifecycle_status: 'active' as const,
   template_id: 'template',
   version_id: `${id}-version`,
   version_number: 1,
@@ -168,6 +170,7 @@ const buildDeckDetail = (id: string, name: string, heroName: string, owner = 'ow
       deprecated_card_count: 0,
       deprecated_card_ids: [],
     },
+    has_restricted_cards: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   };

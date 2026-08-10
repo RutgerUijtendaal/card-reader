@@ -27,6 +27,20 @@ def test_current_card_back_endpoint_returns_null_without_auth_when_unset() -> No
     assert response.json() == {"current": None}
 
 
+def test_immutable_card_back_asset_supports_non_checksum_filename() -> None:
+    card_back = _create_card_back(
+        label="Legacy Named Back",
+        is_current=True,
+        write_image=True,
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/card-images/{card_back.stored_path}")
+
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content).startswith(b"RIFF")
+    response.close()
+
+
 def test_staff_upload_creates_current_card_back_with_canonical_webp(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

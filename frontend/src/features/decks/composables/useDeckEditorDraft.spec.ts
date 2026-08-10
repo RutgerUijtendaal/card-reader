@@ -110,6 +110,7 @@ describe('useDeckEditorDraft', () => {
         mainboard_unique_cards: 0,
       },
       status: { is_valid: false, label: 'In Progress', issues: [] },
+      has_restricted_cards: false,
       created_at: '',
       updated_at: '',
     };

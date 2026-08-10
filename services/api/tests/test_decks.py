@@ -3233,6 +3233,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
 
     assert owner_response.status_code == 200
     owner_payload = owner_response.json()
+    assert owner_payload["has_restricted_cards"] is True
     assert owner_payload["status"]["is_valid"] is False
     assert owner_payload["status"]["issues"] == [
         "Deck contains cards that are unavailable in the Player workspace."
@@ -3244,6 +3245,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert restricted_card["id"].startswith("restricted-card-")
     assert restricted_card["name"] == "Restricted Game Master card"
     assert restricted_card["lifecycle_status"] == "active"
+    assert restricted_card["updated_at"] == ""
     assert "Secret Reclassified Event" not in owner_response.content.decode()
     assert '"max": 73' not in owner_response.content.decode()
     tampered_response = owner_client.patch(
@@ -3296,6 +3298,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     staff_response = staff_client.get(f"/my/decks/{deck.id}")
 
     assert staff_response.status_code == 200
+    assert staff_response.json()["has_restricted_cards"] is True
     assert staff_response.json()["mainboard"]["entries"][0]["card"]["name"].startswith(
         "Secret Reclassified Event"
     )

@@ -24,7 +24,8 @@ const buildSummary = (): DeckSummaryRecord => ({
   },
   mainboard: { total_cards: 1, unique_cards: 1 },
   sideboard_count: 0,
-  status: { is_valid: true, label: 'Ready' },
+  status: { is_valid: true, label: 'Ready', deprecated_card_count: 0 },
+  has_restricted_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 });
@@ -34,6 +35,7 @@ const buildDeck = (): DeckRecord => {
     id: 'card-1',
     card_pool: 'player',
     restricted: false,
+    lifecycle_status: 'active',
   };
   return {
     ...buildSummary(),
@@ -52,15 +54,20 @@ const buildDeck = (): DeckRecord => {
 };
 
 describe('playtester deck eligibility', () => {
-  test('accepts valid Player deck summaries and rejects invalid or restricted ones', () => {
+  test('accepts invalid Player deck summaries and rejects restricted ones', () => {
     const summary = buildSummary();
     expect(isPlaytestDeckSummaryEligible(summary)).toBe(true);
     expect(isPlaytestDeckSummaryEligible({
       ...summary,
       status: { ...summary.status, is_valid: false },
+    })).toBe(true);
+    expect(isPlaytestDeckSummaryEligible({
+      ...summary,
+      status: { ...summary.status, is_valid: false, deprecated_card_count: 1 },
     })).toBe(false);
     expect(isPlaytestDeckSummaryEligible({
       ...summary,
+      has_restricted_cards: true,
       hero_card: { ...summary.hero_card, card_pool: 'game_master', restricted: true },
     })).toBe(false);
   });
@@ -68,6 +75,19 @@ describe('playtester deck eligibility', () => {
   test('rejects a full deck when any referenced card is not a visible Player card', () => {
     const deck = buildDeck();
     expect(isPlaytestDeckEligible(deck)).toBe(true);
+    expect(isPlaytestDeckEligible({
+      ...deck,
+      status: { ...deck.status, is_valid: false, issues: ['Under construction'] },
+    })).toBe(true);
+    expect(isPlaytestDeckEligible({
+      ...deck,
+      status: {
+        ...deck.status,
+        is_valid: false,
+        issues: ['Deck references deprecated cards.'],
+        deprecated_card_count: 1,
+      },
+    })).toBe(false);
     expect(isPlaytestDeckEligible({
       ...deck,
       mainboard: {
@@ -81,6 +101,10 @@ describe('playtester deck eligibility', () => {
     expect(isPlaytestDeckEligible({
       ...deck,
       hero_card: { ...deck.hero_card, card_pool: 'game_master' },
+    })).toBe(false);
+    expect(isPlaytestDeckEligible({
+      ...deck,
+      hero_card: { ...deck.hero_card, lifecycle_status: 'deprecated' },
     })).toBe(false);
   });
 });

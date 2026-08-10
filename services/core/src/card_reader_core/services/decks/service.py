@@ -299,8 +299,12 @@ class DeckService:
     def get_deck(self, deck_id: str) -> Deck | None:
         return get_deck(deck_id)
 
+    def get_visible_deck_for_viewer(self, deck_id: str, *, viewer_id: str | None) -> Deck | None:
+        """Return a deck allowed by ownership/visibility without applying whole-deck validity."""
+        return get_deck_for_viewer(deck_id, viewer_id=viewer_id)
+
     def get_deck_for_viewer(self, deck_id: str, *, viewer_id: str | None) -> Deck | None:
-        deck = get_deck_for_viewer(deck_id, viewer_id=viewer_id)
+        deck = self.get_visible_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return None
         if viewer_id and str(getattr(deck.owner, "pk", "")) == viewer_id:

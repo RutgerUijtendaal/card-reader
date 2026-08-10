@@ -91,6 +91,7 @@ export type DeckRecord = {
     deprecated_card_count?: number;
     deprecated_card_ids?: string[];
   };
+  has_restricted_cards: boolean;
   deck_building_rules?: DeckBuildingRules;
   created_at: string;
   updated_at: string;
@@ -132,6 +133,7 @@ export type DeckSummaryRecord = {
     label: string;
     deprecated_card_count?: number;
   };
+  has_restricted_cards: boolean;
   created_at: string;
   updated_at: string;
 };

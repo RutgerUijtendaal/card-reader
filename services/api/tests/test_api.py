@@ -832,9 +832,11 @@ def test_card_gallery_stable_image_url_changes_freshness_headers_with_latest_ver
     assert redirect_response["Last-Modified"] == second_response["Last-Modified"]
 
 
-def test_card_image_asset_endpoint_serves_immutable_image_path() -> None:
+def test_card_image_asset_endpoint_serves_non_checksum_immutable_image_path() -> None:
     card, version = _create_editable_card_version(name="Immutable Image Card")
     image = _create_card_image(version)
+    image.checksum = "different-from-stored-filename"
+    image.save(update_fields=["checksum"])
 
     response = Client(HTTP_HOST="localhost").get(f"/card-images/{image.stored_path}")
 

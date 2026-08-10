@@ -162,6 +162,53 @@ def test_main_deck_tts_export_omits_sideboard_entries() -> None:
     assert sideboard_card.id not in {card["card_id"] for card in payload["cards"]}
 
 
+def test_deck_tts_export_restricts_only_the_requested_board() -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-board-scope-owner", "password")
+    hero = _create_card(name="TTS Board Scope Hero", hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    restricted_sideboard_card = _create_card(name="TTS Restricted Sideboard Card", hero=False)
+    player_sideboard_card = _create_card(name="TTS Player Sideboard Card", hero=False)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Board Scope Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[
+            DeckSideboardInput(
+                name="Restricted",
+                entries=[DeckEntryInput(card_id=restricted_sideboard_card.id, quantity=1)],
+            ),
+            DeckSideboardInput(
+                name="Player",
+                entries=[DeckEntryInput(card_id=player_sideboard_card.id, quantity=1)],
+            ),
+        ],
+    )
+    restricted_sideboard_card.card_pool = "game_master"
+    restricted_sideboard_card.save(update_fields=["card_pool"])
+    sideboards = {sideboard.name: sideboard for sideboard in deck.sideboards.all()}
+    _prepare_tts_export(
+        "board-scope",
+        [hero, *mainboard_cards, player_sideboard_card],
+    )
+    client = Client(HTTP_HOST="localhost")
+
+    mainboard_response = client.get(f"/decks/{deck.id}/exports/tts")
+    player_sideboard_response = client.get(
+        f"/decks/{deck.id}/exports/tts?sideboard_id={sideboards['Player'].id}"
+    )
+    restricted_sideboard_response = client.get(
+        f"/decks/{deck.id}/exports/tts?sideboard_id={sideboards['Restricted'].id}"
+    )
+
+    assert mainboard_response.status_code == 200
+    assert player_sideboard_response.status_code == 200
+    assert restricted_sideboard_response.status_code == 404
+
+
 def test_tts_export_can_target_one_sideboard() -> None:
     TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-target-sideboard-owner", "password")

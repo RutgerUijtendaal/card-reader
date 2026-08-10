@@ -11,6 +11,7 @@ from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
 from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
 from card_reader_core.models import (
+    PLAYER_CARD_POOL_SCOPE,
     Card,
     CardPoolScope,
     CardVersion,
@@ -55,6 +56,12 @@ def deck_summary_payload(
         entries=entries,
         sideboards=sideboards,
     )
+    has_player_deck_restrictions = _deck_contains_restricted_cards(
+        deck,
+        card_pool_scope=PLAYER_CARD_POOL_SCOPE,
+        entries=entries,
+        sideboards=sideboards,
+    )
     validation = None if has_restricted_cards else DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     return {
@@ -81,6 +88,7 @@ def deck_summary_payload(
             "label": "In Progress" if validation is None else validation.status_label,
             "deprecated_card_count": 0 if validation is None else validation.deprecated_card_count,
         },
+        "has_restricted_cards": has_player_deck_restrictions,
         "tags": deck_tags_payload(deck),
         "pending_tag_suggestions": pending_deck_tag_suggestions_payload(deck)
         if include_pending_suggestions
@@ -102,6 +110,12 @@ def deck_payload(
     has_restricted_cards = _deck_contains_restricted_cards(
         deck,
         card_pool_scope=card_pool_scope,
+        entries=entries,
+        sideboards=sideboards,
+    )
+    has_player_deck_restrictions = _deck_contains_restricted_cards(
+        deck,
+        card_pool_scope=PLAYER_CARD_POOL_SCOPE,
         entries=entries,
         sideboards=sideboards,
     )
@@ -183,6 +197,7 @@ def deck_payload(
             "deprecated_card_count": 0 if validation is None else validation.deprecated_card_count,
             "deprecated_card_ids": [] if validation is None else validation.deprecated_card_ids or [],
         },
+        "has_restricted_cards": has_player_deck_restrictions,
         "deck_building_rules": effective_deck_building_rules_json(
             hero_card=(
                 deck.hero_card
@@ -413,6 +428,7 @@ def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
         "rules_text": "",
         "confidence": 0.0,
         "created_at": "",
+        "updated_at": "",
         "image_url": None,
         "keywords": [],
         "tags": [],

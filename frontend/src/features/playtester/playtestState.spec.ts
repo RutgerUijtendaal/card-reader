@@ -108,6 +108,7 @@ const buildDeck = (): DeckRecord => ({
     label: 'Ready',
     issues: [],
   },
+  has_restricted_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 });
