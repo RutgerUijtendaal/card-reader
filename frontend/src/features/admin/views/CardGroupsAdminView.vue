@@ -79,6 +79,20 @@
 
           <label class="block">
             <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
+              Card pool
+            </span>
+            <select
+              v-model="editorCardPool"
+              class="input-base w-full"
+              :disabled="!editor || editor.members.length > 0"
+            >
+              <option value="player">Player</option>
+              <option value="game_master">Game Master</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
               Search cards
             </span>
             <input
@@ -306,6 +320,7 @@ import { fetchCards } from '@/domain/cards/api';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/features/admin/types';
 import {
   createManagedCardGroup,
@@ -318,6 +333,7 @@ import type { CardGroupWritePayload } from '@/features/admin/api/cardGroups';
 type CardGroupEditor = {
   id: string | null;
   name: string;
+  card_pool: CardPool;
   anchor_card_id: string;
   members: CardGroupMemberRecord[];
 };
@@ -331,6 +347,16 @@ const pickerQuery = ref('');
 const pickerResults = ref<CardListItem[]>([]);
 const errorMessage = ref('');
 const dragIndex = ref<number | null>(null);
+const editorCardPool = computed<CardPool>({
+  get: () => editor.value?.card_pool ?? 'player',
+  set: (cardPool) => {
+    if (!editor.value || editor.value.members.length > 0) {
+      return;
+    }
+    editor.value.card_pool = cardPool;
+    pickerResults.value = [];
+  },
+});
 
 const filteredGroups = computed(() => {
   const query = listSearch.value.trim().toLowerCase();
@@ -364,6 +390,7 @@ const applyEditor = (group: CardGroupRecord): void => {
   editor.value = {
     id: group.id,
     name: group.name,
+    card_pool: group.card_pool,
     anchor_card_id: group.anchor_card_id,
     members: group.members.map((member) => ({ ...member })),
   };
@@ -384,6 +411,7 @@ const startCreate = (): void => {
   editor.value = {
     id: null,
     name: '',
+    card_pool: 'player',
     anchor_card_id: '',
     members: [],
   };
@@ -410,6 +438,7 @@ const searchCards = async (): Promise<void> => {
   }
   const response = await fetchCards<CardListItem>({
     q: query,
+    card_pool: editor.value.card_pool,
     ...managementCardSearchLifecycleParams(),
     page_size: 10,
   });
@@ -433,7 +462,7 @@ const pickerResultActionLabel = (card: CardListItem): string => {
 };
 
 const addMember = (card: CardListItem): void => {
-  if (!editor.value || memberIds.value.has(card.id)) {
+  if (!editor.value || memberIds.value.has(card.id) || card.card_pool !== editor.value.card_pool) {
     return;
   }
   editor.value.members.push({
@@ -566,7 +595,10 @@ const openPublicView = (): void => {
   if (!editor.value?.id) {
     return;
   }
-  void router.push(`/card-groups/${editor.value.id}`);
+  void router.push({
+    path: `/card-groups/${editor.value.id}`,
+    query: editor.value.card_pool === 'game_master' ? { card_pool: 'game_master' } : {},
+  });
 };
 
 const onDragStart = (index: number): void => {

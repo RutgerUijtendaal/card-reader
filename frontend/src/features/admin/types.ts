@@ -148,6 +148,7 @@ export type CardGroupRecord = {
   id: string;
   key: string;
   name: string;
+  card_pool: CardPool;
   anchor_card_id: string;
   anchor_card_name: string;
   member_count: number;

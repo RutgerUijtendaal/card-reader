@@ -130,6 +130,7 @@ def card_group_admin_payload(group: CardGroup) -> dict[str, object]:
         "id": group.id,
         "key": group.key,
         "name": group.name,
+        "card_pool": group.anchor_card.card_pool,
         "anchor_card_id": anchor_card_id,
         "anchor_card_name": anchor_version.name if anchor_version is not None else group.anchor_card.label,
         "member_count": len(members),

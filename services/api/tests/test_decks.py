@@ -3244,6 +3244,14 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     )
     assert owner_search_response.status_code == 200
     assert owner_search_response.json() == []
+    owner_summary_response = owner_client.get("/my/decks", {"view": "summary"})
+    assert owner_summary_response.status_code == 200
+    owner_summary = next(row for row in owner_summary_response.json() if row["id"] == deck.id)
+    assert owner_summary["status"] == {
+        "is_valid": False,
+        "label": "In Progress",
+        "deprecated_card_count": 0,
+    }
 
     staff_client = Client(HTTP_HOST="localhost")
     staff_client.force_login(staff)

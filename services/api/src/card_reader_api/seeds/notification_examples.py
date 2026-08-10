@@ -9,6 +9,7 @@ from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     HERO_CARD_ROLE,
     NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
+    PLAYER_CARD_POOL,
     Card,
     CardVersion,
     Deck,
@@ -104,6 +105,7 @@ def _comparison_version() -> CardVersion | None:
     return (
         CardVersion.objects.select_related("card", "previous_version")
         .filter(
+            card__card_pool=PLAYER_CARD_POOL,
             card__lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
             is_latest=True,
             images__isnull=False,
@@ -119,6 +121,7 @@ def _reference_version() -> CardVersion | None:
     return (
         CardVersion.objects.select_related("card")
         .filter(
+            card__card_pool=PLAYER_CARD_POOL,
             card__lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
             is_latest=True,
             images__isnull=False,
@@ -134,6 +137,7 @@ def _hero_card(comparison_version: CardVersion | None) -> Card | None:
         return comparison_version.card
     return (
         Card.objects.filter(
+            card_pool=PLAYER_CARD_POOL,
             role_assignments__role=HERO_CARD_ROLE,
             lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
             latest_version__images__isnull=False,

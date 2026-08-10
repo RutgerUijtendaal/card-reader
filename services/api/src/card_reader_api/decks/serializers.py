@@ -47,7 +47,14 @@ def deck_summary_payload(
     include_pending_suggestions: bool = False,
     allow_game_master_cards: bool = False,
 ) -> dict[str, object]:
-    validation = DeckService().get_deck_validation(deck)
+    entries = list(deck.entries.all())
+    sideboards = list(deck.sideboards.all())
+    has_restricted_cards = not allow_game_master_cards and _deck_contains_game_master_cards(
+        deck,
+        entries=entries,
+        sideboards=sideboards,
+    )
+    validation = None if has_restricted_cards else DeckService().get_deck_validation(deck)
     totals = DeckService().get_deck_totals(deck)
     return {
         "id": deck.id,
@@ -67,11 +74,11 @@ def deck_summary_payload(
             "total_cards": totals.mainboard_total_cards,
             "unique_cards": totals.mainboard_unique_cards,
         },
-        "sideboard_count": len(list(deck.sideboards.all())),
+        "sideboard_count": len(sideboards),
         "status": {
-            "is_valid": validation.is_valid,
-            "label": validation.status_label,
-            "deprecated_card_count": validation.deprecated_card_count,
+            "is_valid": False if validation is None else validation.is_valid,
+            "label": "In Progress" if validation is None else validation.status_label,
+            "deprecated_card_count": 0 if validation is None else validation.deprecated_card_count,
         },
         "tags": deck_tags_payload(deck),
         "pending_tag_suggestions": pending_deck_tag_suggestions_payload(deck)

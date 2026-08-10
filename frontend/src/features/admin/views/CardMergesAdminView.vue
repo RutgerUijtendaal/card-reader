@@ -7,6 +7,16 @@
       <p class="theme-section-muted text-sm">
         Merge one duplicate card into one canonical card while preserving aliases and version history.
       </p>
+      <label class="mt-3 block max-w-xs space-y-1">
+        <span class="theme-section-title text-sm font-semibold">Card pool</span>
+        <select
+          v-model="selectedPool"
+          class="input-base w-full"
+        >
+          <option value="player">Player</option>
+          <option value="game_master">Game Master</option>
+        </select>
+      </label>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -25,6 +35,7 @@
             <CardSearchSelect
               label="Search source"
               placeholder="Search duplicate card"
+              :card-pool="selectedPool"
               :disabled-card-ids="targetCard ? [targetCard.id] : []"
               disabled-action-label="Target"
               @select="selectSource"
@@ -99,6 +110,7 @@
             <CardSearchSelect
               label="Search target"
               placeholder="Search canonical card"
+              :card-pool="selectedPool"
               :disabled-card-ids="sourceCard ? [sourceCard.id] : []"
               disabled-action-label="Source"
               @select="selectTarget"
@@ -252,6 +264,7 @@ import { cardIsDeprecated } from '@/domain/cards/utils/filters/cardLifecycle';
 import { parseAdminMergeSourceId, parseAdminMergeTargetId } from '@/features/admin/routeState';
 import type { CardMergePreview } from '@/features/admin/types';
 import type { CardListItem } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import { useAdminRouteSync } from '@/features/admin/composables/useAdminRouteSync';
 import { applyCardMerge, previewCardMerge } from '@/features/admin/api/cardMerges';
 
@@ -261,20 +274,27 @@ const sourceCard = ref<CardListItem | null>(null);
 const preview = ref<CardMergePreview | null>(null);
 const previewing = ref(false);
 const applying = ref(false);
+const selectedPool = ref<CardPool>('player');
 
-const canPreview = computed(() => targetCard.value !== null && sourceCard.value !== null);
+const canPreview = computed(() =>
+  targetCard.value !== null
+  && sourceCard.value !== null
+  && targetCard.value.card_pool === sourceCard.value.card_pool,
+);
 
 const selectTarget = (card: CardListItem): void => {
+  selectedPool.value = card.card_pool;
   targetCard.value = card;
-  if (sourceCard.value?.id === card.id) {
+  if (sourceCard.value && (sourceCard.value.id === card.id || sourceCard.value.card_pool !== card.card_pool)) {
     sourceCard.value = null;
   }
   preview.value = null;
 };
 
 const selectSource = (card: CardListItem): void => {
+  selectedPool.value = card.card_pool;
   sourceCard.value = card;
-  if (targetCard.value?.id === card.id) {
+  if (targetCard.value && (targetCard.value.id === card.id || targetCard.value.card_pool !== card.card_pool)) {
     targetCard.value = null;
   }
   preview.value = null;
@@ -350,4 +370,13 @@ const loadPrefilledCards = async (): Promise<void> => {
 
 onMounted(loadPrefilledCards);
 watch(() => route.query, loadPrefilledCards);
+watch(selectedPool, (cardPool) => {
+  if (sourceCard.value?.card_pool !== cardPool) {
+    sourceCard.value = null;
+  }
+  if (targetCard.value?.card_pool !== cardPool) {
+    targetCard.value = null;
+  }
+  preview.value = null;
+});
 </script>

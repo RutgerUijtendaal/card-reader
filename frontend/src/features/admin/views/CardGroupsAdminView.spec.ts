@@ -23,13 +23,13 @@ vi.mock('vue-sonner', () => ({
   },
 }));
 
-const buildCard = (): CardListItem => ({
+const buildCard = (cardPool: CardListItem['card_pool'] = 'player'): CardListItem => ({
   id: 'card-1',
   key: 'card-1',
   result_type: 'card',
   image_url: '/card.png',
   label: 'Card 1',
-  card_pool: 'player' as const, card_roles: [],
+  card_pool: cardPool, card_roles: [],
   template_id: 'template-1',
   version_id: 'version-1',
   version_number: 1,
@@ -52,10 +52,11 @@ const buildCard = (): CardListItem => ({
   types: [],
 });
 
-const buildGroup = (): CardGroupRecord => ({
+const buildGroup = (cardPool: CardGroupRecord['card_pool'] = 'player'): CardGroupRecord => ({
   id: 'group-1',
   key: 'group-1',
   name: 'Group 1',
+  card_pool: cardPool,
   anchor_card_id: '',
   anchor_card_name: 'No anchor',
   member_count: 0,
@@ -103,7 +104,7 @@ describe('CardGroupsAdminView', () => {
     vi.useFakeTimers();
     apiGet.mockImplementation((url: string) => {
       if (url === '/admin/card-groups') {
-        return Promise.resolve({ data: [buildGroup()] });
+        return Promise.resolve({ data: [buildGroup('game_master')] });
       }
       if (url === '/cards') {
         return Promise.resolve({
@@ -113,7 +114,7 @@ describe('CardGroupsAdminView', () => {
             previous_page: null,
             page: 1,
             page_size: 10,
-            results: [buildCard()],
+            results: [buildCard('game_master')],
           },
         });
       }
@@ -149,6 +150,12 @@ describe('CardGroupsAdminView', () => {
 
     expect(mounted.container.textContent).toContain('Position 1');
     expect(mounted.container.querySelector('button[aria-label="Added Card 1"]')).not.toBeNull();
+    expect(apiGet).toHaveBeenCalledWith('/cards', {
+      params: expect.objectContaining({
+        q: 'Card',
+        card_pool: 'game_master',
+      }),
+    });
 
     mounted.unmount();
   });

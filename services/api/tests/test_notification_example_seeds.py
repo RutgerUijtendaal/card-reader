@@ -30,6 +30,19 @@ def test_notification_examples_seed_real_layout_data_idempotently() -> None:
         password="ValidPassword123!",
         is_staff=True,
     )
+    _create_versioned_card(
+        key="0-notification-gm-hero",
+        name="Notification GM Hero",
+        hero=True,
+        with_history=False,
+        card_pool="game_master",
+    )
+    _create_versioned_card(
+        key="0-notification-gm-change",
+        name="Notification GM Change",
+        hero=False,
+        card_pool="game_master",
+    )
     hero, _hero_previous, _hero_current = _create_versioned_card(
         key="z-notification-hero",
         name="Notification Hero",
@@ -101,9 +114,10 @@ def _create_versioned_card(
     name: str,
     hero: bool,
     with_history: bool = True,
+    card_pool: str = "player",
 ) -> tuple[Card, CardVersion | None, CardVersion]:
     template = Template.objects.get(key="mtg-like-v1")
-    card = Card.objects.create(key=key, label=name)
+    card = Card.objects.create(key=key, label=name, card_pool=card_pool)
     if hero:
         CardRoleAssignment.objects.create(card=card, role="hero")
     previous = (

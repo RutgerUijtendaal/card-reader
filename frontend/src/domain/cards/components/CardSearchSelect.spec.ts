@@ -140,4 +140,19 @@ describe('CardSearchSelect', () => {
 
     mounted.unmount();
   });
+
+  test('passes the selected card pool to the cards API', async () => {
+    const mounted = await mountSearch({ cardPool: 'game_master' });
+
+    await typeSearch(mounted.input(), 'Event');
+
+    expect(mockedGet).toHaveBeenCalledWith('/cards', {
+      params: expect.objectContaining({
+        q: 'Event',
+        card_pool: 'game_master',
+      }),
+    });
+
+    mounted.unmount();
+  });
 });
