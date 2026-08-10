@@ -110,6 +110,7 @@ const buildCard = (id: string, name: string, imageUrl: string | null = null) => 
   image_url: imageUrl,
   name,
   card_pool: 'player' as const, card_roles: [],
+  lifecycle_status: 'active' as const,
   template_id: 'template',
   version_id: `${id}-version`,
   version_number: 1,
