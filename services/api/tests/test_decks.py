@@ -3218,7 +3218,10 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     reclassified.card_pool = "game_master"
     reclassified.lifecycle_status = "deprecated"
     reclassified.deck_building_config_json = {
-        "overrides": {"mainboard_copy_limit": {"max": 73}},
+        "overrides": {
+            "mainboard_copy_limit": {"max": 73},
+            "mainboard_card_count": {"max": 0, "blocks_action": True},
+        },
     }
     reclassified.save(update_fields=["card_pool", "lifecycle_status", "deck_building_config_json"])
     CardRoleAssignment.objects.create(card=reclassified, role="event")

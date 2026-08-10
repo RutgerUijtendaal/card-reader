@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from card_reader_core.models import HERO_CARD_ROLE, Card, Deck, card_has_role
+from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, HERO_CARD_ROLE, Card, Deck, card_has_role
 from card_reader_core.repositories.decks import get_cards_by_ids, get_deck_card
 
 from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
@@ -116,9 +116,17 @@ class DeckPayloadNormalizer:
             hero_card=hero_card,
             cards_by_id=sideboard_cards_by_id,
         )
+        constraint_hero = (
+            hero_card if PLAYER_CARD_POOL_SCOPE.allows_card_pool(hero_card.card_pool) else None
+        )
+        constraint_entries = [
+            entry
+            for entry in [*mainboard_constraint_entries, *sideboard_constraint_entries]
+            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+        ]
         evaluation = DeckConstraintEvaluator().evaluate(
-            hero_card=hero_card,
-            entries=[*mainboard_constraint_entries, *sideboard_constraint_entries],
+            hero_card=constraint_hero,
+            entries=constraint_entries,
         )
         if evaluation.blocking_violations:
             raise ValueError(evaluation.blocking_violations[0].message)
