@@ -138,7 +138,7 @@ class DeckTtsExportView(APIView):
 
     def get(self, request: Request, deck_id: str) -> HttpResponse | Response:
         viewer_id = _user_id(request) if is_authenticated(request.user) else None
-        deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
+        deck = DeckService().get_visible_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return not_found("Deck not found")
         sideboard_id = request.query_params.get("sideboard_id")
