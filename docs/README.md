@@ -29,3 +29,11 @@ The approved card-pool and multi-role work is split into four dependency-ordered
 2. [Card classification Step 1.1: Authorization seam](card-classification-step-1-1-authorization-seam.md) consolidates user entitlement into an explicit core card-pool scope across queries, payloads, derived state, notifications, images, and published artifacts before the surface grows.
 3. [Card classification Step 2: Import inference](card-classification-step-2-import-inference.md) adds explicit batch pools, automatic template/tag role inference, batch overrides, immutable job snapshots, and existing-card mismatch warnings.
 4. [Card classification Step 3: Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md) adds the staff-only Game Master sidenav context, route and collection scoping, workspace-aware navigation, and the final authorization audit.
+
+### Classification delivery model
+
+- `feature/card-classification` is the umbrella integration branch. Its aggregate pull request targets `master` and remains open so CI and review can evaluate the complete feature as it grows.
+- Each checkpoint is implemented on its own branch with a pull request targeting `feature/card-classification`, not `master`.
+- Merge checkpoint pull requests into the umbrella branch in dependency order. Create the next checkpoint branch from the updated umbrella branch so its diff contains only that checkpoint.
+- CI and automatic review must run on both checkpoint and aggregate pull requests. Do not retarget a checkpoint pull request merely to trigger them.
+- Merge the umbrella pull request to `master` only after all four checkpoint acceptance criteria pass and the aggregate review is clear.

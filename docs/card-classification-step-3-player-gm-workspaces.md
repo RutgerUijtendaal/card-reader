@@ -20,6 +20,8 @@ The active workspace scopes navigation and card collections so Player and Game M
 - Ordinary card collections are hard-scoped to one pool. An `all pools` option is reserved for explicit staff management tools and must not become a normal workspace.
 - Hero is excluded by default in each workspace. Boon and Event are not globally excluded.
 - Cross-pool links do not automatically change the active workspace. A linked Player Hero opened from a Game Master card is visibly labeled Player, while Back/return navigation preserves the Game Master workspace.
+- Relationship management treats the relationship anchor/target pool and the member-search pool as separate concepts. Staff must be able to select either pool for each member search without reclassifying the group, its anchor, or existing members.
+- Relationship routes use the target or anchor pool supplied by the relationship payload. They must not infer that pool from the source card, the current workspace, or a stale selected-card version.
 - Treat every deck supported by the current deck builder as a **Player deck**. A later deck-design project is expected to add an explicit Player/Game Master classification to stable deck identities, but this workspace step must not infer that classification from a deck's cards or force Game Master decks into the current hero/mainboard/sideboard model.
 - Playtester remains Player-only. It is hidden from Game Master navigation and must accept only explicitly Player-classified decks once deck classification exists.
 - A future **Scenario** is a higher-level composition, not a mixed-pool deck: it may group one or more Player decks with Game Master Boons, Events, and other scenario material. This step must preserve that direction without introducing a scenario schema prematurely.
@@ -134,9 +136,18 @@ For any existing or future relationship serializer:
 
 - authorize the target card independently;
 - include the target's `card_pool` and `card_roles`;
+- include the relationship anchor/target pool needed to construct a direct route without borrowing the source card's pool;
 - display a pool badge when the target differs from the active workspace;
 - preserve the originating return route/workspace;
 - never expose an unauthorized Game Master target through a Player/public relationship payload.
+
+For staff relationship editors and selectors:
+
+- expose an explicit search-pool control for each lookup operation;
+- allow members from either pool regardless of the existing anchor pool;
+- discard stale lookup results when the search pool changes;
+- preserve each member's pool in the editor payload so changing the anchor updates the relationship's route pool correctly;
+- refresh or reconcile relationship summaries after a card changes pool so stale chips cannot construct an invalid route.
 
 This step does not create a new link model. It establishes behavior for relationships that already exist or are added later.
 
@@ -196,6 +207,9 @@ Add or update tests covering:
 - deck builder and Playtester remaining Player-scoped;
 - import pool prefill without removing explicit confirmation;
 - direct cross-pool links preserving the originating workspace;
+- relationship links using the target/anchor pool instead of the source card or workspace pool;
+- staff adding members from either pool to an existing relationship and changing the anchor across pools;
+- stale relationship summaries being removed or refreshed after a card pool edit;
 - unauthorized Game Master list requests returning `403`;
 - unauthorized Game Master object/image access returning `404`;
 - staff access to all corresponding surfaces.
@@ -213,6 +227,7 @@ Do not run prohibited service/integration suites. Run affected permitted fronten
 - Imports visibly prefill the current workspace while retaining explicit pool confirmation.
 - Staff tools remain reachable from either workspace.
 - Direct cross-pool relationships render with pool context and no unauthorized data leak.
+- Staff relationship editors can add and anchor cards across pools without an implicit same-pool restriction.
 - Changing the future Game Master access audience requires a centralized policy change, not data migration.
 - Light/dark, expanded/collapsed desktop, and mobile navigation are verified.
 - Lint, typecheck, Django checks, affected permitted tests, and documentation validation pass.
