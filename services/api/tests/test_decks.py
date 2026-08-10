@@ -3204,6 +3204,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     owner = _create_user("gm-deck-owner", "password")
     staff = _create_user("gm-deck-staff", "password", is_staff=True)
     hero = _create_card(name="GM Deck Player Hero", hero=True)
+    replacement_hero = _create_card(name="GM Deck Replacement Hero", hero=True)
     reclassified = _create_card(name="Secret Reclassified Event", hero=False)
     deck = DeckService().create_owner_deck(
         owner_id=str(owner.id),
@@ -3260,6 +3261,17 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert round_trip_response.status_code == 200
     assert round_trip_response.json()["name"] == "Renamed Reclassified Deck"
     assert round_trip_response.json()["mainboard"]["entries"][0]["card"]["id"] == restricted_card["id"]
+    hero_update_response = owner_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "hero_card_id": replacement_hero.id,
+            "entries": [{"card_id": restricted_card["id"], "quantity": 1}],
+        },
+        content_type="application/json",
+    )
+    assert hero_update_response.status_code == 200
+    assert hero_update_response.json()["hero_card"]["id"] == replacement_hero.id
+    assert hero_update_response.json()["mainboard"]["entries"][0]["card"]["id"] == restricted_card["id"]
     owner_search_response = owner_client.get(
         "/my/decks",
         {"view": "summary", "q": "Secret Reclassified Event"},
@@ -3284,6 +3296,31 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
         "Secret Reclassified Event"
     )
     assert staff_response.json()["deck_building_rules"]["mainboard_copy_limit"]["max"] == 73
+    staff_move_response = staff_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "entries": [{"card_id": reclassified.id, "quantity": 1}],
+            "sideboards": [
+                {
+                    "name": "Moved restricted card",
+                    "entries": [{"card_id": reclassified.id, "quantity": 1}],
+                }
+            ],
+        },
+        content_type="application/json",
+    )
+    assert staff_move_response.status_code == 400
+    staff_round_trip_response = staff_client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "name": "Staff Renamed Reclassified Deck",
+            "entries": [{"card_id": reclassified.id, "quantity": 1}],
+        },
+        content_type="application/json",
+    )
+    assert staff_round_trip_response.status_code == 200
+    assert staff_round_trip_response.json()["name"] == "Staff Renamed Reclassified Deck"
+    assert staff_round_trip_response.json()["mainboard"]["entries"][0]["card"]["id"] == reclassified.id
     owner.is_staff = True
     owner.save(update_fields=["is_staff"])
     staff_owner_client = Client(HTTP_HOST="localhost")

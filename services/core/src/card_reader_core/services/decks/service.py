@@ -514,10 +514,14 @@ class DeckService:
             updates.update_hero_card_id or updates.update_entries or updates.update_sideboards
         )
         if updates_card_references:
-            hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_payload(
+            hero_card, normalized_entries, normalized_sideboards = self._normalizer.normalize_deck_update(
+                existing_deck=existing_deck,
                 hero_card_id=effective_hero_card_id,
                 entries=effective_entries,
                 sideboards=effective_sideboards,
+                update_hero_card_id=updates.update_hero_card_id,
+                update_entries=updates.update_entries,
+                update_sideboards=updates.update_sideboards,
             )
         else:
             hero_card = existing_deck.hero_card

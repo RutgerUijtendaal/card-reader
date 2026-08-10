@@ -19,7 +19,7 @@ from card_reader_api.decks.serializers import (
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
-from card_reader_core.models import CardPoolScope, Deck
+from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, CardPoolScope, Deck
 from card_reader_core.services.decks import (
     DeckCreationDeletedError,
     DeckEntryInput,
@@ -56,7 +56,7 @@ def _discard_unchanged_restricted_deck_references(
     deck: Deck,
     card_pool_scope: CardPoolScope,
 ) -> None:
-    if not deck_uses_out_of_scope_card(deck, card_pool_scope):
+    if not deck_uses_out_of_scope_card(deck, PLAYER_CARD_POOL_SCOPE):
         return
 
     expected_hero_id = deck_card_reference_id(deck.hero_card, card_pool_scope=card_pool_scope)
