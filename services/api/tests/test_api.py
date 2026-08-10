@@ -869,6 +869,20 @@ def test_game_master_card_images_are_hidden_from_non_staff_across_all_routes() -
             response.close()
 
 
+def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:
+    player_card, _player_version = _create_editable_card_version(name="Visible Player Card")
+    game_master_card, game_master_version = _create_editable_card_version(
+        name="Restricted Game Master Version"
+    )
+    _create_card_image(game_master_version)
+    game_master_card.card_pool = "game_master"
+    game_master_card.save(update_fields=["card_pool"])
+    mismatched_path = f"/cards/{player_card.id}/versions/{game_master_version.id}/image"
+
+    assert Client(HTTP_HOST="localhost").get(mismatched_path).status_code == 404
+    assert _staff_client("mismatched-version-image-staff").get(mismatched_path).status_code == 404
+
+
 def test_shared_immutable_image_remains_public_when_any_owning_card_is_player() -> None:
     player_card, player_version = _create_editable_card_version(name="Shared Player Image")
     player_image = _create_card_image(player_version)

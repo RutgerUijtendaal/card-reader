@@ -49,7 +49,9 @@ Persist the preference with the existing VueUse/local-storage conventions. On in
 3. Otherwise use the last permitted preference.
 4. Fall back to Player.
 
-When authentication or capability changes remove Game Master access, synchronously switch to Player, replace any Game Master route/query state, clear disallowed cached collection data, and only then issue new requests. Logging out from Game Master context must never leave a flash of protected data.
+When authentication or capability changes remove Game Master access, synchronously increment a session/workspace request generation, switch to Player, replace any Game Master route/query state, clear disallowed cached collection data, and only then issue new requests. Logging out from Game Master context must never leave a flash of protected data.
+
+Every asynchronous card-derived request captures the current generation, requested pool, session identity, and capability state. Before committing data, errors, pagination, or loading state, it verifies that all captured values are still current and that the pool remains permitted. `AbortController` cancellation may reduce wasted work, but cancellation alone is not the boundary because a response can win the race. A late Game Master response after logout, staff removal, or session refresh is discarded and cannot repopulate a store or rendered view.
 
 Use the existing route filter/query infrastructure. `card_pool` remains shareable in card-gallery URLs; direct card detail routes derive the card's actual pool after loading and preserve the caller's explicit return location.
 
@@ -97,7 +99,7 @@ Apply the active pool explicitly to every relevant frontend request:
 
 Player deck, deck-builder, and Playtester requests always send `card_pool=player`, even if a staff user has Game Master as the shell workspace. If those routes are not offered in Game Master navigation but are reached directly, keep their Player classification explicit and show the Player workspace or route back to a safe Game Master page according to the route guard. Once decks have their own explicit pool, Playtester must reject or omit Game Master decks independently of the cards currently embedded in them.
 
-On a workspace switch, discard the outgoing collection result before fetching the incoming pool. Do not show stale Player cards under a Game Master heading or vice versa.
+On a workspace switch, increment the request generation and discard the outgoing collection result before fetching the incoming pool. Every response must pass the generation/pool/capability guard before it may mutate state. Do not show stale Player cards under a Game Master heading or vice versa.
 
 Gallery defaults in each pool:
 
@@ -198,10 +200,11 @@ Add or update tests covering:
 - permitted Game Master preference restoration;
 - invalid/disallowed stored values falling back to Player;
 - logout, staff removal, or session refresh while Game Master is active;
+- a deferred Game Master response resolving after access loss and being rejected before it can mutate data, error, pagination, or loading state;
 - desktop, collapsed, and mobile toggle behavior;
 - workspace-specific nav item composition;
 - safe landing routes and route-query synchronization;
-- clearing stale collections during a switch;
+- clearing stale collections during a switch and rejecting responses from the previous request generation;
 - gallery Hero-excluded defaults in both pools;
 - every collection request carrying an explicit pool;
 - deck builder and Playtester remaining Player-scoped;
@@ -221,6 +224,7 @@ Do not run prohibited service/integration suites. Run affected permitted fronten
 - Player/Game Master is the primary sidenav context on desktop and mobile.
 - The Game Master option is visible only through the named capability.
 - Player is the safe default and automatic fallback after access loss.
+- In-flight Game Master responses cannot repopulate frontend state after the session loses access.
 - Normal galleries never mix pools.
 - Hero is excluded by default in both workspaces.
 - Player deck building and Playtester never admit Game Master cards.

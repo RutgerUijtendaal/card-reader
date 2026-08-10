@@ -40,6 +40,16 @@ The step succeeds when `Card.is_hero` is no longer a persisted or writable sourc
 
 Migration completion is authoritative for schema/data conversion. Frontend state or cached responses must not be treated as evidence that the migration succeeded.
 
+## Implemented security boundaries
+
+The foundation implementation closes three derived-data paths that require stronger guarantees than checking the requested card alone:
+
+- A historical image route verifies that the requested `CardVersion` belongs to the requested and authorized `Card` before serving bytes. Supplying a visible Player `card_id` with another card's Game Master `version_id` returns `404` for staff and non-staff callers.
+- Public TTS sheets allocate and render Player cards only. Moving an already allocated Player card to Game Master changes the sheet fingerprint, makes the old atlas unavailable immediately, and rerenders the append-only slot without the restricted artwork before the sheet can be served again.
+- Developer-data selection and export are permanently Player-scoped under the current public-artifact contract. Include-all selection omits Game Master cards, while an explicit Game Master card or cross-pool group selection fails validation instead of producing a mixed-audience archive.
+
+These are artifact/data-scope rules, not copies of the current staff entitlement policy. Step 1.1 replaces their local pool vocabulary with the shared scope seam without weakening the behavior.
+
 ## Data model
 
 Implement the schema in `services/core/src/card_reader_core/models` and a new core migration.
@@ -222,8 +232,10 @@ Add or update tests covering:
 - any/all/include/exclude role query semantics;
 - Player default query scope;
 - staff access and non-staff denial/404 behavior for every Game Master surface and asset path;
+- nested historical image ownership, including a visible Player `card_id` paired with another card's Game Master `version_id`;
+- Player-only TTS allocation plus immediate stale-atlas denial and safe rerender after Player-to-Game-Master reclassification;
 - Hero deck validation and selection through the role helper;
-- developer-data Version 1 adoption, Version 2 round trips, format rejection, role/pool coverage, and generated-lock compatibility;
+- developer-data Version 1 adoption, Version 2 round trips, format rejection, role/pool coverage, generated-lock compatibility, include-all exclusion of Game Master cards, and rejection of explicit restricted selections;
 - Card-tab edits, including multiple roles and Standard;
 - Admin Catalog linked-card and suggestion-occurrence payloads and visible pool/role badges;
 - gallery route/request serialization and Hero-excluded default;
@@ -257,6 +269,8 @@ Use `scripts/run-in-agent-env.py` for ad hoc Python checks as directed by `AGENT
 - Gallery filters can select/exclude Standard and each role; Hero is excluded by default.
 - Admin Catalog linked cards and suggestion occurrences visibly identify their pool and every role, using Standard for an empty role set.
 - Non-staff cannot list, retrieve, infer the existence of, or load images for Game Master cards.
+- Nested version-image routes cannot authorize one card while serving a version owned by another card.
+- Public TTS sheets and developer-data bundles contain Player cards only, including after card-pool transitions.
 - Staff can explicitly query and edit Game Master cards.
 - Developer-data Version 2 round-trips pool and roles, while the pinned Version 1 bundle remains adoptable through the explicit compatibility adapter.
 - No same-pool or mutually-exclusive-role database constraint has been introduced.
