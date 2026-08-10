@@ -10,6 +10,7 @@ from card_reader_core.models import (
     Symbol,
     Tag,
     Type,
+    card_role_keys,
     now_utc,
 )
 from card_reader_core.repositories.cards import decode_field_sources
@@ -487,6 +488,8 @@ class CatalogService:
                     "image_url": self._image_url(card.id, card_version.id, image),
                     "source_text": occurrence.source_text,
                     "normalized_source_text": occurrence.normalized_source_text,
+                    "card_pool": card.card_pool,
+                    "card_roles": list(card_role_keys(card)),
                 }
             )
         return {
@@ -552,6 +555,8 @@ class CatalogService:
                     "card_version_id": version.id,
                     "card_version_name": version.name,
                     "image_url": self._image_url(version.card.id, version.id, image),
+                    "card_pool": version.card.card_pool,
+                    "card_roles": list(card_role_keys(version.card)),
                 }
             )
         return previews, linked_card_count

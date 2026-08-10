@@ -29,7 +29,7 @@
           :title-to="deckPath(deck)"
         />
         <div class="theme-muted flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs">
-          <span v-if="deck.card_reference.is_hero">Includes as hero</span>
+          <span v-if="deck.card_reference.as_hero">Includes as hero</span>
           <span v-if="deck.card_reference.mainboard_quantity > 0">Mainboard x{{ deck.card_reference.mainboard_quantity }}</span>
           <span v-if="deck.card_reference.sideboard_quantity > 0">Sideboard x{{ deck.card_reference.sideboard_quantity }}</span>
         </div>

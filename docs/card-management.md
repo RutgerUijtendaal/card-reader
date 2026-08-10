@@ -10,6 +10,14 @@ Each card points to its current version, while older versions remain available f
 
 Content versions provide an additional history boundary for related changes made during import and editing workflows. The UI exposes this history through card detail and generation views.
 
+## Pool and roles
+
+Every stable card identity belongs to either the **Player** or **Game Master** pool. A card can also hold any combination of the code-owned Hero, Boon, and Event roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
+
+Staff edit both dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. The Admin Catalog shows the pool plus every assigned role, or Standard, on linked-card and suggestion tiles.
+
+Card collections accept a pool plus role inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Game Master cards; automatic import classification and workspace-level navigation are separate workflows.
+
 ## Metadata and aliases
 
 Card versions connect parsed content to managed catalogs such as card types, keywords, tags, symbols, and metadata groups. These relationships power filtering, display, rules text, and deck-building behavior.
@@ -31,7 +39,7 @@ Cards have an explicit lifecycle state:
 - Active cards appear by default in gallery, public group views, catalog previews, exports, deck building, and Playtester selection.
 - Deprecated cards remain directly retrievable and available in explicit management queries, but are hidden from ordinary browsing and selection.
 
-Deprecating a card does not silently remove it from existing decks or groups. Those relationships remain visible so owners can resolve them deliberately. Deck validation and management views surface the resulting warnings or invalid state.
+Deprecating or reclassifying a card does not silently remove it from existing decks or groups. Those relationships remain visible so owners can resolve them deliberately. Deck validation and management views surface the resulting warnings or invalid state, while restricted Game Master card content is redacted from non-staff embedded deck payloads.
 
 ## Card groups
 

@@ -5,6 +5,10 @@ import { buildCardFilterApiPayload, buildCardFilterApiSearchParams } from './car
 const selection: CardFilterSelectionState = {
   query: '',
   lifecycleStatus: 'deprecated',
+  cardPool: 'player',
+  cardRoleMatch: 'any',
+  cardRoleIds: [],
+  cardRoleExcludeIds: ['hero'],
   keywordMatch: 'all',
   tagMatch: 'all',
   typeMatch: 'any',
@@ -39,6 +43,8 @@ describe('cardFilterRequest', () => {
     const payload = buildCardFilterApiPayload(selection);
 
     expect(params.get('lifecycle_status')).toBe('deprecated');
+    expect(params.get('card_pool')).toBe('player');
+    expect(params.getAll('card_role_exclude')).toEqual(['hero']);
     expect(params.getAll('keyword_ids')).toEqual(['kw-1']);
     expect(params.get('keyword_match')).toBe('all');
     expect(params.getAll('tag_ids')).toEqual(['tag-1']);

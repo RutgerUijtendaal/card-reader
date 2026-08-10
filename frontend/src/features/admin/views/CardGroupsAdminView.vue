@@ -79,6 +79,20 @@
 
           <label class="block">
             <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
+              Search pool
+            </span>
+            <select
+              v-model="pickerCardPool"
+              class="input-base w-full"
+              :disabled="!editor"
+            >
+              <option value="player">Player</option>
+              <option value="game_master">Game Master</option>
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="theme-kicker mb-1 block text-xs font-medium uppercase tracking-[0.16em]">
               Search cards
             </span>
             <input
@@ -306,6 +320,7 @@ import { fetchCards } from '@/domain/cards/api';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/features/admin/types';
 import {
   createManagedCardGroup,
@@ -318,6 +333,8 @@ import type { CardGroupWritePayload } from '@/features/admin/api/cardGroups';
 type CardGroupEditor = {
   id: string | null;
   name: string;
+  anchor_card_pool: CardPool;
+  picker_card_pool: CardPool;
   anchor_card_id: string;
   members: CardGroupMemberRecord[];
 };
@@ -331,6 +348,18 @@ const pickerQuery = ref('');
 const pickerResults = ref<CardListItem[]>([]);
 const errorMessage = ref('');
 const dragIndex = ref<number | null>(null);
+let pickerSearchGeneration = 0;
+const pickerCardPool = computed<CardPool>({
+  get: () => editor.value?.picker_card_pool ?? 'player',
+  set: (cardPool) => {
+    if (!editor.value) {
+      return;
+    }
+    editor.value.picker_card_pool = cardPool;
+    pickerSearchGeneration += 1;
+    pickerResults.value = [];
+  },
+});
 
 const filteredGroups = computed(() => {
   const query = listSearch.value.trim().toLowerCase();
@@ -360,10 +389,14 @@ const loadGroups = async (): Promise<void> => {
 };
 
 const applyEditor = (group: CardGroupRecord): void => {
+  pickerSearchGeneration += 1;
+  pickerResults.value = [];
   selectedGroupId.value = group.id;
   editor.value = {
     id: group.id,
     name: group.name,
+    anchor_card_pool: group.card_pool,
+    picker_card_pool: group.card_pool,
     anchor_card_id: group.anchor_card_id,
     members: group.members.map((member) => ({ ...member })),
   };
@@ -380,10 +413,13 @@ const selectGroup = (groupId: string): void => {
 };
 
 const startCreate = (): void => {
+  pickerSearchGeneration += 1;
   selectedGroupId.value = null;
   editor.value = {
     id: null,
     name: '',
+    anchor_card_pool: 'player',
+    picker_card_pool: 'player',
     anchor_card_id: '',
     members: [],
   };
@@ -405,14 +441,25 @@ const resetEditor = (): void => {
 const searchCards = async (): Promise<void> => {
   const query = pickerQuery.value.trim();
   if (!editor.value || !query) {
+    pickerSearchGeneration += 1;
     pickerResults.value = [];
     return;
   }
+  const searchGeneration = ++pickerSearchGeneration;
+  const cardPool = editor.value.picker_card_pool;
   const response = await fetchCards<CardListItem>({
     q: query,
+    card_pool: cardPool,
     ...managementCardSearchLifecycleParams(),
     page_size: 10,
   });
+  if (
+    searchGeneration !== pickerSearchGeneration
+    || editor.value?.picker_card_pool !== cardPool
+    || pickerQuery.value.trim() !== query
+  ) {
+    return;
+  }
   pickerResults.value = response.results.filter((row) => row.result_type === 'card');
 };
 
@@ -440,12 +487,14 @@ const addMember = (card: CardListItem): void => {
     card_id: card.id,
     card_label: card.label,
     card_name: card.name,
+    card_pool: card.card_pool,
     position: editor.value.members.length + 1,
     is_anchor: editor.value.anchor_card_id === card.id,
     image_url: card.image_url,
   });
   if (!editor.value.anchor_card_id) {
     editor.value.anchor_card_id = card.id;
+    editor.value.anchor_card_pool = card.card_pool;
   }
   normalizeEditor();
 };
@@ -454,7 +503,12 @@ const setAnchor = (cardId: string): void => {
   if (!editor.value) {
     return;
   }
+  const anchorMember = editor.value.members.find((member) => member.card_id === cardId);
+  if (!anchorMember) {
+    return;
+  }
   editor.value.anchor_card_id = cardId;
+  editor.value.anchor_card_pool = anchorMember.card_pool;
   normalizeEditor();
 };
 
@@ -487,6 +541,9 @@ const normalizeEditor = (): void => {
   }
   const anchorId = editor.value.anchor_card_id;
   const anchorMember = editor.value.members.find((member) => member.card_id === anchorId) ?? null;
+  if (anchorMember) {
+    editor.value.anchor_card_pool = anchorMember.card_pool;
+  }
   const otherMembers = editor.value.members.filter((member) => member.card_id !== anchorId);
   const orderedMembers = anchorMember ? [anchorMember, ...otherMembers] : otherMembers;
   editor.value.members = orderedMembers.map((member, index) => ({
@@ -566,7 +623,10 @@ const openPublicView = (): void => {
   if (!editor.value?.id) {
     return;
   }
-  void router.push(`/card-groups/${editor.value.id}`);
+  void router.push({
+    path: `/card-groups/${editor.value.id}`,
+    query: editor.value.anchor_card_pool === 'game_master' ? { card_pool: 'game_master' } : {},
+  });
 };
 
 const onDragStart = (index: number): void => {
@@ -592,6 +652,13 @@ onMounted(() => {
 
 watch(
   pickerQuery,
+  () => {
+    debouncedSearchCards();
+  },
+);
+
+watch(
+  pickerCardPool,
   () => {
     debouncedSearchCards();
   },

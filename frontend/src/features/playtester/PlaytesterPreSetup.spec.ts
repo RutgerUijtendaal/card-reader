@@ -80,6 +80,8 @@ const buildDeck = (id: string, name: string, heroName: string, owner = 'owner') 
     id: `${id}-hero`,
     key: `${id}-hero`,
     label: heroName,
+    card_pool: 'player' as const,
+    card_roles: ['hero' as const],
     result_type: 'card' as const,
     image_url: null,
     name: heroName,
@@ -106,7 +108,7 @@ const buildCard = (id: string, name: string, imageUrl: string | null = null) => 
   result_type: 'card' as const,
   image_url: imageUrl,
   name,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   template_id: 'template',
   version_id: `${id}-version`,
   version_number: 1,
@@ -131,7 +133,7 @@ const buildCard = (id: string, name: string, imageUrl: string | null = null) => 
 const buildDeckDetail = (id: string, name: string, heroName: string, owner = 'owner') => {
   const heroCard = {
     ...buildCard(`${id}-hero`, heroName),
-    is_hero: true,
+    card_pool: 'player' as const, card_roles: ['hero' as const],
     type_line: 'Hero',
   };
   return {

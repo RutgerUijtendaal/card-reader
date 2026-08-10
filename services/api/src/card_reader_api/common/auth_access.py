@@ -13,6 +13,11 @@ def can_access_admin(user: Any) -> bool:
     return is_authenticated(user) and bool(getattr(user, "is_staff", False))
 
 
+def can_access_game_master_cards(user: Any) -> bool:
+    """Central policy seam for the restricted Game Master card pool."""
+    return can_access_admin(user)
+
+
 def can_access_authenticated_features(user: Any) -> bool:
     return is_authenticated(user)
 
@@ -41,6 +46,7 @@ def capability_payload(user: Any) -> dict[str, bool]:
     return {
         "can_access_authenticated_features": can_access_authenticated_features(user),
         "can_access_admin": can_access_admin(user),
+        "can_access_game_master_cards": can_access_game_master_cards(user),
         "can_manage_users": can_manage_users(user),
         "can_access_maintenance": can_access_maintenance(user),
         "can_download_developer_data": can_download_developer_data(user),

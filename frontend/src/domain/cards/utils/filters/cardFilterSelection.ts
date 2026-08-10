@@ -82,6 +82,10 @@ export const buildCardFilterSelectionState = (
   return normalizeCardFilterSelectionState({
     query: state.query,
     lifecycleStatus: state.lifecycleStatus,
+    cardPool: state.cardPool,
+    cardRoleMatch: state.cardRoleMatch,
+    cardRoleIds: state.cardRoleKeys,
+    cardRoleExcludeIds: state.cardRoleExcludeKeys,
     keywordMatch: state.keywordMatch,
     tagMatch: state.tagMatch,
     typeMatch: state.typeMatch,
@@ -138,6 +142,10 @@ export const buildCardFilterStateFromSelection = (
   normalizeCardFilterState({
     query: state.query,
     lifecycleStatus: state.lifecycleStatus,
+    cardPool: state.cardPool,
+    cardRoleMatch: state.cardRoleMatch,
+    cardRoleKeys: state.cardRoleIds,
+    cardRoleExcludeKeys: state.cardRoleExcludeIds,
     keywordMatch: state.keywordMatch,
     tagMatch: state.tagMatch,
     typeMatch: state.typeMatch,

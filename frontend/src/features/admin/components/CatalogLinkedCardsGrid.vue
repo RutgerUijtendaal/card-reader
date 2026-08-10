@@ -27,6 +27,23 @@
           No image
         </div>
       </div>
+      <div class="space-y-2 p-2.5">
+        <p class="theme-section-title truncate text-xs font-semibold">
+          {{ card.card_version_name || card.card_label }}
+        </p>
+        <div class="flex flex-wrap gap-1">
+          <span class="theme-pill theme-pill-accent px-2 py-0.5 text-[10px] font-semibold">
+            {{ card.card_pool === 'game_master' ? 'Game Master' : 'Player' }}
+          </span>
+          <span
+            v-for="role in displayRoles(card.card_roles)"
+            :key="role"
+            class="theme-pill theme-pill-neutral px-2 py-0.5 text-[10px] font-semibold"
+          >
+            {{ role }}
+          </span>
+        </div>
+      </div>
     </RouterLink>
   </div>
 
@@ -64,6 +81,7 @@ import { useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { buildAdminCardDetailLocation } from '@/features/admin/routeState';
 import type { LinkedCardPreview } from '@/features/admin/types';
+import type { CardRole } from '@/domain/cards/types/cardModels';
 
 defineProps<{
   cards: LinkedCardPreview[];
@@ -85,6 +103,13 @@ const hoverPreviewX = computed(() => floating.x.value ?? 0);
 const hoverPreviewY = computed(() => floating.y.value ?? 0);
 
 const detailLocation = (cardId: string) => buildAdminCardDetailLocation(cardId, route.query);
+const roleLabels: Record<CardRole, string> = {
+  hero: 'Hero',
+  boon: 'Boon',
+  event: 'Event',
+};
+const displayRoles = (roles: CardRole[]): string[] =>
+  roles.length > 0 ? roles.map((role) => roleLabels[role]) : ['Standard'];
 
 const showHoverPreview = (card: LinkedCardPreview, event: MouseEvent): void => {
   if (!card.image_url) {

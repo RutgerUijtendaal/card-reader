@@ -2,11 +2,13 @@ import type { MetadataOption, SymbolFilterOption } from '@/domain/cards/types';
 import type { CardLifecycleFilterValue } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { MetadataFavoriteGroup } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';
 import type { TriStateSelection } from '@/domain/cards/utils/filters/triStateSelection';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 
 export type MatchMode = 'any' | 'all';
 export type LifecycleFilterValue = CardLifecycleFilterValue;
 export type SymbolFilterTriState = TriStateSelection;
 export type CardFilterSectionKey =
+  | 'classification'
   | 'mana'
   | 'types'
   | 'affinity'
@@ -16,6 +18,17 @@ export type CardFilterSectionKey =
   | 'tags';
 
 export type CardFilterSectionsState = {
+  cardPool: CardPool;
+  onUpdateCardPool: (value: CardPool) => void;
+  cardPoolOptions: MetadataOption[];
+  selectedCardRoles: string[];
+  onUpdateSelectedCardRoles: (value: string[]) => void;
+  excludedCardRoles: string[];
+  onUpdateExcludedCardRoles: (value: string[]) => void;
+  cardRoleMatch: MatchMode;
+  onUpdateCardRoleMatch: (value: MatchMode) => void;
+  cardRoleOptions: MetadataOption[];
+  resetClassificationGroup: () => void;
   selectedManaTypeSymbolIds: string[];
   lifecycleStatus: LifecycleFilterValue;
   onUpdateLifecycleStatus: (value: LifecycleFilterValue) => void;

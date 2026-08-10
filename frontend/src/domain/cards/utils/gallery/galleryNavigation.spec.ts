@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildCardDetailLocation,
+  buildCardGroupDetailLocation,
   buildGalleryItemLocation,
   buildGalleryLocation,
   getGallerySnapshot,
@@ -47,6 +48,25 @@ describe('galleryNavigation', () => {
       query: {
         q: 'weapon',
       },
+    });
+  });
+
+  test('uses the card pool as the authority for direct group detail links', () => {
+    expect(
+      buildCardGroupDetailLocation('group-123', {}, 'game_master'),
+    ).toEqual({
+      path: '/card-groups/group-123',
+      query: { card_pool: 'game_master' },
+    });
+    expect(
+      buildCardGroupDetailLocation(
+        'group-123',
+        { card_pool: 'game_master' },
+        'player',
+      ),
+    ).toEqual({
+      path: '/card-groups/group-123',
+      query: {},
     });
   });
 

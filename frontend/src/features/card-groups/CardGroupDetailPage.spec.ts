@@ -70,7 +70,7 @@ const buildCard = (id: string, name: string): CardVersionDetail => ({
   id,
   key: id,
   label: name,
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   deck_building_config: {},
   lifecycle_status: 'active',
   template_id: 'template-1',
@@ -139,7 +139,7 @@ const buildCard = (id: string, name: string): CardVersionDetail => ({
 const deckReference = {
   id: 'deck-1',
   card_reference: {
-    is_hero: true,
+      as_hero: true,
     mainboard_quantity: 0,
     sideboard_quantity: 0,
   },
@@ -231,6 +231,26 @@ describe('CardGroupDetailPage', () => {
 
     expect(apiGet).toHaveBeenCalledWith('/card-groups/group-1', {
       params: { lifecycle_status: 'all' },
+    });
+
+    mounted.unmount();
+  });
+
+  test('passes the Game Master pool through to group detail request', async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/card-groups/group-1') {
+        return Promise.resolve({ data: buildGroup() });
+      }
+      if (url === '/cards/filters') {
+        return Promise.resolve({ data: filters });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    const mounted = await mountView('/card-groups/group-1?card_pool=game_master');
+
+    expect(apiGet).toHaveBeenCalledWith('/card-groups/group-1', {
+      params: { card_pool: 'game_master' },
     });
 
     mounted.unmount();

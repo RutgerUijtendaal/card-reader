@@ -1,5 +1,39 @@
 <template>
   <div class="space-y-3">
+    <div
+      v-if="isSectionVisible('classification')"
+      class="space-y-3"
+    >
+      <label
+        v-if="state.cardPoolOptions.length > 1"
+        class="block space-y-1"
+      >
+        <span class="theme-section-title text-sm font-semibold">Card pool</span>
+        <select
+          v-model="cardPool"
+          class="input-base w-full"
+        >
+          <option
+            v-for="option in state.cardPoolOptions"
+            :key="option.key"
+            :value="option.key"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+
+      <MetadataPillGroup
+        v-model:included-value="selectedCardRoles"
+        v-model:excluded-value="excludedCardRoles"
+        v-model:match-mode="cardRoleMatch"
+        :default-open="isSectionOpenByDefault('classification', true)"
+        label="Card roles"
+        :options="state.cardRoleOptions"
+        @reset="state.resetClassificationGroup"
+      />
+    </div>
+
     <SymbolToggleGroup
       v-if="isSectionVisible('mana')"
       v-model:included-value="selectedManaTypeSymbolIds"
@@ -157,6 +191,7 @@ import type {
   CardFilterSectionKey,
   CardFilterSectionsState,
 } from '@/domain/cards/utils/filters/cardFilterSectionsState';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 
 const props = defineProps<{
   state: CardFilterSectionsState;
@@ -175,6 +210,23 @@ const isSectionVisible = (section: CardFilterSectionKey): boolean =>
   visibleSections.value?.has(section) ?? true;
 const isSectionOpenByDefault = (section: CardFilterSectionKey, fallback = false): boolean =>
   defaultOpenSections.value?.has(section) ?? fallback;
+
+const cardPool = computed({
+  get: () => props.state.cardPool,
+  set: (value: CardPool) => props.state.onUpdateCardPool(value),
+});
+const selectedCardRoles = computed({
+  get: () => props.state.selectedCardRoles,
+  set: props.state.onUpdateSelectedCardRoles,
+});
+const excludedCardRoles = computed({
+  get: () => props.state.excludedCardRoles,
+  set: props.state.onUpdateExcludedCardRoles,
+});
+const cardRoleMatch = computed({
+  get: () => props.state.cardRoleMatch,
+  set: props.state.onUpdateCardRoleMatch,
+});
 
 const selectedManaTypeSymbolIds = computed({
   get: () => props.state.selectedManaTypeSymbolIds,

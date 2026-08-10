@@ -17,7 +17,7 @@ const buildVersion = (overrides: Partial<CardVersionDetail> = {}): CardVersionDe
   id: 'card-1',
   key: 'card-1',
   label: 'Changed Card',
-  is_hero: false,
+  card_pool: 'player' as const, card_roles: [],
   deck_building_config: { overrides: {} },
   template_id: 'template-1',
   version_id: 'version-1',

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ContentVersion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
+from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardRoleAssignment, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ContentVersion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
 from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
@@ -348,6 +348,20 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
     _login_and_get_csrf_token(client, username, password)
 
     card, version = _create_editable_card_version(name="Suggested Catalog Card")
+    card.card_pool = "game_master"
+    card.save(update_fields=["card_pool"])
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=card, role="boon"),
+            CardRoleAssignment(card=card, role="event"),
+        ]
+    )
+    keyword = Keyword.objects.create(
+        key="classified-catalog-keyword",
+        label="Classified Catalog Keyword",
+        identifiers_json=[],
+    )
+    replace_card_version_keywords(card_version_id=version.id, keyword_ids=[keyword.id])
     suggestion = MetadataSuggestion.objects.create(
         kind="tag",
         normalized_value="mystic relic accept auto manual",
@@ -362,15 +376,24 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
     )
 
     response = client.get("/admin/catalog")
+    keyword_detail_response = client.get(f"/admin/keywords/{keyword.id}")
+    suggestion_detail_response = client.get(f"/admin/suggestions/tag/{suggestion.id}")
 
     assert response.status_code == 200
+    assert keyword_detail_response.status_code == 200
+    assert suggestion_detail_response.status_code == 200
     payload = response.json()
     assert "known" in payload
     assert "suggested" in payload
     assert isinstance(payload["known"]["tags"], list)
     suggested_ids = {row["id"] for row in payload["suggested"]["tags"]}
     assert suggestion.id in suggested_ids
-    assert card.id
+    linked_card = keyword_detail_response.json()["linked_cards"][0]
+    occurrence = suggestion_detail_response.json()["occurrences"][0]
+    assert linked_card["card_pool"] == "game_master"
+    assert linked_card["card_roles"] == ["boon", "event"]
+    assert occurrence["card_pool"] == "game_master"
+    assert occurrence["card_roles"] == ["boon", "event"]
 
 
 def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
@@ -822,6 +845,68 @@ def test_card_image_asset_endpoint_serves_immutable_image_path() -> None:
     assert card.id
 
 
+def test_game_master_card_images_are_hidden_from_non_staff_across_all_routes() -> None:
+    card, version = _create_editable_card_version(name="Restricted Game Master Image")
+    image = _create_card_image(version)
+    card.card_pool = "game_master"
+    card.save(update_fields=["card_pool"])
+    anonymous = Client(HTTP_HOST="localhost")
+    paths = [
+        f"/cards/{card.id}/image",
+        f"/cards/{card.id}/versions/{version.id}/image",
+        f"/card-images/{image.stored_path}",
+    ]
+
+    for path in paths:
+        assert anonymous.get(path).status_code == 404
+
+    staff = _staff_client("game-master-image-staff")
+    responses = [staff.get(path) for path in paths]
+    try:
+        assert [response.status_code for response in responses] == [200, 200, 200]
+    finally:
+        for response in responses:
+            response.close()
+
+
+def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:
+    player_card, _player_version = _create_editable_card_version(name="Visible Player Card")
+    game_master_card, game_master_version = _create_editable_card_version(
+        name="Restricted Game Master Version"
+    )
+    _create_card_image(game_master_version)
+    game_master_card.card_pool = "game_master"
+    game_master_card.save(update_fields=["card_pool"])
+    mismatched_path = f"/cards/{player_card.id}/versions/{game_master_version.id}/image"
+
+    assert Client(HTTP_HOST="localhost").get(mismatched_path).status_code == 404
+    assert _staff_client("mismatched-version-image-staff").get(mismatched_path).status_code == 404
+
+
+def test_shared_immutable_image_remains_public_when_any_owning_card_is_player() -> None:
+    player_card, player_version = _create_editable_card_version(name="Shared Player Image")
+    player_image = _create_card_image(player_version)
+    game_master_card, game_master_version = _create_editable_card_version(
+        name="Shared Game Master Image"
+    )
+    game_master_card.card_pool = "game_master"
+    game_master_card.save(update_fields=["card_pool"])
+    CardVersionImage.objects.create(
+        card_version=game_master_version,
+        source_file=player_image.source_file,
+        stored_path=player_image.stored_path,
+        checksum=player_image.checksum,
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        f"/card-images/{player_image.stored_path}"
+    )
+
+    assert response.status_code == 200
+    assert player_card.id
+    response.close()
+
+
 def test_card_payloads_use_immutable_image_urls() -> None:
     card, version = _create_editable_card_version(name="Immutable Payload Card")
     image = _create_card_image(version)
@@ -929,6 +1014,36 @@ def test_admin_content_version_cards_returns_cards_for_selected_version() -> Non
     payload = response.json()
     assert [row["id"] for row in payload] == [matching_card.id]
     assert payload[0]["content_version"]["version_number"] == "74.1.0"
+
+
+def test_admin_content_version_cards_prefetches_card_roles() -> None:
+    content_version = ContentVersion.objects.create(
+        version_number="74.3.0",
+        base_version="74.3",
+        major=74,
+        minor=3,
+        patch=0,
+        description="Role query budget.",
+    )
+    expected_roles: dict[str, list[str]] = {}
+    for index, role in enumerate(["hero", "boon", "event", None]):
+        card, version = _create_editable_card_version(name=f"Role Query Budget {index}")
+        version.content_version = content_version
+        version.save(update_fields=["content_version"])
+        if role is not None:
+            CardRoleAssignment.objects.create(card=card, role=role)
+            expected_roles[card.id] = [role]
+        else:
+            expected_roles[card.id] = []
+
+    client = _staff_client("content-version-card-role-query-user")
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get(f"/admin/content-versions/{content_version.id}/cards")
+
+    assert response.status_code == 200
+    assert {row["id"]: row["card_roles"] for row in response.json()} == expected_roles
+    role_queries = [query for query in queries if "card_role_assignment" in query["sql"]]
+    assert len(role_queries) == 1
 
 
 def test_admin_content_version_patch_updates_version_and_description() -> None:
@@ -1108,6 +1223,28 @@ def test_filters_payload_includes_type_linked_card_counts() -> None:
     assert response.status_code == 200
     returned = next(row for row in response.json()["types"] if row["id"] == counted_type.id)
     assert returned["linked_card_count"] == 1
+
+
+def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
+    counted_type = _create_type(key="filters-pool-counted-type", label="Filters Pool Counted Type")
+    _player_card, player_version = _create_editable_card_version(name="Filters Player Counted Card")
+    game_master_card, game_master_version = _create_editable_card_version(
+        name="Filters Game Master Counted Card"
+    )
+    game_master_card.card_pool = "game_master"
+    game_master_card.save(update_fields=["card_pool"])
+    replace_card_version_types(card_version_id=player_version.id, type_ids=[counted_type.id])
+    replace_card_version_types(card_version_id=game_master_version.id, type_ids=[counted_type.id])
+
+    public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
+    staff_response = _staff_client("filters-pool-count-staff").get("/cards/filters")
+
+    assert public_response.status_code == 200
+    assert staff_response.status_code == 200
+    public_type = next(row for row in public_response.json()["types"] if row["id"] == counted_type.id)
+    staff_type = next(row for row in staff_response.json()["types"] if row["id"] == counted_type.id)
+    assert public_type["linked_card_count"] == 1
+    assert staff_type["linked_card_count"] == 2
 
 
 def test_filters_payload_orders_types_by_linked_card_count_without_pinning_mana() -> None:
@@ -2054,6 +2191,7 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     card_payload = card_response.json()
     group_payload = group_response.json()
     assert card_payload["card_groups"][0]["id"] == group.id
+    assert card_payload["card_groups"][0]["card_pool"] == "player"
     assert card_payload["card_groups"][0]["is_anchor"] is False
     assert group_payload["id"] == group.id
     assert [member["card"]["id"] for member in group_payload["members"]] == [anchor_card.id, member_card.id]
@@ -2066,8 +2204,7 @@ def test_card_detail_includes_viewer_visible_deck_references() -> None:
     hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Hero")
     card, version = _create_editable_card_version(name="Deck Reference Included")
     _create_card_image(version)
-    hero_card.is_hero = True
-    hero_card.save(update_fields=["is_hero"])
+    CardRoleAssignment.objects.create(card=hero_card, role="hero")
     owner_deck = Deck.objects.create(
         owner=owner,
         name="Owner Private Deck",
@@ -2095,7 +2232,7 @@ def test_card_detail_includes_viewer_visible_deck_references() -> None:
     assert references[0]["visibility"] == "private"
     assert references[0]["owner"]["id"] == str(owner.id)
     assert references[0]["hero_card"]["id"] == hero_card.id
-    assert references[0]["card_reference"]["is_hero"] is False
+    assert references[0]["card_reference"]["as_hero"] is False
     assert references[0]["card_reference"]["mainboard_quantity"] == 2
     assert references[0]["card_reference"]["sideboard_quantity"] == 0
     assert anonymous_response.status_code == 200
@@ -2107,8 +2244,7 @@ def test_card_detail_limits_deck_references_to_three_latest() -> None:
     hero_card, _hero_version = _create_editable_card_version(name="Deck Reference Limit Hero")
     card, version = _create_editable_card_version(name="Deck Reference Limit Included")
     _create_card_image(version)
-    hero_card.is_hero = True
-    hero_card.save(update_fields=["is_hero"])
+    CardRoleAssignment.objects.create(card=hero_card, role="hero")
     decks = []
     for index in range(4):
         deck = Deck.objects.create(
@@ -2137,8 +2273,7 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
     member_card, member_version = _create_editable_card_version(name="Group Deck Reference Member")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    anchor_card.is_hero = True
-    anchor_card.save(update_fields=["is_hero"])
+    CardRoleAssignment.objects.create(card=anchor_card, role="hero")
     group = _create_card_group("group-deck-reference", anchor_card=anchor_card, members=[anchor_card, member_card])
     owner_deck = Deck.objects.create(
         owner=owner,
@@ -2163,7 +2298,7 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
     references = owner_response.json()["anchor_deck_references"]
     assert [reference["id"] for reference in references] == [owner_deck.id]
     assert references[0]["name"] == "Owner Private Group Deck"
-    assert references[0]["card_reference"]["is_hero"] is True
+    assert references[0]["card_reference"]["as_hero"] is True
     assert references[0]["card_reference"]["mainboard_quantity"] == 0
     assert references[0]["card_reference"]["sideboard_quantity"] == 0
     assert anonymous_response.status_code == 200
@@ -2176,8 +2311,7 @@ def test_card_group_detail_limits_anchor_deck_references_to_three_latest() -> No
     member_card, member_version = _create_editable_card_version(name="Group Deck Reference Limit Member")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    anchor_card.is_hero = True
-    anchor_card.save(update_fields=["is_hero"])
+    CardRoleAssignment.objects.create(card=anchor_card, role="hero")
     group = _create_card_group("group-deck-reference-limit", anchor_card=anchor_card, members=[anchor_card, member_card])
     decks = []
     for index in range(4):
@@ -2312,6 +2446,8 @@ def test_staff_can_manage_card_groups() -> None:
     anchor_card, _anchor_version = _create_editable_card_version(name="Staff Group Anchor")
     member_card, _member_version = _create_editable_card_version(name="Staff Group Member")
     replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
+    member_card.card_pool = "game_master"
+    member_card.save(update_fields=["card_pool"])
 
     create_response = client.post(
         "/admin/card-groups",
@@ -2353,6 +2489,7 @@ def test_staff_can_manage_card_groups() -> None:
     assert delete_response.status_code == 204
     assert patch_response.json()["anchor_card_id"] == replacement_card.id
     assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
+    assert [member["card_pool"] for member in patch_response.json()["members"]] == ["player", "game_master"]
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 

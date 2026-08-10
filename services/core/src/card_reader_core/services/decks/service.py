@@ -6,7 +6,7 @@ from uuid import UUID
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from card_reader_core.models import Deck, DeckDifficulty, DeckVisibility
+from card_reader_core.models import CardPool, Deck, DeckDifficulty, DeckVisibility
 from card_reader_core.services.deck_tags import DeckTagService
 from card_reader_core.repositories.decks import (
     DeckSummaryPage,
@@ -96,6 +96,7 @@ class DeckService:
         deck_tag_ids: list[str] | None = None,
         deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
+        card_pool: CardPool | None = None,
     ) -> list[Deck]:
         return list_owner_decks(
             owner_id,
@@ -108,6 +109,7 @@ class DeckService:
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
+            card_pool=card_pool,
         )
 
     def list_public_deck_summaries(
@@ -154,6 +156,7 @@ class DeckService:
         deck_tag_ids: list[str] | None = None,
         deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
+        card_pool: CardPool | None = None,
     ) -> list[Deck]:
         return list_owner_deck_summaries(
             owner_id,
@@ -166,6 +169,7 @@ class DeckService:
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
+            card_pool=card_pool,
         )
 
     @transaction.atomic
@@ -230,6 +234,7 @@ class DeckService:
         deck_tag_ids: list[str] | None = None,
         deck_tag_exclude_ids: list[str] | None = None,
         deck_tag_match: str | None = None,
+        card_pool: CardPool | None = None,
     ) -> DeckSummaryPage:
         return list_owner_deck_summary_page_query(
             owner_id,
@@ -247,6 +252,7 @@ class DeckService:
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
+            card_pool=card_pool,
         )
 
     def list_card_decks_for_viewer(self, card_id: str, *, viewer_id: str | None = None) -> list[Deck]:

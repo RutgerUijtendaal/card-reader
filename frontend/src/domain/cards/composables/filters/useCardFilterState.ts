@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
+import type { CardPool, CardRoleFilter } from '@/domain/cards/types/cardModels';
 import type {
   CardFilterSelectionState,
 } from '@/domain/cards/utils/filters/cardFilterState';
@@ -21,6 +22,10 @@ import {
 export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const query = ref('');
   const lifecycleStatus = ref<CardLifecycleFilterValue>(DEFAULT_CARD_LIFECYCLE_FILTER);
+  const cardPool = ref<CardPool>('player');
+  const cardRoleMatch = ref<'any' | 'all'>('any');
+  const cardRoleIds = ref<CardRoleFilter[]>([]);
+  const cardRoleExcludeIds = ref<CardRoleFilter[]>(['hero']);
   const keywordMatch = ref<'any' | 'all'>('any');
   const tagMatch = ref<'any' | 'all'>('any');
   const typeMatch = ref<'any' | 'all'>('any');
@@ -52,6 +57,10 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     normalizeCardFilterSelectionState({
       query: query.value,
       lifecycleStatus: lifecycleStatus.value,
+      cardPool: cardPool.value,
+      cardRoleMatch: cardRoleMatch.value,
+      cardRoleIds: cardRoleIds.value,
+      cardRoleExcludeIds: cardRoleExcludeIds.value,
       keywordMatch: keywordMatch.value,
       tagMatch: tagMatch.value,
       typeMatch: typeMatch.value,
@@ -85,6 +94,10 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     const normalized = normalizeCardFilterSelectionState(state);
     query.value = normalized.query;
     lifecycleStatus.value = normalized.lifecycleStatus ?? DEFAULT_CARD_LIFECYCLE_FILTER;
+    cardPool.value = normalized.cardPool;
+    cardRoleMatch.value = normalized.cardRoleMatch;
+    cardRoleIds.value = [...normalized.cardRoleIds];
+    cardRoleExcludeIds.value = [...normalized.cardRoleExcludeIds];
     keywordMatch.value = normalized.keywordMatch;
     tagMatch.value = normalized.tagMatch;
     typeMatch.value = normalized.typeMatch;
@@ -127,6 +140,10 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   return {
     query,
     lifecycleStatus,
+    cardPool,
+    cardRoleMatch,
+    cardRoleIds,
+    cardRoleExcludeIds,
     keywordMatch,
     tagMatch,
     typeMatch,

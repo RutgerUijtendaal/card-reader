@@ -1,14 +1,15 @@
 # Card Classification Step 1: Foundation
 
-Status: approved implementation plan; not yet implemented.
+Status: implemented and validated.
 
-This is the first of three ordered plans:
+This is the first of four ordered checkpoints:
 
 1. Card classification foundation (this document)
-2. [Import inference](card-classification-step-2-import-inference.md)
-3. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
+2. [Authorization seam consolidation](card-classification-step-1-1-authorization-seam.md)
+3. [Import inference](card-classification-step-2-import-inference.md)
+4. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
 
-Do not begin Step 2 or Step 3 until this step's acceptance criteria are satisfied. Later steps may be implemented in the same branch only when each step remains independently reviewable and verified.
+Do not begin Step 1.1 until this step's acceptance criteria are satisfied. Do not begin Step 2 or Step 3 until Step 1.1 is complete. Later steps may be implemented in the same branch only when each checkpoint remains independently reviewable and verified.
 
 ## Outcome
 
@@ -29,6 +30,7 @@ The existing Player experience must continue to work, Hero behavior must use the
 - Typical pool/role combinations such as Player Hero and Game Master Boon/Event are conventions, not database constraints. Any restrictions or warnings belong in core code.
 - Cross-pool relationships are allowed. Do not add same-pool database constraints to groups, future card links, or other card relationships.
 - Game Master access is controlled through a named backend capability whose initial policy is `is_staff`. Do not scatter direct `is_staff` checks through card queries and views.
+- Public derived artifacts such as developer-data bundles and unauthenticated TTS card sheets are Player-pool scoped. They must not encode the current staff policy; changing who receives the Game Master capability must remain independent from deciding which artifacts are public.
 - Unauthorized list/filter requests that explicitly request the Game Master pool return `403`. Unauthorized direct access to a Game Master card, version, or image returns `404` to avoid disclosing the object.
 - The ordinary gallery defaults to Player cards with Hero excluded. This is a frontend default, not a hidden backend default for every card query.
 
@@ -37,6 +39,16 @@ The existing Player experience must continue to work, Hero behavior must use the
 The step succeeds when `Card.is_hero` is no longer a persisted or writable source of truth; all existing Hero-dependent behavior reads the `hero` role; every existing card has the Player pool; Game Master cards cannot leak through public APIs or assets; and pool/roles can be edited and filtered by staff.
 
 Migration completion is authoritative for schema/data conversion. Frontend state or cached responses must not be treated as evidence that the migration succeeded.
+
+## Implemented security boundaries
+
+The foundation implementation closes three derived-data paths that require stronger guarantees than checking the requested card alone:
+
+- A historical image route verifies that the requested `CardVersion` belongs to the requested and authorized `Card` before serving bytes. Supplying a visible Player `card_id` with another card's Game Master `version_id` returns `404` for staff and non-staff callers.
+- Public TTS sheets allocate and render Player cards only. Moving an already allocated Player card to Game Master changes the sheet fingerprint, makes the old atlas unavailable immediately, and rerenders the append-only slot without the restricted artwork before the sheet can be served again.
+- Developer-data selection and export are permanently Player-scoped under the current public-artifact contract. Include-all selection omits Game Master cards, while an explicit Game Master card or cross-pool group selection fails validation instead of producing a mixed-audience archive.
+
+These are artifact/data-scope rules, not copies of the current staff entitlement policy. Step 1.1 replaces their local pool vocabulary with the shared scope seam without weakening the behavior.
 
 ## Data model
 
@@ -220,8 +232,10 @@ Add or update tests covering:
 - any/all/include/exclude role query semantics;
 - Player default query scope;
 - staff access and non-staff denial/404 behavior for every Game Master surface and asset path;
+- nested historical image ownership, including a visible Player `card_id` paired with another card's Game Master `version_id`;
+- Player-only TTS allocation plus immediate stale-atlas denial and safe rerender after Player-to-Game-Master reclassification;
 - Hero deck validation and selection through the role helper;
-- developer-data Version 1 adoption, Version 2 round trips, format rejection, role/pool coverage, and generated-lock compatibility;
+- developer-data Version 1 adoption, Version 2 round trips, format rejection, role/pool coverage, generated-lock compatibility, include-all exclusion of Game Master cards, and rejection of explicit restricted selections;
 - Card-tab edits, including multiple roles and Standard;
 - Admin Catalog linked-card and suggestion-occurrence payloads and visible pool/role badges;
 - gallery route/request serialization and Hero-excluded default;
@@ -255,6 +269,8 @@ Use `scripts/run-in-agent-env.py` for ad hoc Python checks as directed by `AGENT
 - Gallery filters can select/exclude Standard and each role; Hero is excluded by default.
 - Admin Catalog linked cards and suggestion occurrences visibly identify their pool and every role, using Standard for an empty role set.
 - Non-staff cannot list, retrieve, infer the existence of, or load images for Game Master cards.
+- Nested version-image routes cannot authorize one card while serving a version owned by another card.
+- Public TTS sheets and developer-data bundles contain Player cards only, including after card-pool transitions.
 - Staff can explicitly query and edit Game Master cards.
 - Developer-data Version 2 round-trips pool and roles, while the pinned Version 1 bundle remains adoptable through the explicit compatibility adapter.
 - No same-pool or mutually-exclusive-role database constraint has been introduced.

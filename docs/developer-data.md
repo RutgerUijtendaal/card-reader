@@ -7,13 +7,26 @@ website.
 ## Contents and exclusions
 
 The reviewed `dev-data/selection.json` contains stable must-include keys, inclusion policy, and
-coverage requirements. The current policy includes the complete card and card-group catalog at
-build time; the explicit keys remain regression anchors that must still exist. The committed
+coverage requirements. The current policy includes the complete Player card and Player card-group
+catalog at build time; Game Master cards are excluded while that pool is restricted. The explicit
+keys remain regression anchors that must still exist. The committed
 `dev-data.lock.json` pins the required bundle version, format, checksum, and website API.
 
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and
-Playtester workflows.
+Playtester workflows. Version 2 card records include the required `card_pool` and canonical
+`card_roles` fields; they never emit the removed Hero boolean.
+
+The importer supports both current Version 2 archives and explicitly adopts pinned Version 1
+archives. Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to
+the Hero role before strict current-schema validation. This compatibility keeps older immutable
+bundles usable without making Version 2 classification optional.
+
+Selection coverage is evaluated by pool and by role through `min_cards_by_pool` and
+`min_cards_by_role`. The existing Hero minimum is retained under the Hero role. Game Master pool
+coverage remains zero while that pool is excluded; Boon and Event may remain at zero until reviewed
+Player source data is available. The lock file is still
+generated only by publishing a validated immutable bundle and must not be edited by hand.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.
@@ -41,6 +54,16 @@ the pinned bundle, verifies its checksum and manifest, imports records and media
 admin credentials, creates development-only notification examples for that admin, and runs the
 readiness doctor. The examples and their private demonstration deck are synthesized after import;
 they are not part of the published developer-data bundle.
+
+After the notification examples, bootstrap asks whether to generate the local TTS card sheets.
+The default is **No** because rendering each full sheet can take a while. Choose **Yes** to render
+them immediately with per-sheet progress, pass `--generate-tts-sheets` to opt in without a prompt,
+or pass `--skip-tts-sheets` for a non-interactive fast bootstrap. Skipped sheets can be generated
+later with:
+
+```bash
+uv run --project . --package card-reader-api python services/api/manage.py reconcile_tts_card_sheets --render
+```
 
 For an archive downloaded through the browser or provided offline:
 

@@ -22,7 +22,7 @@
         <RouterLink
           v-for="group in card?.card_groups ?? []"
           :key="group.id"
-          :to="`/card-groups/${group.id}`"
+          :to="buildCardGroupDetailLocation(group.id, route.query, group.card_pool)"
           class="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
         >
           <span>{{ group.name }}</span>
@@ -131,7 +131,8 @@
             @toggle-additional-symbol="toggleAdditionalSymbol"
             @update-group-search="setMetadataSearch"
             @update-field="updateField"
-            @update-hero="updateHero"
+            @update-card-pool="updateCardPool"
+            @toggle-card-role="toggleCardRole"
             @update-deck-building-config="updateDeckBuildingConfig"
             @update-lifecycle-status="updateLifecycleStatus"
           />
@@ -156,6 +157,7 @@ import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import { buildAdminCardMergeSourceLocation } from '@/domain/cards/utils/cards/adminCardNavigation';
 import { buildCardReturnLocation } from '@/domain/card-navigation/cardReturnState';
+import { buildCardGroupDetailLocation } from '@/domain/cards/utils/gallery/galleryNavigation';
 import CardDetailLoadingSkeleton from '@/features/card-detail/components/CardDetailLoadingSkeleton.vue';
 import CardDetailPager from '@/domain/cards/components/CardResultPager.vue';
 import CardVersionEditorPane from '@/features/card-detail/components/CardVersionEditorPane.vue';
@@ -167,6 +169,7 @@ import {
   type CardLifecycleStatus,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { ScalarFieldName } from '@/domain/cards/types';
+import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
 
 const {
   card,
@@ -233,8 +236,14 @@ const updateField = (fieldName: ScalarFieldName, value: string): void => {
   form[fieldName] = value;
 };
 
-const updateHero = (value: boolean): void => {
-  form.is_hero = value;
+const updateCardPool = (value: CardPool): void => {
+  form.card_pool = value;
+};
+
+const toggleCardRole = (role: CardRole, checked: boolean): void => {
+  form.card_roles = checked
+    ? [...new Set([...form.card_roles, role])]
+    : form.card_roles.filter((value) => value !== role);
 };
 
 const updateDeckBuildingConfig = (value: string): void => {

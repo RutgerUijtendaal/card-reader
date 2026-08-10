@@ -6,7 +6,7 @@ from uuid import UUID
 from django.db.models import Case, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 
-from card_reader_core.models import Deck, DeckCreation, DeckVisibility
+from card_reader_core.models import CardPool, Deck, DeckCreation, DeckVisibility
 
 from .filters import apply_deck_filters
 from .prefetch import deck_queryset, deck_summary_queryset, deck_validation_queryset
@@ -58,6 +58,7 @@ def list_owner_decks(
     deck_tag_ids: list[str] | None = None,
     deck_tag_exclude_ids: list[str] | None = None,
     deck_tag_match: str | None = None,
+    card_pool: CardPool | None = None,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -72,6 +73,7 @@ def list_owner_decks(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
+            card_pool=card_pool,
         ).order_by("-updated_at", "-created_at")
     )
 
@@ -118,6 +120,7 @@ def list_owner_deck_summaries(
     deck_tag_ids: list[str] | None = None,
     deck_tag_exclude_ids: list[str] | None = None,
     deck_tag_match: str | None = None,
+    card_pool: CardPool | None = None,
 ) -> list[Deck]:
     return list(
         apply_deck_filters(
@@ -132,6 +135,7 @@ def list_owner_deck_summaries(
             deck_tag_ids=deck_tag_ids,
             deck_tag_exclude_ids=deck_tag_exclude_ids,
             deck_tag_match=deck_tag_match,
+            card_pool=card_pool,
         ).order_by("-updated_at", "-created_at")
     )
 
@@ -238,6 +242,7 @@ def list_owner_deck_summary_page(
     deck_tag_ids: list[str] | None = None,
     deck_tag_exclude_ids: list[str] | None = None,
     deck_tag_match: str | None = None,
+    card_pool: CardPool | None = None,
 ) -> DeckSummaryPage:
     effective_snapshot_at = snapshot_at or timezone.now()
     queryset = apply_deck_filters(
@@ -255,6 +260,7 @@ def list_owner_deck_summary_page(
         deck_tag_ids=deck_tag_ids,
         deck_tag_exclude_ids=deck_tag_exclude_ids,
         deck_tag_match=deck_tag_match,
+        card_pool=card_pool,
     ).order_by(*PAGINATED_DECK_ORDERING)
     return _paginate_deck_summary_queryset(
         queryset,
@@ -264,8 +270,6 @@ def list_owner_deck_summary_page(
         cursor_created_at=cursor_created_at,
         cursor_id=cursor_id,
     )
-
-
 def _paginate_deck_summary_queryset(
     queryset: QuerySet[Deck],
     *,

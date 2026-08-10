@@ -14,6 +14,8 @@ from django.db.models import F, Max, Prefetch, Q, QuerySet
 from PIL import Image
 
 from card_reader_core.models import (
+    GAME_MASTER_CARD_POOL,
+    PLAYER_CARD_POOL,
     TTS_CARD_SHEET_CAPACITY,
     TTS_CARD_SHEET_LAYOUT_VERSION,
     Card,
@@ -29,7 +31,7 @@ from card_reader_core.storage import relativize_storage_path
 _RENDER_DEBOUNCE = timedelta(seconds=2)
 _RENDER_MAX_DEBOUNCE = timedelta(seconds=30)
 TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT = timedelta(minutes=10)
-_RENDERER_FINGERPRINT_VERSION = 1
+_RENDERER_FINGERPRINT_VERSION = 2
 _SQLITE_WRITE_RETRY_ATTEMPTS = 6
 _SLOT_RESERVATION_ATTEMPTS = 16
 _CLAIM_RESERVATION_ATTEMPTS = 16
@@ -86,7 +88,10 @@ def iter_usable_card_source_batches(
 
 
 def _card_source_queryset(card_ids: list[str] | None) -> QuerySet[Card]:
-    cards = Card.objects.filter(latest_version__isnull=False).select_related("latest_version")
+    cards = Card.objects.filter(
+        card_pool=PLAYER_CARD_POOL,
+        latest_version__isnull=False,
+    ).select_related("latest_version")
     if card_ids is not None:
         cards = cards.filter(id__in=card_ids)
     return cards.prefetch_related(
@@ -380,8 +385,40 @@ def _claim_sheet_for_render_once(
 def get_sheet_with_slots(sheet_id: str) -> TtsCardSheet | None:
     return (
         TtsCardSheet.objects.filter(id=sheet_id)
-        .prefetch_related("slots")
+        .prefetch_related(
+            Prefetch(
+                "slots",
+                queryset=TtsCardSheetSlot.objects.select_related("resolved_card").order_by(
+                    "slot_index"
+                ),
+            )
+        )
         .first()
+    )
+
+
+def refresh_card_source_visibility(card_ids: list[str] | None = None) -> set[str]:
+    return _retry_sqlite_write(lambda: _refresh_card_source_visibility_once(card_ids))
+
+
+@transaction.atomic
+def _refresh_card_source_visibility_once(card_ids: list[str] | None) -> set[str]:
+    slots = TtsCardSheetSlot.objects.all()
+    if card_ids is not None:
+        slots = slots.filter(resolved_card_id__in=card_ids)
+    sheet_ids = {str(sheet_id) for sheet_id in slots.values_list("sheet_id", flat=True)}
+    _refresh_sheet_fingerprints(sheet_ids)
+    return sheet_ids
+
+
+def list_non_player_card_ids_on_sheet(sheet_id: str) -> list[str]:
+    return list(
+        TtsCardSheetSlot.objects.filter(
+            sheet_id=sheet_id,
+            resolved_card__card_pool=GAME_MASTER_CARD_POOL,
+        )
+        .order_by("slot_index")
+        .values_list("resolved_card_id", flat=True)
     )
 
 
@@ -563,7 +600,7 @@ def _refresh_sheet_fingerprints(sheet_ids: set[str]) -> None:
         slots = list(
             TtsCardSheetSlot.objects.filter(sheet=sheet)
             .order_by("slot_index")
-            .values_list("slot_index", "image_checksum")
+            .values_list("slot_index", "image_checksum", "resolved_card__card_pool")
         )
         fingerprint = hashlib.sha256(
             json.dumps(
@@ -607,11 +644,13 @@ __all__ = [
     "get_sheet_with_slots",
     "iter_usable_card_source_batches",
     "list_all_sheet_ids",
+    "list_non_player_card_ids_on_sheet",
     "list_sheet_ids_needing_render",
     "list_usable_card_sources",
     "mark_render_failed",
     "mark_render_succeeded",
     "prioritize_sheets",
+    "refresh_card_source_visibility",
     "release_expired_render_claims",
     "release_render_claim",
     "request_sheet_rerender",

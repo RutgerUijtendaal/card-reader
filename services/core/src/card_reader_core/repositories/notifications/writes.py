@@ -122,3 +122,11 @@ def mark_all_notifications_read(recipient_id: str) -> int:
         .filter(read_at__isnull=True)
         .update(read_at=now, updated_at=now)
     )
+
+
+def archive_notifications_for_card(card_id: str) -> int:
+    now = now_utc()
+    return UserNotification.objects.filter(
+        metadata_json__card_id=card_id,
+        archived_at__isnull=True,
+    ).update(archived_at=now, updated_at=now)

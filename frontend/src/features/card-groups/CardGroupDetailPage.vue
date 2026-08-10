@@ -102,6 +102,7 @@ import {
   buildCardLifecycleApiParams,
   normalizeCardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
+import { parseCardFilterRouteQuery } from '@/domain/cards/utils/filters/cardFilterRouteState';
 import { buildGalleryLocation, useGalleryCardNavigation } from '@/domain/cards/utils/gallery/galleryNavigation';
 import { useAuthStore } from '@/domain/session/store';
 import CardGroupDetailLoadingSkeleton from '@/features/card-groups/components/CardGroupDetailLoadingSkeleton.vue';
@@ -117,7 +118,15 @@ const symbolByKey = ref<SymbolLookupMap>({});
 const isLoadingInitial = ref(true);
 const galleryNavigation = useGalleryCardNavigation(route, router, 'detail');
 const groupLifecycleStatus = computed(() => normalizeCardLifecycleFilterValue(route.query.lifecycle_status));
-const groupRequestParams = computed(() => buildCardLifecycleApiParams(groupLifecycleStatus.value));
+const groupCardPool = computed(() => parseCardFilterRouteQuery(route.query).cardPool);
+const groupRequestParams = computed(() => {
+  const lifecycleParams = buildCardLifecycleApiParams(groupLifecycleStatus.value);
+  const poolParams = groupCardPool.value === 'game_master'
+    ? { card_pool: groupCardPool.value }
+    : undefined;
+  if (!lifecycleParams && !poolParams) return undefined;
+  return { ...lifecycleParams, ...poolParams };
+});
 const galleryBackLocation = computed(() => buildGalleryLocation(route.query));
 let groupRequestId = 0;
 
@@ -143,7 +152,7 @@ const loadGroup = async (): Promise<void> => {
   }
 };
 
-watch(() => [route.params.id, route.query.lifecycle_status], loadGroup);
+watch(() => [route.params.id, route.query.lifecycle_status, route.query.card_pool], loadGroup);
 onMounted(loadGroup);
 
 const {

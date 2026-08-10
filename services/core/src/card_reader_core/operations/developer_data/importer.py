@@ -16,6 +16,7 @@ from card_reader_core.models import (
     CardBack,
     CardGroup,
     CardGroupMember,
+    CardRoleAssignment,
     CardVersion,
     CardVersionImage,
     CardVersionKeyword,
@@ -93,9 +94,17 @@ def validate_import_readiness(payload: DeveloperDataPayload) -> list[str]:
         issues.append("deck-tag catalog is empty")
     if not payload.cards:
         issues.append("card selection is empty")
-    if not any(card.is_hero and card.lifecycle_status == "active" for card in payload.cards):
+    if not any(
+        card.card_pool == "player"
+        and "hero" in card.card_roles
+        and card.lifecycle_status == "active"
+        for card in payload.cards
+    ):
         issues.append("no active hero is included")
-    if not any(not card.is_hero and card.lifecycle_status == "active" for card in payload.cards):
+    if not any(
+        not card.card_roles and card.card_pool == "player" and card.lifecycle_status == "active"
+        for card in payload.cards
+    ):
         issues.append("no active mainboard cards are included")
     if payload.current_card_back is None:
         issues.append("current card back is missing")
@@ -232,7 +241,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
         row.key: Card.objects.create(
             key=row.key,
             label=row.label,
-            is_hero=row.is_hero,
+            card_pool=row.card_pool,
             deck_building_config_json=row.deck_building_config,
             lifecycle_status=row.lifecycle_status,
         )
@@ -240,6 +249,9 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
     }
     for card_record in payload.cards:
         card = cards[card_record.key]
+        CardRoleAssignment.objects.bulk_create(
+            [CardRoleAssignment(card=card, role=role) for role in card_record.card_roles]
+        )
         CardAlias.objects.bulk_create(
             [CardAlias(card=card, key=alias.key, label=alias.label) for alias in card_record.aliases]
         )

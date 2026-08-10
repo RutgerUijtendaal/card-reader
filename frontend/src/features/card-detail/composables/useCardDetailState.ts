@@ -12,6 +12,7 @@ import {
 import { useGalleryCardNavigation } from '@/domain/cards/utils/gallery/galleryNavigation';
 import type {
   CardFiltersResponse,
+  CardGroupSummary,
   CardVersionDetail,
   FieldSourceValue,
   MetadataGroupName,
@@ -20,6 +21,7 @@ import type {
   SymbolFilterOption,
   SymbolLookupMap,
 } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import type {
   CardDetail,
   EditorForm,
@@ -68,7 +70,8 @@ export const useCardDetailState = () => {
     attack: '',
     health: '',
     rules_text: '',
-    is_hero: false,
+    card_pool: 'player',
+    card_roles: [],
     deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
@@ -183,7 +186,8 @@ export const useCardDetailState = () => {
     form.attack = version.attack === null ? '' : String(version.attack);
     form.health = version.health === null ? '' : String(version.health);
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
-    form.is_hero = version.is_hero;
+    form.card_pool = version.card_pool;
+    form.card_roles = [...version.card_roles];
     form.deck_building_config = formatDeckBuildingConfigJson(
       Object.keys(version.deck_building_config ?? {}).length > 0
         ? version.deck_building_config
@@ -202,7 +206,9 @@ export const useCardDetailState = () => {
     selectedVersionId.value = versionId;
   };
 
-  const applyUpdatedVersion = (updated: CardVersionDetail): void => {
+  const applyUpdatedVersion = (updated: CardVersionDetail): boolean => {
+    const previousVersion = versions.value.find((version) => version.version_id === updated.version_id);
+    const poolChanged = previousVersion?.card_pool !== updated.card_pool;
     versions.value = versions.value.map((version) =>
       version.version_id === updated.version_id ? updated : version,
     );
@@ -212,10 +218,14 @@ export const useCardDetailState = () => {
         name: updated.name,
         label: updated.name,
         lifecycle_status: updated.lifecycle_status,
+        card_groups: poolChanged
+          ? reconcileCardGroupsAfterPoolChange(card.value.card_groups, updated.card_pool)
+          : card.value.card_groups,
       };
     }
     selectedVersionId.value = updated.version_id;
     syncFormFromSelectedVersion();
+    return poolChanged;
   };
 
   const patchLatestVersion = async (payload: Record<string, unknown>, successMessage = 'Version updated.'): Promise<void> => {
@@ -225,7 +235,17 @@ export const useCardDetailState = () => {
     saveMessage.value = '';
     try {
       const updatedVersion = await patchLatestCardVersion(version.id, payload);
-      applyUpdatedVersion(updatedVersion);
+      const poolChanged = applyUpdatedVersion(updatedVersion);
+      if (poolChanged) {
+        try {
+          const refreshedCard = await fetchCard<CardDetail>(updatedVersion.id);
+          if (card.value?.id === refreshedCard.id) {
+            card.value = refreshedCard;
+          }
+        } catch (error) {
+          console.error('Refresh card groups after pool change failed', error);
+        }
+      }
       saveMessage.value = successMessage;
     } finally {
       isSaving.value = false;
@@ -553,8 +573,11 @@ const buildCardUpdatePayload = (
 ): Record<string, unknown> => {
   const updates: Record<string, unknown> = {};
 
-  if (form.is_hero !== version.is_hero) {
-    updates.is_hero = form.is_hero;
+  if (form.card_pool !== version.card_pool) {
+    updates.card_pool = form.card_pool;
+  }
+  if (JSON.stringify([...form.card_roles].sort()) !== JSON.stringify([...version.card_roles].sort())) {
+    updates.card_roles = form.card_roles;
   }
   const deckBuildingConfig = parseJsonObject(form.deck_building_config);
   if (JSON.stringify(deckBuildingConfig) !== JSON.stringify(version.deck_building_config ?? {})) {
@@ -603,6 +626,16 @@ const sameIds = (left: string[], right: string[]): boolean =>
   JSON.stringify(sortedIds(left)) === JSON.stringify(sortedIds(right));
 
 const uniqueIds = (ids: string[]): string[] => Array.from(new Set(ids));
+
+export const reconcileCardGroupsAfterPoolChange = (
+  groups: CardGroupSummary[],
+  cardPool: CardPool,
+): CardGroupSummary[] => groups.flatMap((group) => {
+  if (group.is_anchor) {
+    return [{ ...group, card_pool: cardPool }];
+  }
+  return group.card_pool === cardPool ? [group] : [];
+});
 
 const parseJsonObject = (value: string): Record<string, unknown> => {
   const parsed = JSON.parse(value.trim() || '{}') as unknown;

@@ -96,7 +96,18 @@ export type DeckRecord = {
   updated_at: string;
 };
 
-export type DeckHeroSummary = Pick<DeckCardSummary, 'id' | 'key' | 'label' | 'name' | 'image_url' | 'symbols'>;
+export type DeckHeroSummary = Pick<
+  DeckCardSummary,
+  | 'id'
+  | 'key'
+  | 'label'
+  | 'name'
+  | 'image_url'
+  | 'symbols'
+  | 'restricted'
+  | 'card_pool'
+  | 'card_roles'
+>;
 
 export type DeckSummaryRecord = {
   id: string;

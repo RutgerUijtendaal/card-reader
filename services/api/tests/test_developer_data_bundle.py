@@ -19,6 +19,7 @@ from card_reader_core.models import (
     CardBack,
     CardGroup,
     CardGroupMember,
+    CardRoleAssignment,
     CardVersion,
     CardVersionImage,
     CardVersionKeyword,
@@ -46,6 +47,46 @@ from card_reader_core.operations.developer_data import (
     sha256_file,
     validate_archive,
 )
+from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
+
+
+def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
+    adopted = adopt_payload_for_format(
+        {"cards": [{"key": "hero", "is_hero": True}, {"key": "standard", "is_hero": False}]},
+        format_version=1,
+    )
+
+    assert adopted == {
+        "cards": [
+            {"key": "hero", "card_pool": "player", "card_roles": ["hero"]},
+            {"key": "standard", "card_pool": "player", "card_roles": []},
+        ]
+    }
+
+
+@pytest.mark.parametrize("legacy_card", [{"key": "missing"}, {"key": "wrong-type", "is_hero": "true"}])
+def test_version_one_payload_adoption_rejects_invalid_hero_fields(
+    legacy_card: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="is_hero must be a Boolean"):
+        adopt_payload_for_format({"cards": [legacy_card]}, format_version=1)
+
+
+def test_version_two_card_record_rejects_duplicate_roles() -> None:
+    with pytest.raises(ValueError, match="Card roles must be unique"):
+        CardRecord.model_validate(
+            {
+                "key": "duplicate-role-card",
+                "label": "Duplicate Role Card",
+                "card_pool": "player",
+                "card_roles": ["hero", "hero"],
+                "deck_building_config": {},
+                "lifecycle_status": "active",
+                "latest_version_number": None,
+                "aliases": [],
+                "versions": [],
+            }
+        )
 
 
 def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
@@ -70,6 +111,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 3
         assert manifest.counts["card_versions"] == 4
+        assert manifest.format_version == 2
 
         with tarfile.open(archive_path, "r:gz") as archive:
             data_member = archive.extractfile("data.json")
@@ -77,6 +119,9 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             payload_text = data_member.read().decode("utf-8")
         assert "raw_ocr_json" not in payload_text
         assert "source_file" not in payload_text
+        assert '"card_pool"' in payload_text
+        assert '"card_roles"' in payload_text
+        assert '"is_hero"' not in payload_text
         assert "synthetic-user" not in payload_text
         published_store = PublishedBundleStore(root=tmp_path / "published")
         published = published_store.publish(archive_path)
@@ -120,7 +165,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
 
         assert result.counts["cards"] == 3
         assert result.copied_assets == 6
-        assert Card.objects.filter(key="synthetic-hero", is_hero=True).exists()
+        assert Card.objects.filter(key="synthetic-hero", role_assignments__role="hero").exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
         latest = Card.objects.get(key="synthetic-hero").latest_version
@@ -154,6 +199,11 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
         Card.objects.create(key="additional-public-card", label="Additional Public Card")
+        Card.objects.create(
+            key="restricted-game-master-card",
+            label="Restricted Game Master Card",
+            card_pool="game_master",
+        )
         selection.update(
             {
                 "include_all_cards": True,
@@ -172,6 +222,16 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
 
         assert manifest.counts["cards"] == 4
         assert manifest.counts["card_groups"] == 1
+        with tarfile.open(archive_path, "r:gz") as archive:
+            data_member = archive.extractfile("data.json")
+            assert data_member is not None
+            payload = json.loads(data_member.read())
+        assert {card["key"] for card in payload["cards"]} == {
+            "additional-public-card",
+            "synthetic-deprecated",
+            "synthetic-hero",
+            "synthetic-mainboard",
+        }
         transaction.set_rollback(True)
 
 
@@ -460,9 +520,9 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     hero = Card.objects.create(
         key="synthetic-hero",
         label="Synthetic Hero",
-        is_hero=True,
         deck_building_config_json={"mainboard_card_count": {"value": 60}},
     )
+    CardRoleAssignment.objects.create(card=hero, role="hero")
     hero_v1 = _create_version(
         card=hero,
         template=template,
@@ -544,7 +604,8 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "card_group_keys": [group.key],
         "coverage": {
             "min_cards": 3,
-            "min_heroes": 1,
+            "min_cards_by_pool": {"player": 3, "game_master": 0},
+            "min_cards_by_role": {"standard": 1, "hero": 1, "boon": 0, "event": 0},
             "min_deprecated_cards": 1,
             "min_card_groups": 1,
             "min_cards_with_multiple_versions": 1,

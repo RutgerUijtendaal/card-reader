@@ -89,7 +89,7 @@ const buildHero = (): DeckCardSummary =>
     result_type: 'card',
     key: 'hero-1',
     label: 'Hero',
-    is_hero: true,
+    card_pool: 'player' as const, card_roles: ['hero' as const],
     template_id: '',
     version_id: 'hero-version',
     version_number: 1,

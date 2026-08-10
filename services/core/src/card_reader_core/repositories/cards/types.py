@@ -7,6 +7,8 @@ from typing import Literal, TypedDict
 from card_reader_core.models import (
     DEFAULT_CARD_LIFECYCLE_FILTER as CORE_DEFAULT_CARD_LIFECYCLE_FILTER,
     CardLifecycleFilter as CoreCardLifecycleFilter,
+    CardPool,
+    CardRoleFilter,
     CardVersion,
     CardVersionImage,
     Keyword,
@@ -17,6 +19,7 @@ from card_reader_core.models import (
 
 CardSort = Literal["updated_desc", "name_asc", "mana_asc", "mana_desc", "mana_type_asc", "types_asc"]
 CardLifecycleFilter = CoreCardLifecycleFilter
+CardRoleMatch = Literal["any", "all"]
 CARD_SORT_UPDATED_DESC: CardSort = "updated_desc"
 CARD_SORT_NAME_ASC: CardSort = "name_asc"
 CARD_SORT_MANA_ASC: CardSort = "mana_asc"
@@ -105,7 +108,10 @@ class CardFilterParams(TypedDict):
     mana_cost_min: int | None
     mana_cost_max: int | None
     template_id: str | None
-    is_hero: bool | None
+    card_pool: CardPool
+    card_roles: list[CardRoleFilter] | None
+    card_role_exclude: list[CardRoleFilter] | None
+    card_role_match: CardRoleMatch
     attack_min: int | None
     attack_max: int | None
     health_min: int | None

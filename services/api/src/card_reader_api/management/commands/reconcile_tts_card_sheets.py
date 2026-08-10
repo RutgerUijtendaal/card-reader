@@ -16,6 +16,7 @@ class Command(BaseCommand):
         result = TtsCardSheetService().reconcile_all(
             render=bool(options["render"]),
             force=bool(options["force"]),
+            progress=self.stdout.write,
         )
         self.stdout.write(
             self.style.SUCCESS(

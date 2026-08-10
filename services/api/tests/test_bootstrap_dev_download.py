@@ -28,6 +28,47 @@ def test_bootstrap_command_loads_in_a_fresh_process() -> None:
     assert completed.returncode == 0, completed.stderr
 
 
+@pytest.mark.parametrize("answer", ["y", "Y", "yes", " YES "])
+def test_bootstrap_tts_prompt_accepts_explicit_confirmation(
+    answer: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("builtins.input", lambda _prompt: answer)
+
+    assert bootstrap_dev._should_generate_tts_sheets({}) is True
+
+
+@pytest.mark.parametrize("answer", ["", "n", "no", "later"])
+def test_bootstrap_tts_prompt_defaults_to_skipping(
+    answer: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("builtins.input", lambda _prompt: answer)
+
+    assert bootstrap_dev._should_generate_tts_sheets({}) is False
+
+
+def test_bootstrap_tts_flags_bypass_the_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda _prompt: pytest.fail("TTS prompt should have been bypassed."),
+    )
+
+    assert bootstrap_dev._should_generate_tts_sheets({"generate_tts_sheets": True}) is True
+    assert bootstrap_dev._should_generate_tts_sheets({"skip_tts_sheets": True}) is False
+
+
+def test_bootstrap_tts_prompt_skips_when_input_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable_input(_prompt: str) -> str:
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", unavailable_input)
+
+    assert bootstrap_dev._should_generate_tts_sheets({}) is False
+
+
 class _Response:
     def __init__(self, content: bytes, *, status: int = 200) -> None:
         self.content = content

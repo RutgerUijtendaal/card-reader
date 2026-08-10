@@ -19,9 +19,19 @@ from card_reader_core.repositories.cards import get_card_image, resolve_image_fi
 from card_reader_core.services.cards import get_card_version_metadata
 
 
-def card_group_visible_members(group: CardGroup, lifecycle_status: CardLifecycleFilter) -> list[CardGroupMember]:
+def card_group_visible_members(
+    group: CardGroup,
+    lifecycle_status: CardLifecycleFilter,
+    *,
+    card_pool: str | None = None,
+) -> list[CardGroupMember]:
     members = sorted(group.members.all(), key=lambda member: (member.position, member.id))
-    return [member for member in members if card_is_visible_for_lifecycle(member.card, lifecycle_status)]
+    return [
+        member
+        for member in members
+        if card_is_visible_for_lifecycle(member.card, lifecycle_status)
+        and (card_pool is None or member.card.card_pool == card_pool)
+    ]
 
 
 def _get_card_version_image(version: CardVersion) -> CardVersionImage | None:
@@ -42,8 +52,9 @@ def card_group_gallery_payload(
     group: CardGroup,
     *,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+    card_pool: str | None = None,
 ) -> dict[str, object]:
-    members = card_group_visible_members(group, lifecycle_status)
+    members = card_group_visible_members(group, lifecycle_status, card_pool=card_pool)
     anchor_card_id = group.anchor_card.id
     preview_cards = []
     for member in members:
@@ -77,11 +88,12 @@ def card_group_detail_payload(
     group: CardGroup,
     *,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
+    card_pool: str | None = None,
     anchor_deck_references: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     anchor_card_id = group.anchor_card.id
     members_payload = []
-    for member in card_group_visible_members(group, lifecycle_status):
+    for member in card_group_visible_members(group, lifecycle_status, card_pool=card_pool):
         version = member.card.latest_version
         if version is None:
             continue
@@ -118,6 +130,7 @@ def card_group_admin_payload(group: CardGroup) -> dict[str, object]:
         "id": group.id,
         "key": group.key,
         "name": group.name,
+        "card_pool": group.anchor_card.card_pool,
         "anchor_card_id": anchor_card_id,
         "anchor_card_name": anchor_version.name if anchor_version is not None else group.anchor_card.label,
         "member_count": len(members),
@@ -133,6 +146,7 @@ def card_group_member_admin_payload(member: CardGroupMember, anchor_card_id: str
         "card_id": card_id,
         "card_label": member.card.label,
         "card_name": version.name if version is not None else member.card.label,
+        "card_pool": member.card.card_pool,
         "position": member.position,
         "is_anchor": card_id == anchor_card_id,
         "image_url": card_image_asset_url(image, fallback_url=f"/cards/{card_id}/image") if version is not None else None,

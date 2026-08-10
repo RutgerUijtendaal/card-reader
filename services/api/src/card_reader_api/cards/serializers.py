@@ -1,20 +1,25 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from rest_framework import serializers
 
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
+    CARD_POOLS,
+    CARD_ROLE_FILTER_VALUES,
+    CARD_ROLES,
     CARD_LIFECYCLE_FILTER_VALUES,
     CARD_LIFECYCLE_STATUSES,
     DEFAULT_CARD_LIFECYCLE_FILTER,
     Card,
     CardLifecycleFilter,
     CardVersion,
+    CardRoleFilter,
     Keyword,
     Symbol,
     Tag,
     Type,
+    card_role_keys,
     normalize_card_lifecycle_filter,
 )
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
@@ -56,7 +61,8 @@ def card_payload(
         "key": card.key,
         "label": card.label,
         "name": version.name,
-        "is_hero": card.is_hero,
+        "card_pool": card.card_pool,
+        "card_roles": list(card_role_keys(card)),
         "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
         "lifecycle_status": card.lifecycle_status,
         "template_id": version.template.key,
@@ -158,8 +164,17 @@ def symbol_option(symbol: Symbol) -> dict[str, object]:
     }
 
 
-def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) -> dict[str, object]:
-    members = list(group.members.all())
+def card_group_summary_payload(
+    group: CardGroup,
+    *,
+    card_id: str | None = None,
+    card_pool: str | None = None,
+) -> dict[str, object]:
+    members = [
+        member
+        for member in group.members.all()
+        if card_pool is None or member.card.card_pool == card_pool
+    ]
     anchor_card_id = group.anchor_card.id
     card_ids = [member.card.id for member in members]
     position = next((member.position for member in members if member.card.id == card_id), None)
@@ -167,6 +182,7 @@ def card_group_summary_payload(group: CardGroup, *, card_id: str | None = None) 
         "id": group.id,
         "key": group.key,
         "name": group.name,
+        "card_pool": group.anchor_card.card_pool,
         "anchor_card_id": anchor_card_id,
         "member_count": len(members),
         "card_ids": card_ids,
@@ -184,7 +200,7 @@ def card_deck_reference_payload(deck: Deck, *, card_id: str) -> dict[str, object
         if entry.card.id == card_id
     )
     return {
-        "is_hero": deck.hero_card.id == card_id,
+        "as_hero": deck.hero_card.id == card_id,
         "mainboard_quantity": mainboard_quantity,
         "sideboard_quantity": sideboard_quantity,
     }
@@ -259,7 +275,18 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     mana_cost_min = serializers.IntegerField(required=False, allow_null=True)
     mana_cost_max = serializers.IntegerField(required=False, allow_null=True)
     template_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    is_hero = serializers.BooleanField(required=False, allow_null=True)
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False, default="player")
+    card_roles = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_ROLE_FILTER_VALUES),
+        required=False,
+        allow_empty=True,
+    )
+    card_role_exclude = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_ROLE_FILTER_VALUES),
+        required=False,
+        allow_empty=True,
+    )
+    card_role_match = serializers.ChoiceField(choices=["any", "all"], required=False, default="any")
     attack_min = serializers.IntegerField(required=False, allow_null=True)
     attack_max = serializers.IntegerField(required=False, allow_null=True)
     health_min = serializers.IntegerField(required=False, allow_null=True)
@@ -305,7 +332,13 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "mana_cost_min": self._int_or_none("mana_cost_min"),
             "mana_cost_max": self._int_or_none("mana_cost_max"),
             "template_id": self._string_or_none("template_id"),
-            "is_hero": self._bool_or_none("is_hero"),
+            "card_pool": self.validated_data.get("card_pool", "player"),
+            "card_roles": cast(list[CardRoleFilter] | None, self._string_list_or_none("card_roles")),
+            "card_role_exclude": cast(
+                list[CardRoleFilter] | None,
+                self._string_list_or_none("card_role_exclude"),
+            ),
+            "card_role_match": self.validated_data.get("card_role_match", "any"),
             "attack_min": self._int_or_none("attack_min"),
             "attack_max": self._int_or_none("attack_max"),
             "health_min": self._int_or_none("health_min"),
@@ -322,6 +355,15 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "page_size": self._required_int("page_size"),
             "show_groups": bool(self.validated_data.get("show_groups", False)),
         }
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        roles = attrs.get("card_roles")
+        if attrs.get("card_role_match") == "all" and isinstance(roles, list):
+            if "standard" in roles and len(set(roles)) > 1:
+                raise serializers.ValidationError(
+                    {"card_roles": "Standard cannot be combined with other roles when matching all."}
+                )
+        return attrs
 
     def _query_or_none(self) -> str | None:
         return self._string_or_none("q") or self._string_or_none("query")
@@ -370,7 +412,12 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     health = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     rules_text_enriched = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    is_hero = serializers.BooleanField(required=False)
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False)
+    card_roles = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_ROLES),
+        required=False,
+        allow_empty=True,
+    )
     deck_building_config = serializers.JSONField(required=False)
     lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -407,8 +454,10 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
                 updates[field_name] = self.validated_data[field_name]
         if "rules_text_enriched" in self.validated_data:
             updates["rules_text"] = self.validated_data["rules_text_enriched"]
-        if "is_hero" in self.validated_data:
-            updates["is_hero"] = self.validated_data["is_hero"]
+        if "card_pool" in self.validated_data:
+            updates["card_pool"] = self.validated_data["card_pool"]
+        if "card_roles" in self.validated_data:
+            updates["card_roles"] = self.validated_data["card_roles"]
         if "deck_building_config" in self.validated_data:
             updates["deck_building_config"] = self.validated_data["deck_building_config"]
         if "lifecycle_status" in self.validated_data:
@@ -465,3 +514,4 @@ def _validated_names(values: list[str], allowed: set[str], message: str) -> list
     if not all(value in allowed for value in values):
         raise serializers.ValidationError(message)
     return values
+    card_role_keys,

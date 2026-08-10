@@ -5,7 +5,14 @@ import json
 from django.contrib.auth import get_user_model
 from django.test import Client
 
-from card_reader_core.models import Card, CardVersion, CardVersionParseFlag, ParseResult, Template
+from card_reader_core.models import (
+    GAME_MASTER_CARD_POOL,
+    Card,
+    CardVersion,
+    CardVersionParseFlag,
+    ParseResult,
+    Template,
+)
 
 
 def test_authenticated_user_can_create_parse_flag_with_multiple_items() -> None:
@@ -59,6 +66,33 @@ def test_anonymous_user_cannot_create_parse_flag() -> None:
     )
 
     assert response.status_code in {401, 403}
+
+
+def test_game_master_parse_flags_follow_the_central_access_capability() -> None:
+    _clear_parse_flags()
+    card, version = _create_card_version(
+        name="Restricted Flag Card",
+        card_pool=GAME_MASTER_CARD_POOL,
+    )
+    regular_client = Client(HTTP_HOST="localhost")
+    regular_client.force_login(_create_user("restricted-flag-user", "password", is_staff=False))
+    staff_client = Client(HTTP_HOST="localhost")
+    staff_client.force_login(_create_user("restricted-flag-staff", "password", is_staff=True))
+    payload = {"items": [{"property_key": "name", "expected_value": "Correct name"}]}
+
+    regular_response = regular_client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data=payload,
+        content_type="application/json",
+    )
+    staff_response = staff_client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data=payload,
+        content_type="application/json",
+    )
+
+    assert regular_response.status_code == 404
+    assert staff_response.status_code == 201
 
 
 def test_authenticated_user_can_create_overall_and_property_flag_items() -> None:
@@ -235,9 +269,13 @@ def _clear_parse_flags() -> None:
     CardVersionParseFlag.objects.all().delete()
 
 
-def _create_card_version(*, name: str) -> tuple[Card, CardVersion]:
+def _create_card_version(*, name: str, card_pool: str = "player") -> tuple[Card, CardVersion]:
     template = Template.objects.get(key="mtg-like-v1")
-    card = Card.objects.create(key=name.lower().replace(" ", "-"), label=name)
+    card = Card.objects.create(
+        key=name.lower().replace(" ", "-"),
+        label=name,
+        card_pool=card_pool,
+    )
     version = CardVersion.objects.create(
         card=card,
         version_number=1,

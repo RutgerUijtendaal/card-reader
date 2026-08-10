@@ -7,6 +7,7 @@ import {
   DEFAULT_CARD_LIFECYCLE_FILTER,
   normalizeCardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
+import type { CardRoleFilter } from '@/domain/cards/types/cardModels';
 
 const readQueryValues = (
   value:
@@ -22,12 +23,23 @@ const readQueryValues = (
   return typeof value === 'string' ? [value] : [];
 };
 
+const readCardRoleValues = (value: LocationQueryValue | LocationQueryValue[] | undefined): CardRoleFilter[] =>
+  readQueryValues(value).filter((role): role is CardRoleFilter =>
+    ['standard', 'hero', 'boon', 'event'].includes(role),
+  );
+
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
   normalizeCardFilterState({
     query: typeof query.q === 'string' ? query.q : '',
     lifecycleStatus: normalizeCardLifecycleFilterValue(
       typeof query.lifecycle_status === 'string' ? query.lifecycle_status : undefined,
     ),
+    cardPool: query.card_pool === 'game_master' ? 'game_master' : 'player',
+    cardRoleMatch: query.card_role_match === 'all' ? 'all' : 'any',
+    cardRoleKeys: readCardRoleValues(query.card_roles),
+    cardRoleExcludeKeys: query.card_role_exclude === undefined
+      ? ['hero']
+      : readCardRoleValues(query.card_role_exclude),
     keywordMatch: query.keyword_match === 'all' ? 'all' : 'any',
     tagMatch: query.tag_match === 'all' ? 'all' : 'any',
     typeMatch: query.type_match === 'all' ? 'all' : 'any',
@@ -69,6 +81,14 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   if (normalized.query) query.q = normalized.query;
   if (normalized.lifecycleStatus !== DEFAULT_CARD_LIFECYCLE_FILTER)
     query.lifecycle_status = normalized.lifecycleStatus;
+  if (normalized.cardPool !== 'player') query.card_pool = normalized.cardPool;
+  if (normalized.cardRoleMatch === 'all') query.card_role_match = 'all';
+  if (normalized.cardRoleKeys.length > 0) query.card_roles = normalized.cardRoleKeys;
+  if (normalized.cardRoleExcludeKeys.length === 0) query.card_role_exclude = 'none';
+  else if (
+    normalized.cardRoleExcludeKeys.length !== 1
+    || normalized.cardRoleExcludeKeys[0] !== 'hero'
+  ) query.card_role_exclude = normalized.cardRoleExcludeKeys;
   if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
   if (normalized.tagMatch === 'all') query.tag_match = 'all';
   if (normalized.typeMatch === 'all') query.type_match = 'all';

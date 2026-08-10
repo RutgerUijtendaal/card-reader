@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from card_reader_core.models import Card
+from card_reader_core.models import HERO_CARD_ROLE, Card, card_has_role
 from card_reader_core.repositories.decks import get_cards_by_ids, get_deck_card
 
 from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
@@ -18,9 +18,8 @@ class DeckPayloadNormalizer:
         hero_card = get_deck_card(hero_card_id)
         if hero_card is None:
             raise ValueError("Hero card not found.")
-        if not hero_card.is_hero:
+        if not card_has_role(hero_card, HERO_CARD_ROLE):
             raise ValueError("Hero card must be marked as a hero.")
-
         ordered_entry_ids = [entry.card_id.strip() for entry in entries if entry.card_id.strip()]
         if len(ordered_entry_ids) != len(entries):
             raise ValueError("Each deck entry must reference a card.")
@@ -105,7 +104,7 @@ class DeckPayloadNormalizer:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
             card = cards_by_id[card_id]
-            if card.is_hero:
+            if card_has_role(card, HERO_CARD_ROLE):
                 raise ValueError("Hero cards cannot appear in mainboard entries.")
             if card.id == hero_card.id:
                 raise ValueError("Hero card cannot also appear in the mainboard.")
@@ -160,7 +159,7 @@ class DeckPayloadNormalizer:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
             card = cards_by_id[card_id]
-            if card.is_hero or card.id == hero_card.id:
+            if card_has_role(card, HERO_CARD_ROLE) or card.id == hero_card.id:
                 raise ValueError("Hero cards cannot appear in sideboards.")
             normalized_sideboard_entries.append((card.id, quantity))
             constraint_entries.append(DeckConstraintEntry(card=card, quantity=quantity, board="sideboard"))

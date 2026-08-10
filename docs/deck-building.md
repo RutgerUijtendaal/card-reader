@@ -6,6 +6,12 @@ Deck building combines card selection with core-owned rules so the editor, API, 
 
 A deck can contain a hero, a mainboard, and supported sideboard sections. Entries reference stable card identities and store quantities rather than copying card content into the deck.
 
+All referenced cards must belong to the Player pool. The selected hero must also have the Hero role, and Hero-role cards remain excluded from ordinary mainboard entries under the existing rules. Deck-builder searches send the Player pool explicitly and use role filters rather than a card boolean.
+
+The current deck model and builder are therefore the **Player deck** workflow. Decks do not yet persist their own Player/Game Master classification. A later deck-design project is expected to classify stable deck identities explicitly, but it must define Game Master deck structure and validation on their own terms instead of assuming the current hero/mainboard/sideboard shape applies.
+
+A future **Scenario** sits above ordinary decks rather than turning a deck into a mixed-pool container. The intended direction is that a scenario can reference Player decks together with Game Master Boons, Events, and other scenario material, potentially through groups. Its exact schema, ownership, cardinalities, and authoring flow remain deliberately undecided.
+
 Decks are owned by users and may be private or publicly listed according to their visibility state. List surfaces use compact summary records; detail, editing, export, and playtest flows load the full deck only when board entries are required.
 
 ## Local-first creation
@@ -46,8 +52,8 @@ Overrides are interpreted and validated by core services. Clients should display
 
 The API validates submitted deck changes against the same rule model exposed to the frontend. This keeps direct API requests and interactive editor actions consistent.
 
-If a card in an existing deck becomes deprecated, the reference is retained. The deck can then show a warning or invalid public-listing state rather than losing an entry without the owner's involvement.
+If a card in an existing deck becomes deprecated, loses the Hero role while selected as the hero, or moves to the Game Master pool, the reference is retained. The deck then shows a warning or invalid public-listing state rather than losing an entry without the owner's involvement. Non-staff owners see a restricted placeholder instead of embedded Game Master card content, while retaining enough deck context to remove or replace the reference.
 
 ## Related features
 
-Decks can be exported and opened in the [Playtester](playtester.md). Card identity, lifecycle, and per-card configuration are described in [Card management](card-management.md).
+Player decks can be exported and opened in the [Playtester](playtester.md). Game Master deck behavior and scenario composition remain deferred. Card identity, lifecycle, and per-card configuration are described in [Card management](card-management.md).

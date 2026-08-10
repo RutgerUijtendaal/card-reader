@@ -6,6 +6,7 @@ from enum import StrEnum
 from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     ALL_CARD_LIFECYCLE_FILTER,
+    PLAYER_CARD_POOL,
     CardVersionImage,
 )
 from card_reader_core.repositories.cards import (
@@ -254,6 +255,22 @@ class TtsCardExportService:
         skipped = list(selection.skipped)
         for entry in selection.entries:
             row = entry.row
+            if row.version.card.card_pool != PLAYER_CARD_POOL:
+                if entry.required:
+                    raise _required_card_unavailable(
+                        row.version.name,
+                        "does not belong to the Player pool",
+                    )
+                skipped.append(
+                    TtsCardExportSkippedCard(
+                        card_id=row.version.card.id,
+                        name=row.version.name,
+                        quantity=entry.quantity,
+                        reason="Game Master cards are not available in public TTS sheets.",
+                        role=entry.role,
+                    )
+                )
+                continue
             image = _first_usable_image(row)
             if image is None:
                 if entry.required:

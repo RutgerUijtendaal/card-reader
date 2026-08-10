@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
-  <desc id="desc">Linear database diagram with Card and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, imported and parsed version data on the right, and import lineage above.</desc>
+  <desc id="desc">Linear database diagram with Card classification and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, imported and parsed version data on the right, and import lineage above.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
@@ -34,7 +34,7 @@
 
   <rect class="bg" width="2000" height="1250"/>
   <text x="70" y="58" style="font: 800 34px Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
-  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable card identity and TTS sheets. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
+  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable identity, pool/role classification, and TTS sheets. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
 
   <rect class="band" x="55" y="130" width="1890" height="190"/>
   <text class="band-title" x="80" y="162">Import lineage / parser output</text>
@@ -136,15 +136,15 @@
   <rect class="box card" x="745" y="575" width="230" height="190"/>
   <text class="title" x="812" y="615">Card</text>
   <text class="field" x="775" y="645">id, key, label</text>
-  <text class="field" x="775" y="670">is_hero</text>
+  <text class="field" x="775" y="670">card_pool (Player / Game Master)</text>
   <text class="field" x="775" y="695">lifecycle_status</text>
   <text class="field" x="775" y="720">deck_building_config_json</text>
   <text class="field" x="775" y="745">latest_version</text>
 
-  <rect x="730" y="805" width="260" height="92" fill="#ffffff" stroke="#cbd5e1" rx="12"/>
-  <text x="755" y="835" class="small">Card is the object decks, groups,</text>
-  <text x="755" y="858" class="small">aliases, imports, and parsed versions</text>
-  <text x="755" y="881" class="small">all converge on.</text>
+  <rect class="box card" x="730" y="805" width="260" height="92"/>
+  <text x="760" y="837" class="title-small">CardRoleAssignment</text>
+  <text x="755" y="861" class="field">card + role (unique)</text>
+  <text x="755" y="883" class="small">Hero / Boon / Event; none = Standard</text>
 
   <rect class="box tts" x="725" y="935" width="270" height="104"/>
   <text class="title" x="785" y="970">TtsCardSheet</text>
@@ -278,6 +278,9 @@
   <text class="label" x="1015" y="575">versions</text>
   <path class="soft" d="M1125 595 C1048 645, 1040 725, 975 745"/>
   <text class="label" x="1015" y="710">latest_version</text>
+
+  <path class="line" d="M860 765 L860 805"/>
+  <text class="label" x="872" y="792">roles</text>
 
   <path class="line" d="M860 1070 L860 1039"/>
   <text class="label" x="872" y="1058">sheet</text>
