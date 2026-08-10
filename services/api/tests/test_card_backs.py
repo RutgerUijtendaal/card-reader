@@ -63,6 +63,10 @@ def test_staff_upload_creates_current_card_back_with_canonical_webp(
     assert payload["is_current"] is True
     assert payload["image_url"] == f"/card-images/{card_back.stored_path}"
 
+    public_image_response = Client(HTTP_HOST="localhost").get(payload["image_url"])
+    assert public_image_response.status_code == 200
+    public_image_response.close()
+
     current_response = client.get("/card-backs/current")
     assert current_response.status_code == 200
     current_payload = current_response.json()["current"]

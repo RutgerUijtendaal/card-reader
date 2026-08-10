@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import type { CardGroupSummary } from '@/domain/cards/types';
-import { reconcileCardGroupsAfterPoolChange } from './useCardDetailState';
+import {
+  reconcileCardGroupsAfterPoolChange,
+  synchronizeCardClassification,
+  type CardClassificationFields,
+} from './useCardDetailState';
 
 const buildGroup = (
   id: string,
@@ -29,6 +33,45 @@ describe('reconcileCardGroupsAfterPoolChange', () => {
     expect(reconcileCardGroupsAfterPoolChange(groups, 'game_master')).toEqual([
       { ...groups[0], card_pool: 'game_master' },
       groups[2],
+    ]);
+  });
+});
+
+describe('synchronizeCardClassification', () => {
+  test('updates card-level classification across current and historical generations', () => {
+    const generations: CardClassificationFields[] = [
+      {
+        version_id: 'current',
+        card_pool: 'player',
+        card_roles: ['hero'],
+        deck_building_config: { overrides: {} },
+        lifecycle_status: 'active',
+      },
+      {
+        version_id: 'historical',
+        card_pool: 'player',
+        card_roles: ['hero'],
+        deck_building_config: { overrides: {} },
+        lifecycle_status: 'active',
+      },
+    ];
+    const updated: CardClassificationFields = {
+      ...generations[0],
+      card_pool: 'game_master',
+      card_roles: ['event'],
+      deck_building_config: { overrides: { mainboard_copy_limit: { max: 1 } } },
+      lifecycle_status: 'deprecated',
+    };
+
+    expect(synchronizeCardClassification(generations, updated)).toEqual([
+      updated,
+      {
+        ...generations[1],
+        card_pool: 'game_master',
+        card_roles: ['event'],
+        deck_building_config: updated.deck_building_config,
+        lifecycle_status: 'deprecated',
+      },
     ]);
   });
 });
