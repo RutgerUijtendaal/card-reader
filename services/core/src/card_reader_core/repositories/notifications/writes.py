@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db import IntegrityError, transaction
 from django.db.models import F, QuerySet
 
-from card_reader_core.models import UserNotification, now_utc
+from card_reader_core.models import CardMergeRedirect, UserNotification, now_utc
 
 from .queries import notification_queryset
 from .types import NotificationInput, NotificationReadStateConflict
@@ -126,7 +126,11 @@ def mark_all_notifications_read(recipient_id: str) -> int:
 
 def archive_notifications_for_card(card_id: str) -> int:
     now = now_utc()
+    referenced_card_ids = [
+        card_id,
+        *CardMergeRedirect.objects.filter(target_card_id=card_id).values_list("old_card_id", flat=True),
+    ]
     return UserNotification.objects.filter(
-        metadata_json__card_id=card_id,
+        metadata_json__card_id__in=referenced_card_ids,
         archived_at__isnull=True,
     ).update(archived_at=now, updated_at=now)

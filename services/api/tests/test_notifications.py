@@ -10,6 +10,7 @@ import pytest
 
 from card_reader_core.config import settings
 from card_reader_core.models import (
+    CardMergeRedirect,
     CardVersion,
     ImportJob,
     ImportJobItem,
@@ -773,8 +774,22 @@ def test_game_master_reclassification_archives_card_notifications_and_stops_futu
             metadata={"card_id": card.id, "card_version_id": version.id},
         )
     )
+    merged_source_card_id = "notification-reclassified-merged-source"
+    CardMergeRedirect.objects.create(old_card_id=merged_source_card_id, target_card=card)
+    create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="reclassified-merged-source-flag-item",
+            target_url=f"/cards/{merged_source_card_id}",
+            title="Flag resolved: merged source",
+            message="A merged-source card-linked flag was resolved.",
+            metadata={"card_id": merged_source_card_id, "card_version_id": version.id},
+        )
+    )
     assert len(created) == 1
-    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 2
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 3
 
     updated = update_latest_card_version_with_notifications(
         card_id=card.id,
@@ -820,6 +835,20 @@ def test_game_master_reclassification_is_authoritative_when_cleanup_fails(
             metadata={"card_id": card.id, "card_version_id": version.id},
         )
     )
+    merged_source_card_id = "notification-cleanup-failure-merged-source"
+    CardMergeRedirect.objects.create(old_card_id=merged_source_card_id, target_card=card)
+    redirected_notification = create_or_coalesce_notification(
+        NotificationInput(
+            recipient_id=str(owner.pk),
+            event_type="parse_flag_item.reviewed",
+            subject_type="parse_flag_item",
+            subject_id="cleanup-failure-merged-source-flag-item",
+            target_url=f"/cards/{merged_source_card_id}",
+            title="Flag resolved: merged source",
+            message="A merged-source card-linked flag was resolved.",
+            metadata={"card_id": merged_source_card_id, "card_version_id": version.id},
+        )
+    )
     synced_card_ids: list[str] = []
 
     def fail_archive(_service: NotificationService, _card_id: str) -> int:
@@ -844,8 +873,10 @@ def test_game_master_reclassification_is_authoritative_when_cleanup_fails(
     assert updated is not None
     card.refresh_from_db()
     notification.refresh_from_db()
+    redirected_notification.refresh_from_db()
     assert card.card_pool == "game_master"
     assert notification.archived_at is None
+    assert redirected_notification.archived_at is None
     assert synced_card_ids == [card.id]
     client = Client(HTTP_HOST="localhost")
     client.force_login(owner)

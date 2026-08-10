@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import TypedDict, cast
 
+from django.utils.crypto import salted_hmac
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
@@ -374,7 +375,7 @@ def deck_card_payload(
 
 def _restricted_deck_card_summary(card: Card) -> dict[str, object]:
     return {
-        "id": card.id,
+        "id": _restricted_deck_card_id(card),
         "key": "restricted-game-master-card",
         "label": "Restricted Game Master card",
         "card_pool": card.card_pool,
@@ -388,7 +389,7 @@ def _restricted_deck_card_summary(card: Card) -> dict[str, object]:
 
 def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
     return {
-        "id": card.id,
+        "id": _restricted_deck_card_id(card),
         "result_type": "card",
         "key": "restricted-game-master-card",
         "label": "Restricted Game Master card",
@@ -419,6 +420,15 @@ def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
         "types": [],
         "restricted": True,
     }
+
+
+def _restricted_deck_card_id(card: Card) -> str:
+    digest = salted_hmac(
+        "card-reader.restricted-deck-card",
+        card.id,
+        algorithm="sha256",
+    ).hexdigest()
+    return f"restricted-card-{digest[:24]}"
 
 
 def _deck_card_metadata(version: CardVersion) -> CardMetadata:

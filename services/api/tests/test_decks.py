@@ -3235,6 +3235,8 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert owner_payload["deck_building_rules"]["mainboard_copy_limit"]["max"] == 4
     restricted_card = owner_payload["mainboard"]["entries"][0]["card"]
     assert restricted_card["restricted"] is True
+    assert restricted_card["id"] != reclassified.id
+    assert restricted_card["id"].startswith("restricted-card-")
     assert restricted_card["name"] == "Restricted Game Master card"
     assert restricted_card["lifecycle_status"] == "active"
     assert "Secret Reclassified Event" not in owner_response.content.decode()
