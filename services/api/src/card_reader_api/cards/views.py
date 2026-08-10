@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.cards.file_views import (
+    card_back_owns_immutable_image,
     cards_for_immutable_image,
     file_response,
     immutable_card_image_response,
@@ -430,7 +431,8 @@ class ImmutableCardImageView(APIView):
             relative_path,
             card_pool_scope=card_pool_scope,
         )
-        if not cards:
+        is_card_back = card_back_owns_immutable_image(relative_path)
+        if not cards and not is_card_back:
             raise Http404("Card image not found")
         return immutable_card_image_response(relative_path)
 
