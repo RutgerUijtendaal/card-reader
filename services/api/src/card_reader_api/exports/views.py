@@ -16,7 +16,7 @@ from card_reader_api.common.urls import build_public_api_url
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts_cards import encode_tts_card_export
 from card_reader_core.repositories.exports import export_cards_csv
-from card_reader_core.services.decks import DeckService, deck_uses_out_of_scope_card
+from card_reader_core.services.decks import DeckService, deck_export_uses_out_of_scope_card
 from card_reader_core.services.exports import (
     TtsCardExportError,
     TtsCardExportErrorCode,
@@ -141,10 +141,13 @@ class DeckTtsExportView(APIView):
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
             return not_found("Deck not found")
-        if deck_uses_out_of_scope_card(deck, PLAYER_CARD_POOL_SCOPE):
-            return not_found("Deck not found")
-
         sideboard_id = request.query_params.get("sideboard_id")
+        if deck_export_uses_out_of_scope_card(
+            deck,
+            PLAYER_CARD_POOL_SCOPE,
+            sideboard_id=sideboard_id,
+        ):
+            return not_found("Deck not found")
         try:
             export_data = TtsCardExportService().build_deck_export(
                 str(deck.id),

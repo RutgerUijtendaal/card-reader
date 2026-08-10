@@ -25,6 +25,8 @@ After this step:
 - new card-derived surfaces must choose a scope before they can return data;
 - Step 2 and Step 3 can reuse the seam without adding another family of authorization branches.
 
+Review hardening also established that Player-workflow eligibility is separate from general deck validity: Playtester accepts under-construction Player-only decks but rejects any deck with a non-Player reference, and deck TTS export evaluates only the requested mainboard or sideboard. Restricted deck placeholders keep the complete client snapshot shape while exposing no original card state. Immutable image ownership resolves candidates through the indexed checksum before exact path verification, and catalog card previews prefetch role assignments before serializing classification badges.
+
 ## Why this checkpoint exists
 
 Step 1 correctly centralized the entitlement in `can_access_game_master_cards(user)`, but review found secondary disclosures across independent output paths: immutable images, TTS sheets, developer-data bundles, filter counts, deck filters and rules, notification snapshots, parse flags, and idempotent replay.

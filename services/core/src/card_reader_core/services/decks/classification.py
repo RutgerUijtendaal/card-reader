@@ -26,4 +26,27 @@ def deck_uses_out_of_scope_card(deck: Deck, card_pool_scope: CardPoolScope) -> b
     )
 
 
-__all__ = ["deck_uses_card_pool", "deck_uses_out_of_scope_card", "iter_deck_cards"]
+def deck_export_uses_out_of_scope_card(
+    deck: Deck,
+    card_pool_scope: CardPoolScope,
+    *,
+    sideboard_id: str | None,
+) -> bool:
+    if sideboard_id is None:
+        cards = [deck.hero_card, *(entry.card for entry in deck.entries.all())]
+    else:
+        cards = [
+            entry.card
+            for sideboard in deck.sideboards.all()
+            if sideboard.id == sideboard_id
+            for entry in sideboard.entries.all()
+        ]
+    return any(not card_pool_scope.allows_card_pool(card.card_pool) for card in cards)
+
+
+__all__ = [
+    "deck_export_uses_out_of_scope_card",
+    "deck_uses_card_pool",
+    "deck_uses_out_of_scope_card",
+    "iter_deck_cards",
+]

@@ -97,6 +97,7 @@ const buildDeck = (id: string, name: string, heroName: string, owner = 'owner') 
     label: 'Ready',
     deprecated_card_count: 0,
   },
+  has_restricted_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 });
@@ -168,6 +169,7 @@ const buildDeckDetail = (id: string, name: string, heroName: string, owner = 'ow
       deprecated_card_count: 0,
       deprecated_card_ids: [],
     },
+    has_restricted_cards: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   };

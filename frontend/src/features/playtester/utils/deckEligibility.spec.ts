@@ -25,6 +25,7 @@ const buildSummary = (): DeckSummaryRecord => ({
   mainboard: { total_cards: 1, unique_cards: 1 },
   sideboard_count: 0,
   status: { is_valid: true, label: 'Ready' },
+  has_restricted_cards: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 });
@@ -52,15 +53,16 @@ const buildDeck = (): DeckRecord => {
 };
 
 describe('playtester deck eligibility', () => {
-  test('accepts valid Player deck summaries and rejects invalid or restricted ones', () => {
+  test('accepts invalid Player deck summaries and rejects restricted ones', () => {
     const summary = buildSummary();
     expect(isPlaytestDeckSummaryEligible(summary)).toBe(true);
     expect(isPlaytestDeckSummaryEligible({
       ...summary,
       status: { ...summary.status, is_valid: false },
-    })).toBe(false);
+    })).toBe(true);
     expect(isPlaytestDeckSummaryEligible({
       ...summary,
+      has_restricted_cards: true,
       hero_card: { ...summary.hero_card, card_pool: 'game_master', restricted: true },
     })).toBe(false);
   });
@@ -68,6 +70,10 @@ describe('playtester deck eligibility', () => {
   test('rejects a full deck when any referenced card is not a visible Player card', () => {
     const deck = buildDeck();
     expect(isPlaytestDeckEligible(deck)).toBe(true);
+    expect(isPlaytestDeckEligible({
+      ...deck,
+      status: { ...deck.status, is_valid: false, issues: ['Under construction'] },
+    })).toBe(true);
     expect(isPlaytestDeckEligible({
       ...deck,
       mainboard: {

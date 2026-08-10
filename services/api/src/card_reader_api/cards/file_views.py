@@ -26,10 +26,10 @@ def cards_for_immutable_image(
     card_pool_scope: CardPoolScope,
 ) -> list[Card]:
     normalized = Path(relative_path).as_posix().strip("/")
-    filename = Path(normalized).name
+    checksum = Path(normalized).stem
     cards: dict[str, Card] = {}
     for image in CardVersionImage.objects.select_related("card_version__card").filter(
-        stored_path__endswith=filename,
+        checksum=checksum,
         card_version__card__card_pool__in=card_pool_scope.allowed_pools,
     ):
         try:
@@ -44,8 +44,8 @@ def cards_for_immutable_image(
 
 def card_back_owns_immutable_image(relative_path: str) -> bool:
     normalized = Path(relative_path).as_posix().strip("/")
-    filename = Path(normalized).name
-    for stored_path in CardBack.objects.filter(stored_path__endswith=filename).values_list(
+    checksum = Path(normalized).stem
+    for stored_path in CardBack.objects.filter(checksum=checksum).values_list(
         "stored_path", flat=True
     ):
         try:

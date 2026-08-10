@@ -1,12 +1,11 @@
 import type { DeckRecord, DeckSummaryRecord } from '@/domain/decks/types';
 
 export const isPlaytestDeckSummaryEligible = (deck: DeckSummaryRecord): boolean =>
-  deck.status.is_valid
+  !deck.has_restricted_cards
   && deck.hero_card.restricted !== true
   && deck.hero_card.card_pool === 'player';
 
 export const isPlaytestDeckEligible = (deck: DeckRecord): boolean => {
-  if (!deck.status.is_valid) return false;
   const cards = [
     deck.hero_card,
     ...deck.mainboard.entries.map((entry) => entry.card),
