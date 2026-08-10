@@ -518,6 +518,7 @@ def list_cards_for_content_version(
         versions
         .select_related("card", "template", "previous_version", "content_version")
         .prefetch_related(
+            "card__role_assignments",
             "images",
             Prefetch(
                 "card_version_keywords",

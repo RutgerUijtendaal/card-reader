@@ -1016,6 +1016,36 @@ def test_admin_content_version_cards_returns_cards_for_selected_version() -> Non
     assert payload[0]["content_version"]["version_number"] == "74.1.0"
 
 
+def test_admin_content_version_cards_prefetches_card_roles() -> None:
+    content_version = ContentVersion.objects.create(
+        version_number="74.3.0",
+        base_version="74.3",
+        major=74,
+        minor=3,
+        patch=0,
+        description="Role query budget.",
+    )
+    expected_roles: dict[str, list[str]] = {}
+    for index, role in enumerate(["hero", "boon", "event", None]):
+        card, version = _create_editable_card_version(name=f"Role Query Budget {index}")
+        version.content_version = content_version
+        version.save(update_fields=["content_version"])
+        if role is not None:
+            CardRoleAssignment.objects.create(card=card, role=role)
+            expected_roles[card.id] = [role]
+        else:
+            expected_roles[card.id] = []
+
+    client = _staff_client("content-version-card-role-query-user")
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get(f"/admin/content-versions/{content_version.id}/cards")
+
+    assert response.status_code == 200
+    assert {row["id"]: row["card_roles"] for row in response.json()} == expected_roles
+    role_queries = [query for query in queries if "card_role_assignment" in query["sql"]]
+    assert len(role_queries) == 1
+
+
 def test_admin_content_version_patch_updates_version_and_description() -> None:
     content_version = ContentVersion.objects.create(
         version_number="175.1.0",

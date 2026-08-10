@@ -47,7 +47,7 @@ from card_reader_core.operations.developer_data import (
     sha256_file,
     validate_archive,
 )
-from card_reader_core.operations.developer_data.schema import adopt_payload_for_format
+from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
 
 
 def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
@@ -62,6 +62,31 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
             {"key": "standard", "card_pool": "player", "card_roles": []},
         ]
     }
+
+
+@pytest.mark.parametrize("legacy_card", [{"key": "missing"}, {"key": "wrong-type", "is_hero": "true"}])
+def test_version_one_payload_adoption_rejects_invalid_hero_fields(
+    legacy_card: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="is_hero must be a Boolean"):
+        adopt_payload_for_format({"cards": [legacy_card]}, format_version=1)
+
+
+def test_version_two_card_record_rejects_duplicate_roles() -> None:
+    with pytest.raises(ValueError, match="Card roles must be unique"):
+        CardRecord.model_validate(
+            {
+                "key": "duplicate-role-card",
+                "label": "Duplicate Role Card",
+                "card_pool": "player",
+                "card_roles": ["hero", "hero"],
+                "deck_building_config": {},
+                "lifecycle_status": "active",
+                "latest_version_number": None,
+                "aliases": [],
+                "versions": [],
+            }
+        )
 
 
 def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(

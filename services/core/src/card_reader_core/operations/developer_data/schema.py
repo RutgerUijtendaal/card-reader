@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 DEVELOPER_DATA_FORMAT_VERSION = 2
 SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, DEVELOPER_DATA_FORMAT_VERSION)
@@ -133,6 +133,16 @@ class CardRecord(StrictModel):
     aliases: list[CardAliasRecord]
     versions: list[CardVersionRecord]
 
+    @field_validator("card_roles")
+    @classmethod
+    def validate_unique_card_roles(
+        cls,
+        value: list[Literal["hero", "boon", "event"]],
+    ) -> list[Literal["hero", "boon", "event"]]:
+        if len(value) != len(set(value)):
+            raise ValueError("Card roles must be unique.")
+        return value
+
 
 class CardGroupMemberRecord(StrictModel):
     card_key: str
@@ -214,7 +224,9 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             adopted_cards.append(card)
             continue
         adopted_card = dict(card)
-        was_hero = adopted_card.pop("is_hero", False)
+        if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
+            raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
+        was_hero = adopted_card.pop("is_hero")
         adopted_card["card_pool"] = "player"
         adopted_card["card_roles"] = ["hero"] if was_hero is True else []
         adopted_cards.append(adopted_card)
