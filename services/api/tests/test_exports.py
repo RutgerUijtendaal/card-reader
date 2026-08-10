@@ -195,6 +195,7 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
         [hero, *mainboard_cards, player_sideboard_card],
     )
     client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
 
     mainboard_response = client.get(f"/decks/{deck.id}/exports/tts")
     player_sideboard_response = client.get(
