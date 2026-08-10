@@ -13,6 +13,7 @@ from .service import (
     get_card_version_metadata,
     get_card_versions_metadata,
     get_card_with_image,
+    get_card_with_image_in_scope,
     get_filter_metadata,
     resolve_card_image_path,
 )
@@ -29,6 +30,7 @@ __all__ = [
     "get_card_version_metadata",
     "get_card_versions_metadata",
     "get_card_with_image",
+    "get_card_with_image_in_scope",
     "get_filter_metadata",
     "resolve_card_image_path",
     "save_parsed_card_with_notifications",

@@ -12,6 +12,8 @@ catalog at build time; Game Master cards are excluded while that pool is restric
 keys remain regression anchors that must still exist. The committed
 `dev-data.lock.json` pins the required bundle version, format, checksum, and website API.
 
+Selection, group validation, and archive construction use a fixed canonical Player-only `CardPoolScope`. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive Game Master eligibility cannot expand published bundles accidentally.
+
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and
 Playtester workflows. Version 2 card records include the required `card_pool` and canonical

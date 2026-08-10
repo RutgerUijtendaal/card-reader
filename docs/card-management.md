@@ -55,6 +55,6 @@ Merges are domain operations, not raw row deletion. Conflict checks and a previe
 
 ## Ownership boundaries
 
-API views handle authorization, request validation, and response formatting. Core card, card-group, and card-merge services enforce lifecycle and relationship rules, while repositories own the underlying Django queries and writes.
+API views handle authorization, request validation, and response formatting. They translate the viewer capability into `CardPoolScope` once and pass that visibility value into card-derived repositories, services, and payload builders. Core code does not inspect users or staff state. Card, card-group, catalog, deck, image, and export queries apply the scope before search, counts, ordering, previews, or aggregation, while unrestricted persistence helpers remain deliberate administrative/domain operations.
 
 This separation keeps imports, staff tools, deck building, and future clients aligned on the same card behavior.

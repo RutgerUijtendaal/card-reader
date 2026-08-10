@@ -13,27 +13,27 @@ from card_reader_api.card_groups.serializers import (
 )
 from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
-from card_reader_api.common.auth_access import can_access_game_master_cards, is_authenticated
+from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
 from card_reader_api.common.permissions import StaffAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.card_groups import CardGroupMemberInput, CardGroupService
-from card_reader_core.models import GAME_MASTER_CARD_POOL
 
 
 class PublicCardGroupDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, group_id: str) -> Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = CardFiltersQuerySerializer(data=_lifecycle_query_data(request))
         if not serializer.is_valid():
             return serializer_error(serializer)
         filters = serializer.validated_filters()
         lifecycle_status = filters["lifecycle_status"]
         card_pool = filters["card_pool"]
-        if card_pool == GAME_MASTER_CARD_POOL and not can_access_game_master_cards(request.user):
+        if not card_pool_scope.allows_card_pool(card_pool):
             return Response({"detail": "Game Master cards require staff access."}, status=status.HTTP_403_FORBIDDEN)
-        group = CardGroupService().get_group(group_id)
-        if group is None or group.anchor_card.card_pool != card_pool:
+        group = CardGroupService().get_group_for_pool(group_id, card_pool=card_pool)
+        if group is None:
             return not_found("Card group not found")
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
         return Response(
@@ -44,7 +44,7 @@ class PublicCardGroupDetailView(APIView):
                 anchor_deck_references=card_deck_references_payload(
                     group.anchor_card.id,
                     viewer_id=viewer_id,
-                    allow_game_master_cards=can_access_game_master_cards(request.user),
+                    card_pool_scope=card_pool_scope,
                 ),
             )
         )

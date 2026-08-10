@@ -3,7 +3,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from card_reader_api.decks.serializers import deck_hero_summary_payload
-from card_reader_core.models import Deck, DeckTag, DeckTagSuggestion
+from card_reader_core.models import ALL_CARD_POOLS_SCOPE, Deck, DeckTag, DeckTagSuggestion
 from card_reader_core.services.deck_tags import DeckTagDetail, DeckTagSuggestionDetail
 
 
@@ -26,7 +26,10 @@ def linked_deck_payload(deck: Deck) -> dict[str, object]:
             "id": str(getattr(deck.owner, "pk", "")),
             "username": deck.owner.get_username(),
         },
-        "hero_card": deck_hero_summary_payload(deck.hero_card, allow_game_master_cards=True),
+        "hero_card": deck_hero_summary_payload(
+            deck.hero_card,
+            card_pool_scope=ALL_CARD_POOLS_SCOPE,
+        ),
         "updated_at": deck.updated_at.isoformat(),
     }
 

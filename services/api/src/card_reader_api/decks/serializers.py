@@ -11,6 +11,7 @@ from card_reader_api.cards.serializers import card_payload, symbol_option
 from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
 from card_reader_core.models import (
     Card,
+    CardPoolScope,
     CardVersion,
     CardVersionImage,
     Deck,
@@ -18,8 +19,6 @@ from card_reader_core.models import (
     DeckEntry,
     DeckSideboard,
     DeckVisibility,
-    GAME_MASTER_CARD_POOL,
-    PLAYER_CARD_POOL,
     card_role_keys,
 )
 from card_reader_core.repositories.cards import get_card_image
@@ -44,13 +43,14 @@ class DeckListFilterParams(TypedDict):
 def deck_summary_payload(
     deck: Deck,
     *,
+    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
-    allow_game_master_cards: bool = False,
 ) -> dict[str, object]:
     entries = list(deck.entries.all())
     sideboards = list(deck.sideboards.all())
-    has_restricted_cards = not allow_game_master_cards and _deck_contains_game_master_cards(
+    has_restricted_cards = _deck_contains_restricted_cards(
         deck,
+        card_pool_scope=card_pool_scope,
         entries=entries,
         sideboards=sideboards,
     )
@@ -68,7 +68,7 @@ def deck_summary_payload(
         },
         "hero_card": deck_hero_summary_payload(
             deck.hero_card,
-            allow_game_master_cards=allow_game_master_cards,
+            card_pool_scope=card_pool_scope,
         ),
         "mainboard": {
             "total_cards": totals.mainboard_total_cards,
@@ -92,14 +92,15 @@ def deck_summary_payload(
 def deck_payload(
     deck: Deck,
     *,
+    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
-    allow_game_master_cards: bool = False,
 ) -> dict[str, object]:
     totals = DeckService().get_deck_totals(deck)
     entries = list(deck.entries.all())
     sideboards = list(deck.sideboards.all())
-    has_restricted_cards = not allow_game_master_cards and _deck_contains_game_master_cards(
+    has_restricted_cards = _deck_contains_restricted_cards(
         deck,
+        card_pool_scope=card_pool_scope,
         entries=entries,
         sideboards=sideboards,
     )
@@ -107,13 +108,13 @@ def deck_payload(
     constraint_entries = [
         DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="mainboard")
         for entry in entries
-        if allow_game_master_cards or entry.card.card_pool == PLAYER_CARD_POOL
+        if card_pool_scope.allows_card_pool(entry.card.card_pool)
     ]
     constraint_entries.extend(
         DeckConstraintEntry(card=entry.card, quantity=int(entry.quantity), board="sideboard")
         for sideboard in sideboards
         for entry in sideboard.entries.all()
-        if allow_game_master_cards or entry.card.card_pool == PLAYER_CARD_POOL
+        if card_pool_scope.allows_card_pool(entry.card.card_pool)
     )
     return {
         "id": deck.id,
@@ -128,7 +129,7 @@ def deck_payload(
         },
         "hero_card": deck_card_payload(
             deck.hero_card,
-            allow_game_master_cards=allow_game_master_cards,
+            card_pool_scope=card_pool_scope,
         ),
         "mainboard": {
             "total_cards": totals.mainboard_total_cards,
@@ -138,7 +139,7 @@ def deck_payload(
                     "quantity": entry.quantity,
                     "card": deck_card_payload(
                         entry.card,
-                        allow_game_master_cards=allow_game_master_cards,
+                        card_pool_scope=card_pool_scope,
                     ),
                 }
                 for entry in entries
@@ -155,7 +156,7 @@ def deck_payload(
                         "quantity": entry.quantity,
                         "card": deck_card_payload(
                             entry.card,
-                            allow_game_master_cards=allow_game_master_cards,
+                            card_pool_scope=card_pool_scope,
                         ),
                     }
                     for entry in sideboard.entries.all()
@@ -184,7 +185,7 @@ def deck_payload(
         "deck_building_rules": effective_deck_building_rules_json(
             hero_card=(
                 deck.hero_card
-                if allow_game_master_cards or deck.hero_card.card_pool == PLAYER_CARD_POOL
+                if card_pool_scope.allows_card_pool(deck.hero_card.card_pool)
                 else None
             ),
             entries=constraint_entries,
@@ -198,18 +199,19 @@ def deck_payload(
     }
 
 
-def _deck_contains_game_master_cards(
+def _deck_contains_restricted_cards(
     deck: Deck,
     *,
+    card_pool_scope: CardPoolScope,
     entries: Iterable[DeckEntry],
     sideboards: Iterable[DeckSideboard],
 ) -> bool:
-    if deck.hero_card.card_pool == GAME_MASTER_CARD_POOL:
+    if not card_pool_scope.allows_card_pool(deck.hero_card.card_pool):
         return True
-    if any(entry.card.card_pool == GAME_MASTER_CARD_POOL for entry in entries):
+    if any(not card_pool_scope.allows_card_pool(entry.card.card_pool) for entry in entries):
         return True
     return any(
-        entry.card.card_pool == GAME_MASTER_CARD_POOL
+        not card_pool_scope.allows_card_pool(entry.card.card_pool)
         for sideboard in sideboards
         for entry in sideboard.entries.all()
     )
@@ -269,9 +271,9 @@ def deck_tag_suggestion_results_payload(
 def deck_hero_summary_payload(
     card: Card,
     *,
-    allow_game_master_cards: bool = False,
+    card_pool_scope: CardPoolScope,
 ) -> dict[str, object]:
-    if card.card_pool == GAME_MASTER_CARD_POOL and not allow_game_master_cards:
+    if not card_pool_scope.allows_card_pool(card.card_pool):
         return _restricted_deck_card_summary(card)
     version = card.latest_version
     if version is None:
@@ -322,9 +324,9 @@ def _prefetched_card_image_asset_url(
 def deck_card_payload(
     card: Card,
     *,
-    allow_game_master_cards: bool = False,
+    card_pool_scope: CardPoolScope,
 ) -> dict[str, object]:
-    if card.card_pool == GAME_MASTER_CARD_POOL and not allow_game_master_cards:
+    if not card_pool_scope.allows_card_pool(card.card_pool):
         return _restricted_deck_card_payload(card)
     version = card.latest_version
     if version is None:

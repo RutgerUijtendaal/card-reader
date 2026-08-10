@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from card_reader_core.models import ALL_CARD_POOLS_SCOPE, PLAYER_CARD_POOL_SCOPE, CardPoolScope
 from card_reader_core.services.user_roles import has_developer_role
 
 
@@ -16,6 +17,11 @@ def can_access_admin(user: Any) -> bool:
 def can_access_game_master_cards(user: Any) -> bool:
     """Central policy seam for the restricted Game Master card pool."""
     return can_access_admin(user)
+
+
+def card_pool_scope_for_user(user: Any) -> CardPoolScope:
+    """Translate the current entitlement policy into a core data scope."""
+    return ALL_CARD_POOLS_SCOPE if can_access_game_master_cards(user) else PLAYER_CARD_POOL_SCOPE
 
 
 def can_access_authenticated_features(user: Any) -> bool:

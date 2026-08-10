@@ -12,8 +12,8 @@ from django.db.migrations.recorder import MigrationRecorder
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
-    GAME_MASTER_CARD_POOL,
-    PLAYER_CARD_POOL,
+    CARD_POOLS,
+    PLAYER_CARD_POOL_SCOPE,
     Card,
     CardBack,
     CardGroup,
@@ -48,6 +48,11 @@ from .schema import (
     DeveloperDataSelection,
     SymbolRecord,
     TemplateRecord,
+)
+
+DEVELOPER_DATA_CARD_POOL_SCOPE = PLAYER_CARD_POOL_SCOPE
+DEVELOPER_DATA_RESTRICTED_POOLS = tuple(
+    pool for pool in CARD_POOLS if not DEVELOPER_DATA_CARD_POOL_SCOPE.allows_card_pool(pool)
 )
 
 
@@ -109,8 +114,10 @@ def _resolve_selection(
 ) -> tuple[list[Card], list[CardGroup]]:
     selected_keys = set(selection.card_keys)
     group_queryset = CardGroup.objects.filter(
-        anchor_card__card_pool=PLAYER_CARD_POOL,
-    ).exclude(members__card__card_pool=GAME_MASTER_CARD_POOL)
+        anchor_card__card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools,
+    ).exclude(
+        members__card__card_pool__in=DEVELOPER_DATA_RESTRICTED_POOLS
+    )
     if not selection.include_all_card_groups:
         group_queryset = group_queryset.filter(key__in=selection.card_group_keys)
     groups = list(
@@ -128,7 +135,7 @@ def _resolve_selection(
 
     restricted_card_keys = set(
         Card.objects.filter(key__in=selected_keys)
-        .exclude(card_pool=PLAYER_CARD_POOL)
+        .exclude(card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools)
         .values_list("key", flat=True)
     )
     if restricted_card_keys:
@@ -137,7 +144,9 @@ def _resolve_selection(
             + ", ".join(sorted(restricted_card_keys))
         )
 
-    card_queryset = Card.objects.filter(card_pool=PLAYER_CARD_POOL)
+    card_queryset = Card.objects.filter(
+        card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools
+    )
     if not selection.include_all_cards:
         card_queryset = card_queryset.filter(key__in=selected_keys)
     cards = list(

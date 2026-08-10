@@ -5,7 +5,7 @@ from pathlib import Path
 from django.http import FileResponse, Http404
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import Card, CardBack, CardVersionImage
+from card_reader_core.models import Card, CardBack, CardPoolScope, CardVersionImage
 from card_reader_core.storage import relativize_image_storage_path
 
 
@@ -20,12 +20,17 @@ def immutable_card_image_response(relative_path: str) -> FileResponse:
     return file_response(requested_path, "Card image not found")
 
 
-def cards_for_immutable_image(relative_path: str) -> list[Card]:
+def cards_for_immutable_image(
+    relative_path: str,
+    *,
+    card_pool_scope: CardPoolScope,
+) -> list[Card]:
     normalized = Path(relative_path).as_posix().strip("/")
     filename = Path(normalized).name
     cards: dict[str, Card] = {}
     for image in CardVersionImage.objects.select_related("card_version__card").filter(
-        stored_path__endswith=filename
+        stored_path__endswith=filename,
+        card_version__card__card_pool__in=card_pool_scope.allowed_pools,
     ):
         try:
             stored_path = Path(relativize_image_storage_path(image.stored_path)).as_posix().strip("/")

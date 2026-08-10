@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol, TypeVar
 
 from django.db import models
@@ -27,6 +28,28 @@ GAME_MASTER_CARD_POOL: Literal["game_master"] = "game_master"
 CardPool = Literal["player", "game_master"]
 CARD_POOLS: tuple[CardPool, ...] = (PLAYER_CARD_POOL, GAME_MASTER_CARD_POOL)
 DEFAULT_CARD_POOL: CardPool = PLAYER_CARD_POOL
+
+
+@dataclass(frozen=True)
+class CardPoolScope:
+    """Explicit visibility boundary for card-derived reads and payloads."""
+
+    allowed_pools: frozenset[CardPool]
+
+    def __post_init__(self) -> None:
+        normalized = frozenset(self.allowed_pools)
+        invalid_pools = normalized.difference(CARD_POOLS)
+        if invalid_pools:
+            invalid = ", ".join(sorted(invalid_pools))
+            raise ValueError(f"Unsupported card pool scope values: {invalid}.")
+        object.__setattr__(self, "allowed_pools", normalized)
+
+    def allows_card_pool(self, card_pool: str) -> bool:
+        return card_pool in self.allowed_pools
+
+
+PLAYER_CARD_POOL_SCOPE = CardPoolScope(frozenset({PLAYER_CARD_POOL}))
+ALL_CARD_POOLS_SCOPE = CardPoolScope(frozenset(CARD_POOLS))
 
 HERO_CARD_ROLE: Literal["hero"] = "hero"
 BOON_CARD_ROLE: Literal["boon"] = "boon"
