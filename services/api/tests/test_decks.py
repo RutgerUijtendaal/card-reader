@@ -3225,6 +3225,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     }
     reclassified.save(update_fields=["card_pool", "lifecycle_status", "deck_building_config_json"])
     CardRoleAssignment.objects.create(card=reclassified, role="event")
+    CardRoleAssignment.objects.create(card=reclassified, role="hero")
 
     owner_client = Client(HTTP_HOST="localhost")
     owner_client.force_login(owner)

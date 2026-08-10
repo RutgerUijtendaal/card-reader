@@ -71,7 +71,10 @@ class DeckPayloadNormalizer:
         retained_mainboard_cards_by_id: dict[str, Card],
         retained_sideboard_cards_by_id: dict[str, Card],
     ) -> tuple[Card, list[tuple[str, int]], list[dict[str, object]]]:
-        if not card_has_role(hero_card, HERO_CARD_ROLE):
+        if PLAYER_CARD_POOL_SCOPE.allows_card_pool(hero_card.card_pool) and not card_has_role(
+            hero_card,
+            HERO_CARD_ROLE,
+        ):
             raise ValueError("Hero card must be marked as a hero.")
         ordered_entry_ids = [entry.card_id.strip() for entry in entries if entry.card_id.strip()]
         if len(ordered_entry_ids) != len(entries):
@@ -169,10 +172,11 @@ class DeckPayloadNormalizer:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
             card = cards_by_id[card_id]
-            if card_has_role(card, HERO_CARD_ROLE):
-                raise ValueError("Hero cards cannot appear in mainboard entries.")
-            if card.id == hero_card.id:
-                raise ValueError("Hero card cannot also appear in the mainboard.")
+            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool):
+                if card_has_role(card, HERO_CARD_ROLE):
+                    raise ValueError("Hero cards cannot appear in mainboard entries.")
+                if card.id == hero_card.id:
+                    raise ValueError("Hero card cannot also appear in the mainboard.")
             normalized_entries.append((card.id, quantity))
             constraint_entries.append(DeckConstraintEntry(card=card, quantity=quantity, board="mainboard"))
         return normalized_entries, constraint_entries
@@ -224,7 +228,9 @@ class DeckPayloadNormalizer:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
             card = cards_by_id[card_id]
-            if card_has_role(card, HERO_CARD_ROLE) or card.id == hero_card.id:
+            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool) and (
+                card_has_role(card, HERO_CARD_ROLE) or card.id == hero_card.id
+            ):
                 raise ValueError("Hero cards cannot appear in sideboards.")
             normalized_sideboard_entries.append((card.id, quantity))
             constraint_entries.append(DeckConstraintEntry(card=card, quantity=quantity, board="sideboard"))
