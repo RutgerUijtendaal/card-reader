@@ -66,10 +66,11 @@ def test_health() -> None:
 
 
 def test_create_import_upload_rejects_unknown_template() -> None:
+    creation_key = str(uuid4())
     response = _staff_client("import-unknown-template-user").post(
         "/imports/upload",
         data={
-            "creation_key": str(uuid4()),
+            "creation_key": creation_key,
             "card_pool": "player",
             "template_id": "unknown-template",
             "content_version_base": "14.1",
@@ -80,6 +81,8 @@ def test_create_import_upload_rejects_unknown_template() -> None:
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Unknown template_id 'unknown-template'"
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
 def test_create_import_upload_rejects_unsupported_files() -> None:

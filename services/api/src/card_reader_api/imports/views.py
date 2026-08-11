@@ -118,6 +118,7 @@ class ImportUploadView(APIView):
             _discard_unclaimed_uploads(upload_dir)
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except ValueError as exc:
+            _discard_unclaimed_uploads(upload_dir)
             return bad_request(str(exc))
         except Exception:
             logger.exception("Failed to create import job from upload. upload_dir=%s", upload_dir)
@@ -195,7 +196,7 @@ def _discard_unclaimed_uploads(upload_dir: str) -> None:
         return
     except OSError:
         logger.warning(
-            "Failed to remove uploads for a conflicting import payload. upload_dir=%s",
+            "Failed to remove unclaimed import uploads. upload_dir=%s",
             upload_dir,
             exc_info=True,
         )
