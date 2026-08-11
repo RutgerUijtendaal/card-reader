@@ -3055,6 +3055,9 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
     card, target_version = _create_editable_card_version(name="Classification Mismatch Card")
     card.lifecycle_status = "deprecated"
     card.save(update_fields=["lifecycle_status"])
+    source_file = settings.storage_root_dir / "uploads" / "classification-mismatch.png"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_bytes(b"classification-mismatch")
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "classification-mismatch.png"),
         template=Template.objects.get(key="mtg-like-v1"),

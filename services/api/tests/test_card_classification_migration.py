@@ -33,4 +33,5 @@ def test_card_classification_migration_backfills_and_reverses_hero_roles() -> No
     assert ReversedCard.objects.get(id=hero.id).is_hero is True
     assert ReversedCard.objects.get(id=standard.id).is_hero is False
 
-    MigrationExecutor(connection).migrate([("card_reader_core", "0054_card_classification")])
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
