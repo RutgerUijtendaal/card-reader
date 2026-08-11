@@ -36,7 +36,7 @@ const IMPORT_HISTORY_PAGE_SIZE = 100;
 const RECENT_IMPORT_JOB_LIMIT = 5;
 const ACTIVITY_REFRESH_ERROR_MESSAGE = 'Import activity could not be refreshed.';
 
-type ImportCreateState =
+export type ImportCreateState =
   | { phase: 'idle' }
   | { phase: 'submitting' }
   | { phase: 'reconciling' }

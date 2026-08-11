@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter, RouterView } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import ImportJobsPage from '@/features/import-jobs/ImportJobsPage.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
+import type { ImportCreateState } from '@/features/import-jobs/composables/useImportJobsController';
 
 vi.mock('@/features/import-jobs/composables/useImportJobsController', () => ({
   useImportJobsController: vi.fn(),
@@ -19,7 +20,7 @@ describe('ImportJobsPage', () => {
   test('renders flat setup and activity columns separated by a responsive divider', async () => {
     const createJobFromPicker = vi.fn();
     const unresolvedCreateAttempt = ref(false);
-    const createState = ref({ phase: 'idle' });
+    const createState = ref<ImportCreateState>({ phase: 'idle' });
     mockedUseImportJobsController.mockReturnValue({
       pickerTemplateId: ref('mtg-like-v1'),
       cardPool: ref('player'),
