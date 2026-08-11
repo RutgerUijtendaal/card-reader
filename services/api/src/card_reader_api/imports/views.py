@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import shutil
 from typing import cast
 
 from django.core.files.uploadedfile import UploadedFile
@@ -90,7 +91,11 @@ class ImportUploadView(APIView):
             )
 
         try:
-            upload_dir = _save_supported_uploads(uploads, creation_key=creation_key)
+            upload_dir = _save_supported_uploads(
+                uploads,
+                creation_key=creation_key,
+                fingerprint=fingerprint,
+            )
         except ImportCreationKeyConflict as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         if upload_dir is None:
@@ -110,6 +115,7 @@ class ImportUploadView(APIView):
                 card_role_override=cast(list[CardRole], serializer.validated_data["card_role_override"]),
             )
         except ImportCreationKeyConflict as exc:
+            _discard_unclaimed_uploads(upload_dir)
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except ValueError as exc:
             return bad_request(str(exc))
@@ -153,8 +159,9 @@ def _save_supported_uploads(
     files: list[tuple[UploadedFile, str]],
     *,
     creation_key: str,
+    fingerprint: str,
 ) -> str | None:
-    upload_dir = build_storage_relative_path("uploads", creation_key)
+    upload_dir = build_storage_relative_path("uploads", creation_key, fingerprint)
     resolve_storage_path(upload_dir).mkdir(parents=True, exist_ok=True)
     saved_count = 0
 
@@ -179,6 +186,19 @@ def _save_supported_uploads(
         saved_count += 1
 
     return upload_dir if saved_count else None
+
+
+def _discard_unclaimed_uploads(upload_dir: str) -> None:
+    try:
+        shutil.rmtree(resolve_storage_path(upload_dir))
+    except FileNotFoundError:
+        return
+    except OSError:
+        logger.warning(
+            "Failed to remove uploads for a conflicting import payload. upload_dir=%s",
+            upload_dir,
+            exc_info=True,
+        )
 
 
 def _publish_upload_atomically(

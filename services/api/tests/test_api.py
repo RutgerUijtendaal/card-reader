@@ -123,6 +123,7 @@ def test_create_import_upload_stores_relative_paths() -> None:
 
 def test_interrupted_upload_is_not_published_and_same_key_can_retry() -> None:
     creation_key = str(uuid4())
+    fingerprint = "a" * 64
     content = b"complete-image-content"
     checksum = hashlib.sha256(content).hexdigest()
 
@@ -136,9 +137,12 @@ def test_interrupted_upload_is_not_published_and_same_key_can_retry() -> None:
         _save_supported_uploads(
             [(InterruptedUpload("card.png", content, content_type="image/png"), checksum)],
             creation_key=creation_key,
+            fingerprint=fingerprint,
         )
 
-    upload_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    upload_dir = resolve_storage_path(
+        build_storage_relative_path("uploads", creation_key, fingerprint)
+    )
     target_file = upload_dir / "0000-card.png"
     assert not target_file.exists()
     assert list(upload_dir.glob(".*.tmp")) == []
@@ -146,10 +150,48 @@ def test_interrupted_upload_is_not_published_and_same_key_can_retry() -> None:
     saved_path = _save_supported_uploads(
         [(SimpleUploadedFile("card.png", content, content_type="image/png"), checksum)],
         creation_key=creation_key,
+        fingerprint=fingerprint,
     )
 
-    assert saved_path == build_storage_relative_path("uploads", creation_key)
+    assert saved_path == build_storage_relative_path("uploads", creation_key, fingerprint)
     assert target_file.read_bytes() == content
+
+
+def test_conflicting_import_payloads_use_isolated_fingerprint_directories() -> None:
+    creation_key = str(uuid4())
+    first_content = b"first-payload"
+    second_content = b"second-payload"
+
+    first_path = _save_supported_uploads(
+        [
+            (
+                SimpleUploadedFile("first.png", first_content, content_type="image/png"),
+                hashlib.sha256(first_content).hexdigest(),
+            )
+        ],
+        creation_key=creation_key,
+        fingerprint="a" * 64,
+    )
+    second_path = _save_supported_uploads(
+        [
+            (
+                SimpleUploadedFile("second.png", second_content, content_type="image/png"),
+                hashlib.sha256(second_content).hexdigest(),
+            )
+        ],
+        creation_key=creation_key,
+        fingerprint="b" * 64,
+    )
+
+    assert first_path != second_path
+    assert first_path is not None
+    assert second_path is not None
+    assert [path.name for path in resolve_storage_path(first_path).iterdir()] == [
+        "0000-first.png"
+    ]
+    assert [path.name for path in resolve_storage_path(second_path).iterdir()] == [
+        "0000-second.png"
+    ]
 
 
 def test_create_import_upload_replays_same_creation_key_without_duplicate_work() -> None:

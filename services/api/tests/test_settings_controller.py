@@ -511,6 +511,92 @@ def test_template_reparse_endpoint_queues_matching_latest_versions(
     assert items[0].target_card_version_id == version_a.id
 
 
+def test_template_reparse_rolls_back_every_group_when_later_creation_fails(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from card_reader_api.templates import views as template_views
+
+    monkeypatch.setattr(settings, "app_data_dir", tmp_path)
+    source_template = Template.objects.create(
+        key="atomic-reparse-source",
+        label="Atomic Reparse Source",
+        definition_json=_template_definition("source_top_bar"),
+    )
+    target_template = Template.objects.create(
+        key="atomic-reparse-target",
+        label="Atomic Reparse Target",
+        definition_json=_template_definition("target_top_bar"),
+    )
+
+    cards = [
+        Card.objects.create(key="atomic-player-card", label="Atomic Player Card"),
+        Card.objects.create(
+            key="atomic-game-master-card",
+            label="Atomic Game Master Card",
+            card_pool="game_master",
+        ),
+    ]
+    for index, card in enumerate(cards):
+        version = CardVersion.objects.create(
+            card=card,
+            version_number=1,
+            template=source_template,
+            image_hash=f"atomic-reparse-{index}",
+            name=card.label,
+            is_latest=True,
+        )
+        card.latest_version = version
+        card.save(update_fields=["latest_version"])
+        image_path = resolve_storage_path(f"images/atomic-reparse-{index}.webp")
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"image")
+        CardVersionImage.objects.create(
+            card_version=version,
+            source_file=build_storage_relative_path("images", image_path.name),
+            stored_path=build_storage_relative_path("images", image_path.name),
+            checksum=f"atomic-reparse-{index}",
+        )
+
+    original_create = template_views.create_import_job_with_files
+    creation_count = 0
+
+    def fail_second_group(**kwargs: object) -> ImportJob:
+        nonlocal creation_count
+        creation_count += 1
+        if creation_count == 2:
+            raise RuntimeError("simulated grouped creation failure")
+        return original_create(**kwargs)
+
+    monkeypatch.setattr(template_views, "create_import_job_with_files", fail_second_group)
+
+    username = "staff-atomic-template-reparse-user"
+    password = "password"
+    user = get_user_model().objects.create_user(username=username, password=password, is_staff=True)
+    client = Client(
+        HTTP_HOST="localhost",
+        enforce_csrf_checks=True,
+        raise_request_exception=False,
+    )
+    csrf_token = client.post(
+        "/auth/login",
+        data={"username": user.username, "password": password},
+        content_type="application/json",
+    ).json()["csrf_token"]
+
+    response = client.post(
+        f"/admin/templates/{target_template.id}/reparse",
+        data={"source_template_id": source_template.key},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert response.status_code == 500
+    assert creation_count == 2
+    assert not ImportJob.objects.exists()
+    assert not ImportJobItem.objects.exists()
+
+
 def test_backfill_metadata_suggestions_runs_management_command(monkeypatch) -> None:
     recorded_calls: list[tuple[str, int]] = []
 
