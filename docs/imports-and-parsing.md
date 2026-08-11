@@ -57,4 +57,6 @@ Parser output is intentionally reviewable rather than treated as unquestionable 
 
 New cards receive the import pool and resolved roles. Existing cards and targeted reparses keep their stored card-level classification. When the inferred result differs, the parsed version still completes and the item records an explainable `card_classification_mismatch` warning alongside any lifecycle warning. Import details link directly to the Card tab for an intentional manual correction.
 
+Import details show resolved roles and inference evidence only after the parser has persisted that evidence. Queued or active items are marked as classification pending, while terminal items that never produced evidence are marked unavailable rather than being presented as Standard.
+
 Reparsing creates new content through the card-version workflow instead of erasing historical state. See [Card management](card-management.md) for the distinction between a stable card identity and its versions.

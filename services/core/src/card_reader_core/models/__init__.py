@@ -127,6 +127,7 @@ if TYPE_CHECKING:
     )
     from .user_activity import UserActivity
     from .import_job import (
+        CardRoleInferenceEvidence,
         LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
         ImportCardRoleMode,
         ImportJob,
@@ -160,6 +161,7 @@ _EXPORTS = {
     "now_utc": ".base",
     "ImportJobStatus": ".import_job",
     "ImportCardRoleMode": ".import_job",
+    "CardRoleInferenceEvidence": ".import_job",
     "LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION": ".import_job",
     "ImportJob": ".import_job",
     "ImportJobItem": ".import_job",
@@ -275,6 +277,7 @@ __all__ = [
     "now_utc",
     "ImportJobStatus",
     "ImportCardRoleMode",
+    "CardRoleInferenceEvidence",
     "LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION",
     "ImportJob",
     "ImportJobItem",

@@ -203,4 +203,52 @@ describe('ImportActivityPanel', () => {
 
     mounted.app.unmount();
   });
+
+  test('does not present unprocessed classification defaults as resolved Standard cards', async () => {
+    const detail: ImportJobDetail = {
+      ...activeJob,
+      items: [
+        {
+          id: 'queued-item',
+          source_file: 'queued.webp',
+          status: 'queued',
+          error_message: null,
+          warning_code: null,
+          warning_message: null,
+          warnings: [],
+          resolved_card_roles: [],
+          card_role_inference: {},
+          target_card_id: null,
+          target_card_version_id: null,
+          target_card_pool_snapshot: null,
+          target_card_roles_snapshot: [],
+          card_tab_url: null,
+        },
+        {
+          id: 'failed-item',
+          source_file: 'failed.webp',
+          status: 'failed',
+          error_message: 'OCR failed.',
+          warning_code: null,
+          warning_message: null,
+          warnings: [],
+          resolved_card_roles: [],
+          card_role_inference: {},
+          target_card_id: null,
+          target_card_version_id: null,
+          target_card_pool_snapshot: null,
+          target_card_roles_snapshot: [],
+          card_tab_url: null,
+        },
+      ],
+    };
+    const mounted = await mountPanel({ selectedJobDetail: detail });
+
+    expect(mounted.host.textContent).toContain('Classification pending');
+    expect(mounted.host.textContent).toContain('Classification unavailable');
+    expect(mounted.host.textContent).not.toContain('Standard — no special roles');
+    expect(mounted.host.textContent).not.toContain('Resolution');
+
+    mounted.app.unmount();
+  });
 });

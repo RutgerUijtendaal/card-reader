@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypedDict, cast
+from typing import Literal, cast
 
 from card_reader_core.models import (
     CARD_ROLES,
@@ -9,22 +9,13 @@ from card_reader_core.models import (
     LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION as CORE_LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
     CardPool,
     CardRole,
+    CardRoleInferenceEvidence,
     normalize_card_roles,
 )
 
 SUPPORTED_CARD_ROLE_INFERENCE_POLICY_VERSIONS = (1,)
 LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION = CORE_LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION
 CardRoleMode = Literal["automatic", "override"]
-
-
-class CardRoleInferenceEvidence(TypedDict):
-    mode: CardRoleMode
-    policy_version: int
-    template_roles: list[CardRole]
-    matched_tag_keys: list[str]
-    tag_roles: list[CardRole]
-    override_roles: list[CardRole]
-    resolved_roles: list[CardRole]
 
 
 @dataclass(frozen=True)

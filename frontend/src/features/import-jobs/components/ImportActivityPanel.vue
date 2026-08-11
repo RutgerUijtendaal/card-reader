@@ -75,25 +75,33 @@
             <p class="theme-section-title truncate text-sm font-medium">
               {{ item.source_file }}
             </p>
-            <p class="theme-section-muted text-xs">
-              {{
-                item.resolved_card_roles.length > 0
-                  ? item.resolved_card_roles.join(', ')
-                  : 'Standard — no special roles'
-              }}
+            <template v-if="hasClassificationEvidence(item)">
+              <p class="theme-section-muted text-xs">
+                {{
+                  item.resolved_card_roles.length > 0
+                    ? item.resolved_card_roles.join(', ')
+                    : 'Standard — no special roles'
+                }}
+              </p>
+              <dl class="theme-section-muted grid gap-1 text-xs">
+                <div
+                  v-for="entry in getInferenceEvidence(item)"
+                  :key="entry.label"
+                  class="flex flex-wrap gap-x-1"
+                >
+                  <dt class="font-semibold">
+                    {{ entry.label }}:
+                  </dt>
+                  <dd>{{ entry.value }}</dd>
+                </div>
+              </dl>
+            </template>
+            <p
+              v-else
+              class="theme-section-muted text-xs"
+            >
+              {{ getClassificationEvidencePlaceholder(item) }}
             </p>
-            <dl class="theme-section-muted grid gap-1 text-xs">
-              <div
-                v-for="entry in getInferenceEvidence(item)"
-                :key="entry.label"
-                class="flex flex-wrap gap-x-1"
-              >
-                <dt class="font-semibold">
-                  {{ entry.label }}:
-                </dt>
-                <dd>{{ entry.value }}</dd>
-              </div>
-            </dl>
             <div
               v-for="warning in item.warnings"
               :key="warning.code"
@@ -395,6 +403,14 @@ const formatClassification = (value: unknown): string | null => {
   if (!classification) return null;
   return `${formatPool(classification.card_pool)} · ${formatRoles(classification.card_roles)}`;
 };
+
+const hasClassificationEvidence = (item: ImportJobItem): boolean =>
+  Object.keys(item.card_role_inference).length > 0;
+
+const getClassificationEvidencePlaceholder = (item: ImportJobItem): string =>
+  ['queued', 'running', 'canceling'].includes(item.status)
+    ? 'Classification pending'
+    : 'Classification unavailable';
 
 const getInferenceEvidence = (item: ImportJobItem): EvidenceEntry[] => {
   const evidence = item.card_role_inference;

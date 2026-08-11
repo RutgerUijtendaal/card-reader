@@ -1,9 +1,10 @@
+from card_reader_core.models import CardRoleInferenceEvidence
+
 from .classification import (
     LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
     SUPPORTED_CARD_ROLE_INFERENCE_POLICY_VERSIONS,
     CardClassificationInput,
     CardClassificationResult,
-    CardRoleInferenceEvidence,
     CardRoleMode,
     classify_import_card,
     normalize_role_mode,

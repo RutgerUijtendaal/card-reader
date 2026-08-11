@@ -10,6 +10,7 @@ from card_reader_core.models import (
     DEFAULT_CARD_POOL,
     CardPool,
     CardRole,
+    CardRoleInferenceEvidence,
     CardRoleAssignment,
     CardVersion,
     ImportJobItem,
@@ -26,7 +27,6 @@ from card_reader_core.repositories.import_jobs import (
     remove_import_warning,
     upsert_import_warning,
 )
-from card_reader_core.services.imports import CardRoleInferenceEvidence
 from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
 
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none

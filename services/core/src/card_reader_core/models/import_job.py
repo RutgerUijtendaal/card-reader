@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
-from .card import DEFAULT_CARD_POOL
+from .card import DEFAULT_CARD_POOL, CardRole
 
 if TYPE_CHECKING:
     from .card import Card
@@ -30,6 +30,16 @@ class ImportCardRoleMode(StrEnum):
 
 
 LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION = 1
+
+
+class CardRoleInferenceEvidence(TypedDict):
+    mode: Literal["automatic", "override"]
+    policy_version: int
+    template_roles: list[CardRole]
+    matched_tag_keys: list[str]
+    tag_roles: list[CardRole]
+    override_roles: list[CardRole]
+    resolved_roles: list[CardRole]
 
 
 class ImportJob(TimestampedModel):
