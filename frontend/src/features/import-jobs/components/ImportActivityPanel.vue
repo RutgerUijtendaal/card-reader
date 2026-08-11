@@ -82,12 +82,39 @@
                   : 'Standard — no special roles'
               }}
             </p>
+            <dl class="theme-section-muted grid gap-1 text-xs">
+              <div
+                v-for="entry in getInferenceEvidence(item)"
+                :key="entry.label"
+                class="flex flex-wrap gap-x-1"
+              >
+                <dt class="font-semibold">
+                  {{ entry.label }}:
+                </dt>
+                <dd>{{ entry.value }}</dd>
+              </div>
+            </dl>
             <div
               v-for="warning in item.warnings"
               :key="warning.code"
               class="theme-alert-warning text-xs"
             >
               <p>{{ warning.message }}</p>
+              <dl
+                v-if="getWarningEvidence(warning).length > 0"
+                class="mt-1 grid gap-1"
+              >
+                <div
+                  v-for="entry in getWarningEvidence(warning)"
+                  :key="entry.label"
+                  class="flex flex-wrap gap-x-1"
+                >
+                  <dt class="font-semibold">
+                    {{ entry.label }}:
+                  </dt>
+                  <dd>{{ entry.value }}</dd>
+                </div>
+              </dl>
               <RouterLink
                 v-if="warning.code === 'card_classification_mismatch' && item.card_tab_url"
                 class="mt-1 inline-flex font-semibold underline"
@@ -308,7 +335,12 @@
 import { Activity, ExternalLink, RefreshCw } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import type { OperationsQueueItem } from '@/domain/operations/types';
-import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
+import type {
+  ImportJob,
+  ImportJobDetail,
+  ImportJobItem,
+  ImportWarning,
+} from '@/features/import-jobs/types';
 import {
   canCancelImportJob,
   formatImportJobTimestamp,
@@ -339,4 +371,68 @@ const emit = defineEmits<{
   cancel: [jobId: string];
   view: [jobId: string];
 }>();
+
+type EvidenceEntry = { label: string; value: string };
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+
+const formatRole = (role: string): string => role.charAt(0).toUpperCase() + role.slice(1);
+const formatRoles = (value: unknown): string => {
+  const roles = asStringArray(value);
+  return roles.length > 0 ? roles.map(formatRole).join(', ') : 'Standard';
+};
+const formatPool = (value: unknown): string =>
+  value === 'game_master' ? 'Game Master' : value === 'player' ? 'Player' : 'Unknown';
+
+const formatClassification = (value: unknown): string | null => {
+  const classification = asRecord(value);
+  if (!classification) return null;
+  return `${formatPool(classification.card_pool)} · ${formatRoles(classification.card_roles)}`;
+};
+
+const getInferenceEvidence = (item: ImportJobItem): EvidenceEntry[] => {
+  const evidence = item.card_role_inference;
+  const mode = evidence.mode === 'override' ? 'Manual override' : 'Automatic';
+  const entries: EvidenceEntry[] = [{ label: 'Resolution', value: mode }];
+  const templateRoles = asStringArray(evidence.template_roles);
+  const matchedTags = asStringArray(evidence.matched_tag_keys);
+  const overrideRoles = asStringArray(evidence.override_roles);
+
+  if (templateRoles.length > 0) {
+    entries.push({ label: 'Template hints', value: templateRoles.map(formatRole).join(', ') });
+  }
+  if (matchedTags.length > 0) {
+    entries.push({ label: 'Matched tags', value: matchedTags.join(', ') });
+  }
+  if (evidence.mode === 'override') {
+    entries.push({ label: 'Override roles', value: formatRoles(overrideRoles) });
+  }
+  if (templateRoles.length === 0 && matchedTags.length === 0 && evidence.mode !== 'override') {
+    entries.push({ label: 'Role signals', value: 'None matched' });
+  }
+  return entries;
+};
+
+const getWarningEvidence = (warning: ImportWarning): EvidenceEntry[] => {
+  const details = warning.details;
+  if (!details) return [];
+  const entries: EvidenceEntry[] = [];
+  const labels: Array<[string, string]> = [
+    ['inferred', 'Inferred'],
+    ['existing', 'Existing'],
+    ['queued', 'Queued'],
+    ['live', 'Live'],
+  ];
+  for (const [key, label] of labels) {
+    const value = formatClassification(details[key]);
+    if (value) entries.push({ label, value });
+  }
+  return entries;
+};
 </script>

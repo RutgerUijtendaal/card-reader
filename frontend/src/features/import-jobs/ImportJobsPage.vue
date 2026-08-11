@@ -319,6 +319,7 @@
 <script setup lang="ts">
 import { Info, Upload } from 'lucide-vue-next';
 import { computed } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import ImportActivityPanel from '@/features/import-jobs/components/ImportActivityPanel.vue';
 import ImportSourcePicker from '@/features/import-jobs/components/ImportSourcePicker.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
@@ -359,6 +360,7 @@ const {
   hasValidVersionInput,
   submitButtonLabel,
   formLocked,
+  hasUnresolvedCreateAttempt,
   createState,
   refreshActivity,
   createJobFromPicker,
@@ -381,4 +383,12 @@ const cardRoleOptions = [
   { value: 'boon', label: 'Boon' },
   { value: 'event', label: 'Event' },
 ];
+
+onBeforeRouteLeave(() => {
+  if (!hasUnresolvedCreateAttempt.value) return true;
+  if (createState.value.phase !== 'uncertain') return false;
+  return globalThis.confirm(
+    'The outcome of this import is still uncertain. Leaving now discards the locked retry details and can cause a duplicate import. Leave anyway?',
+  );
+});
 </script>

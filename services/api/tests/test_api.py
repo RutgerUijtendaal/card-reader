@@ -1,4 +1,6 @@
+import hashlib
 import json
+from collections.abc import Iterator
 from datetime import timedelta
 from importlib import import_module
 from pathlib import Path
@@ -32,6 +34,7 @@ from django.test.utils import CaptureQueriesContext  # noqa: E402
 from django.test import Client  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
+from card_reader_api.imports.views import _save_supported_uploads  # noqa: E402
 from card_reader_api.seeds.users import seed_users  # noqa: E402
 
 
@@ -116,6 +119,37 @@ def test_create_import_upload_stores_relative_paths() -> None:
     assert job.content_version.version_number == "14.1.0"
     assert response.json()["content_version"]["version_number"] == "14.1.0"
     assert item.source_file.startswith(f"{job.source_path}/")
+
+
+def test_interrupted_upload_is_not_published_and_same_key_can_retry() -> None:
+    creation_key = str(uuid4())
+    content = b"complete-image-content"
+    checksum = hashlib.sha256(content).hexdigest()
+
+    class InterruptedUpload(SimpleUploadedFile):
+        def chunks(self, chunk_size: int | None = None) -> Iterator[bytes]:
+            del chunk_size
+            yield b"partial-image"
+            raise OSError("connection interrupted")
+
+    with pytest.raises(OSError, match="connection interrupted"):
+        _save_supported_uploads(
+            [(InterruptedUpload("card.png", content, content_type="image/png"), checksum)],
+            creation_key=creation_key,
+        )
+
+    upload_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    target_file = upload_dir / "0000-card.png"
+    assert not target_file.exists()
+    assert list(upload_dir.glob(".*.tmp")) == []
+
+    saved_path = _save_supported_uploads(
+        [(SimpleUploadedFile("card.png", content, content_type="image/png"), checksum)],
+        creation_key=creation_key,
+    )
+
+    assert saved_path == build_storage_relative_path("uploads", creation_key)
+    assert target_file.read_bytes() == content
 
 
 def test_create_import_upload_replays_same_creation_key_without_duplicate_work() -> None:

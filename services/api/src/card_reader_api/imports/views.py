@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import logging
 import hashlib
 import json
+import logging
+import os
 from pathlib import Path
 from typing import cast
 
@@ -170,18 +171,44 @@ def _save_supported_uploads(
                     "Stored upload content conflicts with this creation key."
                 )
         else:
-            try:
-                with target_file.open("xb") as stream:
-                    for chunk in upload.chunks():
-                        stream.write(chunk)
-            except FileExistsError:
-                if _sha256_path(target_file) != expected_checksum:
-                    raise ImportCreationKeyConflict(
-                        "Stored upload content conflicts with this creation key."
-                    ) from None
+            _publish_upload_atomically(
+                upload,
+                target_file=target_file,
+                expected_checksum=expected_checksum,
+            )
         saved_count += 1
 
     return upload_dir if saved_count else None
+
+
+def _publish_upload_atomically(
+    upload: UploadedFile,
+    *,
+    target_file: Path,
+    expected_checksum: str,
+) -> None:
+    staged_file = target_file.with_name(f".{target_file.name}.{os.urandom(16).hex()}.tmp")
+    try:
+        digest = hashlib.sha256()
+        with staged_file.open("xb") as stream:
+            for chunk in upload.chunks():
+                stream.write(chunk)
+                digest.update(chunk)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        if digest.hexdigest() != expected_checksum:
+            raise ImportCreationKeyConflict("Upload content changed while it was being stored.")
+
+        try:
+            os.link(staged_file, target_file)
+        except FileExistsError:
+            if _sha256_path(target_file) != expected_checksum:
+                raise ImportCreationKeyConflict(
+                    "Stored upload content conflicts with this creation key."
+                ) from None
+    finally:
+        staged_file.unlink(missing_ok=True)
 
 
 def _upload_fingerprint(

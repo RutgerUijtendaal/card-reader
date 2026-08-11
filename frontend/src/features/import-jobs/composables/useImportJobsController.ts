@@ -1,4 +1,4 @@
-import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
+import { useDocumentVisibility, useEventListener, useIntervalFn } from '@vueuse/core';
 import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
 import { fetchOperationsQueuePage } from '@/domain/operations/api';
@@ -85,6 +85,7 @@ export const useImportJobsController = () => {
   const documentVisibility = useDocumentVisibility();
   let activeJobsRequestId = 0;
   let historyRequestId = 0;
+  let detailRequestId = 0;
 
   const queuedCount = computed(
     () => activeJobs.value.filter((job) => job.status === 'queued').length,
@@ -126,6 +127,7 @@ export const useImportJobsController = () => {
   const formLocked = computed(() =>
     ['submitting', 'reconciling', 'uncertain'].includes(createState.value.phase),
   );
+  const hasUnresolvedCreateAttempt = computed(() => pendingAttempt.value !== null);
 
   const loadActiveJobs = async (): Promise<boolean> => {
     const requestId = ++activeJobsRequestId;
@@ -408,15 +410,18 @@ export const useImportJobsController = () => {
   };
 
   const viewJobDetail = async (jobId: string): Promise<void> => {
+    const requestId = ++detailRequestId;
     detailLoading.value = true;
     activityActionErrorMessage.value = '';
     try {
-      selectedJobDetail.value = await fetchImportJobDetail(jobId);
+      const detail = await fetchImportJobDetail(jobId);
+      if (requestId === detailRequestId) selectedJobDetail.value = detail;
     } catch (error) {
+      if (requestId !== detailRequestId) return;
       console.error('Load import detail failed', error);
       activityActionErrorMessage.value = extractImportJobErrorMessage(error);
     } finally {
-      detailLoading.value = false;
+      if (requestId === detailRequestId) detailLoading.value = false;
     }
   };
 
@@ -454,6 +459,12 @@ export const useImportJobsController = () => {
     },
     { immediate: true },
   );
+
+  useEventListener(window, 'beforeunload', (event) => {
+    if (!hasUnresolvedCreateAttempt.value) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
 
   onMounted(() => {
     void loadFormOptions();
@@ -495,6 +506,7 @@ export const useImportJobsController = () => {
     hasValidVersionInput,
     submitButtonLabel,
     formLocked,
+    hasUnresolvedCreateAttempt,
     createState,
     refreshActivity,
     createJobFromPicker,

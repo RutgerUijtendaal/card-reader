@@ -9,9 +9,10 @@ import {
   fetchCurrentContentVersion,
   fetchImportJobs,
   fetchImportJobByCreationKey,
+  fetchImportJobDetail,
 } from '@/features/import-jobs/api';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
-import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
+import type { ContentVersion, ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 
 vi.mock('@/domain/operations/api', () => ({
   fetchOperationsQueuePage: vi.fn(),
@@ -48,6 +49,11 @@ const activeJob = (id = 'active-job'): ImportJob => ({
   card_role_override: [],
   template_role_snapshot: [],
   card_role_inference_policy_version: 1,
+});
+
+const importJobDetail = (id: string): ImportJobDetail => ({
+  ...activeJob(id),
+  items: [],
 });
 
 const historyItem = (id: string, status: OperationsQueueItem['status']): OperationsQueueItem => ({
@@ -136,6 +142,7 @@ describe('useImportJobsController', () => {
       idempotent_replay: false,
     });
     vi.mocked(fetchImportJobByCreationKey).mockResolvedValue(null);
+    vi.mocked(fetchImportJobDetail).mockResolvedValue(importJobDetail('detail-job'));
     vi.mocked(cancelImportJob).mockResolvedValue();
   });
 
@@ -443,6 +450,9 @@ describe('useImportJobsController', () => {
 
     expect(mounted.controller.createState.value.phase).toBe('uncertain');
     expect(mounted.controller.formLocked.value).toBe(true);
+    const beforeUnload = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(beforeUnload)).toBe(false);
+    expect(beforeUnload.defaultPrevented).toBe(true);
     const firstPayload = vi.mocked(createImportJob).mock.calls[0][0];
 
     vi.mocked(createImportJob).mockResolvedValueOnce({
@@ -456,6 +466,32 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.pickedFiles.value).toEqual([]);
     expect(mounted.controller.cardRoleMode.value).toBe('automatic');
     expect(mounted.controller.cardRoleOverride.value).toEqual([]);
+    expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true);
+
+    mounted.app.unmount();
+  });
+
+  test('keeps only the latest requested import detail and loading state', async () => {
+    const firstRequest = deferred<ImportJobDetail>();
+    const secondRequest = deferred<ImportJobDetail>();
+    vi.mocked(fetchImportJobDetail)
+      .mockImplementationOnce(() => firstRequest.promise)
+      .mockImplementationOnce(() => secondRequest.promise);
+    const mounted = mountController();
+
+    const firstLoad = mounted.controller.viewJobDetail('job-a');
+    const secondLoad = mounted.controller.viewJobDetail('job-b');
+    secondRequest.resolve(importJobDetail('job-b'));
+    await secondLoad;
+
+    expect(mounted.controller.selectedJobDetail.value?.id).toBe('job-b');
+    expect(mounted.controller.detailLoading.value).toBe(false);
+
+    firstRequest.resolve(importJobDetail('job-a'));
+    await firstLoad;
+
+    expect(mounted.controller.selectedJobDetail.value?.id).toBe('job-b');
+    expect(mounted.controller.detailLoading.value).toBe(false);
 
     mounted.app.unmount();
   });

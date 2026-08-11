@@ -1,5 +1,5 @@
-import { computed, createApp, ref } from 'vue';
-import { createMemoryHistory, createRouter } from 'vue-router';
+import { computed, createApp, h, ref } from 'vue';
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import ImportJobsPage from '@/features/import-jobs/ImportJobsPage.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
@@ -18,6 +18,8 @@ describe('ImportJobsPage', () => {
 
   test('renders flat setup and activity columns separated by a responsive divider', async () => {
     const createJobFromPicker = vi.fn();
+    const unresolvedCreateAttempt = ref(false);
+    const createState = ref({ phase: 'idle' });
     mockedUseImportJobsController.mockReturnValue({
       pickerTemplateId: ref('mtg-like-v1'),
       cardPool: ref('player'),
@@ -66,7 +68,8 @@ describe('ImportJobsPage', () => {
       hasValidVersionInput: computed(() => true),
       submitButtonLabel: computed(() => 'Update Version'),
       formLocked: computed(() => false),
-      createState: ref({ phase: 'idle' }),
+      hasUnresolvedCreateAttempt: computed(() => unresolvedCreateAttempt.value),
+      createState,
       refreshActivity: vi.fn(),
       createJobFromPicker,
       cancelJob: vi.fn(),
@@ -84,13 +87,16 @@ describe('ImportJobsPage', () => {
     });
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/operations', component: { template: '<div />' } }],
+      routes: [
+        { path: '/operations', component: ImportJobsPage },
+        { path: '/other', component: { template: '<div />' } },
+      ],
     });
     await router.push('/operations');
     await router.isReady();
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const app = createApp(ImportJobsPage);
+    const app = createApp({ render: () => h(RouterView) });
     app.use(router);
     app.mount(host);
 
@@ -160,6 +166,18 @@ describe('ImportJobsPage', () => {
       .querySelector('form')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     expect(createJobFromPicker).toHaveBeenCalledOnce();
+
+    const confirmLeave = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
+    unresolvedCreateAttempt.value = true;
+    createState.value.phase = 'uncertain';
+    await router.push('/other');
+    expect(confirmLeave).toHaveBeenCalledOnce();
+    expect(router.currentRoute.value.path).toBe('/operations');
+
+    confirmLeave.mockReturnValue(true);
+    await router.push('/other');
+    expect(router.currentRoute.value.path).toBe('/other');
+    confirmLeave.mockRestore();
 
     app.unmount();
   });

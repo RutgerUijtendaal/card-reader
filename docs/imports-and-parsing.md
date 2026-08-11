@@ -5,7 +5,7 @@ Card imports turn one or more uploaded images into card records that can be revi
 ## End-to-end flow
 
 1. A staff user uploads supported image files from the staff-only `/imports` interface, explicitly selecting the Player or Game Master pool and either automatic role inference or a batch-wide role override.
-2. The API fingerprints the immutable request, stores the source files under its client-generated creation key, and creates an import job with one queued item per image. Replaying the same key and payload returns the existing job; reusing the key for a different payload is rejected.
+2. The API fingerprints the immutable request, stages and checksum-verifies each source file before atomically publishing it under the client-generated creation key, and creates an import job with one queued item per image. Replaying the same key and payload returns the existing job; reusing the key for a different payload is rejected.
 3. The parser worker polls for work and atomically claims a queued item.
 4. The parser loads the selected parsing template and current catalog resources, then crops regions, runs OCR, extracts fields, and detects symbols.
 5. Core resolves card roles from the job's snapshotted template hints and versioned metadata policy, then persists the card identity, card version, image, metadata relations, parsing suggestions, classification evidence, warnings, and processing result.
@@ -39,7 +39,7 @@ Templates may declare any combination of Hero, Boon, and Event role hints. Autom
 
 An import job is the user-facing batch, while import items are the individual units claimed by workers. Item state is durable, allowing the UI to show queued, processing, completed, failed, or cancelled work even if a process restarts.
 
-Upload creation is idempotent. The browser retains one creation key and the exact submit payload until the server confirms the job, the browser reconciles it through the creation-key lookup, or the user explicitly abandons the attempt. An uncertain attempt is locked against edits and can only be retried unchanged, preventing a lost HTTP response from creating duplicate content versions or parser work.
+Upload creation is idempotent. The browser retains one creation key and the exact submit payload until the server confirms the job, the browser reconciles it through the creation-key lookup, or the user explicitly abandons the attempt. In-app navigation is blocked while submission or reconciliation is active. An uncertain attempt is locked against edits, protected by route and browser-unload prompts, and can only be retried unchanged, preventing a lost HTTP response from creating duplicate content versions or parser work.
 
 Cancellation stops work that has not yet completed. The centered `/imports` workspace groups card
 setup, content-version details, and image or folder selection in one form. Images can be dropped

@@ -161,6 +161,18 @@ describe('ImportActivityPanel', () => {
             {
               code: 'card_classification_mismatch',
               message: 'Inferred roles differ from the existing card.',
+              details: {
+                inferred: { card_pool: 'game_master', card_roles: ['event'] },
+                existing: { card_pool: 'player', card_roles: [] },
+              },
+            },
+            {
+              code: 'card_classification_changed_while_queued',
+              message: 'Classification changed while queued.',
+              details: {
+                queued: { card_pool: 'player', card_roles: ['hero'] },
+                live: { card_pool: 'player', card_roles: [] },
+              },
             },
           ],
           resolved_card_roles: ['event'],
@@ -177,6 +189,14 @@ describe('ImportActivityPanel', () => {
 
     expect(mounted.host.textContent).toContain('Matched a deprecated card.');
     expect(mounted.host.textContent).toContain('Inferred roles differ from the existing card.');
+    expect(mounted.host.textContent).toContain('Classification changed while queued.');
+    expect(mounted.host.textContent).toContain('Template hints');
+    expect(mounted.host.textContent).toContain('Inferred');
+    expect(mounted.host.textContent).toContain('Game Master');
+    expect(mounted.host.textContent).toContain('Existing');
+    expect(mounted.host.textContent).toContain('Queued');
+    expect(mounted.host.textContent).toContain('Live');
+    expect(mounted.host.textContent).toContain('Standard');
     expect(
       mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
     ).toContain('Review card classification');
