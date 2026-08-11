@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
@@ -11,7 +12,18 @@ from PIL import Image
 from card_reader_api.catalog.assets import store_symbol_asset
 from card_reader_api.maintenance import services as maintenance_services
 from card_reader_api.maintenance.services import MaintenanceService
-from card_reader_core.models import Card, CardGroup, CardVersion, CardVersionImage, Deck, DeckEntry, ImportJob, ImportJobItem, Template
+from card_reader_core.models import (
+    Card,
+    CardGroup,
+    CardVersion,
+    CardVersionImage,
+    Deck,
+    DeckEntry,
+    ImportJob,
+    ImportJobItem,
+    Template,
+)
+from card_reader_core.repositories.cards import LatestCardVersionReparseSource
 from card_reader_core.services.cards import convert_card_images_to_webp
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.config.settings import settings
@@ -297,6 +309,63 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
         (card_b.id, version_b.id),
         (card_c.id, version_c.id),
     }
+
+
+def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
+    monkeypatch,
+) -> None:
+    template = Template.objects.create(
+        key="maintenance-atomic",
+        label="Maintenance Atomic",
+        definition_json=_template_definition("atomic_top_bar"),
+    )
+    sources = [
+        LatestCardVersionReparseSource(
+            card_id="player-card",
+            card_version_id="player-version",
+            template_id=template.key,
+            image_path=Path("player-image.webp"),
+            card_pool="player",
+            card_roles=(),
+        ),
+        LatestCardVersionReparseSource(
+            card_id="game-master-card",
+            card_version_id="game-master-version",
+            template_id=template.key,
+            image_path=Path("game-master-image.webp"),
+            card_pool="game_master",
+            card_roles=(),
+        ),
+    ]
+    creation_count = 0
+
+    def fail_second_group(**kwargs: object) -> ImportJob:
+        nonlocal creation_count
+        creation_count += 1
+        if creation_count == 2:
+            raise RuntimeError("simulated grouped creation failure")
+        return ImportJob.objects.create(
+            source_path=str(kwargs["source_path"]),
+            template=Template.objects.get(key=str(kwargs["template_id"])),
+        )
+
+    monkeypatch.setattr(
+        maintenance_services,
+        "create_import_job_with_files",
+        fail_second_group,
+    )
+
+    with pytest.raises(RuntimeError, match="simulated grouped creation failure"):
+        MaintenanceService()._queue_reparse_sources(
+            sources,
+            empty_message="empty",
+            unreadable_message="unreadable",
+            source_name_prefix="atomic",
+            message_suffix=".",
+        )
+
+    assert creation_count == 2
+    assert not ImportJob.objects.exists()
 
 
 def test_queue_reparse_latest_versions_by_filters_targets_only_matching_cards(

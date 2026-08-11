@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.core.management import call_command
+from django.db import transaction
 
 from card_reader_core.repositories.cards import (
     CardFilterParams,
@@ -91,26 +92,31 @@ class MaintenanceService:
             return MaintenanceResult(message=unreadable_message, removed_paths=[])
 
         job_count = 0
-        for (template_id, card_pool, card_roles), grouped in grouped_sources.items():
-            files = [source.image_path for source in grouped]
-            targets = [
-                ImportJobItemTarget(
-                    card_id=source.card_id,
-                    card_version_id=source.card_version_id,
-                    card_pool=source.card_pool,
-                    card_roles=source.card_roles,
+        with transaction.atomic():
+            for (template_id, card_pool, card_roles), grouped in grouped_sources.items():
+                files = [source.image_path for source in grouped]
+                targets = [
+                    ImportJobItemTarget(
+                        card_id=source.card_id,
+                        card_version_id=source.card_version_id,
+                        card_pool=source.card_pool,
+                        card_roles=source.card_roles,
+                    )
+                    for source in grouped
+                ]
+                create_import_job_with_files(
+                    source_path=(
+                        settings.storage_root_dir
+                        / "maintenance"
+                        / f"{source_name_prefix}-{template_id}"
+                    ),
+                    template_id=template_id,
+                    options={"reparse_existing": True},
+                    files=files,
+                    item_targets=targets,
+                    card_pool=card_pool,
                 )
-                for source in grouped
-            ]
-            create_import_job_with_files(
-                source_path=settings.storage_root_dir / "maintenance" / f"{source_name_prefix}-{template_id}",
-                template_id=template_id,
-                options={"reparse_existing": True},
-                files=files,
-                item_targets=targets,
-                card_pool=card_pool,
-            )
-            job_count += 1
+                job_count += 1
 
         return MaintenanceResult(
             message=(

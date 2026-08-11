@@ -426,6 +426,30 @@ export const useImportJobsController = () => {
     }
   };
 
+  const refreshSelectedJobDetail = async (): Promise<void> => {
+    const selectedDetail = selectedJobDetail.value;
+    if (
+      detailLoading.value
+      || !selectedDetail
+      || isTerminalImportStatus(selectedDetail.status)
+    ) return;
+
+    const requestId = ++detailRequestId;
+    try {
+      const detail = await fetchImportJobDetail(selectedDetail.id);
+      if (
+        requestId === detailRequestId
+        && selectedJobDetail.value?.id === selectedDetail.id
+      ) {
+        selectedJobDetail.value = detail;
+      }
+    } catch (error) {
+      if (requestId === detailRequestId) {
+        console.error('Refresh selected import detail failed', error);
+      }
+    }
+  };
+
   const pollJobs = async (): Promise<void> => {
     if (
       documentVisibility.value !== 'visible'
@@ -436,6 +460,7 @@ export const useImportJobsController = () => {
       const activeJobFinished = await loadActiveJobs();
       if (activeJobFinished) await loadRecentJobs();
       await reconcileMissingActiveWork();
+      await refreshSelectedJobDetail();
     } catch (error) {
       console.error('Polling imports failed', error);
     }
