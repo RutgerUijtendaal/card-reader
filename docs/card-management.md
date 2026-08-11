@@ -12,7 +12,9 @@ Content versions provide an additional history boundary for related changes made
 
 ## Pool and roles
 
-Every stable card identity belongs to either the **Player** or **Game Master** pool. A card can also hold any combination of the code-owned Hero, Boon, and Event roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
+Every stable card identity belongs to either the **Player** or **Game Master** pool. A card can also hold any combination of the code-owned Hero, Boon, Event, and Location roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
+
+Role keys allow up to 64 characters. Role definitions, labels, and ordering are code-owned; Location is currently descriptive and has no Hero-like deck or Playtester behavior.
 
 Staff edit both dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. The Admin Catalog shows the pool plus every assigned role, or Standard, on linked-card and suggestion tiles.
 

@@ -3066,6 +3066,7 @@ def test_card_role_filters_support_any_all_and_exclusions() -> None:
         [
             CardRoleAssignment(card=boon_event_card, role="boon"),
             CardRoleAssignment(card=boon_event_card, role="event"),
+            CardRoleAssignment(card=boon_event_card, role="location"),
         ]
     )
     standard_card = _create_card(name="Role Matching Standard", hero=False)
@@ -3075,21 +3076,21 @@ def test_card_role_filters_support_any_all_and_exclusions() -> None:
         row["id"]
         for row in client.get(
             "/cards",
-            {"card_roles": ["hero", "boon"], "card_role_match": "any"},
+            {"card_roles": ["hero", "location"], "card_role_match": "any"},
         ).json()["results"]
     }
     all_ids = {
         row["id"]
         for row in client.get(
             "/cards",
-            {"card_roles": ["boon", "event"], "card_role_match": "all"},
+            {"card_roles": ["boon", "location"], "card_role_match": "all"},
         ).json()["results"]
     }
     excluded_ids = {
         row["id"]
         for row in client.get(
             "/cards",
-            {"card_role_exclude": ["hero", "event"]},
+            {"card_role_exclude": ["hero", "location"]},
         ).json()["results"]
     }
 
@@ -3394,17 +3395,21 @@ def test_latest_version_patch_can_update_card_roles() -> None:
 
     response = client.patch(
         f"/cards/{card.id}/latest-version",
-        data={"card_pool": "game_master", "card_roles": ["hero", "boon"]},
+        data={"card_pool": "game_master", "card_roles": ["hero", "boon", "location"]},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
     assert response.status_code == 200
-    assert set(card.role_assignments.values_list("role", flat=True)) == {"hero", "boon"}
+    assert set(card.role_assignments.values_list("role", flat=True)) == {
+        "hero",
+        "boon",
+        "location",
+    }
     card.refresh_from_db()
     assert card.card_pool == "game_master"
     assert response.json()["card_pool"] == "game_master"
-    assert set(response.json()["card_roles"]) == {"hero", "boon"}
+    assert set(response.json()["card_roles"]) == {"hero", "boon", "location"}
 
     replacement_response = client.patch(
         f"/cards/{card.id}/latest-version",

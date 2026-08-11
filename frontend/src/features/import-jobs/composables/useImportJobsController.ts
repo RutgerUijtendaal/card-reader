@@ -1,6 +1,7 @@
 import { useDocumentVisibility, useEventListener, useIntervalFn } from '@vueuse/core';
 import { computed, onMounted, ref, shallowRef, watch } from 'vue';
-import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import { fetchOperationsQueuePage } from '@/domain/operations/api';
 import type { OperationsQueueItem } from '@/domain/operations/types';
 import { fetchTemplates } from '@/domain/templates/api';

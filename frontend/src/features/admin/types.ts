@@ -1,6 +1,7 @@
 import type { TemplateParserType } from '@/domain/templates/types';
 import type { JsonObject } from '@/shared/types/json';
-import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 
 export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types' | 'deck-roles' | 'deck-types';
 export type SuggestedCatalogKind = 'suggested-tags' | 'suggested-types' | 'suggested-deck-types';

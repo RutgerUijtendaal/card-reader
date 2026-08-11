@@ -228,7 +228,7 @@ def test_create_import_upload_rejects_conflicting_creation_key_and_supports_look
 
 def test_import_upload_snapshots_template_roles_and_defaults_to_automatic() -> None:
     template = Template.objects.get(key="mtg-like-v1")
-    template.inferred_card_roles_json = ["event", "boon"]
+    template.inferred_card_roles_json = ["location", "event", "boon"]
     template.save(update_fields=["inferred_card_roles_json"])
 
     response = _staff_client("import-template-snapshot-user").post(
@@ -248,11 +248,12 @@ def test_import_upload_snapshots_template_roles_and_defaults_to_automatic() -> N
     job = ImportJob.objects.get(id=response.json()["job_id"])
     assert job.card_role_mode == "automatic"
     assert job.card_role_override_json == []
-    assert job.template_role_snapshot_json == ["boon", "event"]
+    assert job.template_role_snapshot_json == ["boon", "event", "location"]
+    assert job.card_role_inference_policy_version == 2
     template.inferred_card_roles_json = []
     template.save(update_fields=["inferred_card_roles_json"])
     job.refresh_from_db()
-    assert job.template_role_snapshot_json == ["boon", "event"]
+    assert job.template_role_snapshot_json == ["boon", "event", "location"]
 
 
 @pytest.mark.parametrize("base_version", ["", "14", "14.1.2", "v14.1", "14.a"])
@@ -750,7 +751,7 @@ def test_staff_can_manage_templates() -> None:
             "label": "Staff Template",
             "key": "staff-template",
             "definition_json": _valid_template_definition(),
-            "inferred_card_roles": ["event", "hero"],
+            "inferred_card_roles": ["location", "event", "hero"],
         },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -758,9 +759,9 @@ def test_staff_can_manage_templates() -> None:
 
     assert list_response.status_code == 200
     assert create_response.status_code == 200
-    assert create_response.json()["inferred_card_roles"] == ["hero", "event"]
+    assert create_response.json()["inferred_card_roles"] == ["hero", "event", "location"]
     created_template = Template.objects.get(key="staff-template")
-    assert created_template.inferred_card_roles_json == ["hero", "event"]
+    assert created_template.inferred_card_roles_json == ["hero", "event", "location"]
 
 
 def test_template_rejects_duplicate_inferred_roles() -> None:
@@ -1362,6 +1363,19 @@ def test_filters_payload_keeps_symbol_asset_urls_public() -> None:
     assert response.status_code == 200
     returned = next(row for row in response.json()["symbols"] if row["id"] == symbol.id)
     assert returned["asset_url"] == "/symbols/assets/mana/test-symbol.svg"
+
+
+def test_filters_payload_uses_the_canonical_card_role_registry() -> None:
+    response = Client(HTTP_HOST="localhost").get("/cards/filters")
+
+    assert response.status_code == 200
+    assert response.json()["card_roles"] == [
+        {"key": "standard", "label": "Standard", "rank": 0, "derived": True},
+        {"key": "hero", "label": "Hero", "rank": 1, "derived": False},
+        {"key": "boon", "label": "Boon", "rank": 2, "derived": False},
+        {"key": "event", "label": "Event", "rank": 3, "derived": False},
+        {"key": "location", "label": "Location", "rank": 4, "derived": False},
+    ]
 
 
 def test_filters_payload_includes_the_ordered_mana_family_catalog() -> None:

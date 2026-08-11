@@ -24,7 +24,7 @@ describe('ImportJobsPage', () => {
     mockedUseImportJobsController.mockReturnValue({
       pickerTemplateId: ref('mtg-like-v1'),
       cardPool: ref('player'),
-      cardRoleMode: ref('automatic'),
+      cardRoleMode: ref<'automatic' | 'override'>('override'),
       cardRoleOverride: ref([]),
       creationKey: ref('f1e10412-e8e8-49cb-9717-a24d2eec38c1'),
       contentVersionBase: ref('16.2'),
@@ -136,6 +136,7 @@ describe('ImportJobsPage', () => {
     expect(host.textContent).not.toContain('Pick mode');
     expect(host.textContent).toContain('Card pool');
     expect(host.textContent).toContain('Automatic');
+    expect(host.textContent).toContain('Location');
     const currentVersion = host.querySelector('[data-testid="current-content-version"]');
     const newVersionRow = host.querySelector('[data-testid="new-version-row"]');
     const versionInput = host.querySelector('#content-version-base');

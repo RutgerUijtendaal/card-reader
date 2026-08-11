@@ -22,6 +22,35 @@ def test_automatic_import_classification_unions_template_and_tag_roles_canonical
     assert result.evidence["matched_tag_keys"] == ["hero"]
 
 
+def test_policy_version_two_infers_location_without_reinterpreting_version_one() -> None:
+    version_one = classify_import_card(
+        CardClassificationInput(
+            card_pool="game_master",
+            role_mode="automatic",
+            override_roles=(),
+            template_roles=(),
+            inference_policy_version=1,
+            matched_tag_keys=("location", "hero"),
+        )
+    )
+    version_two = classify_import_card(
+        CardClassificationInput(
+            card_pool="game_master",
+            role_mode="automatic",
+            override_roles=(),
+            template_roles=("event", "location"),
+            inference_policy_version=2,
+            matched_tag_keys=("location", "hero", "location"),
+        )
+    )
+
+    assert version_one.roles == ("hero",)
+    assert version_one.evidence["tag_roles"] == ["hero"]
+    assert version_two.roles == ("hero", "event", "location")
+    assert version_two.evidence["matched_tag_keys"] == ["hero", "location"]
+    assert version_two.evidence["tag_roles"] == ["hero", "location"]
+
+
 def test_import_role_override_replaces_all_automatic_signals() -> None:
     result = classify_import_card(
         CardClassificationInput(
@@ -29,8 +58,8 @@ def test_import_role_override_replaces_all_automatic_signals() -> None:
             role_mode="override",
             override_roles=("boon",),
             template_roles=("event",),
-            inference_policy_version=1,
-            matched_tag_keys=("hero",),
+            inference_policy_version=2,
+            matched_tag_keys=("hero", "location"),
         )
     )
 
@@ -45,7 +74,7 @@ def test_empty_automatic_and_override_results_are_standard() -> None:
             role_mode="automatic",
             override_roles=(),
             template_roles=(),
-            inference_policy_version=1,
+            inference_policy_version=2,
             matched_tag_keys=(),
         )
     )
@@ -55,8 +84,8 @@ def test_empty_automatic_and_override_results_are_standard() -> None:
             role_mode="override",
             override_roles=(),
             template_roles=("event",),
-            inference_policy_version=1,
-            matched_tag_keys=("hero",),
+            inference_policy_version=2,
+            matched_tag_keys=("hero", "location"),
         )
     )
 

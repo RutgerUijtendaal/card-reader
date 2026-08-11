@@ -317,6 +317,7 @@
 </template>
 
 <script setup lang="ts">
+import { CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
 import { Info, Upload } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
@@ -378,11 +379,7 @@ const cardPoolOptions = [
   { value: 'player', label: 'Player' },
   { value: 'game_master', label: 'Game Master' },
 ];
-const cardRoleOptions = [
-  { value: 'hero', label: 'Hero' },
-  { value: 'boon', label: 'Boon' },
-  { value: 'event', label: 'Event' },
-];
+const cardRoleOptions = CARD_ROLE_OPTIONS;
 
 onBeforeRouteLeave(() => {
   if (!hasUnresolvedCreateAttempt.value) return true;

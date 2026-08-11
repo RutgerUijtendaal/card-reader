@@ -17,7 +17,7 @@ New cards receive the batch pool and resolved roles. Existing cards are updated 
 - Overrides are complete batch-wide role sets, not additions to inferred roles.
 - An empty override means intentionally force Standard.
 - Automatic inference unions all matching signals and therefore supports multiple roles.
-- The stable tag key `hero` infers the Hero role. Do not infer from localized labels or free text when a matched tag key is available.
+- The stable tag keys `hero` and `location` infer the Hero and Location roles under inference policy version 2. Do not infer from localized labels or free text when a matched tag key is available.
 - Templates declare zero or more inferred role hints. The inference engine is generic and must not hard-code individual template IDs.
 - No inferred role means Standard; Standard is never stored as a role.
 - Existing card classification is authoritative. Import mismatches warn and preserve it; imports never silently move an existing card between pools or replace its roles.
@@ -61,7 +61,7 @@ Carry template role hints through seeds and developer data:
 - bump the developer-data format from Version 2 to Version 3 for newly generated bundles;
 - keep explicit Version 1 and Version 2 adapters, with missing template hints normalized to an empty set;
 - publish and validate a Version 3 bundle before replacing `dev-data.lock.json`; never fabricate the bundle checksum locally;
-- add coverage or doctor validation for every template that is expected to infer a role, so a missing Boon/Event hint cannot silently turn imported cards into Standard after bootstrap.
+- add coverage or doctor validation for every template that is expected to infer a role, so a missing Boon/Event/Location hint cannot silently turn imported cards into Standard after bootstrap.
 
 ### Import job
 
@@ -100,6 +100,7 @@ Migrate an existing non-empty `warning_code`/`warning_message` pair into a one-e
 The structured evidence should be sufficient to render messages such as:
 
 - `Hero — detected tag "Hero"`
+- `Location — detected tag "Location"`
 - `Event — inferred from template "event-v1"`
 - `Standard — no special role detected`
 - `Needs review — inferred roles differ from the existing card`
@@ -119,7 +120,7 @@ Automatic resolution is:
 resolved roles = template role hints union tag-derived roles union future code-owned inference
 ```
 
-Initial policy version 1 contains `hero tag -> hero role`. Keep each version's mapping centralized and independently testable. Adding or changing Boon/Event/tag rules creates a new policy version without changing how queued version 1 jobs resolve and without changing the parser adapter.
+Policy version 1 contains `hero tag -> hero role`. Policy version 2 preserves that mapping and adds `location tag -> location role`. Keep each version's mapping centralized and independently testable so queued version 1 jobs remain Hero-only and are never reinterpreted by a later deployment.
 
 Override mode bypasses all automatic signals and records that the result came from a batch override.
 
@@ -191,7 +192,7 @@ In the Card setup section:
 1. Require a visible Player/Game Master pool selection.
 2. Default classification to **Automatic**.
 3. Explain that automatic mode combines template hints and detected metadata.
-4. Provide an **Override** mode with Hero, Boon, and Event multi-select controls.
+4. Provide an **Override** mode with Hero, Boon, Event, and Location multi-select controls.
 5. Present **Standard — no special roles** as the empty override state.
 6. Include the stable creation key, pool, mode, override roles, template, content version, and files in the immutable submit payload.
 
@@ -227,8 +228,9 @@ Add or update tests covering:
 - developer-data coverage/doctor failure when a required inference hint is missing;
 - automatic mode as the default;
 - upload creation replay, conflicting-key rejection, response-loss lookup, and no duplicate upload/job/content-version/items;
-- Hero inferred from the stable Hero tag key;
-- Boon/Event and multi-role inference from template hints;
+- Hero and Location inferred from their stable tag keys under policy version 2;
+- Boon/Event/Location and multi-role inference from template hints;
+- policy version 1 ignoring Location while preserving Hero inference;
 - union and deterministic ordering across inference sources;
 - no signals resolving to Standard/empty roles;
 - override replacing, rather than augmenting, automatic inference;
@@ -254,8 +256,8 @@ Do not run prohibited service/integration suites. Run lint and typecheck for cor
 - Every new import job has an explicit pool and immutable classification snapshot.
 - Ambiguous upload responses can be reconciled by creation key without duplicate jobs, content versions, items, or parser work.
 - Automatic inference is the visible and API default.
-- Hero is inferred from the matched Hero tag key.
-- Template hints can infer Boon, Event, Hero, or any valid combination.
+- Hero and Location are inferred from their matched stable tag keys for new policy-version-2 jobs.
+- Template hints can infer Boon, Event, Hero, Location, or any valid combination.
 - Staff can override a batch with multiple roles or forced Standard.
 - New cards receive the resolved pool and roles.
 - Existing cards are never silently reclassified by import or reparse.

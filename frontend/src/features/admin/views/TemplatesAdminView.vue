@@ -209,7 +209,7 @@ import {
   updateTemplate,
 } from '@/domain/templates/api';
 import { useTemplatePreview } from '@/features/admin/composables/useTemplatePreview';
-import type { CardRole } from '@/domain/cards/types/cardModels';
+import { CARD_ROLE_OPTIONS, type CardRole } from '@/domain/cards/cardRoles';
 import type { TemplateDefinition, TemplateRecord } from '@/domain/templates/types';
 
 type TemplateForm = {
@@ -328,11 +328,7 @@ const form = reactive<TemplateForm>({
   definition_json: TEMPLATE_DEFINITION_EXAMPLE_JSON,
   inferred_card_roles: [],
 });
-const inferredRoleOptions: Array<{ value: CardRole; label: string }> = [
-  { value: 'hero', label: 'Hero' },
-  { value: 'boon', label: 'Boon' },
-  { value: 'event', label: 'Event' },
-];
+const inferredRoleOptions = CARD_ROLE_OPTIONS;
 
 const createMode = computed(() => selectedId.value === null);
 const templateKeyForPreview = computed(() => (createMode.value ? '' : form.key.trim()));

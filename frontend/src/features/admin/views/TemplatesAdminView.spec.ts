@@ -65,10 +65,11 @@ describe('TemplatesAdminView', () => {
     await nextTick();
 
     const checkboxes = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
-    expect(checkboxes).toHaveLength(3);
-    expect(checkboxes.map((checkbox) => checkbox.checked)).toEqual([false, false, true]);
+    expect(checkboxes).toHaveLength(4);
+    expect(checkboxes.map((checkbox) => checkbox.checked)).toEqual([false, false, true, false]);
 
-    checkboxes[1].click();
+    expect(Array.from(host.querySelectorAll('label')).some((label) => label.textContent?.includes('Location'))).toBe(true);
+    checkboxes[3].click();
     Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
       .find((button) => button.textContent?.trim() === 'Save Changes')
       ?.click();
@@ -78,7 +79,7 @@ describe('TemplatesAdminView', () => {
     expect(updateTemplate).toHaveBeenCalledWith('template-id', {
       label: 'Event',
       definition_json: { regions: [] },
-      inferred_card_roles: ['event', 'boon'],
+      inferred_card_roles: ['event', 'location'],
     });
 
     app.unmount();

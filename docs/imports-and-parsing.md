@@ -33,7 +33,7 @@ Parsing templates describe where fields and symbols appear on a card image and h
 
 Templates and catalogs are read at processing time. Changing them affects future parsing and explicit reparses; it does not silently rewrite existing card versions. Import classification is the exception to that live lookup: each job snapshots its template role hints and inference-policy version so queued or retried work keeps its original meaning.
 
-Templates may declare any combination of Hero, Boon, and Event role hints. Automatic classification unions those hints with stable metadata signals, initially the `hero` tag key. Override mode replaces every automatic signal with the selected role set; selecting no roles intentionally produces Standard. The pool is always explicit and is never inferred from a role.
+Templates may declare any combination of Hero, Boon, Event, and Location role hints. Automatic classification unions those hints with stable metadata signals. Policy version 1 recognizes the `hero` tag key; policy version 2 preserves Hero inference and adds the `location` tag key. Override mode replaces every automatic signal with the selected role set; selecting no roles intentionally produces Standard. The pool is always explicit and is never inferred from a role.
 
 ## Jobs, retries, and cancellation
 

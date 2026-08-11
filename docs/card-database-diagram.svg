@@ -146,8 +146,8 @@
 
   <rect class="box card" x="730" y="805" width="260" height="92"/>
   <text x="760" y="837" class="title-small">CardRoleAssignment</text>
-  <text x="755" y="861" class="field">card + role (unique)</text>
-  <text x="755" y="883" class="small">Hero / Boon / Event; none = Standard</text>
+  <text x="755" y="861" class="field">role varchar(64); unique per card</text>
+  <text x="755" y="883" class="small" style="font-size:10px">Hero / Boon / Event / Location; none = Standard</text>
 
   <rect class="box tts" x="725" y="935" width="270" height="104"/>
   <text class="title" x="785" y="970">TtsCardSheet</text>

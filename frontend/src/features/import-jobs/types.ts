@@ -1,3 +1,5 @@
+import type { CardRole } from '@/domain/cards/cardRoles';
+
 export type ImportJobStatus = 'queued' | 'running' | 'canceling' | 'cancelled' | 'completed' | 'failed';
 
 export type ContentVersion = {
@@ -19,8 +21,8 @@ export type ImportJob = {
   updated_at: string;
   card_pool: 'player' | 'game_master';
   card_role_mode: 'automatic' | 'override';
-  card_role_override: Array<'hero' | 'boon' | 'event'>;
-  template_role_snapshot: Array<'hero' | 'boon' | 'event'>;
+  card_role_override: CardRole[];
+  template_role_snapshot: CardRole[];
   card_role_inference_policy_version: number;
 };
 
@@ -38,12 +40,12 @@ export type ImportJobItem = {
   warning_code: string | null;
   warning_message: string | null;
   warnings: ImportWarning[];
-  resolved_card_roles: Array<'hero' | 'boon' | 'event'>;
+  resolved_card_roles: CardRole[];
   card_role_inference: Record<string, unknown>;
   target_card_id: string | null;
   target_card_version_id: string | null;
   target_card_pool_snapshot: 'player' | 'game_master' | null;
-  target_card_roles_snapshot: Array<'hero' | 'boon' | 'event'>;
+  target_card_roles_snapshot: CardRole[];
   card_tab_url: string | null;
 };
 

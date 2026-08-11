@@ -1,5 +1,6 @@
 import type { CardLifecycleStatus } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { DeckBuildingConfig } from '@/domain/deck-building/types';
+import type { CardRole } from '@/domain/cards/cardRoles';
 
 export type CardTooltipSymbolLookup = {
   asset_url?: string | null;
@@ -27,8 +28,6 @@ export type CardContentVersionSummary = {
 };
 
 export type CardPool = 'player' | 'game_master';
-export type CardRole = 'hero' | 'boon' | 'event';
-export type CardRoleFilter = 'standard' | CardRole;
 
 export type CardHoverTooltipModel = {
   id: string;

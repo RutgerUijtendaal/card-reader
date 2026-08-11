@@ -54,11 +54,55 @@ ALL_CARD_POOLS_SCOPE = CardPoolScope(frozenset(CARD_POOLS))
 HERO_CARD_ROLE: Literal["hero"] = "hero"
 BOON_CARD_ROLE: Literal["boon"] = "boon"
 EVENT_CARD_ROLE: Literal["event"] = "event"
+LOCATION_CARD_ROLE: Literal["location"] = "location"
 STANDARD_CARD_ROLE: Literal["standard"] = "standard"
-CardRole = Literal["hero", "boon", "event"]
-CardRoleFilter = Literal["standard", "hero", "boon", "event"]
-CARD_ROLES: tuple[CardRole, ...] = (HERO_CARD_ROLE, BOON_CARD_ROLE, EVENT_CARD_ROLE)
+CardRole = Literal["hero", "boon", "event", "location"]
+CardRoleFilter = Literal["standard", "hero", "boon", "event", "location"]
+
+
+@dataclass(frozen=True)
+class CardRoleDefinition:
+    key: CardRole
+    label: str
+    rank: int
+
+
+@dataclass(frozen=True)
+class CardRoleFilterDefinition:
+    key: CardRoleFilter
+    label: str
+    rank: int
+    derived: bool
+
+
+CARD_ROLE_DEFINITIONS: tuple[CardRoleDefinition, ...] = (
+    CardRoleDefinition(key=HERO_CARD_ROLE, label="Hero", rank=1),
+    CardRoleDefinition(key=BOON_CARD_ROLE, label="Boon", rank=2),
+    CardRoleDefinition(key=EVENT_CARD_ROLE, label="Event", rank=3),
+    CardRoleDefinition(key=LOCATION_CARD_ROLE, label="Location", rank=4),
+)
+CARD_ROLES: tuple[CardRole, ...] = tuple(definition.key for definition in CARD_ROLE_DEFINITIONS)
+CARD_ROLE_CHOICES: tuple[tuple[CardRole, str], ...] = tuple(
+    (definition.key, definition.label) for definition in CARD_ROLE_DEFINITIONS
+)
 CARD_ROLE_FILTER_VALUES: tuple[CardRoleFilter, ...] = (STANDARD_CARD_ROLE, *CARD_ROLES)
+CARD_ROLE_FILTER_DEFINITIONS: tuple[CardRoleFilterDefinition, ...] = (
+    CardRoleFilterDefinition(
+        key=STANDARD_CARD_ROLE,
+        label="Standard",
+        rank=0,
+        derived=True,
+    ),
+    *(
+        CardRoleFilterDefinition(
+            key=definition.key,
+            label=definition.label,
+            rank=definition.rank,
+            derived=False,
+        )
+        for definition in CARD_ROLE_DEFINITIONS
+    ),
+)
 
 
 class CardLifecycleCarrier(Protocol):
@@ -134,12 +178,8 @@ class CardRoleAssignment(TimestampedModel):
         db_column="card_id",
     )
     role: models.CharField[str, str] = models.CharField(
-        max_length=16,
-        choices=[
-            (HERO_CARD_ROLE, "Hero"),
-            (BOON_CARD_ROLE, "Boon"),
-            (EVENT_CARD_ROLE, "Event"),
-        ],
+        max_length=64,
+        choices=CARD_ROLE_CHOICES,
         db_index=True,
     )
 

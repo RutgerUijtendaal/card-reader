@@ -3,7 +3,8 @@ import {
   normalizeCardLifecycleFilterValue,
   type CardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
-import type { CardPool, CardRoleFilter } from '@/domain/cards/types/cardModels';
+import { isCardRoleFilter, type CardRoleFilter } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 
 type FilterMatch = 'any' | 'all';
 
@@ -160,9 +161,7 @@ const normalizeStringArray = (values: readonly string[]): string[] =>
 const normalizeMatch = (value: FilterMatch): FilterMatch => (value === 'all' ? 'all' : 'any');
 const normalizeCardPool = (value: CardPool): CardPool => value === 'game_master' ? 'game_master' : 'player';
 const normalizeCardRoles = (values: readonly string[]): CardRoleFilter[] =>
-  normalizeStringArray(values).filter((value): value is CardRoleFilter =>
-    ['standard', 'hero', 'boon', 'event'].includes(value),
-  );
+  normalizeStringArray(values).filter(isCardRoleFilter);
 
 export const normalizeCardFilterState = (state: CardFilterState): CardFilterState => ({
   query: normalizeStringValue(state.query),

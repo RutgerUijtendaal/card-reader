@@ -220,6 +220,9 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert result.counts["cards"] == 3
         assert result.copied_assets == 6
         assert Card.objects.filter(key="synthetic-hero", role_assignments__role="hero").exists()
+        assert Card.objects.filter(
+            key="synthetic-deprecated", role_assignments__role="location"
+        ).exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
         assert Template.objects.get(key="synthetic-template").inferred_card_roles_json == ["event"]
@@ -695,6 +698,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         label="Synthetic Deprecated",
         lifecycle_status="deprecated",
     )
+    CardRoleAssignment.objects.create(card=deprecated, role="location")
     deprecated_version = _create_version(
         card=deprecated,
         template=template,
@@ -727,7 +731,13 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "coverage": {
             "min_cards": 3,
             "min_cards_by_pool": {"player": 3, "game_master": 0},
-            "min_cards_by_role": {"standard": 1, "hero": 1, "boon": 0, "event": 0},
+            "min_cards_by_role": {
+                "standard": 1,
+                "hero": 1,
+                "boon": 0,
+                "event": 0,
+                "location": 1,
+            },
             "min_deprecated_cards": 1,
             "min_card_groups": 1,
             "min_cards_with_multiple_versions": 1,

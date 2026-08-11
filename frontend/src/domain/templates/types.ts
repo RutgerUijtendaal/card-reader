@@ -1,5 +1,5 @@
 import type { JsonObject } from '@/shared/types/json';
-import type { CardRole } from '@/domain/cards/types/cardModels';
+import type { CardRole } from '@/domain/cards/cardRoles';
 
 export type RegionBounds = {
   unit: 'relative' | 'absolute';

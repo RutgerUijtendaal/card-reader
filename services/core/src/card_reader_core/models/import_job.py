@@ -29,7 +29,7 @@ class ImportCardRoleMode(StrEnum):
     override = "override"
 
 
-LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION = 1
+LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION = 2
 
 
 class CardRoleInferenceEvidence(TypedDict):
@@ -67,7 +67,9 @@ class ImportJob(TimestampedModel):
     card_role_mode: models.TextField[str, str] = models.TextField(default=ImportCardRoleMode.automatic)
     card_role_override_json = models.JSONField(default=list)
     template_role_snapshot_json = models.JSONField(default=list)
-    card_role_inference_policy_version: models.IntegerField[int, int] = models.IntegerField(default=1)
+    card_role_inference_policy_version: models.IntegerField[int, int] = models.IntegerField(
+        default=LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION
+    )
     status: models.TextField[str, str] = models.TextField(default=ImportJobStatus.queued)
     total_items: models.IntegerField[int, int] = models.IntegerField(default=0)
     processed_items: models.IntegerField[int, int] = models.IntegerField(default=0)

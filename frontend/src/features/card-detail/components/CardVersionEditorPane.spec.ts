@@ -255,6 +255,7 @@ describe('CardVersionEditorPane tabs', () => {
     expect(mounted.container.textContent).toContain('Card Classification');
     expect(mounted.container.textContent).toContain('Game Master');
     expect(mounted.container.textContent).toContain('Standard');
+    expect(mounted.container.textContent).toContain('Location');
     expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).toContain('Card Status');
     expect(mounted.container.textContent).not.toContain('Mana Cost');

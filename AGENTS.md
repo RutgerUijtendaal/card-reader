@@ -113,7 +113,7 @@ Core stack:
 - Deliver the classification feature through the umbrella branch `feature/card-classification`, with its aggregate PR targeting `master`. Each checkpoint uses a separate branch and PR targeting `feature/card-classification`; merge checkpoints into the umbrella branch in dependency order, and branch the next checkpoint from the updated umbrella branch. Keep the aggregate PR open for whole-feature CI and review, and do not retarget checkpoint PRs to `master` merely to trigger checks or reviews.
 - The target card classification model has two independent card-level dimensions:
   - `card_pool` is exactly one of `player` or `game_master`.
-  - `card_roles` is a set of zero or more code-owned roles, initially `hero`, `boon`, and `event`; roles may coexist.
+  - `card_roles` is a set of zero or more code-owned roles: `hero`, `boon`, `event`, and `location`; roles may coexist.
   - Standard is the derived empty-role state and must not be persisted as a role.
   - Pool/role conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
   - Pool and roles belong to stable `Card` identity; template remains version/parser configuration.

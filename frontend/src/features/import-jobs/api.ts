@@ -1,5 +1,6 @@
 import { api } from '@/shared/api/client';
-import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import type {
   ContentVersion,
   CreateImportJobResponse,

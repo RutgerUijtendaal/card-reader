@@ -20,7 +20,7 @@ describe('CatalogLinkedCardsGrid', () => {
           card_version_name: 'The Offer',
           image_url: null,
           card_pool: 'game_master',
-          card_roles: ['boon', 'event'],
+          card_roles: ['boon', 'event', 'location'],
         },
       ],
       emptyMessage: 'No cards',
@@ -42,6 +42,7 @@ describe('CatalogLinkedCardsGrid', () => {
     expect(container.textContent).toContain('Game Master');
     expect(container.textContent).toContain('Boon');
     expect(container.textContent).toContain('Event');
+    expect(container.textContent).toContain('Location');
 
     app.unmount();
   });

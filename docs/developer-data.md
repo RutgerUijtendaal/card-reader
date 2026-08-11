@@ -28,9 +28,9 @@ without making current classification fields optional.
 
 Selection coverage is evaluated by pool and by role through `min_cards_by_pool` and
 `min_cards_by_role`. The existing Hero minimum is retained under the Hero role. Game Master pool
-coverage remains zero while that pool is excluded; Boon and Event may remain at zero until reviewed
-Player source data is available. The lock file is still
-generated only by publishing a validated immutable bundle and must not be edited by hand.
+coverage remains zero while that pool is excluded; Boon, Event, and Location may remain at zero
+until reviewed source data is available. The lock file is still generated only by publishing a
+validated immutable bundle and must not be edited by hand.
 
 `required_template_role_hints` in the reviewed selection makes expected template inference explicit.
 Bundle validation and `doctor_dev_data` fail when a named template loses a required hint. Templates

@@ -39,6 +39,7 @@ from card_reader_core.repositories.cards import (
     list_cards,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
+from card_reader_core.models import CARD_ROLE_FILTER_DEFINITIONS
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -162,10 +163,13 @@ class CardFiltersView(APIView):
                     ),
                 ],
                 "card_roles": [
-                    {"key": "standard", "label": "Standard", "rank": 0, "derived": True},
-                    {"key": "hero", "label": "Hero", "rank": 1, "derived": False},
-                    {"key": "boon", "label": "Boon", "rank": 2, "derived": False},
-                    {"key": "event", "label": "Event", "rank": 3, "derived": False},
+                    {
+                        "key": definition.key,
+                        "label": definition.label,
+                        "rank": definition.rank,
+                        "derived": definition.derived,
+                    }
+                    for definition in CARD_ROLE_FILTER_DEFINITIONS
                 ],
                 "mana_families": [
                     {

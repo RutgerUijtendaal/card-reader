@@ -7,13 +7,14 @@ from card_reader_core.models import (
     CARD_ROLES,
     HERO_CARD_ROLE,
     LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION as CORE_LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
+    LOCATION_CARD_ROLE,
     CardPool,
     CardRole,
     CardRoleInferenceEvidence,
     normalize_card_roles,
 )
 
-SUPPORTED_CARD_ROLE_INFERENCE_POLICY_VERSIONS = (1,)
+SUPPORTED_CARD_ROLE_INFERENCE_POLICY_VERSIONS = (1, 2)
 LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION = CORE_LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION
 CardRoleMode = Literal["automatic", "override"]
 
@@ -37,6 +38,7 @@ class CardClassificationResult:
 
 _TAG_ROLE_POLICIES: dict[int, dict[str, CardRole]] = {
     1: {"hero": HERO_CARD_ROLE},
+    2: {"hero": HERO_CARD_ROLE, "location": LOCATION_CARD_ROLE},
 }
 
 

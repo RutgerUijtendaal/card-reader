@@ -170,7 +170,8 @@ import {
   type CardLifecycleStatus,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { ScalarFieldName } from '@/domain/cards/types';
-import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 
 const {
   card,
