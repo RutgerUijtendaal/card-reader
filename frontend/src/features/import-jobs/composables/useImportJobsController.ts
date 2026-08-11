@@ -218,11 +218,36 @@ export const useImportJobsController = () => {
     }
   };
 
+  const refreshSelectedJobDetail = async (): Promise<void> => {
+    const selectedDetail = selectedJobDetail.value;
+    if (
+      detailLoading.value
+      || !selectedDetail
+      || isTerminalImportStatus(selectedDetail.status)
+    ) return;
+
+    const requestId = ++detailRequestId;
+    try {
+      const detail = await fetchImportJobDetail(selectedDetail.id);
+      if (
+        requestId === detailRequestId
+        && selectedJobDetail.value?.id === selectedDetail.id
+      ) {
+        selectedJobDetail.value = detail;
+      }
+    } catch (error) {
+      if (requestId === detailRequestId) {
+        console.error('Refresh selected import detail failed', error);
+      }
+    }
+  };
+
   const refreshActivity = async (): Promise<void> => {
     activityActionErrorMessage.value = '';
     const [activeResult, historyResult] = await Promise.allSettled([
       loadActiveJobs(),
       loadRecentJobs(),
+      refreshSelectedJobDetail(),
     ]);
     if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
 
@@ -423,30 +448,6 @@ export const useImportJobsController = () => {
       activityActionErrorMessage.value = extractImportJobErrorMessage(error);
     } finally {
       if (requestId === detailRequestId) detailLoading.value = false;
-    }
-  };
-
-  const refreshSelectedJobDetail = async (): Promise<void> => {
-    const selectedDetail = selectedJobDetail.value;
-    if (
-      detailLoading.value
-      || !selectedDetail
-      || isTerminalImportStatus(selectedDetail.status)
-    ) return;
-
-    const requestId = ++detailRequestId;
-    try {
-      const detail = await fetchImportJobDetail(selectedDetail.id);
-      if (
-        requestId === detailRequestId
-        && selectedJobDetail.value?.id === selectedDetail.id
-      ) {
-        selectedJobDetail.value = detail;
-      }
-    } catch (error) {
-      if (requestId === detailRequestId) {
-        console.error('Refresh selected import detail failed', error);
-      }
     }
   };
 

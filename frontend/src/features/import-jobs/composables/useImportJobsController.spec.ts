@@ -407,6 +407,32 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
+  test('refreshes the open detail when cancelling the last active job', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+    await mounted.controller.viewJobDetail('active-job');
+
+    vi.mocked(fetchImportJobs).mockResolvedValue([]);
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
+      historyPage([historyItem('active-job', 'cancelled')]),
+    );
+    vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
+      ...importJobDetail('active-job'),
+      status: 'cancelled',
+    });
+
+    await mounted.controller.cancelJob('active-job');
+
+    expect(cancelImportJob).toHaveBeenCalledWith('active-job');
+    expect(mounted.controller.activeJobs.value).toEqual([]);
+    expect(mounted.controller.selectedJobDetail.value?.status).toBe('cancelled');
+
+    mounted.app.unmount();
+  });
+
   test('reconciles unseen active work discovered by polling history', async () => {
     const mounted = mountController();
     await vi.waitFor(() => {
