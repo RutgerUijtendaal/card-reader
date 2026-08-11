@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from typing import Callable, cast
 
-from card_reader_core.models import ImportJob, ImportJobItem, ImportJobStatus
+from card_reader_core.models import CardPool, CardRole, ImportJob, ImportJobItem, ImportJobStatus
 from card_reader_core.repositories.import_jobs import (
     bump_job_processed,
     fetch_job,
@@ -20,6 +20,7 @@ from card_reader_core.repositories.metadata import (
     SuggestionCandidate,
 )
 from card_reader_core.services.cards import save_parsed_card_with_notifications
+from card_reader_core.services.imports import CardClassificationInput, CardRoleMode, classify_import_card
 from card_reader_core.storage import resolve_storage_path
 from .resources import ParserJobContextLoader
 from .types import CardParserProtocol, ItemProcessingResult, JobOptions, ParserResources
@@ -99,6 +100,15 @@ class ImportProcessorService:
             self._log_item_processed(job, item, result)
             return 0
         except Exception as exc:
+            item.refresh_from_db(fields=["status", "error_message", "updated_at"])
+            if item.status == ImportJobStatus.completed:
+                logger.exception(
+                    "Post-success import work failed without changing completed state. "
+                    "job_id=%s item_id=%s",
+                    job.id,
+                    item.id,
+                )
+                return 0
             mark_job_item_failed(item, str(exc))
             logger.exception(
                 "Failed to parse import item. job_id=%s item_id=%s source_file=%s",
@@ -123,6 +133,20 @@ class ImportProcessorService:
             known_keywords=resources.known_keywords,
             known_tags=resources.known_tags,
             known_types=resources.known_types,
+        )
+        tag_keys_by_id = {tag.id: tag.key for tag in resources.known_tags}
+        matched_tag_keys = tuple(
+            tag_keys_by_id[tag_id] for tag_id in parsed.tag_ids if tag_id in tag_keys_by_id
+        )
+        classification = classify_import_card(
+            CardClassificationInput(
+                card_pool=cast(CardPool, job.card_pool),
+                role_mode=cast(CardRoleMode, job.card_role_mode),
+                override_roles=cast(tuple[CardRole, ...], tuple(job.card_role_override_json)),
+                template_roles=cast(tuple[CardRole, ...], tuple(job.template_role_snapshot_json)),
+                inference_policy_version=job.card_role_inference_policy_version,
+                matched_tag_keys=matched_tag_keys,
+            )
         )
         save_parsed_card_with_notifications(
             item=item,
@@ -154,6 +178,9 @@ class ImportProcessorService:
                 for row in parsed.type_suggestions
             ],
             reparse_existing=options.reparse_existing,
+            card_pool=classification.card_pool,
+            resolved_card_roles=classification.roles,
+            classification_evidence=classification.evidence,
         )
         tag_count = len(parsed.tag_ids)
         type_count = len(parsed.type_ids)

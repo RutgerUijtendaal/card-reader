@@ -7,13 +7,26 @@ from django.db import transaction
 from card_reader_core.models import (
     Card,
     CardAlias,
+    DEFAULT_CARD_POOL,
+    CardPool,
+    CardRole,
+    CardRoleAssignment,
     CardVersion,
     ImportJobItem,
     ImportJobStatus,
     ParseResult,
     card_is_deprecated,
+    card_role_keys,
     now_utc,
 )
+from card_reader_core.repositories.import_jobs import (
+    CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
+    CARD_CLASSIFICATION_MISMATCH_WARNING,
+    MATCHED_DEPRECATED_CARD_WARNING,
+    remove_import_warning,
+    upsert_import_warning,
+)
+from card_reader_core.services.imports import CardRoleInferenceEvidence
 from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
 
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
@@ -56,6 +69,9 @@ def save_parsed_card(
     tag_suggestions: list[SuggestionCandidate] | None = None,
     type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    resolved_card_roles: tuple[CardRole, ...] = (),
+    classification_evidence: CardRoleInferenceEvidence | None = None,
 ) -> CardVersion:
     return save_parsed_card_result(
         item=item,
@@ -71,6 +87,9 @@ def save_parsed_card(
         tag_suggestions=tag_suggestions,
         type_suggestions=type_suggestions,
         reparse_existing=reparse_existing,
+        card_pool=card_pool,
+        resolved_card_roles=resolved_card_roles,
+        classification_evidence=classification_evidence,
     ).version
 
 
@@ -89,10 +108,24 @@ def save_parsed_card_result(
     tag_suggestions: list[SuggestionCandidate] | None = None,
     type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    resolved_card_roles: tuple[CardRole, ...] = (),
+    classification_evidence: CardRoleInferenceEvidence | None = None,
 ) -> ParsedCardSaveResult:
-    if item.target_card_version is not None:
-        return ParsedCardSaveResult(
-            version=reparse_target_version(
+    resolved_evidence: CardRoleInferenceEvidence = classification_evidence or {
+        "mode": "automatic",
+        "policy_version": 1,
+        "template_roles": [],
+        "matched_tag_keys": [],
+        "tag_roles": [],
+        "override_roles": [],
+        "resolved_roles": list(resolved_card_roles),
+    }
+    parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
+    card_key = normalize_slug_key(parsed_name)
+    with transaction.atomic():
+        if item.target_card_version is not None:
+            version = reparse_target_version(
                 item=item,
                 template_id=template_id,
                 checksum=checksum,
@@ -105,14 +138,17 @@ def save_parsed_card_result(
                 symbol_ids=symbol_ids or [],
                 tag_suggestions=tag_suggestions or [],
                 type_suggestions=type_suggestions or [],
-            ),
-            created_new_version=False,
-        )
+            )
+            finalize_import_item(
+                item,
+                version,
+                card_pool=card_pool,
+                resolved_card_roles=resolved_card_roles,
+                evidence=resolved_evidence,
+                is_new_card=False,
+            )
+            return ParsedCardSaveResult(version=version, created_new_version=False)
 
-    parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
-    card_key = normalize_slug_key(parsed_name)
-
-    with transaction.atomic():
         existing_version = None
         if reparse_existing:
             existing_version = (
@@ -138,11 +174,9 @@ def save_parsed_card_result(
                     type_suggestions=type_suggestions or [],
                 )
                 apply_latest_version_identity(existing_version.card, version)
-                sync_import_item_lifecycle_warning(item, existing_version.card)
-                mark_item_completed(item)
-                return ParsedCardSaveResult(version=version, created_new_version=True)
-            return ParsedCardSaveResult(
-                version=update_existing_version(
+                created_new_version = True
+            else:
+                version = update_existing_version(
                     item,
                     existing_version,
                     normalized_fields,
@@ -154,13 +188,28 @@ def save_parsed_card_result(
                     symbol_ids=symbol_ids or [],
                     tag_suggestions=tag_suggestions or [],
                     type_suggestions=type_suggestions or [],
-                ),
-                created_new_version=False,
+                )
+                created_new_version = False
+            finalize_import_item(
+                item,
+                version,
+                card_pool=card_pool,
+                resolved_card_roles=resolved_card_roles,
+                evidence=resolved_evidence,
+                is_new_card=False,
+            )
+            return ParsedCardSaveResult(
+                version=version,
+                created_new_version=created_new_version,
             )
 
         card = resolve_card_by_name_key(parsed_name)
+        created_new_card = card is None
         if card is None:
-            card = Card.objects.create(key=card_key, label=parsed_name)
+            card = Card.objects.create(key=card_key, label=parsed_name, card_pool=card_pool)
+            CardRoleAssignment.objects.bulk_create(
+                [CardRoleAssignment(card=card, role=role) for role in resolved_card_roles]
+            )
 
         latest = get_latest_card_version(card.id)
         if latest and latest.image_hash == checksum and reparse_existing:
@@ -181,11 +230,9 @@ def save_parsed_card_result(
                     type_suggestions=type_suggestions or [],
                 )
                 apply_latest_version_identity(card, version)
-                sync_import_item_lifecycle_warning(item, card)
-                mark_item_completed(item)
-                return ParsedCardSaveResult(version=version, created_new_version=True)
-            return ParsedCardSaveResult(
-                version=update_existing_version(
+                created_new_version = True
+            else:
+                version = update_existing_version(
                     item,
                     latest,
                     normalized_fields,
@@ -197,8 +244,19 @@ def save_parsed_card_result(
                     symbol_ids=symbol_ids or [],
                     tag_suggestions=tag_suggestions or [],
                     type_suggestions=type_suggestions or [],
-                ),
-                created_new_version=False,
+                )
+                created_new_version = False
+            finalize_import_item(
+                item,
+                version,
+                card_pool=card_pool,
+                resolved_card_roles=resolved_card_roles,
+                evidence=resolved_evidence,
+                is_new_card=created_new_card,
+            )
+            return ParsedCardSaveResult(
+                version=version,
+                created_new_version=created_new_version,
             )
 
         version = create_parsed_card_version(
@@ -216,10 +274,15 @@ def save_parsed_card_result(
             tag_suggestions=tag_suggestions or [],
             type_suggestions=type_suggestions or [],
         )
-        sync_import_item_lifecycle_warning(item, card)
-        mark_item_completed(item)
-
         apply_latest_version_identity(card, version)
+        finalize_import_item(
+            item,
+            version,
+            card_pool=card_pool,
+            resolved_card_roles=resolved_card_roles,
+            evidence=resolved_evidence,
+            is_new_card=created_new_card,
+        )
         return ParsedCardSaveResult(version=version, created_new_version=True)
 
 
@@ -536,23 +599,85 @@ def update_existing_version(
     card = Card.objects.filter(id=version.card.id).first()
     if card is not None:
         apply_latest_version_identity(card, version)
-        sync_import_item_lifecycle_warning(item, card)
-    mark_item_completed(item)
     return version
 
 
 def sync_import_item_lifecycle_warning(item: ImportJobItem, card: Card) -> None:
     if not card_is_deprecated(card):
-        item.warning_code = None
-        item.warning_message = None
-        item.updated_at = now_utc()
-        item.save(update_fields=["warning_code", "warning_message", "updated_at"])
+        remove_import_warning(item, MATCHED_DEPRECATED_CARD_WARNING)
         return
 
-    item.warning_code = "matched_deprecated_card"
-    item.warning_message = f"Import matched deprecated card '{card.label}'. The card remains deprecated."
-    item.updated_at = now_utc()
-    item.save(update_fields=["warning_code", "warning_message", "updated_at"])
+    upsert_import_warning(
+        item,
+        {
+            "code": MATCHED_DEPRECATED_CARD_WARNING,
+            "message": f"Import matched deprecated card '{card.label}'. The card remains deprecated.",
+        },
+    )
+
+
+def finalize_import_item(
+    item: ImportJobItem,
+    version: CardVersion,
+    *,
+    card_pool: CardPool,
+    resolved_card_roles: tuple[CardRole, ...],
+    evidence: CardRoleInferenceEvidence,
+    is_new_card: bool,
+) -> None:
+    card = version.card
+    live_roles = card_role_keys(card)
+    evidence_payload: dict[str, object] = dict(evidence)
+    evidence_payload["live_classification"] = {
+        "card_pool": card.card_pool,
+        "card_roles": list(live_roles),
+    }
+
+    if item.target_card_pool_snapshot is not None:
+        queued_roles = tuple(item.target_card_roles_snapshot_json)
+        evidence_payload["queued_target_classification"] = {
+            "card_pool": item.target_card_pool_snapshot,
+            "card_roles": list(queued_roles),
+        }
+        if item.target_card_pool_snapshot != card.card_pool or queued_roles != live_roles:
+            upsert_import_warning(
+                item,
+                {
+                    "code": CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
+                    "message": "Card classification changed while this reparse was queued; the live value was preserved.",
+                    "details": {
+                        "queued": evidence_payload["queued_target_classification"],
+                        "live": evidence_payload["live_classification"],
+                    },
+                },
+            )
+        else:
+            remove_import_warning(item, CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING)
+
+    if is_new_card or (card.card_pool == card_pool and live_roles == resolved_card_roles):
+        remove_import_warning(item, CARD_CLASSIFICATION_MISMATCH_WARNING)
+    else:
+        upsert_import_warning(
+            item,
+            {
+                "code": CARD_CLASSIFICATION_MISMATCH_WARNING,
+                "message": "Inferred classification differs from the existing card; the existing classification was preserved.",
+                "details": {
+                    "inferred": {
+                        "card_pool": card_pool,
+                        "card_roles": list(resolved_card_roles),
+                    },
+                    "existing": evidence_payload["live_classification"],
+                },
+            },
+        )
+
+    item.resolved_card_roles_json = list(resolved_card_roles)
+    item.card_role_inference_json = evidence_payload
+    item.target_card = card
+    item.target_card_version = version
+    sync_import_item_lifecycle_warning(item, card)
+    mark_item_completed(item)
 
 
 def create_new_version(
@@ -645,7 +770,20 @@ def mark_item_completed(item: ImportJobItem) -> None:
     item.status = ImportJobStatus.completed
     item.error_message = None
     item.updated_at = now_utc()
-    item.save(update_fields=["status", "error_message", "updated_at"])
+    item.save(
+        update_fields=[
+            "status",
+            "error_message",
+            "warning_code",
+            "warning_message",
+            "warnings_json",
+            "resolved_card_roles_json",
+            "card_role_inference_json",
+            "target_card",
+            "target_card_version",
+            "updated_at",
+        ]
+    )
 
 
 def apply_parsed_output_to_version(

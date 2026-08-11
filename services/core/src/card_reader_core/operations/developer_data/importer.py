@@ -219,6 +219,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             key=row.key,
             label=row.label,
             definition_json=row.definition,
+            inferred_card_roles_json=row.inferred_card_roles,
         )
         for row in payload.templates
     }

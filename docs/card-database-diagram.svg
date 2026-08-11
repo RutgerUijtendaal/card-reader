@@ -45,15 +45,18 @@
 
   <rect class="box import" x="500" y="195" width="215" height="86"/>
   <text class="title" x="558" y="230">ImportJob</text>
-  <text class="field" x="525" y="256">source, template, status</text>
+  <text class="field" x="525" y="252">source, template, status</text>
+  <text class="small" x="516" y="272">creation key • pool/role snapshot</text>
 
   <rect class="box import" x="850" y="195" width="225" height="86"/>
   <text class="title" x="900" y="230">ImportJobItem</text>
-  <text class="field" x="875" y="256">target card/version</text>
+  <text class="field" x="875" y="252">target • resolved roles/evidence</text>
+  <text class="small" x="886" y="272">ordered warnings + audit</text>
 
   <rect class="box version" x="1245" y="195" width="205" height="86"/>
   <text class="title" x="1285" y="230">Template</text>
-  <text class="field" x="1269" y="256">parser definition</text>
+  <text class="field" x="1269" y="252">parser definition</text>
+  <text class="small" x="1263" y="272">inferred card-role hints</text>
 
   <rect class="box external" x="1540" y="195" width="185" height="86"/>
   <text class="title" x="1585" y="230">Auth User</text>

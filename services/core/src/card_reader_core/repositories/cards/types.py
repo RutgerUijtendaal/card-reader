@@ -8,6 +8,7 @@ from card_reader_core.models import (
     DEFAULT_CARD_LIFECYCLE_FILTER as CORE_DEFAULT_CARD_LIFECYCLE_FILTER,
     CardLifecycleFilter as CoreCardLifecycleFilter,
     CardPool,
+    CardRole,
     CardRoleFilter,
     CardVersion,
     CardVersionImage,
@@ -44,6 +45,8 @@ class LatestCardVersionReparseSource:
     card_version_id: str
     template_id: str
     image_path: Path
+    card_pool: CardPool
+    card_roles: tuple[CardRole, ...]
 
 
 @dataclass(frozen=True)

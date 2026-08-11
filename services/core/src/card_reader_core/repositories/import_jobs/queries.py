@@ -20,6 +20,14 @@ def fetch_job(job_id: str) -> ImportJob | None:
     return ImportJob.objects.select_related("content_version", "template").filter(id=job_id).first()
 
 
+def fetch_job_by_creation_key(creation_key: str) -> ImportJob | None:
+    return (
+        ImportJob.objects.select_related("content_version", "template")
+        .filter(creation_key=creation_key)
+        .first()
+    )
+
+
 def fetch_items_for_job(job_id: str) -> list[ImportJobItem]:
     return list(
         ImportJobItem.objects.filter(job_id=job_id)

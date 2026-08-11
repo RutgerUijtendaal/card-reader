@@ -3,7 +3,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { OperationsQueueItem } from '@/domain/operations/types';
 import ImportActivityPanel from '@/features/import-jobs/components/ImportActivityPanel.vue';
-import type { ImportJob } from '@/features/import-jobs/types';
+import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 
 const activeJob: ImportJob = {
   id: 'active-job',
@@ -15,6 +15,11 @@ const activeJob: ImportJob = {
   processed_items: 4,
   created_at: '2026-08-09T10:00:00Z',
   updated_at: '2026-08-09T10:01:00Z',
+  card_pool: 'player',
+  card_role_mode: 'automatic',
+  card_role_override: [],
+  template_role_snapshot: [],
+  card_role_inference_policy_version: 1,
 };
 
 const recentJob: OperationsQueueItem = {
@@ -39,13 +44,17 @@ const mountPanel = async (
     recentJobs?: OperationsQueueItem[];
     activeLoaded?: boolean;
     historyLoaded?: boolean;
+    selectedJobDetail?: ImportJobDetail | null;
   } = {},
 ) => {
   const onRefresh = vi.fn();
   const onCancel = vi.fn();
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/operations', component: { template: '<div />' } }],
+    routes: [
+      { path: '/operations', component: { template: '<div />' } },
+      { path: '/cards/:cardId/edit', component: { template: '<div />' } },
+    ],
   });
   await router.push('/operations');
   await router.isReady();
@@ -63,6 +72,8 @@ const mountPanel = async (
     cancelingCount: 0,
     cancellingJobIds: new Set<string>(),
     lastRefreshedAt: '10:05:00',
+    selectedJobDetail: options.selectedJobDetail ?? null,
+    detailLoading: false,
     onRefresh,
     onCancel,
   });
@@ -126,6 +137,49 @@ describe('ImportActivityPanel', () => {
     expect(
       mounted.host.querySelector('[aria-label="Loading recent import history"]'),
     ).not.toBeNull();
+
+    mounted.app.unmount();
+  });
+
+  test('shows every item warning and links classification mismatches to the Card tab', async () => {
+    const detail: ImportJobDetail = {
+      ...activeJob,
+      id: 'finished-job',
+      status: 'completed',
+      processed_items: 1,
+      total_items: 1,
+      items: [
+        {
+          id: 'item-id',
+          source_file: 'event.webp',
+          status: 'completed',
+          error_message: null,
+          warning_code: 'matched_deprecated_card',
+          warning_message: 'Matched a deprecated card.',
+          warnings: [
+            { code: 'matched_deprecated_card', message: 'Matched a deprecated card.' },
+            {
+              code: 'card_classification_mismatch',
+              message: 'Inferred roles differ from the existing card.',
+            },
+          ],
+          resolved_card_roles: ['event'],
+          card_role_inference: { template_roles: ['event'] },
+          target_card_id: 'card-id',
+          target_card_version_id: 'version-id',
+          target_card_pool_snapshot: null,
+          target_card_roles_snapshot: [],
+          card_tab_url: '/cards/card-id/edit?tab=card',
+        },
+      ],
+    };
+    const mounted = await mountPanel({ selectedJobDetail: detail });
+
+    expect(mounted.host.textContent).toContain('Matched a deprecated card.');
+    expect(mounted.host.textContent).toContain('Inferred roles differ from the existing card.');
+    expect(
+      mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
+    ).toContain('Review card classification');
 
     mounted.app.unmount();
   });

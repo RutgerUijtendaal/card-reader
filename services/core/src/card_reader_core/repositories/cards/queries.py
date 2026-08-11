@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from django.db.models import Count, F, Prefetch, Q, QuerySet
 
@@ -22,6 +22,7 @@ from card_reader_core.models import (
     CardVersionType,
     Type,
     active_card_lifecycle_q,
+    card_role_keys,
     filter_queryset_by_card_lifecycle,
 )
 from card_reader_core.search.cards import apply_card_search
@@ -380,11 +381,11 @@ def get_card_image(card_version_id: str) -> CardVersionImage | None:
 
 def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseSource]:
     latest_versions = [
-        (card.id, card.latest_version)
+        (card, card.latest_version)
         for card in Card.objects.exclude(latest_version__isnull=True)
         .filter(active_card_lifecycle_q(field_path="lifecycle_status"))
         .select_related("latest_version__template")
-        .prefetch_related("latest_version__images")
+        .prefetch_related("role_assignments", "latest_version__images")
         .order_by("id")
         if card.latest_version is not None
     ]
@@ -392,7 +393,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
         return []
 
     out: list[LatestCardVersionReparseSource] = []
-    for card_id, version in latest_versions:
+    for card, version in latest_versions:
         image = next(iter(version.images.all()), None)
         if image is None:
             continue
@@ -401,10 +402,12 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
             continue
         out.append(
             LatestCardVersionReparseSource(
-                card_id=card_id,
+                card_id=card.id,
                 card_version_id=version.id,
                 template_id=version.template.key,
                 image_path=image_path,
+                card_pool=cast(CardPool, card.card_pool),
+                card_roles=card_role_keys(card),
             )
         )
     return out
@@ -508,6 +511,8 @@ def list_filtered_latest_card_version_reparse_sources(
                 card_version_id=version.id,
                 template_id=version.template.key,
                 image_path=image_path,
+                card_pool=cast(CardPool, version.card.card_pool),
+                card_roles=card_role_keys(version.card),
             )
         )
     return out

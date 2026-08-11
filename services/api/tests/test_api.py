@@ -3,6 +3,7 @@ from datetime import timedelta
 from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -65,6 +66,8 @@ def test_create_import_upload_rejects_unknown_template() -> None:
     response = _staff_client("import-unknown-template-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "unknown-template",
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
@@ -80,6 +83,8 @@ def test_create_import_upload_rejects_unsupported_files() -> None:
     response = _staff_client("import-unsupported-files-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
@@ -93,6 +98,8 @@ def test_create_import_upload_stores_relative_paths() -> None:
     response = _staff_client("import-relative-paths-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
@@ -111,12 +118,117 @@ def test_create_import_upload_stores_relative_paths() -> None:
     assert item.source_file.startswith(f"{job.source_path}/")
 
 
+def test_create_import_upload_replays_same_creation_key_without_duplicate_work() -> None:
+    creation_key = str(uuid4())
+    client = _staff_client("import-idempotent-replay-user")
+
+    def submit() -> object:
+        return client.post(
+            "/imports/upload",
+            data={
+                "creation_key": creation_key,
+                "card_pool": "game_master",
+                "card_role_mode": "override",
+                "card_role_override": json.dumps(["boon", "event"]),
+                "template_id": "mtg-like-v1",
+                "content_version_base": "97.1",
+                "content_version_description": "Idempotent import.",
+                "options_json": "{}",
+                "files": SimpleUploadedFile(
+                    "card.png",
+                    b"idempotent-image-content",
+                    content_type="image/png",
+                ),
+            },
+        )
+
+    first = submit()
+    second = submit()
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.json()["job_id"] == first.json()["job_id"]
+    assert second.json()["idempotent_replay"] is True
+    assert ImportJob.objects.filter(creation_key=creation_key).count() == 1
+    assert ImportJobItem.objects.filter(job_id=first.json()["job_id"]).count() == 1
+    assert ContentVersion.objects.filter(base_version="97.1").count() == 1
+    job = ImportJob.objects.get(id=first.json()["job_id"])
+    assert job.card_pool == "game_master"
+    assert job.card_role_mode == "override"
+    assert job.card_role_override_json == ["boon", "event"]
+
+
+def test_create_import_upload_rejects_conflicting_creation_key_and_supports_lookup() -> None:
+    creation_key = str(uuid4())
+    client = _staff_client("import-idempotent-conflict-user")
+    common = {
+        "creation_key": creation_key,
+        "card_pool": "player",
+        "template_id": "mtg-like-v1",
+        "content_version_base": "97.2",
+        "content_version_description": "Creation lookup.",
+        "options_json": "{}",
+    }
+    first = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "files": SimpleUploadedFile("card.png", b"first", content_type="image/png"),
+        },
+    )
+    conflict = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "files": SimpleUploadedFile("card.png", b"different", content_type="image/png"),
+        },
+    )
+    lookup = client.get(f"/imports/by-creation-key/{creation_key}")
+
+    assert first.status_code == 201
+    assert conflict.status_code == 409
+    assert lookup.status_code == 200
+    assert lookup.json()["job_id"] == first.json()["job_id"]
+    assert ImportJob.objects.filter(creation_key=creation_key).count() == 1
+
+
+def test_import_upload_snapshots_template_roles_and_defaults_to_automatic() -> None:
+    template = Template.objects.get(key="mtg-like-v1")
+    template.inferred_card_roles_json = ["event", "boon"]
+    template.save(update_fields=["inferred_card_roles_json"])
+
+    response = _staff_client("import-template-snapshot-user").post(
+        "/imports/upload",
+        data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
+            "template_id": template.key,
+            "content_version_base": "97.3",
+            "content_version_description": "Template snapshot.",
+            "options_json": "{}",
+            "files": SimpleUploadedFile("card.png", b"snapshot", content_type="image/png"),
+        },
+    )
+
+    assert response.status_code == 201
+    job = ImportJob.objects.get(id=response.json()["job_id"])
+    assert job.card_role_mode == "automatic"
+    assert job.card_role_override_json == []
+    assert job.template_role_snapshot_json == ["boon", "event"]
+    template.inferred_card_roles_json = []
+    template.save(update_fields=["inferred_card_roles_json"])
+    job.refresh_from_db()
+    assert job.template_role_snapshot_json == ["boon", "event"]
+
+
 @pytest.mark.parametrize("base_version", ["", "14", "14.1.2", "v14.1", "14.a"])
 def test_create_import_upload_rejects_invalid_content_version_base(base_version: str) -> None:
     existing_count = ContentVersion.objects.count()
     response = _staff_client("import-invalid-version-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": base_version,
             "content_version_description": "Test import version.",
@@ -134,6 +246,8 @@ def test_create_import_upload_rejects_blank_content_version_description() -> Non
     response = _staff_client("import-blank-description-user").post(
         "/imports/upload",
         data={
+            "creation_key": str(uuid4()),
+            "card_pool": "player",
             "template_id": "mtg-like-v1",
             "content_version_base": "14.1",
             "content_version_description": "   ",
@@ -152,6 +266,8 @@ def test_create_import_upload_increments_content_version_patch() -> None:
         response = client.post(
             "/imports/upload",
             data={
+                "creation_key": str(uuid4()),
+                "card_pool": "player",
                 "template_id": "mtg-like-v1",
                 "content_version_base": "98.7",
                 "content_version_description": "Test import version.",
@@ -600,6 +716,7 @@ def test_staff_can_manage_templates() -> None:
             "label": "Staff Template",
             "key": "staff-template",
             "definition_json": _valid_template_definition(),
+            "inferred_card_roles": ["event", "hero"],
         },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -607,6 +724,24 @@ def test_staff_can_manage_templates() -> None:
 
     assert list_response.status_code == 200
     assert create_response.status_code == 200
+    assert create_response.json()["inferred_card_roles"] == ["hero", "event"]
+    created_template = Template.objects.get(key="staff-template")
+    assert created_template.inferred_card_roles_json == ["hero", "event"]
+
+
+def test_template_rejects_duplicate_inferred_roles() -> None:
+    response = _staff_client("staff-template-role-validation-user").post(
+        "/admin/templates",
+        data={
+            "label": "Invalid Role Template",
+            "key": "invalid-role-template",
+            "definition_json": _valid_template_definition(),
+            "inferred_card_roles": ["event", "event"],
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
 
 
 def test_template_key_cannot_be_updated() -> None:
@@ -2868,6 +3003,101 @@ def test_import_matching_deprecated_card_keeps_card_deprecated_and_warns() -> No
     assert item.status == "completed"
     assert item.warning_code == "matched_deprecated_card"
     assert item.warning_message is not None
+
+
+def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
+    source_file = settings.storage_root_dir / "uploads" / "classified-new-card.png"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_bytes(b"classified-new-card")
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "classified-new-card.png"),
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="game_master",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "classified-new-card.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="classified-new-card-checksum",
+        normalized_fields={"name": "Classified New Card"},
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=False,
+        card_pool="game_master",
+        resolved_card_roles=("hero", "event"),
+        classification_evidence={
+            "mode": "automatic",
+            "policy_version": 1,
+            "template_roles": ["event"],
+            "matched_tag_keys": ["hero"],
+            "tag_roles": ["hero"],
+            "override_roles": [],
+            "resolved_roles": ["hero", "event"],
+        },
+    )
+
+    item.refresh_from_db()
+    assert version.card.card_pool == "game_master"
+    assert list(
+        version.card.role_assignments.order_by("role").values_list("role", flat=True)
+    ) == ["event", "hero"]
+    assert item.status == "completed"
+    assert item.resolved_card_roles_json == ["hero", "event"]
+    assert item.card_role_inference_json["matched_tag_keys"] == ["hero"]
+
+
+def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifecycle_warning() -> None:
+    card, target_version = _create_editable_card_version(name="Classification Mismatch Card")
+    card.lifecycle_status = "deprecated"
+    card.save(update_fields=["lifecycle_status"])
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "classification-mismatch.png"),
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="game_master",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "classification-mismatch.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="classification-mismatch-checksum",
+        normalized_fields={"name": "Classification Mismatch Card"},
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        reparse_existing=False,
+        card_pool="game_master",
+        resolved_card_roles=("event",),
+        classification_evidence={
+            "mode": "automatic",
+            "policy_version": 1,
+            "template_roles": ["event"],
+            "matched_tag_keys": [],
+            "tag_roles": [],
+            "override_roles": [],
+            "resolved_roles": ["event"],
+        },
+    )
+
+    card.refresh_from_db()
+    item.refresh_from_db()
+    assert version.card == card
+    assert version.version_number == target_version.version_number + 1
+    assert card.card_pool == "player"
+    assert not card.role_assignments.exists()
+    assert item.status == "completed"
+    assert [warning["code"] for warning in item.warnings_json] == [
+        "matched_deprecated_card",
+        "card_classification_mismatch",
+    ]
 
 
 def test_targeted_reparse_rolls_back_name_conflict() -> None:

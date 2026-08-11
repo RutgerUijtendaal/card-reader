@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 from pathlib import Path
-from uuid import uuid4
+from typing import cast
 
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status
@@ -24,7 +26,8 @@ from card_reader_core.repositories.import_jobs import (
     fetch_job,
     list_import_jobs,
 )
-from card_reader_core.services.imports import ImportService
+from card_reader_core.models import CardPool, CardRole
+from card_reader_core.services.imports import CardRoleMode, ImportCreationKeyConflict, ImportService
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 logger = logging.getLogger(__name__)
@@ -48,28 +51,65 @@ class ImportUploadView(APIView):
     def post(self, request: Request) -> Response:
         serializer = ImportUploadSerializer(
             data={
+                "creation_key": request.data.get("creation_key", ""),
                 "template_id": request.data.get("template_id", ""),
                 "content_version_base": request.data.get("content_version_base", ""),
                 "content_version_description": request.data.get("content_version_description", ""),
                 "options_json": request.data.get("options_json", "{}"),
                 "files": request.FILES.getlist("files"),
+                "card_pool": request.data.get("card_pool", ""),
+                "card_role_mode": request.data.get("card_role_mode", "automatic"),
+                "card_role_override": request.data.get("card_role_override", "[]"),
             }
         )
         if not serializer.is_valid():
             return serializer_error(serializer)
 
-        upload_dir = _save_supported_uploads(serializer.validated_data["files"])
+        fingerprint, uploads = _upload_fingerprint(
+            template_id=serializer.validated_data["template_id"],
+            content_version_base=serializer.validated_data["content_version_base"],
+            content_version_description=serializer.validated_data["content_version_description"],
+            options=serializer.validated_data["options_json"],
+            card_pool=str(serializer.validated_data["card_pool"]),
+            card_role_mode=str(serializer.validated_data["card_role_mode"]),
+            card_role_override=serializer.validated_data["card_role_override"],
+            files=serializer.validated_data["files"],
+        )
+        creation_key = str(serializer.validated_data["creation_key"])
+        service = ImportService()
+        existing = service.get_job_by_creation_key(creation_key=creation_key)
+        if existing is not None:
+            if existing.creation_fingerprint != fingerprint:
+                return Response(
+                    {"detail": "This creation key has already been used for a different import payload."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            return Response(
+                {**import_job_payload(existing), "job_id": existing.id, "idempotent_replay": True}
+            )
+
+        try:
+            upload_dir = _save_supported_uploads(uploads, creation_key=creation_key)
+        except ImportCreationKeyConflict as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         if upload_dir is None:
             return bad_request("No supported image files found in upload")
 
         try:
-            job = ImportService().create_job(
+            job, idempotent_replay = service.create_job(
                 source_path=str(upload_dir),
                 template_id=serializer.validated_data["template_id"],
                 options=serializer.validated_data["options_json"],
                 content_version_base=serializer.validated_data["content_version_base"],
                 content_version_description=serializer.validated_data["content_version_description"],
+                creation_key=creation_key,
+                creation_fingerprint=fingerprint,
+                card_pool=cast(CardPool, serializer.validated_data["card_pool"]),
+                card_role_mode=cast(CardRoleMode, serializer.validated_data["card_role_mode"]),
+                card_role_override=cast(list[CardRole], serializer.validated_data["card_role_override"]),
             )
+        except ImportCreationKeyConflict as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except ValueError as exc:
             return bad_request(str(exc))
         except Exception:
@@ -78,7 +118,18 @@ class ImportUploadView(APIView):
                 {"detail": "Failed to create import job from upload. See API logs."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        return Response(import_job_payload(job), status=status.HTTP_201_CREATED)
+        return Response(
+            {**import_job_payload(job), "job_id": job.id, "idempotent_replay": idempotent_replay},
+            status=status.HTTP_200_OK if idempotent_replay else status.HTTP_201_CREATED,
+        )
+
+
+class ImportCreationKeyView(APIView):
+    def get(self, _request: Request, creation_key: object) -> Response:
+        job = ImportService().get_job_by_creation_key(creation_key=str(creation_key))
+        if job is None:
+            return not_found("Job not found")
+        return Response({**import_job_payload(job), "job_id": job.id, "idempotent_replay": True})
 
 
 class ImportDetailView(APIView):
@@ -97,21 +148,82 @@ class ImportCancelView(APIView):
         return Response(import_job_payload(job), status=status.HTTP_202_ACCEPTED)
 
 
-def _save_supported_uploads(files: list[UploadedFile]) -> str | None:
-    upload_dir = build_storage_relative_path("uploads", str(uuid4()))
+def _save_supported_uploads(
+    files: list[tuple[UploadedFile, str]],
+    *,
+    creation_key: str,
+) -> str | None:
+    upload_dir = build_storage_relative_path("uploads", creation_key)
     resolve_storage_path(upload_dir).mkdir(parents=True, exist_ok=True)
     saved_count = 0
 
-    for index, upload in enumerate(files):
+    for index, (upload, expected_checksum) in enumerate(files):
         original_name = Path(upload.name or f"upload-{index}.img").name
         if Path(original_name).suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
             continue
         target_file = resolve_storage_path(
             build_storage_relative_path(upload_dir, f"{index:04d}-{original_name}")
         )
-        with target_file.open("wb") as stream:
-            for chunk in upload.chunks():
-                stream.write(chunk)
+        if target_file.is_file():
+            if _sha256_path(target_file) != expected_checksum:
+                raise ImportCreationKeyConflict(
+                    "Stored upload content conflicts with this creation key."
+                )
+        else:
+            try:
+                with target_file.open("xb") as stream:
+                    for chunk in upload.chunks():
+                        stream.write(chunk)
+            except FileExistsError:
+                if _sha256_path(target_file) != expected_checksum:
+                    raise ImportCreationKeyConflict(
+                        "Stored upload content conflicts with this creation key."
+                    ) from None
         saved_count += 1
 
     return upload_dir if saved_count else None
+
+
+def _upload_fingerprint(
+    *,
+    template_id: str,
+    content_version_base: str,
+    content_version_description: str,
+    options: dict[str, object],
+    card_pool: str,
+    card_role_mode: str,
+    card_role_override: list[str],
+    files: list[UploadedFile],
+) -> tuple[str, list[tuple[UploadedFile, str]]]:
+    file_records: list[dict[str, object]] = []
+    uploads: list[tuple[UploadedFile, str]] = []
+    for upload in files:
+        digest = hashlib.sha256()
+        for chunk in upload.chunks():
+            digest.update(chunk)
+        upload.seek(0)
+        checksum = digest.hexdigest()
+        file_records.append(
+            {"name": Path(upload.name or "upload.img").name, "size": upload.size, "sha256": checksum}
+        )
+        uploads.append((upload, checksum))
+    payload = {
+        "template_id": template_id,
+        "content_version_base": content_version_base,
+        "content_version_description": content_version_description,
+        "options": options,
+        "card_pool": card_pool,
+        "card_role_mode": card_role_mode,
+        "card_role_override": card_role_override,
+        "files": file_records,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest(), uploads
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()

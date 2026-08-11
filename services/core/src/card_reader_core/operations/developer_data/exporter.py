@@ -183,7 +183,12 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
         types=[_catalog_record(row) for row in Type.objects.order_by("key")],
         symbols=[_symbol_record(row) for row in Symbol.objects.order_by("key")],
         templates=[
-            TemplateRecord(key=row.key, label=row.label, definition=row.definition_json)
+            TemplateRecord(
+                key=row.key,
+                label=row.label,
+                definition=row.definition_json,
+                inferred_card_roles=list(row.inferred_card_roles_json),
+            )
             for row in Template.objects.order_by("key")
         ],
         deck_tags=[
@@ -357,6 +362,17 @@ def _validate_coverage(
     missing_templates = sorted(set(coverage.required_template_keys) - template_keys)
     if missing_templates:
         errors.append(f"missing required templates: {', '.join(missing_templates)}")
+    templates_by_key = {template.key: template for template in payload.templates}
+    for template_key, required_roles in coverage.required_template_role_hints.items():
+        template = templates_by_key.get(template_key)
+        if template is None:
+            errors.append(f"missing inference template: {template_key}")
+            continue
+        missing_roles = sorted(set(required_roles) - set(template.inferred_card_roles))
+        if missing_roles:
+            errors.append(
+                f"template {template_key} is missing inference roles: {', '.join(missing_roles)}"
+            )
     if payload.current_card_back is None:
         errors.append("requires a current card back")
     if errors:

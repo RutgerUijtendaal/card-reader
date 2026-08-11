@@ -10,6 +10,7 @@ class Template(TimestampedModel):
     key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
     label: models.TextField[str, str] = models.TextField(default="")
     definition_json = models.JSONField(default=dict)
+    inferred_card_roles_json = models.JSONField(default=list)
 
     class Meta:
         db_table = "template"

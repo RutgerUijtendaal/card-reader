@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db.migrations.executor import MigrationExecutor
@@ -19,7 +21,9 @@ from card_reader_core.models import (
     Tag,
     Template,
     Type,
+    normalize_card_roles,
 )
+from card_reader_core.operations.developer_data.schema import DeveloperDataSelection
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 
@@ -41,6 +45,23 @@ class Command(BaseCommand):
         ):
             if not model.objects.exists():
                 issues.append(f"{label} are missing")
+        selection_path = settings.developer_data_selection_path
+        if selection_path.is_file():
+            selection = DeveloperDataSelection.model_validate(
+                json.loads(selection_path.read_text(encoding="utf-8"))
+            )
+            for template_key, required_roles in selection.coverage.required_template_role_hints.items():
+                template = Template.objects.filter(key=template_key).first()
+                if template is None:
+                    issues.append(f"template {template_key} required for inference is missing")
+                    continue
+                missing = sorted(
+                    set(required_roles) - set(normalize_card_roles(template.inferred_card_roles_json))
+                )
+                if missing:
+                    issues.append(
+                        f"template {template_key} is missing inference roles: {', '.join(missing)}"
+                    )
         active_cards = Card.objects.filter(lifecycle_status="active")
         if not active_cards.filter(
             card_pool=PLAYER_CARD_POOL,

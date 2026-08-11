@@ -126,7 +126,13 @@ if TYPE_CHECKING:
         UserAccessRequest,
     )
     from .user_activity import UserActivity
-    from .import_job import ImportJob, ImportJobItem, ImportJobStatus
+    from .import_job import (
+        LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
+        ImportCardRoleMode,
+        ImportJob,
+        ImportJobItem,
+        ImportJobStatus,
+    )
     from .metadata import (
         CardVersionMetadataSuggestion,
         CardVersionKeyword,
@@ -153,6 +159,8 @@ if TYPE_CHECKING:
 _EXPORTS = {
     "now_utc": ".base",
     "ImportJobStatus": ".import_job",
+    "ImportCardRoleMode": ".import_job",
+    "LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION": ".import_job",
     "ImportJob": ".import_job",
     "ImportJobItem": ".import_job",
     "Card": ".card",
@@ -266,6 +274,8 @@ _EXPORTS = {
 __all__ = [
     "now_utc",
     "ImportJobStatus",
+    "ImportCardRoleMode",
+    "LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION",
     "ImportJob",
     "ImportJobItem",
     "Card",

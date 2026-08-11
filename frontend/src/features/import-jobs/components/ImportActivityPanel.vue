@@ -45,6 +45,62 @@
       {{ errorMessage }}
     </p>
 
+    <section
+      v-if="selectedJobDetail || detailLoading"
+      class="theme-divider mt-5 space-y-3 border-t pt-5"
+      aria-live="polite"
+    >
+      <p
+        v-if="detailLoading"
+        class="theme-section-muted text-sm"
+      >
+        Loading import details…
+      </p>
+      <template v-else-if="selectedJobDetail">
+        <div>
+          <h4 class="theme-section-title text-sm font-semibold">
+            Import details
+          </h4>
+          <p class="theme-section-muted mt-1 text-xs">
+            {{ selectedJobDetail.card_pool === 'game_master' ? 'Game Master' : 'Player' }} ·
+            {{ selectedJobDetail.card_role_mode }}
+          </p>
+        </div>
+        <div class="space-y-3">
+          <article
+            v-for="item in selectedJobDetail.items"
+            :key="item.id"
+            class="theme-muted-panel space-y-2 p-3"
+          >
+            <p class="theme-section-title truncate text-sm font-medium">
+              {{ item.source_file }}
+            </p>
+            <p class="theme-section-muted text-xs">
+              {{
+                item.resolved_card_roles.length > 0
+                  ? item.resolved_card_roles.join(', ')
+                  : 'Standard — no special roles'
+              }}
+            </p>
+            <div
+              v-for="warning in item.warnings"
+              :key="warning.code"
+              class="theme-alert-warning text-xs"
+            >
+              <p>{{ warning.message }}</p>
+              <RouterLink
+                v-if="warning.code === 'card_classification_mismatch' && item.card_tab_url"
+                class="mt-1 inline-flex font-semibold underline"
+                :to="item.card_tab_url"
+              >
+                Review card classification
+              </RouterLink>
+            </div>
+          </article>
+        </div>
+      </template>
+    </section>
+
     <div
       class="theme-divider mt-5 border-t"
     >
@@ -99,6 +155,16 @@
                 <p class="theme-section-title text-sm font-semibold leading-5">
                   {{ job.template_id }} · {{ job.content_version?.version_number ?? 'Unversioned' }}
                 </p>
+                <p class="theme-section-muted text-xs">
+                  {{ job.card_pool === 'game_master' ? 'Game Master' : 'Player' }} ·
+                  {{
+                    job.card_role_mode === 'automatic'
+                      ? 'Automatic roles'
+                      : job.card_role_override.length > 0
+                        ? `Override: ${job.card_role_override.join(', ')}`
+                        : 'Override: Standard'
+                  }}
+                </p>
               </div>
               <span class="theme-section-muted shrink-0 text-xs">
                 {{ job.processed_items }}/{{ job.total_items }}
@@ -123,15 +189,24 @@
               <span class="theme-section-muted text-xs">
                 Updated {{ formatImportJobTimestamp(job.updated_at) }}
               </span>
-              <button
-                v-if="canCancelImportJob(job)"
-                class="btn-danger-secondary shrink-0 rounded-full px-2.5 py-1 text-xs"
-                type="button"
-                :disabled="cancellingJobIds.has(job.id)"
-                @click="emit('cancel', job.id)"
-              >
-                {{ cancellingJobIds.has(job.id) ? 'Interrupting…' : 'Interrupt' }}
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  class="btn-secondary shrink-0 rounded-full px-2.5 py-1 text-xs"
+                  type="button"
+                  @click="emit('view', job.id)"
+                >
+                  Details
+                </button>
+                <button
+                  v-if="canCancelImportJob(job)"
+                  class="btn-danger-secondary shrink-0 rounded-full px-2.5 py-1 text-xs"
+                  type="button"
+                  :disabled="cancellingJobIds.has(job.id)"
+                  @click="emit('cancel', job.id)"
+                >
+                  {{ cancellingJobIds.has(job.id) ? 'Interrupting…' : 'Interrupt' }}
+                </button>
+              </div>
             </div>
           </article>
         </div>
@@ -215,6 +290,13 @@
             <span class="theme-section-muted block text-xs">
               Updated {{ formatImportJobTimestamp(job.updated_at) }}
             </span>
+            <button
+              class="btn-secondary rounded-full px-2.5 py-1 text-xs"
+              type="button"
+              @click="emit('view', job.id)"
+            >
+              Details
+            </button>
           </article>
         </div>
       </section>
@@ -226,7 +308,7 @@
 import { Activity, ExternalLink, RefreshCw } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import type { OperationsQueueItem } from '@/domain/operations/types';
-import type { ImportJob } from '@/features/import-jobs/types';
+import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 import {
   canCancelImportJob,
   formatImportJobTimestamp,
@@ -248,10 +330,13 @@ defineProps<{
   cancelingCount: number;
   cancellingJobIds: Set<string>;
   lastRefreshedAt: string | null;
+  selectedJobDetail: ImportJobDetail | null;
+  detailLoading: boolean;
 }>();
 
 const emit = defineEmits<{
   refresh: [];
   cancel: [jobId: string];
+  view: [jobId: string];
 }>();
 </script>

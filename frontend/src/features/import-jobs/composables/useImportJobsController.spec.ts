@@ -8,6 +8,7 @@ import {
   createImportJob,
   fetchCurrentContentVersion,
   fetchImportJobs,
+  fetchImportJobByCreationKey,
 } from '@/features/import-jobs/api';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
 import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
@@ -23,6 +24,8 @@ vi.mock('@/features/import-jobs/api', () => ({
   createImportJob: vi.fn(),
   fetchCurrentContentVersion: vi.fn(),
   fetchImportJobs: vi.fn(),
+  fetchImportJobByCreationKey: vi.fn(),
+  fetchImportJobDetail: vi.fn(),
 }));
 
 const activeJob = (id = 'active-job'): ImportJob => ({
@@ -40,6 +43,11 @@ const activeJob = (id = 'active-job'): ImportJob => ({
   processed_items: 4,
   created_at: '2026-08-09T10:00:00Z',
   updated_at: '2026-08-09T10:01:00Z',
+  card_pool: 'player',
+  card_role_mode: 'automatic',
+  card_role_override: [],
+  template_role_snapshot: [],
+  card_role_inference_policy_version: 1,
 });
 
 const historyItem = (id: string, status: OperationsQueueItem['status']): OperationsQueueItem => ({
@@ -106,7 +114,13 @@ const mountController = () => {
 describe('useImportJobsController', () => {
   beforeEach(() => {
     vi.mocked(fetchTemplates).mockResolvedValue([
-      { id: 'template-1', key: 'mtg-like-v1', label: 'Default card', definition_json: '{}' },
+      {
+        id: 'template-1',
+        key: 'mtg-like-v1',
+        label: 'Default card',
+        definition_json: '{}',
+        inferred_card_roles: [],
+      },
     ]);
     vi.mocked(fetchCurrentContentVersion).mockResolvedValue(currentVersion);
     vi.mocked(fetchImportJobs).mockResolvedValue([activeJob()]);
@@ -116,7 +130,12 @@ describe('useImportJobsController', () => {
         historyItem('finished-job', 'completed'),
       ]),
     );
-    vi.mocked(createImportJob).mockResolvedValue();
+    vi.mocked(createImportJob).mockResolvedValue({
+      ...activeJob('created-job'),
+      job_id: 'created-job',
+      idempotent_replay: false,
+    });
+    vi.mocked(fetchImportJobByCreationKey).mockResolvedValue(null);
     vi.mocked(cancelImportJob).mockResolvedValue();
   });
 
@@ -386,18 +405,57 @@ describe('useImportJobsController', () => {
     const file = new File(['image'], 'card.png', { type: 'image/png' });
     mounted.controller.pickedFiles.value = [file];
     const initialInputKey = mounted.controller.fileInputKey.value;
+    const initialCreationKey = mounted.controller.creationKey.value;
 
     await mounted.controller.createJobFromPicker();
 
     expect(createImportJob).toHaveBeenCalledWith({
+      creationKey: expect.any(String),
       templateId: 'mtg-like-v1',
       contentVersionBase: '16.2',
       contentVersionDescription: 'Current release.',
       files: [file],
+      cardPool: 'player',
+      cardRoleMode: 'automatic',
+      cardRoleOverride: [],
     });
     expect(mounted.controller.pickedFiles.value).toEqual([]);
     expect(mounted.controller.fileInputKey.value).toBe(initialInputKey + 1);
+    expect(mounted.controller.creationKey.value).not.toBe(initialCreationKey);
+    expect(mounted.controller.cardRoleMode.value).toBe('automatic');
     expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(2);
+
+    mounted.app.unmount();
+  });
+
+  test('locks an ambiguous attempt and retries the exact immutable payload', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
+    const file = new File(['image'], 'card.png', { type: 'image/png' });
+    mounted.controller.pickedFiles.value = [file];
+    mounted.controller.cardPool.value = 'game_master';
+    mounted.controller.cardRoleMode.value = 'override';
+    mounted.controller.cardRoleOverride.value = ['boon'];
+    vi.mocked(createImportJob).mockRejectedValueOnce(new Error('connection lost'));
+    vi.mocked(fetchImportJobByCreationKey).mockResolvedValueOnce(null);
+
+    await mounted.controller.createJobFromPicker();
+
+    expect(mounted.controller.createState.value.phase).toBe('uncertain');
+    expect(mounted.controller.formLocked.value).toBe(true);
+    const firstPayload = vi.mocked(createImportJob).mock.calls[0][0];
+
+    vi.mocked(createImportJob).mockResolvedValueOnce({
+      ...activeJob('reconciled-job'),
+      job_id: 'reconciled-job',
+      idempotent_replay: true,
+    });
+    await mounted.controller.createJobFromPicker();
+
+    expect(vi.mocked(createImportJob).mock.calls[1][0]).toBe(firstPayload);
+    expect(mounted.controller.pickedFiles.value).toEqual([]);
+    expect(mounted.controller.cardRoleMode.value).toBe('automatic');
+    expect(mounted.controller.cardRoleOverride.value).toEqual([]);
 
     mounted.app.unmount();
   });

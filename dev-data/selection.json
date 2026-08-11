@@ -112,6 +112,7 @@
     "required_template_keys": [
       "basic-mana",
       "mtg-like-v1"
-    ]
+    ],
+    "required_template_role_hints": {}
   }
 }

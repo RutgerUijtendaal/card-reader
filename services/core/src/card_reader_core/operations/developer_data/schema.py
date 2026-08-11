@@ -5,8 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-DEVELOPER_DATA_FORMAT_VERSION = 2
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 3
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
 
 
 def _default_pool_coverage() -> dict[Literal["player", "game_master"], int]:
@@ -33,6 +33,9 @@ class CoverageRequirements(StrictModel):
     min_card_groups: int = Field(default=1, ge=0)
     min_cards_with_multiple_versions: int = Field(default=1, ge=0)
     required_template_keys: list[str] = Field(default_factory=list)
+    required_template_role_hints: dict[
+        str, list[Literal["hero", "boon", "event"]]
+    ] = Field(default_factory=dict)
 
 
 class DeveloperDataSelection(StrictModel):
@@ -66,6 +69,17 @@ class TemplateRecord(StrictModel):
     key: str
     label: str
     definition: dict[str, Any]
+    inferred_card_roles: list[Literal["hero", "boon", "event"]]
+
+    @field_validator("inferred_card_roles")
+    @classmethod
+    def validate_unique_inferred_card_roles(
+        cls,
+        value: list[Literal["hero", "boon", "event"]],
+    ) -> list[Literal["hero", "boon", "event"]]:
+        if len(value) != len(set(value)):
+            raise ValueError("Template inferred card roles must be unique.")
+        return value
 
 
 class DeckTagRecord(StrictModel):
@@ -212,9 +226,19 @@ class DeveloperDataLock(StrictModel):
 
 def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     """Adopt older bundle payloads into the current strict schema."""
-    if format_version != 1 or not isinstance(value, dict):
+    if format_version not in {1, 2} or not isinstance(value, dict):
         return value
     adopted = dict(value)
+    templates = adopted.get("templates")
+    if isinstance(templates, list):
+        adopted["templates"] = [
+            {**template, "inferred_card_roles": []}
+            if isinstance(template, dict) and "inferred_card_roles" not in template
+            else template
+            for template in templates
+        ]
+    if format_version != 1:
+        return adopted
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted

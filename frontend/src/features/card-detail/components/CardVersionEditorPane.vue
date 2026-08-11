@@ -604,6 +604,7 @@ const props = defineProps<{
   ruleTextUnknownSymbolKeys: string[];
   deprecatedStatusDisabled?: boolean;
   reviewFocusPropertyKey?: string | null;
+  initialTab?: 'card' | 'version';
 }>();
 
 const emit = defineEmits<{
@@ -626,7 +627,7 @@ const emit = defineEmits<{
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
 
-const activeEditorTab = ref<'card' | 'version'>('version');
+const activeEditorTab = ref<'card' | 'version'>(props.initialTab ?? 'version');
 const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
 const rulesTextValue = ref('');
 const rulesTextCaretIndex = ref(0);

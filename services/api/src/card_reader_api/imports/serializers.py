@@ -6,6 +6,7 @@ from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
 from card_reader_core.models import ContentVersion, ImportJob, ImportJobItem
+from card_reader_core.models import CARD_POOLS, CARD_ROLES
 from card_reader_core.repositories.content_versions import parse_base_version
 
 
@@ -31,6 +32,11 @@ def import_job_payload(job: ImportJob) -> dict[str, object]:
         "processed_items": job.processed_items,
         "created_at": job.created_at.isoformat(),
         "updated_at": job.updated_at.isoformat(),
+        "card_pool": job.card_pool,
+        "card_role_mode": job.card_role_mode,
+        "card_role_override": list(job.card_role_override_json),
+        "template_role_snapshot": list(job.template_role_snapshot_json),
+        "card_role_inference_policy_version": job.card_role_inference_policy_version,
     }
 
 
@@ -45,6 +51,20 @@ def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[st
                 "error_message": item.error_message,
                 "warning_code": item.warning_code,
                 "warning_message": item.warning_message,
+                "warnings": item.warnings_json,
+                "resolved_card_roles": item.resolved_card_roles_json,
+                "card_role_inference": item.card_role_inference_json,
+                "target_card_id": item.target_card.id if item.target_card is not None else None,
+                "target_card_version_id": (
+                    item.target_card_version.id if item.target_card_version is not None else None
+                ),
+                "target_card_pool_snapshot": item.target_card_pool_snapshot,
+                "target_card_roles_snapshot": item.target_card_roles_snapshot_json,
+                "card_tab_url": (
+                    f"/cards/{item.target_card.id}/edit?tab=card"
+                    if item.target_card is not None
+                    else None
+                ),
             }
             for item in items
         ],
@@ -52,11 +72,19 @@ def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[st
 
 
 class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
+    creation_key = serializers.UUIDField()
     template_id = serializers.CharField()
     content_version_base = serializers.CharField()
     content_version_description = serializers.CharField()
     options_json = serializers.CharField(required=False, default="{}")
     files = serializers.ListField(child=serializers.FileField(), allow_empty=False)
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS)
+    card_role_mode = serializers.ChoiceField(
+        choices=("automatic", "override"),
+        required=False,
+        default="automatic",
+    )
+    card_role_override = serializers.CharField(required=False, default="[]")
 
     def validate_files(self, value: list[UploadedFile]) -> list[UploadedFile]:
         if not value:
@@ -87,3 +115,26 @@ class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
         if not isinstance(payload, dict):
             raise serializers.ValidationError("options_json must decode to an object")
         return payload
+
+    def validate_card_role_override(self, value: str) -> list[str]:
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise serializers.ValidationError("card_role_override must be valid JSON") from exc
+        if not isinstance(payload, list):
+            raise serializers.ValidationError("card_role_override must decode to an array")
+        if len(payload) != len(set(map(str, payload))):
+            raise serializers.ValidationError("card_role_override roles must be unique")
+        invalid = sorted({str(role) for role in payload if role not in CARD_ROLES})
+        if invalid:
+            raise serializers.ValidationError(
+                f"Unsupported card roles: {', '.join(invalid)}"
+            )
+        return [role for role in CARD_ROLES if role in payload]
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        if attrs.get("card_role_mode") == "automatic" and attrs.get("card_role_override"):
+            raise serializers.ValidationError(
+                {"card_role_override": "Automatic role inference cannot include overrides."}
+            )
+        return attrs

@@ -94,6 +94,7 @@
         <aside class="min-w-0 xl:h-full xl:min-h-0 xl:border-l xl:border-[var(--color-border)] xl:pl-6">
           <CardVersionEditorPane
             :version="selectedVersion"
+            :initial-tab="initialEditorTab"
             :form="form"
             :reparse-templates="reparseTemplates"
             :reparse-template-id="reparseTemplateId"
@@ -230,6 +231,7 @@ const {
 } = useCardDetailState();
 
 const router = useRouter();
+const initialEditorTab = route.query.tab === 'card' ? 'card' : 'version';
 const cardIsGroupAnchor = computed(() => card.value?.card_groups.some((group) => group.is_anchor) ?? false);
 
 const updateField = (fieldName: ScalarFieldName, value: string): void => {

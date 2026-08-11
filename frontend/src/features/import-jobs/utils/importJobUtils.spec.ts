@@ -41,6 +41,11 @@ describe('importJobs utils', () => {
           processed_items: 4,
           created_at: '',
           updated_at: '',
+          card_pool: 'player',
+          card_role_mode: 'automatic',
+          card_role_override: [],
+          template_role_snapshot: [],
+          card_role_inference_policy_version: 1,
         },
       ]),
     ).toBe(true);
@@ -56,6 +61,11 @@ describe('importJobs utils', () => {
         processed_items: 0,
         created_at: '',
         updated_at: '',
+        card_pool: 'player',
+        card_role_mode: 'automatic',
+        card_role_override: [],
+        template_role_snapshot: [],
+        card_role_inference_policy_version: 1,
       }),
     ).toBe(0);
   });

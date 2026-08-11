@@ -20,6 +20,10 @@ describe('ImportJobsPage', () => {
     const createJobFromPicker = vi.fn();
     mockedUseImportJobsController.mockReturnValue({
       pickerTemplateId: ref('mtg-like-v1'),
+      cardPool: ref('player'),
+      cardRoleMode: ref('automatic'),
+      cardRoleOverride: ref([]),
+      creationKey: ref('f1e10412-e8e8-49cb-9717-a24d2eec38c1'),
       contentVersionBase: ref('16.2'),
       contentVersionDescription: ref('Current release.'),
       currentContentVersion: ref({
@@ -45,19 +49,31 @@ describe('ImportJobsPage', () => {
       cancellingJobIds: ref(new Set<string>()),
       lastRefreshedAt: ref('10:05:00'),
       templates: ref([
-        { id: 'template-1', key: 'mtg-like-v1', label: 'Default card', definition_json: '{}' },
+        {
+          id: 'template-1',
+          key: 'mtg-like-v1',
+          label: 'Default card',
+          definition_json: '{}',
+          inferred_card_roles: [],
+        },
       ]),
+      selectedJobDetail: ref(null),
+      detailLoading: ref(false),
       queuedCount: computed(() => 0),
       runningCount: computed(() => 0),
       cancelingCount: computed(() => 0),
       contentVersionBaseError: computed(() => ''),
       hasValidVersionInput: computed(() => true),
       submitButtonLabel: computed(() => 'Update Version'),
+      formLocked: computed(() => false),
+      createState: ref({ phase: 'idle' }),
       refreshActivity: vi.fn(),
       createJobFromPicker,
       cancelJob: vi.fn(),
+      viewJobDetail: vi.fn(),
       setPickedFiles: vi.fn(),
       clearPickedFiles: vi.fn(),
+      abandonPendingAttempt: vi.fn(),
       pollJobs: vi.fn(),
       canCancel: vi.fn(),
       progressPercent: vi.fn(),
@@ -98,9 +114,9 @@ describe('ImportJobsPage', () => {
     expect(host.querySelector('aside')).toBeNull();
     expect(
       Array.from(host.querySelectorAll('legend')).map((legend) => legend.textContent?.trim()),
-    ).toEqual(['Card setup', 'Content version', 'Source images']);
+    ).toEqual(['Card setup', 'Card roles', 'Content version', 'Source images']);
     expect(
-      Array.from(host.querySelectorAll('legend')).every((legend) =>
+      Array.from(host.querySelectorAll('form > fieldset > legend')).every((legend) =>
         legend.classList.contains('pr-2'),
       ),
     ).toBe(true);
@@ -111,6 +127,8 @@ describe('ImportJobsPage', () => {
     ).toBe(true);
     expect(host.querySelectorAll('input[type="file"]')).toHaveLength(2);
     expect(host.textContent).not.toContain('Pick mode');
+    expect(host.textContent).toContain('Card pool');
+    expect(host.textContent).toContain('Automatic');
     const currentVersion = host.querySelector('[data-testid="current-content-version"]');
     const newVersionRow = host.querySelector('[data-testid="new-version-row"]');
     const versionInput = host.querySelector('#content-version-base');
