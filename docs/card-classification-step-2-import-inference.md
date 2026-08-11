@@ -217,7 +217,7 @@ Verify all new controls and warnings in light and dark themes.
 9. Add template-admin inferred-role controls.
 10. Add import pool, automatic/override, idempotent reconciliation, and result/warning UI.
 11. Update current-state import/card/developer-data documentation after behavior ships.
-12. Run all permitted validation before beginning Step 3.
+12. Run all permitted validation before beginning [Step 2.1](card-classification-step-2-1-import-workflow-seam.md).
 
 ## Required tests
 
