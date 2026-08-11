@@ -104,7 +104,8 @@
       "standard": 1,
       "hero": 70,
       "boon": 0,
-      "event": 0
+      "event": 0,
+      "location": 0
     },
     "min_deprecated_cards": 3,
     "min_card_groups": 5,
@@ -112,6 +113,7 @@
     "required_template_keys": [
       "basic-mana",
       "mtg-like-v1"
-    ]
+    ],
+    "required_template_role_hints": {}
   }
 }

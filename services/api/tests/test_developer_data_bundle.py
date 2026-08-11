@@ -90,6 +90,50 @@ def test_version_two_card_record_rejects_duplicate_roles() -> None:
         )
 
 
+def test_version_two_payload_adoption_adds_empty_template_role_hints() -> None:
+    adopted = adopt_payload_for_format(
+        {"templates": [{"key": "legacy", "label": "Legacy", "definition": {}}]},
+        format_version=2,
+    )
+
+    assert adopted == {
+        "templates": [
+            {
+                "key": "legacy",
+                "label": "Legacy",
+                "definition": {},
+                "inferred_card_roles": [],
+            }
+        ]
+    }
+
+
+def test_developer_data_coverage_rejects_missing_required_template_role_hint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "missing-template-role.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        template = Template.objects.get(key="synthetic-template")
+        template.inferred_card_roles_json = []
+        template.save(update_fields=["inferred_card_roles_json"])
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(DeveloperDataError, match="missing inference roles: event"):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="missing-role-test",
+            )
+        transaction.set_rollback(True)
+
+
 def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -112,7 +156,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 3
         assert manifest.counts["card_versions"] == 4
-        assert manifest.format_version == 2
+        assert manifest.format_version == 3
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
@@ -176,8 +220,12 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert result.counts["cards"] == 3
         assert result.copied_assets == 6
         assert Card.objects.filter(key="synthetic-hero", role_assignments__role="hero").exists()
+        assert Card.objects.filter(
+            key="synthetic-deprecated", role_assignments__role="location"
+        ).exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
+        assert Template.objects.get(key="synthetic-template").inferred_card_roles_json == ["event"]
         latest = Card.objects.get(key="synthetic-hero").latest_version
         assert latest is not None
         assert latest.version_number == 2
@@ -583,6 +631,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         key="synthetic-template",
         label="Synthetic Template",
         definition_json={"id": "synthetic-template", "version": 1, "regions": []},
+        inferred_card_roles_json=["event"],
     )
     DeckTag.objects.create(kind="role", key="control", label="Control")
     content_version = ContentVersion.objects.create(
@@ -649,6 +698,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         label="Synthetic Deprecated",
         lifecycle_status="deprecated",
     )
+    CardRoleAssignment.objects.create(card=deprecated, role="location")
     deprecated_version = _create_version(
         card=deprecated,
         template=template,
@@ -681,11 +731,18 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "coverage": {
             "min_cards": 3,
             "min_cards_by_pool": {"player": 3, "game_master": 0},
-            "min_cards_by_role": {"standard": 1, "hero": 1, "boon": 0, "event": 0},
+            "min_cards_by_role": {
+                "standard": 1,
+                "hero": 1,
+                "boon": 0,
+                "event": 0,
+                "location": 1,
+            },
             "min_deprecated_cards": 1,
             "min_card_groups": 1,
             "min_cards_with_multiple_versions": 1,
             "required_template_keys": [template.key],
+            "required_template_role_hints": {template.key: ["event"]},
         },
     }
 

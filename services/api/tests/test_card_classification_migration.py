@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 import pytest
 
@@ -33,4 +33,41 @@ def test_card_classification_migration_backfills_and_reverses_hero_roles() -> No
     assert ReversedCard.objects.get(id=hero.id).is_hero is True
     assert ReversedCard.objects.get(id=standard.id).is_hero is False
 
-    MigrationExecutor(connection).migrate([("card_reader_core", "0054_card_classification")])
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_location_role_migration_widens_role_keys_and_preserves_uniqueness() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0056_import_classification_inference")])
+    old_apps = executor.loader.project_state(
+        [("card_reader_core", "0056_import_classification_inference")]
+    ).apps
+    OldCard = old_apps.get_model("card_reader_core", "Card")
+    card = OldCard.objects.create(key="migration-location", label="Migration Location")
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0057_location_card_role")])
+    new_apps = executor.loader.project_state(
+        [("card_reader_core", "0057_location_card_role")]
+    ).apps
+    CardRoleAssignment = new_apps.get_model("card_reader_core", "CardRoleAssignment")
+    role_field = CardRoleAssignment._meta.get_field("role")
+
+    assert role_field.max_length == 64
+    assert ("location", "Location") in role_field.choices
+    CardRoleAssignment.objects.create(card_id=card.id, role="location")
+    with pytest.raises(IntegrityError), transaction.atomic():
+        CardRoleAssignment.objects.create(card_id=card.id, role="location")
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0056_import_classification_inference")])
+    reversed_apps = executor.loader.project_state(
+        [("card_reader_core", "0056_import_classification_inference")]
+    ).apps
+    ReversedRoleAssignment = reversed_apps.get_model("card_reader_core", "CardRoleAssignment")
+    assert ReversedRoleAssignment._meta.get_field("role").max_length == 16
+
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())

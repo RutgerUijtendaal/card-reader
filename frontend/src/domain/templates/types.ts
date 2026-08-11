@@ -1,4 +1,5 @@
 import type { JsonObject } from '@/shared/types/json';
+import type { CardRole } from '@/domain/cards/cardRoles';
 
 export type RegionBounds = {
   unit: 'relative' | 'absolute';
@@ -36,6 +37,7 @@ export type TemplateRecord = {
   key: string;
   label: string;
   definition_json: string;
+  inferred_card_roles: CardRole[];
 };
 
 export type TemplateApiRecord = {
@@ -43,10 +45,12 @@ export type TemplateApiRecord = {
   key: string;
   label: string;
   definition_json: TemplateDefinition;
+  inferred_card_roles: CardRole[];
 };
 
 export type TemplateUpsertRequest = {
   label?: string;
   key?: string;
   definition_json?: TemplateDefinition;
+  inferred_card_roles?: CardRole[];
 };

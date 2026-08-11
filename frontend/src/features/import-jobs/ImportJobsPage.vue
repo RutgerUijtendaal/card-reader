@@ -59,14 +59,76 @@
               description="Choose how the uploaded cards should be interpreted."
             >
               <div class="grid gap-5 md:grid-cols-2">
-                <label class="field-label md:col-span-2">
+                <label class="field-label">
                   Template
                   <AppSelect
                     v-model="pickerTemplateId"
                     :options="templateOptions"
+                    :disabled="formLocked"
                     required
                   />
                 </label>
+                <label class="field-label">
+                  Card pool
+                  <AppSelect
+                    v-model="cardPool"
+                    :options="cardPoolOptions"
+                    :disabled="formLocked"
+                    required
+                  />
+                </label>
+                <fieldset class="theme-divider space-y-3 border-t pt-4 md:col-span-2">
+                  <legend class="field-label">
+                    Card roles
+                  </legend>
+                  <div class="flex flex-wrap gap-3">
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardRoleMode"
+                        type="radio"
+                        value="automatic"
+                        :disabled="formLocked"
+                      >
+                      Automatic
+                    </label>
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardRoleMode"
+                        type="radio"
+                        value="override"
+                        :disabled="formLocked"
+                      >
+                      Override
+                    </label>
+                  </div>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Automatic combines role hints from the template with detected card metadata.
+                  </p>
+                  <div
+                    v-if="cardRoleMode === 'override'"
+                    class="flex flex-wrap gap-3"
+                  >
+                    <label
+                      v-for="option in cardRoleOptions"
+                      :key="option.value"
+                      class="theme-section-title inline-flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        v-model="cardRoleOverride"
+                        type="checkbox"
+                        :value="option.value"
+                        :disabled="formLocked"
+                      >
+                      {{ option.label }}
+                    </label>
+                    <span
+                      v-if="cardRoleOverride.length === 0"
+                      class="theme-section-muted basis-full text-sm"
+                    >
+                      Standard — no special roles
+                    </span>
+                  </div>
+                </fieldset>
               </div>
 
               <p
@@ -122,6 +184,7 @@
                       pattern="[0-9]+\.[0-9]+"
                       placeholder="14.1"
                       autocomplete="off"
+                      :disabled="formLocked"
                       :aria-invalid="contentVersionBaseError.length > 0"
                       aria-describedby="content-version-base-help content-version-patch-help"
                       required
@@ -164,6 +227,7 @@
                   <textarea
                     v-model="contentVersionDescription"
                     class="input-base min-h-28 resize-y"
+                    :disabled="formLocked"
                     required
                   />
                 </label>
@@ -175,12 +239,14 @@
               title="Source images"
               description="Add one image or a folder of supported card images."
             >
-              <ImportSourcePicker
-                :files="pickedFiles"
-                :reset-key="fileInputKey"
-                @select="setPickedFiles"
-                @clear="clearPickedFiles"
-              />
+              <div :class="formLocked ? 'pointer-events-none opacity-60' : ''">
+                <ImportSourcePicker
+                  :files="pickedFiles"
+                  :reset-key="fileInputKey"
+                  @select="setPickedFiles"
+                  @clear="clearPickedFiles"
+                />
+              </div>
             </AppFormSection>
 
             <div
@@ -200,13 +266,21 @@
                 The import will be added to the parser queue.
               </span>
               <button
+                v-if="createState.phase === 'uncertain'"
+                class="btn-secondary"
+                type="button"
+                @click="abandonPendingAttempt"
+              >
+                Abandon attempt and edit
+              </button>
+              <button
                 class="btn-primary w-full justify-center sm:w-auto sm:min-w-44"
                 type="submit"
                 :disabled="
                   pickedFiles.length === 0 ||
                     templates.length === 0 ||
                     !hasValidVersionInput ||
-                    creatingJob
+                    creatingJob || createState.phase === 'reconciling'
                 "
               >
                 {{ submitButtonLabel }}
@@ -230,8 +304,11 @@
             :canceling-count="cancelingCount"
             :cancelling-job-ids="cancellingJobIds"
             :last-refreshed-at="lastRefreshedAt"
+            :selected-job-detail="selectedJobDetail"
+            :detail-loading="detailLoading"
             @refresh="refreshActivity"
             @cancel="cancelJob"
+            @view="viewJobDetail"
           />
         </div>
       </div>
@@ -240,8 +317,10 @@
 </template>
 
 <script setup lang="ts">
+import { CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
 import { Info, Upload } from 'lucide-vue-next';
 import { computed } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import ImportActivityPanel from '@/features/import-jobs/components/ImportActivityPanel.vue';
 import ImportSourcePicker from '@/features/import-jobs/components/ImportSourcePicker.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
@@ -252,6 +331,9 @@ import AppSelect from '@/shared/components/app/AppSelect.vue';
 
 const {
   pickerTemplateId,
+  cardPool,
+  cardRoleMode,
+  cardRoleOverride,
   contentVersionBase,
   contentVersionDescription,
   currentContentVersion,
@@ -270,20 +352,40 @@ const {
   cancellingJobIds,
   lastRefreshedAt,
   templates,
+  selectedJobDetail,
+  detailLoading,
   queuedCount,
   runningCount,
   cancelingCount,
   contentVersionBaseError,
   hasValidVersionInput,
   submitButtonLabel,
+  formLocked,
+  hasUnresolvedCreateAttempt,
+  createState,
   refreshActivity,
   createJobFromPicker,
   cancelJob,
+  viewJobDetail,
   setPickedFiles,
   clearPickedFiles,
+  abandonPendingAttempt,
 } = useImportJobsController();
 
 const templateOptions = computed(() =>
   templates.value.map((item) => ({ value: item.key, label: `${item.label} (${item.key})` })),
 );
+const cardPoolOptions = [
+  { value: 'player', label: 'Player' },
+  { value: 'game_master', label: 'Game Master' },
+];
+const cardRoleOptions = CARD_ROLE_OPTIONS;
+
+onBeforeRouteLeave(() => {
+  if (!hasUnresolvedCreateAttempt.value) return true;
+  if (createState.value.phase !== 'uncertain') return false;
+  return globalThis.confirm(
+    'The outcome of this import is still uncertain. Leaving now discards the locked retry details and can cause a duplicate import. Leave anyway?',
+  );
+});
 </script>

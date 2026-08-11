@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
-import type { CardPool, CardRoleFilter } from '@/domain/cards/types/cardModels';
+import type { CardRoleFilter } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import type {
   CardFilterSelectionState,
 } from '@/domain/cards/utils/filters/cardFilterState';

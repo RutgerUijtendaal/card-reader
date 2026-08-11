@@ -79,9 +79,9 @@ import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
+import { displayCardRoleLabels } from '@/domain/cards/cardRoles';
 import { buildAdminCardDetailLocation } from '@/features/admin/routeState';
 import type { LinkedCardPreview } from '@/features/admin/types';
-import type { CardRole } from '@/domain/cards/types/cardModels';
 
 defineProps<{
   cards: LinkedCardPreview[];
@@ -103,13 +103,7 @@ const hoverPreviewX = computed(() => floating.x.value ?? 0);
 const hoverPreviewY = computed(() => floating.y.value ?? 0);
 
 const detailLocation = (cardId: string) => buildAdminCardDetailLocation(cardId, route.query);
-const roleLabels: Record<CardRole, string> = {
-  hero: 'Hero',
-  boon: 'Boon',
-  event: 'Event',
-};
-const displayRoles = (roles: CardRole[]): string[] =>
-  roles.length > 0 ? roles.map((role) => roleLabels[role]) : ['Standard'];
+const displayRoles = displayCardRoleLabels;
 
 const showHoverPreview = (card: LinkedCardPreview, event: MouseEvent): void => {
   if (!card.image_url) {

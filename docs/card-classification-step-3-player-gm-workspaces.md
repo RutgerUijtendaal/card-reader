@@ -1,6 +1,6 @@
 # Card Classification Step 3: Player and Game Master Workspaces
 
-Status: approved implementation plan; blocked on [Step 2](card-classification-step-2-import-inference.md).
+Status: approved implementation plan; blocked on [Step 2.1](card-classification-step-2-1-import-workflow-seam.md).
 
 This step turns the card pool into a site-level browsing context. It does not change the classification model or infer new data.
 
@@ -18,13 +18,13 @@ The active workspace scopes navigation and card collections so Player and Game M
 - Player is the default for new sessions, logged-out users, and users without Game Master capability.
 - Game Master capability initially maps to staff, but the policy is centralized so it can later map to authenticated users or public access without migrating cards.
 - Ordinary card collections are hard-scoped to one pool. An `all pools` option is reserved for explicit staff management tools and must not become a normal workspace.
-- Hero is excluded by default in each workspace. Boon and Event are not globally excluded.
+- Hero is excluded by default in each workspace. Boon, Event, and Location are not globally excluded.
 - Cross-pool links do not automatically change the active workspace. A linked Player Hero opened from a Game Master card is visibly labeled Player, while Back/return navigation preserves the Game Master workspace.
 - Relationship management treats the relationship anchor/target pool and the member-search pool as separate concepts. Staff must be able to select either pool for each member search without reclassifying the group, its anchor, or existing members.
 - Relationship routes use the target or anchor pool supplied by the relationship payload. They must not infer that pool from the source card, the current workspace, or a stale selected-card version.
 - Treat every deck supported by the current deck builder as a **Player deck**. A later deck-design project is expected to add an explicit Player/Game Master classification to stable deck identities, but this workspace step must not infer that classification from a deck's cards or force Game Master decks into the current hero/mainboard/sideboard model.
 - Playtester remains Player-only. It is hidden from Game Master navigation and must accept only explicitly Player-classified decks once deck classification exists.
-- A future **Scenario** is a higher-level composition, not a mixed-pool deck: it may group one or more Player decks with Game Master Boons, Events, and other scenario material. This step must preserve that direction without introducing a scenario schema prematurely.
+- A future **Scenario** is a higher-level composition, not a mixed-pool deck: it may group one or more Player decks with Game Master Boons, Events, Locations, and other scenario material. This step must preserve that direction without introducing a scenario schema prematurely.
 
 ## Authoritative success condition
 
@@ -132,7 +132,7 @@ If the future policy changes, the intended edit points are the backend capabilit
 
 ## Cross-pool relationships
 
-Do not add a generic same-pool restriction. Game Master Boons/Events may intentionally link to Player Heroes.
+Do not add a generic same-pool restriction. Game Master Boons, Events, and Locations may intentionally link to Player Heroes.
 
 For any existing or future relationship serializer:
 
@@ -163,7 +163,7 @@ When deck classification is designed later:
 - keep Player deck validation limited to Player-pool cards;
 - define Game Master deck structure and validation deliberately before exposing Game Master deck routes;
 - keep Playtester limited to Player decks unless a separate Game Master testing workflow is designed;
-- model scenarios above decks and cards/groups so a scenario can reference Player decks together with Game Master Boons, Events, and future scenario material without weakening ordinary deck pool rules.
+- model scenarios above decks and cards/groups so a scenario can reference Player decks together with Game Master Boons, Events, Locations, and future scenario material without weakening ordinary deck pool rules.
 
 The field name, migration, Game Master deck contents, scenario cardinalities, ownership, visibility, and authoring UI are all deferred. Step 3 only reserves the navigation and scoping boundaries needed to avoid coupling them to the Player deck implementation.
 
@@ -179,7 +179,7 @@ All visible changes must use semantic theme primitives and be verified in light 
 
 ## Implementation sequence
 
-1. Confirm Step 1 capability enforcement and Step 2 explicit import pool are complete.
+1. Confirm Step 1 capability enforcement, Step 2 explicit import classification, and Step 2.1 workflow seams are complete.
 2. Add the frontend card-pool workspace/preference contract and tests.
 3. Expose and consume the named session capability.
 4. Add desktop, collapsed, and mobile sidenav controls.

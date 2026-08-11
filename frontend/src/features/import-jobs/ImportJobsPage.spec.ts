@@ -1,8 +1,9 @@
-import { computed, createApp, ref } from 'vue';
-import { createMemoryHistory, createRouter } from 'vue-router';
+import { computed, createApp, h, ref } from 'vue';
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import ImportJobsPage from '@/features/import-jobs/ImportJobsPage.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
+import type { ImportCreateState } from '@/features/import-jobs/composables/useImportJobsController';
 
 vi.mock('@/features/import-jobs/composables/useImportJobsController', () => ({
   useImportJobsController: vi.fn(),
@@ -18,8 +19,14 @@ describe('ImportJobsPage', () => {
 
   test('renders flat setup and activity columns separated by a responsive divider', async () => {
     const createJobFromPicker = vi.fn();
+    const unresolvedCreateAttempt = ref(false);
+    const createState = ref<ImportCreateState>({ phase: 'idle' });
     mockedUseImportJobsController.mockReturnValue({
       pickerTemplateId: ref('mtg-like-v1'),
+      cardPool: ref('player'),
+      cardRoleMode: ref<'automatic' | 'override'>('override'),
+      cardRoleOverride: ref([]),
+      creationKey: ref('f1e10412-e8e8-49cb-9717-a24d2eec38c1'),
       contentVersionBase: ref('16.2'),
       contentVersionDescription: ref('Current release.'),
       currentContentVersion: ref({
@@ -45,19 +52,32 @@ describe('ImportJobsPage', () => {
       cancellingJobIds: ref(new Set<string>()),
       lastRefreshedAt: ref('10:05:00'),
       templates: ref([
-        { id: 'template-1', key: 'mtg-like-v1', label: 'Default card', definition_json: '{}' },
+        {
+          id: 'template-1',
+          key: 'mtg-like-v1',
+          label: 'Default card',
+          definition_json: '{}',
+          inferred_card_roles: [],
+        },
       ]),
+      selectedJobDetail: ref(null),
+      detailLoading: ref(false),
       queuedCount: computed(() => 0),
       runningCount: computed(() => 0),
       cancelingCount: computed(() => 0),
       contentVersionBaseError: computed(() => ''),
       hasValidVersionInput: computed(() => true),
       submitButtonLabel: computed(() => 'Update Version'),
+      formLocked: computed(() => false),
+      hasUnresolvedCreateAttempt: computed(() => unresolvedCreateAttempt.value),
+      createState,
       refreshActivity: vi.fn(),
       createJobFromPicker,
       cancelJob: vi.fn(),
+      viewJobDetail: vi.fn(),
       setPickedFiles: vi.fn(),
       clearPickedFiles: vi.fn(),
+      abandonPendingAttempt: vi.fn(),
       pollJobs: vi.fn(),
       canCancel: vi.fn(),
       progressPercent: vi.fn(),
@@ -68,13 +88,16 @@ describe('ImportJobsPage', () => {
     });
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/operations', component: { template: '<div />' } }],
+      routes: [
+        { path: '/operations', component: ImportJobsPage },
+        { path: '/other', component: { template: '<div />' } },
+      ],
     });
     await router.push('/operations');
     await router.isReady();
     const host = document.createElement('div');
     document.body.appendChild(host);
-    const app = createApp(ImportJobsPage);
+    const app = createApp({ render: () => h(RouterView) });
     app.use(router);
     app.mount(host);
 
@@ -98,9 +121,9 @@ describe('ImportJobsPage', () => {
     expect(host.querySelector('aside')).toBeNull();
     expect(
       Array.from(host.querySelectorAll('legend')).map((legend) => legend.textContent?.trim()),
-    ).toEqual(['Card setup', 'Content version', 'Source images']);
+    ).toEqual(['Card setup', 'Card roles', 'Content version', 'Source images']);
     expect(
-      Array.from(host.querySelectorAll('legend')).every((legend) =>
+      Array.from(host.querySelectorAll('form > fieldset > legend')).every((legend) =>
         legend.classList.contains('pr-2'),
       ),
     ).toBe(true);
@@ -111,6 +134,9 @@ describe('ImportJobsPage', () => {
     ).toBe(true);
     expect(host.querySelectorAll('input[type="file"]')).toHaveLength(2);
     expect(host.textContent).not.toContain('Pick mode');
+    expect(host.textContent).toContain('Card pool');
+    expect(host.textContent).toContain('Automatic');
+    expect(host.textContent).toContain('Location');
     const currentVersion = host.querySelector('[data-testid="current-content-version"]');
     const newVersionRow = host.querySelector('[data-testid="new-version-row"]');
     const versionInput = host.querySelector('#content-version-base');
@@ -142,6 +168,18 @@ describe('ImportJobsPage', () => {
       .querySelector('form')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     expect(createJobFromPicker).toHaveBeenCalledOnce();
+
+    const confirmLeave = vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
+    unresolvedCreateAttempt.value = true;
+    createState.value.phase = 'uncertain';
+    await router.push('/other');
+    expect(confirmLeave).toHaveBeenCalledOnce();
+    expect(router.currentRoute.value.path).toBe('/operations');
+
+    confirmLeave.mockReturnValue(true);
+    await router.push('/other');
+    expect(router.currentRoute.value.path).toBe('/other');
+    confirmLeave.mockRestore();
 
     app.unmount();
   });

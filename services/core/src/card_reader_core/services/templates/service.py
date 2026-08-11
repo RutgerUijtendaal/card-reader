@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from card_reader_core.models import Template
+from card_reader_core.models import CardRole, Template, normalize_card_roles
 from card_reader_core.repositories.helpers import normalize_slug_key
 from card_reader_core.repositories.templates import (
     create_template,
@@ -52,6 +52,7 @@ class TemplateService:
         label: str,
         key: str | None = None,
         definition_json: str,
+        inferred_card_roles: list[object] | tuple[object, ...] = (),
     ) -> Template:
         normalized_label = self._normalize_label(label)
         normalized_key = self._normalize_key(key=key, label=normalized_label)
@@ -60,6 +61,7 @@ class TemplateService:
             key=normalized_key,
             label=normalized_label,
             definition_json=self._normalize_definition_json(definition_json),
+            inferred_card_roles_json=list(self._normalize_inferred_card_roles(inferred_card_roles)),
         )
 
     def update_template(
@@ -69,6 +71,7 @@ class TemplateService:
         label: str | None = None,
         key: str | None = None,
         definition_json: str | None = None,
+        inferred_card_roles: list[object] | tuple[object, ...] | None = None,
     ) -> Template | None:
         row = get_template(entry_id)
         if row is None:
@@ -83,6 +86,10 @@ class TemplateService:
             raise ValueError("Template key cannot be changed")
         if definition_json is not None:
             updates["definition_json"] = self._normalize_definition_json(definition_json)
+        if inferred_card_roles is not None:
+            updates["inferred_card_roles_json"] = list(
+                self._normalize_inferred_card_roles(inferred_card_roles)
+            )
 
         return update_template(entry_id=entry_id, updates=updates)
 
@@ -117,6 +124,13 @@ class TemplateService:
         if not isinstance(parsed, dict):
             raise ValueError("definition_json must be a JSON object")
         return self._validate_template_definition(parsed)
+
+    def _normalize_inferred_card_roles(self, values: list[object] | tuple[object, ...]) -> tuple[CardRole, ...]:
+        requested = tuple(values)
+        normalized = normalize_card_roles(requested)
+        if len(set(requested)) != len(normalized):
+            raise ValueError("inferred_card_roles contains unsupported or duplicate roles")
+        return normalized
 
     def _validate_template_definition(self, definition: dict[str, Any]) -> dict[str, Any]:
         regions = definition.get("regions")

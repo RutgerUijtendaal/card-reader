@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 from django.core.management import call_command
+from django.db import transaction
 
 from card_reader_core.repositories.cards import (
     CardFilterParams,
@@ -13,6 +13,7 @@ from card_reader_core.repositories.cards import (
 )
 from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
 from card_reader_core.config.settings import settings
+from card_reader_core.models import CardPool, CardRole
 from card_reader_core.services.cards import CardImageConversionResult, convert_card_images_to_webp
 
 
@@ -74,38 +75,48 @@ class MaintenanceService:
         source_name_prefix: str,
         message_suffix: str,
     ) -> MaintenanceResult:
-        grouped_files: dict[str, list[Path]] = {}
+        grouped_sources: dict[
+            tuple[str, CardPool, tuple[CardRole, ...]],
+            list[LatestCardVersionReparseSource],
+        ] = {}
         if not sources:
             return MaintenanceResult(message=empty_message, removed_paths=[])
 
         item_count = 0
         for source in sources:
-            template_id = source.template_id
-            image_path = source.image_path
-            grouped_files.setdefault(template_id, []).append(image_path)
+            key = (source.template_id, source.card_pool, source.card_roles)
+            grouped_sources.setdefault(key, []).append(source)
             item_count += 1
 
-        if not grouped_files:
+        if not grouped_sources:
             return MaintenanceResult(message=unreadable_message, removed_paths=[])
 
         job_count = 0
-        for template_id, files in grouped_files.items():
-            targets = [
-                ImportJobItemTarget(
-                    card_id=source.card_id,
-                    card_version_id=source.card_version_id,
+        with transaction.atomic():
+            for (template_id, card_pool, card_roles), grouped in grouped_sources.items():
+                files = [source.image_path for source in grouped]
+                targets = [
+                    ImportJobItemTarget(
+                        card_id=source.card_id,
+                        card_version_id=source.card_version_id,
+                        card_pool=source.card_pool,
+                        card_roles=source.card_roles,
+                    )
+                    for source in grouped
+                ]
+                create_import_job_with_files(
+                    source_path=(
+                        settings.storage_root_dir
+                        / "maintenance"
+                        / f"{source_name_prefix}-{template_id}"
+                    ),
+                    template_id=template_id,
+                    options={"reparse_existing": True},
+                    files=files,
+                    item_targets=targets,
+                    card_pool=card_pool,
                 )
-                for source in sources
-                if source.template_id == template_id
-            ]
-            create_import_job_with_files(
-                source_path=settings.storage_root_dir / "maintenance" / f"{source_name_prefix}-{template_id}",
-                template_id=template_id,
-                options={"reparse_existing": True},
-                files=files,
-                item_targets=targets,
-            )
-            job_count += 1
+                job_count += 1
 
         return MaintenanceResult(
             message=(

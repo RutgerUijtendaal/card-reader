@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import CardVersion, ImportJobItem
+from card_reader_core.models import DEFAULT_CARD_POOL, CardPool, CardRole, CardVersion, ImportJobItem
+from card_reader_core.services.imports import CardRoleInferenceEvidence
 from card_reader_core.repositories.cards import save_parsed_card_result
 from card_reader_core.repositories.metadata import SuggestionCandidate
 from card_reader_core.services.notifications import (
@@ -27,6 +28,9 @@ def save_parsed_card_with_notifications(
     tag_suggestions: list[SuggestionCandidate] | None = None,
     type_suggestions: list[SuggestionCandidate] | None = None,
     reparse_existing: bool = True,
+    card_pool: CardPool = DEFAULT_CARD_POOL,
+    resolved_card_roles: tuple[CardRole, ...] = (),
+    classification_evidence: CardRoleInferenceEvidence | None = None,
 ) -> CardVersion:
     result = save_parsed_card_result(
         item=item,
@@ -42,6 +46,9 @@ def save_parsed_card_with_notifications(
         tag_suggestions=tag_suggestions,
         type_suggestions=type_suggestions,
         reparse_existing=reparse_existing,
+        card_pool=card_pool,
+        resolved_card_roles=resolved_card_roles,
+        classification_evidence=classification_evidence,
     )
     version = result.version
     if result.created_new_version:
@@ -56,7 +63,8 @@ def save_parsed_card_with_notifications(
                 cause=DECK_CARD_VERSION_CHANGE_IMPORT_CREATED,
                 import_job_id=item.job.id,
                 import_item_id=item.id,
-            )
+            ),
+            robust=True,
         )
-        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card_id]))
+        transaction.on_commit(lambda: TtsCardSheetService().sync_cards([card_id]), robust=True)
     return version

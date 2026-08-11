@@ -16,19 +16,27 @@ Selection, group validation, archive construction, and archive loading use a fix
 
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and
-Playtester workflows. Version 2 card records include the required `card_pool` and canonical
+Playtester workflows. Version 3 template records include canonical `inferred_card_roles` hints used
+by automatic import classification. Card records include the required `card_pool` and canonical
 `card_roles` fields; they never emit the removed Hero boolean.
 
-The importer supports both current Version 2 archives and explicitly adopts pinned Version 1
-archives. Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to
-the Hero role before strict current-schema validation. This compatibility keeps older immutable
-bundles usable without making Version 2 classification optional.
+The importer supports current Version 3 archives and explicitly adopts pinned Version 1 and
+Version 2 archives. Version 1 adoption assigns every card to the Player pool and converts
+`is_hero=true` to the Hero role before strict current-schema validation. Version 1 and Version 2
+templates adopt an empty inferred-role set. This compatibility keeps older immutable bundles usable
+without making current classification fields optional.
 
 Selection coverage is evaluated by pool and by role through `min_cards_by_pool` and
 `min_cards_by_role`. The existing Hero minimum is retained under the Hero role. Game Master pool
-coverage remains zero while that pool is excluded; Boon and Event may remain at zero until reviewed
-Player source data is available. The lock file is still
-generated only by publishing a validated immutable bundle and must not be edited by hand.
+coverage remains zero while that pool is excluded; Boon, Event, and Location may remain at zero
+until reviewed source data is available. The lock file is still generated only by publishing a
+validated immutable bundle and must not be edited by hand.
+
+`required_template_role_hints` in the reviewed selection makes expected template inference explicit.
+Bundle validation and `doctor_dev_data` fail when a named template loses a required hint. Templates
+and catalogs are supplied by developer-data on a clean checkout; there is no parallel built-in
+catalog seed to keep in sync. The committed Version 2 lock remains valid until staff publish and
+validate a real Version 3 bundle and commit its generated checksum.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.

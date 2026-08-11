@@ -7,7 +7,7 @@ import {
   DEFAULT_CARD_LIFECYCLE_FILTER,
   normalizeCardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
-import type { CardRoleFilter } from '@/domain/cards/types/cardModels';
+import { isCardRoleFilter, type CardRoleFilter } from '@/domain/cards/cardRoles';
 
 const readQueryValues = (
   value:
@@ -24,9 +24,7 @@ const readQueryValues = (
 };
 
 const readCardRoleValues = (value: LocationQueryValue | LocationQueryValue[] | undefined): CardRoleFilter[] =>
-  readQueryValues(value).filter((role): role is CardRoleFilter =>
-    ['standard', 'hero', 'boon', 'event'].includes(role),
-  );
+  readQueryValues(value).filter(isCardRoleFilter);
 
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
   normalizeCardFilterState({

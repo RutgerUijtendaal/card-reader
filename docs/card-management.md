@@ -12,11 +12,15 @@ Content versions provide an additional history boundary for related changes made
 
 ## Pool and roles
 
-Every stable card identity belongs to either the **Player** or **Game Master** pool. A card can also hold any combination of the code-owned Hero, Boon, and Event roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
+Every stable card identity belongs to either the **Player** or **Game Master** pool. A card can also hold any combination of the code-owned Hero, Boon, Event, and Location roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
+
+Role keys allow up to 64 characters. Role definitions, labels, and ordering are code-owned; Location is currently descriptive and has no Hero-like deck or Playtester behavior.
 
 Staff edit both dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. The Admin Catalog shows the pool plus every assigned role, or Standard, on linked-card and suggestion tiles.
 
-Card collections accept a pool plus role inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Game Master cards; automatic import classification and workspace-level navigation are separate workflows.
+Card collections accept a pool plus role inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Game Master cards. Imports require an explicit pool and default to automatic multi-role inference from snapshotted template hints and stable metadata signals; workspace-level navigation remains a separate future workflow.
+
+Import classification initializes only new card identities. Existing cards and reparses retain their authoritative Card-tab pool and roles. A differing inferred result completes with an ordered warning and audit evidence instead of silently reclassifying the card.
 
 ## Metadata and aliases
 

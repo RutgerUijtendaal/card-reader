@@ -2,21 +2,22 @@
 
 Status: implemented and validated.
 
-This is the first of four ordered checkpoints:
+This is the first of five ordered checkpoints:
 
 1. Card classification foundation (this document)
 2. [Authorization seam consolidation](card-classification-step-1-1-authorization-seam.md)
 3. [Import inference](card-classification-step-2-import-inference.md)
-4. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
+4. [Import workflow seam consolidation](card-classification-step-2-1-import-workflow-seam.md)
+5. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
 
-Do not begin Step 1.1 until this step's acceptance criteria are satisfied. Do not begin Step 2 or Step 3 until Step 1.1 is complete. Later steps may be implemented in the same branch only when each checkpoint remains independently reviewable and verified.
+Do not begin Step 1.1 until this step's acceptance criteria are satisfied. Do not begin Step 2, Step 2.1, or Step 3 until Step 1.1 is complete. Later steps may be implemented in the same branch only when each checkpoint remains independently reviewable and verified.
 
 ## Outcome
 
 Replace the single `Card.is_hero` flag with two card-level classification dimensions:
 
 - Every card belongs to exactly one pool: `player` or `game_master`.
-- Every card has zero or more roles: initially `hero`, `boon`, and `event`.
+- Every card has zero or more roles: `hero`, `boon`, `event`, and `location`.
 - A card with no roles is displayed and filtered as **Standard**. `standard` is not persisted as a role.
 
 The existing Player experience must continue to work, Hero behavior must use the new role system, Game Master cards must be protected by a central staff-only capability, and staff must be able to edit and query both dimensions. Import inference and the global workspace toggle are deliberately deferred.
@@ -26,8 +27,8 @@ The existing Player experience must continue to work, Hero behavior must use the
 - Pool and roles belong to the stable `Card` identity, not `CardVersion` or `Template`.
 - Template selection remains version-level parsing configuration.
 - Roles are additive and may coexist. Do not encode them as mutually exclusive choices or separate booleans.
-- `standard` means the absence of special roles. Never persist `standard` beside `hero`, `boon`, or `event`.
-- Typical pool/role combinations such as Player Hero and Game Master Boon/Event are conventions, not database constraints. Any restrictions or warnings belong in core code.
+- `standard` means the absence of special roles. Never persist `standard` beside a persisted role.
+- Typical pool/role combinations such as Player Hero and Game Master Boon/Event/Location are conventions, not database constraints. Any restrictions or warnings belong in core code.
 - Cross-pool relationships are allowed. Do not add same-pool database constraints to groups, future card links, or other card relationships.
 - Game Master access is controlled through a named backend capability whose initial policy is `is_staff`. Do not scatter direct `is_staff` checks through card queries and views.
 - Public derived artifacts such as developer-data bundles and unauthenticated TTS card sheets are Player-pool scoped. They must not encode the current staff policy; changing who receives the Game Master capability must remain independent from deciding which artifacts are public.
@@ -69,7 +70,7 @@ Add a `CardRoleAssignment` model with:
 
 - its normal timestamp/id fields following repository conventions;
 - a `card` foreign key with cascade deletion and a clear reverse name such as `role_assignments`;
-- a `role` field using the code-owned values `hero`, `boon`, and `event`;
+- a 64-character `role` field using the code-owned values `hero`, `boon`, `event`, and `location`;
 - an indexed uniqueness constraint on `(card, role)`.
 
 Use assignment rows rather than a JSON array on `Card` so gallery filters remain portable and queryable on SQLite. Do not create a mutable role catalog table: supported top-level roles are application behavior and are released with code.
@@ -132,7 +133,7 @@ Treat card classification as a developer-data format change, not an incidental e
 - Keep a version-aware Version 1 import adapter that maps every card to Player and maps `is_hero=true` to the Hero role. Do not weaken the strict Version 2 schema with permanently optional classification fields.
 - New Version 2 bundles must not emit `is_hero`.
 - Update exporter, importer, archive validation, isolated publication validation, counts/doctor checks, and any schema fixtures together.
-- Replace Hero-boolean coverage evaluation with role-aware coverage and add pool-aware coverage. Preserve the current effective Hero minimum under the Hero role; Game Master/Boon/Event minimums may remain zero until reviewed data exists.
+- Replace Hero-boolean coverage evaluation with role-aware coverage and add pool-aware coverage. Preserve the current effective Hero minimum under the Hero role; Game Master/Boon/Event/Location minimums may remain zero until reviewed data exists.
 - Update `dev-data/selection.json` to the new coverage shape when the implementation lands.
 - Do not hand-edit `dev-data.lock.json`. Publish and validate a compatible immutable bundle, then commit the generated lock with its new bundle version, format version, and checksum. Until that bundle exists, the application must remain able to consume the pinned Version 1 bundle through the adapter.
 - Update `docs/developer-data.md` with the supported-format and adoption behavior.
@@ -157,8 +158,8 @@ Card editing accepts `card_pool` and a complete replacement `card_roles` array o
 Card list/filter contracts accept:
 
 - `card_pool=player|game_master`;
-- repeated `card_roles=standard|hero|boon|event`;
-- repeated `card_role_exclude=standard|hero|boon|event`;
+- repeated `card_roles=standard|hero|boon|event|location`;
+- repeated `card_role_exclude=standard|hero|boon|event|location`;
 - `card_role_match=any|all`.
 
 When `card_pool` is omitted from an ordinary public card collection, use `player`. Staff management callers may explicitly choose either pool. Add the role/pool display options needed by clients to `GET /cards/filters` rather than duplicating labels and ordering in feature code.
@@ -184,7 +185,7 @@ Update card contracts under `frontend/src/domain/cards` and remove `is_hero` fro
 In the Card tab of the staff editor:
 
 - replace the Hero checkbox with a required Player/Game Master pool control;
-- add multi-select role controls for Hero, Boon, and Event;
+- add multi-select role controls for Hero, Boon, Event, and Location;
 - show Standard when no roles are selected;
 - keep lifecycle and deck-building configuration in the same Card tab;
 - surface backend validation when changing a referenced Hero or pool.
@@ -205,7 +206,7 @@ Update the Admin Catalog's existing `CatalogLinkedCardsGrid` and its suggestion-
 
 - extend `LinkedCardPreview` and `SuggestionOccurrencePreview` through the core service, API serializer, and frontend types with `card_pool` and `card_roles`;
 - show a compact Player/Game Master pool badge on every linked-card tile;
-- show canonical Hero, Boon, and Event role badges, or a Standard badge when the role array is empty;
+- show canonical Hero, Boon, Event, and Location role badges, or a Standard badge when the role array is empty;
 - keep the classification visible without requiring hover or opening the card detail;
 - reuse the code-owned labels/order from the card domain instead of defining Admin-only role names;
 - preserve the existing image preview, hover behavior, and link back to the selected catalog entry.
@@ -262,7 +263,7 @@ Use `scripts/run-in-agent-env.py` for ad hoc Python checks as directed by `AGENT
 
 - All existing cards are Player cards after migration.
 - Former Hero cards have exactly the Hero role; former non-Hero cards are Standard.
-- A card can hold Hero, Boon, and Event simultaneously.
+- A card can hold Hero, Boon, Event, and Location simultaneously.
 - `is_hero` is absent from the database and first-party writable contracts.
 - Existing Hero-dependent deck, export, and Playtester behavior is unchanged.
 - Staff can edit pool and multiple roles from the Card tab.

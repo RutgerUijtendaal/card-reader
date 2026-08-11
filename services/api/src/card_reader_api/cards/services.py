@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from card_reader_core.repositories.cards import (
     get_card,
@@ -10,6 +11,7 @@ from card_reader_core.repositories.cards import (
 )
 from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
 from card_reader_core.config.settings import settings
+from card_reader_core.models import CardPool, card_role_keys
 from card_reader_core.services.templates import TemplateService
 
 
@@ -52,7 +54,15 @@ class CardActionService:
             template_id=resolved_template_id,
             options={"reparse_existing": True},
             files=[image_path],
-            item_targets=[ImportJobItemTarget(card_id=card.id, card_version_id=version.id)],
+            item_targets=[
+                ImportJobItemTarget(
+                    card_id=card.id,
+                    card_version_id=version.id,
+                    card_pool=cast(CardPool, card.card_pool),
+                    card_roles=card_role_keys(card),
+                )
+            ],
+            card_pool=cast(CardPool, card.card_pool),
         )
         return CardReparseQueueResult(
             job_id=job.id,

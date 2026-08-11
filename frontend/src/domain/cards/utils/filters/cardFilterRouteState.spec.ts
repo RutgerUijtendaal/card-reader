@@ -62,6 +62,20 @@ describe('cardFilterRouteState', () => {
     ).toEqual({});
   });
 
+  test('round-trips Location through role include and exclude filters', () => {
+    const state = parseCardFilterRouteQuery({
+      card_roles: ['location', 'event'],
+      card_role_exclude: 'boon',
+    });
+
+    expect(state.cardRoleKeys).toEqual(['event', 'location']);
+    expect(state.cardRoleExcludeKeys).toEqual(['boon']);
+    expect(buildCardFilterRouteQuery(state)).toMatchObject({
+      card_roles: ['event', 'location'],
+      card_role_exclude: ['boon'],
+    });
+  });
+
   test('produces a stable signature for equivalent filter selections', () => {
     const left = getCardFilterSignature(
       parseCardFilterRouteQuery({

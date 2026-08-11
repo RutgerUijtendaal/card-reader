@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db import transaction
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -7,9 +8,10 @@ from rest_framework.views import APIView
 
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.templates.serializers import TemplateReparseSerializer, TemplateWriteSerializer, template_payload
-from card_reader_core.repositories.cards import list_latest_card_version_reparse_sources
+from card_reader_core.repositories.cards import LatestCardVersionReparseSource, list_latest_card_version_reparse_sources
 from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
 from card_reader_core.config.settings import settings
+from card_reader_core.models import CardPool, CardRole
 from card_reader_core.services.templates import TemplateService
 
 
@@ -26,6 +28,7 @@ class TemplateListCreateView(APIView):
                 label=serializer.validated_data["label"],
                 key=serializer.validated_data.get("key"),
                 definition_json=serializer.validated_data["definition_json"],
+                inferred_card_roles=serializer.validated_data.get("inferred_card_roles", []),
             )
         except ValueError as exc:
             return bad_request(str(exc))
@@ -43,6 +46,7 @@ class TemplateDetailView(APIView):
                 label=serializer.validated_data.get("label"),
                 key=serializer.validated_data.get("key"),
                 definition_json=serializer.validated_data.get("definition_json"),
+                inferred_card_roles=serializer.validated_data.get("inferred_card_roles"),
             )
         except ValueError as exc:
             return bad_request(str(exc))
@@ -78,16 +82,32 @@ class TemplateReparseView(APIView):
         if not matching_sources:
             return Response({"message": "No latest card versions found for the selected source template."})
 
-        create_import_job_with_files(
-            source_path=settings.storage_root_dir / "templates" / f"reparse-{target_template.key}",
-            template_id=target_template.key,
-            options={"reparse_existing": True},
-            files=[source.image_path for source in matching_sources],
-            item_targets=[
-                ImportJobItemTarget(card_id=source.card_id, card_version_id=source.card_version_id)
-                for source in matching_sources
-            ],
-        )
+        grouped_sources: dict[
+            tuple[CardPool, tuple[CardRole, ...]],
+            list[LatestCardVersionReparseSource],
+        ] = {}
+        for source in matching_sources:
+            grouped_sources.setdefault((source.card_pool, source.card_roles), []).append(source)
+        with transaction.atomic():
+            for (card_pool, _card_roles), sources in grouped_sources.items():
+                create_import_job_with_files(
+                    source_path=(
+                        settings.storage_root_dir / "templates" / f"reparse-{target_template.key}"
+                    ),
+                    template_id=target_template.key,
+                    options={"reparse_existing": True},
+                    files=[source.image_path for source in sources],
+                    item_targets=[
+                        ImportJobItemTarget(
+                            card_id=source.card_id,
+                            card_version_id=source.card_version_id,
+                            card_pool=source.card_pool,
+                            card_roles=source.card_roles,
+                        )
+                        for source in sources
+                    ],
+                    card_pool=card_pool,
+                )
         return Response(
             {
                 "message": (

@@ -1,5 +1,7 @@
-import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
-import { computed, onMounted, ref, watch } from 'vue';
+import { useDocumentVisibility, useEventListener, useIntervalFn } from '@vueuse/core';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
+import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import { fetchOperationsQueuePage } from '@/domain/operations/api';
 import type { OperationsQueueItem } from '@/domain/operations/types';
 import { fetchTemplates } from '@/domain/templates/api';
@@ -7,10 +9,13 @@ import type { TemplateRecord } from '@/domain/templates/types';
 import {
   cancelImportJob,
   createImportJob,
+  fetchImportJobByCreationKey,
+  fetchImportJobDetail,
   fetchCurrentContentVersion,
   fetchImportJobs,
 } from '@/features/import-jobs/api';
-import type { ContentVersion, ImportJob } from '@/features/import-jobs/types';
+import type { CreateImportJobInput } from '@/features/import-jobs/api';
+import type { ContentVersion, ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 import {
   canCancelImportJob,
   extractImportJobErrorMessage,
@@ -32,8 +37,29 @@ const IMPORT_HISTORY_PAGE_SIZE = 100;
 const RECENT_IMPORT_JOB_LIMIT = 5;
 const ACTIVITY_REFRESH_ERROR_MESSAGE = 'Import activity could not be refreshed.';
 
+export type ImportCreateState =
+  | { phase: 'idle' }
+  | { phase: 'submitting' }
+  | { phase: 'reconciling' }
+  | { phase: 'uncertain' }
+  | { phase: 'confirmed'; jobId: string };
+
+const newCreationKey = (): string => globalThis.crypto.randomUUID();
+
+const isAmbiguousCreateFailure = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null || !("response" in error)) return true;
+  const status = (error as { response?: { status?: number } }).response?.status;
+  return status === undefined || status >= 500;
+};
+
 export const useImportJobsController = () => {
   const pickerTemplateId = ref('mtg-like-v1');
+  const cardPool = ref<CardPool>('player');
+  const cardRoleMode = ref<'automatic' | 'override'>('automatic');
+  const cardRoleOverride = ref<CardRole[]>([]);
+  const creationKey = ref(newCreationKey());
+  const createState = ref<ImportCreateState>({ phase: 'idle' });
+  const pendingAttempt = shallowRef<CreateImportJobInput | null>(null);
   const contentVersionBase = ref('');
   const contentVersionDescription = ref('');
   const currentContentVersion = ref<ContentVersion | null>(null);
@@ -55,9 +81,12 @@ export const useImportJobsController = () => {
   const cancellingJobIds = ref<Set<string>>(new Set());
   const lastRefreshedAt = ref<string | null>(null);
   const templates = ref<TemplateRecord[]>([]);
+  const selectedJobDetail = ref<ImportJobDetail | null>(null);
+  const detailLoading = ref(false);
   const documentVisibility = useDocumentVisibility();
   let activeJobsRequestId = 0;
   let historyRequestId = 0;
+  let detailRequestId = 0;
 
   const queuedCount = computed(
     () => activeJobs.value.filter((job) => job.status === 'queued').length,
@@ -91,9 +120,15 @@ export const useImportJobsController = () => {
       contentVersionDescription.value.trim().length > 0,
   );
   const submitButtonLabel = computed(() => {
+    if (createState.value.phase === 'reconciling') return 'Checking Import...';
+    if (createState.value.phase === 'uncertain') return 'Retry Locked Import';
     if (creatingJob.value) return 'Queueing Import...';
     return getImportSubmitLabel(contentVersionBase.value, currentContentVersion.value);
   });
+  const formLocked = computed(() =>
+    ['submitting', 'reconciling', 'uncertain'].includes(createState.value.phase),
+  );
+  const hasUnresolvedCreateAttempt = computed(() => pendingAttempt.value !== null);
 
   const loadActiveJobs = async (): Promise<boolean> => {
     const requestId = ++activeJobsRequestId;
@@ -183,11 +218,36 @@ export const useImportJobsController = () => {
     }
   };
 
+  const refreshSelectedJobDetail = async (): Promise<void> => {
+    const selectedDetail = selectedJobDetail.value;
+    if (
+      detailLoading.value
+      || !selectedDetail
+      || isTerminalImportStatus(selectedDetail.status)
+    ) return;
+
+    const requestId = ++detailRequestId;
+    try {
+      const detail = await fetchImportJobDetail(selectedDetail.id);
+      if (
+        requestId === detailRequestId
+        && selectedJobDetail.value?.id === selectedDetail.id
+      ) {
+        selectedJobDetail.value = detail;
+      }
+    } catch (error) {
+      if (requestId === detailRequestId) {
+        console.error('Refresh selected import detail failed', error);
+      }
+    }
+  };
+
   const refreshActivity = async (): Promise<void> => {
     activityActionErrorMessage.value = '';
     const [activeResult, historyResult] = await Promise.allSettled([
       loadActiveJobs(),
       loadRecentJobs(),
+      refreshSelectedJobDetail(),
     ]);
     if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
 
@@ -256,7 +316,30 @@ export const useImportJobsController = () => {
   };
 
   const setPickedFiles = (files: File[]): void => {
+    if (formLocked.value) return;
     pickedFiles.value = files;
+  };
+
+  const clearPickedFiles = (): void => {
+    if (formLocked.value) return;
+    resetPickedFiles();
+  };
+
+  const completeCreatedAttempt = (jobId: string): void => {
+    createState.value = { phase: 'confirmed', jobId };
+    pendingAttempt.value = null;
+    resetPickedFiles();
+    cardRoleMode.value = 'automatic';
+    cardRoleOverride.value = [];
+    creationKey.value = newCreationKey();
+  };
+
+  const abandonPendingAttempt = (): void => {
+    if (!pendingAttempt.value) return;
+    pendingAttempt.value = null;
+    createState.value = { phase: 'idle' };
+    creationKey.value = newCreationKey();
+    formErrorMessage.value = '';
   };
 
   const createJobFromPicker = async (): Promise<void> => {
@@ -274,22 +357,51 @@ export const useImportJobsController = () => {
       return;
     }
 
+    const attempt = pendingAttempt.value ?? {
+      creationKey: creationKey.value,
+      templateId: pickerTemplateId.value,
+      contentVersionBase: contentVersionBase.value.trim(),
+      contentVersionDescription: contentVersionDescription.value.trim(),
+      files: [...pickedFiles.value],
+      cardPool: cardPool.value,
+      cardRoleMode: cardRoleMode.value,
+      cardRoleOverride: cardRoleMode.value === 'override' ? [...cardRoleOverride.value] : [],
+    };
+    pendingAttempt.value = attempt;
     creatingJob.value = true;
+    createState.value = { phase: 'submitting' };
+    let createdJobId: string | null = null;
     try {
-      await createImportJob({
-        templateId: pickerTemplateId.value,
-        contentVersionBase: contentVersionBase.value.trim(),
-        contentVersionDescription: contentVersionDescription.value.trim(),
-        files: pickedFiles.value,
-      });
-      resetPickedFiles();
+      const result = await createImportJob(attempt);
+      createdJobId = result.job_id;
     } catch (error) {
       console.error('Create import from upload failed', error);
-      formErrorMessage.value = extractImportJobErrorMessage(error);
-      return;
+      if (!isAmbiguousCreateFailure(error)) {
+        pendingAttempt.value = null;
+        createState.value = { phase: 'idle' };
+        creationKey.value = newCreationKey();
+        formErrorMessage.value = extractImportJobErrorMessage(error);
+        return;
+      }
+      createState.value = { phase: 'reconciling' };
+      try {
+        const existing = await fetchImportJobByCreationKey(attempt.creationKey);
+        if (existing) createdJobId = existing.job_id;
+      } catch (lookupError) {
+        console.error('Import creation-key reconciliation failed', lookupError);
+      }
+      if (!createdJobId) {
+        createState.value = { phase: 'uncertain' };
+        formErrorMessage.value =
+          'The server outcome is uncertain. The exact files and settings are locked; retry this attempt or abandon it to edit.';
+        return;
+      }
     } finally {
       creatingJob.value = false;
     }
+
+    if (!createdJobId) return;
+    completeCreatedAttempt(createdJobId);
 
     const [versionResult] = await Promise.allSettled([
       loadCurrentContentVersion(),
@@ -323,6 +435,22 @@ export const useImportJobsController = () => {
     await refreshActivity();
   };
 
+  const viewJobDetail = async (jobId: string): Promise<void> => {
+    const requestId = ++detailRequestId;
+    detailLoading.value = true;
+    activityActionErrorMessage.value = '';
+    try {
+      const detail = await fetchImportJobDetail(jobId);
+      if (requestId === detailRequestId) selectedJobDetail.value = detail;
+    } catch (error) {
+      if (requestId !== detailRequestId) return;
+      console.error('Load import detail failed', error);
+      activityActionErrorMessage.value = extractImportJobErrorMessage(error);
+    } finally {
+      if (requestId === detailRequestId) detailLoading.value = false;
+    }
+  };
+
   const pollJobs = async (): Promise<void> => {
     if (
       documentVisibility.value !== 'visible'
@@ -333,6 +461,7 @@ export const useImportJobsController = () => {
       const activeJobFinished = await loadActiveJobs();
       if (activeJobFinished) await loadRecentJobs();
       await reconcileMissingActiveWork();
+      await refreshSelectedJobDetail();
     } catch (error) {
       console.error('Polling imports failed', error);
     }
@@ -358,6 +487,12 @@ export const useImportJobsController = () => {
     { immediate: true },
   );
 
+  useEventListener(window, 'beforeunload', (event) => {
+    if (!hasUnresolvedCreateAttempt.value) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+
   onMounted(() => {
     void loadFormOptions();
     void refreshActivity();
@@ -365,6 +500,10 @@ export const useImportJobsController = () => {
 
   return {
     pickerTemplateId,
+    cardPool,
+    cardRoleMode,
+    cardRoleOverride,
+    creationKey,
     contentVersionBase,
     contentVersionDescription,
     currentContentVersion,
@@ -385,17 +524,24 @@ export const useImportJobsController = () => {
     cancellingJobIds,
     lastRefreshedAt,
     templates,
+    selectedJobDetail,
+    detailLoading,
     queuedCount,
     runningCount,
     cancelingCount,
     contentVersionBaseError,
     hasValidVersionInput,
     submitButtonLabel,
+    formLocked,
+    hasUnresolvedCreateAttempt,
+    createState,
     refreshActivity,
     createJobFromPicker,
     cancelJob,
+    viewJobDetail,
     setPickedFiles,
-    clearPickedFiles: resetPickedFiles,
+    clearPickedFiles,
+    abandonPendingAttempt,
     pollJobs,
     canCancel: canCancelImportJob,
     progressPercent: getImportJobProgressPercent,

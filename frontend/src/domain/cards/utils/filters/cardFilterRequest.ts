@@ -7,7 +7,8 @@ import {
   buildCardLifecycleApiParams,
   type CardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
-import type { CardPool, CardRoleFilter } from '@/domain/cards/types/cardModels';
+import type { CardRoleFilter } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 
 export type CardFilterApiPayload = {
   q?: string;

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
+from .card import DEFAULT_CARD_POOL, CardRole
 
 if TYPE_CHECKING:
     from .card import Card
@@ -21,6 +22,24 @@ class ImportJobStatus(StrEnum):
     cancelled = "cancelled"
     completed = "completed"
     failed = "failed"
+
+
+class ImportCardRoleMode(StrEnum):
+    automatic = "automatic"
+    override = "override"
+
+
+LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION = 2
+
+
+class CardRoleInferenceEvidence(TypedDict):
+    mode: Literal["automatic", "override"]
+    policy_version: int
+    template_roles: list[CardRole]
+    matched_tag_keys: list[str]
+    tag_roles: list[CardRole]
+    override_roles: list[CardRole]
+    resolved_roles: list[CardRole]
 
 
 class ImportJob(TimestampedModel):
@@ -42,6 +61,15 @@ class ImportJob(TimestampedModel):
         blank=True,
     )
     options_json = models.JSONField(default=dict)
+    creation_key: models.TextField[str, str] = models.TextField(default=uuid_str, unique=True)
+    creation_fingerprint: models.TextField[str, str] = models.TextField(default="")
+    card_pool: models.TextField[str, str] = models.TextField(default=DEFAULT_CARD_POOL)
+    card_role_mode: models.TextField[str, str] = models.TextField(default=ImportCardRoleMode.automatic)
+    card_role_override_json = models.JSONField(default=list)
+    template_role_snapshot_json = models.JSONField(default=list)
+    card_role_inference_policy_version: models.IntegerField[int, int] = models.IntegerField(
+        default=LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION
+    )
     status: models.TextField[str, str] = models.TextField(default=ImportJobStatus.queued)
     total_items: models.IntegerField[int, int] = models.IntegerField(default=0)
     processed_items: models.IntegerField[int, int] = models.IntegerField(default=0)
@@ -92,6 +120,15 @@ class ImportJobItem(TimestampedModel):
         null=True,
         blank=True,
     )
+    resolved_card_roles_json = models.JSONField(default=list)
+    card_role_inference_json = models.JSONField(default=dict)
+    target_card_pool_snapshot: models.TextField[str | None, str | None] = models.TextField(
+        default=None,
+        null=True,
+        blank=True,
+    )
+    target_card_roles_snapshot_json = models.JSONField(default=list)
+    warnings_json = models.JSONField(default=list)
 
     class Meta:
         db_table = "import_job_item"

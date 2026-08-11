@@ -566,6 +566,7 @@ import {
   applySymbolAutocomplete,
   findActiveSymbolTrigger,
 } from '@/domain/cards/utils/cards/ruleTextSymbols';
+import { CARD_ROLE_OPTIONS, type CardRole } from '@/domain/cards/cardRoles';
 import type {
   CardVersionDetail,
   MetadataGroupName,
@@ -574,7 +575,7 @@ import type {
   SymbolFilterOption,
 } from '@/domain/cards/types';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
-import type { CardPool, CardRole } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/types/cardModels';
 import type { EditorForm, MetadataSearchState, ReparseTemplateOption } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 
@@ -604,6 +605,7 @@ const props = defineProps<{
   ruleTextUnknownSymbolKeys: string[];
   deprecatedStatusDisabled?: boolean;
   reviewFocusPropertyKey?: string | null;
+  initialTab?: 'card' | 'version';
 }>();
 
 const emit = defineEmits<{
@@ -626,7 +628,7 @@ const emit = defineEmits<{
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
 
-const activeEditorTab = ref<'card' | 'version'>('version');
+const activeEditorTab = ref<'card' | 'version'>(props.initialTab ?? 'version');
 const rulesTextTextarea = ref<HTMLTextAreaElement | null>(null);
 const rulesTextValue = ref('');
 const rulesTextCaretIndex = ref(0);
@@ -637,11 +639,7 @@ const lifecycleOptions = [
   { value: ACTIVE_CARD_LIFECYCLE_STATUS, label: 'Active' },
   { value: DEPRECATED_CARD_LIFECYCLE_STATUS, label: 'Deprecated' },
 ] as const;
-const cardRoleOptions: Array<{ value: CardRole; label: string }> = [
-  { value: 'hero', label: 'Hero' },
-  { value: 'boon', label: 'Boon' },
-  { value: 'event', label: 'Event' },
-];
+const cardRoleOptions = CARD_ROLE_OPTIONS;
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
 const additionalSymbolIds = computed(() => props.additionalSymbolIds);

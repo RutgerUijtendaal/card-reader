@@ -5,16 +5,29 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-DEVELOPER_DATA_FORMAT_VERSION = 2
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, DEVELOPER_DATA_FORMAT_VERSION)
+from card_reader_core.models import (
+    CARD_ROLE_FILTER_VALUES,
+    HERO_CARD_ROLE,
+    STANDARD_CARD_ROLE,
+    CardRole,
+    CardRoleFilter,
+)
+
+DEVELOPER_DATA_FORMAT_VERSION = 3
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
 
 
 def _default_pool_coverage() -> dict[Literal["player", "game_master"], int]:
     return {"player": 1, "game_master": 0}
 
 
-def _default_role_coverage() -> dict[Literal["standard", "hero", "boon", "event"], int]:
-    return {"standard": 1, "hero": 1, "boon": 0, "event": 0}
+def _default_role_coverage() -> dict[CardRoleFilter, int]:
+    coverage: dict[CardRoleFilter, int] = {
+        role: 0 for role in CARD_ROLE_FILTER_VALUES
+    }
+    coverage[STANDARD_CARD_ROLE] = 1
+    coverage[HERO_CARD_ROLE] = 1
+    return coverage
 
 
 class StrictModel(BaseModel):
@@ -26,13 +39,14 @@ class CoverageRequirements(StrictModel):
     min_cards_by_pool: dict[Literal["player", "game_master"], int] = Field(
         default_factory=_default_pool_coverage
     )
-    min_cards_by_role: dict[Literal["standard", "hero", "boon", "event"], int] = Field(
+    min_cards_by_role: dict[CardRoleFilter, int] = Field(
         default_factory=_default_role_coverage
     )
     min_deprecated_cards: int = Field(default=1, ge=0)
     min_card_groups: int = Field(default=1, ge=0)
     min_cards_with_multiple_versions: int = Field(default=1, ge=0)
     required_template_keys: list[str] = Field(default_factory=list)
+    required_template_role_hints: dict[str, list[CardRole]] = Field(default_factory=dict)
 
 
 class DeveloperDataSelection(StrictModel):
@@ -66,6 +80,17 @@ class TemplateRecord(StrictModel):
     key: str
     label: str
     definition: dict[str, Any]
+    inferred_card_roles: list[CardRole]
+
+    @field_validator("inferred_card_roles")
+    @classmethod
+    def validate_unique_inferred_card_roles(
+        cls,
+        value: list[CardRole],
+    ) -> list[CardRole]:
+        if len(value) != len(set(value)):
+            raise ValueError("Template inferred card roles must be unique.")
+        return value
 
 
 class DeckTagRecord(StrictModel):
@@ -126,7 +151,7 @@ class CardRecord(StrictModel):
     key: str
     label: str
     card_pool: Literal["player", "game_master"]
-    card_roles: list[Literal["hero", "boon", "event"]]
+    card_roles: list[CardRole]
     deck_building_config: dict[str, Any]
     lifecycle_status: str
     latest_version_number: int | None
@@ -137,8 +162,8 @@ class CardRecord(StrictModel):
     @classmethod
     def validate_unique_card_roles(
         cls,
-        value: list[Literal["hero", "boon", "event"]],
-    ) -> list[Literal["hero", "boon", "event"]]:
+        value: list[CardRole],
+    ) -> list[CardRole]:
         if len(value) != len(set(value)):
             raise ValueError("Card roles must be unique.")
         return value
@@ -212,9 +237,19 @@ class DeveloperDataLock(StrictModel):
 
 def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     """Adopt older bundle payloads into the current strict schema."""
-    if format_version != 1 or not isinstance(value, dict):
+    if format_version not in {1, 2} or not isinstance(value, dict):
         return value
     adopted = dict(value)
+    templates = adopted.get("templates")
+    if isinstance(templates, list):
+        adopted["templates"] = [
+            {**template, "inferred_card_roles": []}
+            if isinstance(template, dict) and "inferred_card_roles" not in template
+            else template
+            for template in templates
+        ]
+    if format_version != 1:
+        return adopted
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted

@@ -7,7 +7,8 @@ This is a hardening checkpoint between the classification foundation and import 
 1. [Card classification foundation](card-classification-step-1-foundation.md)
 2. Authorization seam consolidation (this document)
 3. [Import inference](card-classification-step-2-import-inference.md)
-4. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
+4. [Import workflow seam consolidation](card-classification-step-2-1-import-workflow-seam.md)
+5. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
 
 Do not grow import or workspace behavior until this step's acceptance criteria are satisfied. The purpose is to make the existing Step 1 access boundary secure by construction before more features consume it.
 
