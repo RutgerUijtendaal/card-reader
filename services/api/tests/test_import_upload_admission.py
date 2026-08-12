@@ -173,6 +173,20 @@ def test_cleanup_failure_does_not_replace_the_domain_conflict(
         ImportUploadAdmission(service=service).admit(_validated_data())  # type: ignore[arg-type]
 
 
+def test_staging_conflict_is_translated_to_an_admission_conflict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def conflict(*_args: object, **_kwargs: object) -> StagedImportUpload:
+        raise ImportCreationKeyConflict("Stored upload content conflicts")
+
+    monkeypatch.setattr(StagedImportUpload, "publish", conflict)
+
+    with pytest.raises(ImportAdmissionConflict, match="Stored upload content conflicts"):
+        ImportUploadAdmission(service=_FakeImportService()).admit(  # type: ignore[arg-type]
+            _validated_data()
+        )
+
+
 def test_matching_replay_returns_before_staging(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -218,11 +218,14 @@ class ImportUploadAdmission:
                 error=exc,
             )
 
-        staged = StagedImportUpload.publish(
-            uploads,
-            creation_key=creation_key,
-            fingerprint=fingerprint,
-        )
+        try:
+            staged = StagedImportUpload.publish(
+                uploads,
+                creation_key=creation_key,
+                fingerprint=fingerprint,
+            )
+        except ImportCreationKeyConflict as exc:
+            raise ImportAdmissionConflict(str(exc)) from exc
         try:
             result = self._service.create_job(
                 source_path=staged.relative_path,
