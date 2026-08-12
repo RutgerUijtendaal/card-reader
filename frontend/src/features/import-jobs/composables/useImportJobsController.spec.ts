@@ -143,7 +143,10 @@ describe('useImportJobsController', () => {
     });
     vi.mocked(fetchImportJobByCreationKey).mockResolvedValue(null);
     vi.mocked(fetchImportJobDetail).mockResolvedValue(importJobDetail('detail-job'));
-    vi.mocked(cancelImportJob).mockResolvedValue();
+    vi.mocked(cancelImportJob).mockResolvedValue({
+      ...activeJob(),
+      status: 'canceling',
+    });
   });
 
   afterEach(() => {
@@ -457,6 +460,35 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.activityErrorMessage.value).toBe(
       'Import activity could not be refreshed.',
     );
+    mounted.app.unmount();
+  });
+
+  test('preserves a queued cancellation terminal response when refresh fails', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+    mounted.controller.activeJobs.value = [
+      { ...activeJob('queued-job'), status: 'queued' },
+    ];
+    vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
+      ...importJobDetail('queued-job'),
+      status: 'queued',
+    });
+    await mounted.controller.viewJobDetail('queued-job');
+    vi.mocked(cancelImportJob).mockResolvedValueOnce({
+      ...activeJob('queued-job'),
+      status: 'cancelled',
+      processed_items: 10,
+    });
+    vi.mocked(fetchImportJobs).mockRejectedValueOnce(new Error('Active unavailable'));
+    vi.mocked(fetchOperationsQueuePage).mockRejectedValueOnce(new Error('History unavailable'));
+
+    await mounted.controller.cancelJob('queued-job');
+
+    expect(mounted.controller.activeJobs.value).toEqual([]);
+    expect(mounted.controller.selectedJobDetail.value?.status).toBe('cancelled');
     mounted.app.unmount();
   });
 

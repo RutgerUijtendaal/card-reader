@@ -263,8 +263,9 @@ export const useImportActivity = () => {
     next.add(jobId);
     cancellingJobIds.value = next;
     activityActionErrorMessage.value = '';
+    let cancelledJob: ImportJob;
     try {
-      await cancelImportJob(jobId);
+      cancelledJob = await cancelImportJob(jobId);
     } catch (error) {
       console.error('Cancel import job failed', error);
       activityActionErrorMessage.value = extractImportJobErrorMessage(error);
@@ -275,12 +276,16 @@ export const useImportActivity = () => {
       cancellingJobIds.value = done;
     }
 
-    activeJobs.value = activeJobs.value.map((job) =>
-      job.id === jobId ? { ...job, status: 'canceling' } : job,
-    );
+    activeJobs.value = isTerminalImportStatus(cancelledJob.status)
+      ? activeJobs.value.filter((job) => job.id !== jobId)
+      : activeJobs.value.map((job) => (job.id === jobId ? cancelledJob : job));
     if (selectedJobDetail.value?.id === jobId) {
       detailRequestId += 1;
-      selectedJobDetail.value = { ...selectedJobDetail.value, status: 'canceling' };
+      selectedJobDetail.value = {
+        ...selectedJobDetail.value,
+        ...cancelledJob,
+        items: selectedJobDetail.value.items,
+      };
     }
     await refreshActivity();
   };

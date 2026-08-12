@@ -146,6 +146,34 @@ def test_definitive_creation_rejection_discards_only_the_owned_stage() -> None:
     assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
+def test_post_staging_rejection_discards_a_preserved_exact_retry_stage() -> None:
+    data = _validated_data()
+    creation_key = str(data["creation_key"])
+    fingerprint, uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+    )
+    StagedImportUpload.publish(
+        uploads,
+        creation_key=creation_key,
+        fingerprint=fingerprint,
+    )
+    service = _FakeImportService()
+    service.create_error = ImportCreationRejected("Template disappeared after staging")
+
+    with pytest.raises(ImportAdmissionRejected, match="Template disappeared after staging"):
+        ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
 def test_unknown_ownership_preserves_the_isolated_stage_for_reconciliation() -> None:
     data = _validated_data()
     creation_key = str(data["creation_key"])

@@ -240,10 +240,20 @@ class ImportUploadAdmission:
                 card_role_override=card_role_override,
             )
         except ImportCreationKeyConflict as exc:
-            staged.discard()
+            _discard_reconciled_stage(
+                uploads,
+                creation_key=creation_key,
+                fingerprint=fingerprint,
+                reason="post-staging creation-key conflict",
+            )
             raise ImportAdmissionConflict(str(exc)) from exc
         except ImportCreationRejected as exc:
-            staged.discard()
+            _discard_reconciled_stage(
+                uploads,
+                creation_key=creation_key,
+                fingerprint=fingerprint,
+                reason="post-staging definitive creation rejection",
+            )
             raise ImportAdmissionRejected(str(exc)) from exc
         except Exception as exc:
             return self._reconcile_uncertain_stage(

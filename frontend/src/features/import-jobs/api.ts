@@ -71,6 +71,7 @@ export const fetchImportJobDetail = async (jobId: string): Promise<ImportJobDeta
   return response.data;
 };
 
-export const cancelImportJob = async (jobId: string): Promise<void> => {
-  await api.post(`/imports/${jobId}/cancel`);
+export const cancelImportJob = async (jobId: string): Promise<ImportJob> => {
+  const response = await api.post<ImportJob>(`/imports/${jobId}/cancel`);
+  return response.data;
 };
