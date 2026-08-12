@@ -1,5 +1,5 @@
 from .cancellation import cancel_import_job, requeue_running_import_jobs
-from .creation import create_import_job, create_import_job_with_files
+from .creation import create_import_job, create_import_job_with_files, prepare_import_job_inputs
 from .files import collect_supported_files
 from .queries import fetch_items_for_job, fetch_job, fetch_job_by_creation_key, get_next_queued_job, list_import_jobs
 from .status import (
@@ -15,7 +15,7 @@ from .status import (
     mark_job_queued,
     mark_job_running,
 )
-from .types import SUPPORTED_IMAGE_SUFFIXES, ImportJobItemTarget
+from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES, ImportJobItemTarget
 from .warnings import (
     CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
     CARD_CLASSIFICATION_MISMATCH_WARNING,
@@ -39,6 +39,7 @@ __all__ = [
     "count_terminal_items",
     "create_import_job",
     "create_import_job_with_files",
+    "prepare_import_job_inputs",
     "fetch_items_for_job",
     "fetch_job",
     "fetch_job_by_creation_key",

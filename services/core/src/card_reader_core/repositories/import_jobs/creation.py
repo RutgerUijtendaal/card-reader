@@ -6,6 +6,11 @@ from uuid import uuid4
 
 from django.db import transaction
 
+from card_reader_core.imports import (
+    ImportJobInputValidationError,
+    ImportJobItemTarget,
+    PreparedImportJobInputs,
+)
 from card_reader_core.models import (
     DEFAULT_CARD_POOL,
     CARD_ROLES,
@@ -24,7 +29,6 @@ from card_reader_core.repositories.templates import get_template_by_key
 from card_reader_core.storage import relativize_storage_path
 
 from .files import collect_supported_files
-from .types import ImportJobItemTarget
 
 
 def create_import_job(
@@ -76,30 +80,13 @@ def create_import_job_with_files(
     normalized_targets = list(item_targets) if item_targets is not None else [None] * len(files)
     if len(normalized_targets) != len(files):
         raise ValueError("item_targets length must match files length")
-    if not is_card_pool(card_pool):
-        raise ValueError(f"Unsupported card pool: {card_pool}")
-    if card_role_mode not in {ImportCardRoleMode.automatic, ImportCardRoleMode.override}:
-        raise ValueError("card_role_mode must be either 'automatic' or 'override'.")
-    normalized_mode = str(card_role_mode)
-    normalized_override = normalize_card_roles(card_role_override)
-    if len(set(card_role_override)) != len(normalized_override):
-        raise ValueError("card_role_override contains unsupported or duplicate roles.")
-    if normalized_mode == ImportCardRoleMode.automatic and normalized_override:
-        raise ValueError("Automatic role inference cannot include role overrides.")
-    if inference_policy_version != LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION:
-        raise ValueError(f"Unsupported card-role inference policy version: {inference_policy_version}")
-    normalized_policy_version = inference_policy_version
-    template = get_template_by_key(key=template_id)
-    if template is None:
-        raise ValueError(f"Unknown template_id '{template_id}'")
-
-    template_roles = normalize_card_roles(template.inferred_card_roles_json)
-    if len(set(template.inferred_card_roles_json)) != len(template_roles):
-        invalid = sorted(set(template.inferred_card_roles_json) - set(CARD_ROLES))
-        raise ValueError(
-            "template.inferred_card_roles contains unsupported or duplicate roles"
-            + (f": {', '.join(invalid)}" if invalid else ".")
-        )
+    prepared = prepare_import_job_inputs(
+        template_id=template_id,
+        card_pool=card_pool,
+        card_role_mode=card_role_mode,
+        card_role_override=card_role_override,
+        inference_policy_version=inference_policy_version,
+    )
     resolved_creation_key = creation_key or str(uuid4())
     resolved_fingerprint = creation_fingerprint or f"internal:{resolved_creation_key}"
 
@@ -110,16 +97,16 @@ def create_import_job_with_files(
                 default_root="uploads",
                 preserve_unmatched_absolute=True,
             ),
-            template=template,
+            template=prepared.template,
             content_version=content_version,
             options_json=options,
             creation_key=resolved_creation_key,
             creation_fingerprint=resolved_fingerprint,
             card_pool=card_pool,
-            card_role_mode=normalized_mode,
-            card_role_override_json=list(normalized_override),
-            template_role_snapshot_json=list(template_roles),
-            card_role_inference_policy_version=normalized_policy_version,
+            card_role_mode=prepared.card_role_mode,
+            card_role_override_json=list(prepared.card_role_override),
+            template_role_snapshot_json=list(prepared.template_roles),
+            card_role_inference_policy_version=prepared.inference_policy_version,
             total_items=len(files),
             processed_items=0,
         )
@@ -142,3 +129,51 @@ def create_import_job_with_files(
             ]
         )
     return job
+
+
+def prepare_import_job_inputs(
+    *,
+    template_id: str,
+    card_pool: CardPool,
+    card_role_mode: str,
+    card_role_override: Sequence[CardRole],
+    inference_policy_version: int,
+) -> PreparedImportJobInputs:
+    if not is_card_pool(card_pool):
+        raise ImportJobInputValidationError(f"Unsupported card pool: {card_pool}")
+    if card_role_mode not in {ImportCardRoleMode.automatic, ImportCardRoleMode.override}:
+        raise ImportJobInputValidationError(
+            "card_role_mode must be either 'automatic' or 'override'."
+        )
+    normalized_mode = str(card_role_mode)
+    normalized_override = normalize_card_roles(card_role_override)
+    if len(set(card_role_override)) != len(normalized_override):
+        raise ImportJobInputValidationError(
+            "card_role_override contains unsupported or duplicate roles."
+        )
+    if normalized_mode == ImportCardRoleMode.automatic and normalized_override:
+        raise ImportJobInputValidationError(
+            "Automatic role inference cannot include role overrides."
+        )
+    if inference_policy_version != LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION:
+        raise ImportJobInputValidationError(
+            f"Unsupported card-role inference policy version: {inference_policy_version}"
+        )
+    template = get_template_by_key(key=template_id)
+    if template is None:
+        raise ImportJobInputValidationError(f"Unknown template_id '{template_id}'")
+
+    template_roles = normalize_card_roles(template.inferred_card_roles_json)
+    if len(set(template.inferred_card_roles_json)) != len(template_roles):
+        invalid = sorted(set(template.inferred_card_roles_json) - set(CARD_ROLES))
+        raise ImportJobInputValidationError(
+            "template.inferred_card_roles contains unsupported or duplicate roles"
+            + (f": {', '.join(invalid)}" if invalid else ".")
+        )
+    return PreparedImportJobInputs(
+        template=template,
+        card_role_mode=normalized_mode,
+        card_role_override=normalized_override,
+        template_roles=template_roles,
+        inference_policy_version=inference_policy_version,
+    )

@@ -75,6 +75,7 @@ describe('ImportJobsPage', () => {
       createJobFromPicker,
       cancelJob: vi.fn(),
       viewJobDetail: vi.fn(),
+      closeJobDetail: vi.fn(),
       setPickedFiles: vi.fn(),
       clearPickedFiles: vi.fn(),
       abandonPendingAttempt: vi.fn(),

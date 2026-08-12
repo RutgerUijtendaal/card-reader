@@ -1,6 +1,6 @@
 # Card Classification Step 2.2: Import Workflow Seam Consolidation
 
-Status: approved implementation plan; blocked on completion and merge of [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md).
+Status: implemented and validated on the Step 2.2 checkpoint branch; awaiting review and merge into the classification umbrella branch. [Step 3](card-classification-step-3-card-pool-workspaces.md) remains blocked until that merge.
 
 This is a hardening checkpoint between import inference/identity and the Player/Evil/Neutral workspaces:
 
