@@ -36,6 +36,22 @@ def populate_alias_pools(apps: Any, _schema_editor: Any) -> None:
         alias.save(update_fields=["card_pool"])
 
 
+def reject_primary_alias_namespace_collisions(apps: Any, _schema_editor: Any) -> None:
+    Card = apps.get_model("card_reader_core", "Card")
+    CardAlias = apps.get_model("card_reader_core", "CardAlias")
+    for alias in CardAlias.objects.iterator():
+        if (
+            Card.objects.filter(card_pool=alias.card_pool, key=alias.key)
+            .exclude(id=alias.card_id)
+            .exists()
+        ):
+            raise RuntimeError(
+                "Migration 0058 cannot establish pool-scoped identity while a primary card key "
+                f"also exists as another card's alias in the '{alias.card_pool}' pool: "
+                f"'{alias.key}'. Resolve the collision before retrying."
+            )
+
+
 def guard_global_identity_restoration(apps: Any, _schema_editor: Any) -> None:
     Card = apps.get_model("card_reader_core", "Card")
     CardAlias = apps.get_model("card_reader_core", "CardAlias")
@@ -87,6 +103,10 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunPython(populate_alias_pools, migrations.RunPython.noop),
+        migrations.RunPython(
+            reject_primary_alias_namespace_collisions,
+            migrations.RunPython.noop,
+        ),
         migrations.AlterField(
             model_name="cardalias",
             name="card_pool",

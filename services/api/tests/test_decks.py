@@ -9,7 +9,9 @@ from django.http import HttpResponse
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 
+from card_reader_api.decks.serializers import deck_hero_summary_payload
 from card_reader_core.models import (
+    PLAYER_CARD_POOL_SCOPE,
     Card,
     CardRoleAssignment,
     CardVersion,
@@ -3119,6 +3121,12 @@ def test_evil_and_neutral_cards_are_staff_scoped_for_lists_and_details() -> None
         assert response.json()["detail"] == "Restricted card pools require staff access."
         assert anonymous.get(f"/cards/{card.id}").status_code == 404
         assert card.id not in public_ids
+        restricted_summary = deck_hero_summary_payload(
+            card,
+            card_pool_scope=PLAYER_CARD_POOL_SCOPE,
+        )
+        assert restricted_summary["key"] == "restricted-card"
+        assert restricted_summary["card_pool"] == "player"
 
     username = "gm-card-list-staff"
     password = "password"
@@ -3252,6 +3260,8 @@ def test_reclassified_evil_card_is_redacted_in_owner_deck_but_visible_to_staff()
     assert restricted_card["id"] != reclassified.id
     assert restricted_card["id"].startswith("restricted-card-")
     assert restricted_card["name"] == "Restricted card"
+    assert restricted_card["key"] == "restricted-card"
+    assert restricted_card["card_pool"] == "player"
     assert restricted_card["lifecycle_status"] == "active"
     assert restricted_card["updated_at"] == ""
     assert "Secret Reclassified Event" not in owner_response.content.decode()

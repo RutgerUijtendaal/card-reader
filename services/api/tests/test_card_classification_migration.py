@@ -141,6 +141,30 @@ def test_pool_scoped_identity_migration_rejects_temporary_game_master_values() -
 
 
 @pytest.mark.django_db(transaction=True)
+def test_pool_scoped_identity_migration_rejects_primary_alias_collisions() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0057_location_card_role")])
+    old_apps = executor.loader.project_state([("card_reader_core", "0057_location_card_role")]).apps
+    OldCard = old_apps.get_model("card_reader_core", "Card")
+    OldCardAlias = old_apps.get_model("card_reader_core", "CardAlias")
+    primary = OldCard.objects.create(key="forward-collision", label="Primary", card_pool="player")
+    alias_owner = OldCard.objects.create(key="forward-alias-owner", label="Alias Owner", card_pool="player")
+    alias = OldCardAlias.objects.create(
+        card_id=alias_owner.id,
+        key=primary.key,
+        label="Conflicting Alias",
+    )
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="another card's alias"):
+        executor.migrate([("card_reader_core", "0058_pool_scoped_card_identity")])
+
+    OldCardAlias.objects.filter(id=alias.id).delete()
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
 def test_pool_scoped_identity_reverse_rejects_primary_alias_collisions() -> None:
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0058_pool_scoped_card_identity")])
