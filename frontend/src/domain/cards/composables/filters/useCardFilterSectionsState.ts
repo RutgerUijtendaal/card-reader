@@ -4,7 +4,7 @@ import type { CardFiltersResponse } from '@/domain/cards/types';
 import type { CardFilterCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
 import type { MetadataFavoriteGroup } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';
 import type { ReturnTypeUseCardFilterState } from '@/domain/cards/composables/filters/useCardFilterState';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 import type {
   CardFilterSectionsState,
   LifecycleFilterValue,

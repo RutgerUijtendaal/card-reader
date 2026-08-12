@@ -20,21 +20,21 @@ The main access levels are:
 
 The developer flag is deliberately narrower than staff access: it supports project onboarding without granting import, catalog, user-management, or maintenance permissions. See [Developer data](developer-data.md) for its download and publishing flows.
 
-## Game Master cards
+## Restricted card pools
 
-Game Master card access is represented by the named `can_access_game_master_cards` capability. Its current policy grants access to staff only. At the API boundary, `card_pool_scope_for_user` translates that entitlement into the immutable core `CardPoolScope`: ordinary and anonymous viewers receive the canonical Player-only scope, while entitled viewers receive the canonical all-pools scope. Core repositories, services, and payload builders consume the scope without inspecting users or staff state, so changing the entitlement policy remains a single boundary edit.
+Player is the public/default card pool. Evil and Neutral are separate restricted pools whose current policy grants access to staff only. At the API boundary, `card_pool_scope_for_user` is the single policy seam that translates a user into an immutable core `CardPoolScope`: ordinary and anonymous viewers receive the canonical Player-only scope, while staff receive Player, Evil, and Neutral. Core repositories, services, and payload builders consume the scope without inspecting users or staff state, so changing the entitlement policy remains a single boundary edit.
 
-An unauthorized collection request that explicitly selects the Game Master pool returns `403`. Direct Game Master card, version, image, and immutable-asset lookups return `404` so they do not disclose whether an identity exists. The same policy applies to grouped cards, exports, selectors, filter counts, and other card-derived public data. If a Player card already referenced by an ordinary user's deck is reclassified, the deck reference and invalid-state warning remain, but the embedded Game Master card content and image are replaced by a restricted placeholder. Deck rules and validation details returned to that owner are computed from visible Player cards or replaced with a generic restricted-card issue, so restricted card configuration and type behavior are not exposed indirectly.
+An unauthorized collection request that explicitly selects Evil or Neutral returns `403` with generic restricted-pool copy. Direct restricted card, version, image, and immutable-asset lookups return `404` so they do not disclose whether an identity exists. The same policy applies to grouped cards, exports, selectors, filter counts, and other card-derived public data. If a Player card already referenced by an ordinary user's deck is reclassified, the deck reference and invalid-state warning remain, but the embedded restricted card content and image are replaced by a generic placeholder. Deck rules and validation details returned to that owner are computed from visible Player cards or replaced with a generic restricted-card issue, so restricted card configuration and type behavior are not exposed indirectly.
 
 Unauthenticated TTS sheets and developer-data bundles are public derived artifacts and therefore
 contain Player-pool cards only. That artifact scope is separate from the access capability: changing
-who may receive Game Master access does not implicitly publish Game Master card data.
+who may receive restricted-pool access does not implicitly publish Evil or Neutral card data.
 
-Card-derived search, counts, ordering, validation, previews, notifications, and generated outputs apply their scope before exposing results. Direct restricted identities still use the established `404` policy, while an explicitly forbidden Game Master collection selection remains `403`.
+Card-derived search, counts, ordering, validation, previews, notifications, and generated outputs apply their scope before exposing results. Direct restricted identities still use the established `404` policy, while an explicitly forbidden Evil or Neutral collection selection remains `403`.
 
 ## Capability-driven UI
 
-The authenticated session payload exposes named capabilities such as developer-data and Game Master card access. Pages and navigation should consume these values instead of duplicating role checks in the frontend.
+The authenticated session payload exposes named capabilities plus ordered `accessible_card_pools`. Ordinary sessions receive `player`; staff sessions receive `player`, `evil`, and `neutral`. Pages and navigation consume this list instead of duplicating pool literals or staff checks in the frontend.
 
 The server still authorizes every request. Hiding an unavailable control improves the interface but is never treated as the security boundary.
 

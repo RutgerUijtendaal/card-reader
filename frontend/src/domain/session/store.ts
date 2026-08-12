@@ -7,6 +7,7 @@ import {
   logoutUser,
 } from '@/domain/session/api';
 import type { CurrentUser, LoginCredentials } from './types';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<CurrentUser | null>(null);
@@ -15,7 +16,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const authenticated = computed(() => user.value?.authenticated ?? false);
   const canAccessStaffRoutes = computed(() => user.value?.can_access_admin === true);
-  const canAccessGameMasterCards = computed(() => user.value?.can_access_game_master_cards === true);
+  const accessibleCardPools = computed<readonly CardPool[]>(
+    () => user.value?.accessible_card_pools ?? ['player'],
+  );
   const canManageUsers = computed(() => user.value?.can_manage_users === true);
   const canAccessMaintenance = computed(() => user.value?.can_access_maintenance === true);
   const canDownloadDeveloperData = computed(() => user.value?.can_download_developer_data === true);
@@ -63,7 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     authenticated,
     canAccessStaffRoutes,
-    canAccessGameMasterCards,
+    accessibleCardPools,
     canManageUsers,
     canAccessMaintenance,
     canDownloadDeveloperData,

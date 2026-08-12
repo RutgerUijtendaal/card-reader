@@ -1,6 +1,6 @@
 # Card Classification Step 2.1: Pool-Scoped Card Identity
 
-Status: proposed implementation plan; ready for review after completion of [Step 2](card-classification-step-2-import-inference.md).
+Status: implemented and validated on the Step 2.1 checkpoint branch; awaiting review and merge into the classification umbrella branch. [Step 2.2](card-classification-step-2-2-import-workflow-seam.md) and [Step 3](card-classification-step-3-card-pool-workspaces.md) remain blocked until that merge.
 
 This checkpoint sits between import inference and import workflow consolidation:
 

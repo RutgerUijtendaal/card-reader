@@ -62,7 +62,7 @@
             Import details
           </h4>
           <p class="theme-section-muted mt-1 text-xs">
-            {{ selectedJobDetail.card_pool === 'game_master' ? 'Game Master' : 'Player' }} ·
+            {{ cardPoolLabel(selectedJobDetail.card_pool) }} ·
             {{ selectedJobDetail.card_role_mode }}
           </p>
         </div>
@@ -191,7 +191,7 @@
                   {{ job.template_id }} · {{ job.content_version?.version_number ?? 'Unversioned' }}
                 </p>
                 <p class="theme-section-muted text-xs">
-                  {{ job.card_pool === 'game_master' ? 'Game Master' : 'Player' }} ·
+                  {{ cardPoolLabel(job.card_pool) }} ·
                   {{
                     job.card_role_mode === 'automatic'
                       ? 'Automatic roles'
@@ -340,6 +340,7 @@
 </template>
 
 <script setup lang="ts">
+import { cardPoolLabel, isCardPool } from '@/domain/cards/cardPools';
 import { Activity, ExternalLink, RefreshCw } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import type { OperationsQueueItem } from '@/domain/operations/types';
@@ -395,8 +396,7 @@ const formatRoles = (value: unknown): string => {
   const roles = asStringArray(value);
   return roles.length > 0 ? roles.map(formatRole).join(', ') : 'Standard';
 };
-const formatPool = (value: unknown): string =>
-  value === 'game_master' ? 'Game Master' : value === 'player' ? 'Player' : 'Unknown';
+const formatPool = (value: unknown): string => isCardPool(value) ? cardPoolLabel(value) : 'Unknown';
 
 const formatClassification = (value: unknown): string | null => {
   const classification = asRecord(value);

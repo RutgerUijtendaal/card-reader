@@ -493,7 +493,7 @@ describe('useImportJobsController', () => {
     await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
     const file = new File(['image'], 'card.png', { type: 'image/png' });
     mounted.controller.pickedFiles.value = [file];
-    mounted.controller.cardPool.value = 'game_master';
+    mounted.controller.cardPool.value = 'evil';
     mounted.controller.cardRoleMode.value = 'override';
     mounted.controller.cardRoleOverride.value = ['boon'];
     vi.mocked(createImportJob).mockRejectedValueOnce(new Error('connection lost'));

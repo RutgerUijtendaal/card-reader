@@ -13,8 +13,13 @@
           v-model="selectedPool"
           class="input-base w-full"
         >
-          <option value="player">Player</option>
-          <option value="game_master">Game Master</option>
+          <option
+            v-for="option in cardPoolOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
         </select>
       </label>
     </div>
@@ -264,7 +269,7 @@ import { cardIsDeprecated } from '@/domain/cards/utils/filters/cardLifecycle';
 import { parseAdminMergeSourceId, parseAdminMergeTargetId } from '@/features/admin/routeState';
 import type { CardMergePreview } from '@/features/admin/types';
 import type { CardListItem } from '@/domain/cards/types';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
 import { useAdminRouteSync } from '@/features/admin/composables/useAdminRouteSync';
 import { applyCardMerge, previewCardMerge } from '@/features/admin/api/cardMerges';
 
@@ -275,6 +280,7 @@ const preview = ref<CardMergePreview | null>(null);
 const previewing = ref(false);
 const applying = ref(false);
 const selectedPool = ref<CardPool>('player');
+const cardPoolOptions = CARD_POOL_OPTIONS;
 
 const canPreview = computed(() =>
   targetCard.value !== null

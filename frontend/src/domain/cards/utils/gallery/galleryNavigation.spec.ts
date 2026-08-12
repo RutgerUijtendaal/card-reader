@@ -53,15 +53,21 @@ describe('galleryNavigation', () => {
 
   test('uses the card pool as the authority for direct group detail links', () => {
     expect(
-      buildCardGroupDetailLocation('group-123', {}, 'game_master'),
+      buildCardGroupDetailLocation('group-123', {}, 'evil'),
     ).toEqual({
       path: '/card-groups/group-123',
-      query: { card_pool: 'game_master' },
+      query: { card_pool: 'evil' },
+    });
+    expect(
+      buildCardGroupDetailLocation('group-123', {}, 'neutral'),
+    ).toEqual({
+      path: '/card-groups/group-123',
+      query: { card_pool: 'neutral' },
     });
     expect(
       buildCardGroupDetailLocation(
         'group-123',
-        { card_pool: 'game_master' },
+        { card_pool: 'evil' },
         'player',
       ),
     ).toEqual({

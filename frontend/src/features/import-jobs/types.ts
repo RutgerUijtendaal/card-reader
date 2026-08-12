@@ -19,7 +19,7 @@ export type ImportJob = {
   processed_items: number;
   created_at: string;
   updated_at: string;
-  card_pool: 'player' | 'game_master';
+  card_pool: CardPool;
   card_role_mode: 'automatic' | 'override';
   card_role_override: CardRole[];
   template_role_snapshot: CardRole[];
@@ -44,7 +44,7 @@ export type ImportJobItem = {
   card_role_inference: Record<string, unknown>;
   target_card_id: string | null;
   target_card_version_id: string | null;
-  target_card_pool_snapshot: 'player' | 'game_master' | null;
+  target_card_pool_snapshot: CardPool | null;
   target_card_roles_snapshot: CardRole[];
   card_tab_url: string | null;
 };
@@ -57,3 +57,4 @@ export type CreateImportJobResponse = ImportJob & {
   job_id: string;
   idempotent_replay: boolean;
 };
+import type { CardPool } from '@/domain/cards/cardPools';

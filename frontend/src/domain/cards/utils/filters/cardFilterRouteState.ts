@@ -8,6 +8,7 @@ import {
   normalizeCardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import { isCardRoleFilter, type CardRoleFilter } from '@/domain/cards/cardRoles';
+import { normalizeCardPool } from '@/domain/cards/cardPools';
 
 const readQueryValues = (
   value:
@@ -32,7 +33,7 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
     lifecycleStatus: normalizeCardLifecycleFilterValue(
       typeof query.lifecycle_status === 'string' ? query.lifecycle_status : undefined,
     ),
-    cardPool: query.card_pool === 'game_master' ? 'game_master' : 'player',
+    cardPool: normalizeCardPool(query.card_pool),
     cardRoleMatch: query.card_role_match === 'all' ? 'all' : 'any',
     cardRoleKeys: readCardRoleValues(query.card_roles),
     cardRoleExcludeKeys: query.card_role_exclude === undefined

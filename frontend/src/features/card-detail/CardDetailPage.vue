@@ -171,7 +171,7 @@ import {
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { ScalarFieldName } from '@/domain/cards/types';
 import type { CardRole } from '@/domain/cards/cardRoles';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 const {
   card,

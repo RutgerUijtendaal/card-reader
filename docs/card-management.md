@@ -12,21 +12,21 @@ Content versions provide an additional history boundary for related changes made
 
 ## Pool and roles
 
-Every stable card identity belongs to either the **Player** or **Game Master** pool. A card can also hold any combination of the code-owned Hero, Boon, Event, and Location roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
+Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boon, Event, and Location roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
 
 Role keys allow up to 64 characters. Role definitions, labels, and ordering are code-owned; Location is currently descriptive and has no Hero-like deck or Playtester behavior.
 
 Staff edit both dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. The Admin Catalog shows the pool plus every assigned role, or Standard, on linked-card and suggestion tiles.
 
-Card collections accept a pool plus role inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Game Master cards. Imports require an explicit pool and default to automatic multi-role inference from snapshotted template hints and stable metadata signals; workspace-level navigation remains a separate future workflow.
+Card collections accept one pool plus role inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Evil or Neutral. Imports require an explicit pool and default to automatic multi-role inference from snapshotted template hints and stable metadata signals; workspace-level navigation remains a separate future workflow.
 
-Import classification initializes only new card identities. Existing cards and reparses retain their authoritative Card-tab pool and roles. A differing inferred result completes with an ordered warning and audit evidence instead of silently reclassifying the card.
+Import classification initializes only new card identities. Untargeted imports match latest image hashes, primary names, and aliases only inside the selected pool, so the same name or artwork may represent independent Player, Evil, and Neutral cards. Existing same-pool cards and targeted reparses retain their authoritative Card-tab pool and roles. A differing inferred result after a same-pool match completes with an ordered warning and audit evidence instead of silently reclassifying the card.
 
 ## Metadata and aliases
 
 Card versions connect parsed content to managed catalogs such as card types, keywords, tags, symbols, and metadata groups. These relationships power filtering, display, rules text, and deck-building behavior.
 
-Aliases provide alternate names or identifiers for the same card identity. They support matching and redirects without creating duplicate cards solely because an import used a different spelling or historical name.
+Aliases provide alternate names or identifiers for the same card identity. Primary and alias keys share a pool-local namespace: each is unique within a pool, while the same normalized key may exist independently in other pools. Rename and pool-move edits validate the complete destination namespace and move the primary name plus every alias atomically.
 
 ### Mana families
 
@@ -43,7 +43,7 @@ Cards have an explicit lifecycle state:
 - Active cards appear by default in gallery, public group views, catalog previews, exports, deck building, and Playtester selection.
 - Deprecated cards remain directly retrievable and available in explicit management queries, but are hidden from ordinary browsing and selection.
 
-Deprecating or reclassifying a card does not silently remove it from existing decks or groups. Those relationships remain visible so owners can resolve them deliberately. Deck validation and management views surface the resulting warnings or invalid state, while restricted Game Master card content is redacted from non-staff embedded deck payloads.
+Deprecating or reclassifying a card does not silently remove it from existing decks or groups. Those relationships remain visible so owners can resolve them deliberately. Deck validation and management views surface the resulting warnings or invalid state, while Evil and Neutral card content is redacted from non-staff embedded deck payloads.
 
 ## Card groups
 
@@ -55,7 +55,7 @@ Deprecated non-anchor members may remain attached for administrative history but
 
 Merging consolidates duplicate card identities while preserving useful history. The merge workflow moves compatible versions, aliases, metadata relationships, group membership, and other references to the surviving card. Old identifiers can redirect to the survivor instead of becoming broken links.
 
-Merges are domain operations, not raw row deletion. Conflict checks and a preview step allow staff to understand the result before committing a merge.
+Merges are domain operations, not raw row deletion. Conflict checks and a preview step allow staff to understand the result before committing a merge. Cross-pool merges are rejected; same-pool merges transfer aliases inside the target pool namespace.
 
 ## Ownership boundaries
 

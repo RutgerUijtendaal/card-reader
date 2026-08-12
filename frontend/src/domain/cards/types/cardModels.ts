@@ -1,6 +1,7 @@
 import type { CardLifecycleStatus } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { DeckBuildingConfig } from '@/domain/deck-building/types';
 import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export type CardTooltipSymbolLookup = {
   asset_url?: string | null;
@@ -26,8 +27,6 @@ export type CardContentVersionSummary = {
   base_version: string;
   description: string;
 };
-
-export type CardPool = 'player' | 'game_master';
 
 export type CardHoverTooltipModel = {
   id: string;

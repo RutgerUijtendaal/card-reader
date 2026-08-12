@@ -27,11 +27,11 @@ describe('reconcileCardGroupsAfterPoolChange', () => {
     const groups = [
       buildGroup('anchored-group', 'player', true),
       buildGroup('old-pool-group', 'player', false),
-      buildGroup('target-pool-group', 'game_master', false),
+      buildGroup('target-pool-group', 'evil', false),
     ];
 
-    expect(reconcileCardGroupsAfterPoolChange(groups, 'game_master')).toEqual([
-      { ...groups[0], card_pool: 'game_master' },
+    expect(reconcileCardGroupsAfterPoolChange(groups, 'evil')).toEqual([
+      { ...groups[0], card_pool: 'evil' },
       groups[2],
     ]);
   });
@@ -57,7 +57,7 @@ describe('synchronizeCardClassification', () => {
     ];
     const updated: CardClassificationFields = {
       ...generations[0],
-      card_pool: 'game_master',
+      card_pool: 'evil',
       card_roles: ['event'],
       deck_building_config: { overrides: { mainboard_copy_limit: { max: 1 } } },
       lifecycle_status: 'deprecated',
@@ -67,7 +67,7 @@ describe('synchronizeCardClassification', () => {
       updated,
       {
         ...generations[1],
-        card_pool: 'game_master',
+        card_pool: 'evil',
         card_roles: ['event'],
         deck_building_config: updated.deck_building_config,
         lifecycle_status: 'deprecated',

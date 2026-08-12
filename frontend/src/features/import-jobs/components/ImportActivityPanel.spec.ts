@@ -162,7 +162,7 @@ describe('ImportActivityPanel', () => {
               code: 'card_classification_mismatch',
               message: 'Inferred roles differ from the existing card.',
               details: {
-                inferred: { card_pool: 'game_master', card_roles: ['event'] },
+                inferred: { card_pool: 'evil', card_roles: ['event'] },
                 existing: { card_pool: 'player', card_roles: [] },
               },
             },
@@ -192,7 +192,7 @@ describe('ImportActivityPanel', () => {
     expect(mounted.host.textContent).toContain('Classification changed while queued.');
     expect(mounted.host.textContent).toContain('Template hints');
     expect(mounted.host.textContent).toContain('Inferred');
-    expect(mounted.host.textContent).toContain('Game Master');
+    expect(mounted.host.textContent).toContain('Evil');
     expect(mounted.host.textContent).toContain('Existing');
     expect(mounted.host.textContent).toContain('Queued');
     expect(mounted.host.textContent).toContain('Live');

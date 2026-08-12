@@ -1,6 +1,6 @@
 import type { CardHoverTooltipModel, CardTooltipSymbolLookup } from '@/domain/cards/types/cardModels';
 import type { CardRoleFilter } from '@/domain/cards/cardRoles';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export type ScalarFieldName = 'name' | 'type_line' | 'mana_cost' | 'attack' | 'health' | 'rules_text';
 export type MetadataGroupName = 'keywords' | 'tags' | 'types' | 'symbols';

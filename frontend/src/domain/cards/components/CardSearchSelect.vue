@@ -63,7 +63,7 @@ import { fetchCards } from '@/domain/cards/api';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 const props = withDefaults(defineProps<{
   label: string;

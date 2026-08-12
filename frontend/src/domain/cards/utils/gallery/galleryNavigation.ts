@@ -14,7 +14,7 @@ import {
 import type { GalleryPageState } from '@/domain/cards/utils/gallery/galleryState';
 import { DEFAULT_CARD_PAGE_SIZE } from '@/domain/cards/utils/gallery/pageSize';
 import type { GalleryItem } from '@/domain/cards/types';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 type GalleryNavigationCard = {
   id: string;
@@ -66,7 +66,7 @@ export const buildCardGroupDetailLocation = (
   cardPool?: CardPool,
 ): RouteLocationRaw => {
   const groupQuery = getGalleryRouteQuery(query);
-  if (cardPool === 'game_master') {
+  if (cardPool && cardPool !== 'player') {
     groupQuery.card_pool = cardPool;
   } else if (cardPool === 'player') {
     delete groupQuery.card_pool;

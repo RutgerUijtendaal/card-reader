@@ -18,7 +18,7 @@ export const domainDependencies = {
   notifications: ['session'],
   operations: [],
   review: ['cards', 'session'],
-  session: [],
+  session: ['cards'],
   templates: ['cards', 'maintenance'],
 };
 
