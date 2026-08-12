@@ -5,7 +5,7 @@ Card imports turn one or more uploaded images into card records that can be revi
 ## End-to-end flow
 
 1. A staff user uploads supported image files from the staff-only `/imports` interface, explicitly selecting the Player, Evil, or Neutral pool and either automatic role inference or a batch-wide role override.
-2. The API fingerprints the immutable request, stages and checksum-verifies each source file before atomically publishing it under the client-generated creation key, and creates an import job with one queued item per image. Replaying the same key and payload returns the existing job; reusing the key for a different payload is rejected.
+2. The API admission boundary fingerprints the immutable request, stages and checksum-verifies each source file before atomically publishing it under the client-generated creation key, then asks core to create the content version, import job, and queued items in one transaction. Replaying the same key and payload returns the existing job; reusing the key for a different payload is rejected.
 3. The parser worker polls for work and atomically claims a queued item.
 4. The parser loads the selected parsing template and current catalog resources, then crops regions, runs OCR, extracts fields, and detects symbols.
 5. Core resolves card roles from the job's snapshotted template hints and versioned metadata policy, then matches image hashes, primary names, and aliases inside the selected pool before persisting the card identity, card version, image, metadata relations, parsing suggestions, classification evidence, warnings, and processing result.
@@ -15,9 +15,9 @@ Claiming is coordinated through the shared core layer. This prevents the API, pa
 
 ## Service responsibilities
 
-- The API owns upload validation, request authorization, job creation, status responses, cancellation requests, and retry actions.
+- The API owns HTTP upload streaming, request authorization, fingerprint-isolated staging, admission responses, cancellation requests, and retry actions. Its upload view delegates claimed/discarded/uncertain lifecycle decisions to the import admission boundary.
 - The parser owns polling, OCR adapters, region parsing, symbol detection, and extraction logic. It does not depend on API views or serializers.
-- Core owns job claiming, persistence, state transitions, storage paths, and the domain services used by both processes.
+- Core owns creation prevalidation, the atomic content-version/job/item transaction, grouped reparse planning, job claiming, persistence, state transitions, storage paths, and the domain services used by both processes. Template and maintenance reparses use the same grouped operation and transaction.
 
 The API and parser share the database and storage root. In the standard development and production layouts they run as separate processes, so both must be running for queued items to advance.
 
@@ -41,13 +41,18 @@ An import job is the user-facing batch, while import items are the individual un
 
 Upload creation is idempotent. The browser retains one creation key and the exact submit payload until the server confirms the job, the browser reconciles it through the creation-key lookup, or the user explicitly abandons the attempt. In-app navigation is blocked while submission or reconciliation is active. An uncertain attempt is locked against edits, protected by route and browser-unload prompts, and can only be retried unchanged, preventing a lost HTTP response from creating duplicate content versions or parser work.
 
+Staged uploads are unclaimed until the core transaction confirms durable ownership. Definitive validation or creation rejection removes only files owned by that exact fingerprint stage; confirmed success never cleans them up. If an unexpected infrastructure failure leaves ownership genuinely unknown, the isolated stage is preserved and logged for bounded reconciliation instead of risking deletion of committed work. Cleanup errors are reported separately and cannot replace a confirmed success, conflict, or validation response.
+
 Cancellation stops work that has not yet completed. The centered `/imports` workspace groups card
 setup, content-version details, and image or folder selection in one form. Images can be dropped
 onto the source picker or selected with the native image and folder dialogs. A compact activity
 area beside the form on wide screens, and below it on smaller screens, shows cancellable
 active jobs and the five most recent finished jobs. Complete paged queue history remains available
 under `/operations`; its latest page refreshes automatically while older pages remain stable during
-inspection. Failed or cancelled items can be retried through supported API and UI flows rather than
+inspection. Active jobs, recent history, and an open detail are refreshed through one activity
+coordinator. Each read keeps independent error state, stale responses cannot replace newer manual
+selection, and a non-terminal open detail receives its terminal refresh even after the active list
+becomes empty. Failed or cancelled items can be retried through supported API and UI flows rather than
 by manually editing database state. Worker claims and state transitions are designed to avoid two
 workers completing the same queued item.
 

@@ -57,14 +57,23 @@
         Loading import details…
       </p>
       <template v-else-if="selectedJobDetail">
-        <div>
-          <h4 class="theme-section-title text-sm font-semibold">
-            Import details
-          </h4>
-          <p class="theme-section-muted mt-1 text-xs">
-            {{ cardPoolLabel(selectedJobDetail.card_pool) }} ·
-            {{ selectedJobDetail.card_role_mode }}
-          </p>
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h4 class="theme-section-title text-sm font-semibold">
+              Import details
+            </h4>
+            <p class="theme-section-muted mt-1 text-xs">
+              {{ cardPoolLabel(selectedJobDetail.card_pool) }} ·
+              {{ selectedJobDetail.card_role_mode }}
+            </p>
+          </div>
+          <button
+            class="btn-secondary rounded-full px-2.5 py-1 text-xs"
+            type="button"
+            @click="emit('close-detail')"
+          >
+            Close
+          </button>
         </div>
         <div class="space-y-3">
           <article
@@ -75,11 +84,11 @@
             <p class="theme-section-title truncate text-sm font-medium">
               {{ item.source_file }}
             </p>
-            <template v-if="hasClassificationEvidence(item)">
+            <template v-if="getImportEvidenceState(item).startsWith('resolved')">
               <p class="theme-section-muted text-xs">
                 {{
                   item.resolved_card_roles.length > 0
-                    ? item.resolved_card_roles.join(', ')
+                    ? formatImportRoles(item.resolved_card_roles)
                     : 'Standard — no special roles'
                 }}
               </p>
@@ -100,7 +109,7 @@
               v-else
               class="theme-section-muted text-xs"
             >
-              {{ getClassificationEvidencePlaceholder(item) }}
+              {{ getImportEvidencePlaceholder(getImportEvidenceState(item)) }}
             </p>
             <div
               v-for="warning in item.warnings"
@@ -340,16 +349,18 @@
 </template>
 
 <script setup lang="ts">
-import { cardPoolLabel, isCardPool } from '@/domain/cards/cardPools';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { Activity, ExternalLink, RefreshCw } from 'lucide-vue-next';
 import { RouterLink } from 'vue-router';
 import type { OperationsQueueItem } from '@/domain/operations/types';
-import type {
-  ImportJob,
-  ImportJobDetail,
-  ImportJobItem,
-  ImportWarning,
-} from '@/features/import-jobs/types';
+import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
+import {
+  formatImportRoles,
+  getImportEvidencePlaceholder,
+  getImportEvidenceState,
+  getInferenceEvidence,
+  getWarningEvidence,
+} from '@/features/import-jobs/utils/importEvidence';
 import {
   canCancelImportJob,
   formatImportJobTimestamp,
@@ -379,76 +390,7 @@ const emit = defineEmits<{
   refresh: [];
   cancel: [jobId: string];
   view: [jobId: string];
+  'close-detail': [];
 }>();
 
-type EvidenceEntry = { label: string; value: string };
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-
-const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-
-const formatRole = (role: string): string => role.charAt(0).toUpperCase() + role.slice(1);
-const formatRoles = (value: unknown): string => {
-  const roles = asStringArray(value);
-  return roles.length > 0 ? roles.map(formatRole).join(', ') : 'Standard';
-};
-const formatPool = (value: unknown): string => isCardPool(value) ? cardPoolLabel(value) : 'Unknown';
-
-const formatClassification = (value: unknown): string | null => {
-  const classification = asRecord(value);
-  if (!classification) return null;
-  return `${formatPool(classification.card_pool)} · ${formatRoles(classification.card_roles)}`;
-};
-
-const hasClassificationEvidence = (item: ImportJobItem): boolean =>
-  Object.keys(item.card_role_inference).length > 0;
-
-const getClassificationEvidencePlaceholder = (item: ImportJobItem): string =>
-  ['queued', 'running', 'canceling'].includes(item.status)
-    ? 'Classification pending'
-    : 'Classification unavailable';
-
-const getInferenceEvidence = (item: ImportJobItem): EvidenceEntry[] => {
-  const evidence = item.card_role_inference;
-  const mode = evidence.mode === 'override' ? 'Manual override' : 'Automatic';
-  const entries: EvidenceEntry[] = [{ label: 'Resolution', value: mode }];
-  const templateRoles = asStringArray(evidence.template_roles);
-  const matchedTags = asStringArray(evidence.matched_tag_keys);
-  const overrideRoles = asStringArray(evidence.override_roles);
-
-  if (templateRoles.length > 0) {
-    entries.push({ label: 'Template hints', value: templateRoles.map(formatRole).join(', ') });
-  }
-  if (matchedTags.length > 0) {
-    entries.push({ label: 'Matched tags', value: matchedTags.join(', ') });
-  }
-  if (evidence.mode === 'override') {
-    entries.push({ label: 'Override roles', value: formatRoles(overrideRoles) });
-  }
-  if (templateRoles.length === 0 && matchedTags.length === 0 && evidence.mode !== 'override') {
-    entries.push({ label: 'Role signals', value: 'None matched' });
-  }
-  return entries;
-};
-
-const getWarningEvidence = (warning: ImportWarning): EvidenceEntry[] => {
-  const details = warning.details;
-  if (!details) return [];
-  const entries: EvidenceEntry[] = [];
-  const labels: Array<[string, string]> = [
-    ['inferred', 'Inferred'],
-    ['existing', 'Existing'],
-    ['queued', 'Queued'],
-    ['live', 'Live'],
-  ];
-  for (const [key, label] of labels) {
-    const value = formatClassification(details[key]);
-    if (value) entries.push({ label, value });
-  }
-  return entries;
-};
 </script>

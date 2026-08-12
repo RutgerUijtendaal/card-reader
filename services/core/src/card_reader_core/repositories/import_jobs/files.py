@@ -4,7 +4,7 @@ from pathlib import Path
 
 from card_reader_core.storage import resolve_storage_path
 
-from .types import SUPPORTED_IMAGE_SUFFIXES
+from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES
 
 
 def collect_supported_files(source_path: Path) -> list[Path]:

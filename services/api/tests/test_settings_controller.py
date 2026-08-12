@@ -25,6 +25,7 @@ from card_reader_core.models import (
 )
 from card_reader_core.repositories.cards import LatestCardVersionReparseSource
 from card_reader_core.services.cards import convert_card_images_to_webp
+import card_reader_core.services.imports.reparse as import_reparse
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
@@ -350,7 +351,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
         )
 
     monkeypatch.setattr(
-        maintenance_services,
+        import_reparse,
         "create_import_job_with_files",
         fail_second_group,
     )
@@ -584,8 +585,6 @@ def test_template_reparse_rolls_back_every_group_when_later_creation_fails(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from card_reader_api.templates import views as template_views
-
     monkeypatch.setattr(settings, "app_data_dir", tmp_path)
     source_template = Template.objects.create(
         key="atomic-reparse-source",
@@ -627,7 +626,7 @@ def test_template_reparse_rolls_back_every_group_when_later_creation_fails(
             checksum=f"atomic-reparse-{index}",
         )
 
-    original_create = template_views.create_import_job_with_files
+    original_create = import_reparse.create_import_job_with_files
     creation_count = 0
 
     def fail_second_group(**kwargs: object) -> ImportJob:
@@ -637,7 +636,7 @@ def test_template_reparse_rolls_back_every_group_when_later_creation_fails(
             raise RuntimeError("simulated grouped creation failure")
         return original_create(**kwargs)
 
-    monkeypatch.setattr(template_views, "create_import_job_with_files", fail_second_group)
+    monkeypatch.setattr(import_reparse, "create_import_job_with_files", fail_second_group)
 
     username = "staff-atomic-template-reparse-user"
     password = "password"

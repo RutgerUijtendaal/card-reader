@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.core.management import call_command
-from django.db import transaction
 
 from card_reader_core.repositories.cards import (
     CardFilterParams,
@@ -11,10 +10,8 @@ from card_reader_core.repositories.cards import (
     list_filtered_latest_card_version_reparse_sources,
     list_latest_card_version_reparse_sources,
 )
-from card_reader_core.repositories.import_jobs import ImportJobItemTarget, create_import_job_with_files
-from card_reader_core.config.settings import settings
-from card_reader_core.models import CardPool, CardRole
 from card_reader_core.services.cards import CardImageConversionResult, convert_card_images_to_webp
+from card_reader_core.services.imports import queue_grouped_reparse_jobs
 
 
 @dataclass(slots=True)
@@ -75,53 +72,19 @@ class MaintenanceService:
         source_name_prefix: str,
         message_suffix: str,
     ) -> MaintenanceResult:
-        grouped_sources: dict[
-            tuple[str, CardPool, tuple[CardRole, ...]],
-            list[LatestCardVersionReparseSource],
-        ] = {}
         if not sources:
             return MaintenanceResult(message=empty_message, removed_paths=[])
-
-        item_count = 0
-        for source in sources:
-            key = (source.template_id, source.card_pool, source.card_roles)
-            grouped_sources.setdefault(key, []).append(source)
-            item_count += 1
-
-        if not grouped_sources:
+        summary = queue_grouped_reparse_jobs(
+            sources=sources,
+            source_name_prefix=source_name_prefix,
+        )
+        if summary.item_count == 0:
             return MaintenanceResult(message=unreadable_message, removed_paths=[])
-
-        job_count = 0
-        with transaction.atomic():
-            for (template_id, card_pool, card_roles), grouped in grouped_sources.items():
-                files = [source.image_path for source in grouped]
-                targets = [
-                    ImportJobItemTarget(
-                        card_id=source.card_id,
-                        card_version_id=source.card_version_id,
-                        card_pool=source.card_pool,
-                        card_roles=source.card_roles,
-                    )
-                    for source in grouped
-                ]
-                create_import_job_with_files(
-                    source_path=(
-                        settings.storage_root_dir
-                        / "maintenance"
-                        / f"{source_name_prefix}-{template_id}"
-                    ),
-                    template_id=template_id,
-                    options={"reparse_existing": True},
-                    files=files,
-                    item_targets=targets,
-                    card_pool=card_pool,
-                )
-                job_count += 1
 
         return MaintenanceResult(
             message=(
-                f"Queued {job_count} reparse job{'s' if job_count != 1 else ''} "
-                f"for {item_count} latest card image{'s' if item_count != 1 else ''}"
+                f"Queued {summary.job_count} reparse job{'s' if summary.job_count != 1 else ''} "
+                f"for {summary.item_count} latest card image{'s' if summary.item_count != 1 else ''}"
                 f"{message_suffix}"
             ),
             removed_paths=[],

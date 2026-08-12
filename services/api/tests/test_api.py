@@ -34,7 +34,7 @@ from django.test.utils import CaptureQueriesContext  # noqa: E402
 from django.test import Client  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
-from card_reader_api.imports.views import _save_supported_uploads  # noqa: E402
+from card_reader_api.imports.creation import StagedImportUpload  # noqa: E402
 from card_reader_api.seeds.users import seed_users  # noqa: E402
 
 
@@ -137,7 +137,7 @@ def test_interrupted_upload_is_not_published_and_same_key_can_retry() -> None:
             raise OSError("connection interrupted")
 
     with pytest.raises(OSError, match="connection interrupted"):
-        _save_supported_uploads(
+        StagedImportUpload.publish(
             [(InterruptedUpload("card.png", content, content_type="image/png"), checksum)],
             creation_key=creation_key,
             fingerprint=fingerprint,
@@ -148,15 +148,15 @@ def test_interrupted_upload_is_not_published_and_same_key_can_retry() -> None:
     )
     target_file = upload_dir / "0000-card.png"
     assert not target_file.exists()
-    assert list(upload_dir.glob(".*.tmp")) == []
+    assert not upload_dir.exists()
 
-    saved_path = _save_supported_uploads(
+    staged = StagedImportUpload.publish(
         [(SimpleUploadedFile("card.png", content, content_type="image/png"), checksum)],
         creation_key=creation_key,
         fingerprint=fingerprint,
     )
 
-    assert saved_path == build_storage_relative_path("uploads", creation_key, fingerprint)
+    assert staged.relative_path == build_storage_relative_path("uploads", creation_key, fingerprint)
     assert target_file.read_bytes() == content
 
 
@@ -165,7 +165,7 @@ def test_conflicting_import_payloads_use_isolated_fingerprint_directories() -> N
     first_content = b"first-payload"
     second_content = b"second-payload"
 
-    first_path = _save_supported_uploads(
+    first = StagedImportUpload.publish(
         [
             (
                 SimpleUploadedFile("first.png", first_content, content_type="image/png"),
@@ -175,7 +175,7 @@ def test_conflicting_import_payloads_use_isolated_fingerprint_directories() -> N
         creation_key=creation_key,
         fingerprint="a" * 64,
     )
-    second_path = _save_supported_uploads(
+    second = StagedImportUpload.publish(
         [
             (
                 SimpleUploadedFile("second.png", second_content, content_type="image/png"),
@@ -186,13 +186,11 @@ def test_conflicting_import_payloads_use_isolated_fingerprint_directories() -> N
         fingerprint="b" * 64,
     )
 
-    assert first_path != second_path
-    assert first_path is not None
-    assert second_path is not None
-    assert [path.name for path in resolve_storage_path(first_path).iterdir()] == [
+    assert first.relative_path != second.relative_path
+    assert [path.name for path in resolve_storage_path(first.relative_path).iterdir()] == [
         "0000-first.png"
     ]
-    assert [path.name for path in resolve_storage_path(second_path).iterdir()] == [
+    assert [path.name for path in resolve_storage_path(second.relative_path).iterdir()] == [
         "0000-second.png"
     ]
 

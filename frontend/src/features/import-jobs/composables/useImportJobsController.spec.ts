@@ -335,7 +335,7 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
-  test('preserves a history refresh failure after a successful active-only poll', async () => {
+  test('clears a history error only after the unified poll refresh succeeds', async () => {
     const mounted = mountController();
     await vi.waitFor(() => {
       expect(mounted.controller.activeJobsLoaded.value).toBe(true);
@@ -352,10 +352,8 @@ describe('useImportJobsController', () => {
     vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob()]);
     await mounted.controller.pollJobs();
 
-    expect(mounted.controller.activityErrorMessage.value).toBe(
-      'Import activity could not be refreshed.',
-    );
-    expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(2);
+    expect(mounted.controller.activityErrorMessage.value).toBe('');
+    expect(fetchOperationsQueuePage).toHaveBeenCalledTimes(3);
 
     mounted.app.unmount();
   });
@@ -430,6 +428,29 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.activeJobs.value).toEqual([]);
     expect(mounted.controller.selectedJobDetail.value?.status).toBe('cancelled');
 
+    mounted.app.unmount();
+  });
+
+  test('keeps cancellation authoritative when every follow-up read fails', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+    vi.mocked(fetchImportJobDetail).mockResolvedValueOnce(importJobDetail('active-job'));
+    await mounted.controller.viewJobDetail('active-job');
+    vi.mocked(fetchImportJobs).mockRejectedValueOnce(new Error('Active unavailable'));
+    vi.mocked(fetchOperationsQueuePage).mockRejectedValueOnce(new Error('History unavailable'));
+    vi.mocked(fetchImportJobDetail).mockRejectedValueOnce(new Error('Detail unavailable'));
+
+    await mounted.controller.cancelJob('active-job');
+
+    expect(cancelImportJob).toHaveBeenCalledWith('active-job');
+    expect(mounted.controller.activeJobs.value[0]?.status).toBe('canceling');
+    expect(mounted.controller.selectedJobDetail.value?.status).toBe('canceling');
+    expect(mounted.controller.activityErrorMessage.value).toBe(
+      'Import activity could not be refreshed.',
+    );
     mounted.app.unmount();
   });
 
@@ -546,6 +567,86 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.selectedJobDetail.value?.id).toBe('job-b');
     expect(mounted.controller.detailLoading.value).toBe(false);
 
+    mounted.app.unmount();
+  });
+
+  test('manual detail selection wins over an overlapping background refresh', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => expect(mounted.controller.activeJobsLoaded.value).toBe(true));
+    await mounted.controller.viewJobDetail('active-job');
+
+    const background = deferred<ImportJobDetail>();
+    const manual = deferred<ImportJobDetail>();
+    vi.mocked(fetchImportJobDetail)
+      .mockImplementationOnce(() => background.promise)
+      .mockImplementationOnce(() => manual.promise);
+    const refresh = mounted.controller.refreshActivity();
+    await vi.waitFor(() => expect(fetchImportJobDetail).toHaveBeenCalledTimes(2));
+    const selection = mounted.controller.viewJobDetail('manual-job');
+    manual.resolve(importJobDetail('manual-job'));
+    await selection;
+
+    background.resolve(importJobDetail('active-job'));
+    await refresh;
+
+    expect(mounted.controller.selectedJobDetail.value?.id).toBe('manual-job');
+    mounted.app.unmount();
+  });
+
+  test('closing detail while a request is in flight does not reopen it', async () => {
+    const request = deferred<ImportJobDetail>();
+    vi.mocked(fetchImportJobDetail).mockImplementationOnce(() => request.promise);
+    const mounted = mountController();
+
+    const selection = mounted.controller.viewJobDetail('active-job');
+    mounted.controller.closeJobDetail();
+    request.resolve(importJobDetail('active-job'));
+    await selection;
+
+    expect(mounted.controller.selectedJobDetail.value).toBeNull();
+    expect(mounted.controller.detailLoading.value).toBe(false);
+    mounted.app.unmount();
+  });
+
+  test('a detail refresh failure preserves successful list and history updates', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+    await mounted.controller.viewJobDetail('active-job');
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob('new-job')]);
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
+      historyPage([
+        historyItem('active-job', 'completed'),
+        historyItem('new-job', 'running'),
+        historyItem('new-finished', 'completed'),
+      ]),
+    );
+    vi.mocked(fetchImportJobDetail).mockRejectedValueOnce(new Error('Detail unavailable'));
+
+    await mounted.controller.refreshActivity();
+
+    expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['new-job']);
+    expect(mounted.controller.recentJobs.value.map((job) => job.id)).toContain('new-finished');
+    expect(mounted.controller.activityErrorMessage.value).toBe(
+      'Import details could not be refreshed.',
+    );
+    mounted.app.unmount();
+  });
+
+  test('terminal details are not refreshed by later polling', async () => {
+    vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
+      ...importJobDetail('finished-job'),
+      status: 'completed',
+    });
+    const mounted = mountController();
+    await vi.waitFor(() => expect(mounted.controller.activeJobsLoaded.value).toBe(true));
+    await mounted.controller.viewJobDetail('finished-job');
+
+    await mounted.controller.pollJobs();
+
+    expect(fetchImportJobDetail).toHaveBeenCalledOnce();
     mounted.app.unmount();
   });
 

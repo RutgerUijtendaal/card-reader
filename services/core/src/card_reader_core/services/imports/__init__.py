@@ -11,7 +11,8 @@ from .classification import (
     validate_card_roles,
     validate_inference_policy_version,
 )
-from .service import ImportCreationKeyConflict, ImportService
+from .reparse import queue_grouped_reparse_jobs
+from .service import ImportCreationKeyConflict, ImportCreationRejected, ImportService
 
 __all__ = [
     "LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION",
@@ -22,8 +23,10 @@ __all__ = [
     "CardRoleMode",
     "ImportService",
     "ImportCreationKeyConflict",
+    "ImportCreationRejected",
     "classify_import_card",
     "normalize_role_mode",
+    "queue_grouped_reparse_jobs",
     "validate_card_roles",
     "validate_inference_policy_version",
 ]

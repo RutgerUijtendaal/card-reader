@@ -6,17 +6,26 @@ from collections.abc import Sequence
 from django.db import IntegrityError, transaction
 
 from card_reader_core.models import CardPool, CardRole, ImportJob
-from card_reader_core.repositories.content_versions import create_next_content_version
+from card_reader_core.imports import ImportJobCreationResult
+from card_reader_core.repositories.content_versions import (
+    create_next_content_version,
+    normalize_description,
+    parse_base_version,
+)
 from card_reader_core.repositories.import_jobs import (
     cancel_import_job,
     create_import_job,
     fetch_job_by_creation_key,
+    prepare_import_job_inputs,
 )
-from card_reader_core.repositories.templates import get_template_by_key
 from .classification import LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION, CardRoleMode
 
 
 class ImportCreationKeyConflict(ValueError):
+    pass
+
+
+class ImportCreationRejected(ValueError):
     pass
 
 
@@ -34,13 +43,21 @@ class ImportService:
         card_pool: CardPool,
         card_role_mode: CardRoleMode = "automatic",
         card_role_override: Sequence[CardRole] = (),
-    ) -> tuple[ImportJob, bool]:
+    ) -> ImportJobCreationResult:
         existing = self.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
-            return self._matching_replay(existing, creation_fingerprint), True
-        template = get_template_by_key(key=template_id)
-        if template is None:
-            raise ValueError(f"Unknown template_id '{template_id}'")
+            return ImportJobCreationResult(
+                job=self._matching_replay(existing, creation_fingerprint),
+                outcome="replayed",
+            )
+        self.prevalidate_job_creation(
+            template_id=template_id,
+            content_version_base=content_version_base,
+            content_version_description=content_version_description,
+            card_pool=card_pool,
+            card_role_mode=card_role_mode,
+            card_role_override=card_role_override,
+        )
 
         try:
             with transaction.atomic():
@@ -64,8 +81,34 @@ class ImportService:
             existing = self.get_job_by_creation_key(creation_key=creation_key)
             if existing is None:
                 raise
-            return self._matching_replay(existing, creation_fingerprint), True
-        return job, False
+            return ImportJobCreationResult(
+                job=self._matching_replay(existing, creation_fingerprint),
+                outcome="replayed",
+            )
+        return ImportJobCreationResult(job=job, outcome="created")
+
+    def prevalidate_job_creation(
+        self,
+        *,
+        template_id: str,
+        content_version_base: str,
+        content_version_description: str,
+        card_pool: CardPool,
+        card_role_mode: CardRoleMode,
+        card_role_override: Sequence[CardRole],
+    ) -> None:
+        try:
+            parse_base_version(content_version_base)
+            normalize_description(content_version_description)
+            prepare_import_job_inputs(
+                template_id=template_id,
+                card_pool=card_pool,
+                card_role_mode=card_role_mode,
+                card_role_override=card_role_override,
+                inference_policy_version=LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
+            )
+        except ValueError as exc:
+            raise ImportCreationRejected(str(exc)) from exc
 
     def get_job_by_creation_key(self, *, creation_key: str) -> ImportJob | None:
         return fetch_job_by_creation_key(creation_key)

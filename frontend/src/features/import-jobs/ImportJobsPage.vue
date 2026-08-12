@@ -309,6 +309,7 @@
             @refresh="refreshActivity"
             @cancel="cancelJob"
             @view="viewJobDetail"
+            @close-detail="closeJobDetail"
           />
         </div>
       </div>
@@ -368,6 +369,7 @@ const {
   createJobFromPicker,
   cancelJob,
   viewJobDetail,
+  closeJobDetail,
   setPickedFiles,
   clearPickedFiles,
   abandonPendingAttempt,
