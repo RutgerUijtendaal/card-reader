@@ -15,6 +15,7 @@ from card_reader_api.imports.creation import (
     StagedImportUpload,
     _upload_fingerprint,
 )
+from card_reader_core.imports import ImportJobInputValidationError
 from card_reader_core.models import ContentVersion, ImportJob
 from card_reader_core.services.imports import (
     ImportCreationKeyConflict,
@@ -65,6 +66,39 @@ class _FakeImportService:
 def test_prevalidation_rejection_happens_before_upload_staging() -> None:
     data = _validated_data()
     creation_key = str(data["creation_key"])
+    service = _FakeImportService()
+
+    def reject(**_kwargs: object) -> None:
+        raise ImportCreationRejected("Unknown template_id 'missing'")
+
+    service.prevalidate_job_creation = reject  # type: ignore[method-assign]
+
+    with pytest.raises(ImportAdmissionRejected, match="Unknown template_id"):
+        ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
+def test_prevalidation_rejection_discards_a_preserved_exact_retry_stage() -> None:
+    data = _validated_data()
+    creation_key = str(data["creation_key"])
+    fingerprint, uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+    )
+    staged = StagedImportUpload.publish(
+        uploads,
+        creation_key=creation_key,
+        fingerprint=fingerprint,
+    )
+    assert staged._validated_directory().is_dir()
     service = _FakeImportService()
 
     def reject(**_kwargs: object) -> None:
@@ -179,6 +213,31 @@ def test_core_creation_rolls_back_content_version_when_job_creation_fails(
             options={},
             content_version_base="14.1",
             content_version_description="Atomic creation.",
+            creation_key=str(uuid4()),
+            creation_fingerprint="a" * 64,
+            card_pool="player",
+        )
+
+    assert ContentVersion.objects.count() == content_version_count
+    assert not ImportJob.objects.exists()
+
+
+def test_core_creation_converts_authoritative_input_validation_to_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reject_job_creation(**_kwargs: object) -> object:
+        raise ImportJobInputValidationError("Unknown template_id 'deleted'")
+
+    monkeypatch.setattr(import_service_module, "create_import_job", reject_job_creation)
+    content_version_count = ContentVersion.objects.count()
+
+    with pytest.raises(ImportCreationRejected, match="Unknown template_id 'deleted'"):
+        ImportService().create_job(
+            source_path="uploads/test/source",
+            template_id="mtg-like-v1",
+            options={},
+            content_version_base="14.1",
+            content_version_description="Late validation.",
             creation_key=str(uuid4()),
             creation_fingerprint="a" * 64,
             card_pool="player",

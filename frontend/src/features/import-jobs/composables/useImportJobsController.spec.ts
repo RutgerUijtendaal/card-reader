@@ -212,7 +212,7 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
-  test('keeps active jobs usable and polling while recent history is pending', async () => {
+  test('does not overlap polling while the unified activity refresh is pending', async () => {
     const pendingHistoryRequest = deferred<OperationsQueuePage>();
     vi.mocked(fetchOperationsQueuePage).mockImplementationOnce(
       () => pendingHistoryRequest.promise,
@@ -226,8 +226,14 @@ describe('useImportJobsController', () => {
     vi.mocked(fetchImportJobs).mockResolvedValueOnce([activeJob()]);
     await mounted.controller.pollJobs();
 
-    expect(fetchImportJobs).toHaveBeenCalledTimes(2);
+    expect(fetchImportJobs).toHaveBeenCalledOnce();
     expect(mounted.controller.activeJobs.value.map((job) => job.id)).toEqual(['active-job']);
+
+    pendingHistoryRequest.resolve(historyPage([historyItem('active-job', 'running')]));
+    await vi.waitFor(() => expect(mounted.controller.historyLoaded.value).toBe(true));
+    await mounted.controller.pollJobs();
+
+    expect(fetchImportJobs).toHaveBeenCalledTimes(2);
 
     mounted.app.unmount();
   });

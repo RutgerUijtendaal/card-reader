@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from django.db import IntegrityError, transaction
 
 from card_reader_core.models import CardPool, CardRole, ImportJob
-from card_reader_core.imports import ImportJobCreationResult
+from card_reader_core.imports import ImportJobCreationResult, ImportJobInputValidationError
 from card_reader_core.repositories.content_versions import (
     create_next_content_version,
     normalize_description,
@@ -77,6 +77,8 @@ class ImportService:
                     card_role_override=card_role_override,
                     inference_policy_version=LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
                 )
+        except ImportJobInputValidationError as exc:
+            raise ImportCreationRejected(str(exc)) from exc
         except IntegrityError:
             existing = self.get_job_by_creation_key(creation_key=creation_key)
             if existing is None:

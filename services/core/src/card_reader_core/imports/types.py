@@ -9,6 +9,10 @@ from card_reader_core.models import DEFAULT_CARD_POOL, CardPool, CardRole, Impor
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
+class ImportJobInputValidationError(ValueError):
+    """A definitive import-job input rejection raised before durable creation."""
+
+
 @dataclass(frozen=True)
 class ImportJobItemTarget:
     card_id: str

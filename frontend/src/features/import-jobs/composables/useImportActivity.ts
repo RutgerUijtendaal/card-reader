@@ -36,11 +36,13 @@ export const useImportActivity = () => {
   const selectedJobId = ref<string | null>(null);
   const selectedJobDetail = ref<ImportJobDetail | null>(null);
   const detailLoading = ref(false);
+  const activityRefreshInFlight = ref(false);
   const documentVisibility = useDocumentVisibility();
   let activeJobsRequestId = 0;
   let historyRequestId = 0;
   let detailRequestId = 0;
   let detailSelectionRevision = 0;
+  let activityRefreshCount = 0;
 
   const queuedCount = computed(
     () => activeJobs.value.filter((job) => job.status === 'queued').length,
@@ -183,26 +185,33 @@ export const useImportActivity = () => {
   };
 
   const refreshActivity = async (): Promise<void> => {
-    const [activeResult, historyResult] = await Promise.allSettled([
-      loadActiveJobs(),
-      loadRecentJobs(),
-      refreshSelectedJobDetail(),
-    ]);
-    if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
-    const removedJobsMissingFromHistory = activeResult.value.some(
-      (jobId) => !historyItems.value.some(
-        (item) => item.id === jobId && isTerminalImportStatus(item.status),
-      ),
-    );
-    if (removedJobsMissingFromHistory) {
-      try {
-        await loadRecentJobs();
-      } catch (error) {
-        console.error('Reconcile import history after activity refresh failed', error);
-        return;
+    activityRefreshCount += 1;
+    activityRefreshInFlight.value = true;
+    try {
+      const [activeResult, historyResult] = await Promise.allSettled([
+        loadActiveJobs(),
+        loadRecentJobs(),
+        refreshSelectedJobDetail(),
+      ]);
+      if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
+      const removedJobsMissingFromHistory = activeResult.value.some(
+        (jobId) => !historyItems.value.some(
+          (item) => item.id === jobId && isTerminalImportStatus(item.status),
+        ),
+      );
+      if (removedJobsMissingFromHistory) {
+        try {
+          await loadRecentJobs();
+        } catch (error) {
+          console.error('Reconcile import history after activity refresh failed', error);
+          return;
+        }
       }
+      await reconcileMissingActiveWork();
+    } finally {
+      activityRefreshCount -= 1;
+      activityRefreshInFlight.value = activityRefreshCount > 0;
     }
-    await reconcileMissingActiveWork();
   };
 
   const viewJobDetail = async (jobId: string): Promise<void> => {
@@ -270,7 +279,7 @@ export const useImportActivity = () => {
   };
 
   const pollJobs = async (): Promise<void> => {
-    if (!shouldPoll.value || activeJobsRefreshing.value) return;
+    if (!shouldPoll.value || activityRefreshInFlight.value) return;
     await refreshActivity();
   };
 

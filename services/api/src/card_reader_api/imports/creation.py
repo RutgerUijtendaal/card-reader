@@ -100,6 +100,32 @@ class StagedImportUpload:
             raise ImportAdmissionRejected("No supported image files found in upload")
         return staged
 
+    @classmethod
+    def reconcile_existing(
+        cls,
+        uploads: list[tuple[UploadedFile, str]],
+        *,
+        creation_key: str,
+        fingerprint: str,
+    ) -> StagedImportUpload:
+        relative_path = build_storage_relative_path("uploads", creation_key, fingerprint)
+        staged = cls(
+            creation_key=creation_key,
+            fingerprint=fingerprint,
+            relative_path=relative_path,
+        )
+        target_dir = staged._validated_directory()
+        cleanup_files: list[Path] = []
+        for index, (upload, expected_checksum) in enumerate(uploads):
+            original_name = Path(upload.name or f"upload-{index}.img").name
+            if Path(original_name).suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
+                continue
+            target_file = target_dir / f"{index:04d}-{original_name}"
+            if target_file.is_file() and _sha256_path(target_file) == expected_checksum:
+                cleanup_files.append(target_file)
+        staged.owned_files = tuple(cleanup_files)
+        return staged
+
     def claim(self) -> None:
         self.claimed = True
 
@@ -179,7 +205,12 @@ class ImportUploadAdmission:
                 card_role_override=card_role_override,
             )
         except ImportCreationRejected as exc:
-            raise ImportAdmissionRejected(str(exc)) from exc
+            return self._reconcile_prevalidation_rejection(
+                creation_key=creation_key,
+                fingerprint=fingerprint,
+                uploads=uploads,
+                error=exc,
+            )
 
         staged = StagedImportUpload.publish(
             uploads,
@@ -217,6 +248,40 @@ class ImportUploadAdmission:
             job=result.job,
             idempotent_replay=result.idempotent_replay,
         )
+
+    def _reconcile_prevalidation_rejection(
+        self,
+        *,
+        creation_key: str,
+        fingerprint: str,
+        uploads: list[tuple[UploadedFile, str]],
+        error: ImportCreationRejected,
+    ) -> ImportAdmissionResult:
+        try:
+            existing = self._service.get_job_by_creation_key(creation_key=creation_key)
+        except Exception:
+            logger.exception(
+                "Import ownership lookup failed after validation rejection; preserving isolated "
+                "stage. creation_key=%s fingerprint=%s",
+                creation_key,
+                fingerprint,
+            )
+            raise ImportAdmissionUncertain(
+                "Failed to reconcile rejected import upload. See API logs."
+            ) from error
+        if existing is not None:
+            if existing.creation_fingerprint != fingerprint:
+                raise ImportAdmissionConflict(
+                    "This creation key has already been used for a different import payload."
+                ) from error
+            return ImportAdmissionResult(job=existing, idempotent_replay=True)
+
+        StagedImportUpload.reconcile_existing(
+            uploads,
+            creation_key=creation_key,
+            fingerprint=fingerprint,
+        ).discard()
+        raise ImportAdmissionRejected(str(error)) from error
 
     def _reconcile_uncertain_stage(
         self,
