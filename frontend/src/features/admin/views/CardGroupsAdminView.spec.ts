@@ -120,7 +120,7 @@ describe('CardGroupsAdminView', () => {
     vi.useFakeTimers();
     apiGet.mockImplementation((url: string) => {
       if (url === '/admin/card-groups') {
-        return Promise.resolve({ data: [buildGroup('game_master', true)] });
+        return Promise.resolve({ data: [buildGroup('evil', true)] });
       }
       if (url === '/cards') {
         return Promise.resolve({
@@ -151,7 +151,7 @@ describe('CardGroupsAdminView', () => {
     if (!(poolSelect instanceof HTMLSelectElement)) {
       throw new Error('expected search pool select');
     }
-    expect(poolSelect.value).toBe('game_master');
+    expect(poolSelect.value).toBe('evil');
     poolSelect.value = 'player';
     poolSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await nextTick();

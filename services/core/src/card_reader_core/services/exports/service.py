@@ -268,7 +268,7 @@ class TtsCardExportService:
                         card_id=row.version.card.id,
                         name=row.version.name,
                         quantity=entry.quantity,
-                        reason="Game Master cards are not available in public TTS sheets.",
+                        reason="Restricted cards are not available in public TTS sheets.",
                         role=entry.role,
                     )
                 )

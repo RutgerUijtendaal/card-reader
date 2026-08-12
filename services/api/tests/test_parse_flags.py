@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 
 from card_reader_core.models import (
-    GAME_MASTER_CARD_POOL,
+    EVIL_CARD_POOL,
     Card,
     CardVersion,
     CardVersionParseFlag,
@@ -68,11 +68,11 @@ def test_anonymous_user_cannot_create_parse_flag() -> None:
     assert response.status_code in {401, 403}
 
 
-def test_game_master_parse_flags_follow_the_central_access_capability() -> None:
+def test_evil_parse_flags_follow_the_central_access_capability() -> None:
     _clear_parse_flags()
     card, version = _create_card_version(
         name="Restricted Flag Card",
-        card_pool=GAME_MASTER_CARD_POOL,
+        card_pool=EVIL_CARD_POOL,
     )
     regular_client = Client(HTTP_HOST="localhost")
     regular_client.force_login(_create_user("restricted-flag-user", "password", is_staff=False))

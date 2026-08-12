@@ -2,13 +2,15 @@
 
 Status: implemented by the Step 2 checkpoint; retained as the executable design and acceptance record.
 
+Target amendment: this document records Step 2's temporary Player/Game Master import values. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces `game_master` with `evil` and `neutral`, requires one of the final three pools for every batch, and keeps inference and override semantics unchanged.
+
 This step adds reliable, explainable import classification on top of the pool and role model. It must not reintroduce Hero-specific persistence or allow an import to silently reclassify an existing card.
 
 ## Outcome
 
 Every import batch selects exactly one card pool and defaults to automatic role inference. Automatic inference unions roles declared by the selected template with roles inferred from parsed metadata. Staff can instead choose an explicit batch-wide role override, including forced Standard.
 
-New cards receive the batch pool and resolved roles. Existing cards are updated only when their stored classification agrees; a mismatch completes with a durable warning and preserves the existing card classification for manual review in the Card tab.
+New cards receive the batch pool and resolved roles. Once an existing identity is resolved, it is updated only when its stored classification agrees; a mismatch completes with a durable warning and preserves the existing card classification for manual review in the Card tab. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) makes that identity resolution pool-scoped so a same-name card in the other pool is a distinct card rather than a mismatch.
 
 ## Locked decisions
 
@@ -20,7 +22,7 @@ New cards receive the batch pool and resolved roles. Existing cards are updated 
 - The stable tag keys `hero` and `location` infer the Hero and Location roles under inference policy version 2. Do not infer from localized labels or free text when a matched tag key is available.
 - Templates declare zero or more inferred role hints. The inference engine is generic and must not hard-code individual template IDs.
 - No inferred role means Standard; Standard is never stored as a role.
-- Existing card classification is authoritative. Import mismatches warn and preserve it; imports never silently move an existing card between pools or replace its roles.
+- Existing card classification is authoritative after identity resolution. Import mismatches warn and preserve it; imports never silently move an existing card between pools or replace its roles. Step 2.1 requires untargeted identity resolution to stay inside the selected pool.
 - Manual Card-tab edits remain authoritative after import.
 - Inference is core-owned and consumes normalized evidence. Parser code extracts evidence but does not own classification policy.
 - Upload creation is idempotent through a stable client-generated creation key. An ambiguous response must be reconcilable without creating a second job, upload directory, content version, or set of parser items.
@@ -142,8 +144,9 @@ For each item:
 Persistence behavior:
 
 - New card: assign the job pool and resolved roles in the same transaction as card identity creation.
-- Existing card with equal pool and roles: persist the new version normally.
-- Existing card with a different pool or role set: persist the valid parsed version, preserve the card's existing pool/roles, and mark the item completed with `card_classification_mismatch`.
+- Existing card resolved inside the selected pool with equal roles: persist the new version normally.
+- Existing card resolved inside the selected pool with a different role set: persist the valid parsed version, preserve the card's existing roles, and mark the item completed with `card_classification_mismatch`.
+- Same name or image hash in another pool: after Step 2.1, create or resolve an independent card in the selected pool; do not emit a cross-pool classification mismatch.
 - Targeted reparse: never changes card-level classification; compare the inference result with the live classification, preserve the live value, and warn on mismatch. The queued per-item target snapshot remains audit evidence if staff classification changes while the reparse waits.
 
 If any card/version/audit/warning write fails, the transaction rolls back and item failure remains governed by the existing parser-job failure path. `ImportProcessorService` may transition an item to failed only when the authoritative persistence transaction did not commit; catching a later auxiliary error must not overwrite an already completed item. Do not mark failed persistence as a classification warning.
@@ -189,7 +192,7 @@ Extend `frontend/src/features/import-jobs` without moving import-specific state 
 
 In the Card setup section:
 
-1. Require a visible Player/Game Master pool selection.
+1. Require a visible pool selection. Step 2 implemented Player/Game Master; Step 2.1 changes the available values to Player/Evil/Neutral.
 2. Default classification to **Automatic**.
 3. Explain that automatic mode combines template hints and detected metadata.
 4. Provide an **Override** mode with Hero, Boon, Event, and Location multi-select controls.
@@ -217,7 +220,7 @@ Verify all new controls and warnings in light and dark themes.
 9. Add template-admin inferred-role controls.
 10. Add import pool, automatic/override, idempotent reconciliation, and result/warning UI.
 11. Update current-state import/card/developer-data documentation after behavior ships.
-12. Run all permitted validation before beginning [Step 2.1](card-classification-step-2-1-import-workflow-seam.md).
+12. Run all permitted validation before beginning [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md).
 
 ## Required tests
 
@@ -238,7 +241,7 @@ Add or update tests covering:
 - job snapshot stability after later template edits and inference-policy deployments;
 - new-card classification assignment;
 - existing-card exact match;
-- pool mismatch and role mismatch preserving existing classification while completing with warning;
+- same-pool role mismatch and targeted-reparse pool-snapshot mismatch preserving existing classification while completing with warning;
 - deprecated-card and classification-mismatch warnings coexisting without overwrite;
 - audit evidence, warnings, and terminal completion committing atomically with the parsed version;
 - post-success auxiliary failure preserving completed state;
@@ -275,5 +278,5 @@ Do not run prohibited service/integration suites. Run lint and typecheck for cor
 - OCR inference from arbitrary unrecognized free text.
 - Automatic pool inference.
 - Automatically resolving classification mismatches.
-- The global Player/Game Master workspace toggle.
-- Relaxing Game Master access beyond staff.
+- The global Player/Evil/Neutral workspace selector.
+- Relaxing Evil/Neutral access beyond staff.

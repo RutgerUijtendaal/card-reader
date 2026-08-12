@@ -4,7 +4,7 @@ import {
   type CardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import { isCardRoleFilter, type CardRoleFilter } from '@/domain/cards/cardRoles';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import { normalizeCardPool, type CardPool } from '@/domain/cards/cardPools';
 
 type FilterMatch = 'any' | 'all';
 
@@ -159,7 +159,6 @@ const normalizeStringArray = (values: readonly string[]): string[] =>
   );
 
 const normalizeMatch = (value: FilterMatch): FilterMatch => (value === 'all' ? 'all' : 'any');
-const normalizeCardPool = (value: CardPool): CardPool => value === 'game_master' ? 'game_master' : 'player';
 const normalizeCardRoles = (values: readonly string[]): CardRoleFilter[] =>
   normalizeStringArray(values).filter(isCardRoleFilter);
 

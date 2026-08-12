@@ -7,10 +7,13 @@ This is a hardening checkpoint between the classification foundation and import 
 1. [Card classification foundation](card-classification-step-1-foundation.md)
 2. Authorization seam consolidation (this document)
 3. [Import inference](card-classification-step-2-import-inference.md)
-4. [Import workflow seam consolidation](card-classification-step-2-1-import-workflow-seam.md)
-5. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
+4. [Pool-scoped card identity](card-classification-step-2-1-pool-scoped-identity.md)
+5. [Import workflow seam consolidation](card-classification-step-2-2-import-workflow-seam.md)
+6. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
 
 Do not grow import or workspace behavior until this step's acceptance criteria are satisfied. The purpose is to make the existing Step 1 access boundary secure by construction before more features consume it.
+
+Target amendment: this document preserves the implemented Step 1.1 names. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces the temporary Game-Master-specific entitlement/session vocabulary with a Player/Evil/Neutral pool scope. Evil and Neutral share the same initially staff-only restricted-pool policy.
 
 ## Outcome
 

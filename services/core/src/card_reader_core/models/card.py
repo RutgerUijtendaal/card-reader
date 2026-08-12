@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Protocol, TypeVar
+from typing import TYPE_CHECKING, Literal, Protocol, TypeGuard, TypeVar
 
 from django.db import models
 from django.db.models import Q, QuerySet
@@ -24,10 +24,28 @@ CardLifecycleStatus = Literal["active", "deprecated"]
 CardLifecycleFilter = Literal["active", "deprecated", "all"]
 
 PLAYER_CARD_POOL: Literal["player"] = "player"
-GAME_MASTER_CARD_POOL: Literal["game_master"] = "game_master"
-CardPool = Literal["player", "game_master"]
-CARD_POOLS: tuple[CardPool, ...] = (PLAYER_CARD_POOL, GAME_MASTER_CARD_POOL)
+EVIL_CARD_POOL: Literal["evil"] = "evil"
+NEUTRAL_CARD_POOL: Literal["neutral"] = "neutral"
+CardPool = Literal["player", "evil", "neutral"]
 DEFAULT_CARD_POOL: CardPool = PLAYER_CARD_POOL
+
+
+@dataclass(frozen=True)
+class CardPoolDefinition:
+    key: CardPool
+    label: str
+    rank: int
+
+
+CARD_POOL_DEFINITIONS: tuple[CardPoolDefinition, ...] = (
+    CardPoolDefinition(key=PLAYER_CARD_POOL, label="Player", rank=0),
+    CardPoolDefinition(key=EVIL_CARD_POOL, label="Evil", rank=1),
+    CardPoolDefinition(key=NEUTRAL_CARD_POOL, label="Neutral", rank=2),
+)
+CARD_POOLS: tuple[CardPool, ...] = tuple(definition.key for definition in CARD_POOL_DEFINITIONS)
+CARD_POOL_CHOICES: tuple[tuple[CardPool, str], ...] = tuple(
+    (definition.key, definition.label) for definition in CARD_POOL_DEFINITIONS
+)
 
 
 @dataclass(frozen=True)
@@ -134,14 +152,11 @@ class Card(TimestampedModel):
         versions: Manager[CardVersion]
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
-    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True)
     label: models.TextField[str, str] = models.TextField(default="")
     card_pool: models.CharField[str, str] = models.CharField(
         max_length=16,
-        choices=[
-            (PLAYER_CARD_POOL, "Player"),
-            (GAME_MASTER_CARD_POOL, "Game Master"),
-        ],
+        choices=CARD_POOL_CHOICES,
         default=DEFAULT_CARD_POOL,
         db_index=True,
     )
@@ -167,6 +182,23 @@ class Card(TimestampedModel):
 
     class Meta:
         db_table = "card"
+        constraints = [
+            models.UniqueConstraint(fields=("card_pool", "key"), name="uq_card_pool_key"),
+        ]
+
+
+class CardIdentityPoolLock(TimestampedModel):
+    """Durable serialization row for card primary/alias namespace mutations."""
+
+    card_pool: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=CARD_POOL_CHOICES,
+        primary_key=True,
+    )
+    revision: models.PositiveBigIntegerField[int, int] = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        db_table = "card_identity_pool_lock"
 
 
 class CardRoleAssignment(TimestampedModel):
@@ -190,7 +222,7 @@ class CardRoleAssignment(TimestampedModel):
         ]
 
 
-def is_card_pool(value: object) -> bool:
+def is_card_pool(value: object) -> TypeGuard[CardPool]:
     return value in CARD_POOLS
 
 
@@ -262,11 +294,19 @@ class CardAlias(TimestampedModel):
         related_name="aliases",
         db_column="card_id",
     )
-    key: models.TextField[str, str] = models.TextField(default="", db_index=True, unique=True)
+    card_pool: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=CARD_POOL_CHOICES,
+        db_index=True,
+    )
+    key: models.TextField[str, str] = models.TextField(default="", db_index=True)
     label: models.TextField[str, str] = models.TextField(default="")
 
     class Meta:
         db_table = "card_alias"
+        constraints = [
+            models.UniqueConstraint(fields=("card_pool", "key"), name="uq_card_alias_pool_key"),
+        ]
 
 
 class CardMergeRedirect(TimestampedModel):

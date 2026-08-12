@@ -191,7 +191,7 @@ import type {
   CardFilterSectionKey,
   CardFilterSectionsState,
 } from '@/domain/cards/utils/filters/cardFilterSectionsState';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 const props = defineProps<{
   state: CardFilterSectionsState;

@@ -19,8 +19,17 @@ describe('CatalogLinkedCardsGrid', () => {
           card_version_id: 'version-1',
           card_version_name: 'The Offer',
           image_url: null,
-          card_pool: 'game_master',
+          card_pool: 'evil',
           card_roles: ['boon', 'event', 'location'],
+        },
+        {
+          card_id: 'card-2',
+          card_label: 'The Offer',
+          card_version_id: 'version-2',
+          card_version_name: 'The Offer',
+          image_url: null,
+          card_pool: 'neutral',
+          card_roles: [],
         },
       ],
       emptyMessage: 'No cards',
@@ -39,7 +48,9 @@ describe('CatalogLinkedCardsGrid', () => {
     app.mount(container);
     await nextTick();
 
-    expect(container.textContent).toContain('Game Master');
+    expect(container.textContent).toContain('Evil');
+    expect(container.textContent).toContain('Neutral');
+    expect(container.textContent?.match(/The Offer/g)).toHaveLength(2);
     expect(container.textContent).toContain('Boon');
     expect(container.textContent).toContain('Event');
     expect(container.textContent).toContain('Location');

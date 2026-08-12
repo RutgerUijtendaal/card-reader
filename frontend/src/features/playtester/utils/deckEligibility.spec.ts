@@ -68,7 +68,7 @@ describe('playtester deck eligibility', () => {
     expect(isPlaytestDeckSummaryEligible({
       ...summary,
       has_restricted_cards: true,
-      hero_card: { ...summary.hero_card, card_pool: 'game_master', restricted: true },
+      hero_card: { ...summary.hero_card, card_pool: 'evil', restricted: true },
     })).toBe(false);
   });
 
@@ -100,7 +100,7 @@ describe('playtester deck eligibility', () => {
     })).toBe(false);
     expect(isPlaytestDeckEligible({
       ...deck,
-      hero_card: { ...deck.hero_card, card_pool: 'game_master' },
+      hero_card: { ...deck.hero_card, card_pool: 'evil' },
     })).toBe(false);
     expect(isPlaytestDeckEligible({
       ...deck,

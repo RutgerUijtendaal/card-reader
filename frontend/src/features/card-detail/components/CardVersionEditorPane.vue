@@ -62,8 +62,13 @@
                   :disabled="!version.editable || isBusy"
                   @change="$emit('update-card-pool', ($event.target as HTMLSelectElement).value as CardPool)"
                 >
-                  <option value="player">Player</option>
-                  <option value="game_master">Game Master</option>
+                  <option
+                    v-for="option in cardPoolOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
                 </select>
               </label>
               <fieldset class="space-y-2">
@@ -575,7 +580,7 @@ import type {
   SymbolFilterOption,
 } from '@/domain/cards/types';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
 import type { EditorForm, MetadataSearchState, ReparseTemplateOption } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 
@@ -640,6 +645,7 @@ const lifecycleOptions = [
   { value: DEPRECATED_CARD_LIFECYCLE_STATUS, label: 'Deprecated' },
 ] as const;
 const cardRoleOptions = CARD_ROLE_OPTIONS;
+const cardPoolOptions = CARD_POOL_OPTIONS;
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));
 const additionalSymbolIds = computed(() => props.additionalSymbolIds);

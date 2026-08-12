@@ -76,6 +76,17 @@ describe('cardFilterRouteState', () => {
     });
   });
 
+  test('serializes Evil and Neutral explicitly and normalizes obsolete pools to Player', () => {
+    expect(buildCardFilterRouteQuery(parseCardFilterRouteQuery({ card_pool: 'evil' }))).toEqual({
+      card_pool: 'evil',
+    });
+    expect(buildCardFilterRouteQuery(parseCardFilterRouteQuery({ card_pool: 'neutral' }))).toEqual({
+      card_pool: 'neutral',
+    });
+    expect(parseCardFilterRouteQuery({ card_pool: 'game_master' }).cardPool).toBe('player');
+    expect(parseCardFilterRouteQuery({ card_pool: 'unknown' }).cardPool).toBe('player');
+  });
+
   test('produces a stable signature for equivalent filter selections', () => {
     const left = getCardFilterSignature(
       parseCardFilterRouteQuery({

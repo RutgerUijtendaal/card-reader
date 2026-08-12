@@ -32,6 +32,7 @@ from card_reader_core.models import (
     TtsCardSheet,
     Type,
 )
+from card_reader_core.repositories.cards import lock_card_identity_pools
 from card_reader_core.metadata import mana_family_sort_key
 
 from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle, sha256_file
@@ -70,6 +71,7 @@ def import_developer_data(
             asset_paths=asset_paths,
         ) as created_assets:
             with transaction.atomic():
+                lock_card_identity_pools("player")
                 _import_payload(payload)
     return DeveloperDataImportResult(
         bundle_version=manifest.bundle_version,
@@ -256,7 +258,15 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             [CardRoleAssignment(card=card, role=role) for role in card_record.card_roles]
         )
         CardAlias.objects.bulk_create(
-            [CardAlias(card=card, key=alias.key, label=alias.label) for alias in card_record.aliases]
+            [
+                CardAlias(
+                    card=card,
+                    card_pool=card.card_pool,
+                    key=alias.key,
+                    label=alias.label,
+                )
+                for alias in card_record.aliases
+            ]
         )
         version_models: dict[int, CardVersion] = {}
         for version in card_record.versions:

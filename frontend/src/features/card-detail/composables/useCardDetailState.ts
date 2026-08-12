@@ -21,7 +21,7 @@ import type {
   SymbolFilterOption,
   SymbolLookupMap,
 } from '@/domain/cards/types';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 import type {
   CardDetail,
   EditorForm,

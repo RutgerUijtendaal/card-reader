@@ -2,7 +2,7 @@ import type { MetadataOption, SymbolFilterOption } from '@/domain/cards/types';
 import type { CardLifecycleFilterValue } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { MetadataFavoriteGroup } from '@/domain/cards/composables/filters/useMetadataFilterFavorites';
 import type { TriStateSelection } from '@/domain/cards/utils/filters/triStateSelection';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export type MatchMode = 'any' | 'all';
 export type LifecycleFilterValue = CardLifecycleFilterValue;

@@ -86,8 +86,13 @@
               class="input-base w-full"
               :disabled="!editor"
             >
-              <option value="player">Player</option>
-              <option value="game_master">Game Master</option>
+              <option
+                v-for="option in cardPoolOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
             </select>
           </label>
 
@@ -320,7 +325,7 @@ import { fetchCards } from '@/domain/cards/api';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/features/admin/types';
 import {
   createManagedCardGroup,
@@ -360,6 +365,7 @@ const pickerCardPool = computed<CardPool>({
     pickerResults.value = [];
   },
 });
+const cardPoolOptions = CARD_POOL_OPTIONS;
 
 const filteredGroups = computed(() => {
   const query = listSearch.value.trim().toLowerCase();
@@ -625,7 +631,9 @@ const openPublicView = (): void => {
   }
   void router.push({
     path: `/card-groups/${editor.value.id}`,
-    query: editor.value.anchor_card_pool === 'game_master' ? { card_pool: 'game_master' } : {},
+    query: editor.value.anchor_card_pool === 'player'
+      ? {}
+      : { card_pool: editor.value.anchor_card_pool },
   });
 };
 

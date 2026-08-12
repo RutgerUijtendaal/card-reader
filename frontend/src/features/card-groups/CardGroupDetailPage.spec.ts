@@ -236,7 +236,7 @@ describe('CardGroupDetailPage', () => {
     mounted.unmount();
   });
 
-  test('passes the Game Master pool through to group detail request', async () => {
+  test('passes the Evil pool through to group detail request', async () => {
     apiGet.mockImplementation((url: string) => {
       if (url === '/card-groups/group-1') {
         return Promise.resolve({ data: buildGroup() });
@@ -247,10 +247,10 @@ describe('CardGroupDetailPage', () => {
       return Promise.reject(new Error(`unexpected GET ${url}`));
     });
 
-    const mounted = await mountView('/card-groups/group-1?card_pool=game_master');
+    const mounted = await mountView('/card-groups/group-1?card_pool=evil');
 
     expect(apiGet).toHaveBeenCalledWith('/card-groups/group-1', {
-      params: { card_pool: 'game_master' },
+      params: { card_pool: 'evil' },
     });
 
     mounted.unmount();

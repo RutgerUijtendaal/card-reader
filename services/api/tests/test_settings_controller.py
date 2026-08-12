@@ -333,7 +333,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
             card_version_id="game-master-version",
             template_id=template.key,
             image_path=Path("game-master-image.webp"),
-            card_pool="game_master",
+            card_pool="evil",
             card_roles=(),
         ),
     ]
@@ -602,8 +602,8 @@ def test_template_reparse_rolls_back_every_group_when_later_creation_fails(
         Card.objects.create(key="atomic-player-card", label="Atomic Player Card"),
         Card.objects.create(
             key="atomic-game-master-card",
-            label="Atomic Game Master Card",
-            card_pool="game_master",
+            label="Atomic Evil Card",
+            card_pool="evil",
         ),
     ]
     for index, card in enumerate(cards):

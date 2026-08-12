@@ -11,6 +11,7 @@ from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.serializers import card_payload, symbol_option
 from card_reader_core.metadata import NO_MANA_FAMILY_SORT_KEY
 from card_reader_core.models import (
+    PLAYER_CARD_POOL,
     PLAYER_CARD_POOL_SCOPE,
     Card,
     CardPoolScope,
@@ -391,11 +392,11 @@ def deck_card_payload(
 def _restricted_deck_card_summary(card: Card) -> dict[str, object]:
     return {
         "id": _restricted_deck_card_id(card),
-        "key": "restricted-game-master-card",
-        "label": "Restricted Game Master card",
-        "card_pool": card.card_pool,
+        "key": "restricted-card",
+        "label": "Restricted card",
+        "card_pool": PLAYER_CARD_POOL,
         "card_roles": [],
-        "name": "Restricted Game Master card",
+        "name": "Restricted card",
         "image_url": None,
         "symbols": [],
         "restricted": True,
@@ -406,9 +407,9 @@ def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
     return {
         "id": _restricted_deck_card_id(card),
         "result_type": "card",
-        "key": "restricted-game-master-card",
-        "label": "Restricted Game Master card",
-        "card_pool": card.card_pool,
+        "key": "restricted-card",
+        "label": "Restricted card",
+        "card_pool": PLAYER_CARD_POOL,
         "card_roles": [],
         "deck_building_config": normalize_deck_building_config({}),
         "lifecycle_status": "active",
@@ -417,7 +418,7 @@ def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
         "version_number": 0,
         "previous_version_id": None,
         "is_latest": True,
-        "name": "Restricted Game Master card",
+        "name": "Restricted card",
         "type_line": "",
         "mana_cost": "",
         "mana_symbols": [],

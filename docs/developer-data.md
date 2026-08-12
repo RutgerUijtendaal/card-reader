@@ -8,11 +8,11 @@ website.
 
 The reviewed `dev-data/selection.json` contains stable must-include keys, inclusion policy, and
 coverage requirements. The current policy includes the complete Player card and Player card-group
-catalog at build time; Game Master cards are excluded while that pool is restricted. The explicit
+catalog at build time; Evil and Neutral cards are excluded while those pools are restricted. The explicit
 keys remain regression anchors that must still exist. The committed
 `dev-data.lock.json` pins the required bundle version, format, checksum, and website API.
 
-Selection, group validation, archive construction, and archive loading use a fixed canonical Player-only `CardPoolScope`. Archive validation rejects non-Player card records and cross-pool groups even when an archive was produced outside the normal exporter. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive Game Master eligibility cannot expand published bundles accidentally.
+Selection, group validation, archive construction, and archive loading use a fixed canonical Player-only `CardPoolScope`. Selection keys resolve only against Player cards, so same-key Evil or Neutral twins neither override nor invalidate the selected Player card. Archive validation rejects non-Player card records and cross-pool groups even when an archive was produced outside the normal exporter. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive restricted-pool eligibility cannot expand published bundles accidentally.
 
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and
@@ -27,8 +27,8 @@ templates adopt an empty inferred-role set. This compatibility keeps older immut
 without making current classification fields optional.
 
 Selection coverage is evaluated by pool and by role through `min_cards_by_pool` and
-`min_cards_by_role`. The existing Hero minimum is retained under the Hero role. Game Master pool
-coverage remains zero while that pool is excluded; Boon, Event, and Location may remain at zero
+`min_cards_by_role`. The existing Hero minimum is retained under the Hero role. Evil and Neutral pool
+coverage remain zero while those pools are excluded; Boon, Event, and Location may remain at zero
 until reviewed source data is available. The lock file is still generated only by publishing a
 validated immutable bundle and must not be edited by hand.
 

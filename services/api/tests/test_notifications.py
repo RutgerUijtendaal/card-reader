@@ -538,7 +538,7 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     assert payload["metadata"] == notification.metadata_json
 
 
-def test_parse_flag_review_does_not_notify_after_card_moves_to_game_master_pool() -> None:
+def test_parse_flag_review_does_not_notify_after_card_moves_to_evil_pool() -> None:
     _clear_notifications()
     submitter = _create_user("notification-gm-flag-submit", "password")
     reviewer = _create_user("notification-gm-flag-reviewer", "password", is_staff=True)
@@ -558,7 +558,7 @@ def test_parse_flag_review_does_not_notify_after_card_moves_to_game_master_pool(
         content_type="application/json",
     )
     assert submit_response.status_code == 201
-    card.card_pool = "game_master"
+    card.card_pool = "evil"
     card.save(update_fields=["card_pool"])
     review_client = Client(HTTP_HOST="localhost")
     review_client.force_login(reviewer)
@@ -739,7 +739,7 @@ def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_game_master_reclassification_archives_card_notifications_and_stops_future_delivery() -> None:
+def test_evil_reclassification_archives_card_notifications_and_stops_future_delivery() -> None:
     _clear_notifications()
     owner = _create_user("notification-reclassified-owner", "password")
     hero = _create_card(name="Notification Reclassified Hero", hero=True)
@@ -793,7 +793,7 @@ def test_game_master_reclassification_archives_card_notifications_and_stops_futu
 
     updated = update_latest_card_version_with_notifications(
         card_id=card.id,
-        updates={"card_pool": "game_master"},
+        updates={"card_pool": "evil"},
         restore_fields=[],
         restore_metadata_groups=[],
         unlock_fields=[],
@@ -815,7 +815,7 @@ def test_game_master_reclassification_archives_card_notifications_and_stops_futu
 
 
 @pytest.mark.django_db(transaction=True)
-def test_game_master_reclassification_is_authoritative_when_cleanup_fails(
+def test_evil_reclassification_is_authoritative_when_cleanup_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_notifications()
@@ -863,7 +863,7 @@ def test_game_master_reclassification_is_authoritative_when_cleanup_fails(
 
     updated = update_latest_card_version_with_notifications(
         card_id=card.id,
-        updates={"card_pool": "game_master"},
+        updates={"card_pool": "evil"},
         restore_fields=[],
         restore_metadata_groups=[],
         unlock_fields=[],
@@ -874,7 +874,7 @@ def test_game_master_reclassification_is_authoritative_when_cleanup_fails(
     card.refresh_from_db()
     notification.refresh_from_db()
     redirected_notification.refresh_from_db()
-    assert card.card_pool == "game_master"
+    assert card.card_pool == "evil"
     assert notification.archived_at is None
     assert redirected_notification.archived_at is None
     assert synced_card_ids == [card.id]

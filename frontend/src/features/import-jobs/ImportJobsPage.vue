@@ -318,6 +318,7 @@
 
 <script setup lang="ts">
 import { CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
+import { CARD_POOL_OPTIONS } from '@/domain/cards/cardPools';
 import { Info, Upload } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
@@ -375,10 +376,7 @@ const {
 const templateOptions = computed(() =>
   templates.value.map((item) => ({ value: item.key, label: `${item.label} (${item.key})` })),
 );
-const cardPoolOptions = [
-  { value: 'player', label: 'Player' },
-  { value: 'game_master', label: 'Game Master' },
-];
+const cardPoolOptions = CARD_POOL_OPTIONS;
 const cardRoleOptions = CARD_ROLE_OPTIONS;
 
 onBeforeRouteLeave(() => {

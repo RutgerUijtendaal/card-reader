@@ -121,7 +121,7 @@ const groupLifecycleStatus = computed(() => normalizeCardLifecycleFilterValue(ro
 const groupCardPool = computed(() => parseCardFilterRouteQuery(route.query).cardPool);
 const groupRequestParams = computed(() => {
   const lifecycleParams = buildCardLifecycleApiParams(groupLifecycleStatus.value);
-  const poolParams = groupCardPool.value === 'game_master'
+  const poolParams = groupCardPool.value !== 'player'
     ? { card_pool: groupCardPool.value }
     : undefined;
   if (!lifecycleParams && !poolParams) return undefined;

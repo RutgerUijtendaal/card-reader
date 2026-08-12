@@ -2,7 +2,7 @@ import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/typ
 import type { CardGroupSummary, MetadataGroupName, ScalarFieldName } from '@/domain/cards/types';
 import type { CardLifecycleStatus } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardRole } from '@/domain/cards/cardRoles';
-import type { CardPool } from '@/domain/cards/types/cardModels';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export type CardDetail = {
   id: string;

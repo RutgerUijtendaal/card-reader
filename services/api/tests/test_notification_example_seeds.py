@@ -35,13 +35,13 @@ def test_notification_examples_seed_real_layout_data_idempotently() -> None:
         name="Notification GM Hero",
         hero=True,
         with_history=False,
-        card_pool="game_master",
+        card_pool="evil",
     )
     _create_versioned_card(
         key="0-notification-gm-change",
         name="Notification GM Change",
         hero=False,
-        card_pool="game_master",
+        card_pool="evil",
     )
     hero, _hero_previous, _hero_current = _create_versioned_card(
         key="z-notification-hero",

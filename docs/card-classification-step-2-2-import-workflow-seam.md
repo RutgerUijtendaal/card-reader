@@ -1,16 +1,17 @@
-# Card Classification Step 2.1: Import Workflow Seam Consolidation
+# Card Classification Step 2.2: Import Workflow Seam Consolidation
 
-Status: approved implementation plan; blocked on completion and merge of [Step 2](card-classification-step-2-import-inference.md).
+Status: approved implementation plan; blocked on completion and merge of [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md).
 
-This is a hardening checkpoint between import inference and the Player/Game Master workspace:
+This is a hardening checkpoint between import inference/identity and the Player/Evil/Neutral workspaces:
 
 1. [Card classification foundation](card-classification-step-1-foundation.md)
 2. [Authorization seam consolidation](card-classification-step-1-1-authorization-seam.md)
 3. [Import inference](card-classification-step-2-import-inference.md)
-4. Import workflow seam consolidation (this document)
-5. [Player and Game Master workspaces](card-classification-step-3-player-gm-workspaces.md)
+4. [Pool-scoped card identity](card-classification-step-2-1-pool-scoped-identity.md)
+5. Import workflow seam consolidation (this document)
+6. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
 
-Do not add workspace behavior in this checkpoint. Step 2.1 consolidates the lifecycle and state-management contracts established by Step 2 so later work does not have to reproduce them across more entry points.
+Do not add workspace behavior in this checkpoint. Step 2.2 consolidates the lifecycle and state-management contracts established by Step 2 so later work does not have to reproduce them across more entry points.
 
 ## Outcome
 
@@ -65,12 +66,12 @@ Each fix is valid, but the repeated shape shows that the workflow lacks one plac
 
 ## Delivery and dependency order
 
-- Finish and merge the Step 2 checkpoint PR into `feature/card-classification` first.
-- Create `feature/card-classification-step-2-1-import-workflow-seam` from the updated umbrella branch.
-- Open the Step 2.1 PR against `feature/card-classification`, not `master`.
+- Finish and merge the Step 2.1 checkpoint PR into `feature/card-classification` first.
+- Create `feature/card-classification-step-2-2-import-workflow-seam` from the updated umbrella branch.
+- Open the Step 2.2 PR against `feature/card-classification`, not `master`.
 - Keep the aggregate feature PR to `master` open so the combined classification work continues receiving CI and review.
-- Merge Step 2.1 into the umbrella only after its acceptance criteria and review are clear.
-- Create the Step 3 branch from the newly updated umbrella branch so the workspace diff does not contain Step 2.1 implementation commits.
+- Merge Step 2.2 into the umbrella only after its acceptance criteria and review are clear.
+- Create the Step 3 branch from the newly updated umbrella branch so the workspace diff does not contain Step 2.2 implementation commits.
 
 ## Authoritative success and failure domains
 
@@ -274,10 +275,10 @@ Add backend failure-matrix and architecture tests for CI. Manually verify the im
 ## Explicit non-goals
 
 - New card roles, inference policies, pool rules, or per-file overrides.
-- Player/Game Master sidenav or workspace scoping.
-- Changing staff-only Game Master access.
+- Player/Evil/Neutral sidenav or workspace scoping.
+- Changing staff-only Evil/Neutral access.
 - Parser/OCR algorithm changes.
 - A generic workflow engine, external queue, or distributed lock service.
 - Automatic cleanup of unrelated historical storage directories.
 - Import-job cancellation semantics beyond keeping existing state and refresh behavior consistent.
-- New deck, Game Master deck, Scenario, or Playtester behavior.
+- New deck, Evil/Neutral deck, Scenario, or Playtester behavior.

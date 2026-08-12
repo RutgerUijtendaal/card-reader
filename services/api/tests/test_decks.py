@@ -9,7 +9,9 @@ from django.http import HttpResponse
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 
+from card_reader_api.decks.serializers import deck_hero_summary_payload
 from card_reader_core.models import (
+    PLAYER_CARD_POOL_SCOPE,
     Card,
     CardRoleAssignment,
     CardVersion,
@@ -1780,7 +1782,7 @@ def test_deck_create_replay_rejects_newly_restricted_cards_without_returning_car
         HTTP_IDEMPOTENCY_KEY=creation_key,
     )
     assert create_response.status_code == 201
-    reclassified.card_pool = "game_master"
+    reclassified.card_pool = "evil"
     reclassified.save(update_fields=["card_pool"])
 
     replay_response = client.post(
@@ -3102,37 +3104,50 @@ def test_card_role_filters_support_any_all_and_exclusions() -> None:
     assert boon_event_card.id not in excluded_ids
 
 
-def test_game_master_cards_are_staff_scoped_for_lists_and_details() -> None:
-    gm_card = _create_card(name="Restricted Game Master Event", hero=False)
-    gm_card.card_pool = "game_master"
-    gm_card.save(update_fields=["card_pool"])
-    CardRoleAssignment.objects.create(card=gm_card, role="event")
+def test_evil_and_neutral_cards_are_staff_scoped_for_lists_and_details() -> None:
+    restricted_cards = []
+    for pool in ("evil", "neutral"):
+        card = _create_card(name=f"Restricted {pool.title()} Event", hero=False)
+        card.card_pool = pool
+        card.save(update_fields=["card_pool"])
+        CardRoleAssignment.objects.create(card=card, role="event")
+        restricted_cards.append(card)
     anonymous = Client(HTTP_HOST="localhost")
 
-    assert anonymous.get("/cards", {"card_pool": "game_master"}).status_code == 403
-    assert anonymous.get(f"/cards/{gm_card.id}").status_code == 404
-    assert gm_card.id not in {row["id"] for row in anonymous.get("/cards").json()["results"]}
+    public_ids = {row["id"] for row in anonymous.get("/cards").json()["results"]}
+    for card in restricted_cards:
+        response = anonymous.get("/cards", {"card_pool": card.card_pool})
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Restricted card pools require staff access."
+        assert anonymous.get(f"/cards/{card.id}").status_code == 404
+        assert card.id not in public_ids
+        restricted_summary = deck_hero_summary_payload(
+            card,
+            card_pool_scope=PLAYER_CARD_POOL_SCOPE,
+        )
+        assert restricted_summary["key"] == "restricted-card"
+        assert restricted_summary["card_pool"] == "player"
 
     username = "gm-card-list-staff"
     password = "password"
     _create_user(username, password, is_staff=True)
     staff = Client(HTTP_HOST="localhost")
     assert staff.login(username=username, password=password)
-    response = staff.get("/cards", {"card_pool": "game_master", "card_roles": "event"})
+    for card in restricted_cards:
+        response = staff.get("/cards", {"card_pool": card.card_pool, "card_roles": "event"})
+        assert response.status_code == 200
+        assert [row["id"] for row in response.json()["results"]] == [card.id]
 
-    assert response.status_code == 200
-    assert [row["id"] for row in response.json()["results"]] == [gm_card.id]
 
-
-def test_deck_writes_treat_game_master_card_ids_as_missing_player_cards() -> None:
+def test_deck_writes_treat_evil_card_ids_as_missing_player_cards() -> None:
     username = "gm-deck-write-scope-user"
     password = "password"
     _create_user(username, password)
     player_hero = _create_card(name="GM Write Player Hero", hero=True)
-    game_master_hero = _create_card(name="GM Write Secret Hero", hero=True)
-    game_master_card = _create_card(name="GM Write Secret Card", hero=False)
-    Card.objects.filter(id__in=[game_master_hero.id, game_master_card.id]).update(
-        card_pool="game_master"
+    evil_hero = _create_card(name="GM Write Secret Hero", hero=True)
+    evil_card = _create_card(name="GM Write Secret Card", hero=False)
+    Card.objects.filter(id__in=[evil_hero.id, evil_card.id]).update(
+        card_pool="evil"
     )
     client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
     csrf_token = _login_and_get_csrf_token(client, username, password)
@@ -3156,11 +3171,11 @@ def test_deck_writes_treat_game_master_card_ids_as_missing_player_cards() -> Non
             HTTP_X_CSRFTOKEN=csrf_token,
         )
 
-    restricted_hero_response = create_response(hero_card_id=game_master_hero.id, entries=[])
+    restricted_hero_response = create_response(hero_card_id=evil_hero.id, entries=[])
     missing_hero_response = create_response(hero_card_id="missing-hero", entries=[])
     restricted_entry_response = create_response(
         hero_card_id=player_hero.id,
-        entries=[{"card_id": game_master_card.id, "quantity": 1}],
+        entries=[{"card_id": evil_card.id, "quantity": 1}],
     )
     missing_entry_response = create_response(
         hero_card_id=player_hero.id,
@@ -3172,7 +3187,7 @@ def test_deck_writes_treat_game_master_card_ids_as_missing_player_cards() -> Non
         sideboards=[
             {
                 "name": "Restricted",
-                "entries": [{"card_id": game_master_card.id, "quantity": 1}],
+                "entries": [{"card_id": evil_card.id, "quantity": 1}],
             }
         ],
     )
@@ -3201,7 +3216,7 @@ def test_deck_writes_treat_game_master_card_ids_as_missing_player_cards() -> Non
     }
 
 
-def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_staff() -> None:
+def test_reclassified_evil_card_is_redacted_in_owner_deck_but_visible_to_staff() -> None:
     owner = _create_user("gm-deck-owner", "password")
     staff = _create_user("gm-deck-staff", "password", is_staff=True)
     hero = _create_card(name="GM Deck Player Hero", hero=True)
@@ -3216,7 +3231,7 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
         entries=[DeckEntryInput(card_id=reclassified.id, quantity=1)],
         sideboards=[],
     )
-    reclassified.card_pool = "game_master"
+    reclassified.card_pool = "evil"
     reclassified.lifecycle_status = "deprecated"
     reclassified.deck_building_config_json = {
         "overrides": {
@@ -3244,7 +3259,9 @@ def test_reclassified_game_master_card_is_redacted_in_owner_deck_but_visible_to_
     assert restricted_card["restricted"] is True
     assert restricted_card["id"] != reclassified.id
     assert restricted_card["id"].startswith("restricted-card-")
-    assert restricted_card["name"] == "Restricted Game Master card"
+    assert restricted_card["name"] == "Restricted card"
+    assert restricted_card["key"] == "restricted-card"
+    assert restricted_card["card_pool"] == "player"
     assert restricted_card["lifecycle_status"] == "active"
     assert restricted_card["updated_at"] == ""
     assert "Secret Reclassified Event" not in owner_response.content.decode()
@@ -3395,7 +3412,7 @@ def test_latest_version_patch_can_update_card_roles() -> None:
 
     response = client.patch(
         f"/cards/{card.id}/latest-version",
-        data={"card_pool": "game_master", "card_roles": ["hero", "boon", "location"]},
+        data={"card_pool": "evil", "card_roles": ["hero", "boon", "location"]},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
@@ -3407,8 +3424,8 @@ def test_latest_version_patch_can_update_card_roles() -> None:
         "location",
     }
     card.refresh_from_db()
-    assert card.card_pool == "game_master"
-    assert response.json()["card_pool"] == "game_master"
+    assert card.card_pool == "evil"
+    assert response.json()["card_pool"] == "evil"
     assert set(response.json()["card_roles"]) == {"hero", "boon", "location"}
 
     replacement_response = client.patch(

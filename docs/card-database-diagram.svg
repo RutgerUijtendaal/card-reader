@@ -111,7 +111,8 @@
 
   <rect class="box group" x="95" y="930" width="210" height="86"/>
   <text class="title" x="150" y="967">CardAlias</text>
-  <text class="field" x="122" y="991">card + key/label</text>
+  <text class="field" x="122" y="986">card + card_pool</text>
+  <text class="field" x="122" y="1008">key/label (unique per pool)</text>
 
   <rect class="box group" x="360" y="930" width="210" height="86"/>
   <text class="title" x="382" y="967">CardMergeRedirect</text>
@@ -136,10 +137,15 @@
   <rect class="band" x="700" y="370" width="320" height="880"/>
   <text class="band-title" x="735" y="402">Stable identity</text>
 
+  <rect class="box card" x="745" y="445" width="230" height="90"/>
+  <text class="title-small" x="773" y="477">CardIdentityPoolLock</text>
+  <text class="field" x="775" y="501">card_pool (primary key)</text>
+  <text class="small" x="775" y="522">serializes name/alias writes</text>
+
   <rect class="box card" x="745" y="575" width="230" height="190"/>
   <text class="title" x="812" y="615">Card</text>
-  <text class="field" x="775" y="645">id, key, label</text>
-  <text class="field" x="775" y="670">card_pool (Player / Game Master)</text>
+  <text class="field" x="775" y="645">id, label; key unique per pool</text>
+  <text class="field" x="775" y="670">card_pool (Player / Evil / Neutral)</text>
   <text class="field" x="775" y="695">lifecycle_status</text>
   <text class="field" x="775" y="720">deck_building_config_json</text>
   <text class="field" x="775" y="745">latest_version</text>

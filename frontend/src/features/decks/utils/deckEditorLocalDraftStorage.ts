@@ -176,7 +176,7 @@ const normalizeCardSnapshot = (value: unknown): DeckCardSummary | null => {
   let cardPool: DeckCardSummary['card_pool'];
   let cardRoles: DeckCardSummary['card_roles'];
   if (
-    (value.card_pool === 'player' || value.card_pool === 'game_master')
+    (value.card_pool === 'player' || value.card_pool === 'evil' || value.card_pool === 'neutral')
     && isStringArray(value.card_roles)
   ) {
     cardPool = value.card_pool;

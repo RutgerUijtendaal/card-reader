@@ -193,11 +193,11 @@ describe('CardMergesAdminView', () => {
     mounted.unmount();
   });
 
-  test('uses a prefilled Game Master card as the merge search pool', async () => {
+  test('uses a prefilled Evil card as the merge search pool', async () => {
     vi.useFakeTimers();
     apiGet.mockImplementation((url: string) => {
       if (url === '/cards/gm-source') {
-        return Promise.resolve({ data: buildCard('gm-source', 'GM Source', 'game_master') });
+        return Promise.resolve({ data: buildCard('gm-source', 'GM Source', 'evil') });
       }
       if (url === '/cards') {
         return Promise.resolve({
@@ -207,7 +207,7 @@ describe('CardMergesAdminView', () => {
             previous_page: null,
             page: 1,
             page_size: 12,
-            results: [buildCard('gm-target', 'GM Target', 'game_master')],
+            results: [buildCard('gm-target', 'GM Target', 'evil')],
           },
         });
       }
@@ -220,14 +220,14 @@ describe('CardMergesAdminView', () => {
     if (!(poolSelect instanceof HTMLSelectElement) || !(targetInput instanceof HTMLInputElement)) {
       throw new Error('expected merge pool and target controls');
     }
-    expect(poolSelect.value).toBe('game_master');
+    expect(poolSelect.value).toBe('evil');
 
     await searchAndSelect(targetInput, 'Target', 'Select GM Target');
 
     expect(apiGet).toHaveBeenCalledWith('/cards', {
       params: expect.objectContaining({
         q: 'Target',
-        card_pool: 'game_master',
+        card_pool: 'evil',
       }),
     });
 

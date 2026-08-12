@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -9,6 +9,7 @@ from card_reader_core.models import (
     CARD_ROLE_FILTER_VALUES,
     HERO_CARD_ROLE,
     STANDARD_CARD_ROLE,
+    CardPool,
     CardRole,
     CardRoleFilter,
 )
@@ -17,8 +18,8 @@ DEVELOPER_DATA_FORMAT_VERSION = 3
 SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
 
 
-def _default_pool_coverage() -> dict[Literal["player", "game_master"], int]:
-    return {"player": 1, "game_master": 0}
+def _default_pool_coverage() -> dict[CardPool, int]:
+    return {"player": 1, "evil": 0, "neutral": 0}
 
 
 def _default_role_coverage() -> dict[CardRoleFilter, int]:
@@ -36,7 +37,7 @@ class StrictModel(BaseModel):
 
 class CoverageRequirements(StrictModel):
     min_cards: int = Field(default=1, ge=0)
-    min_cards_by_pool: dict[Literal["player", "game_master"], int] = Field(
+    min_cards_by_pool: dict[CardPool, int] = Field(
         default_factory=_default_pool_coverage
     )
     min_cards_by_role: dict[CardRoleFilter, int] = Field(
@@ -150,7 +151,7 @@ class CardAliasRecord(StrictModel):
 class CardRecord(StrictModel):
     key: str
     label: str
-    card_pool: Literal["player", "game_master"]
+    card_pool: CardPool
     card_roles: list[CardRole]
     deck_building_config: dict[str, Any]
     lifecycle_status: str

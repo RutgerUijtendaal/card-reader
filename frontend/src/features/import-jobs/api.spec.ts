@@ -46,7 +46,7 @@ describe('importJobs api', () => {
       contentVersionBase: '14.1',
       contentVersionDescription: 'Current release.',
       files: [file],
-      cardPool: 'game_master',
+      cardPool: 'evil',
       cardRoleMode: 'override',
       cardRoleOverride: ['boon', 'event'],
     });
@@ -59,7 +59,7 @@ describe('importJobs api', () => {
     );
     expect(formData.get('template_id')).toBe('mtg-like-v1');
     expect(formData.get('creation_key')).toBe('f1e10412-e8e8-49cb-9717-a24d2eec38c1');
-    expect(formData.get('card_pool')).toBe('game_master');
+    expect(formData.get('card_pool')).toBe('evil');
     expect(formData.get('card_role_mode')).toBe('override');
     expect(formData.get('card_role_override')).toBe('["boon","event"]');
     expect(formData.get('content_version_base')).toBe('14.1');
