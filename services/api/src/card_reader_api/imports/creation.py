@@ -258,6 +258,7 @@ class ImportUploadAdmission:
         except Exception as exc:
             return self._reconcile_uncertain_stage(
                 staged=staged,
+                uploads=uploads,
                 fingerprint=fingerprint,
                 error=exc,
             )
@@ -313,6 +314,7 @@ class ImportUploadAdmission:
         self,
         *,
         staged: StagedImportUpload,
+        uploads: list[tuple[UploadedFile, str]],
         fingerprint: str,
         error: Exception,
     ) -> ImportAdmissionResult:
@@ -328,7 +330,12 @@ class ImportUploadAdmission:
             ) from error
         if existing is not None:
             if existing.creation_fingerprint != fingerprint:
-                staged.discard()
+                _discard_reconciled_stage(
+                    uploads,
+                    creation_key=staged.creation_key,
+                    fingerprint=fingerprint,
+                    reason="unexpected creation failure superseded by a conflicting job",
+                )
                 raise ImportAdmissionConflict(
                     "This creation key has already been used for a different import payload."
                 ) from error

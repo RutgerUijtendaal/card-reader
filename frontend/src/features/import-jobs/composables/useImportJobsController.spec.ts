@@ -482,6 +482,7 @@ describe('useImportJobsController', () => {
       status: 'cancelled',
       processed_items: 10,
     });
+    vi.mocked(fetchImportJobDetail).mockRejectedValueOnce(new Error('Detail unavailable'));
     vi.mocked(fetchImportJobs).mockRejectedValueOnce(new Error('Active unavailable'));
     vi.mocked(fetchOperationsQueuePage).mockRejectedValueOnce(new Error('History unavailable'));
 
@@ -489,6 +490,61 @@ describe('useImportJobsController', () => {
 
     expect(mounted.controller.activeJobs.value).toEqual([]);
     expect(mounted.controller.selectedJobDetail.value?.status).toBe('cancelled');
+    mounted.app.unmount();
+  });
+
+  test('refreshes queued item states after a terminal cancellation response', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+    mounted.controller.activeJobs.value = [
+      { ...activeJob('queued-job'), status: 'queued' },
+    ];
+    const queuedItem = {
+      id: 'queued-item',
+      source_file: 'queued.png',
+      status: 'queued' as const,
+      error_message: null,
+      warning_code: null,
+      warning_message: null,
+      warnings: [],
+      resolved_card_roles: [],
+      card_role_inference: {},
+      target_card_id: null,
+      target_card_version_id: null,
+      target_card_pool_snapshot: null,
+      target_card_roles_snapshot: [],
+      card_tab_url: null,
+    };
+    vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
+      ...importJobDetail('queued-job'),
+      status: 'queued',
+      items: [queuedItem],
+    });
+    await mounted.controller.viewJobDetail('queued-job');
+    vi.mocked(cancelImportJob).mockResolvedValueOnce({
+      ...activeJob('queued-job'),
+      status: 'cancelled',
+      processed_items: 10,
+    });
+    vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
+      ...importJobDetail('queued-job'),
+      status: 'cancelled',
+      processed_items: 10,
+      items: [{ ...queuedItem, status: 'cancelled' }],
+    });
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([]);
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
+      historyPage([historyItem('queued-job', 'cancelled')]),
+    );
+
+    await mounted.controller.cancelJob('queued-job');
+
+    expect(fetchImportJobDetail).toHaveBeenCalledTimes(2);
+    expect(mounted.controller.selectedJobDetail.value?.status).toBe('cancelled');
+    expect(mounted.controller.selectedJobDetail.value?.items[0]?.status).toBe('cancelled');
     mounted.app.unmount();
   });
 

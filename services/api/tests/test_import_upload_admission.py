@@ -274,6 +274,40 @@ def test_creation_key_conflict_discards_a_preserved_losing_fingerprint() -> None
     assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
+def test_late_creation_key_conflict_discards_a_preserved_losing_fingerprint() -> None:
+    data = _validated_data()
+    creation_key = str(data["creation_key"])
+    fingerprint, uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+    )
+    StagedImportUpload.publish(
+        uploads,
+        creation_key=creation_key,
+        fingerprint=fingerprint,
+    )
+    service = _FakeImportService()
+
+    def lose_creation_race(**_kwargs: object) -> object:
+        service.create_called = True
+        service.existing = SimpleNamespace(id="winner", creation_fingerprint="b" * 64)
+        raise RuntimeError("database response lost")
+
+    service.create_job = lose_creation_race  # type: ignore[method-assign]
+
+    with pytest.raises(ImportAdmissionConflict, match="different import payload"):
+        ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
 def test_staged_upload_rejects_cleanup_paths_outside_exact_fingerprint_directory() -> None:
     creation_key = str(uuid4())
     staged = StagedImportUpload(

@@ -159,11 +159,17 @@ export const useImportActivity = () => {
     }
   };
 
-  const refreshSelectedJobDetail = async (): Promise<void> => {
+  const refreshSelectedJobDetail = async (
+    { force = false }: { force?: boolean } = {},
+  ): Promise<void> => {
     const jobId = selectedJobId.value;
     const selectionRevision = detailSelectionRevision;
     const detail = selectedJobDetail.value;
-    if (!jobId || detailLoading.value || (detail && isTerminalImportStatus(detail.status))) return;
+    if (
+      !jobId
+      || detailLoading.value
+      || (!force && detail && isTerminalImportStatus(detail.status))
+    ) return;
 
     const requestId = ++detailRequestId;
     try {
@@ -279,13 +285,22 @@ export const useImportActivity = () => {
     activeJobs.value = isTerminalImportStatus(cancelledJob.status)
       ? activeJobs.value.filter((job) => job.id !== jobId)
       : activeJobs.value.map((job) => (job.id === jobId ? cancelledJob : job));
-    if (selectedJobDetail.value?.id === jobId) {
+    const selectedDetail = selectedJobDetail.value;
+    const cancelledDetailIsOpen = selectedDetail?.id === jobId;
+    if (selectedDetail && cancelledDetailIsOpen) {
       detailRequestId += 1;
       selectedJobDetail.value = {
-        ...selectedJobDetail.value,
+        ...selectedDetail,
         ...cancelledJob,
-        items: selectedJobDetail.value.items,
+        items: selectedDetail.items,
       };
+    }
+    if (cancelledDetailIsOpen && isTerminalImportStatus(cancelledJob.status)) {
+      try {
+        await refreshSelectedJobDetail({ force: true });
+      } catch (error) {
+        console.error('Refresh import detail after cancellation failed', error);
+      }
     }
     await refreshActivity();
   };
