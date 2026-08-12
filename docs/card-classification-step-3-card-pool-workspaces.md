@@ -1,6 +1,6 @@
 # Card Classification Step 3: Player, Evil, and Neutral Workspaces
 
-Status: approved implementation plan; blocked on [Step 2.2](card-classification-step-2-2-import-workflow-seam.md).
+Status: approved implementation plan; blocked on [Step 2.3](card-classification-step-2-3-faction-classification.md).
 
 This step turns the card pool into a site-level browsing context. It does not change the classification model or infer new data.
 
@@ -180,7 +180,7 @@ All visible changes must use semantic theme primitives and be verified in light 
 
 ## Implementation sequence
 
-1. Confirm Step 1 capability enforcement, Step 2 explicit import classification, Step 2.1 pool-scoped identity, and Step 2.2 workflow seams are complete.
+1. Confirm Step 1 capability enforcement, Step 2 explicit import classification, Step 2.1 pool-scoped identity, Step 2.2 workflow seams, and Step 2.3 faction classification are complete.
 2. Add the frontend card-pool workspace/preference contract and tests.
 3. Consume the ordered session pool-scope contract.
 4. Add desktop, collapsed, and mobile sidenav controls.

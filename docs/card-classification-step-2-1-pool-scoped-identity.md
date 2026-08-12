@@ -1,6 +1,8 @@
 # Card Classification Step 2.1: Pool-Scoped Card Identity
 
-Status: implemented, validated, and merged into the classification umbrella branch. [Step 2.2](card-classification-step-2-2-import-workflow-seam.md) is the active checkpoint; [Step 3](card-classification-step-3-card-pool-workspaces.md) remains blocked until Step 2.2 merges.
+Status: implemented, validated, and merged into the classification umbrella branch. [Step 2.2](card-classification-step-2-2-import-workflow-seam.md) is also merged; [Step 2.3](card-classification-step-2-3-faction-classification.md) is the active design checkpoint.
+
+Target amendment: this document records the implemented pool-scoped identity seam. [Step 2.3](card-classification-step-2-3-faction-classification.md) extends that seam so normalized names, aliases, and untargeted image matching are scoped by pool plus the exact canonical faction set, allowing same-name cards in different factions within one pool.
 
 This checkpoint sits between import inference and import workflow consolidation:
 
@@ -9,7 +11,8 @@ This checkpoint sits between import inference and import workflow consolidation:
 3. [Import inference](card-classification-step-2-import-inference.md)
 4. Pool-scoped card identity (this document)
 5. [Import workflow seam consolidation](card-classification-step-2-2-import-workflow-seam.md)
-6. [Card-pool workspaces](card-classification-step-3-card-pool-workspaces.md)
+6. [Faction classification](card-classification-step-2-3-faction-classification.md)
+7. [Card-pool workspaces](card-classification-step-3-card-pool-workspaces.md)
 
 Do not begin Step 2.2 until this checkpoint is merged into the classification umbrella branch. This step changes stable identity and every path that resolves it; Step 2.2 can then consolidate import lifecycles without preserving a globally scoped lookup.
 

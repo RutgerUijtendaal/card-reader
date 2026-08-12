@@ -1,15 +1,16 @@
 # Card Classification Step 2.2: Import Workflow Seam Consolidation
 
-Status: implemented and validated on the Step 2.2 checkpoint branch; awaiting review and merge into the classification umbrella branch. [Step 3](card-classification-step-3-card-pool-workspaces.md) remains blocked until that merge.
+Status: implemented, validated, reviewed, and merged into the classification umbrella branch. [Step 2.3](card-classification-step-2-3-faction-classification.md) is the active design checkpoint; [Step 3](card-classification-step-3-card-pool-workspaces.md) remains blocked on it.
 
-This is a hardening checkpoint between import inference/identity and the Player/Evil/Neutral workspaces:
+This is a hardening checkpoint between import inference/identity and the faction/workspace checkpoints:
 
 1. [Card classification foundation](card-classification-step-1-foundation.md)
 2. [Authorization seam consolidation](card-classification-step-1-1-authorization-seam.md)
 3. [Import inference](card-classification-step-2-import-inference.md)
 4. [Pool-scoped card identity](card-classification-step-2-1-pool-scoped-identity.md)
 5. Import workflow seam consolidation (this document)
-6. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
+6. [Faction classification](card-classification-step-2-3-faction-classification.md)
+7. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
 
 Do not add workspace behavior in this checkpoint. Step 2.2 consolidates the lifecycle and state-management contracts established by Step 2 so later work does not have to reproduce them across more entry points.
 
@@ -71,7 +72,7 @@ Each fix is valid, but the repeated shape shows that the workflow lacks one plac
 - Open the Step 2.2 PR against `feature/card-classification`, not `master`.
 - Keep the aggregate feature PR to `master` open so the combined classification work continues receiving CI and review.
 - Merge Step 2.2 into the umbrella only after its acceptance criteria and review are clear.
-- Create the Step 3 branch from the newly updated umbrella branch so the workspace diff does not contain Step 2.2 implementation commits.
+- Create the Step 2.3 branch from the newly updated umbrella branch so the faction-classification diff does not contain Step 2.2 implementation commits.
 
 ## Authoritative success and failure domains
 
@@ -192,7 +193,7 @@ Warnings remain ordered domain records. UI helpers may format known details but 
 10. Remove obsolete branch-specific cleanup, grouping, refresh, and evidence logic after all callers use the seam.
 11. Add architecture guards for the new ownership boundaries.
 12. Update current-state import/operations documentation if module ownership or operational recovery changes.
-13. Run all permitted validation and complete a final state-matrix audit before starting Step 3.
+13. Run all permitted validation and complete a final state-matrix audit before starting Step 2.3.
 
 ## Required tests
 
