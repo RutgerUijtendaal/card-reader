@@ -39,7 +39,7 @@ from card_reader_core.repositories.cards import (
     list_cards,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
-from card_reader_core.models import CARD_ROLE_FILTER_DEFINITIONS
+from card_reader_core.models import CARD_POOL_DEFINITIONS, CARD_ROLE_FILTER_DEFINITIONS
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -63,7 +63,7 @@ class CardListView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_list_filters()
         if not card_pool_scope.allows_card_pool(filters["card_pool"]):
-            return Response({"detail": "Game Master cards require staff access."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Restricted card pools require staff access."}, status=status.HTTP_403_FORBIDDEN)
         show_groups = filters["show_groups"]
         if show_groups:
             return Response(grouped_gallery_payload(filters))
@@ -151,16 +151,13 @@ class CardFiltersView(APIView):
                 "symbols": [symbol_option(row) for row in metadata["symbols"]],
                 "types": [metadata_option(row) for row in metadata["types"]],
                 "card_pools": [
-                    *(
-                        [{"key": "player", "label": "Player", "rank": 0}]
-                        if card_pool_scope.allows_card_pool("player")
-                        else []
-                    ),
-                    *(
-                        [{"key": "game_master", "label": "Game Master", "rank": 1}]
-                        if card_pool_scope.allows_card_pool("game_master")
-                        else []
-                    ),
+                    {
+                        "key": definition.key,
+                        "label": definition.label,
+                        "rank": definition.rank,
+                    }
+                    for definition in CARD_POOL_DEFINITIONS
+                    if card_pool_scope.allows_card_pool(definition.key)
                 ],
                 "card_roles": [
                     {

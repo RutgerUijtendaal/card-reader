@@ -259,8 +259,18 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
         Card.objects.create(key="additional-public-card", label="Additional Public Card")
         Card.objects.create(
             key="restricted-game-master-card",
-            label="Restricted Game Master Card",
-            card_pool="game_master",
+            label="Restricted Evil Card",
+            card_pool="evil",
+        )
+        Card.objects.create(
+            key="synthetic-hero",
+            label="Restricted Evil Twin",
+            card_pool="evil",
+        )
+        Card.objects.create(
+            key="synthetic-hero",
+            label="Restricted Neutral Twin",
+            card_pool="neutral",
         )
         selection.update(
             {
@@ -475,16 +485,18 @@ def test_archive_validation_rejects_unsafe_paths(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("card_key", "expected_error"),
+    ("card_key", "card_pool", "expected_error"),
     [
-        ("synthetic-deprecated", "non-Player cards: synthetic-deprecated"),
-        ("synthetic-mainboard", "cross-pool card groups: synthetic-group"),
+        ("synthetic-deprecated", "evil", "non-Player cards: synthetic-deprecated"),
+        ("synthetic-deprecated", "neutral", "non-Player cards: synthetic-deprecated"),
+        ("synthetic-mainboard", "evil", "cross-pool card groups: synthetic-group"),
     ],
 )
 def test_archive_validation_rejects_restricted_cards_and_cross_pool_groups(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     card_key: str,
+    card_pool: str,
     expected_error: str,
 ) -> None:
     source_storage = tmp_path / "source-storage"
@@ -506,6 +518,7 @@ def test_archive_validation_rejects_restricted_cards_and_cross_pool_groups(
             restricted_archive_path,
             tmp_path / "restricted-archive",
             card_key=card_key,
+            card_pool=card_pool,
         )
 
         with pytest.raises(DeveloperDataError, match=expected_error):
@@ -540,6 +553,7 @@ def _build_reclassified_archive(
     extraction_root: Path,
     *,
     card_key: str,
+    card_pool: str,
 ) -> None:
     extraction_root.mkdir()
     with tarfile.open(source, "r:gz") as archive:
@@ -547,7 +561,7 @@ def _build_reclassified_archive(
     data_path = extraction_root / "data.json"
     payload = json.loads(data_path.read_text(encoding="utf-8"))
     card = next(card for card in payload["cards"] if card["key"] == card_key)
-    card["card_pool"] = "game_master"
+    card["card_pool"] = card_pool
     serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     data_path.write_bytes(serialized)
     manifest_path = extraction_root / "manifest.json"
@@ -676,7 +690,12 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     )
     hero_v2.parse_result = parse_result
     hero_v2.save(update_fields=["parse_result"])
-    CardAlias.objects.create(card=hero, key="synthetic-hero-alias", label="Hero Alias")
+    CardAlias.objects.create(
+        card=hero,
+        card_pool=hero.card_pool,
+        key="synthetic-hero-alias",
+        label="Hero Alias",
+    )
     CardVersionKeyword.objects.create(card_version=hero_v2, keyword=keyword)
     CardVersionTag.objects.create(card_version=hero_v2, tag=tag)
     CardVersionSymbol.objects.create(card_version=hero_v2, symbol=symbol)
@@ -730,7 +749,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "card_group_keys": [group.key],
         "coverage": {
             "min_cards": 3,
-            "min_cards_by_pool": {"player": 3, "game_master": 0},
+            "min_cards_by_pool": {"player": 3, "evil": 0, "neutral": 0},
             "min_cards_by_role": {
                 "standard": 1,
                 "hero": 1,

@@ -206,7 +206,7 @@ def test_create_import_upload_replays_same_creation_key_without_duplicate_work()
             "/imports/upload",
             data={
                 "creation_key": creation_key,
-                "card_pool": "game_master",
+                "card_pool": "evil",
                 "card_role_mode": "override",
                 "card_role_override": json.dumps(["boon", "event"]),
                 "template_id": "mtg-like-v1",
@@ -232,7 +232,7 @@ def test_create_import_upload_replays_same_creation_key_without_duplicate_work()
     assert ImportJobItem.objects.filter(job_id=first.json()["job_id"]).count() == 1
     assert ContentVersion.objects.filter(base_version="97.1").count() == 1
     job = ImportJob.objects.get(id=first.json()["job_id"])
-    assert job.card_pool == "game_master"
+    assert job.card_pool == "evil"
     assert job.card_role_mode == "override"
     assert job.card_role_override_json == ["boon", "event"]
 
@@ -544,7 +544,7 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
     _login_and_get_csrf_token(client, username, password)
 
     card, version = _create_editable_card_version(name="Suggested Catalog Card")
-    card.card_pool = "game_master"
+    card.card_pool = "evil"
     card.save(update_fields=["card_pool"])
     CardRoleAssignment.objects.bulk_create(
         [
@@ -586,9 +586,9 @@ def test_catalog_response_groups_known_and_suggested_entries() -> None:
     assert suggestion.id in suggested_ids
     linked_card = keyword_detail_response.json()["linked_cards"][0]
     occurrence = suggestion_detail_response.json()["occurrences"][0]
-    assert linked_card["card_pool"] == "game_master"
+    assert linked_card["card_pool"] == "evil"
     assert linked_card["card_roles"] == ["boon", "event"]
-    assert occurrence["card_pool"] == "game_master"
+    assert occurrence["card_pool"] == "evil"
     assert occurrence["card_roles"] == ["boon", "event"]
 
 
@@ -1062,10 +1062,10 @@ def test_card_image_asset_endpoint_serves_non_checksum_immutable_image_path() ->
     assert card.id
 
 
-def test_game_master_card_images_are_hidden_from_non_staff_across_all_routes() -> None:
-    card, version = _create_editable_card_version(name="Restricted Game Master Image")
+def test_evil_card_images_are_hidden_from_non_staff_across_all_routes() -> None:
+    card, version = _create_editable_card_version(name="Restricted Evil Image")
     image = _create_card_image(version)
-    card.card_pool = "game_master"
+    card.card_pool = "evil"
     card.save(update_fields=["card_pool"])
     anonymous = Client(HTTP_HOST="localhost")
     paths = [
@@ -1088,13 +1088,13 @@ def test_game_master_card_images_are_hidden_from_non_staff_across_all_routes() -
 
 def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:
     player_card, _player_version = _create_editable_card_version(name="Visible Player Card")
-    game_master_card, game_master_version = _create_editable_card_version(
-        name="Restricted Game Master Version"
+    evil_card, evil_version = _create_editable_card_version(
+        name="Restricted Evil Version"
     )
-    _create_card_image(game_master_version)
-    game_master_card.card_pool = "game_master"
-    game_master_card.save(update_fields=["card_pool"])
-    mismatched_path = f"/cards/{player_card.id}/versions/{game_master_version.id}/image"
+    _create_card_image(evil_version)
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    mismatched_path = f"/cards/{player_card.id}/versions/{evil_version.id}/image"
 
     assert Client(HTTP_HOST="localhost").get(mismatched_path).status_code == 404
     assert _staff_client("mismatched-version-image-staff").get(mismatched_path).status_code == 404
@@ -1103,13 +1103,13 @@ def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> N
 def test_shared_immutable_image_remains_public_when_any_owning_card_is_player() -> None:
     player_card, player_version = _create_editable_card_version(name="Shared Player Image")
     player_image = _create_card_image(player_version)
-    game_master_card, game_master_version = _create_editable_card_version(
-        name="Shared Game Master Image"
+    evil_card, evil_version = _create_editable_card_version(
+        name="Shared Evil Image"
     )
-    game_master_card.card_pool = "game_master"
-    game_master_card.save(update_fields=["card_pool"])
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
     CardVersionImage.objects.create(
-        card_version=game_master_version,
+        card_version=evil_version,
         source_file=player_image.source_file,
         stored_path=player_image.stored_path,
         checksum=player_image.checksum,
@@ -1458,13 +1458,13 @@ def test_filters_payload_includes_type_linked_card_counts() -> None:
 def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
     counted_type = _create_type(key="filters-pool-counted-type", label="Filters Pool Counted Type")
     _player_card, player_version = _create_editable_card_version(name="Filters Player Counted Card")
-    game_master_card, game_master_version = _create_editable_card_version(
-        name="Filters Game Master Counted Card"
+    evil_card, evil_version = _create_editable_card_version(
+        name="Filters Evil Counted Card"
     )
-    game_master_card.card_pool = "game_master"
-    game_master_card.save(update_fields=["card_pool"])
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
     replace_card_version_types(card_version_id=player_version.id, type_ids=[counted_type.id])
-    replace_card_version_types(card_version_id=game_master_version.id, type_ids=[counted_type.id])
+    replace_card_version_types(card_version_id=evil_version.id, type_ids=[counted_type.id])
 
     public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
     staff_response = _staff_client("filters-pool-count-staff").get("/cards/filters")
@@ -1475,6 +1475,26 @@ def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
     staff_type = next(row for row in staff_response.json()["types"] if row["id"] == counted_type.id)
     assert public_type["linked_card_count"] == 1
     assert staff_type["linked_card_count"] == 2
+
+
+def test_filters_payload_returns_authorized_pool_registry_in_canonical_order() -> None:
+    public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
+    staff_response = _staff_client("filters-pool-registry-staff").get("/cards/filters")
+
+    assert public_response.json()["card_pools"] == [
+        {"key": "player", "label": "Player", "rank": 0},
+    ]
+    assert staff_response.json()["card_pools"] == [
+        {"key": "player", "label": "Player", "rank": 0},
+        {"key": "evil", "label": "Evil", "rank": 1},
+        {"key": "neutral", "label": "Neutral", "rank": 2},
+    ]
+
+    obsolete_response = _staff_client("obsolete-pool-staff").get(
+        "/cards",
+        {"card_pool": "game_master"},
+    )
+    assert obsolete_response.status_code == 400
 
 
 def test_filters_payload_orders_types_by_linked_card_count_without_pinning_mana() -> None:
@@ -2676,7 +2696,7 @@ def test_staff_can_manage_card_groups() -> None:
     anchor_card, _anchor_version = _create_editable_card_version(name="Staff Group Anchor")
     member_card, _member_version = _create_editable_card_version(name="Staff Group Member")
     replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
-    member_card.card_pool = "game_master"
+    member_card.card_pool = "evil"
     member_card.save(update_fields=["card_pool"])
 
     create_response = client.post(
@@ -2719,7 +2739,7 @@ def test_staff_can_manage_card_groups() -> None:
     assert delete_response.status_code == 204
     assert patch_response.json()["anchor_card_id"] == replacement_card.id
     assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
-    assert [member["card_pool"] for member in patch_response.json()["members"]] == ["player", "game_master"]
+    assert [member["card_pool"] for member in patch_response.json()["members"]] == ["player", "evil"]
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 
@@ -2758,7 +2778,11 @@ def test_staff_can_preview_and_apply_card_merge() -> None:
     assert apply_response.status_code == 200
 
     assert not Card.objects.filter(id=source_card.id).exists()
-    assert CardAlias.objects.filter(card_id=target_card.id, key=source_card.key).exists()
+    assert CardAlias.objects.filter(
+        card_id=target_card.id,
+        card_pool="player",
+        key=source_card.key,
+    ).exists()
     assert CardMergeRedirect.objects.filter(old_card_id=source_card.id, target_card_id=target_card.id).exists()
     assert list(CardVersion.objects.filter(card_id=target_card.id).order_by("version_number").values_list("id", flat=True)) == [
         source_version.id,
@@ -2788,6 +2812,38 @@ def test_card_merge_endpoints_require_staff() -> None:
     )
 
     assert response.status_code == 403
+
+
+def test_card_merge_rejects_cross_pool_sources() -> None:
+    target_card, _target_version = _create_editable_card_version(name="Cross Pool Merge Target")
+    source_card, _source_version = _create_editable_card_version(name="Cross Pool Merge Source")
+    source_card.card_pool = "neutral"
+    source_card.save(update_fields=["card_pool"])
+    username = "staff-cross-pool-merge-user"
+    password = "password"
+    _create_user(username, password, is_staff=True)
+    client = Client(HTTP_HOST="localhost", enforce_csrf_checks=True)
+    csrf_token = _login_and_get_csrf_token(client, username, password)
+    payload = {"target_card_id": target_card.id, "source_card_ids": [source_card.id]}
+
+    preview = client.post(
+        "/admin/card-merges/preview",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    apply = client.post(
+        "/admin/card-merges/apply",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+
+    assert preview.status_code == 200
+    assert preview.json()["can_apply"] is False
+    assert "Cards from different pools cannot be merged." in preview.json()["blocking_conflicts"]
+    assert apply.status_code == 400
+    assert Card.objects.filter(id__in=[target_card.id, source_card.id]).count() == 2
 
 
 def test_card_merge_retargets_existing_redirect_chains() -> None:
@@ -2827,7 +2883,12 @@ def test_card_merge_retargets_existing_redirect_chains() -> None:
 
 def test_import_uses_card_alias_for_renamed_card() -> None:
     target_card, target_version = _create_editable_card_version(name="Canonical Import Card")
-    CardAlias.objects.create(card=target_card, key="old-import-card", label="Old Import Card")
+    CardAlias.objects.create(
+        card=target_card,
+        card_pool=target_card.card_pool,
+        key="old-import-card",
+        label="Old Import Card",
+    )
     source_file = settings.storage_root_dir / "uploads" / "old-import-card.png"
     source_file.parent.mkdir(parents=True, exist_ok=True)
     source_file.write_bytes(b"old-import-card")
@@ -3105,7 +3166,7 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "classified-new-card.png"),
         template=Template.objects.get(key="mtg-like-v1"),
-        card_pool="game_master",
+        card_pool="evil",
         total_items=1,
     )
     item = ImportJobItem.objects.create(
@@ -3121,7 +3182,7 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
         confidence={"overall": 0.8},
         raw_ocr={},
         reparse_existing=False,
-        card_pool="game_master",
+        card_pool="evil",
         resolved_card_roles=("hero", "event"),
         classification_evidence={
             "mode": "automatic",
@@ -3135,7 +3196,7 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
     )
 
     item.refresh_from_db()
-    assert version.card.card_pool == "game_master"
+    assert version.card.card_pool == "evil"
     assert list(
         version.card.role_assignments.order_by("role").values_list("role", flat=True)
     ) == ["event", "hero"]
@@ -3147,14 +3208,15 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
 def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifecycle_warning() -> None:
     card, target_version = _create_editable_card_version(name="Classification Mismatch Card")
     card.lifecycle_status = "deprecated"
-    card.save(update_fields=["lifecycle_status"])
+    card.card_pool = "evil"
+    card.save(update_fields=["lifecycle_status", "card_pool"])
     source_file = settings.storage_root_dir / "uploads" / "classification-mismatch.png"
     source_file.parent.mkdir(parents=True, exist_ok=True)
     source_file.write_bytes(b"classification-mismatch")
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "classification-mismatch.png"),
         template=Template.objects.get(key="mtg-like-v1"),
-        card_pool="game_master",
+        card_pool="evil",
         total_items=1,
     )
     item = ImportJobItem.objects.create(
@@ -3170,7 +3232,7 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
         confidence={"overall": 0.8},
         raw_ocr={},
         reparse_existing=False,
-        card_pool="game_master",
+        card_pool="evil",
         resolved_card_roles=("event",),
         classification_evidence={
             "mode": "automatic",
@@ -3187,13 +3249,50 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
     item.refresh_from_db()
     assert version.card == card
     assert version.version_number == target_version.version_number + 1
-    assert card.card_pool == "player"
+    assert card.card_pool == "evil"
     assert not card.role_assignments.exists()
     assert item.status == "completed"
     assert [warning["code"] for warning in item.warnings_json] == [
         "matched_deprecated_card",
         "card_classification_mismatch",
     ]
+
+
+def test_untargeted_import_does_not_match_same_name_or_image_hash_across_pools() -> None:
+    player_card, player_version = _create_editable_card_version(name="Cross Pool Twin")
+    player_version.image_hash = "cross-pool-shared-checksum"
+    player_version.save(update_fields=["image_hash"])
+    source_file = settings.storage_root_dir / "uploads" / "cross-pool-twin.png"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_bytes(b"cross-pool-twin")
+    job = ImportJob.objects.create(
+        source_path=build_storage_relative_path("uploads", "cross-pool-twin.png"),
+        template=Template.objects.get(key="mtg-like-v1"),
+        card_pool="neutral",
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=build_storage_relative_path("uploads", "cross-pool-twin.png"),
+    )
+
+    version = save_parsed_card(
+        item=item,
+        template_id="mtg-like-v1",
+        checksum="cross-pool-shared-checksum",
+        normalized_fields={"name": "Cross Pool Twin"},
+        confidence={"overall": 0.8},
+        raw_ocr={},
+        card_pool="neutral",
+        resolved_card_roles=("location",),
+    )
+
+    item.refresh_from_db()
+    assert version.card_id != player_card.id
+    assert version.card.card_pool == "neutral"
+    assert version.card.key == player_card.key
+    assert list(version.card.role_assignments.values_list("role", flat=True)) == ["location"]
+    assert item.warnings_json == []
 
 
 def test_targeted_reparse_rolls_back_name_conflict() -> None:

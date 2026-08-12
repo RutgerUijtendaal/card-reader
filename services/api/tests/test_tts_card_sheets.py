@@ -75,10 +75,10 @@ def test_unreadable_images_are_not_assigned_to_sheets() -> None:
     assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
 
 
-def test_game_master_cards_are_not_allocated_to_public_tts_sheets() -> None:
+def test_evil_cards_are_not_allocated_to_public_tts_sheets() -> None:
     TtsCardSheet.objects.all().delete()
     card = _create_sheet_card("game-master-source", color=(20, 30, 40))
-    card.card_pool = "game_master"
+    card.card_pool = "evil"
     card.save(update_fields=["card_pool"])
 
     sheet_ids = TtsCardSheetService().sync_cards([card.id])
@@ -266,7 +266,7 @@ def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerend
     sheet_id = next(iter(sheet_ids))
     client = Client(HTTP_HOST="localhost")
 
-    card.card_pool = "game_master"
+    card.card_pool = "evil"
     card.save(update_fields=["card_pool"])
     service.sync_cards([card.id])
 

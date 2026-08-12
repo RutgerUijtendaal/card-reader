@@ -256,7 +256,15 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             [CardRoleAssignment(card=card, role=role) for role in card_record.card_roles]
         )
         CardAlias.objects.bulk_create(
-            [CardAlias(card=card, key=alias.key, label=alias.label) for alias in card_record.aliases]
+            [
+                CardAlias(
+                    card=card,
+                    card_pool=card.card_pool,
+                    key=alias.key,
+                    label=alias.label,
+                )
+                for alias in card_record.aliases
+            ]
         )
         version_models: dict[int, CardVersion] = {}
         for version in card_record.versions:

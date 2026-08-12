@@ -98,7 +98,8 @@
     "min_cards": 750,
     "min_cards_by_pool": {
       "player": 750,
-      "game_master": 0
+      "evil": 0,
+      "neutral": 0
     },
     "min_cards_by_role": {
       "standard": 1,

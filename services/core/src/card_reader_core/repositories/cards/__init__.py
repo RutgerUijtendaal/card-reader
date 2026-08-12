@@ -4,6 +4,13 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from .images import list_latest_active_card_image_sources, resolve_image_file_path
+from .identity import (
+    change_card_identity,
+    conflicting_card_id_for_key,
+    create_card_identity,
+    ensure_card_alias,
+    resolve_card_by_name_key,
+)
 from .queries import (
     get_card,
     get_card_in_scope,
@@ -40,6 +47,7 @@ from .types import (
     DEFAULT_CARD_LIFECYCLE_FILTER,
     DEFAULT_CARD_PAGE_SIZE,
     CardFilterParams,
+    CardIdentityConflict,
     CardImageSource,
     CardLifecycleFilter,
     CardListCandidate,
@@ -76,6 +84,7 @@ __all__ = [
     "CardListCandidate",
     "CardFilterParams",
     "CardImageSource",
+    "CardIdentityConflict",
     "DEFAULT_FIELD_SOURCES",
     "DEFAULT_CARD_LIFECYCLE_FILTER",
     "DEFAULT_CARD_PAGE_SIZE",
@@ -100,6 +109,10 @@ __all__ = [
     "CardSort",
     "decode_field_sources",
     "decode_parsed_snapshot",
+    "change_card_identity",
+    "conflicting_card_id_for_key",
+    "create_card_identity",
+    "ensure_card_alias",
     "get_card",
     "get_card_in_scope",
     "get_card_image",
@@ -117,6 +130,7 @@ __all__ = [
     "list_latest_active_card_image_sources",
     "promote_card_version",
     "resolve_image_file_path",
+    "resolve_card_by_name_key",
     "save_parsed_card",
     "save_parsed_card_result",
     "update_latest_card_version",

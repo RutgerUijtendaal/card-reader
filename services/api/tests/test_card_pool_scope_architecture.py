@@ -16,18 +16,22 @@ def _python_source(root: Path) -> str:
     )
 
 
-def test_card_payloads_do_not_restore_boolean_game_master_flags() -> None:
-    assert "allow_game_master_cards" not in _python_source(API_SOURCE)
-    assert "allow_game_master_cards" not in _python_source(CORE_SOURCE)
+def test_card_payloads_do_not_add_pool_specific_boolean_flags() -> None:
+    source = _python_source(API_SOURCE) + _python_source(CORE_SOURCE)
+    assert "allow_evil_cards" not in source
+    assert "allow_neutral_cards" not in source
+    assert "can_access_evil_cards" not in source
+    assert "can_access_neutral_cards" not in source
 
 
-def test_game_master_entitlement_is_only_consumed_by_the_auth_mapper() -> None:
+def test_card_pool_scope_is_the_only_card_pool_entitlement_mapper() -> None:
     direct_consumers: list[str] = []
     auth_path = API_SOURCE / "common" / "auth_access.py"
     for path in sorted(API_SOURCE.rglob("*.py")):
         if path == auth_path:
             continue
-        if "can_access_game_master_cards" in path.read_text(encoding="utf-8"):
+        source = path.read_text(encoding="utf-8")
+        if "ALL_CARD_POOLS_SCOPE if can_access_admin" in source:
             direct_consumers.append(path.relative_to(REPO_ROOT).as_posix())
 
     assert direct_consumers == []

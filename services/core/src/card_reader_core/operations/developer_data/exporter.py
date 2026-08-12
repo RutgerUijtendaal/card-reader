@@ -133,17 +133,6 @@ def _resolve_selection(
         selected_keys.add(group.anchor_card.key)
         selected_keys.update(member.card.key for member in group.members.all())
 
-    restricted_card_keys = set(
-        Card.objects.filter(key__in=selected_keys)
-        .exclude(card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools)
-        .values_list("key", flat=True)
-    )
-    if restricted_card_keys:
-        raise DeveloperDataError(
-            "Developer-data bundles cannot include Game Master cards: "
-            + ", ".join(sorted(restricted_card_keys))
-        )
-
     card_queryset = Card.objects.filter(
         card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools
     )

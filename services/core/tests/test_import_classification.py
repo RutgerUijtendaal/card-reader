@@ -8,7 +8,7 @@ from card_reader_core.services.imports import CardClassificationInput, classify_
 def test_automatic_import_classification_unions_template_and_tag_roles_canonically() -> None:
     result = classify_import_card(
         CardClassificationInput(
-            card_pool="game_master",
+            card_pool="evil",
             role_mode="automatic",
             override_roles=(),
             template_roles=("event", "boon"),
@@ -17,7 +17,7 @@ def test_automatic_import_classification_unions_template_and_tag_roles_canonical
         )
     )
 
-    assert result.card_pool == "game_master"
+    assert result.card_pool == "evil"
     assert result.roles == ("hero", "boon", "event")
     assert result.evidence["matched_tag_keys"] == ["hero"]
 
@@ -25,7 +25,7 @@ def test_automatic_import_classification_unions_template_and_tag_roles_canonical
 def test_policy_version_two_infers_location_without_reinterpreting_version_one() -> None:
     version_one = classify_import_card(
         CardClassificationInput(
-            card_pool="game_master",
+            card_pool="evil",
             role_mode="automatic",
             override_roles=(),
             template_roles=(),
@@ -35,7 +35,7 @@ def test_policy_version_two_infers_location_without_reinterpreting_version_one()
     )
     version_two = classify_import_card(
         CardClassificationInput(
-            card_pool="game_master",
+            card_pool="evil",
             role_mode="automatic",
             override_roles=(),
             template_roles=("event", "location"),

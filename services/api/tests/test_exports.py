@@ -187,7 +187,7 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
             ),
         ],
     )
-    restricted_sideboard_card.card_pool = "game_master"
+    restricted_sideboard_card.card_pool = "evil"
     restricted_sideboard_card.save(update_fields=["card_pool"])
     sideboards = {sideboard.name: sideboard for sideboard in deck.sideboards.all()}
     _prepare_tts_export(

@@ -45,7 +45,7 @@ class ExportCsvView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_filters()
         if not card_pool_scope.allows_card_pool(filters["card_pool"]):
-            return Response({"detail": "Game Master cards require staff access."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Restricted card pools require staff access."}, status=status.HTTP_403_FORBIDDEN)
         content = export_cards_csv(
             query=filters["query"],
             max_confidence=filters["max_confidence"],

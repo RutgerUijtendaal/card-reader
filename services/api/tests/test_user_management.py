@@ -31,6 +31,7 @@ def test_current_user_payload_includes_capabilities() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["can_access_admin"] is True
+    assert payload["accessible_card_pools"] == ["player", "evil", "neutral"]
     assert payload["can_manage_users"] is True
     assert payload["can_access_maintenance"] is False
 
@@ -278,6 +279,7 @@ def test_managed_user_can_set_password_once_and_then_only_access_public_routes()
     )
     assert login_response.status_code == 200
     assert login_response.json()["can_access_admin"] is False
+    assert login_response.json()["accessible_card_pools"] == ["player"]
 
     assert managed_client.get("/cards").status_code == 200
     assert managed_client.get("/imports").status_code == 403

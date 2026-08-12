@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from typing import cast
+
 from django.db import transaction
 
 from card_reader_core.models import (
     CARD_ROLES,
     DEPRECATED_CARD_LIFECYCLE_STATUS,
     Card,
-    CardAlias,
+    CardPool,
     CardRoleAssignment,
     CardVersion,
     is_card_pool,
@@ -14,10 +16,9 @@ from card_reader_core.models import (
     now_utc,
 )
 from card_reader_core.rules import render_enriched_rule_text
-from card_reader_core.services.card_merges import ensure_card_alias
 
 from ..card_groups import card_is_group_anchor
-from ..helpers import infer_mana_value, normalize_slug_key
+from ..helpers import infer_mana_value
 from ..metadata import (
     get_symbols_for_card_version,
     replace_card_version_keywords,
@@ -26,6 +27,7 @@ from ..metadata import (
     replace_card_version_types,
 )
 from .queries import get_card, get_latest_card_version
+from .identity import change_card_identity
 from .snapshots import (
     FIELD_SOURCE_AUTO,
     FIELD_SOURCE_MANUAL,
@@ -121,11 +123,12 @@ def update_latest_card_version(
             field_sources["metadata"]["symbols"] = FIELD_SOURCE_MANUAL
             symbol_links_changed = True
         classification_changed = False
+        destination_card_pool: CardPool = cast(CardPool, card.card_pool)
         if "card_pool" in updates:
             card_pool = str(updates["card_pool"])
             if not is_card_pool(card_pool):
                 raise ValueError("Invalid card pool.")
-            card.card_pool = card_pool
+            destination_card_pool = card_pool
             classification_changed = True
         if "card_roles" in updates:
             raw_roles = updates["card_roles"]
@@ -159,15 +162,13 @@ def update_latest_card_version(
         if symbol_links_changed:
             apply_manual_rule_text(version, version.rules_text_enriched)
 
-        if restored_name or "name" in updates:
-            next_key = normalize_slug_key(version.name)
-            conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
-            conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
-            if conflicting_card is not None or conflicting_alias is not None:
-                raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
-            ensure_card_alias(card=card, key=card.key, label=card.label)
-            card.label = version.name
-            card.key = next_key
+        identity_changed = restored_name or "name" in updates or "card_pool" in updates
+        if identity_changed:
+            change_card_identity(
+                card=card,
+                label=version.name if restored_name or "name" in updates else None,
+                card_pool=destination_card_pool,
+            )
         if (
             restored_name
             or "name" in updates
@@ -177,10 +178,6 @@ def update_latest_card_version(
         ):
             card.updated_at = now_utc()
             update_fields = ["updated_at"]
-            if restored_name or "name" in updates:
-                update_fields = ["label", "key", *update_fields]
-            if "card_pool" in updates:
-                update_fields = ["card_pool", *update_fields]
             if "deck_building_config" in updates:
                 update_fields = ["deck_building_config_json", *update_fields]
             if "lifecycle_status" in updates:

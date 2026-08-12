@@ -3,9 +3,10 @@ from __future__ import annotations
 from django.db import transaction
 
 from card_reader_core.models import Card, CardAlias, CardMergeRedirect, CardRoleAssignment, CardVersion, now_utc
+from card_reader_core.repositories.cards import CardIdentityConflict, ensure_card_alias
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
-from .aliases import build_alias_previews, ensure_card_alias
+from .aliases import build_alias_previews
 from .relations import merge_card_group_references, merge_deck_references, preview_relation_changes
 from .types import CardMergeCardSummary, CardMergeError, CardMergePreview
 from .versions import merge_card_versions
@@ -48,7 +49,11 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
     merge_card_group_references(target.id, source_ids)
     merge_card_versions(target.id, source_ids)
     TtsCardSheetService().sync_merge(target_card_id=target.id, source_card_ids=source_ids)
-    CardAlias.objects.filter(card_id__in=source_ids).update(card=target, updated_at=now_utc())
+    CardAlias.objects.filter(card_id__in=source_ids).update(
+        card=target,
+        card_pool=target.card_pool,
+        updated_at=now_utc(),
+    )
     roles = set(
         CardRoleAssignment.objects.filter(card_id__in=[target.id, *source_ids]).values_list("role", flat=True)
     )
@@ -57,8 +62,16 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
         ignore_conflicts=True,
     )
 
-    for alias in preview.aliases:
-        ensure_card_alias(card=target, key=alias.key, label=alias.label, allowed_conflict_card_ids=set(source_ids))
+    try:
+        for alias in preview.aliases:
+            ensure_card_alias(
+                card=target,
+                key=alias.key,
+                label=alias.label,
+                allowed_conflict_card_ids=set(source_ids),
+            )
+    except CardIdentityConflict as exc:
+        raise CardMergeError(str(exc)) from exc
 
     for source in sources:
         CardMergeRedirect.objects.update_or_create(

@@ -137,3 +137,7 @@ class FieldSourcesPayload(TypedDict):
 class ParsedSnapshotPayload(TypedDict):
     fields: dict[str, object]
     metadata: dict[str, list[str]]
+
+
+class CardIdentityConflict(ValueError):
+    """A primary name or alias collides inside one card pool namespace."""

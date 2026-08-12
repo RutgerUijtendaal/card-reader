@@ -6,7 +6,6 @@ from django.db import transaction
 
 from card_reader_core.models import (
     Card,
-    CardAlias,
     DEFAULT_CARD_POOL,
     CardPool,
     CardRole,
@@ -27,7 +26,6 @@ from card_reader_core.repositories.import_jobs import (
     remove_import_warning,
     upsert_import_warning,
 )
-from card_reader_core.services.card_merges import ensure_card_alias, resolve_card_by_name_key
 
 from ..helpers import extract_mana_symbols, infer_mana_value, normalize_slug_key, to_int_or_none
 from ..metadata import (
@@ -44,6 +42,7 @@ from ..metadata import (
 )
 from ..templates import get_template_by_key
 from .images import save_image_record
+from .identity import change_card_identity, create_card_identity
 from .queries import get_latest_card_version
 from .snapshots import (
     DEFAULT_FIELD_SOURCES,
@@ -122,7 +121,6 @@ def save_parsed_card_result(
         "resolved_roles": list(resolved_card_roles),
     }
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
-    card_key = normalize_slug_key(parsed_name)
     with transaction.atomic():
         if item.target_card_version is not None:
             version = reparse_target_version(
@@ -152,7 +150,11 @@ def save_parsed_card_result(
         existing_version = None
         if reparse_existing:
             existing_version = (
-                CardVersion.objects.filter(image_hash=checksum, is_latest=True)
+                CardVersion.objects.filter(
+                    image_hash=checksum,
+                    is_latest=True,
+                    card__card_pool=card_pool,
+                )
                 .order_by("-updated_at")
                 .first()
             )
@@ -203,10 +205,8 @@ def save_parsed_card_result(
                 created_new_version=created_new_version,
             )
 
-        card = resolve_card_by_name_key(parsed_name)
-        created_new_card = card is None
-        if card is None:
-            card = Card.objects.create(key=card_key, label=parsed_name, card_pool=card_pool)
+        card, created_new_card = create_card_identity(name=parsed_name, card_pool=card_pool)
+        if created_new_card:
             CardRoleAssignment.objects.bulk_create(
                 [CardRoleAssignment(card=card, role=role) for role in resolved_card_roles]
             )
@@ -287,22 +287,11 @@ def save_parsed_card_result(
 
 
 def apply_latest_version_identity(card: Card, version: CardVersion) -> None:
-    update_fields = ["latest_version", "updated_at"]
+    if normalize_slug_key(version.name) != card.key or card.label != version.name:
+        change_card_identity(card=card, label=version.name)
     card.latest_version = version
     card.updated_at = now_utc()
-    next_key = normalize_slug_key(version.name)
-    if next_key != card.key or card.label != version.name:
-        previous_key = card.key
-        previous_label = card.label
-        conflicting_card = Card.objects.filter(key=next_key).exclude(id=card.id).first()
-        conflicting_alias = CardAlias.objects.filter(key=next_key).exclude(card_id=card.id).first()
-        if conflicting_card is not None or conflicting_alias is not None:
-            raise ValueError("Card name conflicts with another card or alias. Use card merge to resolve the duplicate.")
-        card.label = version.name
-        card.key = next_key
-        ensure_card_alias(card=card, key=previous_key, label=previous_label)
-        update_fields = ["label", "key", *update_fields]
-    card.save(update_fields=list(dict.fromkeys(update_fields)))
+    card.save(update_fields=["latest_version", "updated_at"])
 
 
 def should_create_content_version_snapshot(item: ImportJobItem, version: CardVersion) -> bool:
