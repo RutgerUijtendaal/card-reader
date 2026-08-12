@@ -105,21 +105,24 @@ Core stack:
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
-- Card pool and multi-role work has five approved, dependency-ordered implementation checkpoints. Execute them in order and keep each step independently reviewable and verified:
+- Card pool and multi-role work has six approved, dependency-ordered implementation checkpoints. Execute them in order and keep each step independently reviewable and verified:
   1. `docs/card-classification-step-1-foundation.md`
   2. `docs/card-classification-step-1-1-authorization-seam.md`
   3. `docs/card-classification-step-2-import-inference.md`
-  4. `docs/card-classification-step-2-1-import-workflow-seam.md`
-  5. `docs/card-classification-step-3-player-gm-workspaces.md`
+  4. `docs/card-classification-step-2-1-pool-scoped-identity.md`
+  5. `docs/card-classification-step-2-2-import-workflow-seam.md`
+  6. `docs/card-classification-step-3-card-pool-workspaces.md`
 - Deliver the classification feature through the umbrella branch `feature/card-classification`, with its aggregate PR targeting `master`. Each checkpoint uses a separate branch and PR targeting `feature/card-classification`; merge checkpoints into the umbrella branch in dependency order, and branch the next checkpoint from the updated umbrella branch. Keep the aggregate PR open for whole-feature CI and review, and do not retarget checkpoint PRs to `master` merely to trigger checks or reviews.
 - The target card classification model has two independent card-level dimensions:
-  - `card_pool` is exactly one of `player` or `game_master`.
+  - `card_pool` is exactly one of `player`, `evil`, or `neutral`; `game_master` is a temporary undeployed value removed by Step 2.1 and must not remain as a compatibility alias.
   - `card_roles` is a set of zero or more code-owned roles: `hero`, `boon`, `event`, and `location`; roles may coexist.
   - Standard is the derived empty-role state and must not be persisted as a role.
   - Pool/role conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
   - Pool and roles belong to stable `Card` identity; template remains version/parser configuration.
-- Game Master card access must use a named backend capability whose initial policy is staff-only. Enforce it on direct objects, collections, embedded payloads, exports, and image/assets; frontend visibility is not the security boundary. Keep the policy centralized so it can later expand without card-data migration.
-- Until the five card-classification checkpoints are complete, preserve their boundaries: Step 1 owns schema/migration/manual editing/filtering and Hero replacement; Step 1.1 owns authorization-seam consolidation; Step 2 owns import inference and overrides; Step 2.1 owns upload admission and cleanup, grouped-reparse transactionality, import activity/detail refresh consistency, and explicit evidence-state contracts; Step 3 owns the global sidenav workspace and site-level scoping.
+  - Stable human-readable card identity is pool-scoped: normalized primary names, aliases, and untargeted image-hash matching must resolve inside one explicit pool. Roles never participate in identity matching.
+  - Neutral remains a separate stable pool. Do not include it implicitly in Player or Evil queries; any future Neutral overlay must be an explicit, authorized multi-pool view state.
+- Evil and Neutral card access must use the centralized backend card-pool scope whose initial policy is staff-only for both pools. Enforce it on direct objects, collections, embedded payloads, exports, and image/assets; frontend visibility is not the security boundary. Session/frontend code consumes ordered accessible pools rather than separate Evil and Neutral booleans. Keep the policy centralized so it can later expand without card-data migration.
+- Until the six card-classification checkpoints are complete, preserve their boundaries: Step 1 owns schema/migration/manual editing/filtering and Hero replacement; Step 1.1 owns authorization-seam consolidation; Step 2 owns import inference and overrides; Step 2.1 owns the final Player/Evil/Neutral pool contract, pool-scoped name/alias/hash identity, and related authorization/session renaming; Step 2.2 owns upload admission and cleanup, grouped-reparse transactionality, import activity/detail refresh consistency, and explicit evidence-state contracts; Step 3 owns the global three-pool sidenav workspace and site-level scoping.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.
@@ -164,7 +167,7 @@ Core stack:
 - Auth is enabled by default.
 - Card gallery and card assets are public. Deck TTS exports follow deck visibility; gallery and
   content-version TTS exports require staff access.
-- Player cards remain the public/default pool. Game Master cards and their direct details, embedded payloads, exports, and assets are staff-only until the centralized Game Master capability policy is deliberately expanded.
+- Player cards remain the public/default pool. Evil and Neutral cards and their direct details, embedded payloads, exports, and assets are staff-only until the centralized restricted-pool scope policy is deliberately expanded.
 - Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
 - Developer-data metadata, browser downloads, and bootstrap-code creation require an active
