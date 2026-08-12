@@ -460,6 +460,23 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
+  test('clears a stale cancellation error after activity refresh succeeds', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+    vi.mocked(cancelImportJob).mockRejectedValueOnce(new Error('Cancellation unavailable'));
+
+    await mounted.controller.cancelJob('active-job');
+    expect(mounted.controller.activityErrorMessage.value).toBe('Cancellation unavailable');
+
+    await mounted.controller.refreshActivity();
+
+    expect(mounted.controller.activityErrorMessage.value).toBe('');
+    mounted.app.unmount();
+  });
+
   test('reconciles unseen active work discovered by polling history', async () => {
     const mounted = mountController();
     await vi.waitFor(() => {

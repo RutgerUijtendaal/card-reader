@@ -63,10 +63,10 @@ export const useImportActivity = () => {
   );
   const activityErrorMessage = computed(
     () =>
-      activityActionErrorMessage.value
-      || activeJobsErrorMessage.value
+      activeJobsErrorMessage.value
       || historyErrorMessage.value
-      || detailErrorMessage.value,
+      || detailErrorMessage.value
+      || activityActionErrorMessage.value,
   );
   const hasRefreshableDetail = computed(
     () => selectedJobDetail.value !== null
@@ -188,11 +188,18 @@ export const useImportActivity = () => {
     activityRefreshCount += 1;
     activityRefreshInFlight.value = true;
     try {
-      const [activeResult, historyResult] = await Promise.allSettled([
+      const [activeResult, historyResult, detailResult] = await Promise.allSettled([
         loadActiveJobs(),
         loadRecentJobs(),
         refreshSelectedJobDetail(),
       ]);
+      if (
+        activeResult.status === 'fulfilled'
+        && historyResult.status === 'fulfilled'
+        && detailResult.status === 'fulfilled'
+      ) {
+        activityActionErrorMessage.value = '';
+      }
       if (activeResult.status !== 'fulfilled' || historyResult.status !== 'fulfilled') return;
       const removedJobsMissingFromHistory = activeResult.value.some(
         (jobId) => !historyItems.value.some(

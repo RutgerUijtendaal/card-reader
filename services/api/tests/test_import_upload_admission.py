@@ -113,6 +113,26 @@ def test_prevalidation_rejection_discards_a_preserved_exact_retry_stage() -> Non
     assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
+def test_retry_cleanup_failure_does_not_replace_prevalidation_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = _validated_data()
+    service = _FakeImportService()
+
+    def reject(**_kwargs: object) -> None:
+        raise ImportCreationRejected("Unknown template_id 'missing'")
+
+    service.prevalidate_job_creation = reject  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        StagedImportUpload,
+        "reconcile_existing",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(PermissionError("unreadable stage")),
+    )
+
+    with pytest.raises(ImportAdmissionRejected, match="Unknown template_id"):
+        ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+
 def test_definitive_creation_rejection_discards_only_the_owned_stage() -> None:
     data = _validated_data()
     creation_key = str(data["creation_key"])
@@ -182,6 +202,34 @@ def test_matching_replay_returns_before_staging(
 
     assert result.idempotent_replay is True
     assert result.job.id == "existing"
+
+
+def test_creation_key_conflict_discards_a_preserved_losing_fingerprint() -> None:
+    data = _validated_data()
+    creation_key = str(data["creation_key"])
+    fingerprint, uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+    )
+    StagedImportUpload.publish(
+        uploads,
+        creation_key=creation_key,
+        fingerprint=fingerprint,
+    )
+    service = _FakeImportService()
+    service.existing = SimpleNamespace(id="winner", creation_fingerprint="b" * 64)
+
+    with pytest.raises(ImportAdmissionConflict, match="different import payload"):
+        ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
 def test_staged_upload_rejects_cleanup_paths_outside_exact_fingerprint_directory() -> None:

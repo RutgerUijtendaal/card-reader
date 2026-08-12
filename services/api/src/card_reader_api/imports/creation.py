@@ -190,6 +190,12 @@ class ImportUploadAdmission:
         existing = self._service.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
             if existing.creation_fingerprint != fingerprint:
+                _discard_reconciled_stage(
+                    uploads,
+                    creation_key=creation_key,
+                    fingerprint=fingerprint,
+                    reason="creation-key conflict",
+                )
                 raise ImportAdmissionConflict(
                     "This creation key has already been used for a different import payload."
                 )
@@ -271,16 +277,23 @@ class ImportUploadAdmission:
             ) from error
         if existing is not None:
             if existing.creation_fingerprint != fingerprint:
+                _discard_reconciled_stage(
+                    uploads,
+                    creation_key=creation_key,
+                    fingerprint=fingerprint,
+                    reason="validation rejection superseded by a conflicting job",
+                )
                 raise ImportAdmissionConflict(
                     "This creation key has already been used for a different import payload."
                 ) from error
             return ImportAdmissionResult(job=existing, idempotent_replay=True)
 
-        StagedImportUpload.reconcile_existing(
+        _discard_reconciled_stage(
             uploads,
             creation_key=creation_key,
             fingerprint=fingerprint,
-        ).discard()
+            reason="definitive validation rejection",
+        )
         raise ImportAdmissionRejected(str(error)) from error
 
     def _reconcile_uncertain_stage(
@@ -354,6 +367,30 @@ def _publish_upload_atomically(
         return True
     finally:
         staged_file.unlink(missing_ok=True)
+
+
+def _discard_reconciled_stage(
+    uploads: list[tuple[UploadedFile, str]],
+    *,
+    creation_key: str,
+    fingerprint: str,
+    reason: str,
+) -> None:
+    try:
+        StagedImportUpload.reconcile_existing(
+            uploads,
+            creation_key=creation_key,
+            fingerprint=fingerprint,
+        ).discard()
+    except Exception:
+        logger.warning(
+            "Failed to reconcile unclaimed import uploads; preserving domain outcome. "
+            "creation_key=%s fingerprint=%s reason=%s",
+            creation_key,
+            fingerprint,
+            reason,
+            exc_info=True,
+        )
 
 
 def _upload_fingerprint(
