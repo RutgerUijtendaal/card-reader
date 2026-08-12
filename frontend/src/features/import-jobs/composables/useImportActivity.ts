@@ -286,9 +286,12 @@ export const useImportActivity = () => {
       ? activeJobs.value.filter((job) => job.id !== jobId)
       : activeJobs.value.map((job) => (job.id === jobId ? cancelledJob : job));
     const selectedDetail = selectedJobDetail.value;
-    const cancelledDetailIsOpen = selectedDetail?.id === jobId;
-    if (selectedDetail && cancelledDetailIsOpen) {
+    const cancelledDetailIsOpen = selectedJobId.value === jobId;
+    if (cancelledDetailIsOpen && isTerminalImportStatus(cancelledJob.status)) {
       detailRequestId += 1;
+      detailLoading.value = false;
+    }
+    if (selectedDetail && cancelledDetailIsOpen) {
       selectedJobDetail.value = {
         ...selectedDetail,
         ...cancelledJob,

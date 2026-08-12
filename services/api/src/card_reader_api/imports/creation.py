@@ -12,6 +12,7 @@ from typing import cast
 from uuid import UUID
 
 from django.core.files.uploadedfile import UploadedFile
+from filelock import FileLock, Timeout as FileLockTimeout
 
 from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES
 from card_reader_core.models import CardPool, CardRole, ImportJob
@@ -24,6 +25,7 @@ from card_reader_core.services.imports import (
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 logger = logging.getLogger(__name__)
+IMPORT_ADMISSION_LOCK_TIMEOUT_SECONDS = 60
 
 
 class ImportAdmissionConflict(ValueError):
@@ -187,6 +189,50 @@ class ImportUploadAdmission:
             card_role_override=card_role_override,
             files=cast(list[UploadedFile], validated_data["files"]),
         )
+        StagedImportUpload(
+            creation_key=creation_key,
+            fingerprint=fingerprint,
+            relative_path=build_storage_relative_path("uploads", creation_key, fingerprint),
+        )._validated_directory()
+        lock_path = resolve_storage_path(
+            build_storage_relative_path(
+                "uploads",
+                ".admission-locks",
+                f"{creation_key}-{fingerprint}.lock",
+            )
+        )
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with FileLock(lock_path, timeout=IMPORT_ADMISSION_LOCK_TIMEOUT_SECONDS):
+                return self._admit_locked(
+                    validated_data=validated_data,
+                    creation_key=creation_key,
+                    template_id=template_id,
+                    content_version_base=content_version_base,
+                    card_pool=card_pool,
+                    card_role_mode=card_role_mode,
+                    card_role_override=card_role_override,
+                    fingerprint=fingerprint,
+                    uploads=uploads,
+                )
+        except FileLockTimeout as exc:
+            raise ImportAdmissionUncertain(
+                "Another request is still reconciling this import upload."
+            ) from exc
+
+    def _admit_locked(
+        self,
+        *,
+        validated_data: dict[str, object],
+        creation_key: str,
+        template_id: str,
+        content_version_base: str,
+        card_pool: CardPool,
+        card_role_mode: CardRoleMode,
+        card_role_override: list[CardRole],
+        fingerprint: str,
+        uploads: list[tuple[UploadedFile, str]],
+    ) -> ImportAdmissionResult:
         existing = self._service.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
             if existing.creation_fingerprint != fingerprint:

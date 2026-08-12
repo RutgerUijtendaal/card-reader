@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event, Lock
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -306,6 +308,53 @@ def test_late_creation_key_conflict_discards_a_preserved_losing_fingerprint() ->
 
     creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
     assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
+def test_identical_admissions_serialize_publication_and_ownership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    creation_key = str(uuid4())
+    first_entered = Event()
+    release_first = Event()
+    second_started = Event()
+    second_entered = Event()
+    counter_lock = Lock()
+    call_count = 0
+
+    def observe_locked_admission(
+        _self: ImportUploadAdmission,
+        **_kwargs: object,
+    ) -> object:
+        nonlocal call_count
+        with counter_lock:
+            call_count += 1
+            call_index = call_count
+        if call_index == 1:
+            first_entered.set()
+            assert release_first.wait(timeout=5)
+        else:
+            second_entered.set()
+        return SimpleNamespace(call_index=call_index)
+
+    monkeypatch.setattr(ImportUploadAdmission, "_admit_locked", observe_locked_admission)
+    first_admission = ImportUploadAdmission(service=_FakeImportService())
+    second_admission = ImportUploadAdmission(service=_FakeImportService())
+
+    def run_second_admission() -> object:
+        second_started.set()
+        return second_admission.admit(_validated_data(creation_key=creation_key))
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_result = executor.submit(first_admission.admit, _validated_data(creation_key=creation_key))
+        assert first_entered.wait(timeout=5)
+        second_result = executor.submit(run_second_admission)
+        assert second_started.wait(timeout=5)
+        assert not second_entered.wait(timeout=0.1)
+        release_first.set()
+        assert first_result.result(timeout=5).call_index == 1
+        assert second_result.result(timeout=5).call_index == 2
+
+    assert second_entered.is_set()
 
 
 def test_staged_upload_rejects_cleanup_paths_outside_exact_fingerprint_directory() -> None:

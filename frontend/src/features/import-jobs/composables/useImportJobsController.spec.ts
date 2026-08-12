@@ -548,6 +548,43 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
+  test('reconciles a terminal cancellation while the selected detail request is pending', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => {
+      expect(mounted.controller.activeJobsLoaded.value).toBe(true);
+      expect(mounted.controller.historyLoaded.value).toBe(true);
+    });
+    mounted.controller.activeJobs.value = [
+      { ...activeJob('queued-job'), status: 'queued' },
+    ];
+    const pendingDetail = deferred<ImportJobDetail>();
+    vi.mocked(fetchImportJobDetail).mockImplementationOnce(() => pendingDetail.promise);
+    const viewPromise = mounted.controller.viewJobDetail('queued-job');
+    await vi.waitFor(() => expect(fetchImportJobDetail).toHaveBeenCalledOnce());
+    vi.mocked(cancelImportJob).mockResolvedValueOnce({
+      ...activeJob('queued-job'),
+      status: 'cancelled',
+      processed_items: 10,
+    });
+    vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
+      ...importJobDetail('queued-job'),
+      status: 'cancelled',
+      processed_items: 10,
+    });
+    vi.mocked(fetchImportJobs).mockResolvedValueOnce([]);
+    vi.mocked(fetchOperationsQueuePage).mockResolvedValueOnce(
+      historyPage([historyItem('queued-job', 'cancelled')]),
+    );
+
+    await mounted.controller.cancelJob('queued-job');
+    pendingDetail.reject(new Error('Stale detail request failed'));
+    await viewPromise;
+
+    expect(fetchImportJobDetail).toHaveBeenCalledTimes(2);
+    expect(mounted.controller.selectedJobDetail.value?.status).toBe('cancelled');
+    mounted.app.unmount();
+  });
+
   test('clears a stale cancellation error after activity refresh succeeds', async () => {
     const mounted = mountController();
     await vi.waitFor(() => {
