@@ -137,6 +137,11 @@
   <rect class="band" x="700" y="370" width="320" height="880"/>
   <text class="band-title" x="735" y="402">Stable identity</text>
 
+  <rect class="box card" x="745" y="445" width="230" height="90"/>
+  <text class="title-small" x="773" y="477">CardIdentityPoolLock</text>
+  <text class="field" x="775" y="501">card_pool (primary key)</text>
+  <text class="small" x="775" y="522">serializes name/alias writes</text>
+
   <rect class="box card" x="745" y="575" width="230" height="190"/>
   <text class="title" x="812" y="615">Card</text>
   <text class="field" x="775" y="645">id, label; key unique per pool</text>

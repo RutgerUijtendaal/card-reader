@@ -2,12 +2,36 @@ from __future__ import annotations
 
 from typing import cast
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, OperationalError, transaction
+from django.db.models import F
 
-from card_reader_core.models import Card, CardAlias, CardPool, now_utc
+from card_reader_core.models import CARD_POOLS, Card, CardAlias, CardIdentityPoolLock, CardPool, now_utc
 
 from ..helpers import normalize_slug_key
 from .types import CardIdentityConflict
+
+
+def lock_card_identity_pools(*card_pools: CardPool) -> None:
+    """Serialize primary/alias namespace writes for the requested pools."""
+    if not transaction.get_connection().in_atomic_block:
+        raise RuntimeError("Card identity pool locks require an active database transaction.")
+    requested = set(card_pools)
+    try:
+        for card_pool in CARD_POOLS:
+            if card_pool not in requested:
+                continue
+            updated = CardIdentityPoolLock.objects.filter(card_pool=card_pool).update(
+                revision=F("revision") + 1,
+                updated_at=now_utc(),
+            )
+            if updated != 1:
+                raise CardIdentityConflict(
+                    f"Identity namespace lock is missing for the {card_pool} pool."
+                )
+    except OperationalError as exc:
+        raise CardIdentityConflict(
+            "The card identity namespace is being changed by another request; retry the operation."
+        ) from exc
 
 
 def resolve_card_by_name_key(*, name: str, card_pool: CardPool) -> Card | None:
@@ -46,6 +70,7 @@ def conflicting_card_id_for_key(
     return str(getattr(alias, "card_id")) if alias is not None else None
 
 
+@transaction.atomic
 def ensure_card_alias(
     *,
     card: Card,
@@ -53,13 +78,15 @@ def ensure_card_alias(
     label: str,
     allowed_conflict_card_ids: set[str] | None = None,
 ) -> CardAlias | None:
+    card_pool = cast(CardPool, card.card_pool)
+    lock_card_identity_pools(card_pool)
     normalized_key = normalize_slug_key(key)
     if not normalized_key or normalized_key == card.key:
         return None
     allowed_conflicts = allowed_conflict_card_ids or set()
     conflict_id = conflicting_card_id_for_key(
         key=normalized_key,
-        card_pool=cast(CardPool, card.card_pool),
+        card_pool=card_pool,
         excluded_card_ids={card.id, *allowed_conflicts},
     )
     if conflict_id is not None:
@@ -84,7 +111,7 @@ def ensure_card_alias(
     except IntegrityError as exc:
         conflict_id = conflicting_card_id_for_key(
             key=normalized_key,
-            card_pool=cast(CardPool, card.card_pool),
+            card_pool=card_pool,
             excluded_card_ids={card.id, *allowed_conflicts},
         )
         if conflict_id is not None:
@@ -101,7 +128,9 @@ def ensure_card_alias(
         raise
 
 
+@transaction.atomic
 def create_card_identity(*, name: str, card_pool: CardPool) -> tuple[Card, bool]:
+    lock_card_identity_pools(card_pool)
     existing = resolve_card_by_name_key(name=name, card_pool=card_pool)
     if existing is not None:
         return existing, False
@@ -128,6 +157,7 @@ def change_card_identity(
     label: str | None = None,
     card_pool: CardPool | None = None,
 ) -> Card:
+    lock_card_identity_pools(*CARD_POOLS)
     locked = Card.objects.select_for_update().get(id=card.id)
     destination_pool = card_pool or cast(CardPool, locked.card_pool)
     destination_label = locked.label if label is None else label
@@ -160,32 +190,44 @@ def change_card_identity(
                 f"Alias key '{alias_key}' conflicts with card '{alias_conflict}' in the {destination_pool} pool."
             )
 
-    CardAlias.objects.filter(card_id=locked.id, key=destination_key).delete()
-    CardAlias.objects.filter(card_id=locked.id).update(
-        card_pool=destination_pool,
-        updated_at=now_utc(),
-    )
-    locked.card_pool = destination_pool
-    locked.label = destination_label
-    locked.key = destination_key
-    locked.updated_at = now_utc()
-    locked.save(update_fields=["card_pool", "label", "key", "updated_at"])
-
-    existing_alias_keys = set(
-        CardAlias.objects.filter(card_id=locked.id).values_list("key", flat=True)
-    )
-    CardAlias.objects.bulk_create(
-        [
-            CardAlias(
-                card=locked,
+    try:
+        with transaction.atomic():
+            CardAlias.objects.filter(card_id=locked.id, key=destination_key).delete()
+            CardAlias.objects.filter(card_id=locked.id).update(
                 card_pool=destination_pool,
-                key=alias_key,
-                label=alias_label,
+                updated_at=now_utc(),
             )
-            for alias_key, alias_label in alias_labels.items()
-            if alias_key not in existing_alias_keys
-        ]
-    )
+            locked.card_pool = destination_pool
+            locked.label = destination_label
+            locked.key = destination_key
+            locked.updated_at = now_utc()
+            locked.save(update_fields=["card_pool", "label", "key", "updated_at"])
+
+            existing_alias_keys = set(
+                CardAlias.objects.filter(card_id=locked.id).values_list("key", flat=True)
+            )
+            CardAlias.objects.bulk_create(
+                [
+                    CardAlias(
+                        card=locked,
+                        card_pool=destination_pool,
+                        key=alias_key,
+                        label=alias_label,
+                    )
+                    for alias_key, alias_label in alias_labels.items()
+                    if alias_key not in existing_alias_keys
+                ]
+            )
+    except IntegrityError as exc:
+        conflict_id = conflicting_card_id_for_key(
+            key=destination_key,
+            card_pool=destination_pool,
+            excluded_card_ids={locked.id},
+        )
+        conflict_suffix = f" with card '{conflict_id}'" if conflict_id is not None else ""
+        raise CardIdentityConflict(
+            f"Card identity conflicts{conflict_suffix} in the {destination_pool} pool."
+        ) from exc
 
     card.card_pool = locked.card_pool
     card.label = locked.label

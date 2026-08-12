@@ -2,8 +2,20 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import Card, CardAlias, CardMergeRedirect, CardRoleAssignment, CardVersion, now_utc
-from card_reader_core.repositories.cards import CardIdentityConflict, ensure_card_alias
+from card_reader_core.models import (
+    CARD_POOLS,
+    Card,
+    CardAlias,
+    CardMergeRedirect,
+    CardRoleAssignment,
+    CardVersion,
+    now_utc,
+)
+from card_reader_core.repositories.cards import (
+    CardIdentityConflict,
+    ensure_card_alias,
+    lock_card_identity_pools,
+)
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService
 
 from .aliases import build_alias_previews
@@ -35,6 +47,7 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
 
 @transaction.atomic
 def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMergePreview:
+    lock_card_identity_pools(*CARD_POOLS)
     target, sources = _load_merge_cards(
         target_card_id=target_card_id,
         source_card_ids=source_card_ids,

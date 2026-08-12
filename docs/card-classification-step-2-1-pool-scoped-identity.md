@@ -95,13 +95,15 @@ Add a required `CardAlias.card_pool` field using the same code-owned pool choice
 
 The migration must:
 
-1. Add the alias pool as nullable.
-2. Backfill it from each alias's owning card.
-3. Make it required and indexed.
-4. Remove global uniqueness from `CardAlias.key`.
-5. Add a uniqueness constraint on `(card_pool, key)`.
-6. Replace `Card.key` global uniqueness with `(card_pool, key)` uniqueness.
-7. Apply the final Player/Evil/Neutral choices to every persisted pool field.
+1. Create and seed one `CardIdentityPoolLock` row for each final pool.
+2. Add the alias pool as nullable.
+3. Backfill it from each alias's owning card.
+4. Reject pre-existing same-pool primary/alias collisions.
+5. Make the alias pool required and indexed.
+6. Remove global uniqueness from `CardAlias.key`.
+7. Add a uniqueness constraint on `(card_pool, key)`.
+8. Replace `Card.key` global uniqueness with `(card_pool, key)` uniqueness.
+9. Apply the final Player/Evil/Neutral choices to every persisted pool field.
 
 The model cannot express `CardAlias.card_pool == CardAlias.card.card_pool` as a portable cross-table check constraint. Enforce that invariant through the one core identity mutation seam and cover direct repository writes with tests. Do not scatter alias creation or pool updates through callers.
 
@@ -145,7 +147,7 @@ The seam owns:
 
 Require `card_pool` at call sites that resolve an identity. Do not keep a defaulted global resolver for convenience. Helpers operating on a loaded card may derive the pool from that card.
 
-Use database constraints as the final race-safe boundary for same-table collisions. Convert uniqueness errors raised by concurrent creates or moves into the same domain conflict used by preflight checks. Cross-table primary/alias collision checks remain centralized in the identity transaction; a larger generic name-registry table is outside this checkpoint.
+Use database constraints as the final race-safe boundary for same-table collisions and one durable lock row per pool to serialize primary and alias writes across their two tables. Every identity mutation acquires the appropriate pool lock through the cards identity seam before checking or writing the namespace. Convert uniqueness or lock-contention errors raised by concurrent creates or moves into the same domain conflict used by preflight checks. A larger per-name registry table remains outside this checkpoint.
 
 ## Import persistence behavior
 

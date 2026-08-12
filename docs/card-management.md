@@ -26,7 +26,7 @@ Import classification initializes only new card identities. Untargeted imports m
 
 Card versions connect parsed content to managed catalogs such as card types, keywords, tags, symbols, and metadata groups. These relationships power filtering, display, rules text, and deck-building behavior.
 
-Aliases provide alternate names or identifiers for the same card identity. Primary and alias keys share a pool-local namespace: each is unique within a pool, while the same normalized key may exist independently in other pools. Rename and pool-move edits validate the complete destination namespace and move the primary name plus every alias atomically.
+Aliases provide alternate names or identifiers for the same card identity. Primary and alias keys share a pool-local namespace: each is unique within a pool, while the same normalized key may exist independently in other pools. Rename and pool-move edits validate the complete destination namespace and move the primary name plus every alias atomically. One durable lock row per pool serializes primary and alias mutations as a single logical namespace across imports, edits, merges, and developer-data adoption.
 
 ### Mana families
 

@@ -124,6 +124,27 @@ def test_pool_scoped_identity_migration_backfills_aliases_and_allows_cross_pool_
 
 
 @pytest.mark.django_db(transaction=True)
+def test_card_identity_pool_lock_migration_seeds_every_pool() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0058_pool_scoped_card_identity")])
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0059_card_identity_pool_locks")]
+    ).apps
+    CardIdentityPoolLock = apps.get_model("card_reader_core", "CardIdentityPoolLock")
+
+    assert set(CardIdentityPoolLock.objects.values_list("card_pool", flat=True)) == {
+        "player",
+        "evil",
+        "neutral",
+    }
+
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
 def test_pool_scoped_identity_migration_rejects_temporary_game_master_values() -> None:
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0057_location_card_role")])

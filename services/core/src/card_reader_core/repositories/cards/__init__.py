@@ -9,6 +9,7 @@ from .identity import (
     conflicting_card_id_for_key,
     create_card_identity,
     ensure_card_alias,
+    lock_card_identity_pools,
     resolve_card_by_name_key,
 )
 from .queries import (
@@ -113,6 +114,7 @@ __all__ = [
     "conflicting_card_id_for_key",
     "create_card_identity",
     "ensure_card_alias",
+    "lock_card_identity_pools",
     "get_card",
     "get_card_in_scope",
     "get_card_image",

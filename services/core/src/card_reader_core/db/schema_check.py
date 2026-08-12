@@ -27,6 +27,7 @@ EXPECTED_TABLE_COLUMNS = {
         "updated_at",
     },
     "card_alias": {"id", "card_id", "card_pool", "key", "label", "created_at", "updated_at"},
+    "card_identity_pool_lock": {"card_pool", "revision", "created_at", "updated_at"},
     "card_merge_redirect": {"id", "old_card_id", "target_card_id", "created_at", "updated_at"},
     "import_job": {
         "id",

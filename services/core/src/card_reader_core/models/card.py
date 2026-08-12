@@ -187,6 +187,20 @@ class Card(TimestampedModel):
         ]
 
 
+class CardIdentityPoolLock(TimestampedModel):
+    """Durable serialization row for card primary/alias namespace mutations."""
+
+    card_pool: models.CharField[str, str] = models.CharField(
+        max_length=16,
+        choices=CARD_POOL_CHOICES,
+        primary_key=True,
+    )
+    revision: models.PositiveBigIntegerField[int, int] = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        db_table = "card_identity_pool_lock"
+
+
 class CardRoleAssignment(TimestampedModel):
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
     card: models.ForeignKey[Card, Card] = models.ForeignKey(
