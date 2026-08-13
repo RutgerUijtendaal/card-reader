@@ -9,8 +9,6 @@ import tempfile
 from typing import Any, cast
 
 from django.db.migrations.recorder import MigrationRecorder
-from django.db.models import Q
-
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
     CARD_POOLS,
@@ -141,9 +139,30 @@ def _resolve_selection(
         card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools
     )
     if not selection.include_all_cards:
-        card_queryset = card_queryset.filter(
-            Q(key__in=selected_keys) | Q(id__in=group_card_ids)
+        explicit_matches: dict[str, list[str]] = {}
+        for card_id, card_key in card_queryset.filter(key__in=selected_keys).values_list(
+            "id", "key"
+        ):
+            explicit_matches.setdefault(card_key, []).append(card_id)
+        missing_cards = sorted(selected_keys - explicit_matches.keys())
+        if missing_cards:
+            raise DeveloperDataError(
+                f"Selected cards were not found: {', '.join(missing_cards)}"
+            )
+        ambiguous_cards = sorted(
+            card_key
+            for card_key, card_ids in explicit_matches.items()
+            if len(card_ids) > 1
         )
+        if ambiguous_cards:
+            raise DeveloperDataError(
+                "Selected card keys are ambiguous across faction namespaces: "
+                f"{', '.join(ambiguous_cards)}"
+            )
+        selected_card_ids = group_card_ids | {
+            card_ids[0] for card_ids in explicit_matches.values()
+        }
+        card_queryset = card_queryset.filter(id__in=selected_card_ids)
     cards = list(
         card_queryset
         .prefetch_related(
@@ -160,9 +179,6 @@ def _resolve_selection(
         )
         .order_by("key", "faction_identity_key", "id")
     )
-    missing_cards = sorted(selected_keys - {card.key for card in cards})
-    if missing_cards:
-        raise DeveloperDataError(f"Selected cards were not found: {', '.join(missing_cards)}")
     return cards, groups
 
 

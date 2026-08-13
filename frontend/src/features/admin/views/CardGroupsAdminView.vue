@@ -207,6 +207,15 @@
                     <p class="theme-section-title text-sm font-semibold">
                       {{ member.card_name }}
                     </p>
+                    <div class="mt-1 flex flex-wrap gap-1">
+                      <span
+                        v-for="faction in displayCardFactionLabels(member.card_factions)"
+                        :key="`${member.card_id}-${faction}`"
+                        class="theme-pill theme-pill-success px-1.5 py-0.5 text-[9px] font-semibold"
+                      >
+                        {{ faction }}
+                      </span>
+                    </div>
                     <p class="theme-section-muted text-xs">
                       Position {{ index + 1 }}
                     </p>
@@ -326,6 +335,7 @@ import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchR
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
 import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
+import { displayCardFactionLabels } from '@/domain/cards/cardFactions';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/features/admin/types';
 import {
   createManagedCardGroup,
@@ -494,6 +504,7 @@ const addMember = (card: CardListItem): void => {
     card_label: card.label,
     card_name: card.name,
     card_pool: card.card_pool,
+    card_factions: card.card_factions ?? [],
     position: editor.value.members.length + 1,
     is_anchor: editor.value.anchor_card_id === card.id,
     image_url: card.image_url,

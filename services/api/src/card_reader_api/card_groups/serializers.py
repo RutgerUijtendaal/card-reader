@@ -13,6 +13,7 @@ from card_reader_core.models import (
     CardLifecycleFilter,
     CardVersion,
     CardVersionImage,
+    card_faction_keys,
     card_is_visible_for_lifecycle,
 )
 from card_reader_core.repositories.cards import get_card_image, resolve_image_file_path
@@ -147,6 +148,7 @@ def card_group_member_admin_payload(member: CardGroupMember, anchor_card_id: str
         "card_label": member.card.label,
         "card_name": version.name if version is not None else member.card.label,
         "card_pool": member.card.card_pool,
+        "card_factions": list(card_faction_keys(member.card)),
         "position": member.position,
         "is_anchor": card_id == anchor_card_id,
         "image_url": card_image_asset_url(image, fallback_url=f"/cards/{card_id}/image") if version is not None else None,

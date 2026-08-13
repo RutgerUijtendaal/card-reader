@@ -145,6 +145,7 @@ export type CardGroupMemberRecord = {
   card_label: string;
   card_name: string;
   card_pool: CardPool;
+  card_factions: CardFaction[];
   position: number;
   is_anchor: boolean;
   image_url: string | null;

@@ -8,7 +8,7 @@ import shutil
 import tarfile
 
 from django.contrib.auth import get_user_model
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import IntegrityError, transaction
 import pytest
 
@@ -215,6 +215,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         _clear_domain_data()
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
         selection_path.write_text(json.dumps(selection), encoding="utf-8")
 
         manifest = export_developer_data(
@@ -423,6 +424,41 @@ def test_group_selection_keeps_same_key_faction_twins_out_of_bundle(
         transaction.set_rollback(True)
 
 
+def test_explicit_card_selection_rejects_same_key_faction_twins(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "ambiguous-selection-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection.update(
+            {
+                "card_keys": ["synthetic-mainboard"],
+                "card_group_keys": [],
+            }
+        )
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(
+            DeveloperDataError,
+            match=(
+                "Selected card keys are ambiguous across faction namespaces: "
+                "synthetic-mainboard"
+            ),
+        ):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="ambiguous-selection-test-revision",
+            )
+        transaction.set_rollback(True)
+
+
 def test_import_removes_assets_copied_before_asset_conflict(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -573,11 +609,16 @@ def test_doctor_resolves_symbol_assets_and_honors_legacy_bundle_coverage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source_storage = tmp_path / "source-storage"
+    selection_path = tmp_path / "selection.json"
 
     with transaction.atomic():
         _clear_domain_data()
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
-        _build_synthetic_source(source_storage)
+        monkeypatch.setattr(settings, "developer_data_selection_file", selection_path)
+        selection_path.write_text(
+            json.dumps(_build_synthetic_source(source_storage)),
+            encoding="utf-8",
+        )
         for index in range(14):
             Card.objects.create(
                 key=f"doctor-mainboard-{index}",
@@ -589,6 +630,12 @@ def test_doctor_resolves_symbol_assets_and_honors_legacy_bundle_coverage(
         )
 
         call_command("doctor_dev_data")
+        template = Template.objects.get(key="synthetic-template")
+        template.inferred_card_roles_json = []
+        template.save(update_fields=["inferred_card_roles_json"])
+        call_command("doctor_dev_data", source_format_version=2)
+        with pytest.raises(CommandError, match="missing inference roles: event"):
+            call_command("doctor_dev_data", source_format_version=3)
         Tag.objects.exclude(key="synthetic").delete()
         call_command("doctor_dev_data", source_format_version=1)
         transaction.set_rollback(True)
@@ -928,11 +975,11 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     )
     return {
         "bundle_version": "synthetic-v1",
-        "card_keys": [hero.key, mainboard.key, deprecated.key],
+        "card_keys": [hero.key, deprecated.key],
         "card_group_keys": [group.key],
         "coverage": {
-            "min_cards": 4,
-            "min_cards_by_pool": {"player": 4, "evil": 0, "neutral": 0},
+            "min_cards": 3,
+            "min_cards_by_pool": {"player": 3, "evil": 0, "neutral": 0},
             "min_cards_by_role": {
                 "standard": 1,
                 "hero": 1,

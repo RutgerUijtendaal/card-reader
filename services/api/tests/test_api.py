@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from card_reader_core.models import Card, CardAlias, CardGroup, CardGroupMember, CardMergeRedirect, CardRoleAssignment, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ContentVersion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
+from card_reader_core.models import Card, CardAlias, CardFactionAssignment, CardGroup, CardGroupMember, CardMergeRedirect, CardRoleAssignment, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ContentVersion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
 from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
@@ -2753,6 +2753,7 @@ def test_staff_can_manage_card_groups() -> None:
     replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
     member_card.card_pool = "evil"
     member_card.save(update_fields=["card_pool"])
+    CardFactionAssignment.objects.create(card=member_card, faction="darkness")
 
     create_response = client.post(
         "/admin/card-groups",
@@ -2795,6 +2796,7 @@ def test_staff_can_manage_card_groups() -> None:
     assert patch_response.json()["anchor_card_id"] == replacement_card.id
     assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
     assert [member["card_pool"] for member in patch_response.json()["members"]] == ["player", "evil"]
+    assert [member["card_factions"] for member in patch_response.json()["members"]] == [[], ["darkness"]]
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 

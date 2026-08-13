@@ -83,7 +83,7 @@ class Command(BaseCommand):
                     )
             role_hint_requirements = (
                 selection.coverage.required_template_role_hints
-                if source_format_version >= 2
+                if source_format_version >= 3
                 else {}
             )
             for template_key, required_roles in role_hint_requirements.items():
