@@ -139,8 +139,8 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn, useScroll } from '@vueuse/core';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useScroll, useTimeoutFn } from '@vueuse/core';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Copy, Download, Hammer, Images, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/shared/composables/useCsvExport';
@@ -295,7 +295,7 @@ const clearGalleryHoverModeOverride = (): void => {
   clearOverrideHoverMode();
 };
 
-const debouncedUpdateRoute = useDebounceFn(() => {
+const updateFilterRoute = (): void => {
   if (!filtersLoaded.value) {
     return;
   }
@@ -307,7 +307,11 @@ const debouncedUpdateRoute = useDebounceFn(() => {
     path: '/cards',
     query: buildCardFilterRouteQuery(nextRouteState),
   });
-}, 250);
+};
+const {
+  start: debouncedUpdateRoute,
+  stop: cancelDebouncedUpdateRoute,
+} = useTimeoutFn(updateFilterRoute, 250, { immediate: false });
 
 const observedFilterState = computed(() => selectionState.value);
 const galleryNavigationSearchParams = computed(() => {
@@ -328,6 +332,14 @@ watch(
     debouncedUpdateRoute();
   },
   { deep: true },
+);
+
+watch(
+  () => workspace.generation,
+  () => {
+    cancelDebouncedUpdateRoute();
+  },
+  { flush: 'sync' },
 );
 
 watch(
@@ -392,6 +404,10 @@ const resetFilters = (): void => {
 
 onBeforeRouteLeave(() => {
   saveGallerySnapshot(galleryRequestSignature.value, collection.galleryState.value, scrollTopRef.value);
+});
+
+onBeforeUnmount(() => {
+  cancelDebouncedUpdateRoute();
 });
 
 onMounted(() => {

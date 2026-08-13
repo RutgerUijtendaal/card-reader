@@ -217,6 +217,7 @@ watch(
   }),
   ({ sessionKey, accessiblePools }) => {
     const previousGeneration = workspace.generation;
+    const previousPool = workspace.activePool;
     const changedPool = workspace.synchronizeSession(accessiblePools, sessionKey);
     if (workspace.generation === previousGeneration) {
       return;
@@ -227,9 +228,16 @@ watch(
       : null;
     const routePoolIsNoLongerAccessible = routePool !== null
       && !workspace.accessiblePools.includes(routePool);
+    const lostRestrictedWorkspace = previousPool !== 'player'
+      && workspace.activePool === 'player'
+      && !workspace.accessiblePools.includes(previousPool);
     if (route.meta.requiresStaff && !auth.canAccessStaffRoutes) {
       void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
-    } else if (routePoolIsNoLongerAccessible || (changedPool && route.path === '/cards')) {
+    } else if (
+      routePoolIsNoLongerAccessible
+      || (changedPool && route.path === '/cards')
+      || (lostRestrictedWorkspace && route.meta.cardPoolWorkspace)
+    ) {
       void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
     }
   },

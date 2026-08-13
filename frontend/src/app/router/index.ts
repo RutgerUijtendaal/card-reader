@@ -31,9 +31,9 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     history,
     routes: [
       { path: '/', redirect: '/cards' },
-      { path: '/cards', component: CardGalleryPage, meta: { title: 'Gallery' } },
-      { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { title: 'Card' } },
-      { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { title: 'Card Group' } },
+      { path: '/cards', component: CardGalleryPage, meta: { cardPoolWorkspace: true, title: 'Gallery' } },
+      { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { cardPoolWorkspace: true, title: 'Card' } },
+      { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { cardPoolWorkspace: true, title: 'Card Group' } },
       { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks', playerWorkspace: true } },
       { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck', playerWorkspace: true } },
       { path: '/playtester', component: PlaytesterPage, meta: { title: 'Playtester', playerWorkspace: true } },
@@ -49,7 +49,7 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       { path: '/imports', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Imports' } },
       { path: '/operations', component: OperationsPage, meta: { requiresStaff: true, title: 'Operations' } },
       { path: '/import-jobs', redirect: '/imports' },
-      { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { requiresStaff: true, title: 'Edit Card' } },
+      { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { cardPoolWorkspace: true, requiresStaff: true, title: 'Edit Card' } },
       { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue' } },
       { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin' } },
     ],
@@ -72,8 +72,15 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       to.path === '/cards' ? requestedPool : undefined,
     );
 
-    if (to.meta.playerWorkspace && workspace.activePool !== 'player') {
-      workspace.selectPool('player');
+    if (to.meta.playerWorkspace) {
+      if (workspace.activePool !== 'player') {
+        workspace.selectPool('player');
+      }
+      if (rawRequestedPool !== undefined) {
+        const query = { ...to.query };
+        delete query.card_pool;
+        return { path: to.path, query, hash: to.hash };
+      }
     }
 
     if (requestedPool && !workspace.accessiblePools.includes(requestedPool)) {

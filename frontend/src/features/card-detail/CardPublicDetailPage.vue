@@ -9,6 +9,17 @@
       title-tag="h2"
       title-class="text-xl"
     >
+      <template #titleMeta>
+        <span
+          v-if="card && card.card_pool !== workspace.activePool"
+          class="theme-pill theme-pill-accent px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+          :aria-label="`${cardPoolLabel(card.card_pool)} card`"
+          data-testid="cross-pool-card-badge"
+        >
+          {{ cardPoolLabel(card.card_pool) }}
+        </span>
+      </template>
+
       <template #actions>
         <AppHeaderAction
           v-if="canEdit"
@@ -107,6 +118,8 @@ import { toast } from 'vue-sonner';
 import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { useAuthStore } from '@/domain/session/store';
 import { buildCardReturnLocation } from '@/domain/card-navigation/cardReturnState';
 import { useReviewSummary } from '@/domain/review/composables/useReviewSummary';
@@ -122,6 +135,7 @@ import { submitCardParseFlag } from '@/features/card-detail/api';
 
 const route = useRoute();
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const flagModalOpen = ref(false);
 const flagSubmitting = ref(false);
 const flagError = ref('');

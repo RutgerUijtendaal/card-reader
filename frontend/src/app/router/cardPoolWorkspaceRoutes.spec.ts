@@ -82,10 +82,30 @@ describe('card pool workspace routes', () => {
     const router = createAppRouter(createMemoryHistory());
     await router.push('/cards?card_pool=evil');
 
-    await router.push('/playtester');
+    await router.push('/playtester?card_pool=evil&preview=deck-1');
 
     expect(router.currentRoute.value.path).toBe('/playtester');
+    expect(router.currentRoute.value.fullPath).toBe('/playtester?preview=deck-1');
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+  });
+
+  test('strips an inaccessible pool query instead of rejecting a Player-only route', async () => {
+    setSession(['player']);
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/playtester?card_pool=evil');
+
+    expect(router.currentRoute.value.fullPath).toBe('/playtester');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+  });
+
+  test('marks card-derived routes for safe fallback after workspace access loss', () => {
+    setSession(['player', 'evil', 'neutral']);
+    const router = createAppRouter(createMemoryHistory());
+
+    expect(router.resolve('/cards/restricted-card').meta.cardPoolWorkspace).toBe(true);
+    expect(router.resolve('/card-groups/restricted-group').meta.cardPoolWorkspace).toBe(true);
+    expect(router.resolve('/settings').meta.cardPoolWorkspace).toBeUndefined();
   });
 
   test.each(['evil', 'neutral'] as const)(
