@@ -23,14 +23,15 @@ This directory contains feature descriptions, operational guides, and technical 
 
 ## Implementation plans
 
-The approved card-pool and multi-role work is split into six dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
+The card-pool, role, and faction work is split into seven dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
 
 1. [Card classification Step 1: Foundation](card-classification-step-1-foundation.md) replaces the Hero flag with an initial Player/Game Master pool and multi-valued card roles, migrates existing data, preserves Hero behavior, adds editing/filtering, and establishes restricted-card access protection.
 2. [Card classification Step 1.1: Authorization seam](card-classification-step-1-1-authorization-seam.md) consolidates user entitlement into an explicit core card-pool scope across queries, payloads, derived state, notifications, images, and published artifacts before the surface grows.
 3. [Card classification Step 2: Import inference](card-classification-step-2-import-inference.md) adds explicit batch pools, automatic template/tag role inference, batch overrides, immutable job snapshots, and existing-card mismatch warnings.
 4. [Card classification Step 2.1: Pool-scoped card identity](card-classification-step-2-1-pool-scoped-identity.md) replaces the temporary Game Master value with Evil and Neutral, makes normalized names, aliases, and import image matching unique within each of the three pools, and preserves id-based relationships and Player-only developer-data.
 5. [Card classification Step 2.2: Import workflow seam](card-classification-step-2-2-import-workflow-seam.md) consolidates upload ownership and cleanup, transactional grouped reparses, frontend activity/detail refresh, and explicit evidence state before the workspace adds more callers.
-6. [Card classification Step 3: Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md) adds the three-way sidenav context, single-pool route and collection scoping, workspace-aware navigation, and the final restricted-pool authorization audit.
+6. [Card classification Step 2.3: Faction classification](card-classification-step-2-3-faction-classification.md) adds Order/Blood/Darkness as a second multi-valued facet, completes the role vocabulary, generalizes import classification mechanics, and scopes natural card identity by pool plus exact faction set.
+7. [Card classification Step 3: Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md) adds the three-way sidenav context, single-pool route and collection scoping, workspace-aware navigation, and the final restricted-pool authorization audit.
 
 ### Classification delivery model
 
@@ -38,4 +39,4 @@ The approved card-pool and multi-role work is split into six dependency-ordered 
 - Each checkpoint is implemented on its own branch with a pull request targeting `feature/card-classification`, not `master`.
 - Merge checkpoint pull requests into the umbrella branch in dependency order. Create the next checkpoint branch from the updated umbrella branch so its diff contains only that checkpoint.
 - CI and automatic review must run on both checkpoint and aggregate pull requests. Do not retarget a checkpoint pull request merely to trigger them.
-- Merge the umbrella pull request to `master` only after all six checkpoint acceptance criteria pass and the aggregate review is clear.
+- Merge the umbrella pull request to `master` only after all seven checkpoint acceptance criteria pass and the aggregate review is clear.

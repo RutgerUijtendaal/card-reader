@@ -12,6 +12,7 @@ from card_reader_core.models import (
     Symbol,
     Tag,
     Type,
+    card_faction_keys,
     card_role_keys,
     now_utc,
 )
@@ -554,6 +555,7 @@ class CatalogService:
                     "normalized_source_text": occurrence.normalized_source_text,
                     "card_pool": card.card_pool,
                     "card_roles": list(card_role_keys(card)),
+                    "card_factions": list(card_faction_keys(card)),
                 }
             )
         return {
@@ -624,6 +626,7 @@ class CatalogService:
                     "image_url": self._image_url(version.card.id, version.id, image),
                     "card_pool": version.card.card_pool,
                     "card_roles": list(card_role_keys(version.card)),
+                    "card_factions": list(card_faction_keys(version.card)),
                 }
             )
         return previews, linked_card_count

@@ -64,7 +64,8 @@
             </h4>
             <p class="theme-section-muted mt-1 text-xs">
               {{ cardPoolLabel(selectedJobDetail.card_pool) }} ·
-              {{ selectedJobDetail.card_role_mode }}
+              roles {{ selectedJobDetail.card_role_mode }} · factions
+              {{ selectedJobDetail.card_faction_mode }}
             </p>
           </div>
           <button
@@ -89,8 +90,11 @@
                 {{
                   item.resolved_card_roles.length > 0
                     ? formatImportRoles(item.resolved_card_roles)
-                    : 'Standard — no special roles'
+                    : 'Normal — no special roles'
                 }}
+              </p>
+              <p class="theme-section-muted text-xs">
+                Factions: {{ formatImportFactions(item.resolved_card_factions) }}
               </p>
               <dl class="theme-section-muted grid gap-1 text-xs">
                 <div
@@ -206,7 +210,15 @@
                       ? 'Automatic roles'
                       : job.card_role_override.length > 0
                         ? `Override: ${job.card_role_override.join(', ')}`
-                        : 'Override: Standard'
+                        : 'Override: Normal'
+                  }}
+                  ·
+                  {{
+                    job.card_faction_mode === 'automatic'
+                      ? 'Automatic factions'
+                      : job.card_faction_override.length > 0
+                        ? `Faction override: ${job.card_faction_override.join(', ')}`
+                        : 'Faction override: None'
                   }}
                 </p>
               </div>
@@ -356,6 +368,7 @@ import type { OperationsQueueItem } from '@/domain/operations/types';
 import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 import {
   formatImportRoles,
+  formatImportFactions,
   getImportEvidencePlaceholder,
   getImportEvidenceState,
   getInferenceEvidence,

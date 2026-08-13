@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 from django.db import IntegrityError, transaction
 
-from card_reader_core.models import CardPool, CardRole, ImportJob
+from card_reader_core.models import CardFaction, CardPool, CardRole, ImportJob
 from card_reader_core.imports import ImportJobCreationResult, ImportJobInputValidationError
 from card_reader_core.repositories.content_versions import (
     create_next_content_version,
@@ -18,7 +18,10 @@ from card_reader_core.repositories.import_jobs import (
     fetch_job_by_creation_key,
     prepare_import_job_inputs,
 )
-from .classification import LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION, CardRoleMode
+from .classification import (
+    LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
+    CardClassificationMode,
+)
 
 
 class ImportCreationKeyConflict(ValueError):
@@ -41,8 +44,10 @@ class ImportService:
         creation_key: str,
         creation_fingerprint: str,
         card_pool: CardPool,
-        card_role_mode: CardRoleMode = "automatic",
+        card_role_mode: CardClassificationMode = "automatic",
         card_role_override: Sequence[CardRole] = (),
+        card_faction_mode: CardClassificationMode = "automatic",
+        card_faction_override: Sequence[CardFaction] = (),
     ) -> ImportJobCreationResult:
         existing = self.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
@@ -57,6 +62,8 @@ class ImportService:
             card_pool=card_pool,
             card_role_mode=card_role_mode,
             card_role_override=card_role_override,
+            card_faction_mode=card_faction_mode,
+            card_faction_override=card_faction_override,
         )
 
         try:
@@ -75,7 +82,9 @@ class ImportService:
                     card_pool=card_pool,
                     card_role_mode=card_role_mode,
                     card_role_override=card_role_override,
-                    inference_policy_version=LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
+                    card_faction_mode=card_faction_mode,
+                    card_faction_override=card_faction_override,
+                    inference_policy_version=LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
                 )
         except ImportJobInputValidationError as exc:
             raise ImportCreationRejected(str(exc)) from exc
@@ -96,8 +105,10 @@ class ImportService:
         content_version_base: str,
         content_version_description: str,
         card_pool: CardPool,
-        card_role_mode: CardRoleMode,
+        card_role_mode: CardClassificationMode,
         card_role_override: Sequence[CardRole],
+        card_faction_mode: CardClassificationMode,
+        card_faction_override: Sequence[CardFaction],
     ) -> None:
         try:
             parse_base_version(content_version_base)
@@ -107,7 +118,9 @@ class ImportService:
                 card_pool=card_pool,
                 card_role_mode=card_role_mode,
                 card_role_override=card_role_override,
-                inference_policy_version=LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION,
+                card_faction_mode=card_faction_mode,
+                card_faction_override=card_faction_override,
+                inference_policy_version=LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
             )
         except ValueError as exc:
             raise ImportCreationRejected(str(exc)) from exc

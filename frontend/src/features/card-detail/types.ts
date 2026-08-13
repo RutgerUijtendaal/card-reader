@@ -2,6 +2,7 @@ import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/typ
 import type { CardGroupSummary, MetadataGroupName, ScalarFieldName } from '@/domain/cards/types';
 import type { CardLifecycleStatus } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
 
 export type CardDetail = {
@@ -24,6 +25,7 @@ export type EditorForm = {
   rules_text: string;
   card_pool: CardPool;
   card_roles: CardRole[];
+  card_factions: CardFaction[];
   deck_building_config: string;
   lifecycle_status: CardLifecycleStatus;
   keyword_ids: string[];

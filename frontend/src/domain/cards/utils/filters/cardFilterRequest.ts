@@ -9,6 +9,7 @@ import {
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardRoleFilter } from '@/domain/cards/cardRoles';
 import type { CardPool } from '@/domain/cards/cardPools';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 
 export type CardFilterApiPayload = {
   q?: string;
@@ -17,6 +18,9 @@ export type CardFilterApiPayload = {
   card_roles?: CardRoleFilter[];
   card_role_exclude?: CardRoleFilter[];
   card_role_match?: 'any' | 'all';
+  card_factions?: CardFaction[];
+  card_faction_exclude?: CardFaction[];
+  card_faction_match?: 'any' | 'all';
   keyword_ids?: string[];
   keyword_match?: 'any' | 'all';
   tag_ids?: string[];
@@ -74,6 +78,13 @@ export const buildCardFilterApiPayload = (
   }
   if (normalized.cardRoleExcludeIds.length > 0) {
     payload.card_role_exclude = normalized.cardRoleExcludeIds;
+  }
+  if ((normalized.cardFactionIds?.length ?? 0) > 0) {
+    payload.card_factions = normalized.cardFactionIds;
+    payload.card_faction_match = normalized.cardFactionMatch ?? 'any';
+  }
+  if ((normalized.cardFactionExcludeIds?.length ?? 0) > 0) {
+    payload.card_faction_exclude = normalized.cardFactionExcludeIds;
   }
   if (normalized.keywordIds.length > 0) {
     payload.keyword_ids = normalized.keywordIds;
@@ -142,6 +153,16 @@ export const buildCardFilterApiSearchParams = (
   payload.card_roles?.forEach((role) => params.append('card_roles', role));
   payload.card_role_exclude?.forEach((role) => params.append('card_role_exclude', role));
   if (payload.card_roles) params.set('card_role_match', payload.card_role_match ?? normalized.cardRoleMatch);
+  payload.card_factions?.forEach((faction) => params.append('card_factions', faction));
+  payload.card_faction_exclude?.forEach((faction) =>
+    params.append('card_faction_exclude', faction),
+  );
+  if (payload.card_factions) {
+    params.set(
+      'card_faction_match',
+      payload.card_faction_match ?? normalized.cardFactionMatch ?? 'any',
+    );
+  }
   if (payload.keyword_ids) {
     payload.keyword_ids.forEach((id) => params.append('keyword_ids', id));
     params.set('keyword_match', payload.keyword_match ?? normalized.keywordMatch);

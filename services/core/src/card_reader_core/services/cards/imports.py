@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from card_reader_core.models import DEFAULT_CARD_POOL, CardPool, CardRole, CardVersion, ImportJobItem
-from card_reader_core.services.imports import CardRoleInferenceEvidence
+from card_reader_core.models import (
+    DEFAULT_CARD_POOL,
+    CardClassificationInferenceEvidence,
+    CardFaction,
+    CardPool,
+    CardRole,
+    CardVersion,
+    ImportJobItem,
+)
 from card_reader_core.repositories.cards import save_parsed_card_result
 from card_reader_core.repositories.metadata import SuggestionCandidate
 from card_reader_core.services.notifications import (
@@ -30,7 +37,8 @@ def save_parsed_card_with_notifications(
     reparse_existing: bool = True,
     card_pool: CardPool = DEFAULT_CARD_POOL,
     resolved_card_roles: tuple[CardRole, ...] = (),
-    classification_evidence: CardRoleInferenceEvidence | None = None,
+    resolved_card_factions: tuple[CardFaction, ...] = (),
+    classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> CardVersion:
     result = save_parsed_card_result(
         item=item,
@@ -48,6 +56,7 @@ def save_parsed_card_with_notifications(
         reparse_existing=reparse_existing,
         card_pool=card_pool,
         resolved_card_roles=resolved_card_roles,
+        resolved_card_factions=resolved_card_factions,
         classification_evidence=classification_evidence,
     )
     version = result.version

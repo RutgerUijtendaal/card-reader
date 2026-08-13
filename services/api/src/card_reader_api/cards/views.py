@@ -39,7 +39,11 @@ from card_reader_core.repositories.cards import (
     list_cards,
 )
 from card_reader_core.repositories.parse_flags import ParseFlagItemInput
-from card_reader_core.models import CARD_POOL_DEFINITIONS, CARD_ROLE_FILTER_DEFINITIONS
+from card_reader_core.models import (
+    CARD_FACTION_DEFINITIONS,
+    CARD_POOL_DEFINITIONS,
+    CARD_ROLE_FILTER_DEFINITIONS,
+)
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
     get_card_version_edit_state,
@@ -101,6 +105,9 @@ class CardListView(APIView):
             card_roles=filters["card_roles"],
             card_role_exclude=filters["card_role_exclude"],
             card_role_match=filters["card_role_match"],
+            card_factions=filters["card_factions"],
+            card_faction_exclude=filters["card_faction_exclude"],
+            card_faction_match=filters["card_faction_match"],
             attack_min=filters["attack_min"],
             attack_max=filters["attack_max"],
             health_min=filters["health_min"],
@@ -167,6 +174,14 @@ class CardFiltersView(APIView):
                         "derived": definition.derived,
                     }
                     for definition in CARD_ROLE_FILTER_DEFINITIONS
+                ],
+                "card_factions": [
+                    {
+                        "key": definition.key,
+                        "label": definition.label,
+                        "rank": definition.rank,
+                    }
+                    for definition in CARD_FACTION_DEFINITIONS
                 ],
                 "mana_families": [
                     {

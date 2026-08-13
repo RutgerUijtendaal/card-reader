@@ -12,6 +12,7 @@
     <CardCompactRowContent
       :card="card"
       art-width="5.5rem"
+      show-classification
     />
 
     <div
@@ -44,6 +45,7 @@
     <CardCompactRowContent
       :card="card"
       art-width="5.5rem"
+      show-classification
     />
 
     <div

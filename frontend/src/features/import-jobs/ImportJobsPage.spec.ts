@@ -26,6 +26,8 @@ describe('ImportJobsPage', () => {
       cardPool: ref('player'),
       cardRoleMode: ref<'automatic' | 'override'>('override'),
       cardRoleOverride: ref([]),
+      cardFactionMode: ref<'automatic' | 'override'>('override'),
+      cardFactionOverride: ref([]),
       creationKey: ref('f1e10412-e8e8-49cb-9717-a24d2eec38c1'),
       contentVersionBase: ref('16.2'),
       contentVersionDescription: ref('Current release.'),
@@ -58,6 +60,7 @@ describe('ImportJobsPage', () => {
           label: 'Default card',
           definition_json: '{}',
           inferred_card_roles: [],
+          inferred_card_factions: [],
         },
       ]),
       selectedJobDetail: ref(null),
@@ -122,7 +125,13 @@ describe('ImportJobsPage', () => {
     expect(host.querySelector('aside')).toBeNull();
     expect(
       Array.from(host.querySelectorAll('legend')).map((legend) => legend.textContent?.trim()),
-    ).toEqual(['Card setup', 'Card roles', 'Content version', 'Source images']);
+    ).toEqual([
+      'Card setup',
+      'Card roles',
+      'Card factions',
+      'Content version',
+      'Source images',
+    ]);
     expect(
       Array.from(host.querySelectorAll('form > fieldset > legend')).every((legend) =>
         legend.classList.contains('pr-2'),

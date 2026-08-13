@@ -1,6 +1,7 @@
 import { useEventListener } from '@vueuse/core';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
 import { fetchTemplates } from '@/domain/templates/api';
 import type { TemplateRecord } from '@/domain/templates/types';
@@ -46,6 +47,8 @@ export const useImportJobsController = () => {
   const cardPool = ref<CardPool>('player');
   const cardRoleMode = ref<'automatic' | 'override'>('automatic');
   const cardRoleOverride = ref<CardRole[]>([]);
+  const cardFactionMode = ref<'automatic' | 'override'>('automatic');
+  const cardFactionOverride = ref<CardFaction[]>([]);
   const creationKey = ref(newCreationKey());
   const createState = ref<ImportCreateState>({ phase: 'idle' });
   const pendingAttempt = shallowRef<CreateImportJobInput | null>(null);
@@ -169,6 +172,8 @@ export const useImportJobsController = () => {
     resetPickedFiles();
     cardRoleMode.value = 'automatic';
     cardRoleOverride.value = [];
+    cardFactionMode.value = 'automatic';
+    cardFactionOverride.value = [];
     creationKey.value = newCreationKey();
   };
 
@@ -204,6 +209,9 @@ export const useImportJobsController = () => {
       cardPool: cardPool.value,
       cardRoleMode: cardRoleMode.value,
       cardRoleOverride: cardRoleMode.value === 'override' ? [...cardRoleOverride.value] : [],
+      cardFactionMode: cardFactionMode.value,
+      cardFactionOverride:
+        cardFactionMode.value === 'override' ? [...cardFactionOverride.value] : [],
     };
     pendingAttempt.value = attempt;
     creatingJob.value = true;
@@ -266,6 +274,8 @@ export const useImportJobsController = () => {
     cardPool,
     cardRoleMode,
     cardRoleOverride,
+    cardFactionMode,
+    cardFactionOverride,
     creationKey,
     contentVersionBase,
     contentVersionDescription,

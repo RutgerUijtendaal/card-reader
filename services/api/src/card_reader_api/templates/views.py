@@ -26,6 +26,9 @@ class TemplateListCreateView(APIView):
                 key=serializer.validated_data.get("key"),
                 definition_json=serializer.validated_data["definition_json"],
                 inferred_card_roles=serializer.validated_data.get("inferred_card_roles", []),
+                inferred_card_factions=serializer.validated_data.get(
+                    "inferred_card_factions", []
+                ),
             )
         except ValueError as exc:
             return bad_request(str(exc))
@@ -44,6 +47,9 @@ class TemplateDetailView(APIView):
                 key=serializer.validated_data.get("key"),
                 definition_json=serializer.validated_data.get("definition_json"),
                 inferred_card_roles=serializer.validated_data.get("inferred_card_roles"),
+                inferred_card_factions=serializer.validated_data.get(
+                    "inferred_card_factions"
+                ),
             )
         except ValueError as exc:
             return bad_request(str(exc))

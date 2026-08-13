@@ -65,6 +65,9 @@ const buildPreview = (): CardMergePreview => ({
     label: 'Target Card',
     latest_name: 'Target Card',
     version_count: 1,
+    card_pool: 'player',
+    card_roles: [],
+    card_factions: [],
   },
   sources: [
     {
@@ -73,6 +76,9 @@ const buildPreview = (): CardMergePreview => ({
       label: 'Source Card',
       latest_name: 'Source Card',
       version_count: 1,
+      card_pool: 'player',
+      card_roles: [],
+      card_factions: [],
     },
   ],
   aliases: [],

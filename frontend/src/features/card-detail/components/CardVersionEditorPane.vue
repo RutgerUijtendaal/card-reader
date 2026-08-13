@@ -50,7 +50,8 @@
                 Card Classification
               </p>
               <p class="theme-section-muted text-xs">
-                Pool controls audience access. Roles may be combined; no selected roles means Standard.
+                Pool controls audience access. Roles and factions may be combined independently;
+                no selected roles means Normal.
               </p>
             </div>
             <div class="grid gap-4 md:grid-cols-[minmax(0,12rem)_1fr]">
@@ -93,7 +94,32 @@
                   <span
                     v-if="form.card_roles.length === 0"
                     class="theme-pill theme-pill-accent px-3 py-2 text-xs font-semibold"
-                  >Standard</span>
+                  >Normal</span>
+                </div>
+              </fieldset>
+              <fieldset class="space-y-2">
+                <legend class="field-label">
+                  Factions
+                </legend>
+                <div class="flex flex-wrap gap-2">
+                  <label
+                    v-for="option in cardFactionOptions"
+                    :key="option.value"
+                    class="theme-pill theme-pill-success flex items-center gap-2 px-3 py-2 text-xs font-semibold"
+                  >
+                    <input
+                      :checked="form.card_factions.includes(option.value)"
+                      type="checkbox"
+                      class="theme-checkbox h-4 w-4"
+                      :disabled="!version.editable || isBusy"
+                      @change="$emit('toggle-card-faction', option.value, ($event.target as HTMLInputElement).checked)"
+                    >
+                    {{ option.label }}
+                  </label>
+                  <span
+                    v-if="form.card_factions.length === 0"
+                    class="theme-pill theme-pill-neutral px-3 py-2 text-xs font-semibold"
+                  >No faction</span>
                 </div>
               </fieldset>
             </div>
@@ -572,6 +598,7 @@ import {
   findActiveSymbolTrigger,
 } from '@/domain/cards/utils/cards/ruleTextSymbols';
 import { CARD_ROLE_OPTIONS, type CardRole } from '@/domain/cards/cardRoles';
+import { CARD_FACTION_OPTIONS, type CardFaction } from '@/domain/cards/cardFactions';
 import type {
   CardVersionDetail,
   MetadataGroupName,
@@ -629,6 +656,7 @@ const emit = defineEmits<{
   (e: 'update-field', fieldName: ScalarFieldName, value: string): void;
   (e: 'update-card-pool', value: CardPool): void;
   (e: 'toggle-card-role', role: CardRole, checked: boolean): void;
+  (e: 'toggle-card-faction', faction: CardFaction, checked: boolean): void;
   (e: 'update-deck-building-config', value: string): void;
   (e: 'update-lifecycle-status', value: CardLifecycleStatus): void;
 }>();
@@ -645,6 +673,7 @@ const lifecycleOptions = [
   { value: DEPRECATED_CARD_LIFECYCLE_STATUS, label: 'Deprecated' },
 ] as const;
 const cardRoleOptions = CARD_ROLE_OPTIONS;
+const cardFactionOptions = CARD_FACTION_OPTIONS;
 const cardPoolOptions = CARD_POOL_OPTIONS;
 const symbolInsertOptions = computed(() => props.optionsForGroup('symbols') as SymbolFilterOption[]);
 const rulesTextSymbolIds = computed(() => props.ruleTextSymbols.map((symbol) => symbol.id));

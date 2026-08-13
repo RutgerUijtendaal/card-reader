@@ -7,6 +7,7 @@ from typing import Literal, TypedDict
 from card_reader_core.models import (
     DEFAULT_CARD_LIFECYCLE_FILTER as CORE_DEFAULT_CARD_LIFECYCLE_FILTER,
     CardLifecycleFilter as CoreCardLifecycleFilter,
+    CardFaction,
     CardPool,
     CardRole,
     CardRoleFilter,
@@ -47,6 +48,7 @@ class LatestCardVersionReparseSource:
     image_path: Path
     card_pool: CardPool
     card_roles: tuple[CardRole, ...]
+    card_factions: tuple[CardFaction, ...]
 
 
 @dataclass(frozen=True)
@@ -115,6 +117,9 @@ class CardFilterParams(TypedDict):
     card_roles: list[CardRoleFilter] | None
     card_role_exclude: list[CardRoleFilter] | None
     card_role_match: CardRoleMatch
+    card_factions: list[CardFaction] | None
+    card_faction_exclude: list[CardFaction] | None
+    card_faction_match: CardRoleMatch
     attack_min: int | None
     attack_max: int | None
     health_min: int | None
@@ -140,4 +145,4 @@ class ParsedSnapshotPayload(TypedDict):
 
 
 class CardIdentityConflict(ValueError):
-    """A primary name or alias collides inside one card pool namespace."""
+    """A primary name or alias collides inside one pool/faction namespace."""

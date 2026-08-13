@@ -1,6 +1,7 @@
 import type { TemplateParserType } from '@/domain/templates/types';
 import type { JsonObject } from '@/shared/types/json';
 import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
 
 export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types' | 'deck-roles' | 'deck-types';
@@ -48,6 +49,9 @@ export type CardMergeCardSummary = {
   label: string;
   latest_name: string;
   version_count: number;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
 };
 
 export type CardMergeAliasPreview = {
@@ -141,6 +145,7 @@ export type CardGroupMemberRecord = {
   card_label: string;
   card_name: string;
   card_pool: CardPool;
+  card_factions: CardFaction[];
   position: number;
   is_anchor: boolean;
   image_url: string | null;
@@ -165,6 +170,7 @@ export type LinkedCardPreview = {
   image_url: string | null;
   card_pool: CardPool;
   card_roles: CardRole[];
+  card_factions: CardFaction[];
 };
 
 export type LinkedDeckPreview = {
@@ -337,6 +343,7 @@ export type SuggestionOccurrencePreview = {
   normalized_source_text: string;
   card_pool: CardPool;
   card_roles: CardRole[];
+  card_factions: CardFaction[];
 };
 
 export type SuggestionAcceptedTarget = {

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from card_reader_core.models import (
     DEFAULT_CARD_POOL,
+    CardFaction,
     CardPool,
     CardRoleFilter,
     Symbol,
@@ -56,6 +57,9 @@ def export_cards_csv(
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
+    card_factions: list[CardFaction] | None = None,
+    card_faction_exclude: list[CardFaction] | None = None,
+    card_faction_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -120,6 +124,9 @@ def export_cards_csv(
             card_roles=card_roles,
             card_role_exclude=card_role_exclude,
             card_role_match=card_role_match,
+            card_factions=card_factions,
+            card_faction_exclude=card_faction_exclude,
+            card_faction_match=card_faction_match,
             attack_min=attack_min,
             attack_max=attack_max,
             health_min=health_min,

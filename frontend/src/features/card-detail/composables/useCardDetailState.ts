@@ -72,6 +72,7 @@ export const useCardDetailState = () => {
     rules_text: '',
     card_pool: 'player',
     card_roles: [],
+    card_factions: [],
     deck_building_config: formatDeckBuildingConfigJson(fallbackDeckBuildingDefaultConfig),
     lifecycle_status: ACTIVE_CARD_LIFECYCLE_STATUS,
     keyword_ids: [],
@@ -188,6 +189,7 @@ export const useCardDetailState = () => {
     form.rules_text = version.rules_text_enriched ?? version.rules_text ?? '';
     form.card_pool = version.card_pool;
     form.card_roles = [...version.card_roles];
+    form.card_factions = [...(version.card_factions ?? [])];
     form.deck_building_config = formatDeckBuildingConfigJson(
       Object.keys(version.deck_building_config ?? {}).length > 0
         ? version.deck_building_config
@@ -577,6 +579,12 @@ const buildCardUpdatePayload = (
   if (JSON.stringify([...form.card_roles].sort()) !== JSON.stringify([...version.card_roles].sort())) {
     updates.card_roles = form.card_roles;
   }
+  if (
+    JSON.stringify([...form.card_factions].sort())
+    !== JSON.stringify([...(version.card_factions ?? [])].sort())
+  ) {
+    updates.card_factions = form.card_factions;
+  }
   const deckBuildingConfig = parseJsonObject(form.deck_building_config);
   if (JSON.stringify(deckBuildingConfig) !== JSON.stringify(version.deck_building_config ?? {})) {
     updates.deck_building_config = deckBuildingConfig;
@@ -637,7 +645,12 @@ export const reconcileCardGroupsAfterPoolChange = (
 
 export type CardClassificationFields = Pick<
   CardVersionDetail,
-  'version_id' | 'card_pool' | 'card_roles' | 'deck_building_config' | 'lifecycle_status'
+  | 'version_id'
+  | 'card_pool'
+  | 'card_roles'
+  | 'card_factions'
+  | 'deck_building_config'
+  | 'lifecycle_status'
 >;
 
 export const synchronizeCardClassification = <T extends CardClassificationFields>(
@@ -651,6 +664,7 @@ export const synchronizeCardClassification = <T extends CardClassificationFields
           ...version,
           card_pool: updated.card_pool,
           card_roles: [...updated.card_roles],
+          card_factions: [...(updated.card_factions ?? [])],
           deck_building_config: updated.deck_building_config,
           lifecycle_status: updated.lifecycle_status,
         },

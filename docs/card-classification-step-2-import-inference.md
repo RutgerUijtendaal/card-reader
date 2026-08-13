@@ -4,6 +4,8 @@ Status: implemented by the Step 2 checkpoint; retained as the executable design 
 
 Target amendment: this document records Step 2's temporary Player/Game Master import values. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces `game_master` with `evil` and `neutral`, requires one of the final three pools for every batch, and keeps inference and override semantics unchanged.
 
+Faction amendment: [Step 2.3](card-classification-step-2-3-faction-classification.md) adds an independent faction facet, generalizes the role-shaped inference/evidence machinery, and requires untargeted imports to resolve factions before natural identity lookup. This document remains the implementation record for the original role-only policy versions.
+
 This step adds reliable, explainable import classification on top of the pool and role model. It must not reintroduce Hero-specific persistence or allow an import to silently reclassify an existing card.
 
 ## Outcome

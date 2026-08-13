@@ -14,29 +14,41 @@ keys remain regression anchors that must still exist. The committed
 
 Selection, group validation, archive construction, and archive loading use a fixed canonical Player-only `CardPoolScope`. Selection keys resolve only against Player cards, so same-key Evil or Neutral twins neither override nor invalidate the selected Player card. Archive validation rejects non-Player card records and cross-pool groups even when an archive was produced outside the normal exporter. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive restricted-pool eligibility cannot expand published bundles accidentally.
 
+Cards included through a selected group retain their exact database identity during selection; a
+same-key Player card in another faction namespace is not pulled into the bundle merely because it
+shares the group's member key.
+
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and
-Playtester workflows. Version 3 template records include canonical `inferred_card_roles` hints used
-by automatic import classification. Card records include the required `card_pool` and canonical
-`card_roles` fields; they never emit the removed Hero boolean.
+Playtester workflows. Version 4 template records include canonical `inferred_card_roles` and
+`inferred_card_factions` hints used by automatic import classification. Card records include the
+required `card_pool`, canonical `card_roles`, and canonical `card_factions` fields; they never emit
+the removed Hero boolean or internal faction identity key. Card-group anchors and members use a
+structured card reference containing the pool, canonical faction set, and normalized card key, so
+same-key cards in different faction namespaces remain distinct throughout validation and import.
 
-The importer supports current Version 3 archives and explicitly adopts pinned Version 1 and
-Version 2 archives. Version 1 adoption assigns every card to the Player pool and converts
-`is_hero=true` to the Hero role before strict current-schema validation. Version 1 and Version 2
-templates adopt an empty inferred-role set. This compatibility keeps older immutable bundles usable
-without making current classification fields optional.
+The importer supports current Version 4 archives and explicitly adopts pinned Versions 1 through 3.
+Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to the Hero role
+before strict current-schema validation. Older templates adopt the hint fields introduced after their
+format, and every pre-Version-4 card and template adopts empty factions. Import reconstructs the
+pool-plus-faction natural identity namespace rather than trusting a serialized internal key. This
+compatibility keeps older immutable bundles usable without making current classification fields optional.
 
-Selection coverage is evaluated by pool and by role through `min_cards_by_pool` and
-`min_cards_by_role`. The existing Hero minimum is retained under the Hero role. Evil and Neutral pool
-coverage remain zero while those pools are excluded; Boon, Event, and Location may remain at zero
-until reviewed source data is available. The lock file is still generated only by publishing a
-validated immutable bundle and must not be edited by hand.
+Selection coverage is evaluated by pool, role, and faction through `min_cards_by_pool`,
+`min_cards_by_role`, and `min_cards_by_faction`. The existing Hero minimum is retained under the Hero
+role. Evil and Neutral pool coverage remains zero while those pools are excluded; newly introduced
+roles and Order, Blood, and Darkness may remain at zero until reviewed source data is available. The
+lock file is still generated only by publishing a validated immutable bundle and must not be edited by
+hand.
 
-`required_template_role_hints` in the reviewed selection makes expected template inference explicit.
-Bundle validation and `doctor_dev_data` fail when a named template loses a required hint. Templates
-and catalogs are supplied by developer-data on a clean checkout; there is no parallel built-in
-catalog seed to keep in sync. The committed Version 2 lock remains valid until staff publish and
-validate a real Version 3 bundle and commit its generated checksum.
+`required_tag_keys`, `required_template_role_hints`, and `required_template_faction_hints` in the
+reviewed selection make expected inference inputs explicit. Version 4 bundle validation and normal
+`doctor_dev_data` source-readiness checks fail when a stable tag or named template hint is missing.
+`bootstrap_dev` passes the pinned source format to the doctor so adopted immutable Version 1-3 bundles
+are checked only against fields that their format can represent. Templates and catalogs are supplied
+by developer-data on a clean checkout; there is no parallel built-in catalog seed to keep in sync. The
+existing lock remains valid until staff publish and validate a real Version 4 bundle and commit its
+generated checksum.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.

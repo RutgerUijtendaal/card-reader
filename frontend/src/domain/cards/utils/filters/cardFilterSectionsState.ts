@@ -28,7 +28,15 @@ export type CardFilterSectionsState = {
   cardRoleMatch: MatchMode;
   onUpdateCardRoleMatch: (value: MatchMode) => void;
   cardRoleOptions: MetadataOption[];
-  resetClassificationGroup: () => void;
+  selectedCardFactions: string[];
+  onUpdateSelectedCardFactions: (value: string[]) => void;
+  excludedCardFactions: string[];
+  onUpdateExcludedCardFactions: (value: string[]) => void;
+  cardFactionMatch: MatchMode;
+  onUpdateCardFactionMatch: (value: MatchMode) => void;
+  cardFactionOptions: MetadataOption[];
+  resetCardRoleGroup: () => void;
+  resetCardFactionGroup: () => void;
   selectedManaTypeSymbolIds: string[];
   lifecycleStatus: LifecycleFilterValue;
   onUpdateLifecycleStatus: (value: LifecycleFilterValue) => void;

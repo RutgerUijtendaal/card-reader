@@ -32,7 +32,7 @@ from card_reader_core.models import (
     Template,
     Type,
 )
-from card_reader_core.repositories.cards import list_cards
+from card_reader_core.repositories.cards import change_card_identity, list_cards
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.decks import (
@@ -3104,6 +3104,47 @@ def test_card_role_filters_support_any_all_and_exclusions() -> None:
     assert boon_event_card.id not in excluded_ids
 
 
+def test_card_faction_filters_support_any_all_and_exclusions() -> None:
+    order_card = _create_card(name="Faction Matching Order", hero=False)
+    order_blood_card = _create_card(name="Faction Matching Order Blood", hero=False)
+    factionless_card = _create_card(name="Faction Matching None", hero=False)
+    change_card_identity(card=order_card, card_factions=("order",))
+    change_card_identity(
+        card=order_blood_card,
+        card_factions=("blood", "order"),
+    )
+    client = Client(HTTP_HOST="localhost")
+
+    any_ids = {
+        row["id"]
+        for row in client.get(
+            "/cards",
+            {"card_factions": ["blood", "darkness"], "card_faction_match": "any"},
+        ).json()["results"]
+    }
+    all_ids = {
+        row["id"]
+        for row in client.get(
+            "/cards",
+            {"card_factions": ["order", "blood"], "card_faction_match": "all"},
+        ).json()["results"]
+    }
+    excluded_ids = {
+        row["id"]
+        for row in client.get(
+            "/cards",
+            {"card_faction_exclude": ["order"]},
+        ).json()["results"]
+    }
+
+    assert order_blood_card.id in any_ids
+    assert order_card.id not in any_ids
+    assert all_ids == {order_blood_card.id}
+    assert factionless_card.id in excluded_ids
+    assert order_card.id not in excluded_ids
+    assert order_blood_card.id not in excluded_ids
+
+
 def test_evil_and_neutral_cards_are_staff_scoped_for_lists_and_details() -> None:
     restricted_cards = []
     for pool in ("evil", "neutral"):
@@ -3412,7 +3453,11 @@ def test_latest_version_patch_can_update_card_roles() -> None:
 
     response = client.patch(
         f"/cards/{card.id}/latest-version",
-        data={"card_pool": "evil", "card_roles": ["hero", "boon", "location"]},
+        data={
+            "card_pool": "evil",
+            "card_roles": ["hero", "boss", "shop_item"],
+            "card_factions": ["blood", "order"],
+        },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
@@ -3420,17 +3465,26 @@ def test_latest_version_patch_can_update_card_roles() -> None:
     assert response.status_code == 200
     assert set(card.role_assignments.values_list("role", flat=True)) == {
         "hero",
-        "boon",
-        "location",
+        "boss",
+        "shop_item",
     }
     card.refresh_from_db()
     assert card.card_pool == "evil"
+    assert set(card.faction_assignments.values_list("faction", flat=True)) == {
+        "order",
+        "blood",
+    }
     assert response.json()["card_pool"] == "evil"
-    assert set(response.json()["card_roles"]) == {"hero", "boon", "location"}
+    assert set(response.json()["card_roles"]) == {"hero", "boss", "shop_item"}
+    assert response.json()["card_factions"] == ["order", "blood"]
 
     replacement_response = client.patch(
         f"/cards/{card.id}/latest-version",
-        data={"card_pool": "player", "card_roles": ["event"]},
+        data={
+            "card_pool": "player",
+            "card_roles": ["event"],
+            "card_factions": ["darkness"],
+        },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
@@ -3439,6 +3493,9 @@ def test_latest_version_patch_can_update_card_roles() -> None:
     card.refresh_from_db()
     assert card.card_pool == "player"
     assert list(card.role_assignments.values_list("role", flat=True)) == ["event"]
+    assert list(card.faction_assignments.values_list("faction", flat=True)) == [
+        "darkness"
+    ]
 
 
 def test_latest_version_patch_can_deprecate_card() -> None:

@@ -76,6 +76,7 @@ def suggestion_occurrence_payload(row: SuggestionOccurrencePreview) -> dict[str,
         "normalized_source_text": row["normalized_source_text"],
         "card_pool": row["card_pool"],
         "card_roles": row["card_roles"],
+        "card_factions": row["card_factions"],
     }
 
 
@@ -88,6 +89,7 @@ def linked_card_payload(row: LinkedCardPreview) -> dict[str, object]:
         "image_url": row["image_url"],
         "card_pool": row["card_pool"],
         "card_roles": row["card_roles"],
+        "card_factions": row["card_factions"],
     }
 
 

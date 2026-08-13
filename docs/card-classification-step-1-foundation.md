@@ -2,16 +2,17 @@
 
 Status: implemented and validated.
 
-This is the first of six ordered checkpoints:
+This is the first of seven ordered checkpoints:
 
 1. Card classification foundation (this document)
 2. [Authorization seam consolidation](card-classification-step-1-1-authorization-seam.md)
 3. [Import inference](card-classification-step-2-import-inference.md)
 4. [Pool-scoped card identity](card-classification-step-2-1-pool-scoped-identity.md)
 5. [Import workflow seam consolidation](card-classification-step-2-2-import-workflow-seam.md)
-6. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
+6. [Faction classification](card-classification-step-2-3-faction-classification.md)
+7. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
 
-Do not begin Step 1.1 until this step's acceptance criteria are satisfied. Do not begin Step 2, Step 2.1, Step 2.2, or Step 3 until Step 1.1 is complete. Later steps may be implemented in the same branch only when each checkpoint remains independently reviewable and verified.
+Do not begin Step 1.1 until this step's acceptance criteria are satisfied. Do not begin Step 2, Step 2.1, Step 2.2, Step 2.3, or Step 3 until Step 1.1 is complete. Later steps may be implemented in the same branch only when each checkpoint remains independently reviewable and verified.
 
 Target amendment: this document records the implemented Step 1 foundation and therefore uses its temporary `game_master` pool terminology. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces that undeployed value with the final `evil` and `neutral` pools and renames authorization/session contracts to pool-scope terminology. There are no Game Master card rows to migrate.
 

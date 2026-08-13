@@ -3,7 +3,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from card_reader_core.models import CardRole, Template, normalize_card_roles
+from card_reader_core.models import (
+    CardFaction,
+    CardRole,
+    Template,
+    normalize_card_factions,
+    normalize_card_roles,
+)
 from card_reader_core.repositories.helpers import normalize_slug_key
 from card_reader_core.repositories.templates import (
     create_template,
@@ -53,6 +59,7 @@ class TemplateService:
         key: str | None = None,
         definition_json: str,
         inferred_card_roles: list[object] | tuple[object, ...] = (),
+        inferred_card_factions: list[object] | tuple[object, ...] = (),
     ) -> Template:
         normalized_label = self._normalize_label(label)
         normalized_key = self._normalize_key(key=key, label=normalized_label)
@@ -62,6 +69,9 @@ class TemplateService:
             label=normalized_label,
             definition_json=self._normalize_definition_json(definition_json),
             inferred_card_roles_json=list(self._normalize_inferred_card_roles(inferred_card_roles)),
+            inferred_card_factions_json=list(
+                self._normalize_inferred_card_factions(inferred_card_factions)
+            ),
         )
 
     def update_template(
@@ -72,6 +82,7 @@ class TemplateService:
         key: str | None = None,
         definition_json: str | None = None,
         inferred_card_roles: list[object] | tuple[object, ...] | None = None,
+        inferred_card_factions: list[object] | tuple[object, ...] | None = None,
     ) -> Template | None:
         row = get_template(entry_id)
         if row is None:
@@ -89,6 +100,10 @@ class TemplateService:
         if inferred_card_roles is not None:
             updates["inferred_card_roles_json"] = list(
                 self._normalize_inferred_card_roles(inferred_card_roles)
+            )
+        if inferred_card_factions is not None:
+            updates["inferred_card_factions_json"] = list(
+                self._normalize_inferred_card_factions(inferred_card_factions)
             )
 
         return update_template(entry_id=entry_id, updates=updates)
@@ -130,6 +145,17 @@ class TemplateService:
         normalized = normalize_card_roles(requested)
         if len(set(requested)) != len(normalized):
             raise ValueError("inferred_card_roles contains unsupported or duplicate roles")
+        return normalized
+
+    def _normalize_inferred_card_factions(
+        self, values: list[object] | tuple[object, ...]
+    ) -> tuple[CardFaction, ...]:
+        requested = tuple(values)
+        normalized = normalize_card_factions(requested)
+        if len(set(requested)) != len(normalized):
+            raise ValueError(
+                "inferred_card_factions contains unsupported or duplicate factions"
+            )
         return normalized
 
     def _validate_template_definition(self, definition: dict[str, Any]) -> dict[str, Any]:

@@ -2,6 +2,7 @@ import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
 import type { CardRoleFilter } from '@/domain/cards/cardRoles';
 import type { CardPool } from '@/domain/cards/cardPools';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 import type {
   CardFilterSelectionState,
 } from '@/domain/cards/utils/filters/cardFilterState';
@@ -27,6 +28,9 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const cardRoleMatch = ref<'any' | 'all'>('any');
   const cardRoleIds = ref<CardRoleFilter[]>([]);
   const cardRoleExcludeIds = ref<CardRoleFilter[]>(['hero']);
+  const cardFactionMatch = ref<'any' | 'all'>('any');
+  const cardFactionIds = ref<CardFaction[]>([]);
+  const cardFactionExcludeIds = ref<CardFaction[]>([]);
   const keywordMatch = ref<'any' | 'all'>('any');
   const tagMatch = ref<'any' | 'all'>('any');
   const typeMatch = ref<'any' | 'all'>('any');
@@ -62,6 +66,9 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
       cardRoleMatch: cardRoleMatch.value,
       cardRoleIds: cardRoleIds.value,
       cardRoleExcludeIds: cardRoleExcludeIds.value,
+      cardFactionMatch: cardFactionMatch.value,
+      cardFactionIds: cardFactionIds.value,
+      cardFactionExcludeIds: cardFactionExcludeIds.value,
       keywordMatch: keywordMatch.value,
       tagMatch: tagMatch.value,
       typeMatch: typeMatch.value,
@@ -99,6 +106,9 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     cardRoleMatch.value = normalized.cardRoleMatch;
     cardRoleIds.value = [...normalized.cardRoleIds];
     cardRoleExcludeIds.value = [...normalized.cardRoleExcludeIds];
+    cardFactionMatch.value = normalized.cardFactionMatch ?? 'any';
+    cardFactionIds.value = [...(normalized.cardFactionIds ?? [])];
+    cardFactionExcludeIds.value = [...(normalized.cardFactionExcludeIds ?? [])];
     keywordMatch.value = normalized.keywordMatch;
     tagMatch.value = normalized.tagMatch;
     typeMatch.value = normalized.typeMatch;
@@ -145,6 +155,9 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
     cardRoleMatch,
     cardRoleIds,
     cardRoleExcludeIds,
+    cardFactionMatch,
+    cardFactionIds,
+    cardFactionExcludeIds,
     keywordMatch,
     tagMatch,
     typeMatch,

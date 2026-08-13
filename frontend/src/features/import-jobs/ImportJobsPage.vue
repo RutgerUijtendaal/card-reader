@@ -125,7 +125,59 @@
                       v-if="cardRoleOverride.length === 0"
                       class="theme-section-muted basis-full text-sm"
                     >
-                      Standard — no special roles
+                      Normal — no special roles
+                    </span>
+                  </div>
+                </fieldset>
+                <fieldset class="theme-divider space-y-3 border-t pt-4 md:col-span-2">
+                  <legend class="field-label">
+                    Card factions
+                  </legend>
+                  <div class="flex flex-wrap gap-3">
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardFactionMode"
+                        type="radio"
+                        value="automatic"
+                        :disabled="formLocked"
+                      >
+                      Automatic
+                    </label>
+                    <label class="theme-section-title inline-flex items-center gap-2 text-sm">
+                      <input
+                        v-model="cardFactionMode"
+                        type="radio"
+                        value="override"
+                        :disabled="formLocked"
+                      >
+                      Override
+                    </label>
+                  </div>
+                  <p class="theme-section-muted mt-1 text-sm">
+                    Automatic combines faction hints from the template with detected card metadata.
+                  </p>
+                  <div
+                    v-if="cardFactionMode === 'override'"
+                    class="flex flex-wrap gap-3"
+                  >
+                    <label
+                      v-for="option in cardFactionOptions"
+                      :key="option.value"
+                      class="theme-section-title inline-flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        v-model="cardFactionOverride"
+                        type="checkbox"
+                        :value="option.value"
+                        :disabled="formLocked"
+                      >
+                      {{ option.label }}
+                    </label>
+                    <span
+                      v-if="cardFactionOverride.length === 0"
+                      class="theme-section-muted basis-full text-sm"
+                    >
+                      No faction
                     </span>
                   </div>
                 </fieldset>
@@ -319,6 +371,7 @@
 
 <script setup lang="ts">
 import { CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
+import { CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
 import { CARD_POOL_OPTIONS } from '@/domain/cards/cardPools';
 import { Info, Upload } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -336,6 +389,8 @@ const {
   cardPool,
   cardRoleMode,
   cardRoleOverride,
+  cardFactionMode,
+  cardFactionOverride,
   contentVersionBase,
   contentVersionDescription,
   currentContentVersion,
@@ -380,6 +435,7 @@ const templateOptions = computed(() =>
 );
 const cardPoolOptions = CARD_POOL_OPTIONS;
 const cardRoleOptions = CARD_ROLE_OPTIONS;
+const cardFactionOptions = CARD_FACTION_OPTIONS;
 
 onBeforeRouteLeave(() => {
   if (!hasUnresolvedCreateAttempt.value) return true;

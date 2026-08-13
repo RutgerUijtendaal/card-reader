@@ -72,6 +72,7 @@ const buildGroup = (
         card_label: 'Anchor Card',
         card_name: 'Anchor Card',
         card_pool: cardPool,
+        card_factions: ['order'],
         position: 1,
         is_anchor: true,
         image_url: '/anchor.png',
@@ -146,6 +147,8 @@ describe('CardGroupsAdminView', () => {
     }
     groupButton.click();
     await nextTick();
+
+    expect(mounted.container.textContent).toContain('Order');
 
     const poolSelect = mounted.container.querySelector<HTMLSelectElement>('select');
     if (!(poolSelect instanceof HTMLSelectElement)) {

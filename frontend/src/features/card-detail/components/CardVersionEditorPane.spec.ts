@@ -14,7 +14,7 @@ const buildVersion = (overrides: Partial<CardVersionDetail> = {}): CardVersionDe
   id: 'card-1',
   key: 'card-1',
   label: 'Card 1',
-  card_pool: 'player' as const, card_roles: [],
+  card_pool: 'player' as const, card_roles: [], card_factions: [],
   deck_building_config: { overrides: {} },
   template_id: 'template-1',
   version_id: 'version-1',
@@ -86,7 +86,7 @@ const buildForm = (overrides: Partial<EditorForm> = {}): EditorForm => ({
   attack: '',
   health: '',
   rules_text: '',
-  card_pool: 'player' as const, card_roles: [],
+  card_pool: 'player' as const, card_roles: [], card_factions: [],
   deck_building_config: JSON.stringify({ overrides: {} }, null, 2),
   lifecycle_status: 'active',
   keyword_ids: [],
@@ -255,8 +255,11 @@ describe('CardVersionEditorPane tabs', () => {
     expect(mounted.container.textContent).toContain('Card Classification');
     expect(mounted.container.textContent).toContain('Evil');
     expect(mounted.container.textContent).toContain('Neutral');
-    expect(mounted.container.textContent).toContain('Standard');
+    expect(mounted.container.textContent).toContain('Normal');
+    expect(mounted.container.textContent).toContain('Boss');
     expect(mounted.container.textContent).toContain('Location');
+    expect(mounted.container.textContent).toContain('Shop Item');
+    expect(mounted.container.textContent).toContain('Order');
     expect(mounted.container.textContent).toContain('Deck-Building Config JSON');
     expect(mounted.container.textContent).toContain('Card Status');
     expect(mounted.container.textContent).not.toContain('Mana Cost');

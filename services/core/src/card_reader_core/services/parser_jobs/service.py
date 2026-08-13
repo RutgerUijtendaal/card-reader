@@ -3,7 +3,14 @@ from __future__ import annotations
 import logging
 from typing import Callable, cast
 
-from card_reader_core.models import CardPool, CardRole, ImportJob, ImportJobItem, ImportJobStatus
+from card_reader_core.models import (
+    CardFaction,
+    CardPool,
+    CardRole,
+    ImportJob,
+    ImportJobItem,
+    ImportJobStatus,
+)
 from card_reader_core.repositories.import_jobs import (
     bump_job_processed,
     fetch_job,
@@ -20,7 +27,11 @@ from card_reader_core.repositories.metadata import (
     SuggestionCandidate,
 )
 from card_reader_core.services.cards import save_parsed_card_with_notifications
-from card_reader_core.services.imports import CardClassificationInput, CardRoleMode, classify_import_card
+from card_reader_core.services.imports import (
+    CardClassificationInput,
+    CardClassificationMode,
+    classify_import_card,
+)
 from card_reader_core.storage import resolve_storage_path
 from .resources import ParserJobContextLoader
 from .types import CardParserProtocol, ItemProcessingResult, JobOptions, ParserResources
@@ -141,10 +152,17 @@ class ImportProcessorService:
         classification = classify_import_card(
             CardClassificationInput(
                 card_pool=cast(CardPool, job.card_pool),
-                role_mode=cast(CardRoleMode, job.card_role_mode),
+                role_mode=cast(CardClassificationMode, job.card_role_mode),
                 override_roles=cast(tuple[CardRole, ...], tuple(job.card_role_override_json)),
                 template_roles=cast(tuple[CardRole, ...], tuple(job.template_role_snapshot_json)),
-                inference_policy_version=job.card_role_inference_policy_version,
+                faction_mode=cast(CardClassificationMode, job.card_faction_mode),
+                override_factions=cast(
+                    tuple[CardFaction, ...], tuple(job.card_faction_override_json)
+                ),
+                template_factions=cast(
+                    tuple[CardFaction, ...], tuple(job.template_faction_snapshot_json)
+                ),
+                inference_policy_version=job.classification_inference_policy_version,
                 matched_tag_keys=matched_tag_keys,
             )
         )
@@ -180,6 +198,7 @@ class ImportProcessorService:
             reparse_existing=options.reparse_existing,
             card_pool=classification.card_pool,
             resolved_card_roles=classification.roles,
+            resolved_card_factions=classification.factions,
             classification_evidence=classification.evidence,
         )
         tag_count = len(parsed.tag_ids)

@@ -4,11 +4,11 @@ Card imports turn one or more uploaded images into card records that can be revi
 
 ## End-to-end flow
 
-1. A staff user uploads supported image files from the staff-only `/imports` interface, explicitly selecting the Player, Evil, or Neutral pool and either automatic role inference or a batch-wide role override.
+1. A staff user uploads supported image files from the staff-only `/imports` interface, explicitly selecting the Player, Evil, or Neutral pool and choosing Automatic or an exact batch-wide Override independently for roles and factions.
 2. The API admission boundary fingerprints the immutable request, stages and checksum-verifies each source file before atomically publishing it under the client-generated creation key, then asks core to create the content version, import job, and queued items in one transaction. Replaying the same key and payload returns the existing job; reusing the key for a different payload is rejected.
 3. The parser worker polls for work and atomically claims a queued item.
 4. The parser loads the selected parsing template and current catalog resources, then crops regions, runs OCR, extracts fields, and detects symbols.
-5. Core resolves card roles from the job's snapshotted template hints and versioned metadata policy, then matches image hashes, primary names, and aliases inside the selected pool before persisting the card identity, card version, image, metadata relations, parsing suggestions, classification evidence, warnings, and processing result.
+5. Core resolves roles and factions from the job's snapshotted template hints and versioned metadata policy, then matches image hashes, primary names, and aliases inside the selected pool and exact faction namespace before persisting the card identity, card version, image, metadata relations, parsing suggestions, classification evidence, warnings, and processing result.
 6. The import job reports aggregate progress while completed items become available in Review and the card detail editor.
 
 Claiming is coordinated through the shared core layer. This prevents the API, parser, and any future background worker from inventing separate queue semantics.
@@ -31,9 +31,9 @@ stopped reporting; they are operational telemetry and do not replace durable imp
 
 Parsing templates describe where fields and symbols appear on a card image and how those regions should be interpreted. Catalogs provide the known keywords, tags, symbols, and card types used to match extracted text and detected artwork to application metadata.
 
-Templates and catalogs are read at processing time. Changing them affects future parsing and explicit reparses; it does not silently rewrite existing card versions. Import classification is the exception to that live lookup: each job snapshots its template role hints and inference-policy version so queued or retried work keeps its original meaning.
+Templates and catalogs are read at processing time. Changing them affects future parsing and explicit reparses; it does not silently rewrite existing card versions. Import classification is the exception to that live lookup: each job snapshots its template role and faction hints plus its classification-inference-policy version so queued or retried work keeps its original meaning.
 
-Templates may declare any combination of Hero, Boon, Event, and Location role hints. Automatic classification unions those hints with stable metadata signals. Policy version 1 recognizes the `hero` tag key; policy version 2 preserves Hero inference and adds the `location` tag key. Override mode replaces every automatic signal with the selected role set; selecting no roles intentionally produces Standard. The pool is always explicit and is never inferred from a role.
+Templates may declare any supported role or faction hints. Automatic classification unions those hints with stable metadata signals. Policy version 1 recognizes the `hero` role tag and version 2 adds `location`; both infer no factions. Policy version 3 recognizes the `hero`, `boss`, `location`, and `shop-item` role tags plus the `order`, `blood`, and `darkness` faction tags. Boon and Event remain template-inferred. A role override replaces only role inference, and a faction override replaces only faction inference. Selecting no roles intentionally produces Normal; selecting no factions intentionally produces No faction. The pool is always explicit and is never inferred from either facet.
 
 ## Jobs, retries, and cancellation
 
@@ -60,8 +60,8 @@ workers completing the same queued item.
 
 Parser output is intentionally reviewable rather than treated as unquestionable source data. Reviewers can inspect images, parsed values, symbols, metadata matches, and suggestions before correcting the card version.
 
-New cards receive the import pool and resolved roles. An untargeted import never attaches to a same-name, same-alias, or same-image card from another pool; it creates an independent identity without a role-mismatch warning. Existing same-pool cards and targeted reparses keep their stored card-level classification. When the inferred result differs after a same-pool or id-driven match, the parsed version still completes and the item records an explainable `card_classification_mismatch` warning alongside any lifecycle warning. Import details link directly to the Card tab for an intentional manual correction.
+New cards receive the import pool plus resolved roles and factions. An untargeted import never attaches to a same-name, same-alias, or same-image card from another pool or exact faction namespace; it creates an independent identity without a classification-mismatch warning. Existing cards resolved in the same namespace and targeted reparses keep their stored card-level classification. When roles differ after a natural-key match, or any queued/live/inferred classification differs for a targeted reparse, the parsed version still completes and the item records an explainable `card_classification_mismatch` warning alongside any lifecycle warning. Import details link directly to the Card tab for an intentional manual correction.
 
-Import details show resolved roles and inference evidence only after the parser has persisted that evidence. Queued or active items are marked as classification pending, while terminal items that never produced evidence are marked unavailable rather than being presented as Standard.
+Import details show resolved roles, factions, and their separate evidence sections only after the parser has persisted that evidence. Queued or active items are marked as classification pending, while terminal items that never produced evidence are marked unavailable rather than being presented as Normal or No faction.
 
 Reparsing creates new content through the card-version workflow instead of erasing historical state. See [Card management](card-management.md) for the distinction between a stable card identity and its versions.

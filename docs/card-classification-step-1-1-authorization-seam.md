@@ -9,7 +9,8 @@ This is a hardening checkpoint between the classification foundation and import 
 3. [Import inference](card-classification-step-2-import-inference.md)
 4. [Pool-scoped card identity](card-classification-step-2-1-pool-scoped-identity.md)
 5. [Import workflow seam consolidation](card-classification-step-2-2-import-workflow-seam.md)
-6. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
+6. [Faction classification](card-classification-step-2-3-faction-classification.md)
+7. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
 
 Do not grow import or workspace behavior until this step's acceptance criteria are satisfied. The purpose is to make the existing Step 1 access boundary secure by construction before more features consume it.
 

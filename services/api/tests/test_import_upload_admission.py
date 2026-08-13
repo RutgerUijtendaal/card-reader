@@ -39,6 +39,8 @@ def _validated_data(*, creation_key: str | None = None) -> dict[str, object]:
         "card_pool": "player",
         "card_role_mode": "automatic",
         "card_role_override": [],
+        "card_faction_mode": "automatic",
+        "card_faction_override": [],
     }
 
 
@@ -93,6 +95,8 @@ def test_prevalidation_rejection_discards_a_preserved_exact_retry_stage() -> Non
         card_pool="player",
         card_role_mode="automatic",
         card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
         files=data["files"],  # type: ignore[arg-type]
     )
     staged = StagedImportUpload.publish(
@@ -159,6 +163,8 @@ def test_post_staging_rejection_discards_a_preserved_exact_retry_stage() -> None
         card_pool="player",
         card_role_mode="automatic",
         card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
         files=data["files"],  # type: ignore[arg-type]
     )
     StagedImportUpload.publish(
@@ -229,6 +235,8 @@ def test_matching_replay_returns_before_staging(
         card_pool="player",
         card_role_mode="automatic",
         card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
         files=data["files"],  # type: ignore[arg-type]
     )
     service = _FakeImportService()
@@ -259,6 +267,8 @@ def test_creation_key_conflict_discards_a_preserved_losing_fingerprint() -> None
         card_pool="player",
         card_role_mode="automatic",
         card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
         files=data["files"],  # type: ignore[arg-type]
     )
     StagedImportUpload.publish(
@@ -287,6 +297,8 @@ def test_late_creation_key_conflict_discards_a_preserved_losing_fingerprint() ->
         card_pool="player",
         card_role_mode="automatic",
         card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
         files=data["files"],  # type: ignore[arg-type]
     )
     StagedImportUpload.publish(

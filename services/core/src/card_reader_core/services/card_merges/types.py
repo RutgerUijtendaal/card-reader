@@ -14,6 +14,9 @@ class CardMergeCardSummary:
     label: str
     latest_name: str
     version_count: int
+    card_pool: str
+    card_roles: tuple[str, ...]
+    card_factions: tuple[str, ...]
 
 
 @dataclass(frozen=True)

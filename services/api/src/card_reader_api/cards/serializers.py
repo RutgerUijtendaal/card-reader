@@ -6,12 +6,14 @@ from rest_framework import serializers
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
     CARD_POOLS,
+    CARD_FACTIONS,
     CARD_ROLE_FILTER_VALUES,
     CARD_ROLES,
     CARD_LIFECYCLE_FILTER_VALUES,
     CARD_LIFECYCLE_STATUSES,
     DEFAULT_CARD_LIFECYCLE_FILTER,
     Card,
+    CardFaction,
     CardLifecycleFilter,
     CardVersion,
     CardRoleFilter,
@@ -20,6 +22,7 @@ from card_reader_core.models import (
     Tag,
     Type,
     card_role_keys,
+    card_faction_keys,
     normalize_card_lifecycle_filter,
 )
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
@@ -63,6 +66,7 @@ def card_payload(
         "name": version.name,
         "card_pool": card.card_pool,
         "card_roles": list(card_role_keys(card)),
+        "card_factions": list(card_faction_keys(card)),
         "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
         "lifecycle_status": card.lifecycle_status,
         "template_id": version.template.key,
@@ -287,6 +291,19 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         allow_empty=True,
     )
     card_role_match = serializers.ChoiceField(choices=["any", "all"], required=False, default="any")
+    card_factions = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_FACTIONS),
+        required=False,
+        allow_empty=True,
+    )
+    card_faction_exclude = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_FACTIONS),
+        required=False,
+        allow_empty=True,
+    )
+    card_faction_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, default="any"
+    )
     attack_min = serializers.IntegerField(required=False, allow_null=True)
     attack_max = serializers.IntegerField(required=False, allow_null=True)
     health_min = serializers.IntegerField(required=False, allow_null=True)
@@ -339,6 +356,17 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
                 self._string_list_or_none("card_role_exclude"),
             ),
             "card_role_match": self.validated_data.get("card_role_match", "any"),
+            "card_factions": cast(
+                list[CardFaction] | None,
+                self._string_list_or_none("card_factions"),
+            ),
+            "card_faction_exclude": cast(
+                list[CardFaction] | None,
+                self._string_list_or_none("card_faction_exclude"),
+            ),
+            "card_faction_match": self.validated_data.get(
+                "card_faction_match", "any"
+            ),
             "attack_min": self._int_or_none("attack_min"),
             "attack_max": self._int_or_none("attack_max"),
             "health_min": self._int_or_none("health_min"),
@@ -361,7 +389,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         if attrs.get("card_role_match") == "all" and isinstance(roles, list):
             if "standard" in roles and len(set(roles)) > 1:
                 raise serializers.ValidationError(
-                    {"card_roles": "Standard cannot be combined with other roles when matching all."}
+                    {"card_roles": "Normal cannot be combined with other roles when matching all."}
                 )
         return attrs
 
@@ -418,6 +446,11 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
         required=False,
         allow_empty=True,
     )
+    card_factions = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_FACTIONS),
+        required=False,
+        allow_empty=True,
+    )
     deck_building_config = serializers.JSONField(required=False)
     lifecycle_status = serializers.ChoiceField(choices=CARD_LIFECYCLE_STATUSES, required=False)
     keyword_ids = serializers.ListField(child=serializers.CharField(), required=False)
@@ -458,6 +491,8 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
             updates["card_pool"] = self.validated_data["card_pool"]
         if "card_roles" in self.validated_data:
             updates["card_roles"] = self.validated_data["card_roles"]
+        if "card_factions" in self.validated_data:
+            updates["card_factions"] = self.validated_data["card_factions"]
         if "deck_building_config" in self.validated_data:
             updates["deck_building_config"] = self.validated_data["deck_building_config"]
         if "lifecycle_status" in self.validated_data:

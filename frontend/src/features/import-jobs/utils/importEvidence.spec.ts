@@ -16,11 +16,13 @@ const item = (overrides: Partial<ImportJobItem> = {}): ImportJobItem => ({
   warning_message: null,
   warnings: [],
   resolved_card_roles: [],
-  card_role_inference: {},
+  resolved_card_factions: [],
+  classification_inference: {},
   target_card_id: null,
   target_card_version_id: null,
   target_card_pool_snapshot: null,
   target_card_roles_snapshot: [],
+  target_card_factions_snapshot: [],
   card_tab_url: null,
   ...overrides,
 });
@@ -31,17 +33,17 @@ describe('import evidence presentation', () => {
     expect(getImportEvidenceState(item({ status: 'failed' }))).toBe('unavailable');
     expect(getImportEvidenceState(item({
       status: 'completed',
-      card_role_inference: { mode: 'automatic' },
+      classification_inference: { roles: { mode: 'automatic' } },
     }))).toBe('resolved');
     expect(getImportEvidenceState(item({
       status: 'completed',
-      card_role_inference: { mode: 'automatic' },
+      classification_inference: { roles: { mode: 'automatic' } },
       warnings: [{ code: 'future_warning', message: 'Future warning.' }],
     }))).toBe('resolved_with_warning');
   });
 
-  test('uses the shared role registry for Standard and multi-role labels', () => {
-    expect(formatImportRoles([])).toBe('Standard');
+  test('uses the shared role registry for Normal and multi-role labels', () => {
+    expect(formatImportRoles([])).toBe('Normal');
     expect(formatImportRoles(['hero', 'location'])).toBe('Hero, Location');
     expect(formatImportRoles(['unknown', 'boon'])).toBe('Boon');
   });
@@ -49,15 +51,37 @@ describe('import evidence presentation', () => {
   test('renders structured inference and keeps generic warnings safe', () => {
     const evidence = getInferenceEvidence(item({
       resolved_card_roles: ['event', 'location'],
-      card_role_inference: {
-        mode: 'automatic',
-        template_roles: ['location'],
-        matched_tag_keys: ['event'],
+      resolved_card_factions: ['order'],
+      classification_inference: {
+        roles: {
+          mode: 'automatic',
+          template_roles: ['location'],
+          matched_tag_keys: ['event'],
+        },
+        factions: {
+          mode: 'automatic',
+          matched_tag_keys: ['order'],
+        },
       },
     }));
 
     expect(evidence).toContainEqual({ label: 'Template hints', value: 'Location' });
-    expect(evidence).toContainEqual({ label: 'Matched tags', value: 'event' });
+    expect(evidence).toContainEqual({ label: 'Role tags', value: 'event' });
+    expect(evidence).toContainEqual({ label: 'Faction tags', value: 'order' });
     expect(getWarningEvidence({ code: 'future_warning', message: 'Future warning.' })).toEqual([]);
+  });
+
+  test('labels historical missing facet evidence as unavailable', () => {
+    const evidence = getInferenceEvidence(item({
+      status: 'completed',
+      classification_inference: {
+        roles: { mode: 'automatic', matched_tag_keys: ['hero'] },
+        factions: {},
+      },
+    }));
+
+    expect(evidence).toContainEqual({ label: 'Role resolution', value: 'Automatic' });
+    expect(evidence).toContainEqual({ label: 'Faction resolution', value: 'Unavailable' });
+    expect(evidence).not.toContainEqual({ label: 'Faction signals', value: 'None matched' });
   });
 });

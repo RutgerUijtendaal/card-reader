@@ -9,6 +9,8 @@ from card_reader_core.models import (
     DEFAULT_CARD_POOL,
     STANDARD_CARD_ROLE,
     Card,
+    CardFaction,
+    CardFactionAssignment,
     CardPool,
     CardPoolScope,
     CardRoleAssignment,
@@ -23,6 +25,7 @@ from card_reader_core.models import (
     Type,
     active_card_lifecycle_q,
     card_role_keys,
+    card_faction_keys,
     filter_queryset_by_card_lifecycle,
 )
 from card_reader_core.search.cards import apply_card_search
@@ -83,6 +86,9 @@ def list_cards(
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
+    card_factions: list[CardFaction] | None = None,
+    card_faction_exclude: list[CardFaction] | None = None,
+    card_faction_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -128,6 +134,9 @@ def list_cards(
         card_roles=card_roles,
         card_role_exclude=card_role_exclude,
         card_role_match=card_role_match,
+        card_factions=card_factions,
+        card_faction_exclude=card_faction_exclude,
+        card_faction_match=card_faction_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -188,6 +197,9 @@ def list_matching_cards(
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
+    card_factions: list[CardFaction] | None = None,
+    card_faction_exclude: list[CardFaction] | None = None,
+    card_faction_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -229,6 +241,9 @@ def list_matching_cards(
         card_roles=card_roles,
         card_role_exclude=card_role_exclude,
         card_role_match=card_role_match,
+        card_factions=card_factions,
+        card_faction_exclude=card_faction_exclude,
+        card_faction_match=card_faction_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -274,6 +289,9 @@ def list_matching_card_candidates(
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
+    card_factions: list[CardFaction] | None = None,
+    card_faction_exclude: list[CardFaction] | None = None,
+    card_faction_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -315,6 +333,9 @@ def list_matching_card_candidates(
         card_roles=card_roles,
         card_role_exclude=card_role_exclude,
         card_role_match=card_role_match,
+        card_factions=card_factions,
+        card_faction_exclude=card_faction_exclude,
+        card_faction_match=card_faction_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -341,7 +362,9 @@ def _get_card(
     *,
     card_pool_scope: CardPoolScope | None = None,
 ) -> Card | None:
-    cards = Card.objects.prefetch_related("role_assignments").filter(id=card_id)
+    cards = Card.objects.prefetch_related("role_assignments", "faction_assignments").filter(
+        id=card_id
+    )
     if card_pool_scope is not None:
         cards = cards.filter(card_pool__in=card_pool_scope.allowed_pools)
     card = cards.first()
@@ -349,7 +372,9 @@ def _get_card(
         return card
     redirects = (
         CardMergeRedirect.objects.select_related("target_card")
-        .prefetch_related("target_card__role_assignments")
+        .prefetch_related(
+            "target_card__role_assignments", "target_card__faction_assignments"
+        )
         .filter(old_card_id=card_id)
     )
     if card_pool_scope is not None:
@@ -362,7 +387,7 @@ def get_latest_card_version(card_id: str) -> CardVersion | None:
     return (
         CardVersion.objects.filter(card_id=card_id, is_latest=True)
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
-        .prefetch_related("card__role_assignments")
+        .prefetch_related("card__role_assignments", "card__faction_assignments")
         .order_by("-version_number")
         .first()
     )
@@ -385,7 +410,9 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
         for card in Card.objects.exclude(latest_version__isnull=True)
         .filter(active_card_lifecycle_q(field_path="lifecycle_status"))
         .select_related("latest_version__template")
-        .prefetch_related("role_assignments", "latest_version__images")
+        .prefetch_related(
+            "role_assignments", "faction_assignments", "latest_version__images"
+        )
         .order_by("id")
         if card.latest_version is not None
     ]
@@ -408,6 +435,7 @@ def list_latest_card_version_reparse_sources() -> list[LatestCardVersionReparseS
                 image_path=image_path,
                 card_pool=cast(CardPool, card.card_pool),
                 card_roles=card_role_keys(card),
+                card_factions=card_faction_keys(card),
             )
         )
     return out
@@ -448,6 +476,9 @@ def list_filtered_latest_card_version_reparse_sources(
     card_roles: list[CardRoleFilter] | None = None,
     card_role_exclude: list[CardRoleFilter] | None = None,
     card_role_match: str = "any",
+    card_factions: list[CardFaction] | None = None,
+    card_faction_exclude: list[CardFaction] | None = None,
+    card_faction_match: str = "any",
     attack_min: int | None = None,
     attack_max: int | None = None,
     health_min: int | None = None,
@@ -489,6 +520,9 @@ def list_filtered_latest_card_version_reparse_sources(
         card_roles=card_roles,
         card_role_exclude=card_role_exclude,
         card_role_match=card_role_match,
+        card_factions=card_factions,
+        card_faction_exclude=card_faction_exclude,
+        card_faction_match=card_faction_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -513,6 +547,7 @@ def list_filtered_latest_card_version_reparse_sources(
                 image_path=image_path,
                 card_pool=cast(CardPool, version.card.card_pool),
                 card_roles=card_role_keys(version.card),
+                card_factions=card_faction_keys(version.card),
             )
         )
     return out
@@ -525,7 +560,7 @@ def list_card_generations(card_id: str) -> list[CardVersion]:
     return list(
         CardVersion.objects.filter(card_id=card.id)
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
-        .prefetch_related("card__role_assignments")
+        .prefetch_related("card__role_assignments", "card__faction_assignments")
         .order_by("-version_number")
     )
 
@@ -544,7 +579,7 @@ def list_card_generations_in_scope(
             card__card_pool__in=card_pool_scope.allowed_pools,
         )
         .select_related("card", "template", "previous_version", "parse_result", "content_version")
-        .prefetch_related("card__role_assignments")
+        .prefetch_related("card__role_assignments", "card__faction_assignments")
         .order_by("-version_number")
     )
 
@@ -561,6 +596,7 @@ def list_cards_for_content_version(
         .select_related("card", "template", "previous_version", "content_version")
         .prefetch_related(
             "card__role_assignments",
+            "card__faction_assignments",
             "images",
             Prefetch(
                 "card_version_keywords",
@@ -600,6 +636,12 @@ def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> Qu
         match_mode=str(filters["card_role_match"]),
     )
     queryset = exclude_by_card_roles(queryset, filters["card_role_exclude"])
+    queryset = filter_by_card_factions(
+        queryset,
+        filters["card_factions"],
+        match_mode=str(filters["card_faction_match"]),
+    )
+    queryset = exclude_by_card_factions(queryset, filters["card_faction_exclude"])
     if filters["attack_min"] is not None:
         queryset = queryset.filter(attack__isnull=False, attack__gte=filters["attack_min"])
     if filters["attack_max"] is not None:
@@ -653,6 +695,38 @@ def exclude_by_card_roles(queryset: QuerySet[CardVersion], values: object) -> Qu
         card_ids = CardRoleAssignment.objects.filter(role__in=persisted_roles).values_list("card_id", flat=True)
         queryset = queryset.exclude(card_id__in=card_ids)
     return queryset
+
+
+def filter_by_card_factions(
+    queryset: QuerySet[CardVersion],
+    values: object,
+    *,
+    match_mode: str,
+) -> QuerySet[CardVersion]:
+    if not isinstance(values, list) or not values:
+        return queryset
+    factions = list(dict.fromkeys(str(value) for value in values))
+    if match_mode == "all":
+        matching_cards = (
+            CardFactionAssignment.objects.filter(faction__in=factions)
+            .values("card_id")
+            .annotate(match_count=Count("faction", distinct=True))
+            .filter(match_count=len(factions))
+            .values_list("card_id", flat=True)
+        )
+        return queryset.filter(card_id__in=matching_cards)
+    return queryset.filter(card__faction_assignments__faction__in=factions).distinct()
+
+
+def exclude_by_card_factions(
+    queryset: QuerySet[CardVersion], values: object
+) -> QuerySet[CardVersion]:
+    if not isinstance(values, list) or not values:
+        return queryset
+    card_ids = CardFactionAssignment.objects.filter(faction__in=values).values_list(
+        "card_id", flat=True
+    )
+    return queryset.exclude(card_id__in=card_ids)
 
 
 def filter_by_links(
@@ -762,6 +836,9 @@ def _build_filtered_versions_queryset(
     card_roles: list[CardRoleFilter] | None,
     card_role_exclude: list[CardRoleFilter] | None,
     card_role_match: str,
+    card_factions: list[CardFaction] | None,
+    card_faction_exclude: list[CardFaction] | None,
+    card_faction_match: str,
     attack_min: int | None,
     attack_max: int | None,
     health_min: int | None,
@@ -783,6 +860,9 @@ def _build_filtered_versions_queryset(
         card_roles=card_roles,
         card_role_exclude=card_role_exclude,
         card_role_match=card_role_match,
+        card_factions=card_factions,
+        card_faction_exclude=card_faction_exclude,
+        card_faction_match=card_faction_match,
         attack_min=attack_min,
         attack_max=attack_max,
         health_min=health_min,
@@ -948,6 +1028,7 @@ def _hydrate_card_list_candidates(
 def _card_list_prefetches() -> tuple[Any, ...]:
     return (
         "card__role_assignments",
+        "card__faction_assignments",
         Prefetch("images", queryset=CardVersionImage.objects.order_by("-created_at")),
         Prefetch(
             "card_version_keywords",

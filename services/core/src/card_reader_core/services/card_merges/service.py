@@ -9,6 +9,8 @@ from card_reader_core.models import (
     CardMergeRedirect,
     CardRoleAssignment,
     CardVersion,
+    card_faction_keys,
+    card_role_keys,
     now_utc,
 )
 from card_reader_core.repositories.cards import (
@@ -34,6 +36,10 @@ def preview_card_merge(*, target_card_id: str, source_card_ids: list[str]) -> Ca
     ]
     if any(source.card_pool != target.card_pool for source in sources):
         blocking_conflicts.append("Cards from different pools cannot be merged.")
+    if any(
+        source.faction_identity_key != target.faction_identity_key for source in sources
+    ):
+        blocking_conflicts.append("Cards from different faction namespaces cannot be merged.")
     source_ids = [source.id for source in sources]
     return CardMergePreview(
         target=_card_summary(target),
@@ -65,6 +71,7 @@ def merge_cards(*, target_card_id: str, source_card_ids: list[str]) -> CardMerge
     CardAlias.objects.filter(card_id__in=source_ids).update(
         card=target,
         card_pool=target.card_pool,
+        faction_identity_key=target.faction_identity_key,
         updated_at=now_utc(),
     )
     roles = set(
@@ -111,7 +118,10 @@ def _load_merge_cards(
         raise CardMergeError("Target card is required.")
     if target_card_id in normalized_source_ids:
         raise CardMergeError("Target card cannot also be a source card.")
-    queryset = Card.objects.select_related("latest_version")
+    queryset = Card.objects.select_related("latest_version").prefetch_related(
+        "role_assignments",
+        "faction_assignments",
+    )
     if for_update:
         queryset = queryset.select_for_update()
     cards = {card.id: card for card in queryset.filter(id__in=[target_card_id, *normalized_source_ids])}
@@ -132,4 +142,7 @@ def _card_summary(card: Card) -> CardMergeCardSummary:
         label=card.label,
         latest_name=latest.name if latest is not None else "",
         version_count=CardVersion.objects.filter(card_id=card.id).count(),
+        card_pool=card.card_pool,
+        card_roles=card_role_keys(card),
+        card_factions=card_faction_keys(card),
     )

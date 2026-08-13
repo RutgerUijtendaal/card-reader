@@ -32,6 +32,7 @@ class SuggestionOccurrencePreview(TypedDict):
     normalized_source_text: str
     card_pool: str
     card_roles: list[str]
+    card_factions: list[str]
 
 
 class LinkedCardPreview(TypedDict):
@@ -42,6 +43,7 @@ class LinkedCardPreview(TypedDict):
     image_url: str | None
     card_pool: str
     card_roles: list[str]
+    card_factions: list[str]
 
 
 class CatalogSuggestionDetail(TypedDict):

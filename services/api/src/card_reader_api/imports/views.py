@@ -50,6 +50,8 @@ class ImportUploadView(APIView):
                 "card_pool": request.data.get("card_pool", ""),
                 "card_role_mode": request.data.get("card_role_mode", "automatic"),
                 "card_role_override": request.data.get("card_role_override", "[]"),
+                "card_faction_mode": request.data.get("card_faction_mode", "automatic"),
+                "card_faction_override": request.data.get("card_faction_override", "[]"),
             }
         )
         if not serializer.is_valid():

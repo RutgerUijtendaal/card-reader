@@ -47,11 +47,15 @@ export const useCardFilterSectionsState = (
   favoriteKeys: Record<MetadataFavoriteGroup, ComputedRef<string[]>>,
   toggleFavorite: (group: MetadataFavoriteGroup, key: string) => void,
 ) => {
-  const resetClassificationGroup = (): void => {
-    filterState.cardPool.value = 'player';
+  const resetCardRoleGroup = (): void => {
     filterState.cardRoleIds.value = [];
     filterState.cardRoleExcludeIds.value = ['hero'];
     filterState.cardRoleMatch.value = 'any';
+  };
+  const resetCardFactionGroup = (): void => {
+    filterState.cardFactionIds.value = [];
+    filterState.cardFactionExcludeIds.value = [];
+    filterState.cardFactionMatch.value = 'any';
   };
   const resetManaGroup = (): void => {
     filterState.manaTypeSymbolIds.value = [];
@@ -118,7 +122,19 @@ export const useCardFilterSectionsState = (
       key: option.key,
       label: option.label,
     })),
-    resetClassificationGroup,
+    selectedCardFactions: filterState.cardFactionIds.value,
+    onUpdateSelectedCardFactions: createArrayUpdater(filterState.cardFactionIds),
+    excludedCardFactions: filterState.cardFactionExcludeIds.value,
+    onUpdateExcludedCardFactions: createArrayUpdater(filterState.cardFactionExcludeIds),
+    cardFactionMatch: filterState.cardFactionMatch.value,
+    onUpdateCardFactionMatch: createMatchModeUpdater(filterState.cardFactionMatch),
+    cardFactionOptions: (filters.value.card_factions ?? []).map((option) => ({
+      id: option.key,
+      key: option.key,
+      label: option.label,
+    })),
+    resetCardRoleGroup,
+    resetCardFactionGroup,
     lifecycleStatus: filterState.lifecycleStatus.value,
     onUpdateLifecycleStatus: createLifecycleUpdater(filterState.lifecycleStatus),
     selectedManaTypeSymbolIds: filterState.manaTypeSymbolIds.value,
@@ -195,7 +211,8 @@ export const useCardFilterSectionsState = (
 
   return {
     filterSectionsState,
-    resetClassificationGroup,
+    resetCardRoleGroup,
+    resetCardFactionGroup,
     resetManaGroup,
     resetAffinityGroup,
     resetDevotionGroup,

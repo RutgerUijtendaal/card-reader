@@ -23,7 +23,10 @@ from card_reader_core.models import (
     ImportJobItem,
     Template,
 )
-from card_reader_core.repositories.cards import LatestCardVersionReparseSource
+from card_reader_core.repositories.cards import (
+    LatestCardVersionReparseSource,
+    change_card_identity,
+)
 from card_reader_core.services.cards import convert_card_images_to_webp
 import card_reader_core.services.imports.reparse as import_reparse
 from card_reader_core.services.templates import TemplateService
@@ -201,7 +204,7 @@ def test_convert_card_images_to_webp_endpoint_returns_summary(
     assert payload["missing"] == 0
     assert payload["failed"] == 0
     assert payload["bytes_before"] > payload["bytes_after"]
-def test_queue_reparse_latest_versions_groups_jobs_by_template(
+def test_queue_reparse_latest_versions_groups_jobs_by_template_and_classification(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -270,6 +273,7 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     card_a.save(update_fields=["latest_version"])
     card_b.save(update_fields=["latest_version"])
     card_c.save(update_fields=["latest_version"])
+    change_card_identity(card=card_b, card_factions=("blood",))
 
     CardVersionImage.objects.create(
         card_version_id=version_a.id,
@@ -295,9 +299,9 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
     jobs = list(ImportJob.objects.select_related("template").order_by("template__key"))
     items = list(ImportJobItem.objects.order_by("source_file"))
 
-    assert "Queued 2 reparse jobs for 3 latest card images." == result.message
+    assert "Queued 3 reparse jobs for 3 latest card images." == result.message
     assert result.removed_paths == []
-    assert len(jobs) == 2
+    assert len(jobs) == 3
     assert {job.template.key for job in jobs} == {"mtg-like-v1", "sorcery-v1"}
     assert all(job.total_items >= 1 for job in jobs)
     assert {item.source_file for item in items} == {
@@ -309,6 +313,13 @@ def test_queue_reparse_latest_versions_groups_jobs_by_template(
         (card_a.id, version_a.id),
         (card_b.id, version_b.id),
         (card_c.id, version_c.id),
+    }
+    assert {
+        item.target_card_id: item.target_card_factions_snapshot_json for item in items
+    } == {
+        card_a.id: [],
+        card_b.id: ["blood"],
+        card_c.id: [],
     }
 
 
@@ -328,6 +339,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
             image_path=Path("player-image.webp"),
             card_pool="player",
             card_roles=(),
+            card_factions=(),
         ),
         LatestCardVersionReparseSource(
             card_id="game-master-card",
@@ -336,6 +348,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
             image_path=Path("game-master-image.webp"),
             card_pool="evil",
             card_roles=(),
+            card_factions=(),
         ),
     ]
     creation_count = 0
