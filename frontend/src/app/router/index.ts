@@ -17,7 +17,7 @@ import NotificationsPage from '@/features/notifications/NotificationsPage.vue';
 import ReviewQueuePage from '@/features/review-queue/ReviewQueuePage.vue';
 import SettingsPage from '@/features/settings/SettingsPage.vue';
 import AdminPage from '@/features/admin/AdminPage.vue';
-import { isCardPool } from '@/domain/cards/cardPools';
+import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
 import {
   buildWorkspaceGalleryLocation,
   useCardPoolWorkspaceStore,
@@ -25,6 +25,24 @@ import {
 
 const APP_TITLE = "Maity's Card Game";
 const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
+
+const resolveRouteWorkspacePool = (
+  path: string,
+  isWorkspaceRoute: boolean,
+  cardPool: unknown,
+  returnCardPool: unknown,
+): CardPool | undefined => {
+  if (path === '/cards') {
+    return isCardPool(cardPool) ? cardPool : undefined;
+  }
+  if (!isWorkspaceRoute) {
+    return undefined;
+  }
+  if (isCardPool(returnCardPool)) {
+    return returnCardPool;
+  }
+  return isCardPool(cardPool) ? cardPool : undefined;
+};
 
 export const createAppRouter = (history: RouterHistory = createWebHistory()) => {
   const router = createRouter({
@@ -69,7 +87,12 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     workspace.synchronizeSession(
       auth.accessibleCardPools,
       sessionKey,
-      to.path === '/cards' ? requestedPool : undefined,
+      resolveRouteWorkspacePool(
+        to.path,
+        to.meta.cardPoolWorkspace === true,
+        rawRequestedPool,
+        to.query.return_card_pool,
+      ),
     );
 
     if (to.meta.requiresAuth && !auth.authenticated) {

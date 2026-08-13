@@ -74,6 +74,27 @@ describe('card pool workspace routes', () => {
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
 
+  test('initializes a resource workspace from its explicit card pool', async () => {
+    localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, 'player');
+    setSession(['player', 'evil', 'neutral']);
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/cards/evil-card?card_pool=evil');
+
+    expect(router.currentRoute.value.fullPath).toBe('/cards/evil-card?card_pool=evil');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
+  });
+
+  test('prefers a resource return pool over the target card pool', async () => {
+    localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, 'player');
+    setSession(['player', 'evil', 'neutral']);
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/cards/neutral-card?card_pool=neutral&return_card_pool=evil');
+
+    expect(useCardPoolWorkspaceStore().activePool).toBe('evil');
+  });
+
   test('preserves a restricted staff-route deep link through login', async () => {
     setAnonymousSession();
     const router = createAppRouter(createMemoryHistory());

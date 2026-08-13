@@ -69,7 +69,7 @@
                 <button
                   class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
                   type="button"
-                  :disabled="isExportingTtsCards"
+                  :disabled="isExportingTtsCards || !exportsReady"
                   @click="exportTtsCards"
                 >
                   <Copy class="h-4 w-4" />
@@ -78,6 +78,7 @@
                 <button
                   class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
                   type="button"
+                  :disabled="!exportsReady"
                   @click="exportCsv"
                 >
                   <Download class="h-4 w-4" />
@@ -164,6 +165,7 @@ import {
 import {
   buildCardFilterRouteQuery,
   getCardFilterSignature,
+  isCardFilterStateReady,
   parseCardFilterRouteQuery,
   sameCardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterRouteState';
@@ -257,6 +259,11 @@ const displayItems = computed(() =>
     ? createLoadingShimItems(loadingShimCount.value)
     : cards.value,
 );
+const exportsReady = computed(() => isCardFilterStateReady(
+  filtersLoaded.value,
+  readFilterState(),
+  currentRouteFilterState.value,
+));
 let componentActive = true;
 
 const captureExportRequestGuard = (): (() => boolean) => {
@@ -271,6 +278,9 @@ const restoreScroll = (value: number): void => {
 };
 
 const exportCsv = async (): Promise<void> => {
+  if (!exportsReady.value) {
+    return;
+  }
   const isRequestCurrent = captureExportRequestGuard();
   const params = buildCardFilterApiSearchParams(selectionState.value);
   await exportCardsCsv(
@@ -280,6 +290,9 @@ const exportCsv = async (): Promise<void> => {
 };
 
 const exportTtsCards = async (): Promise<void> => {
+  if (!exportsReady.value) {
+    return;
+  }
   const isRequestCurrent = captureExportRequestGuard();
   await copyTtsCardExport({
     type: 'gallery',
