@@ -1,6 +1,6 @@
 # Card Classification Step 3: Player, Evil, and Neutral Workspaces
 
-Status: approved implementation plan; blocked on [Step 2.3](card-classification-step-2-3-faction-classification.md).
+Status: implemented.
 
 This step turns the card pool into a site-level browsing context. It does not change the classification model or infer new data.
 

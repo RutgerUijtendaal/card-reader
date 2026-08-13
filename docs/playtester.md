@@ -10,7 +10,7 @@ Starting a playtest expands mainboard quantities into distinct `PlaytestCardInst
 
 Playtester consumes Player-pool decks only. Until decks persist their own classification, every deck supported by the current builder is treated as a Player deck. Once explicit deck pools exist, the selector and direct play route must omit or reject Evil and Neutral decks rather than inferring eligibility from their current card contents.
 
-The future pool workspace must not show Playtester in Evil or Neutral navigation. A direct Playtester route remains Player-scoped and may switch to the Player workspace or return to a safe restricted-pool route according to the workspace guard. A future non-Player testing workflow would be a separate design; the current hero, opening-hand, and mainboard assumptions must not be generalized into one automatically.
+The pool workspace does not show Playtester in Evil or Neutral navigation. A direct Playtester route switches the global workspace to Player, while deck and card eligibility independently reject non-Player references. A future non-Player testing workflow would be a separate design; the current hero, opening-hand, and mainboard assumptions must not be generalized into one automatically.
 
 Hero-zone behavior follows the card's Hero role through the shared deck contract; Playtester does not maintain a separate Hero boolean or infer classification from card text.
 

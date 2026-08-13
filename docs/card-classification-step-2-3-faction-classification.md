@@ -1,6 +1,6 @@
 # Card Classification Step 2.3: Faction Classification
 
-Status: implemented on the Step 2.3 checkpoint branch and awaiting review/merge into the classification umbrella branch. [Step 3](card-classification-step-3-card-pool-workspaces.md) remains blocked until this checkpoint is validated, reviewed, and merged.
+Status: implemented, validated, reviewed, and merged into the classification umbrella branch.
 
 This checkpoint completes the card-classification vocabulary before the Player/Evil/Neutral workspace is built:
 

@@ -34,7 +34,9 @@ Card-derived search, counts, ordering, validation, previews, notifications, and 
 
 ## Capability-driven UI
 
-The authenticated session payload exposes named capabilities plus ordered `accessible_card_pools`. Ordinary sessions receive `player`; staff sessions receive `player`, `evil`, and `neutral`. Pages and navigation consume this list instead of duplicating pool literals or staff checks in the frontend.
+The authenticated session payload exposes named capabilities plus ordered `accessible_card_pools`. Ordinary sessions receive `player`; staff sessions receive `player`, `evil`, and `neutral`. The global sidenav workspace consumes this list instead of duplicating pool literals or staff checks in the frontend. It shows only permitted pools, restores only a permitted preference, and falls back to Player for logged-out or reduced-scope sessions.
+
+Workspace state is navigation context rather than authorization. Session identity or pool-scope changes increment a frontend request generation, discard cached card collections and filter metadata, unmount the rendered route surface, and remove disallowed route state before new requests run. Late responses from the previous generation are ignored. Direct backend authorization remains authoritative throughout that transition.
 
 The server still authorizes every request. Hiding an unavailable control improves the interface but is never treated as the security boundary.
 

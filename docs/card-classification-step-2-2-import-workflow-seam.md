@@ -1,6 +1,6 @@
 # Card Classification Step 2.2: Import Workflow Seam Consolidation
 
-Status: implemented, validated, reviewed, and merged into the classification umbrella branch. [Step 2.3](card-classification-step-2-3-faction-classification.md) is the active design checkpoint; [Step 3](card-classification-step-3-card-pool-workspaces.md) remains blocked on it.
+Status: implemented, validated, reviewed, and merged into the classification umbrella branch. Its dependent classification checkpoints are also implemented.
 
 This is a hardening checkpoint between import inference/identity and the faction/workspace checkpoints:
 
