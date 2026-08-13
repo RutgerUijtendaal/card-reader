@@ -40,7 +40,7 @@ class PublicCardGroupDetailView(APIView):
             card_group_detail_payload(
                 group,
                 lifecycle_status=lifecycle_status,
-                card_pool=card_pool,
+                card_pool_scope=card_pool_scope,
                 anchor_deck_references=card_deck_references_payload(
                     group.anchor_card.id,
                     viewer_id=viewer_id,

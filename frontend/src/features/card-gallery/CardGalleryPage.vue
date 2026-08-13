@@ -2,13 +2,14 @@
   <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="Images"
-      title="Gallery"
-      subtitle="Browse the card pool and find cards to build around."
+      :title="`${cardPoolLabel(workspace.activePool)} Gallery`"
+      :subtitle="gallerySubtitle"
       title-tag="h2"
       title-class="text-xl"
     >
       <template #actions>
         <AppHeaderAction
+          v-if="workspace.activePool === 'player'"
           :icon="Hammer"
           label="Build a deck"
           short-label="Build a deck"
@@ -29,7 +30,10 @@
           :total-count="totalCount"
           :on-reset="resetFilters"
         >
-          <CardFilterSections :state="filterSectionsState" />
+          <CardFilterSections
+            :state="filterSectionsState"
+            :show-card-pool="false"
+          />
 
           <template #footer>
             <div class="flex w-full flex-col gap-2">
@@ -178,14 +182,19 @@ import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions'
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
 import { useTtsCardExport } from '@/domain/cards/composables/useTtsCardExport';
 import { buildContextualNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const scrollContainer = useScrollContainer();
 const { y: scrollTopRef } = useScroll(scrollContainer);
 
-const filterController = useCardFilterController();
+const filterController = useCardFilterController({
+  resultSetKey: computed(() => workspace.generation),
+});
 const {
   query,
   filterSectionsState,
@@ -193,7 +202,6 @@ const {
   selectionState,
   readFilterState,
   applyRouteFilterState,
-  resetFilters: resetCardFilterState,
   updateQuery,
   loadFilters,
 } = filterController;
@@ -222,6 +230,8 @@ const collection = useCardCollection<GalleryItem>({
   filtersLoaded,
   pageSize,
   identity: (card) => `${card.result_type}:${card.id}`,
+  resultSetKey: computed(() => workspace.generation),
+  refreshOnResultSetChange: false,
 });
 const cards = collection.cards;
 const totalCount = collection.totalCount;
@@ -236,6 +246,11 @@ const galleryGridStyle = computed(() => ({
 }));
 const gallerySortOverride = computed(() => overrideSort.value);
 const newDeckLocation = computed(() => buildContextualNewDeckEditorLocation(route.path, route.query));
+const gallerySubtitle = computed(() =>
+  workspace.activePool === 'player'
+    ? 'Browse Player cards and find cards to build around.'
+    : `Browse ${cardPoolLabel(workspace.activePool)} cards.`,
+);
 const loadingShimCount = computed(() => pageSize.value);
 const displayItems = computed(() =>
   (!hasLoadedOnce.value || isRefreshing.value)
@@ -370,8 +385,9 @@ watch(
 );
 
 const resetFilters = (): void => {
-  resetCardFilterState();
-  void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(createEmptyCardFilterState()) });
+  const defaults = createEmptyCardFilterState(workspace.activePool);
+  applyRouteFilterState(defaults);
+  void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(defaults) });
 };
 
 onBeforeRouteLeave(() => {

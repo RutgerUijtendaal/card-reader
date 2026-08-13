@@ -32,7 +32,7 @@
         v-else
         class="flex min-w-0 items-center gap-3 rounded-xl transition"
         :class="collapsed ? 'justify-center' : ''"
-        to="/cards"
+        :to="galleryLocation"
         @click="handleNavClick"
       >
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
@@ -74,10 +74,20 @@
       </button>
     </div>
 
+    <div
+      class="mb-5"
+      :class="collapsed ? 'px-0' : ''"
+    >
+      <CardPoolWorkspaceSwitcher
+        :collapsed="collapsed"
+        @selected="handleNavClick"
+      />
+    </div>
+
     <nav class="grid w-full gap-2">
       <template
         v-for="item in publicItems"
-        :key="item.to"
+        :key="item.label"
       >
         <RouterLink
           class="nav-link relative"
@@ -113,7 +123,7 @@
 
       <template
         v-for="item in staffItems"
-        :key="item.to"
+        :key="item.label"
       >
         <RouterLink
           class="nav-link relative"
@@ -191,16 +201,22 @@
 import { computed } from 'vue';
 import { Activity, Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Gamepad2, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
+import type { RouteLocationRaw } from 'vue-router';
 import AppHotkeysPanel from '@/app/components/AppHotkeysPanel.vue';
+import CardPoolWorkspaceSwitcher from '@/app/components/CardPoolWorkspaceSwitcher.vue';
 import ThemeModeMenu from '@/app/components/ThemeModeMenu.vue';
 import { useAccessRequestSummary } from '@/domain/access-requests/composables/useAccessRequestSummary';
 import { useNotificationSummary } from '@/domain/notifications/composables/useNotificationSummary';
 import { useReviewSummary } from '@/domain/review/composables/useReviewSummary';
 import { useAuthStore } from '@/domain/session/store';
+import {
+  buildWorkspaceGalleryLocation,
+  useCardPoolWorkspaceStore,
+} from '@/domain/cards/cardPoolWorkspace';
 
 type NavItem = {
   label: string;
-  to: string;
+  to: RouteLocationRaw;
   icon: typeof Images;
   requiresStaff?: boolean;
   requiresAuth?: boolean;
@@ -227,18 +243,22 @@ const emit = defineEmits<{
 }>();
 
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const router = useRouter();
 const cardLogoUrl = `${import.meta.env.BASE_URL}card_logo_transparent.webp`;
 const { openParseFlagItemCount } = useReviewSummary();
 const { unreadNotificationCount } = useNotificationSummary();
 const { pendingAccessRequestCount } = useAccessRequestSummary();
 
+const galleryLocation = computed(() => buildWorkspaceGalleryLocation(workspace.activePool));
 const items = computed<NavItem[]>(() => [
-  { label: 'Gallery', to: '/cards', icon: Images },
-  { label: 'Decks', to: '/decks', icon: BookOpen },
-  { label: 'Playtester', to: '/playtester', icon: Gamepad2 },
-  { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
-  { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: Hammer, requiresAuth: true },
+  { label: 'Gallery', to: galleryLocation.value, icon: Images },
+  ...(workspace.activePool === 'player' ? [
+    { label: 'Decks', to: '/decks', icon: BookOpen },
+    { label: 'Playtester', to: '/playtester', icon: Gamepad2 },
+    { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
+    { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: Hammer, requiresAuth: true },
+  ] : []),
   { label: 'Notifications', to: '/notifications', icon: Bell, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },
   { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
   { label: 'Imports', to: '/imports', icon: Upload, requiresStaff: true },

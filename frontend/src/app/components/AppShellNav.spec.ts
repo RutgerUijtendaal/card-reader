@@ -1,7 +1,10 @@
 import { createApp, nextTick } from 'vue';
+import { createPinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import AppShellNav from '@/app/components/AppShellNav.vue';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 const authState = {
   authenticated: true,
@@ -52,7 +55,10 @@ vi.mock('@/app/components/ThemeModeMenu.vue', () => ({
   },
 }));
 
-const mountNav = async (props: { collapsed?: boolean } = {}) => {
+const mountNav = async (
+  props: { collapsed?: boolean; mobile?: boolean } = {},
+  accessiblePools: CardPool[] = ['player'],
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const router = createRouter({
@@ -72,7 +78,11 @@ const mountNav = async (props: { collapsed?: boolean } = {}) => {
   });
   await router.push('/cards');
   await router.isReady();
+  const pinia = createPinia();
+  const workspace = useCardPoolWorkspaceStore(pinia);
+  workspace.synchronizeSession(accessiblePools, 'test-user');
   const app = createApp(AppShellNav, props);
+  app.use(pinia);
   app.use(router);
   app.mount(container);
   await nextTick();
@@ -105,6 +115,15 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
+  test('shows Player as the only workspace when restricted pools are unavailable', async () => {
+    const mounted = await mountNav();
+
+    expect(mounted.container.querySelector('[aria-label="Card workspace"]')?.textContent).toContain('Player');
+    expect(mounted.container.textContent).not.toContain('Evil');
+    expect(mounted.container.textContent).not.toContain('Neutral');
+    mounted.unmount();
+  });
+
   test('shows notification indicator dot when collapsed', async () => {
     const mounted = await mountNav({ collapsed: true });
     const notificationLink = mounted.container.querySelector('a[href="/notifications"]');
@@ -133,6 +152,37 @@ describe('AppShellNav', () => {
 
     expect(adminLink).not.toBeNull();
     expect(adminLink?.querySelector('.nav-badge')?.textContent).toContain('2');
+    mounted.unmount();
+  });
+
+  test('shows permitted workspaces and removes Player-only navigation in Evil', async () => {
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const evilButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Evil',
+    );
+    expect(evilButton).toBeInstanceOf(HTMLButtonElement);
+
+    evilButton?.click();
+    await nextTick();
+
+    expect(mounted.container.textContent).not.toContain('Playtester');
+    expect(mounted.container.textContent).not.toContain('Build a deck');
+    expect(mounted.container.querySelector('a[href="/cards?card_pool=evil"]')).not.toBeNull();
+    mounted.unmount();
+  });
+
+  test('exposes an accessible compact workspace selector when collapsed', async () => {
+    const mounted = await mountNav({ collapsed: true }, ['player', 'evil', 'neutral']);
+    const selector = mounted.container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Card workspace"]',
+    );
+
+    expect(selector).toBeInstanceOf(HTMLSelectElement);
+    expect(Array.from(selector?.options ?? []).map((option) => option.text)).toEqual([
+      'Player',
+      'Evil',
+      'Neutral',
+    ]);
     mounted.unmount();
   });
 });

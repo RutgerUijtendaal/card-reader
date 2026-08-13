@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch, type WatchSource } from 'vue';
 import { fetchCardFilters } from '@/domain/cards/api';
 import type { CardFiltersResponse } from '@/domain/cards/types';
 import type { CardFilterState } from '@/domain/cards/utils/filters/cardFilterState';
@@ -14,9 +14,14 @@ const EMPTY_FILTERS: CardFiltersResponse = {
   types: [],
 };
 
-export const useCardFilterController = () => {
+interface CardFilterControllerOptions {
+  resultSetKey?: WatchSource<unknown>;
+}
+
+export const useCardFilterController = (options: CardFilterControllerOptions = {}) => {
   const filters = ref<CardFiltersResponse>(EMPTY_FILTERS);
   const filtersLoaded = ref(false);
+  let requestGeneration = 0;
   const filterCatalog = computed(() => createCardFilterCatalog(filters.value));
   const filterState = useCardFilterState(filterCatalog);
   const favorites = useMetadataFilterFavorites();
@@ -36,9 +41,27 @@ export const useCardFilterController = () => {
   };
 
   const loadFilters = async (): Promise<void> => {
-    filters.value = await fetchCardFilters();
+    const generation = ++requestGeneration;
+    const nextFilters = await fetchCardFilters();
+    if (generation !== requestGeneration) {
+      return;
+    }
+    filters.value = nextFilters;
     filtersLoaded.value = true;
   };
+
+  if (options.resultSetKey) {
+    watch(
+      options.resultSetKey,
+      () => {
+        requestGeneration += 1;
+        filters.value = EMPTY_FILTERS;
+        filtersLoaded.value = false;
+        void loadFilters();
+      },
+      { flush: 'sync' },
+    );
+  }
 
   const applyRouteFilterState = (state: CardFilterState): void => {
     filterState.applyFilterState(state);

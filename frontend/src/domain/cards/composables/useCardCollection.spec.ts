@@ -268,4 +268,26 @@ describe('useCardCollection', () => {
     await vi.runAllTimersAsync();
     expect(collection.cards.value).toEqual([{ id: 'card-1', name: 'Card' }]);
   });
+
+  test('can invalidate a result set without refreshing before its route state changes', async () => {
+    vi.useFakeTimers();
+    mockedGet.mockResolvedValueOnce(buildResponse([{ id: 'player-1', name: 'Player Card' }]));
+    const resultSetKey = ref('player');
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      resultSetKey,
+      refreshOnResultSetChange: false,
+      pageSize: 30,
+      debounceMs: 0,
+    });
+
+    await collection.searchCards();
+    resultSetKey.value = 'evil';
+    await nextTick();
+    await vi.runAllTimersAsync();
+
+    expect(collection.cards.value).toEqual([]);
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+  });
 });

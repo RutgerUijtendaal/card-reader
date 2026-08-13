@@ -28,7 +28,7 @@
 
         <RouterLink
           class="flex items-center gap-3"
-          to="/cards"
+          :to="buildWorkspaceGalleryLocation(workspace.activePool)"
         >
           <span class="flex h-11 w-11 items-center justify-center rounded-xl">
             <img
@@ -106,10 +106,17 @@ import {
   useHoverModePreferences,
   type HoverModeSurface,
 } from '@/domain/cards/composables/useHoverModePreferences';
+import {
+  buildWorkspaceGalleryLocation,
+  useCardPoolWorkspaceStore,
+} from '@/domain/cards/cardPoolWorkspace';
+import { isCardPool } from '@/domain/cards/cardPools';
+import { clearGalleryNavigationState } from '@/domain/cards/utils/gallery/galleryNavigation';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const hoverModePreferences = useHoverModePreferences();
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const pageHeaderOutletRef = ref<HTMLElement | null>(null);
@@ -125,7 +132,7 @@ const globalHotkeysEnabled = computed(() => !isActivePlaytesterRoute.value);
 const globalNavigationHotkeys = computed(() => [
   {
     sequence: ['n', 'n'] as const,
-    enabled: auth.authenticated && globalHotkeysEnabled.value,
+    enabled: auth.authenticated && globalHotkeysEnabled.value && workspace.activePool === 'player',
     onTrigger: () => {
       void router.push(buildContextualNewDeckEditorLocation(route.path, route.query));
     },
@@ -138,7 +145,7 @@ const hoverModeOverrides = {
   notifications: hoverModePreferences.getOverrideHoverMode('notifications'),
 } satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
 const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
-const routeViewKey = computed(() => resolveRouteViewKey(route.path));
+const routeViewKey = computed(() => `${resolveRouteViewKey(route.path)}:${workspace.generation}`);
 const hoverModeHotkeyActions = computed(() => {
   if (!globalHotkeysEnabled.value) {
     return null;
@@ -200,4 +207,32 @@ watch(isDesktop, (desktop) => {
     mobileNavOpen.value = false;
   }
 });
+
+watch(
+  () => ({
+    sessionKey: auth.authenticated
+      ? `user:${auth.user?.id ?? auth.user?.username ?? 'authenticated'}`
+      : 'anonymous',
+    accessiblePools: [...auth.accessibleCardPools],
+  }),
+  ({ sessionKey, accessiblePools }) => {
+    const previousGeneration = workspace.generation;
+    const changedPool = workspace.synchronizeSession(accessiblePools, sessionKey);
+    if (workspace.generation === previousGeneration) {
+      return;
+    }
+    clearGalleryNavigationState();
+    const routePool = isCardPool(route.query.card_pool)
+      ? route.query.card_pool
+      : null;
+    const routePoolIsNoLongerAccessible = routePool !== null
+      && !workspace.accessiblePools.includes(routePool);
+    if (route.meta.requiresStaff && !auth.canAccessStaffRoutes) {
+      void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
+    } else if (routePoolIsNoLongerAccessible || (changedPool && route.path === '/cards')) {
+      void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
+    }
+  },
+  { deep: true, flush: 'sync' },
+);
 </script>

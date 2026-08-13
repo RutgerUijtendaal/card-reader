@@ -1,4 +1,5 @@
 import { createApp, defineComponent, h } from 'vue';
+import { createPinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fetchOperationsQueuePage } from '@/domain/operations/api';
 import type { OperationsQueueItem, OperationsQueuePage } from '@/domain/operations/types';
@@ -13,6 +14,8 @@ import {
 } from '@/features/import-jobs/api';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
 import type { ContentVersion, ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 vi.mock('@/domain/operations/api', () => ({
   fetchOperationsQueuePage: vi.fn(),
@@ -104,7 +107,7 @@ const currentVersion = {
   description: 'Current release.',
 };
 
-const mountController = () => {
+const mountController = (cardPool: CardPool = 'player') => {
   let controller!: ReturnType<typeof useImportJobsController>;
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -116,6 +119,10 @@ const mountController = () => {
       },
     }),
   );
+  const pinia = createPinia();
+  const workspace = useCardPoolWorkspaceStore(pinia);
+  workspace.synchronizeSession(['player', 'evil', 'neutral'], 'test-staff', cardPool);
+  app.use(pinia);
   app.mount(host);
   return { app, controller };
 };
@@ -151,6 +158,13 @@ describe('useImportJobsController', () => {
       ...activeJob(),
       status: 'canceling',
     });
+  });
+
+  test('prefills the explicit import pool from the active workspace', () => {
+    const { app, controller } = mountController('neutral');
+
+    expect(controller.cardPool.value).toBe('neutral');
+    app.unmount();
   });
 
   afterEach(() => {

@@ -1110,10 +1110,15 @@ def test_card_image_asset_endpoint_serves_non_checksum_immutable_image_path() ->
     assert card.id
 
 
-def test_evil_card_images_are_hidden_from_non_staff_across_all_routes() -> None:
-    card, version = _create_editable_card_version(name="Restricted Evil Image")
+@pytest.mark.parametrize("restricted_pool", ["evil", "neutral"])
+def test_restricted_card_images_are_hidden_from_non_staff_across_all_routes(
+    restricted_pool: str,
+) -> None:
+    card, version = _create_editable_card_version(
+        name=f"Restricted {restricted_pool.title()} Image"
+    )
     image = _create_card_image(version)
-    card.card_pool = "evil"
+    card.card_pool = restricted_pool
     card.save(update_fields=["card_pool"])
     anonymous = Client(HTTP_HOST="localhost")
     paths = [
@@ -1125,13 +1130,36 @@ def test_evil_card_images_are_hidden_from_non_staff_across_all_routes() -> None:
     for path in paths:
         assert anonymous.get(path).status_code == 404
 
-    staff = _staff_client("game-master-image-staff")
+    staff = _staff_client(f"restricted-{restricted_pool}-image-staff")
     responses = [staff.get(path) for path in paths]
     try:
         assert [response.status_code for response in responses] == [200, 200, 200]
     finally:
         for response in responses:
             response.close()
+
+
+@pytest.mark.parametrize("restricted_pool", ["evil", "neutral"])
+def test_restricted_card_collections_and_objects_enforce_pool_scope(
+    restricted_pool: str,
+) -> None:
+    card, _version = _create_editable_card_version(
+        name=f"Restricted {restricted_pool.title()} Collection Card"
+    )
+    card.card_pool = restricted_pool
+    card.save(update_fields=["card_pool"])
+    anonymous = Client(HTTP_HOST="localhost")
+    staff = _staff_client(f"restricted-{restricted_pool}-collection-staff")
+
+    assert anonymous.get("/cards", {"card_pool": restricted_pool}).status_code == 403
+    assert anonymous.get(f"/cards/{card.id}").status_code == 404
+    assert anonymous.get(f"/cards/{card.id}/generations").status_code == 404
+
+    staff_list = staff.get("/cards", {"card_pool": restricted_pool})
+    assert staff_list.status_code == 200
+    assert [row["id"] for row in staff_list.json()["results"]] == [card.id]
+    assert staff.get(f"/cards/{card.id}").status_code == 200
+    assert staff.get(f"/cards/{card.id}/generations").status_code == 200
 
 
 def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:
@@ -2501,6 +2529,58 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     assert group_payload["id"] == group.id
     assert [member["card"]["id"] for member in group_payload["members"]] == [anchor_card.id, member_card.id]
     assert group_payload["members"][0]["is_anchor"] is True
+
+
+def test_cross_pool_group_relationships_only_expose_authorized_members() -> None:
+    player_card, player_version = _create_editable_card_version(
+        name="Cross Pool Group Player"
+    )
+    evil_card, evil_version = _create_editable_card_version(
+        name="Cross Pool Group Evil"
+    )
+    evil_card.card_pool = "evil"
+    evil_card.save(update_fields=["card_pool"])
+    _create_card_image(player_version)
+    _create_card_image(evil_version)
+    group = _create_card_group(
+        "cross-pool-detail-group",
+        anchor_card=player_card,
+        members=[player_card, evil_card],
+    )
+
+    anonymous_group_response = Client(HTTP_HOST="localhost").get(
+        f"/card-groups/{group.id}"
+    )
+    anonymous_card_response = Client(HTTP_HOST="localhost").get(
+        f"/cards/{player_card.id}"
+    )
+    staff_client = _staff_client("cross-pool-group-staff")
+    staff_group_response = staff_client.get(f"/card-groups/{group.id}")
+    staff_evil_card_response = staff_client.get(f"/cards/{evil_card.id}")
+
+    assert anonymous_group_response.status_code == 200
+    assert [
+        member["card"]["id"]
+        for member in anonymous_group_response.json()["members"]
+    ] == [player_card.id]
+    assert anonymous_card_response.json()["card_groups"][0]["id"] == group.id
+    assert anonymous_card_response.json()["card_groups"][0]["member_count"] == 1
+    assert anonymous_card_response.json()["card_groups"][0]["card_ids"] == [
+        player_card.id
+    ]
+    assert staff_group_response.status_code == 200
+    assert [
+        member["card"]["id"] for member in staff_group_response.json()["members"]
+    ] == [player_card.id, evil_card.id]
+    assert staff_group_response.json()["members"][1]["card"]["card_pool"] == "evil"
+    assert staff_evil_card_response.json()["card_groups"][0]["id"] == group.id
+    assert staff_evil_card_response.json()["card_groups"][0]["card_pool"] == "player"
+    assert staff_evil_card_response.json()["card_groups"][0]["member_count"] == 2
+    assert staff_evil_card_response.json()["card_groups"][0]["card_ids"] == [
+        player_card.id,
+        evil_card.id,
+    ]
+    assert staff_evil_card_response.json()["card_groups"][0]["position"] == 2
 
 
 def test_card_detail_includes_viewer_visible_deck_references() -> None:

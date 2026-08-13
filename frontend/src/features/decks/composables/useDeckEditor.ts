@@ -282,6 +282,7 @@ export const useDeckEditor = () => {
       return;
     }
     const params = new URLSearchParams({
+      card_pool: 'player',
       lifecycle_status: MANAGEMENT_CARD_LIFECYCLE_FILTER,
       page_size: '100',
       show_groups: 'false',

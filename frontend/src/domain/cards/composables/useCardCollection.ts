@@ -13,6 +13,7 @@ type UseCardCollectionOptions<TCard extends IdentifiableCard> = {
   filtersLoaded: Ref<boolean>;
   enabled?: Ref<boolean>;
   resultSetKey?: WatchSource<unknown>;
+  refreshOnResultSetChange?: boolean;
   pageSize: number | Ref<number>;
   debounceMs?: number;
   watchSource?: WatchSource<unknown> | WatchSource<unknown>[];
@@ -28,6 +29,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   filtersLoaded,
   enabled,
   resultSetKey,
+  refreshOnResultSetChange = true,
   pageSize,
   debounceMs = 200,
   watchSource,
@@ -136,7 +138,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
 
   const collectionWatchSource = [
     ...(Array.isArray(watchSource) ? watchSource : watchSource ? [watchSource] : []),
-    ...(resultSetKey ? [resultSetKey] : []),
+    ...(resultSetKey && refreshOnResultSetChange ? [resultSetKey] : []),
     ...(enabled ? [enabled] : []),
   ];
 

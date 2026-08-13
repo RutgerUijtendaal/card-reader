@@ -35,6 +35,7 @@
 
     <CardFilterSections
       :state="controller.filters.filterSectionsState.value"
+      :show-card-pool="false"
       :visible-sections="controller.deck.isHeroStep.value ? ['mana', 'affinity'] : undefined"
       :default-open-sections="controller.deck.isHeroStep.value ? ['mana', 'affinity'] : undefined"
     />

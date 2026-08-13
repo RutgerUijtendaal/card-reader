@@ -56,13 +56,13 @@ describe('galleryNavigation', () => {
       buildCardGroupDetailLocation('group-123', {}, 'evil'),
     ).toEqual({
       path: '/card-groups/group-123',
-      query: { card_pool: 'evil' },
+      query: { card_pool: 'evil', return_card_pool: 'player' },
     });
     expect(
       buildCardGroupDetailLocation('group-123', {}, 'neutral'),
     ).toEqual({
       path: '/card-groups/group-123',
-      query: { card_pool: 'neutral' },
+      query: { card_pool: 'neutral', return_card_pool: 'player' },
     });
     expect(
       buildCardGroupDetailLocation(
@@ -72,8 +72,41 @@ describe('galleryNavigation', () => {
       ),
     ).toEqual({
       path: '/card-groups/group-123',
-      query: {},
+      query: { return_card_pool: 'evil' },
     });
+  });
+
+  test('preserves the source workspace when opening a linked card in another pool', () => {
+    expect(
+      buildCardDetailLocation(
+        'card-2',
+        { card_pool: 'evil', q: 'boss' },
+        'detail',
+        'player',
+      ),
+    ).toEqual({
+      path: '/cards/card-2',
+      query: { q: 'boss', return_card_pool: 'evil' },
+    });
+  });
+
+  test('uses the originating workspace when returning from a cross-pool group', () => {
+    expect(
+      buildGalleryLocation({
+        card_pool: 'player',
+        return_card_pool: 'evil',
+        q: 'linked hero',
+      }),
+    ).toEqual({
+      path: '/cards',
+      query: { card_pool: 'evil', q: 'linked hero' },
+    });
+    expect(
+      buildGalleryLocation({
+        card_pool: 'evil',
+        return_card_pool: 'player',
+      }),
+    ).toBe('/cards');
   });
 
   test('preserves gallery query when returning to the gallery', () => {

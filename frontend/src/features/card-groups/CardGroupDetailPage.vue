@@ -49,9 +49,15 @@
                   >
                     Anchor
                   </span>
+                  <span
+                    v-if="member.card.card_pool !== workspace.activePool"
+                    class="theme-pill theme-pill-neutral px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                  >
+                    {{ cardPoolLabel(member.card.card_pool) }}
+                  </span>
                 </div>
                 <RouterLink
-                  :to="`/cards/${member.card.id}`"
+                  :to="buildCardDetailLocation(member.card.id, route.query, 'detail', member.card.card_pool)"
                   class="theme-link text-sm font-medium transition"
                 >
                   Open card
@@ -103,7 +109,13 @@ import {
   normalizeCardLifecycleFilterValue,
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import { parseCardFilterRouteQuery } from '@/domain/cards/utils/filters/cardFilterRouteState';
-import { buildGalleryLocation, useGalleryCardNavigation } from '@/domain/cards/utils/gallery/galleryNavigation';
+import {
+  buildCardDetailLocation,
+  buildGalleryLocation,
+  useGalleryCardNavigation,
+} from '@/domain/cards/utils/gallery/galleryNavigation';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { useAuthStore } from '@/domain/session/store';
 import CardGroupDetailLoadingSkeleton from '@/features/card-groups/components/CardGroupDetailLoadingSkeleton.vue';
 import type { SymbolLookupMap } from '@/domain/cards/types';
@@ -113,6 +125,7 @@ import { fetchCardGroupDetail } from '@/features/card-groups/api';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const group = ref<CardGroupDetail | null>(null);
 const symbolByKey = ref<SymbolLookupMap>({});
 const isLoadingInitial = ref(true);

@@ -215,9 +215,13 @@ class CardDetailView(APIView):
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
         card_groups = [
-            card_group_summary_payload(group, card_id=card.id, card_pool=card.card_pool)
+            card_group_summary_payload(
+                group,
+                card_id=card.id,
+                card_pool_scope=card_pool_scope,
+            )
             for group in CardGroupService().get_groups_for_card(card.id)
-            if group.anchor_card.card_pool == card.card_pool
+            if card_pool_scope.allows_card_pool(group.anchor_card.card_pool)
         ]
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
         deck_references = card_deck_references_payload(

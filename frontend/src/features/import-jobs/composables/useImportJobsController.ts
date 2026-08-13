@@ -3,6 +3,7 @@ import { computed, onMounted, ref, shallowRef } from 'vue';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { fetchTemplates } from '@/domain/templates/api';
 import type { TemplateRecord } from '@/domain/templates/types';
 import {
@@ -43,8 +44,9 @@ const isAmbiguousCreateFailure = (error: unknown): boolean => {
 };
 
 export const useImportJobsController = () => {
+  const workspace = useCardPoolWorkspaceStore();
   const pickerTemplateId = ref('mtg-like-v1');
-  const cardPool = ref<CardPool>('player');
+  const cardPool = ref<CardPool>(workspace.activePool);
   const cardRoleMode = ref<'automatic' | 'override'>('automatic');
   const cardRoleOverride = ref<CardRole[]>([]);
   const cardFactionMode = ref<'automatic' | 'override'>('automatic');

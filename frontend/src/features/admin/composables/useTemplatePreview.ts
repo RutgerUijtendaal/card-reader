@@ -153,6 +153,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     try {
       const params: Record<string, string | number | boolean | undefined> = {
         ...managementCardSearchLifecycleParams(),
+        card_pool: 'player',
         page_size: 8,
         show_groups: false,
       };

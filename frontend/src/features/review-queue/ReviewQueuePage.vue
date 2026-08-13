@@ -411,6 +411,7 @@ const collection = useCardCollection<ReviewCard>({
   buildSearchParams: () => {
     const params = new URLSearchParams();
     params.set('max_confidence', '0.8');
+    params.set('card_pool', 'player');
     return params;
   },
   filtersLoaded,
