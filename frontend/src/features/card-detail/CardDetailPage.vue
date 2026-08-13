@@ -134,6 +134,7 @@
             @update-field="updateField"
             @update-card-pool="updateCardPool"
             @toggle-card-role="toggleCardRole"
+            @toggle-card-faction="toggleCardFaction"
             @update-deck-building-config="updateDeckBuildingConfig"
             @update-lifecycle-status="updateLifecycleStatus"
           />
@@ -171,6 +172,7 @@ import {
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { ScalarFieldName } from '@/domain/cards/types';
 import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
 import type { CardPool } from '@/domain/cards/cardPools';
 
 const {
@@ -247,6 +249,12 @@ const toggleCardRole = (role: CardRole, checked: boolean): void => {
   form.card_roles = checked
     ? [...new Set([...form.card_roles, role])]
     : form.card_roles.filter((value) => value !== role);
+};
+
+const toggleCardFaction = (faction: CardFaction, checked: boolean): void => {
+  form.card_factions = checked
+    ? [...new Set([...form.card_factions, faction])]
+    : form.card_factions.filter((value) => value !== faction);
 };
 
 const updateDeckBuildingConfig = (value: string): void => {

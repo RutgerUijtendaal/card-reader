@@ -5,6 +5,7 @@ import {
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import { isCardRoleFilter, type CardRoleFilter } from '@/domain/cards/cardRoles';
 import { normalizeCardPool, type CardPool } from '@/domain/cards/cardPools';
+import { isCardFaction, type CardFaction } from '@/domain/cards/cardFactions';
 
 type FilterMatch = 'any' | 'all';
 
@@ -15,6 +16,9 @@ export type CardFilterState = {
   cardRoleMatch: FilterMatch;
   cardRoleKeys: CardRoleFilter[];
   cardRoleExcludeKeys: CardRoleFilter[];
+  cardFactionMatch?: FilterMatch;
+  cardFactionKeys?: CardFaction[];
+  cardFactionExcludeKeys?: CardFaction[];
   keywordMatch: FilterMatch;
   tagMatch: FilterMatch;
   typeMatch: FilterMatch;
@@ -50,6 +54,9 @@ export type CardFilterSelectionState = {
   cardRoleMatch: FilterMatch;
   cardRoleIds: CardRoleFilter[];
   cardRoleExcludeIds: CardRoleFilter[];
+  cardFactionMatch?: FilterMatch;
+  cardFactionIds?: CardFaction[];
+  cardFactionExcludeIds?: CardFaction[];
   keywordMatch: FilterMatch;
   tagMatch: FilterMatch;
   typeMatch: FilterMatch;
@@ -85,6 +92,9 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
   cardRoleMatch: 'any',
   cardRoleKeys: [],
   cardRoleExcludeKeys: ['hero'],
+  cardFactionMatch: 'any',
+  cardFactionKeys: [],
+  cardFactionExcludeKeys: [],
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
@@ -120,6 +130,9 @@ export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState 
   cardRoleMatch: 'any',
   cardRoleIds: [],
   cardRoleExcludeIds: ['hero'],
+  cardFactionMatch: 'any',
+  cardFactionIds: [],
+  cardFactionExcludeIds: [],
   keywordMatch: 'any',
   tagMatch: 'any',
   typeMatch: 'any',
@@ -161,6 +174,8 @@ const normalizeStringArray = (values: readonly string[]): string[] =>
 const normalizeMatch = (value: FilterMatch): FilterMatch => (value === 'all' ? 'all' : 'any');
 const normalizeCardRoles = (values: readonly string[]): CardRoleFilter[] =>
   normalizeStringArray(values).filter(isCardRoleFilter);
+const normalizeCardFactions = (values: readonly string[]): CardFaction[] =>
+  normalizeStringArray(values).filter(isCardFaction);
 
 export const normalizeCardFilterState = (state: CardFilterState): CardFilterState => ({
   query: normalizeStringValue(state.query),
@@ -169,6 +184,9 @@ export const normalizeCardFilterState = (state: CardFilterState): CardFilterStat
   cardRoleMatch: normalizeMatch(state.cardRoleMatch),
   cardRoleKeys: normalizeCardRoles(state.cardRoleKeys),
   cardRoleExcludeKeys: normalizeCardRoles(state.cardRoleExcludeKeys),
+  cardFactionMatch: normalizeMatch(state.cardFactionMatch ?? 'any'),
+  cardFactionKeys: normalizeCardFactions(state.cardFactionKeys ?? []),
+  cardFactionExcludeKeys: normalizeCardFactions(state.cardFactionExcludeKeys ?? []),
   keywordMatch: normalizeMatch(state.keywordMatch),
   tagMatch: normalizeMatch(state.tagMatch),
   typeMatch: normalizeMatch(state.typeMatch),
@@ -206,6 +224,9 @@ export const normalizeCardFilterSelectionState = (
   cardRoleMatch: normalizeMatch(state.cardRoleMatch),
   cardRoleIds: normalizeCardRoles(state.cardRoleIds),
   cardRoleExcludeIds: normalizeCardRoles(state.cardRoleExcludeIds),
+  cardFactionMatch: normalizeMatch(state.cardFactionMatch ?? 'any'),
+  cardFactionIds: normalizeCardFactions(state.cardFactionIds ?? []),
+  cardFactionExcludeIds: normalizeCardFactions(state.cardFactionExcludeIds ?? []),
   keywordMatch: normalizeMatch(state.keywordMatch),
   tagMatch: normalizeMatch(state.tagMatch),
   typeMatch: normalizeMatch(state.typeMatch),

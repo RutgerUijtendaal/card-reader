@@ -19,7 +19,10 @@ const activeJob: ImportJob = {
   card_role_mode: 'automatic',
   card_role_override: [],
   template_role_snapshot: [],
-  card_role_inference_policy_version: 1,
+  card_faction_mode: 'automatic',
+  card_faction_override: [],
+  template_faction_snapshot: [],
+  classification_inference_policy_version: 3,
 };
 
 const recentJob: OperationsQueueItem = {
@@ -176,11 +179,16 @@ describe('ImportActivityPanel', () => {
             },
           ],
           resolved_card_roles: ['event'],
-          card_role_inference: { template_roles: ['event'] },
+          resolved_card_factions: ['order'],
+          classification_inference: {
+            roles: { mode: 'automatic', template_roles: ['event'] },
+            factions: { mode: 'automatic', matched_tag_keys: ['order'] },
+          },
           target_card_id: 'card-id',
           target_card_version_id: 'version-id',
           target_card_pool_snapshot: null,
           target_card_roles_snapshot: [],
+          target_card_factions_snapshot: [],
           card_tab_url: '/cards/card-id/edit?tab=card',
         },
       ],
@@ -196,7 +204,8 @@ describe('ImportActivityPanel', () => {
     expect(mounted.host.textContent).toContain('Existing');
     expect(mounted.host.textContent).toContain('Queued');
     expect(mounted.host.textContent).toContain('Live');
-    expect(mounted.host.textContent).toContain('Standard');
+    expect(mounted.host.textContent).toContain('Normal');
+    expect(mounted.host.textContent).toContain('Factions: Order');
     expect(
       mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
     ).toContain('Review card classification');
@@ -204,7 +213,7 @@ describe('ImportActivityPanel', () => {
     mounted.app.unmount();
   });
 
-  test('does not present unprocessed classification defaults as resolved Standard cards', async () => {
+  test('does not present unprocessed classification defaults as resolved Normal cards', async () => {
     const detail: ImportJobDetail = {
       ...activeJob,
       items: [
@@ -217,11 +226,13 @@ describe('ImportActivityPanel', () => {
           warning_message: null,
           warnings: [],
           resolved_card_roles: [],
-          card_role_inference: {},
+          resolved_card_factions: [],
+          classification_inference: {},
           target_card_id: null,
           target_card_version_id: null,
           target_card_pool_snapshot: null,
           target_card_roles_snapshot: [],
+          target_card_factions_snapshot: [],
           card_tab_url: null,
         },
         {
@@ -233,11 +244,13 @@ describe('ImportActivityPanel', () => {
           warning_message: null,
           warnings: [],
           resolved_card_roles: [],
-          card_role_inference: {},
+          resolved_card_factions: [],
+          classification_inference: {},
           target_card_id: null,
           target_card_version_id: null,
           target_card_pool_snapshot: null,
           target_card_roles_snapshot: [],
+          target_card_factions_snapshot: [],
           card_tab_url: null,
         },
       ],
@@ -246,7 +259,7 @@ describe('ImportActivityPanel', () => {
 
     expect(mounted.host.textContent).toContain('Classification pending');
     expect(mounted.host.textContent).toContain('Classification unavailable');
-    expect(mounted.host.textContent).not.toContain('Standard — no special roles');
+    expect(mounted.host.textContent).not.toContain('Normal — no special roles');
     expect(mounted.host.textContent).not.toContain('Resolution');
 
     mounted.app.unmount();

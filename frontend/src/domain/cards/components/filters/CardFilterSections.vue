@@ -32,6 +32,16 @@
         :options="state.cardRoleOptions"
         @reset="state.resetClassificationGroup"
       />
+
+      <MetadataPillGroup
+        v-model:included-value="selectedCardFactions"
+        v-model:excluded-value="excludedCardFactions"
+        v-model:match-mode="cardFactionMatch"
+        :default-open="isSectionOpenByDefault('classification', true)"
+        label="Factions"
+        :options="state.cardFactionOptions"
+        @reset="state.resetClassificationGroup"
+      />
     </div>
 
     <SymbolToggleGroup
@@ -226,6 +236,18 @@ const excludedCardRoles = computed({
 const cardRoleMatch = computed({
   get: () => props.state.cardRoleMatch,
   set: props.state.onUpdateCardRoleMatch,
+});
+const selectedCardFactions = computed({
+  get: () => props.state.selectedCardFactions,
+  set: props.state.onUpdateSelectedCardFactions,
+});
+const excludedCardFactions = computed({
+  get: () => props.state.excludedCardFactions,
+  set: props.state.onUpdateExcludedCardFactions,
+});
+const cardFactionMatch = computed({
+  get: () => props.state.cardFactionMatch,
+  set: props.state.onUpdateCardFactionMatch,
 });
 
 const selectedManaTypeSymbolIds = computed({

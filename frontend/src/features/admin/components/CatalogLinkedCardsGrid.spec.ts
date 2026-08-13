@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 describe('CatalogLinkedCardsGrid', () => {
-  test('shows pool and role badges without requiring hover', async () => {
+  test('shows pool, role, and faction badges without requiring hover', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const app = createApp(CatalogLinkedCardsGrid, {
@@ -21,6 +21,7 @@ describe('CatalogLinkedCardsGrid', () => {
           image_url: null,
           card_pool: 'evil',
           card_roles: ['boon', 'event', 'location'],
+          card_factions: ['order', 'blood'],
         },
         {
           card_id: 'card-2',
@@ -30,6 +31,7 @@ describe('CatalogLinkedCardsGrid', () => {
           image_url: null,
           card_pool: 'neutral',
           card_roles: [],
+          card_factions: [],
         },
       ],
       emptyMessage: 'No cards',
@@ -54,6 +56,10 @@ describe('CatalogLinkedCardsGrid', () => {
     expect(container.textContent).toContain('Boon');
     expect(container.textContent).toContain('Event');
     expect(container.textContent).toContain('Location');
+    expect(container.textContent).toContain('Order');
+    expect(container.textContent).toContain('Blood');
+    expect(container.textContent).toContain('Normal');
+    expect(container.textContent).toContain('No faction');
 
     app.unmount();
   });

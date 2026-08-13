@@ -95,6 +95,34 @@
                 </span>
               </div>
             </fieldset>
+            <fieldset class="theme-divider space-y-2 border-t pt-3 md:col-span-2">
+              <legend class="field-label">
+                Inferred card factions
+              </legend>
+              <p class="theme-section-muted text-xs">
+                Automatic imports add these faction hints before combining detected metadata.
+              </p>
+              <div class="flex flex-wrap gap-4">
+                <label
+                  v-for="option in inferredFactionOptions"
+                  :key="option.value"
+                  class="theme-section-title inline-flex items-center gap-2 text-sm"
+                >
+                  <input
+                    v-model="form.inferred_card_factions"
+                    type="checkbox"
+                    :value="option.value"
+                  >
+                  {{ option.label }}
+                </label>
+                <span
+                  v-if="form.inferred_card_factions.length === 0"
+                  class="theme-section-muted text-sm"
+                >
+                  No template faction hints
+                </span>
+              </div>
+            </fieldset>
           </div>
 
           <div class="mt-3 grid min-h-0 flex-1 gap-4 xl:grid-cols-2">
@@ -210,6 +238,7 @@ import {
 } from '@/domain/templates/api';
 import { useTemplatePreview } from '@/features/admin/composables/useTemplatePreview';
 import { CARD_ROLE_OPTIONS, type CardRole } from '@/domain/cards/cardRoles';
+import { CARD_FACTION_OPTIONS, type CardFaction } from '@/domain/cards/cardFactions';
 import type { TemplateDefinition, TemplateRecord } from '@/domain/templates/types';
 
 type TemplateForm = {
@@ -217,6 +246,7 @@ type TemplateForm = {
   key: string;
   definition_json: string;
   inferred_card_roles: CardRole[];
+  inferred_card_factions: CardFaction[];
 };
 
 const TEMPLATE_DEFINITION_EXAMPLE: TemplateDefinition = {
@@ -327,8 +357,10 @@ const form = reactive<TemplateForm>({
   key: '',
   definition_json: TEMPLATE_DEFINITION_EXAMPLE_JSON,
   inferred_card_roles: [],
+  inferred_card_factions: [],
 });
 const inferredRoleOptions = CARD_ROLE_OPTIONS;
+const inferredFactionOptions = CARD_FACTION_OPTIONS;
 
 const createMode = computed(() => selectedId.value === null);
 const templateKeyForPreview = computed(() => (createMode.value ? '' : form.key.trim()));
@@ -382,6 +414,7 @@ const selectTemplate = (id: string): void => {
   form.key = row.key;
   form.definition_json = formatJsonForEditor(row.definition_json);
   form.inferred_card_roles = [...row.inferred_card_roles];
+  form.inferred_card_factions = [...row.inferred_card_factions];
 };
 
 const startCreate = (): void => {
@@ -398,6 +431,7 @@ const resetForm = (): void => {
   form.key = '';
   form.definition_json = TEMPLATE_DEFINITION_EXAMPLE_JSON;
   form.inferred_card_roles = [];
+  form.inferred_card_factions = [];
 };
 
 const saveTemplate = async (): Promise<void> => {
@@ -420,6 +454,7 @@ const saveTemplate = async (): Promise<void> => {
       label: normalizedLabel,
       definition_json: normalizedDefinition.value,
       inferred_card_roles: [...form.inferred_card_roles],
+      inferred_card_factions: [...form.inferred_card_factions],
     };
     if (createMode.value) {
       await createTemplate({

@@ -2,9 +2,11 @@ export const STANDARD_CARD_ROLE = 'standard' as const;
 
 export const CARD_ROLE_OPTIONS = [
   { value: 'hero', label: 'Hero' },
+  { value: 'boss', label: 'Boss' },
+  { value: 'location', label: 'Location' },
   { value: 'boon', label: 'Boon' },
   { value: 'event', label: 'Event' },
-  { value: 'location', label: 'Location' },
+  { value: 'shop_item', label: 'Shop Item' },
 ] as const;
 
 export type CardRole = (typeof CARD_ROLE_OPTIONS)[number]['value'];
@@ -24,4 +26,4 @@ export const cardRoleLabel = (role: CardRole): string =>
   CARD_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
 
 export const displayCardRoleLabels = (roles: readonly CardRole[]): string[] =>
-  roles.length > 0 ? roles.map(cardRoleLabel) : ['Standard'];
+  roles.length > 0 ? roles.map(cardRoleLabel) : ['Normal'];

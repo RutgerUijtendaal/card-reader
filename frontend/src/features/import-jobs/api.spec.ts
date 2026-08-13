@@ -49,6 +49,8 @@ describe('importJobs api', () => {
       cardPool: 'evil',
       cardRoleMode: 'override',
       cardRoleOverride: ['boon', 'event'],
+      cardFactionMode: 'override',
+      cardFactionOverride: ['order', 'blood'],
     });
 
     const formData = vi.mocked(api.post).mock.calls[0]?.[1] as FormData;
@@ -62,6 +64,8 @@ describe('importJobs api', () => {
     expect(formData.get('card_pool')).toBe('evil');
     expect(formData.get('card_role_mode')).toBe('override');
     expect(formData.get('card_role_override')).toBe('["boon","event"]');
+    expect(formData.get('card_faction_mode')).toBe('override');
+    expect(formData.get('card_faction_override')).toBe('["order","blood"]');
     expect(formData.get('content_version_base')).toBe('14.1');
     expect(formData.get('content_version_description')).toBe('Current release.');
     expect(formData.get('options_json')).toBe('{}');

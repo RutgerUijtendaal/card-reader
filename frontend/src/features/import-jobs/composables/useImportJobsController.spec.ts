@@ -48,7 +48,10 @@ const activeJob = (id = 'active-job'): ImportJob => ({
   card_role_mode: 'automatic',
   card_role_override: [],
   template_role_snapshot: [],
-  card_role_inference_policy_version: 1,
+  card_faction_mode: 'automatic',
+  card_faction_override: [],
+  template_faction_snapshot: [],
+  classification_inference_policy_version: 3,
 });
 
 const importJobDetail = (id: string): ImportJobDetail => ({
@@ -126,6 +129,7 @@ describe('useImportJobsController', () => {
         label: 'Default card',
         definition_json: '{}',
         inferred_card_roles: [],
+        inferred_card_factions: [],
       },
     ]);
     vi.mocked(fetchCurrentContentVersion).mockResolvedValue(currentVersion);
@@ -511,11 +515,13 @@ describe('useImportJobsController', () => {
       warning_message: null,
       warnings: [],
       resolved_card_roles: [],
-      card_role_inference: {},
+      resolved_card_factions: [],
+      classification_inference: {},
       target_card_id: null,
       target_card_version_id: null,
       target_card_pool_snapshot: null,
       target_card_roles_snapshot: [],
+      target_card_factions_snapshot: [],
       card_tab_url: null,
     };
     vi.mocked(fetchImportJobDetail).mockResolvedValueOnce({
@@ -647,6 +653,8 @@ describe('useImportJobsController', () => {
       cardPool: 'player',
       cardRoleMode: 'automatic',
       cardRoleOverride: [],
+      cardFactionMode: 'automatic',
+      cardFactionOverride: [],
     });
     expect(mounted.controller.pickedFiles.value).toEqual([]);
     expect(mounted.controller.fileInputKey.value).toBe(initialInputKey + 1);
@@ -665,6 +673,8 @@ describe('useImportJobsController', () => {
     mounted.controller.cardPool.value = 'evil';
     mounted.controller.cardRoleMode.value = 'override';
     mounted.controller.cardRoleOverride.value = ['boon'];
+    mounted.controller.cardFactionMode.value = 'override';
+    mounted.controller.cardFactionOverride.value = ['blood'];
     vi.mocked(createImportJob).mockRejectedValueOnce(new Error('connection lost'));
     vi.mocked(fetchImportJobByCreationKey).mockResolvedValueOnce(null);
 
@@ -688,6 +698,8 @@ describe('useImportJobsController', () => {
     expect(mounted.controller.pickedFiles.value).toEqual([]);
     expect(mounted.controller.cardRoleMode.value).toBe('automatic');
     expect(mounted.controller.cardRoleOverride.value).toEqual([]);
+    expect(mounted.controller.cardFactionMode.value).toBe('automatic');
+    expect(mounted.controller.cardFactionOverride.value).toEqual([]);
     expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(true);
 
     mounted.app.unmount();

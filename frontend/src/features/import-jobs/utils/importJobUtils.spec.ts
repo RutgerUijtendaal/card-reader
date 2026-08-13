@@ -45,7 +45,10 @@ describe('importJobs utils', () => {
           card_role_mode: 'automatic',
           card_role_override: [],
           template_role_snapshot: [],
-          card_role_inference_policy_version: 1,
+          card_faction_mode: 'automatic',
+          card_faction_override: [],
+          template_faction_snapshot: [],
+          classification_inference_policy_version: 3,
         },
       ]),
     ).toBe(true);
@@ -65,7 +68,10 @@ describe('importJobs utils', () => {
         card_role_mode: 'automatic',
         card_role_override: [],
         template_role_snapshot: [],
-        card_role_inference_policy_version: 1,
+        card_faction_mode: 'automatic',
+        card_faction_override: [],
+        template_faction_snapshot: [],
+        classification_inference_policy_version: 3,
       }),
     ).toBe(0);
   });

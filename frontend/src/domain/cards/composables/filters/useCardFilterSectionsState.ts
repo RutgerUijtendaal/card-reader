@@ -52,6 +52,9 @@ export const useCardFilterSectionsState = (
     filterState.cardRoleIds.value = [];
     filterState.cardRoleExcludeIds.value = ['hero'];
     filterState.cardRoleMatch.value = 'any';
+    filterState.cardFactionIds.value = [];
+    filterState.cardFactionExcludeIds.value = [];
+    filterState.cardFactionMatch.value = 'any';
   };
   const resetManaGroup = (): void => {
     filterState.manaTypeSymbolIds.value = [];
@@ -114,6 +117,17 @@ export const useCardFilterSectionsState = (
     cardRoleMatch: filterState.cardRoleMatch.value,
     onUpdateCardRoleMatch: createMatchModeUpdater(filterState.cardRoleMatch),
     cardRoleOptions: (filters.value.card_roles ?? []).map((option) => ({
+      id: option.key,
+      key: option.key,
+      label: option.label,
+    })),
+    selectedCardFactions: filterState.cardFactionIds.value,
+    onUpdateSelectedCardFactions: createArrayUpdater(filterState.cardFactionIds),
+    excludedCardFactions: filterState.cardFactionExcludeIds.value,
+    onUpdateExcludedCardFactions: createArrayUpdater(filterState.cardFactionExcludeIds),
+    cardFactionMatch: filterState.cardFactionMatch.value,
+    onUpdateCardFactionMatch: createMatchModeUpdater(filterState.cardFactionMatch),
+    cardFactionOptions: (filters.value.card_factions ?? []).map((option) => ({
       id: option.key,
       key: option.key,
       label: option.label,

@@ -9,6 +9,7 @@ import {
 } from '@/domain/cards/utils/filters/cardLifecycle';
 import { isCardRoleFilter, type CardRoleFilter } from '@/domain/cards/cardRoles';
 import { normalizeCardPool } from '@/domain/cards/cardPools';
+import { isCardFaction, type CardFaction } from '@/domain/cards/cardFactions';
 
 const readQueryValues = (
   value:
@@ -26,6 +27,9 @@ const readQueryValues = (
 
 const readCardRoleValues = (value: LocationQueryValue | LocationQueryValue[] | undefined): CardRoleFilter[] =>
   readQueryValues(value).filter(isCardRoleFilter);
+const readCardFactionValues = (
+  value: LocationQueryValue | LocationQueryValue[] | undefined,
+): CardFaction[] => readQueryValues(value).filter(isCardFaction);
 
 export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState =>
   normalizeCardFilterState({
@@ -39,6 +43,9 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
     cardRoleExcludeKeys: query.card_role_exclude === undefined
       ? ['hero']
       : readCardRoleValues(query.card_role_exclude),
+    cardFactionMatch: query.card_faction_match === 'all' ? 'all' : 'any',
+    cardFactionKeys: readCardFactionValues(query.card_factions),
+    cardFactionExcludeKeys: readCardFactionValues(query.card_faction_exclude),
     keywordMatch: query.keyword_match === 'all' ? 'all' : 'any',
     tagMatch: query.tag_match === 'all' ? 'all' : 'any',
     typeMatch: query.type_match === 'all' ? 'all' : 'any',
@@ -88,6 +95,11 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
     normalized.cardRoleExcludeKeys.length !== 1
     || normalized.cardRoleExcludeKeys[0] !== 'hero'
   ) query.card_role_exclude = normalized.cardRoleExcludeKeys;
+  if (normalized.cardFactionMatch === 'all') query.card_faction_match = 'all';
+  if ((normalized.cardFactionKeys?.length ?? 0) > 0) query.card_factions = normalized.cardFactionKeys;
+  if ((normalized.cardFactionExcludeKeys?.length ?? 0) > 0) {
+    query.card_faction_exclude = normalized.cardFactionExcludeKeys;
+  }
   if (normalized.keywordMatch === 'all') query.keyword_match = 'all';
   if (normalized.tagMatch === 'all') query.tag_match = 'all';
   if (normalized.typeMatch === 'all') query.type_match = 'all';

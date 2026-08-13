@@ -62,17 +62,26 @@ describe('cardFilterRouteState', () => {
     ).toEqual({});
   });
 
-  test('round-trips Location through role include and exclude filters', () => {
+  test('round-trips final roles and factions through independent filters', () => {
     const state = parseCardFilterRouteQuery({
-      card_roles: ['location', 'event'],
+      card_roles: ['location', 'event', 'boss', 'shop_item'],
       card_role_exclude: 'boon',
+      card_factions: ['darkness', 'order'],
+      card_faction_exclude: 'blood',
+      card_faction_match: 'all',
     });
 
-    expect(state.cardRoleKeys).toEqual(['event', 'location']);
+    expect(state.cardRoleKeys).toEqual(['boss', 'event', 'location', 'shop_item']);
     expect(state.cardRoleExcludeKeys).toEqual(['boon']);
+    expect(state.cardFactionKeys).toEqual(['darkness', 'order']);
+    expect(state.cardFactionExcludeKeys).toEqual(['blood']);
+    expect(state.cardFactionMatch).toBe('all');
     expect(buildCardFilterRouteQuery(state)).toMatchObject({
-      card_roles: ['event', 'location'],
+      card_roles: ['boss', 'event', 'location', 'shop_item'],
       card_role_exclude: ['boon'],
+      card_factions: ['darkness', 'order'],
+      card_faction_exclude: ['blood'],
+      card_faction_match: 'all',
     });
   });
 

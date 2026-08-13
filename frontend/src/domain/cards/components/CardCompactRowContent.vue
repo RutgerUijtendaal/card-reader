@@ -28,6 +28,28 @@
           :symbol-by-key="manaSymbolByKey"
         />
       </div>
+      <div
+        v-if="showClassification"
+        class="flex min-w-0 flex-wrap gap-1 overflow-hidden"
+      >
+        <span class="theme-pill theme-pill-accent px-1.5 py-0.5 text-[9px] font-semibold">
+          {{ cardPoolLabel(card.card_pool) }}
+        </span>
+        <span
+          v-for="role in displayCardRoleLabels(card.card_roles)"
+          :key="`role-${role}`"
+          class="theme-pill theme-pill-neutral px-1.5 py-0.5 text-[9px] font-semibold"
+        >
+          {{ role }}
+        </span>
+        <span
+          v-for="faction in displayCardFactionLabels(card.card_factions ?? [])"
+          :key="`faction-${faction}`"
+          class="theme-pill theme-pill-success px-1.5 py-0.5 text-[9px] font-semibold"
+        >
+          {{ faction }}
+        </span>
+      </div>
     </div>
   </div>
 
@@ -62,10 +84,21 @@ import { toAbsoluteApiUrl } from '@/shared/api/client';
 import SymbolizedText from '@/domain/cards/components/SymbolizedText.vue';
 import type { CardHoverTooltipModel } from '@/domain/cards/types/cardModels';
 import { cardIsDeprecated } from '@/domain/cards/utils/filters/cardLifecycle';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
+import { displayCardRoleLabels } from '@/domain/cards/cardRoles';
+import { displayCardFactionLabels } from '@/domain/cards/cardFactions';
 
 type CardCompactRowCard = Pick<
   CardHoverTooltipModel,
-  'name' | 'mana_cost' | 'mana_symbols' | 'mana_value' | 'symbols' | 'lifecycle_status'
+  | 'name'
+  | 'mana_cost'
+  | 'mana_symbols'
+  | 'mana_value'
+  | 'symbols'
+  | 'lifecycle_status'
+  | 'card_pool'
+  | 'card_roles'
+  | 'card_factions'
 > & {
   image_url: string | null;
 };
@@ -75,10 +108,12 @@ const props = withDefaults(defineProps<{
   artWidth?: string;
   artObjectPosition?: string;
   artTransform?: string;
+  showClassification?: boolean;
 }>(), {
   artWidth: '6rem',
   artObjectPosition: '52% 5%',
   artTransform: 'scale(1.4)',
+  showClassification: false,
 });
 
 const manaSymbolByKey = computed(() =>

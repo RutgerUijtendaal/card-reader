@@ -45,7 +45,7 @@ describe('TemplatesAdminView', () => {
     document.body.innerHTML = '';
   });
 
-  test('edits inferred roles separately from the parsing definition', async () => {
+  test('edits inferred roles and factions separately from the parsing definition', async () => {
     fetchTemplates.mockResolvedValue([
       {
         id: 'template-id',
@@ -53,6 +53,7 @@ describe('TemplatesAdminView', () => {
         label: 'Event',
         definition_json: '{"regions":[]}',
         inferred_card_roles: ['event'],
+        inferred_card_factions: ['order'],
       },
     ]);
     updateTemplate.mockResolvedValue(undefined);
@@ -65,11 +66,17 @@ describe('TemplatesAdminView', () => {
     await nextTick();
 
     const checkboxes = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
-    expect(checkboxes).toHaveLength(4);
-    expect(checkboxes.map((checkbox) => checkbox.checked)).toEqual([false, false, true, false]);
+    expect(checkboxes).toHaveLength(9);
 
-    expect(Array.from(host.querySelectorAll('label')).some((label) => label.textContent?.includes('Location'))).toBe(true);
-    checkboxes[3].click();
+    const labels = Array.from(host.querySelectorAll('label'));
+    const locationInput = labels.find((label) => label.textContent?.includes('Location'))
+      ?.querySelector<HTMLInputElement>('input');
+    const bloodInput = labels.find((label) => label.textContent?.includes('Blood'))
+      ?.querySelector<HTMLInputElement>('input');
+    expect(locationInput?.checked).toBe(false);
+    expect(bloodInput?.checked).toBe(false);
+    locationInput?.click();
+    bloodInput?.click();
     Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
       .find((button) => button.textContent?.trim() === 'Save Changes')
       ?.click();
@@ -80,6 +87,7 @@ describe('TemplatesAdminView', () => {
       label: 'Event',
       definition_json: { regions: [] },
       inferred_card_roles: ['event', 'location'],
+      inferred_card_factions: ['order', 'blood'],
     });
 
     app.unmount();

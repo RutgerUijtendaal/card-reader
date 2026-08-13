@@ -1,4 +1,6 @@
 import type { CardRole } from '@/domain/cards/cardRoles';
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export type ImportJobStatus = 'queued' | 'running' | 'canceling' | 'cancelled' | 'completed' | 'failed';
 
@@ -23,7 +25,10 @@ export type ImportJob = {
   card_role_mode: 'automatic' | 'override';
   card_role_override: CardRole[];
   template_role_snapshot: CardRole[];
-  card_role_inference_policy_version: number;
+  card_faction_mode: 'automatic' | 'override';
+  card_faction_override: CardFaction[];
+  template_faction_snapshot: CardFaction[];
+  classification_inference_policy_version: number;
 };
 
 export type ImportWarning = {
@@ -41,11 +46,13 @@ export type ImportJobItem = {
   warning_message: string | null;
   warnings: ImportWarning[];
   resolved_card_roles: CardRole[];
-  card_role_inference: Record<string, unknown>;
+  resolved_card_factions: CardFaction[];
+  classification_inference: Record<string, unknown>;
   target_card_id: string | null;
   target_card_version_id: string | null;
   target_card_pool_snapshot: CardPool | null;
   target_card_roles_snapshot: CardRole[];
+  target_card_factions_snapshot: CardFaction[];
   card_tab_url: string | null;
 };
 
@@ -57,4 +64,3 @@ export type CreateImportJobResponse = ImportJob & {
   job_id: string;
   idempotent_replay: boolean;
 };
-import type { CardPool } from '@/domain/cards/cardPools';
