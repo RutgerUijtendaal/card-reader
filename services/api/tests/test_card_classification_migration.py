@@ -324,3 +324,33 @@ def test_faction_classification_reverse_rejects_faction_data() -> None:
     executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
     executor = MigrationExecutor(connection)
     executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_faction_classification_reverse_rejects_policy_version_three_jobs() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0060_faction_classification")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0060_faction_classification")]
+    ).apps
+    Template = apps.get_model("card_reader_core", "Template")
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    template = Template.objects.create(key="policy-three-template", label="Policy Three")
+    job = ImportJob.objects.create(
+        source_path="imports/policy-three",
+        template_id=template.id,
+        classification_inference_policy_version=3,
+    )
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(
+        RuntimeError,
+        match="classification policy versions newer than 2",
+    ):
+        executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+
+    ImportJob.objects.filter(id=job.id).update(classification_inference_policy_version=2)
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())

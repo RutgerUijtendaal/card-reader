@@ -54,6 +54,8 @@ def guard_and_flatten_classification_evidence(apps: Any, _schema_editor: Any) ->
         unsupported.append("import faction overrides")
     if ImportJob.objects.exclude(template_faction_snapshot_json=[]).exists():
         unsupported.append("import template faction snapshots")
+    if ImportJob.objects.filter(classification_inference_policy_version__gt=2).exists():
+        unsupported.append("classification policy versions newer than 2")
     if ImportJobItem.objects.exclude(resolved_card_factions_json=[]).exists():
         unsupported.append("resolved import factions")
     if ImportJobItem.objects.exclude(target_card_factions_snapshot_json=[]).exists():
