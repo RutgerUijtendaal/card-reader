@@ -67,6 +67,9 @@ const poolIcons: Record<CardPool, Component> = {
 };
 
 const selectPool = async (cardPool: CardPool): Promise<void> => {
+  if (cardPool === workspace.activePool) {
+    return;
+  }
   const navigationFailure = await router.push(buildWorkspaceSelectionLocation(cardPool));
   if (navigationFailure) {
     return;

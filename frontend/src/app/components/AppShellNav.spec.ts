@@ -93,6 +93,7 @@ const mountNav = async (
 
   return {
     container,
+    router,
     workspace,
     unmount: () => {
       app.unmount();
@@ -186,6 +187,20 @@ describe('AppShellNav', () => {
     expect(mounted.container.textContent).not.toContain('Playtester');
     expect(mounted.container.textContent).not.toContain('Build a deck');
     expect(mounted.container.querySelector('a[href="/cards?card_pool=evil"]')).not.toBeNull();
+    mounted.unmount();
+  });
+
+  test('treats the active workspace button as a no-op', async () => {
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const generation = mounted.workspace.generation;
+    const playerButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Player workspace"]');
+
+    playerButton?.click();
+    await nextTick();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
+    expect(mounted.workspace.activePool).toBe('player');
+    expect(mounted.workspace.generation).toBe(generation);
     mounted.unmount();
   });
 
