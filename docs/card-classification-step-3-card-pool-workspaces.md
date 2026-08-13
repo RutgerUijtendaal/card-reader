@@ -2,6 +2,8 @@
 
 Status: implemented.
 
+Navigation amendment: [Step 3.1](card-classification-step-3-1-context-preserving-workspace-switching.md) replaces this step's initial unconditional safe-landing navigation with a centralized route-capability policy. Compatible global and resource routes stay mounted when the workspace changes; Gallery changes pool in place; only incompatible Player-only routes fall back to the target Gallery.
+
 This step turns the card pool into a site-level browsing context. It does not change the classification model or infer new data.
 
 ## Outcome
@@ -64,7 +66,7 @@ Update `frontend/src/app/components/AppShellNav.vue` with a prominent three-opti
 - Each Evil or Neutral option appears only when that pool is present in the session's allowed scope.
 - Collapsed desktop navigation uses an accessible compact control or menu with an unambiguous tooltip/label.
 - Mobile navigation exposes the same state and behavior.
-- Switching workspaces closes the mobile drawer and navigates to the target workspace's safe landing route.
+- Switching workspaces closes the mobile drawer. After Step 3.1, compatible routes remain in place, Gallery changes pool in place, and only incompatible routes navigate to the target workspace's safe landing route.
 
 Player workspace navigation initially contains:
 
@@ -186,7 +188,7 @@ All visible changes must use semantic theme primitives and be verified in light 
 3. Consume the ordered session pool-scope contract.
 4. Add desktop, collapsed, and mobile sidenav controls.
 5. Make nav item composition workspace-aware.
-6. Synchronize workspace, route query, auth changes, and safe landing routes.
+6. Synchronize workspace, route query, auth changes, and initial safe landing routes; Step 3.1 refines voluntary switching to preserve compatible routes.
 7. Scope gallery and all reusable card collection clients.
 8. Keep existing deck routes Player-scoped, hide them and Playtester from Evil/Neutral navigation, and lock Playtester to Player decks explicitly.
 9. Prefill, but do not hide, the import pool from the active workspace.
@@ -205,7 +207,7 @@ Add or update tests covering:
 - deferred Evil and Neutral responses resolving after access loss and being rejected before they can mutate data, errors, pagination, or loading state;
 - desktop, collapsed, and mobile toggle behavior;
 - workspace-specific nav item composition;
-- safe landing routes and route-query synchronization;
+- safe landing routes and route-query synchronization, followed by Step 3.1 coverage for context-preserving compatible routes;
 - clearing stale collections during a switch and rejecting responses from the previous request generation;
 - gallery Hero-excluded defaults in all three pools;
 - every collection request carrying an explicit pool;

@@ -13,6 +13,7 @@ This checkpoint sits between import inference and import workflow consolidation:
 5. [Import workflow seam consolidation](card-classification-step-2-2-import-workflow-seam.md)
 6. [Faction classification](card-classification-step-2-3-faction-classification.md)
 7. [Card-pool workspaces](card-classification-step-3-card-pool-workspaces.md)
+8. [Context-preserving workspace switching](card-classification-step-3-1-context-preserving-workspace-switching.md)
 
 Do not begin Step 2.2 until this checkpoint is merged into the classification umbrella branch. This step changes stable identity and every path that resolves it; Step 2.2 can then consolidate import lifecycles without preserving a globally scoped lookup.
 

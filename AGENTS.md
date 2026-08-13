@@ -105,7 +105,7 @@ Core stack:
 - Django owns the domain schema through migrations in `services/core`.
 - When adding, removing, or changing Django database models or relationships, update `docs/card-database-diagram.svg` when the card-related schema diagram is affected.
 - When changing documented feature behavior, workflows, permissions, API contracts, onboarding, or operations, review the relevant guides under `docs/` and update them when they are no longer accurate. Also review `docs/README.md` when documentation is added, removed, or renamed.
-- Card pool, role, and faction work has seven approved, dependency-ordered implementation checkpoints. Execute them in order and keep each step independently reviewable and verified:
+- Card pool, role, and faction work has eight approved, dependency-ordered implementation checkpoints. Execute them in order and keep each step independently reviewable and verified:
   1. `docs/card-classification-step-1-foundation.md`
   2. `docs/card-classification-step-1-1-authorization-seam.md`
   3. `docs/card-classification-step-2-import-inference.md`
@@ -113,6 +113,7 @@ Core stack:
   5. `docs/card-classification-step-2-2-import-workflow-seam.md`
   6. `docs/card-classification-step-2-3-faction-classification.md`
   7. `docs/card-classification-step-3-card-pool-workspaces.md`
+  8. `docs/card-classification-step-3-1-context-preserving-workspace-switching.md`
 - Deliver the classification feature through the umbrella branch `feature/card-classification`, with its aggregate PR targeting `master`. Each checkpoint uses a separate branch and PR targeting `feature/card-classification`; merge checkpoints into the umbrella branch in dependency order, and branch the next checkpoint from the updated umbrella branch. Keep the aggregate PR open for whole-feature CI and review, and do not retarget checkpoint PRs to `master` merely to trigger checks or reviews.
 - The target card classification model has three independent card-level dimensions:
   - `card_pool` is exactly one of `player`, `evil`, or `neutral`; `game_master` is a temporary undeployed value removed by Step 2.1 and must not remain as a compatibility alias.
@@ -125,7 +126,7 @@ Core stack:
   - Faction assignments and the derived faction identity key form one invariant. Runtime faction mutations must go through the cards identity seam so assignments plus card and alias namespace keys update atomically.
   - Neutral remains a separate stable pool. Do not include it implicitly in Player or Evil queries; any future Neutral overlay must be an explicit, authorized multi-pool view state.
 - Evil and Neutral card access must use the centralized backend card-pool scope whose initial policy is staff-only for both pools. Enforce it on direct objects, collections, embedded payloads, exports, and image/assets; frontend visibility is not the security boundary. Session/frontend code consumes ordered accessible pools rather than separate Evil and Neutral booleans. Keep the policy centralized so it can later expand without card-data migration.
-- Until the seven card-classification checkpoints are complete, preserve their boundaries: Step 1 owns schema/migration/manual editing/filtering and Hero replacement; Step 1.1 owns authorization-seam consolidation; Step 2 owns role import inference and overrides; Step 2.1 owns the final Player/Evil/Neutral pool contract, pool-scoped name/alias/hash identity, and related authorization/session renaming; Step 2.2 owns upload admission and cleanup, grouped-reparse transactionality, import activity/detail refresh consistency, and explicit evidence-state contracts; Step 2.3 owns faction persistence, pool-plus-exact-faction natural identity, the completed role vocabulary, and generalized role/faction inference and overrides; Step 3 owns the global three-pool sidenav workspace and site-level scoping.
+- Until the eight card-classification checkpoints are complete, preserve their boundaries: Step 1 owns schema/migration/manual editing/filtering and Hero replacement; Step 1.1 owns authorization-seam consolidation; Step 2 owns role import inference and overrides; Step 2.1 owns the final Player/Evil/Neutral pool contract, pool-scoped name/alias/hash identity, and related authorization/session renaming; Step 2.2 owns upload admission and cleanup, grouped-reparse transactionality, import activity/detail refresh consistency, and explicit evidence-state contracts; Step 2.3 owns faction persistence, pool-plus-exact-faction natural identity, the completed role vocabulary, and generalized role/faction inference and overrides; Step 3 owns the global three-pool sidenav workspace and site-level scoping; Step 3.1 owns context-preserving workspace selection, centralized route capabilities, routed-component lifetime, and safe fallback only for incompatible routes.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
   - API creates jobs and items.

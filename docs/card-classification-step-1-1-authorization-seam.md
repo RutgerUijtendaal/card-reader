@@ -11,6 +11,7 @@ This is a hardening checkpoint between the classification foundation and import 
 5. [Import workflow seam consolidation](card-classification-step-2-2-import-workflow-seam.md)
 6. [Faction classification](card-classification-step-2-3-faction-classification.md)
 7. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
+8. [Context-preserving workspace switching](card-classification-step-3-1-context-preserving-workspace-switching.md)
 
 Do not grow import or workspace behavior until this step's acceptance criteria are satisfied. The purpose is to make the existing Step 1 access boundary secure by construction before more features consume it.
 

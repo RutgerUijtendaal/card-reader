@@ -11,6 +11,7 @@ This is a hardening checkpoint between import inference/identity and the faction
 5. Import workflow seam consolidation (this document)
 6. [Faction classification](card-classification-step-2-3-faction-classification.md)
 7. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
+8. [Context-preserving workspace switching](card-classification-step-3-1-context-preserving-workspace-switching.md)
 
 Do not add workspace behavior in this checkpoint. Step 2.2 consolidates the lifecycle and state-management contracts established by Step 2 so later work does not have to reproduce them across more entry points.
 
