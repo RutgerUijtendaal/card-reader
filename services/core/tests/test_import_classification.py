@@ -64,9 +64,9 @@ def test_policy_three_unions_and_orders_role_and_faction_signals() -> None:
     assert result.evidence["roles"]["matched_tag_keys"] == [
         "boss",
         "hero",
-        "order",
         "shop-item",
     ]
+    assert result.evidence["factions"]["matched_tag_keys"] == ["order"]
     assert result.evidence["factions"]["tag_factions"] == ["order"]
 
 

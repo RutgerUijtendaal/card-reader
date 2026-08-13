@@ -40,6 +40,7 @@ from .schema import (
     CardGroupRecord,
     CardImageRecord,
     CardRecord,
+    CardReferenceRecord,
     CardVersionRecord,
     CatalogRecord,
     ContentVersionRecord,
@@ -301,11 +302,22 @@ def _group_record(group: CardGroup) -> CardGroupRecord:
     return CardGroupRecord(
         key=group.key,
         name=group.name,
-        anchor_card_key=group.anchor_card.key,
+        anchor_card_ref=_card_reference_record(group.anchor_card),
         members=[
-            CardGroupMemberRecord(card_key=member.card.key, position=member.position)
+            CardGroupMemberRecord(
+                card_ref=_card_reference_record(member.card),
+                position=member.position,
+            )
             for member in sorted(group.members.all(), key=lambda row: row.position)
         ],
+    )
+
+
+def _card_reference_record(card: Card) -> CardReferenceRecord:
+    return CardReferenceRecord(
+        key=card.key,
+        card_pool=cast(CardPool, card.card_pool),
+        card_factions=list(card_faction_keys(card)),
     )
 
 

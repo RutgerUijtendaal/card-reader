@@ -38,7 +38,14 @@ from card_reader_core.repositories.cards import lock_card_identity_pools
 from card_reader_core.metadata import mana_family_sort_key
 
 from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle, sha256_file
-from .schema import DeveloperDataManifest, DeveloperDataPayload
+from .schema import (
+    CardReferenceRecord,
+    CardReferenceIdentity,
+    CardRecord as DeveloperDataCardRecord,
+    DeveloperDataManifest,
+    DeveloperDataPayload,
+    card_reference_identity,
+)
 
 
 @dataclass(frozen=True)
@@ -246,7 +253,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
         for row in payload.content_versions
     }
     cards = {
-        row.key: Card.objects.create(
+        _payload_card_identity(row): Card.objects.create(
             key=row.key,
             label=row.label,
             card_pool=row.card_pool,
@@ -257,7 +264,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
         for row in payload.cards
     }
     for card_record in payload.cards:
-        card = cards[card_record.key]
+        card = cards[_payload_card_identity(card_record)]
         CardRoleAssignment.objects.bulk_create(
             [CardRoleAssignment(card=card, role=role) for role in card_record.card_roles]
         )
@@ -345,11 +352,15 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
         group = CardGroup.objects.create(
             key=group_record.key,
             name=group_record.name,
-            anchor_card=cards[group_record.anchor_card_key],
+            anchor_card=cards[card_reference_identity(group_record.anchor_card_ref)],
         )
         CardGroupMember.objects.bulk_create(
             [
-                CardGroupMember(group=group, card=cards[member.card_key], position=member.position)
+                CardGroupMember(
+                    group=group,
+                    card=cards[card_reference_identity(member.card_ref)],
+                    position=member.position,
+                )
                 for member in group_record.members
             ]
         )
@@ -395,9 +406,9 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
     symbol_keys = {row.key for row in payload.symbols}
     template_keys = {row.key for row in payload.templates}
     content_versions = {row.version_number for row in payload.content_versions}
-    card_keys = {row.key for row in payload.cards}
-    if len(card_keys) != len(payload.cards):
-        issues.append("card keys are not unique")
+    card_identities = {_payload_card_identity(row) for row in payload.cards}
+    if len(card_identities) != len(payload.cards):
+        issues.append("card identities are not unique")
     for symbol in payload.symbols:
         for asset_path in symbol.reference_assets:
             _symbol_reference_asset_path(asset_path)
@@ -417,12 +428,34 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
             _append_missing_reference_issue(issues, card.key, "symbols", version.symbol_keys, symbol_keys)
             _append_missing_reference_issue(issues, card.key, "types", version.type_keys, type_keys)
     for group in payload.card_groups:
-        referenced = {group.anchor_card_key, *(member.card_key for member in group.members)}
-        missing = sorted(referenced - card_keys)
+        referenced = {
+            card_reference_identity(group.anchor_card_ref),
+            *(card_reference_identity(member.card_ref) for member in group.members),
+        }
+        missing = sorted(referenced - card_identities)
         if missing:
-            issues.append(f"group {group.key} references unknown cards: {', '.join(missing)}")
+            missing_labels = ", ".join(_card_reference_label(reference) for reference in missing)
+            issues.append(f"group {group.key} references unknown cards: {missing_labels}")
     if issues:
         raise DeveloperDataError("Developer-data payload failed validation: " + "; ".join(issues))
+
+
+def _card_reference_label(
+    reference: CardReferenceIdentity,
+) -> str:
+    card_pool, card_factions, key = reference
+    factions = ",".join(str(faction) for faction in card_factions) or "none"
+    return f"{card_pool}/{factions}/{key}"
+
+
+def _payload_card_identity(card: DeveloperDataCardRecord) -> CardReferenceIdentity:
+    return card_reference_identity(
+        CardReferenceRecord(
+            key=card.key,
+            card_pool=card.card_pool,
+            card_factions=card.card_factions,
+        )
+    )
 
 
 def _append_missing_reference_issue(

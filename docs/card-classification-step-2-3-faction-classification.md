@@ -142,7 +142,7 @@ resolved roles = template role hints union tag-derived roles
 resolved factions = template faction hints union tag-derived factions
 ```
 
-An exact role override replaces only automatic role inference. An exact faction override replaces only automatic faction inference. Evidence records the mode, template values, all matched stable tag keys, mapped values, override values, and resolved values for each facet.
+An exact role override replaces only automatic role inference. An exact faction override replaces only automatic faction inference. Evidence records the mode, template values, matched stable tag keys that map to that facet, mapped values, override values, and resolved values for each facet.
 
 Unknown policy versions fail explicitly. Retry copies the original snapshots and policy version byte-for-byte; a new explicit import or reparse snapshots the current policy.
 
@@ -250,6 +250,8 @@ Hero remains excluded by default. Do not add default faction exclusions. Verify 
 Bump newly generated developer-data bundles from format Version 3 to Version 4 because cards and templates gain faction fields.
 
 - `CardRecord` gains `card_factions`.
+- Card-group anchor/member references become structured `(card_pool, card_factions, key)` records
+  instead of ambiguous key-only references.
 - `TemplateRecord` gains `inferred_card_factions`.
 - coverage gains `min_cards_by_faction`, defaulting each code-owned faction to zero.
 - template coverage gains `required_template_faction_hints`.

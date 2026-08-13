@@ -35,7 +35,8 @@ export type CardFilterSectionsState = {
   cardFactionMatch: MatchMode;
   onUpdateCardFactionMatch: (value: MatchMode) => void;
   cardFactionOptions: MetadataOption[];
-  resetClassificationGroup: () => void;
+  resetCardRoleGroup: () => void;
+  resetCardFactionGroup: () => void;
   selectedManaTypeSymbolIds: string[];
   lifecycleStatus: LifecycleFilterValue;
   onUpdateLifecycleStatus: (value: LifecycleFilterValue) => void;

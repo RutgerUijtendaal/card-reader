@@ -244,6 +244,11 @@ def test_faction_classification_migration_backfills_empty_namespace_and_nests_ev
             "live_classification": {"card_pool": "player", "card_roles": ["hero"]},
         },
     )
+    empty_evidence_item = OldImportJobItem.objects.create(
+        job_id=job.id,
+        source_file="imports/migration/unclassified.webp",
+        card_role_inference_json={},
+    )
 
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0060_faction_classification")])
@@ -265,6 +270,10 @@ def test_faction_classification_migration_backfills_empty_namespace_and_nests_ev
         "card_pool": "player",
         "card_roles": ["hero"],
     }
+    assert (
+        ImportJobItem.objects.get(id=empty_evidence_item.id).classification_inference_json
+        == {}
+    )
     assert CardFactionAssignment._meta.get_field("faction").max_length == 64
     assert CardRoleAssignment._meta.get_field("role").choices == [
         ("hero", "Hero"),
@@ -284,6 +293,7 @@ def test_faction_classification_migration_backfills_empty_namespace_and_nests_ev
     assert ReversedItem.objects.get(id=item.id).card_role_inference_json["resolved_roles"] == [
         "hero"
     ]
+    assert ReversedItem.objects.get(id=empty_evidence_item.id).card_role_inference_json == {}
     executor = MigrationExecutor(connection)
     executor.migrate(executor.loader.graph.leaf_nodes())
 

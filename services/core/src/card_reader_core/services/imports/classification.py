@@ -113,6 +113,10 @@ def classify_import_card(value: CardClassificationInput) -> CardClassificationRe
     tag_factions = normalize_card_factions(
         faction_policy[key] for key in matched_tag_keys if key in faction_policy
     )
+    matched_role_tag_keys = tuple(key for key in matched_tag_keys if key in role_policy)
+    matched_faction_tag_keys = tuple(
+        key for key in matched_tag_keys if key in faction_policy
+    )
     resolved_roles = _resolve_facet(
         mode=value.role_mode,
         template_values=template_roles,
@@ -134,7 +138,7 @@ def classify_import_card(value: CardClassificationInput) -> CardClassificationRe
         "mode": value.role_mode,
         "policy_version": value.inference_policy_version,
         "template_roles": list(template_roles),
-        "matched_tag_keys": list(matched_tag_keys),
+        "matched_tag_keys": list(matched_role_tag_keys),
         "tag_roles": list(tag_roles),
         "override_roles": list(override_roles) if value.role_mode == "override" else [],
         "resolved_roles": list(resolved_roles),
@@ -143,7 +147,7 @@ def classify_import_card(value: CardClassificationInput) -> CardClassificationRe
         "mode": value.faction_mode,
         "policy_version": value.inference_policy_version,
         "template_factions": list(template_factions),
-        "matched_tag_keys": list(matched_tag_keys),
+        "matched_tag_keys": list(matched_faction_tag_keys),
         "tag_factions": list(tag_factions),
         "override_factions": (
             list(override_factions) if value.faction_mode == "override" else []

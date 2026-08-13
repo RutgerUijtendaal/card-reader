@@ -19,7 +19,9 @@ cards with the public relationships needed for gallery, history, metadata, deck 
 Playtester workflows. Version 4 template records include canonical `inferred_card_roles` and
 `inferred_card_factions` hints used by automatic import classification. Card records include the
 required `card_pool`, canonical `card_roles`, and canonical `card_factions` fields; they never emit
-the removed Hero boolean or internal faction identity key.
+the removed Hero boolean or internal faction identity key. Card-group anchors and members use a
+structured card reference containing the pool, canonical faction set, and normalized card key, so
+same-key cards in different faction namespaces remain distinct throughout validation and import.
 
 The importer supports current Version 4 archives and explicitly adopts pinned Versions 1 through 3.
 Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to the Hero role

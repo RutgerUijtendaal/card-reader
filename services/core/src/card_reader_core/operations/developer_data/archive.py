@@ -11,6 +11,7 @@ from .schema import (
     DeveloperDataManifest,
     DeveloperDataPayload,
     adopt_payload_for_format,
+    card_reference_identity,
 )
 
 
@@ -105,17 +106,20 @@ def load_extracted_bundle(extraction_root: Path) -> tuple[DeveloperDataManifest,
 
 
 def _validate_public_payload_scope(payload: DeveloperDataPayload) -> None:
-    card_pools_by_key = {card.key: card.card_pool for card in payload.cards}
+    card_pools_by_identity = {
+        (card.card_pool, tuple(card.card_factions), card.key): card.card_pool
+        for card in payload.cards
+    }
     cross_pool_groups = []
     for group in payload.card_groups:
-        referenced_card_keys = {
-            group.anchor_card_key,
-            *(member.card_key for member in group.members),
+        referenced_card_identities = {
+            card_reference_identity(group.anchor_card_ref),
+            *(card_reference_identity(member.card_ref) for member in group.members),
         }
         referenced_pools = {
-            card_pools_by_key[card_key]
-            for card_key in referenced_card_keys
-            if card_key in card_pools_by_key
+            card_pools_by_identity[identity]
+            for identity in referenced_card_identities
+            if identity in card_pools_by_identity
         }
         if len(referenced_pools) > 1:
             cross_pool_groups.append(group.key)

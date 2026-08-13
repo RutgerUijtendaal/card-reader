@@ -47,11 +47,12 @@ export const useCardFilterSectionsState = (
   favoriteKeys: Record<MetadataFavoriteGroup, ComputedRef<string[]>>,
   toggleFavorite: (group: MetadataFavoriteGroup, key: string) => void,
 ) => {
-  const resetClassificationGroup = (): void => {
-    filterState.cardPool.value = 'player';
+  const resetCardRoleGroup = (): void => {
     filterState.cardRoleIds.value = [];
     filterState.cardRoleExcludeIds.value = ['hero'];
     filterState.cardRoleMatch.value = 'any';
+  };
+  const resetCardFactionGroup = (): void => {
     filterState.cardFactionIds.value = [];
     filterState.cardFactionExcludeIds.value = [];
     filterState.cardFactionMatch.value = 'any';
@@ -132,7 +133,8 @@ export const useCardFilterSectionsState = (
       key: option.key,
       label: option.label,
     })),
-    resetClassificationGroup,
+    resetCardRoleGroup,
+    resetCardFactionGroup,
     lifecycleStatus: filterState.lifecycleStatus.value,
     onUpdateLifecycleStatus: createLifecycleUpdater(filterState.lifecycleStatus),
     selectedManaTypeSymbolIds: filterState.manaTypeSymbolIds.value,
@@ -209,7 +211,8 @@ export const useCardFilterSectionsState = (
 
   return {
     filterSectionsState,
-    resetClassificationGroup,
+    resetCardRoleGroup,
+    resetCardFactionGroup,
     resetManaGroup,
     resetAffinityGroup,
     resetDevotionGroup,

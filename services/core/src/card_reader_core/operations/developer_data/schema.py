@@ -14,6 +14,7 @@ from card_reader_core.models import (
     CardPool,
     CardRole,
     CardRoleFilter,
+    normalize_card_factions,
 )
 
 DEVELOPER_DATA_FORMAT_VERSION = 4
@@ -172,6 +173,35 @@ class CardAliasRecord(StrictModel):
     label: str
 
 
+class CardReferenceRecord(StrictModel):
+    key: str
+    card_pool: CardPool
+    card_factions: list[CardFaction]
+
+    @field_validator("card_factions")
+    @classmethod
+    def validate_unique_card_factions(
+        cls,
+        value: list[CardFaction],
+    ) -> list[CardFaction]:
+        if len(value) != len(set(value)):
+            raise ValueError("Card reference factions must be unique.")
+        return list(normalize_card_factions(value))
+
+
+type CardReferenceIdentity = tuple[CardPool, tuple[CardFaction, ...], str]
+
+
+def card_reference_identity(
+    reference: CardReferenceRecord,
+) -> CardReferenceIdentity:
+    return (
+        reference.card_pool,
+        normalize_card_factions(reference.card_factions),
+        reference.key,
+    )
+
+
 class CardRecord(StrictModel):
     key: str
     label: str
@@ -202,18 +232,18 @@ class CardRecord(StrictModel):
     ) -> list[CardFaction]:
         if len(value) != len(set(value)):
             raise ValueError("Card factions must be unique.")
-        return value
+        return list(normalize_card_factions(value))
 
 
 class CardGroupMemberRecord(StrictModel):
-    card_key: str
+    card_ref: CardReferenceRecord
     position: int
 
 
 class CardGroupRecord(StrictModel):
     key: str
     name: str
-    anchor_card_key: str
+    anchor_card_ref: CardReferenceRecord
     members: list[CardGroupMemberRecord]
 
 
@@ -310,4 +340,39 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
         adopted_card["card_factions"] = []
         adopted_cards.append(adopted_card)
     adopted["cards"] = adopted_cards
+    cards_by_key = {
+        card["key"]: {
+            "key": card["key"],
+            "card_pool": card["card_pool"],
+            "card_factions": card["card_factions"],
+        }
+        for card in adopted_cards
+        if isinstance(card, dict)
+    }
+    if len(cards_by_key) != len(adopted_cards):
+        raise ValueError("Legacy developer-data card keys must be unique.")
+    groups = adopted.get("card_groups")
+    if isinstance(groups, list):
+        adopted["card_groups"] = [
+            {
+                **{
+                    key: item
+                    for key, item in group.items()
+                    if key not in {"anchor_card_key", "members"}
+                },
+                "anchor_card_ref": cards_by_key.get(group.get("anchor_card_key")),
+                "members": [
+                    {
+                        **{key: item for key, item in member.items() if key != "card_key"},
+                        "card_ref": cards_by_key.get(member.get("card_key")),
+                    }
+                    if isinstance(member, dict)
+                    else member
+                    for member in group.get("members", [])
+                ],
+            }
+            if isinstance(group, dict)
+            else group
+            for group in groups
+        ]
     return adopted

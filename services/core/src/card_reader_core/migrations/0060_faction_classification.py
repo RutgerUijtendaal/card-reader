@@ -15,6 +15,10 @@ def nest_classification_evidence(apps: Any, _schema_editor: Any) -> None:
     ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
     for item in ImportJobItem.objects.iterator():
         previous = item.classification_inference_json
+        if not isinstance(previous, dict) or not previous:
+            item.classification_inference_json = {}
+            item.save(update_fields=["classification_inference_json"])
+            continue
         role_evidence = dict(previous) if isinstance(previous, dict) else {}
         shared = {
             key: role_evidence.pop(key)

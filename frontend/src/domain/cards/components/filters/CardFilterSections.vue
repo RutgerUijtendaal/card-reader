@@ -30,7 +30,7 @@
         :default-open="isSectionOpenByDefault('classification', true)"
         label="Card roles"
         :options="state.cardRoleOptions"
-        @reset="state.resetClassificationGroup"
+        @reset="state.resetCardRoleGroup"
       />
 
       <MetadataPillGroup
@@ -40,7 +40,7 @@
         :default-open="isSectionOpenByDefault('classification', true)"
         label="Factions"
         :options="state.cardFactionOptions"
-        @reset="state.resetClassificationGroup"
+        @reset="state.resetCardFactionGroup"
       />
     </div>
 

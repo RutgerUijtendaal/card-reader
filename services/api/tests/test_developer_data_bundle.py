@@ -139,6 +139,43 @@ def test_version_two_payload_adoption_adds_empty_template_role_hints() -> None:
     }
 
 
+def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "legacy-card",
+                    "card_pool": "player",
+                    "card_roles": [],
+                }
+            ],
+            "card_groups": [
+                {
+                    "key": "legacy-group",
+                    "name": "Legacy Group",
+                    "anchor_card_key": "legacy-card",
+                    "members": [{"card_key": "legacy-card", "position": 1}],
+                }
+            ],
+        },
+        format_version=3,
+    )
+
+    reference = {
+        "key": "legacy-card",
+        "card_pool": "player",
+        "card_factions": [],
+    }
+    assert adopted["card_groups"] == [  # type: ignore[index]
+        {
+            "key": "legacy-group",
+            "name": "Legacy Group",
+            "anchor_card_ref": reference,
+            "members": [{"position": 1, "card_ref": reference}],
+        }
+    ]
+
+
 def test_developer_data_coverage_rejects_missing_required_template_role_hint(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -185,8 +222,8 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             output_path=archive_path,
             source_revision="synthetic-test-revision",
         )
-        assert manifest.counts["cards"] == 3
-        assert manifest.counts["card_versions"] == 4
+        assert manifest.counts["cards"] == 4
+        assert manifest.counts["card_versions"] == 5
         assert manifest.format_version == 4
 
         _, validated_payload = validate_archive(archive_path)
@@ -249,8 +286,8 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             expected_archive_sha256=sha256_file(archive_path),
         )
 
-        assert result.counts["cards"] == 3
-        assert result.copied_assets == 6
+        assert result.counts["cards"] == 4
+        assert result.copied_assets == 7
         assert Card.objects.filter(key="synthetic-hero", role_assignments__role="hero").exists()
         assert Card.objects.filter(
             key="synthetic-deprecated", role_assignments__role="location"
@@ -262,9 +299,15 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             "blood"
         ]
         assert set(
-            Card.objects.get(key="synthetic-mainboard")
+            Card.objects.get(
+                key="synthetic-mainboard",
+                faction_identity_key='["order","blood"]',
+            )
             .faction_assignments.values_list("faction", flat=True)
         ) == {"order", "blood"}
+        assert Card.objects.filter(key="synthetic-mainboard").count() == 2
+        imported_group = CardGroup.objects.get(key="synthetic-group")
+        assert imported_group.members.get(position=2).card.faction_identity_key == '["order","blood"]'
         latest = Card.objects.get(key="synthetic-hero").latest_version
         assert latest is not None
         assert latest.version_number == 2
@@ -327,7 +370,7 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
             source_revision="complete-catalog-test-revision",
         )
 
-        assert manifest.counts["cards"] == 4
+        assert manifest.counts["cards"] == 5
         assert manifest.counts["card_groups"] == 1
         with tarfile.open(archive_path, "r:gz") as archive:
             data_member = archive.extractfile("data.json")
@@ -603,6 +646,14 @@ def _build_reclassified_archive(
     payload = json.loads(data_path.read_text(encoding="utf-8"))
     card = next(card for card in payload["cards"] if card["key"] == card_key)
     card["card_pool"] = card_pool
+    for group in payload["card_groups"]:
+        references = [
+            group["anchor_card_ref"],
+            *(member["card_ref"] for member in group["members"]),
+        ]
+        for reference in references:
+            if reference["key"] == card_key:
+                reference["card_pool"] = card_pool
     serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     data_path.write_bytes(serialized)
     manifest_path = extraction_root / "manifest.json"
@@ -659,6 +710,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "images/hero-v1.webp": b"hero-v1",
         "images/hero-v2.webp": b"hero-v2",
         "images/mainboard.webp": b"mainboard",
+        "images/mainboard-darkness.webp": b"mainboard-darkness",
         "images/deprecated.webp": b"deprecated",
         "images/card-back.webp": b"card-back",
         "symbols/defaults/arcane.webp": b"symbol",
@@ -779,6 +831,22 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     )
     mainboard.latest_version = mainboard_version
     mainboard.save(update_fields=["latest_version"])
+    darkness_mainboard = Card.objects.create(
+        key="synthetic-mainboard",
+        label="Synthetic Mainboard Darkness",
+        faction_identity_key='["darkness"]',
+    )
+    CardFactionAssignment.objects.create(card=darkness_mainboard, faction="darkness")
+    darkness_mainboard_version = _create_version(
+        card=darkness_mainboard,
+        template=template,
+        content_version=content_version,
+        version_number=1,
+        stored_path="images/mainboard-darkness.webp",
+        content=assets["images/mainboard-darkness.webp"],
+    )
+    darkness_mainboard.latest_version = darkness_mainboard_version
+    darkness_mainboard.save(update_fields=["latest_version"])
     deprecated = Card.objects.create(
         key="synthetic-deprecated",
         label="Synthetic Deprecated",
@@ -815,8 +883,8 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "card_keys": [hero.key, mainboard.key, deprecated.key],
         "card_group_keys": [group.key],
         "coverage": {
-            "min_cards": 3,
-            "min_cards_by_pool": {"player": 3, "evil": 0, "neutral": 0},
+            "min_cards": 4,
+            "min_cards_by_pool": {"player": 4, "evil": 0, "neutral": 0},
             "min_cards_by_role": {
                 "standard": 1,
                 "hero": 1,
