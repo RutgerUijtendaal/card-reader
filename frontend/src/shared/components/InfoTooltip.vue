@@ -2,6 +2,7 @@
   <span
     ref="triggerRef"
     class="inline-flex"
+    :class="triggerClass"
     :tabindex="triggerTabbable ? 0 : undefined"
     :aria-describedby="triggerTabbable ? tooltipId : undefined"
     @mouseenter="open"
@@ -36,11 +37,13 @@ const props = withDefaults(
     placement?: Placement;
     allowFlip?: boolean;
     triggerTabbable?: boolean;
+    triggerClass?: string;
   }>(),
   {
     placement: 'top',
     allowFlip: true,
     triggerTabbable: true,
+    triggerClass: '',
   },
 );
 

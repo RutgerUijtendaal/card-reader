@@ -146,6 +146,7 @@ describe('AppHotkeysPanel', () => {
     );
 
     expect(trigger).not.toBeNull();
+    expect(trigger?.parentElement?.classList.contains('justify-center')).toBe(true);
     expect(mounted.container.textContent?.trim()).toBe('');
     trigger?.click();
     await nextTick();

@@ -1,5 +1,8 @@
 <template>
-  <div class="relative w-full">
+  <div
+    class="relative w-full"
+    :class="compact ? 'flex justify-center' : ''"
+  >
     <button
       v-if="showsHotkeysPopover"
       ref="triggerRef"

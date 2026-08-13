@@ -42,7 +42,7 @@ vi.mock('@/domain/access-requests/composables/useAccessRequestSummary', () => ({
 vi.mock('@/app/components/AppHotkeysPanel.vue', () => ({
   default: {
     name: 'AppHotkeysPanel',
-    template: '<div />',
+    template: '<div data-testid="hotkeys-panel" />',
     props: ['compact'],
   },
 }));
@@ -118,9 +118,22 @@ describe('AppShellNav', () => {
   test('shows Player as the only workspace when restricted pools are unavailable', async () => {
     const mounted = await mountNav();
 
-    expect(mounted.container.querySelector('[aria-label="Card workspace"]')?.textContent).toContain('Player');
-    expect(mounted.container.textContent).not.toContain('Evil');
-    expect(mounted.container.textContent).not.toContain('Neutral');
+    expect(mounted.container.querySelector('[aria-label="Player workspace"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Evil workspace"]')).toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Neutral workspace"]')).toBeNull();
+    mounted.unmount();
+  });
+
+  test('places the workspace picker immediately before the hotkeys area', async () => {
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const pickerSection = mounted.container.querySelector('[data-testid="card-pool-workspace-switcher"]')?.parentElement;
+    const hotkeysSection = mounted.container.querySelector('[data-testid="hotkeys-panel"]')?.parentElement?.parentElement;
+    const poolButtons = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="card-pool-workspace-switcher"] button',
+    ));
+
+    expect(pickerSection?.nextElementSibling).toBe(hotkeysSection);
+    expect(poolButtons.every((button) => button.parentElement?.classList.contains('flex-1'))).toBe(true);
     mounted.unmount();
   });
 
@@ -157,9 +170,7 @@ describe('AppShellNav', () => {
 
   test('shows permitted workspaces and removes Player-only navigation in Evil', async () => {
     const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
-    const evilButton = Array.from(mounted.container.querySelectorAll('button')).find(
-      (button) => button.textContent?.trim() === 'Evil',
-    );
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]');
     expect(evilButton).toBeInstanceOf(HTMLButtonElement);
 
     evilButton?.click();
@@ -171,18 +182,29 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
-  test('exposes an accessible compact workspace selector when collapsed', async () => {
+  test('exposes all compact workspace icons with accessible names when collapsed', async () => {
     const mounted = await mountNav({ collapsed: true }, ['player', 'evil', 'neutral']);
-    const selector = mounted.container.querySelector<HTMLSelectElement>(
-      'select[aria-label="Card workspace"]',
-    );
+    const buttons = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="card-pool-workspace-switcher"] button',
+    ));
 
-    expect(selector).toBeInstanceOf(HTMLSelectElement);
-    expect(Array.from(selector?.options ?? []).map((option) => option.text)).toEqual([
-      'Player',
-      'Evil',
-      'Neutral',
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Player workspace',
+      'Evil workspace',
+      'Neutral workspace',
     ]);
+    expect(buttons.every((button) => button.querySelector('svg'))).toBe(true);
+    mounted.unmount();
+  });
+
+  test('shows pool names in tooltips on hover', async () => {
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]');
+
+    evilButton?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await nextTick();
+
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe('Evil');
     mounted.unmount();
   });
 });

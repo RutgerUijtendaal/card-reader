@@ -74,16 +74,6 @@
       </button>
     </div>
 
-    <div
-      class="mb-5"
-      :class="collapsed ? 'px-0' : ''"
-    >
-      <CardPoolWorkspaceSwitcher
-        :collapsed="collapsed"
-        @selected="handleNavClick"
-      />
-    </div>
-
     <nav class="grid w-full gap-2">
       <template
         v-for="item in publicItems"
@@ -154,6 +144,13 @@
     </nav>
 
     <div class="mt-auto w-full space-y-4 pt-6">
+      <div class="app-sidebar-divider pt-4">
+        <CardPoolWorkspaceSwitcher
+          :collapsed="collapsed"
+          @selected="handleNavClick"
+        />
+      </div>
+
       <div class="app-sidebar-divider pt-4">
         <div :class="collapsed ? 'flex justify-center' : ''">
           <AppHotkeysPanel :compact="collapsed" />
