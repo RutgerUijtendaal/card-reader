@@ -1,6 +1,7 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
 import { useDebounceFn, useLocalStorage } from '@vueuse/core';
 import { fetchCard, fetchCards } from '@/domain/cards/api';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
 import type {
@@ -21,6 +22,7 @@ type TemplatePreviewCardDetail = {
   id: string;
   label: string;
   name: string;
+  card_pool: CardListItem['card_pool'];
   template_id: string;
   image_url: string | null;
 };
@@ -45,6 +47,7 @@ const toPreviewCardOption = (
 });
 
 export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplatePreviewOptions) => {
+  const workspace = useCardPoolWorkspaceStore();
   const previewSearchQuery = ref('');
   const previewScope = ref<TemplatePreviewScope>('current-template');
   const previewCards = ref<TemplatePreviewCardOption[]>([]);
@@ -96,7 +99,9 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
   );
 
   const templateScopedKey = computed(() => templateKey.value.trim());
-  const selectionStorageKey = computed(() => templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY);
+  const selectionStorageKey = computed(() =>
+    `${workspace.activePool}:${templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY}`,
+  );
   const templateScopeAvailable = computed(() => templateScopedKey.value.length > 0);
   const defaultPreviewScope = computed<TemplatePreviewScope>(() =>
     templateScopeAvailable.value ? 'current-template' : 'all-cards',
@@ -149,11 +154,13 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
   const searchPreviewCards = async (expectedStorageKey = selectionStorageKey.value): Promise<void> => {
     const requestId = ++searchRequestId;
+    const expectedWorkspaceGeneration = workspace.generation;
+    const cardPool = workspace.activePool;
     previewLoading.value = true;
     try {
       const params: Record<string, string | number | boolean | undefined> = {
         ...managementCardSearchLifecycleParams(),
-        card_pool: 'player',
+        card_pool: cardPool,
         page_size: 8,
         show_groups: false,
       };
@@ -166,7 +173,11 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
       }
 
       const response = await fetchCards<CardListItem>(params);
-      if (requestId !== searchRequestId || expectedStorageKey !== selectionStorageKey.value) {
+      if (
+        requestId !== searchRequestId
+        || expectedStorageKey !== selectionStorageKey.value
+        || expectedWorkspaceGeneration !== workspace.generation
+      ) {
         return;
       }
 
@@ -188,6 +199,8 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
   const restoreStoredPreviewCard = async (): Promise<void> => {
     const requestId = ++restoreRequestId;
+    const expectedWorkspaceGeneration = workspace.generation;
+    const cardPool = workspace.activePool;
     const storageKey = selectionStorageKey.value;
     const stored = storedSelections.value[storageKey] ?? null;
     isRestoringSelection.value = true;
@@ -205,14 +218,25 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
     try {
       const response = await fetchCard<TemplatePreviewCardDetail>(stored.id);
-      if (requestId !== restoreRequestId || storageKey !== selectionStorageKey.value) {
+      if (
+        requestId !== restoreRequestId
+        || storageKey !== selectionStorageKey.value
+        || expectedWorkspaceGeneration !== workspace.generation
+      ) {
         return;
+      }
+      if (response.card_pool !== cardPool) {
+        throw new Error('Stored preview card belongs to another workspace.');
       }
       const restored = toPreviewCardOption(response);
       selectedPreviewCard.value = restored;
       setStoredSelection({ ...restored, scope: previewScope.value });
     } catch {
-      if (requestId !== restoreRequestId || storageKey !== selectionStorageKey.value) {
+      if (
+        requestId !== restoreRequestId
+        || storageKey !== selectionStorageKey.value
+        || expectedWorkspaceGeneration !== workspace.generation
+      ) {
         return;
       }
       selectedPreviewCard.value = null;
@@ -273,12 +297,16 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     }
   });
 
-  watch(templateScopedKey, () => {
+  watch([selectionStorageKey, () => workspace.generation], () => {
     if (!hasInitializedSelection.value) {
       return;
     }
+    searchRequestId += 1;
+    restoreRequestId += 1;
+    previewCards.value = [];
+    selectedPreviewCard.value = null;
     void restoreStoredPreviewCard();
-  });
+  }, { flush: 'sync' });
 
   return {
     activePreviewDefinition,

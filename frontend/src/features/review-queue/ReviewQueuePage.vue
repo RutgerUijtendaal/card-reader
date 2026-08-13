@@ -381,6 +381,7 @@ import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import { buildReviewCardEditorLocation } from '@/domain/card-navigation/cardReturnState';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { useCardCollection } from '@/domain/cards/composables/useCardCollection';
 import { useReviewSummary } from '@/domain/review/composables/useReviewSummary';
 import { parseFlagPropertyLabels, type ParseFlagPropertyKey } from '@/domain/review/types';
@@ -398,6 +399,7 @@ import type {
 
 const route = useRoute();
 const router = useRouter();
+const workspace = useCardPoolWorkspaceStore();
 const activeView = ref<ReviewView>(queryString(route.query.view) === 'confidence' ? 'confidence' : 'flags');
 const flagStatus = ref<FlagStatus>(normalizeFlagStatus(queryString(route.query.status)));
 const flagReports = ref<ParseFlagReviewReport[]>([]);
@@ -411,11 +413,12 @@ const collection = useCardCollection<ReviewCard>({
   buildSearchParams: () => {
     const params = new URLSearchParams();
     params.set('max_confidence', '0.8');
-    params.set('card_pool', 'player');
+    params.set('card_pool', workspace.activePool);
     return params;
   },
   filtersLoaded,
   pageSize: 100,
+  resultSetKey: computed(() => workspace.generation),
 });
 const cards = collection.cards;
 const isLoadingInitial = collection.isLoadingInitial;

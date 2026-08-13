@@ -3,11 +3,26 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import ReviewQueuePage from '@/features/review-queue/ReviewQueuePage.vue';
 
-const { apiGet, apiPatch, decrementOpenParseFlagItemCount, loadReviewSummary } = vi.hoisted(() => ({
+const {
+  apiGet,
+  apiPatch,
+  collectionOptions,
+  decrementOpenParseFlagItemCount,
+  loadReviewSummary,
+  workspaceState,
+} = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
+  collectionOptions: {
+    buildSearchParams: null as null | (() => URLSearchParams),
+    resultSetKey: null as null | { value: unknown },
+  },
   decrementOpenParseFlagItemCount: vi.fn(),
   loadReviewSummary: vi.fn(),
+  workspaceState: {
+    activePool: 'player' as 'player' | 'evil' | 'neutral',
+    generation: 0,
+  },
 }));
 
 vi.mock('@/shared/api/client', () => ({
@@ -19,13 +34,24 @@ vi.mock('@/shared/api/client', () => ({
 }));
 
 vi.mock('@/domain/cards/composables/useCardCollection', () => ({
-  useCardCollection: () => ({
-    cards: ref([]),
-    isLoadingInitial: ref(false),
-    nextPage: ref(null),
-    searchCards: vi.fn(),
-    loadNextPage: vi.fn(),
-  }),
+  useCardCollection: (options: {
+    buildSearchParams: () => URLSearchParams;
+    resultSetKey?: { value: unknown };
+  }) => {
+    collectionOptions.buildSearchParams = options.buildSearchParams;
+    collectionOptions.resultSetKey = options.resultSetKey ?? null;
+    return {
+      cards: ref([]),
+      isLoadingInitial: ref(false),
+      nextPage: ref(null),
+      searchCards: vi.fn(),
+      loadNextPage: vi.fn(),
+    };
+  },
+}));
+
+vi.mock('@/domain/cards/cardPoolWorkspace', () => ({
+  useCardPoolWorkspaceStore: () => workspaceState,
 }));
 
 vi.mock('@/domain/review/composables/useReviewSummary', () => ({
@@ -120,6 +146,8 @@ const mountPage = async () => {
 
 describe('ReviewQueuePage parse flags', () => {
   beforeEach(() => {
+    workspaceState.activePool = 'player';
+    workspaceState.generation = 0;
     apiGet.mockResolvedValue({ data: pagePayload() });
     apiPatch.mockResolvedValue({ data: { ...overallItem, status: 'dismissed' } });
   });
@@ -188,6 +216,17 @@ describe('ReviewQueuePage parse flags', () => {
     expect(lowConfidenceButton?.getAttribute('aria-current')).toBe('page');
     expect(lowConfidenceButton?.classList.contains('theme-selected-surface-strong')).toBe(true);
     expect(mounted.container.textContent).not.toContain('Report Status');
+    mounted.unmount();
+  });
+
+  test('scopes confidence cards and their result set to the active workspace', async () => {
+    workspaceState.activePool = 'neutral';
+    workspaceState.generation = 7;
+    const mounted = await mountPage();
+
+    expect(collectionOptions.buildSearchParams?.().get('card_pool')).toBe('neutral');
+    expect(collectionOptions.resultSetKey?.value).toBe(7);
+
     mounted.unmount();
   });
 });

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { computed, nextTick, ref } from 'vue';
+import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@/shared/api/client';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { TEMPLATE_PREVIEW_STORAGE_KEY } from '@/features/admin/utils/templatePreview';
 import { useTemplatePreview } from '@/features/admin/composables/useTemplatePreview';
 
@@ -11,6 +13,7 @@ vi.mock('@/shared/api/client', () => ({
 }));
 
 const mockedGet = vi.mocked(api.get);
+const selectionKey = (templateKey: string): string => `player:${templateKey}`;
 
 const relativeDefinitionJson = JSON.stringify({
   id: 'mtg-like-v1',
@@ -69,6 +72,8 @@ describe('useTemplatePreview', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
+    setActivePinia(createPinia());
+    useCardPoolWorkspaceStore().synchronizeSession(['player', 'evil', 'neutral'], 'staff:1');
     mockedGet.mockReset();
     mockedGet.mockImplementation(async (url) => {
       if (url === '/cards') {
@@ -145,7 +150,7 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
@@ -162,6 +167,7 @@ describe('useTemplatePreview', () => {
             id: 'card-1',
             label: 'Card One',
             name: 'Card One',
+            card_pool: 'player',
             template_id: 'mtg-like-v1',
             image_url: '/cards/card-1/image',
           },
@@ -197,7 +203,7 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'missing-card',
           label: 'Missing Card',
           name: 'Missing Card',
@@ -242,7 +248,7 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
@@ -250,7 +256,7 @@ describe('useTemplatePreview', () => {
           image_url: '/cards/card-1/image',
           scope: 'current-template',
         },
-        'mtg-like-v2': {
+        [selectionKey('mtg-like-v2')]: {
           id: 'card-2',
           label: 'Card Two',
           name: 'Card Two',
@@ -267,6 +273,7 @@ describe('useTemplatePreview', () => {
             id: 'card-1',
             label: 'Card One',
             name: 'Card One',
+            card_pool: 'player',
             template_id: 'mtg-like-v1',
             image_url: '/cards/card-1/image',
           },
@@ -278,6 +285,7 @@ describe('useTemplatePreview', () => {
             id: 'card-2',
             label: 'Card Two',
             name: 'Card Two',
+            card_pool: 'player',
             template_id: 'mtg-like-v2',
             image_url: '/cards/card-2/image',
           },
@@ -322,7 +330,7 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
@@ -339,6 +347,7 @@ describe('useTemplatePreview', () => {
             id: 'card-1',
             label: 'Card One',
             name: 'Card One',
+            card_pool: 'player',
             template_id: 'mtg-like-v1',
             image_url: '/cards/card-1/image',
           },
@@ -471,7 +480,7 @@ describe('useTemplatePreview', () => {
     localStorage.setItem(
       TEMPLATE_PREVIEW_STORAGE_KEY,
       JSON.stringify({
-        'mtg-like-v1': {
+        [selectionKey('mtg-like-v1')]: {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
@@ -547,6 +556,56 @@ describe('useTemplatePreview', () => {
         params: expect.objectContaining({
           template_id: 'mtg-like-v1',
         }),
+      }),
+    );
+  });
+
+  test('switches preview selection and searches to the active workspace', async () => {
+    mockedGet.mockImplementation(async (url, config) => {
+      if (url !== '/cards') {
+        throw new Error(`Unhandled request: ${String(url)}`);
+      }
+      const params = config && typeof config === 'object' && 'params' in config ? config.params : {};
+      const pool = params && typeof params === 'object' && 'card_pool' in params
+        ? params.card_pool
+        : 'player';
+      return {
+        data: {
+          count: 1,
+          next_page: null,
+          previous_page: null,
+          page: 1,
+          page_size: 8,
+          results: [{
+            id: `${String(pool)}-card`,
+            label: `${String(pool)} Card`,
+            name: `${String(pool)} Card`,
+            template_id: 'mtg-like-v1',
+            image_url: null,
+            result_type: 'card',
+          }],
+        },
+      };
+    });
+    const workspace = useCardPoolWorkspaceStore();
+    const preview = useTemplatePreview({
+      definitionJson: ref(relativeDefinitionJson),
+      templateKey: computed(() => 'mtg-like-v1'),
+    });
+
+    await preview.restorePreviewCard();
+    expect(preview.selectedPreviewCard.value?.id).toBe('player-card');
+
+    workspace.selectPool('evil');
+    await nextTick();
+    await vi.runOnlyPendingTimersAsync();
+    await nextTick();
+
+    expect(preview.selectedPreviewCard.value?.id).toBe('evil-card');
+    expect(mockedGet).toHaveBeenLastCalledWith(
+      '/cards',
+      expect.objectContaining({
+        params: expect.objectContaining({ card_pool: 'evil' }),
       }),
     );
   });
