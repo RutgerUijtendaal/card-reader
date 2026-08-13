@@ -78,4 +78,23 @@ describe('useTtsCardExport', () => {
       description: 'Current card back is missing.',
     });
   });
+
+  test('drops side effects when the originating request is no longer current', async () => {
+    vi.mocked(exportTtsCards).mockResolvedValue({
+      encodedPayload: 'restricted-pool-payload',
+      exportedCount: 1,
+      skippedCount: 0,
+      sheetCount: 1,
+    });
+
+    const { copyTtsCardExport } = useTtsCardExport();
+    await copyTtsCardExport(
+      { type: 'content_version', content_version_id: 'version-1' },
+      () => false,
+    );
+
+    expect(clipboardWriteText).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
 });

@@ -72,6 +72,23 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       to.path === '/cards' ? requestedPool : undefined,
     );
 
+    if (to.meta.requiresAuth && !auth.authenticated) {
+      return {
+        path: '/login',
+        query: { redirect: to.fullPath },
+      };
+    }
+
+    if (to.meta.requiresStaff && !auth.canAccessStaffRoutes) {
+      if (auth.authenticated) {
+        return '/cards';
+      }
+      return {
+        path: '/login',
+        query: { redirect: to.fullPath },
+      };
+    }
+
     if (to.meta.playerWorkspace) {
       if (workspace.activePool !== 'player') {
         workspace.selectPool('player');
@@ -104,23 +121,6 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
 
     if (to.path === '/login' && auth.canAccessStaffRoutes) {
       return '/operations';
-    }
-
-    if (to.meta.requiresAuth && !auth.authenticated) {
-      return {
-        path: '/login',
-        query: { redirect: to.fullPath },
-      };
-    }
-
-    if (to.meta.requiresStaff && !auth.canAccessStaffRoutes) {
-      if (auth.authenticated) {
-        return '/cards';
-      }
-      return {
-        path: '/login',
-        query: { redirect: to.fullPath },
-      };
     }
 
     return true;

@@ -257,6 +257,12 @@ const displayItems = computed(() =>
     ? createLoadingShimItems(loadingShimCount.value)
     : cards.value,
 );
+let componentActive = true;
+
+const captureExportRequestGuard = (): (() => boolean) => {
+  const expectedGeneration = workspace.generation;
+  return () => componentActive && workspace.generation === expectedGeneration;
+};
 
 const restoreScroll = (value: number): void => {
   window.requestAnimationFrame(() => {
@@ -265,18 +271,23 @@ const restoreScroll = (value: number): void => {
 };
 
 const exportCsv = async (): Promise<void> => {
+  const isRequestCurrent = captureExportRequestGuard();
   const params = buildCardFilterApiSearchParams(selectionState.value);
-  await exportCardsCsv(appendCardSortSearchParam(params, effectiveSort.value));
+  await exportCardsCsv(
+    appendCardSortSearchParam(params, effectiveSort.value),
+    isRequestCurrent,
+  );
 };
 
 const exportTtsCards = async (): Promise<void> => {
+  const isRequestCurrent = captureExportRequestGuard();
   await copyTtsCardExport({
     type: 'gallery',
     filters: {
       ...buildCardFilterApiPayload(selectionState.value),
       sort: effectiveSort.value,
     },
-  });
+  }, isRequestCurrent);
 };
 
 const setGallerySortOverride = (value: typeof effectiveSort.value): void => {
@@ -407,6 +418,7 @@ onBeforeRouteLeave(() => {
 });
 
 onBeforeUnmount(() => {
+  componentActive = false;
   cancelDebouncedUpdateRoute();
 });
 

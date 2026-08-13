@@ -26,6 +26,14 @@ const setSession = (
   });
 };
 
+const setAnonymousSession = (): void => {
+  const auth = useAuthStore();
+  auth.$patch({
+    initialized: true,
+    user: null,
+  });
+};
+
 describe('card pool workspace routes', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -64,6 +72,18 @@ describe('card pool workspace routes', () => {
 
     expect(router.currentRoute.value.fullPath).toBe('/cards');
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+  });
+
+  test('preserves a restricted staff-route deep link through login', async () => {
+    setAnonymousSession();
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/cards/restricted-card/edit?card_pool=evil');
+
+    expect(router.currentRoute.value.path).toBe('/login');
+    expect(router.currentRoute.value.query.redirect).toBe(
+      '/cards/restricted-card/edit?card_pool=evil',
+    );
   });
 
   test('normalizes an obsolete Gallery pool to Player instead of a stored preference', async () => {
