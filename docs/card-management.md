@@ -10,23 +10,23 @@ Each card points to its current version, while older versions remain available f
 
 Content versions provide an additional history boundary for related changes made during import and editing workflows. The UI exposes this history through card detail and generation views.
 
-## Pool and roles
+## Pool, roles, and factions
 
-Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boon, Event, and Location roles. **Standard** is the displayed name for a card with no role assignments; it is derived rather than stored.
+Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boss, Location, Boon, Event, and Shop Item roles, plus any combination of the Order, Blood, and Darkness factions. **Normal** is the displayed name for a card with no role assignments; it is derived rather than stored. A Normal card may still have factions.
 
-Role keys allow up to 64 characters. Role definitions, labels, and ordering are code-owned; Location is currently descriptive and has no Hero-like deck or Playtester behavior.
+Role and faction keys allow up to 64 characters. Their definitions, labels, and ordering are code-owned. Hero remains the only role with existing deck-builder or Playtester behavior; every other role and all factions are descriptive until their gameplay rules are designed.
 
-Staff edit both dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. The Admin Catalog shows the pool plus every assigned role, or Standard, on linked-card and suggestion tiles.
+Staff edit all three dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. The Admin Catalog and reusable staff card-search rows show the pool, roles or Normal, and factions or No faction as visually distinct badge groups.
 
-Card collections accept one pool plus role inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Evil or Neutral. Imports require an explicit pool and default to automatic multi-role inference from snapshotted template hints and stable metadata signals; workspace-level navigation remains a separate future workflow.
+Card collections accept one pool plus independent role and faction inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Evil or Neutral. Filter choices remain unconditional until the later pool-aware filter redesign. Imports require an explicit pool and default to independent automatic role and faction inference from snapshotted template hints and stable metadata signals; workspace-level navigation remains a separate future workflow.
 
-Import classification initializes only new card identities. Untargeted imports match latest image hashes, primary names, and aliases only inside the selected pool, so the same name or artwork may represent independent Player, Evil, and Neutral cards. Existing same-pool cards and targeted reparses retain their authoritative Card-tab pool and roles. A differing inferred result after a same-pool match completes with an ordered warning and audit evidence instead of silently reclassifying the card.
+Import classification initializes only new card identities. Untargeted imports resolve factions before matching latest image hashes, primary names, and aliases inside the selected pool and exact canonical faction set. The same name or artwork may therefore represent independent cards in different pools or faction namespaces. Existing cards in the matched namespace and targeted reparses retain their authoritative Card-tab pool, roles, and factions. A differing inferred role result after an untargeted match, or any differing targeted-reparse classification, completes with an ordered warning and audit evidence instead of silently reclassifying the card.
 
 ## Metadata and aliases
 
 Card versions connect parsed content to managed catalogs such as card types, keywords, tags, symbols, and metadata groups. These relationships power filtering, display, rules text, and deck-building behavior.
 
-Aliases provide alternate names or identifiers for the same card identity. Primary and alias keys share a pool-local namespace: each is unique within a pool, while the same normalized key may exist independently in other pools. Rename and pool-move edits validate the complete destination namespace and move the primary name plus every alias atomically. One durable lock row per pool serializes primary and alias mutations as a single logical namespace across imports, edits, merges, and developer-data adoption.
+Aliases provide alternate names or identifiers for the same card identity. Primary and alias keys share a namespace scoped by pool plus the card's exact canonical faction set. The same normalized key may exist independently in another pool or faction namespace. Rename, pool, and faction edits validate the complete destination namespace and move the primary name, every alias, and faction assignments atomically. One durable lock row per pool serializes primary and alias mutations across imports, edits, merges, and developer-data adoption.
 
 ### Mana families
 
@@ -55,7 +55,7 @@ Deprecated non-anchor members may remain attached for administrative history but
 
 Merging consolidates duplicate card identities while preserving useful history. The merge workflow moves compatible versions, aliases, metadata relationships, group membership, and other references to the surviving card. Old identifiers can redirect to the survivor instead of becoming broken links.
 
-Merges are domain operations, not raw row deletion. Conflict checks and a preview step allow staff to understand the result before committing a merge. Cross-pool merges are rejected; same-pool merges transfer aliases inside the target pool namespace.
+Merges are domain operations, not raw row deletion. Conflict checks and a preview step allow staff to understand the result before committing a merge. Cross-pool and cross-faction-namespace merges are rejected; staff must explicitly reclassify a source first when that is intentional. Same-namespace merges transfer aliases inside the target namespace.
 
 ## Ownership boundaries
 

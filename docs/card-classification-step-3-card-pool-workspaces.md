@@ -19,7 +19,7 @@ The active workspace scopes navigation and ordinary card collections to exactly 
 - Evil and Neutral share one restricted-pool access policy that initially maps to staff. Session/frontend code consumes the ordered allowed-pool scope rather than separate Evil and Neutral booleans.
 - Ordinary card collections are hard-scoped to one pool. An `all pools` option is reserved for explicit staff management tools and must not become a normal workspace.
 - Neutral is its own stable pool and is not included automatically in Player or Evil. A future product pass may add an explicit Neutral overlay to either workspace, but that must remain an authorized multi-pool query state rather than multiple card ownership or silent request expansion.
-- Hero is excluded by default in each workspace. Boon, Event, and Location are not globally excluded.
+- Hero is excluded by default in each workspace. Boss, Location, Boon, Event, and Shop Item are not globally excluded. Faction filters have no default exclusions.
 - Cross-pool links do not automatically change the active workspace. A linked Player Hero opened from an Evil or Neutral card is visibly labeled Player, while Back/return navigation preserves the originating workspace.
 - Relationship management treats the relationship anchor/target pool and the member-search pool as separate concepts. Staff must be able to select any permitted pool for each member search without reclassifying the group, its anchor, or existing members.
 - Relationship routes use the target or anchor pool supplied by the relationship payload. They must not infer that pool from the source card, the current workspace, or a stale selected-card version.
@@ -108,6 +108,7 @@ Gallery defaults in each pool:
 - current workspace pool;
 - Hero excluded;
 - other role filters empty.
+- faction include and exclude filters empty.
 
 Switching pool resets transient gallery filters to these defaults for the target pool in the first implementation. Preserve pagination, selection, and export state only when it is valid for the target pool; otherwise clear it explicitly. Do not carry an implicit Neutral overlay between workspaces because that overlay is not part of this checkpoint.
 
@@ -138,7 +139,7 @@ Do not add a generic same-pool restriction. Evil or Neutral Boons, Events, and L
 For any existing or future relationship serializer:
 
 - authorize the target card independently;
-- include the target's `card_pool` and `card_roles`;
+- include the target's `card_pool`, `card_roles`, and `card_factions`;
 - include the relationship anchor/target pool needed to construct a direct route without borrowing the source card's pool;
 - display a pool badge when the target differs from the active workspace;
 - preserve the originating return route/workspace;

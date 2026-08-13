@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
-  <desc id="desc">Linear database diagram with Card classification and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, imported and parsed version data on the right, and import lineage above.</desc>
+  <desc id="desc">Linear database diagram with Card pool, role, faction, identity namespace, and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, imported and parsed version data on the right, and import lineage above.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
@@ -34,7 +34,7 @@
 
   <rect class="bg" width="2000" height="1250"/>
   <text x="70" y="58" style="font: 800 34px Arial, sans-serif; fill: #0f172a;">Card Reader: card model relationships</text>
-  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable identity, pool/role classification, and TTS sheets. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
+  <text x="70" y="88" class="small">Left: structures built from cards. Center: stable identity, pool/role/faction classification, and TTS sheets. Right: parsed versions, metadata, images, parse results, and review flags. Top: import lineage, auth, and notifications.</text>
 
   <rect class="band" x="55" y="130" width="1890" height="190"/>
   <text class="band-title" x="80" y="162">Import lineage / parser output</text>
@@ -46,17 +46,17 @@
   <rect class="box import" x="500" y="195" width="215" height="86"/>
   <text class="title" x="558" y="230">ImportJob</text>
   <text class="field" x="525" y="252">source, template, status</text>
-  <text class="small" x="516" y="272">creation key • pool/role snapshot</text>
+  <text class="small" x="507" y="272">creation key • classification snapshots</text>
 
   <rect class="box import" x="850" y="195" width="225" height="86"/>
   <text class="title" x="900" y="230">ImportJobItem</text>
-  <text class="field" x="875" y="252">target • resolved roles/evidence</text>
+  <text class="field" x="868" y="252">target • resolved classification</text>
   <text class="small" x="886" y="272">ordered warnings + audit</text>
 
   <rect class="box version" x="1245" y="195" width="205" height="86"/>
   <text class="title" x="1285" y="230">Template</text>
   <text class="field" x="1269" y="252">parser definition</text>
-  <text class="small" x="1263" y="272">inferred card-role hints</text>
+  <text class="small" x="1254" y="272">inferred role/faction hints</text>
 
   <rect class="box external" x="1540" y="195" width="185" height="86"/>
   <text class="title" x="1585" y="230">Auth User</text>
@@ -111,8 +111,8 @@
 
   <rect class="box group" x="95" y="930" width="210" height="86"/>
   <text class="title" x="150" y="967">CardAlias</text>
-  <text class="field" x="122" y="986">card + card_pool</text>
-  <text class="field" x="122" y="1008">key/label (unique per pool)</text>
+  <text class="field" x="122" y="986">card + pool + faction key</text>
+  <text class="field" x="112" y="1008">key unique per pool/factions</text>
 
   <rect class="box group" x="360" y="930" width="210" height="86"/>
   <text class="title" x="382" y="967">CardMergeRedirect</text>
@@ -144,16 +144,23 @@
 
   <rect class="box card" x="745" y="575" width="230" height="190"/>
   <text class="title" x="812" y="615">Card</text>
-  <text class="field" x="775" y="645">id, label; key unique per pool</text>
+  <text class="field" x="763" y="645">id, label; key unique per pool/factions</text>
   <text class="field" x="775" y="670">card_pool (Player / Evil / Neutral)</text>
-  <text class="field" x="775" y="695">lifecycle_status</text>
-  <text class="field" x="775" y="720">deck_building_config_json</text>
+  <text class="field" x="775" y="695">faction_identity_key</text>
+  <text class="field" x="775" y="720">lifecycle + deck config</text>
   <text class="field" x="775" y="745">latest_version</text>
 
-  <rect class="box card" x="730" y="805" width="260" height="92"/>
-  <text x="760" y="837" class="title-small">CardRoleAssignment</text>
-  <text x="755" y="861" class="field">role varchar(64); unique per card</text>
-  <text x="755" y="883" class="small" style="font-size:10px">Hero / Boon / Event / Location; none = Standard</text>
+  <rect class="box card" x="715" y="805" width="135" height="92"/>
+  <text x="744" y="832" class="title-small">CardRole</text>
+  <text x="731" y="851" class="title-small">Assignment</text>
+  <text x="728" y="874" class="small">role varchar(64)</text>
+  <text x="728" y="891" class="small">none = Normal</text>
+
+  <rect class="box card" x="870" y="805" width="135" height="92"/>
+  <text x="881" y="832" class="title-small">CardFaction</text>
+  <text x="886" y="851" class="title-small">Assignment</text>
+  <text x="883" y="874" class="small">faction varchar(64)</text>
+  <text x="883" y="891" class="small">unique per card</text>
 
   <rect class="box tts" x="725" y="935" width="270" height="104"/>
   <text class="title" x="785" y="970">TtsCardSheet</text>
@@ -288,8 +295,10 @@
   <path class="soft" d="M1125 595 C1048 645, 1040 725, 975 745"/>
   <text class="label" x="1015" y="710">latest_version</text>
 
-  <path class="line" d="M860 765 L860 805"/>
-  <text class="label" x="872" y="792">roles</text>
+  <path class="line" d="M820 765 L782 805"/>
+  <text class="label" x="748" y="792">roles</text>
+  <path class="line" d="M900 765 L937 805"/>
+  <text class="label" x="914" y="792">factions</text>
 
   <path class="line" d="M860 1070 L860 1039"/>
   <text class="label" x="872" y="1058">sheet</text>
