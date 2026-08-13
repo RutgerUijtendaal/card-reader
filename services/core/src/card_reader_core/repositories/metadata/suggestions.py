@@ -132,6 +132,10 @@ def list_card_version_suggestion_occurrences(
             card_version__card__card_pool__in=card_pool_scope.allowed_pools,
         )
         .select_related("card_version__card", "parse_result")
-        .prefetch_related("card_version__images", "card_version__card__role_assignments")
+        .prefetch_related(
+            "card_version__images",
+            "card_version__card__role_assignments",
+            "card_version__card__faction_assignments",
+        )
         .order_by("-created_at")
     )

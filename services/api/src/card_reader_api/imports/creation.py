@@ -15,9 +15,9 @@ from django.core.files.uploadedfile import UploadedFile
 from filelock import FileLock, Timeout as FileLockTimeout
 
 from card_reader_core.imports import SUPPORTED_IMAGE_SUFFIXES
-from card_reader_core.models import CardPool, CardRole, ImportJob
+from card_reader_core.models import CardFaction, CardPool, CardRole, ImportJob
 from card_reader_core.services.imports import (
-    CardRoleMode,
+    CardClassificationMode,
     ImportCreationKeyConflict,
     ImportCreationRejected,
     ImportService,
@@ -177,8 +177,14 @@ class ImportUploadAdmission:
         template_id = str(validated_data["template_id"])
         content_version_base = str(validated_data["content_version_base"])
         card_pool = cast(CardPool, validated_data["card_pool"])
-        card_role_mode = cast(CardRoleMode, validated_data["card_role_mode"])
+        card_role_mode = cast(CardClassificationMode, validated_data["card_role_mode"])
         card_role_override = cast(list[CardRole], validated_data["card_role_override"])
+        card_faction_mode = cast(
+            CardClassificationMode, validated_data["card_faction_mode"]
+        )
+        card_faction_override = cast(
+            list[CardFaction], validated_data["card_faction_override"]
+        )
         fingerprint, uploads = _upload_fingerprint(
             template_id=template_id,
             content_version_base=content_version_base,
@@ -187,6 +193,8 @@ class ImportUploadAdmission:
             card_pool=card_pool,
             card_role_mode=card_role_mode,
             card_role_override=card_role_override,
+            card_faction_mode=card_faction_mode,
+            card_faction_override=card_faction_override,
             files=cast(list[UploadedFile], validated_data["files"]),
         )
         StagedImportUpload(
@@ -212,6 +220,8 @@ class ImportUploadAdmission:
                     card_pool=card_pool,
                     card_role_mode=card_role_mode,
                     card_role_override=card_role_override,
+                    card_faction_mode=card_faction_mode,
+                    card_faction_override=card_faction_override,
                     fingerprint=fingerprint,
                     uploads=uploads,
                 )
@@ -228,8 +238,10 @@ class ImportUploadAdmission:
         template_id: str,
         content_version_base: str,
         card_pool: CardPool,
-        card_role_mode: CardRoleMode,
+        card_role_mode: CardClassificationMode,
         card_role_override: list[CardRole],
+        card_faction_mode: CardClassificationMode,
+        card_faction_override: list[CardFaction],
         fingerprint: str,
         uploads: list[tuple[UploadedFile, str]],
     ) -> ImportAdmissionResult:
@@ -255,6 +267,8 @@ class ImportUploadAdmission:
                 card_pool=card_pool,
                 card_role_mode=card_role_mode,
                 card_role_override=card_role_override,
+                card_faction_mode=card_faction_mode,
+                card_faction_override=card_faction_override,
             )
         except ImportCreationRejected as exc:
             return self._reconcile_prevalidation_rejection(
@@ -284,6 +298,8 @@ class ImportUploadAdmission:
                 card_pool=card_pool,
                 card_role_mode=card_role_mode,
                 card_role_override=card_role_override,
+                card_faction_mode=card_faction_mode,
+                card_faction_override=card_faction_override,
             )
         except ImportCreationKeyConflict as exc:
             _discard_reconciled_stage(
@@ -468,6 +484,8 @@ def _upload_fingerprint(
     card_pool: str,
     card_role_mode: str,
     card_role_override: Sequence[str],
+    card_faction_mode: str,
+    card_faction_override: Sequence[str],
     files: list[UploadedFile],
 ) -> tuple[str, list[tuple[UploadedFile, str]]]:
     file_records: list[dict[str, object]] = []
@@ -490,6 +508,8 @@ def _upload_fingerprint(
         "card_pool": card_pool,
         "card_role_mode": card_role_mode,
         "card_role_override": list(card_role_override),
+        "card_faction_mode": card_faction_mode,
+        "card_faction_override": list(card_faction_override),
         "files": file_records,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")

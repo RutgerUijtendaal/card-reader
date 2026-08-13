@@ -16,6 +16,7 @@ from card_reader_core.models import (
     CardBack,
     CardGroup,
     CardGroupMember,
+    CardFactionAssignment,
     CardRoleAssignment,
     CardVersion,
     CardVersionImage,
@@ -31,6 +32,7 @@ from card_reader_core.models import (
     Template,
     TtsCardSheet,
     Type,
+    card_faction_identity_key,
 )
 from card_reader_core.repositories.cards import lock_card_identity_pools
 from card_reader_core.metadata import mana_family_sort_key
@@ -222,6 +224,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             label=row.label,
             definition_json=row.definition,
             inferred_card_roles_json=row.inferred_card_roles,
+            inferred_card_factions_json=row.inferred_card_factions,
         )
         for row in payload.templates
     }
@@ -247,6 +250,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             key=row.key,
             label=row.label,
             card_pool=row.card_pool,
+            faction_identity_key=card_faction_identity_key(row.card_factions),
             deck_building_config_json=row.deck_building_config,
             lifecycle_status=row.lifecycle_status,
         )
@@ -257,11 +261,18 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
         CardRoleAssignment.objects.bulk_create(
             [CardRoleAssignment(card=card, role=role) for role in card_record.card_roles]
         )
+        CardFactionAssignment.objects.bulk_create(
+            [
+                CardFactionAssignment(card=card, faction=faction)
+                for faction in card_record.card_factions
+            ]
+        )
         CardAlias.objects.bulk_create(
             [
                 CardAlias(
                     card=card,
                     card_pool=card.card_pool,
+                    faction_identity_key=card.faction_identity_key,
                     key=alias.key,
                     label=alias.label,
                 )

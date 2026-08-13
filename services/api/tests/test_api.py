@@ -207,6 +207,8 @@ def test_create_import_upload_replays_same_creation_key_without_duplicate_work()
                 "card_pool": "evil",
                 "card_role_mode": "override",
                 "card_role_override": json.dumps(["boon", "event"]),
+                "card_faction_mode": "override",
+                "card_faction_override": json.dumps(["order", "blood"]),
                 "template_id": "mtg-like-v1",
                 "content_version_base": "97.1",
                 "content_version_description": "Idempotent import.",
@@ -233,6 +235,44 @@ def test_create_import_upload_replays_same_creation_key_without_duplicate_work()
     assert job.card_pool == "evil"
     assert job.card_role_mode == "override"
     assert job.card_role_override_json == ["boon", "event"]
+    assert job.card_faction_mode == "override"
+    assert job.card_faction_override_json == ["order", "blood"]
+
+
+def test_import_creation_fingerprint_distinguishes_faction_override() -> None:
+    creation_key = str(uuid4())
+    client = _staff_client("import-faction-fingerprint-user")
+    common = {
+        "creation_key": creation_key,
+        "card_pool": "evil",
+        "card_role_mode": "automatic",
+        "template_id": "mtg-like-v1",
+        "content_version_base": "97.15",
+        "content_version_description": "Faction fingerprint.",
+        "options_json": "{}",
+    }
+    first = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "card_faction_mode": "override",
+            "card_faction_override": json.dumps(["order"]),
+            "files": SimpleUploadedFile("card.png", b"same-image", content_type="image/png"),
+        },
+    )
+    conflict = client.post(
+        "/imports/upload",
+        data={
+            **common,
+            "card_faction_mode": "override",
+            "card_faction_override": json.dumps(["blood"]),
+            "files": SimpleUploadedFile("card.png", b"same-image", content_type="image/png"),
+        },
+    )
+
+    assert first.status_code == 201
+    assert conflict.status_code == 409
+    assert ImportJob.objects.filter(creation_key=creation_key).count() == 1
 
 
 def test_create_import_upload_rejects_conflicting_creation_key_and_supports_lookup() -> None:
@@ -272,7 +312,10 @@ def test_create_import_upload_rejects_conflicting_creation_key_and_supports_look
 def test_import_upload_snapshots_template_roles_and_defaults_to_automatic() -> None:
     template = Template.objects.get(key="mtg-like-v1")
     template.inferred_card_roles_json = ["location", "event", "boon"]
-    template.save(update_fields=["inferred_card_roles_json"])
+    template.inferred_card_factions_json = ["darkness", "order"]
+    template.save(
+        update_fields=["inferred_card_roles_json", "inferred_card_factions_json"]
+    )
 
     response = _staff_client("import-template-snapshot-user").post(
         "/imports/upload",
@@ -291,12 +334,16 @@ def test_import_upload_snapshots_template_roles_and_defaults_to_automatic() -> N
     job = ImportJob.objects.get(id=response.json()["job_id"])
     assert job.card_role_mode == "automatic"
     assert job.card_role_override_json == []
-    assert job.template_role_snapshot_json == ["boon", "event", "location"]
-    assert job.card_role_inference_policy_version == 2
+    assert job.template_role_snapshot_json == ["location", "boon", "event"]
+    assert job.card_faction_mode == "automatic"
+    assert job.card_faction_override_json == []
+    assert job.template_faction_snapshot_json == ["order", "darkness"]
+    assert job.classification_inference_policy_version == 3
     template.inferred_card_roles_json = []
     template.save(update_fields=["inferred_card_roles_json"])
     job.refresh_from_db()
-    assert job.template_role_snapshot_json == ["boon", "event", "location"]
+    assert job.template_role_snapshot_json == ["location", "boon", "event"]
+    assert job.template_faction_snapshot_json == ["order", "darkness"]
 
 
 @pytest.mark.parametrize("base_version", ["", "14", "14.1.2", "v14.1", "14.a"])
@@ -795,6 +842,7 @@ def test_staff_can_manage_templates() -> None:
             "key": "staff-template",
             "definition_json": _valid_template_definition(),
             "inferred_card_roles": ["location", "event", "hero"],
+            "inferred_card_factions": ["darkness", "order"],
         },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -802,9 +850,11 @@ def test_staff_can_manage_templates() -> None:
 
     assert list_response.status_code == 200
     assert create_response.status_code == 200
-    assert create_response.json()["inferred_card_roles"] == ["hero", "event", "location"]
+    assert create_response.json()["inferred_card_roles"] == ["hero", "location", "event"]
+    assert create_response.json()["inferred_card_factions"] == ["order", "darkness"]
     created_template = Template.objects.get(key="staff-template")
-    assert created_template.inferred_card_roles_json == ["hero", "event", "location"]
+    assert created_template.inferred_card_roles_json == ["hero", "location", "event"]
+    assert created_template.inferred_card_factions_json == ["order", "darkness"]
 
 
 def test_template_rejects_duplicate_inferred_roles() -> None:
@@ -1413,11 +1463,18 @@ def test_filters_payload_uses_the_canonical_card_role_registry() -> None:
 
     assert response.status_code == 200
     assert response.json()["card_roles"] == [
-        {"key": "standard", "label": "Standard", "rank": 0, "derived": True},
+        {"key": "standard", "label": "Normal", "rank": 0, "derived": True},
         {"key": "hero", "label": "Hero", "rank": 1, "derived": False},
-        {"key": "boon", "label": "Boon", "rank": 2, "derived": False},
-        {"key": "event", "label": "Event", "rank": 3, "derived": False},
-        {"key": "location", "label": "Location", "rank": 4, "derived": False},
+        {"key": "boss", "label": "Boss", "rank": 2, "derived": False},
+        {"key": "location", "label": "Location", "rank": 3, "derived": False},
+        {"key": "boon", "label": "Boon", "rank": 4, "derived": False},
+        {"key": "event", "label": "Event", "rank": 5, "derived": False},
+        {"key": "shop_item", "label": "Shop Item", "rank": 6, "derived": False},
+    ]
+    assert response.json()["card_factions"] == [
+        {"key": "order", "label": "Order", "rank": 1},
+        {"key": "blood", "label": "Blood", "rank": 2},
+        {"key": "darkness", "label": "Darkness", "rank": 3},
     ]
 
 
@@ -3182,14 +3239,26 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
         reparse_existing=False,
         card_pool="evil",
         resolved_card_roles=("hero", "event"),
+        resolved_card_factions=("order", "darkness"),
         classification_evidence={
-            "mode": "automatic",
-            "policy_version": 1,
-            "template_roles": ["event"],
-            "matched_tag_keys": ["hero"],
-            "tag_roles": ["hero"],
-            "override_roles": [],
-            "resolved_roles": ["hero", "event"],
+            "roles": {
+                "mode": "automatic",
+                "policy_version": 3,
+                "template_roles": ["event"],
+                "matched_tag_keys": ["hero", "order", "darkness"],
+                "tag_roles": ["hero"],
+                "override_roles": [],
+                "resolved_roles": ["hero", "event"],
+            },
+            "factions": {
+                "mode": "automatic",
+                "policy_version": 3,
+                "template_factions": [],
+                "matched_tag_keys": ["hero", "order", "darkness"],
+                "tag_factions": ["order", "darkness"],
+                "override_factions": [],
+                "resolved_factions": ["order", "darkness"],
+            },
         },
     )
 
@@ -3198,9 +3267,19 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
     assert list(
         version.card.role_assignments.order_by("role").values_list("role", flat=True)
     ) == ["event", "hero"]
+    assert list(
+        version.card.faction_assignments.order_by("faction").values_list(
+            "faction", flat=True
+        )
+    ) == ["darkness", "order"]
     assert item.status == "completed"
     assert item.resolved_card_roles_json == ["hero", "event"]
-    assert item.card_role_inference_json["matched_tag_keys"] == ["hero"]
+    assert item.resolved_card_factions_json == ["order", "darkness"]
+    assert item.classification_inference_json["roles"]["tag_roles"] == ["hero"]
+    assert item.classification_inference_json["factions"]["tag_factions"] == [
+        "order",
+        "darkness",
+    ]
 
 
 def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifecycle_warning() -> None:

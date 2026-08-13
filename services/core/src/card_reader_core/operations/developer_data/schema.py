@@ -7,15 +7,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from card_reader_core.models import (
     CARD_ROLE_FILTER_VALUES,
+    CARD_FACTIONS,
     HERO_CARD_ROLE,
     STANDARD_CARD_ROLE,
+    CardFaction,
     CardPool,
     CardRole,
     CardRoleFilter,
 )
 
-DEVELOPER_DATA_FORMAT_VERSION = 3
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 4
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, DEVELOPER_DATA_FORMAT_VERSION)
 
 
 def _default_pool_coverage() -> dict[CardPool, int]:
@@ -31,6 +33,10 @@ def _default_role_coverage() -> dict[CardRoleFilter, int]:
     return coverage
 
 
+def _default_faction_coverage() -> dict[CardFaction, int]:
+    return {faction: 0 for faction in CARD_FACTIONS}
+
+
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,11 +49,18 @@ class CoverageRequirements(StrictModel):
     min_cards_by_role: dict[CardRoleFilter, int] = Field(
         default_factory=_default_role_coverage
     )
+    min_cards_by_faction: dict[CardFaction, int] = Field(
+        default_factory=_default_faction_coverage
+    )
     min_deprecated_cards: int = Field(default=1, ge=0)
     min_card_groups: int = Field(default=1, ge=0)
     min_cards_with_multiple_versions: int = Field(default=1, ge=0)
     required_template_keys: list[str] = Field(default_factory=list)
+    required_tag_keys: list[str] = Field(default_factory=list)
     required_template_role_hints: dict[str, list[CardRole]] = Field(default_factory=dict)
+    required_template_faction_hints: dict[str, list[CardFaction]] = Field(
+        default_factory=dict
+    )
 
 
 class DeveloperDataSelection(StrictModel):
@@ -82,6 +95,7 @@ class TemplateRecord(StrictModel):
     label: str
     definition: dict[str, Any]
     inferred_card_roles: list[CardRole]
+    inferred_card_factions: list[CardFaction]
 
     @field_validator("inferred_card_roles")
     @classmethod
@@ -91,6 +105,16 @@ class TemplateRecord(StrictModel):
     ) -> list[CardRole]:
         if len(value) != len(set(value)):
             raise ValueError("Template inferred card roles must be unique.")
+        return value
+
+    @field_validator("inferred_card_factions")
+    @classmethod
+    def validate_unique_inferred_card_factions(
+        cls,
+        value: list[CardFaction],
+    ) -> list[CardFaction]:
+        if len(value) != len(set(value)):
+            raise ValueError("Template inferred card factions must be unique.")
         return value
 
 
@@ -153,6 +177,7 @@ class CardRecord(StrictModel):
     label: str
     card_pool: CardPool
     card_roles: list[CardRole]
+    card_factions: list[CardFaction]
     deck_building_config: dict[str, Any]
     lifecycle_status: str
     latest_version_number: int | None
@@ -167,6 +192,16 @@ class CardRecord(StrictModel):
     ) -> list[CardRole]:
         if len(value) != len(set(value)):
             raise ValueError("Card roles must be unique.")
+        return value
+
+    @field_validator("card_factions")
+    @classmethod
+    def validate_unique_card_factions(
+        cls,
+        value: list[CardFaction],
+    ) -> list[CardFaction]:
+        if len(value) != len(set(value)):
+            raise ValueError("Card factions must be unique.")
         return value
 
 
@@ -238,19 +273,25 @@ class DeveloperDataLock(StrictModel):
 
 def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     """Adopt older bundle payloads into the current strict schema."""
-    if format_version not in {1, 2} or not isinstance(value, dict):
+    if format_version not in {1, 2, 3} or not isinstance(value, dict):
         return value
     adopted = dict(value)
     templates = adopted.get("templates")
     if isinstance(templates, list):
         adopted["templates"] = [
-            {**template, "inferred_card_roles": []}
-            if isinstance(template, dict) and "inferred_card_roles" not in template
+            {
+                **template,
+                **(
+                    {"inferred_card_roles": []}
+                    if "inferred_card_roles" not in template
+                    else {}
+                ),
+                "inferred_card_factions": [],
+            }
+            if isinstance(template, dict)
             else template
             for template in templates
         ]
-    if format_version != 1:
-        return adopted
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted
@@ -260,11 +301,13 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             adopted_cards.append(card)
             continue
         adopted_card = dict(card)
-        if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
-            raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
-        was_hero = adopted_card.pop("is_hero")
-        adopted_card["card_pool"] = "player"
-        adopted_card["card_roles"] = ["hero"] if was_hero is True else []
+        if format_version == 1:
+            if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
+                raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
+            was_hero = adopted_card.pop("is_hero")
+            adopted_card["card_pool"] = "player"
+            adopted_card["card_roles"] = ["hero"] if was_hero is True else []
+        adopted_card["card_factions"] = []
         adopted_cards.append(adopted_card)
     adopted["cards"] = adopted_cards
     return adopted

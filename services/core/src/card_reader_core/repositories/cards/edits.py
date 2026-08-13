@@ -6,11 +6,14 @@ from django.db import transaction
 
 from card_reader_core.models import (
     CARD_ROLES,
+    CARD_FACTIONS,
     DEPRECATED_CARD_LIFECYCLE_STATUS,
     Card,
+    CardFaction,
     CardPool,
     CardRoleAssignment,
     CardVersion,
+    card_faction_keys,
     is_card_pool,
     is_card_lifecycle_status,
     now_utc,
@@ -124,11 +127,23 @@ def update_latest_card_version(
             symbol_links_changed = True
         classification_changed = False
         destination_card_pool: CardPool = cast(CardPool, card.card_pool)
+        destination_card_factions: tuple[CardFaction, ...] = card_faction_keys(card)
         if "card_pool" in updates:
             card_pool = str(updates["card_pool"])
             if not is_card_pool(card_pool):
                 raise ValueError("Invalid card pool.")
             destination_card_pool = card_pool
+            classification_changed = True
+        if "card_factions" in updates:
+            raw_factions = updates["card_factions"]
+            if not isinstance(raw_factions, list):
+                raise ValueError("Card factions must be a list.")
+            requested_factions = {str(faction) for faction in raw_factions}
+            if not requested_factions.issubset(CARD_FACTIONS):
+                raise ValueError("Invalid card faction.")
+            destination_card_factions = tuple(
+                faction for faction in CARD_FACTIONS if faction in requested_factions
+            )
             classification_changed = True
         if "card_roles" in updates:
             raw_roles = updates["card_roles"]
@@ -162,12 +177,18 @@ def update_latest_card_version(
         if symbol_links_changed:
             apply_manual_rule_text(version, version.rules_text_enriched)
 
-        identity_changed = restored_name or "name" in updates or "card_pool" in updates
+        identity_changed = (
+            restored_name
+            or "name" in updates
+            or "card_pool" in updates
+            or "card_factions" in updates
+        )
         if identity_changed:
             change_card_identity(
                 card=card,
                 label=version.name if restored_name or "name" in updates else None,
                 card_pool=destination_card_pool,
+                card_factions=destination_card_factions,
             )
         if (
             restored_name

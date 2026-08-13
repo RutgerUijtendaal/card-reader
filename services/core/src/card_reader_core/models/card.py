@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+import json
 from typing import TYPE_CHECKING, Literal, Protocol, TypeGuard, TypeVar
 
 from django.db import models
@@ -70,12 +71,22 @@ PLAYER_CARD_POOL_SCOPE = CardPoolScope(frozenset({PLAYER_CARD_POOL}))
 ALL_CARD_POOLS_SCOPE = CardPoolScope(frozenset(CARD_POOLS))
 
 HERO_CARD_ROLE: Literal["hero"] = "hero"
+BOSS_CARD_ROLE: Literal["boss"] = "boss"
 BOON_CARD_ROLE: Literal["boon"] = "boon"
 EVENT_CARD_ROLE: Literal["event"] = "event"
 LOCATION_CARD_ROLE: Literal["location"] = "location"
+SHOP_ITEM_CARD_ROLE: Literal["shop_item"] = "shop_item"
 STANDARD_CARD_ROLE: Literal["standard"] = "standard"
-CardRole = Literal["hero", "boon", "event", "location"]
-CardRoleFilter = Literal["standard", "hero", "boon", "event", "location"]
+CardRole = Literal["hero", "boss", "location", "boon", "event", "shop_item"]
+CardRoleFilter = Literal[
+    "standard",
+    "hero",
+    "boss",
+    "location",
+    "boon",
+    "event",
+    "shop_item",
+]
 
 
 @dataclass(frozen=True)
@@ -95,9 +106,11 @@ class CardRoleFilterDefinition:
 
 CARD_ROLE_DEFINITIONS: tuple[CardRoleDefinition, ...] = (
     CardRoleDefinition(key=HERO_CARD_ROLE, label="Hero", rank=1),
-    CardRoleDefinition(key=BOON_CARD_ROLE, label="Boon", rank=2),
-    CardRoleDefinition(key=EVENT_CARD_ROLE, label="Event", rank=3),
-    CardRoleDefinition(key=LOCATION_CARD_ROLE, label="Location", rank=4),
+    CardRoleDefinition(key=BOSS_CARD_ROLE, label="Boss", rank=2),
+    CardRoleDefinition(key=LOCATION_CARD_ROLE, label="Location", rank=3),
+    CardRoleDefinition(key=BOON_CARD_ROLE, label="Boon", rank=4),
+    CardRoleDefinition(key=EVENT_CARD_ROLE, label="Event", rank=5),
+    CardRoleDefinition(key=SHOP_ITEM_CARD_ROLE, label="Shop Item", rank=6),
 )
 CARD_ROLES: tuple[CardRole, ...] = tuple(definition.key for definition in CARD_ROLE_DEFINITIONS)
 CARD_ROLE_CHOICES: tuple[tuple[CardRole, str], ...] = tuple(
@@ -107,7 +120,7 @@ CARD_ROLE_FILTER_VALUES: tuple[CardRoleFilter, ...] = (STANDARD_CARD_ROLE, *CARD
 CARD_ROLE_FILTER_DEFINITIONS: tuple[CardRoleFilterDefinition, ...] = (
     CardRoleFilterDefinition(
         key=STANDARD_CARD_ROLE,
-        label="Standard",
+        label="Normal",
         rank=0,
         derived=True,
     ),
@@ -120,6 +133,31 @@ CARD_ROLE_FILTER_DEFINITIONS: tuple[CardRoleFilterDefinition, ...] = (
         )
         for definition in CARD_ROLE_DEFINITIONS
     ),
+)
+
+ORDER_CARD_FACTION: Literal["order"] = "order"
+BLOOD_CARD_FACTION: Literal["blood"] = "blood"
+DARKNESS_CARD_FACTION: Literal["darkness"] = "darkness"
+CardFaction = Literal["order", "blood", "darkness"]
+
+
+@dataclass(frozen=True)
+class CardFactionDefinition:
+    key: CardFaction
+    label: str
+    rank: int
+
+
+CARD_FACTION_DEFINITIONS: tuple[CardFactionDefinition, ...] = (
+    CardFactionDefinition(key=ORDER_CARD_FACTION, label="Order", rank=1),
+    CardFactionDefinition(key=BLOOD_CARD_FACTION, label="Blood", rank=2),
+    CardFactionDefinition(key=DARKNESS_CARD_FACTION, label="Darkness", rank=3),
+)
+CARD_FACTIONS: tuple[CardFaction, ...] = tuple(
+    definition.key for definition in CARD_FACTION_DEFINITIONS
+)
+CARD_FACTION_CHOICES: tuple[tuple[CardFaction, str], ...] = tuple(
+    (definition.key, definition.label) for definition in CARD_FACTION_DEFINITIONS
 )
 
 
@@ -149,6 +187,7 @@ class Card(TimestampedModel):
         deck_entries: Manager[DeckEntry]
         deck_sideboard_entries: Manager[DeckSideboardEntry]
         role_assignments: Manager[CardRoleAssignment]
+        faction_assignments: Manager[CardFactionAssignment]
         versions: Manager[CardVersion]
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
@@ -159,6 +198,10 @@ class Card(TimestampedModel):
         choices=CARD_POOL_CHOICES,
         default=DEFAULT_CARD_POOL,
         db_index=True,
+    )
+    faction_identity_key: models.TextField[str, str] = models.TextField(
+        default="[]",
+        editable=False,
     )
     deck_building_config_json = models.JSONField(default=dict)
     lifecycle_status: models.CharField[str, str] = models.CharField(
@@ -183,7 +226,10 @@ class Card(TimestampedModel):
     class Meta:
         db_table = "card"
         constraints = [
-            models.UniqueConstraint(fields=("card_pool", "key"), name="uq_card_pool_key"),
+            models.UniqueConstraint(
+                fields=("card_pool", "faction_identity_key", "key"),
+                name="uq_card_pool_faction_key",
+            ),
         ]
 
 
@@ -222,6 +268,30 @@ class CardRoleAssignment(TimestampedModel):
         ]
 
 
+class CardFactionAssignment(TimestampedModel):
+    id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card: models.ForeignKey[Card, Card] = models.ForeignKey(
+        "Card",
+        on_delete=models.CASCADE,
+        related_name="faction_assignments",
+        db_column="card_id",
+    )
+    faction: models.CharField[str, str] = models.CharField(
+        max_length=64,
+        choices=CARD_FACTION_CHOICES,
+        db_index=True,
+    )
+
+    class Meta:
+        db_table = "card_faction_assignment"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("card", "faction"),
+                name="uq_card_faction_assignment_card_faction",
+            ),
+        ]
+
+
 def is_card_pool(value: object) -> TypeGuard[CardPool]:
     return value in CARD_POOLS
 
@@ -229,6 +299,15 @@ def is_card_pool(value: object) -> TypeGuard[CardPool]:
 def normalize_card_roles(values: Iterable[object]) -> tuple[CardRole, ...]:
     requested = set(values)
     return tuple(role for role in CARD_ROLES if role in requested)
+
+
+def normalize_card_factions(values: Iterable[object]) -> tuple[CardFaction, ...]:
+    requested = set(values)
+    return tuple(faction for faction in CARD_FACTIONS if faction in requested)
+
+
+def card_faction_identity_key(values: Iterable[object]) -> str:
+    return json.dumps(normalize_card_factions(values), separators=(",", ":"))
 
 
 def card_role_keys(card: Card) -> tuple[CardRole, ...]:
@@ -242,6 +321,19 @@ def card_has_role(card: Card, role: CardRole) -> bool:
     if prefetched is not None:
         return any(assignment.role == role for assignment in prefetched)
     return card.role_assignments.filter(role=role).exists()
+
+
+def card_faction_keys(card: Card) -> tuple[CardFaction, ...]:
+    prefetched = getattr(card, "_prefetched_objects_cache", {}).get("faction_assignments")
+    assignments = prefetched if prefetched is not None else card.faction_assignments.all()
+    return normalize_card_factions(assignment.faction for assignment in assignments)
+
+
+def card_has_faction(card: Card, faction: CardFaction) -> bool:
+    prefetched = getattr(card, "_prefetched_objects_cache", {}).get("faction_assignments")
+    if prefetched is not None:
+        return any(assignment.faction == faction for assignment in prefetched)
+    return card.faction_assignments.filter(faction=faction).exists()
 
 
 def normalize_card_lifecycle_filter(value: object) -> CardLifecycleFilter:
@@ -299,13 +391,20 @@ class CardAlias(TimestampedModel):
         choices=CARD_POOL_CHOICES,
         db_index=True,
     )
+    faction_identity_key: models.TextField[str, str] = models.TextField(
+        default="[]",
+        editable=False,
+    )
     key: models.TextField[str, str] = models.TextField(default="", db_index=True)
     label: models.TextField[str, str] = models.TextField(default="")
 
     class Meta:
         db_table = "card_alias"
         constraints = [
-            models.UniqueConstraint(fields=("card_pool", "key"), name="uq_card_alias_pool_key"),
+            models.UniqueConstraint(
+                fields=("card_pool", "faction_identity_key", "key"),
+                name="uq_card_alias_pool_faction_key",
+            ),
         ]
 
 

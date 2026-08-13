@@ -6,15 +6,19 @@ from django.db import transaction
 
 from card_reader_core.models import (
     Card,
+    CardClassificationInferenceEvidence,
     DEFAULT_CARD_POOL,
+    CardFaction,
     CardPool,
     CardRole,
-    CardRoleInferenceEvidence,
     CardRoleAssignment,
     CardVersion,
     ImportJobItem,
     ImportJobStatus,
+    LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
     ParseResult,
+    card_faction_identity_key,
+    card_faction_keys,
     card_is_deprecated,
     card_role_keys,
     now_utc,
@@ -70,7 +74,8 @@ def save_parsed_card(
     reparse_existing: bool = True,
     card_pool: CardPool = DEFAULT_CARD_POOL,
     resolved_card_roles: tuple[CardRole, ...] = (),
-    classification_evidence: CardRoleInferenceEvidence | None = None,
+    resolved_card_factions: tuple[CardFaction, ...] = (),
+    classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> CardVersion:
     return save_parsed_card_result(
         item=item,
@@ -88,6 +93,7 @@ def save_parsed_card(
         reparse_existing=reparse_existing,
         card_pool=card_pool,
         resolved_card_roles=resolved_card_roles,
+        resolved_card_factions=resolved_card_factions,
         classification_evidence=classification_evidence,
     ).version
 
@@ -109,16 +115,28 @@ def save_parsed_card_result(
     reparse_existing: bool = True,
     card_pool: CardPool = DEFAULT_CARD_POOL,
     resolved_card_roles: tuple[CardRole, ...] = (),
-    classification_evidence: CardRoleInferenceEvidence | None = None,
+    resolved_card_factions: tuple[CardFaction, ...] = (),
+    classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> ParsedCardSaveResult:
-    resolved_evidence: CardRoleInferenceEvidence = classification_evidence or {
-        "mode": "automatic",
-        "policy_version": 1,
-        "template_roles": [],
-        "matched_tag_keys": [],
-        "tag_roles": [],
-        "override_roles": [],
-        "resolved_roles": list(resolved_card_roles),
+    resolved_evidence: CardClassificationInferenceEvidence = classification_evidence or {
+        "roles": {
+            "mode": "automatic",
+            "policy_version": LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
+            "template_roles": [],
+            "matched_tag_keys": [],
+            "tag_roles": [],
+            "override_roles": [],
+            "resolved_roles": list(resolved_card_roles),
+        },
+        "factions": {
+            "mode": "automatic",
+            "policy_version": LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
+            "template_factions": [],
+            "matched_tag_keys": [],
+            "tag_factions": [],
+            "override_factions": [],
+            "resolved_factions": list(resolved_card_factions),
+        },
     }
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
     with transaction.atomic():
@@ -142,6 +160,7 @@ def save_parsed_card_result(
                 version,
                 card_pool=card_pool,
                 resolved_card_roles=resolved_card_roles,
+                resolved_card_factions=resolved_card_factions,
                 evidence=resolved_evidence,
                 is_new_card=False,
             )
@@ -154,6 +173,9 @@ def save_parsed_card_result(
                     image_hash=checksum,
                     is_latest=True,
                     card__card_pool=card_pool,
+                    card__faction_identity_key=card_faction_identity_key(
+                        resolved_card_factions
+                    ),
                 )
                 .order_by("-updated_at")
                 .first()
@@ -197,6 +219,7 @@ def save_parsed_card_result(
                 version,
                 card_pool=card_pool,
                 resolved_card_roles=resolved_card_roles,
+                resolved_card_factions=resolved_card_factions,
                 evidence=resolved_evidence,
                 is_new_card=False,
             )
@@ -205,7 +228,11 @@ def save_parsed_card_result(
                 created_new_version=created_new_version,
             )
 
-        card, created_new_card = create_card_identity(name=parsed_name, card_pool=card_pool)
+        card, created_new_card = create_card_identity(
+            name=parsed_name,
+            card_pool=card_pool,
+            card_factions=resolved_card_factions,
+        )
         if created_new_card:
             CardRoleAssignment.objects.bulk_create(
                 [CardRoleAssignment(card=card, role=role) for role in resolved_card_roles]
@@ -251,6 +278,7 @@ def save_parsed_card_result(
                 version,
                 card_pool=card_pool,
                 resolved_card_roles=resolved_card_roles,
+                resolved_card_factions=resolved_card_factions,
                 evidence=resolved_evidence,
                 is_new_card=created_new_card,
             )
@@ -280,6 +308,7 @@ def save_parsed_card_result(
             version,
             card_pool=card_pool,
             resolved_card_roles=resolved_card_roles,
+            resolved_card_factions=resolved_card_factions,
             evidence=resolved_evidence,
             is_new_card=created_new_card,
         )
@@ -611,24 +640,33 @@ def finalize_import_item(
     *,
     card_pool: CardPool,
     resolved_card_roles: tuple[CardRole, ...],
-    evidence: CardRoleInferenceEvidence,
+    resolved_card_factions: tuple[CardFaction, ...],
+    evidence: CardClassificationInferenceEvidence,
     is_new_card: bool,
 ) -> None:
     card = version.card
     live_roles = card_role_keys(card)
+    live_factions = card_faction_keys(card)
     evidence_payload: dict[str, object] = dict(evidence)
     evidence_payload["live_classification"] = {
         "card_pool": card.card_pool,
         "card_roles": list(live_roles),
+        "card_factions": list(live_factions),
     }
 
     if item.target_card_pool_snapshot is not None:
         queued_roles = tuple(item.target_card_roles_snapshot_json)
+        queued_factions = tuple(item.target_card_factions_snapshot_json)
         evidence_payload["queued_target_classification"] = {
             "card_pool": item.target_card_pool_snapshot,
             "card_roles": list(queued_roles),
+            "card_factions": list(queued_factions),
         }
-        if item.target_card_pool_snapshot != card.card_pool or queued_roles != live_roles:
+        if (
+            item.target_card_pool_snapshot != card.card_pool
+            or queued_roles != live_roles
+            or queued_factions != live_factions
+        ):
             upsert_import_warning(
                 item,
                 {
@@ -643,7 +681,11 @@ def finalize_import_item(
         else:
             remove_import_warning(item, CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING)
 
-    if is_new_card or (card.card_pool == card_pool and live_roles == resolved_card_roles):
+    if is_new_card or (
+        card.card_pool == card_pool
+        and live_roles == resolved_card_roles
+        and live_factions == resolved_card_factions
+    ):
         remove_import_warning(item, CARD_CLASSIFICATION_MISMATCH_WARNING)
     else:
         upsert_import_warning(
@@ -655,6 +697,7 @@ def finalize_import_item(
                     "inferred": {
                         "card_pool": card_pool,
                         "card_roles": list(resolved_card_roles),
+                        "card_factions": list(resolved_card_factions),
                     },
                     "existing": evidence_payload["live_classification"],
                 },
@@ -662,7 +705,8 @@ def finalize_import_item(
         )
 
     item.resolved_card_roles_json = list(resolved_card_roles)
-    item.card_role_inference_json = evidence_payload
+    item.resolved_card_factions_json = list(resolved_card_factions)
+    item.classification_inference_json = evidence_payload
     item.target_card = card
     item.target_card_version = version
     sync_import_item_lifecycle_warning(item, card)
@@ -767,7 +811,8 @@ def mark_item_completed(item: ImportJobItem) -> None:
             "warning_message",
             "warnings_json",
             "resolved_card_roles_json",
-            "card_role_inference_json",
+            "resolved_card_factions_json",
+            "classification_inference_json",
             "target_card",
             "target_card_version",
             "updated_at",

@@ -4,7 +4,13 @@ import json
 
 from rest_framework import serializers
 
-from card_reader_core.models import CARD_ROLES, Template, normalize_card_roles
+from card_reader_core.models import (
+    CARD_FACTIONS,
+    CARD_ROLES,
+    Template,
+    normalize_card_factions,
+    normalize_card_roles,
+)
 
 
 def template_payload(row: Template) -> dict[str, object]:
@@ -14,6 +20,9 @@ def template_payload(row: Template) -> dict[str, object]:
         "label": row.label,
         "definition_json": row.definition_json,
         "inferred_card_roles": list(normalize_card_roles(row.inferred_card_roles_json)),
+        "inferred_card_factions": list(
+            normalize_card_factions(row.inferred_card_factions_json)
+        ),
     }
 
 
@@ -23,6 +32,11 @@ class TemplateWriteSerializer(serializers.Serializer[dict[str, object]]):
     definition_json = serializers.JSONField(required=True)
     inferred_card_roles = serializers.ListField(
         child=serializers.ChoiceField(choices=CARD_ROLES),
+        required=False,
+        default=list,
+    )
+    inferred_card_factions = serializers.ListField(
+        child=serializers.ChoiceField(choices=CARD_FACTIONS),
         required=False,
         default=list,
     )
@@ -41,6 +55,11 @@ class TemplateWriteSerializer(serializers.Serializer[dict[str, object]]):
         if len(value) != len(set(value)):
             raise serializers.ValidationError("Roles must be unique.")
         return list(normalize_card_roles(value))
+
+    def validate_inferred_card_factions(self, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("Factions must be unique.")
+        return list(normalize_card_factions(value))
 
 
 class TemplateReparseSerializer(serializers.Serializer[dict[str, object]]):

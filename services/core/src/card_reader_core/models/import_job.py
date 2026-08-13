@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 from django.db import models
 
 from .base import TimestampedModel, uuid_str
-from .card import DEFAULT_CARD_POOL, CardRole
+from .card import DEFAULT_CARD_POOL, CardFaction, CardRole
 
 if TYPE_CHECKING:
     from .card import Card
@@ -24,12 +24,12 @@ class ImportJobStatus(StrEnum):
     failed = "failed"
 
 
-class ImportCardRoleMode(StrEnum):
+class ImportClassificationMode(StrEnum):
     automatic = "automatic"
     override = "override"
 
 
-LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION = 2
+LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION = 3
 
 
 class CardRoleInferenceEvidence(TypedDict):
@@ -40,6 +40,21 @@ class CardRoleInferenceEvidence(TypedDict):
     tag_roles: list[CardRole]
     override_roles: list[CardRole]
     resolved_roles: list[CardRole]
+
+
+class CardFactionInferenceEvidence(TypedDict):
+    mode: Literal["automatic", "override"]
+    policy_version: int
+    template_factions: list[CardFaction]
+    matched_tag_keys: list[str]
+    tag_factions: list[CardFaction]
+    override_factions: list[CardFaction]
+    resolved_factions: list[CardFaction]
+
+
+class CardClassificationInferenceEvidence(TypedDict):
+    roles: CardRoleInferenceEvidence
+    factions: CardFactionInferenceEvidence
 
 
 class ImportJob(TimestampedModel):
@@ -64,11 +79,18 @@ class ImportJob(TimestampedModel):
     creation_key: models.TextField[str, str] = models.TextField(default=uuid_str, unique=True)
     creation_fingerprint: models.TextField[str, str] = models.TextField(default="")
     card_pool: models.TextField[str, str] = models.TextField(default=DEFAULT_CARD_POOL)
-    card_role_mode: models.TextField[str, str] = models.TextField(default=ImportCardRoleMode.automatic)
+    card_role_mode: models.TextField[str, str] = models.TextField(
+        default=ImportClassificationMode.automatic
+    )
     card_role_override_json = models.JSONField(default=list)
     template_role_snapshot_json = models.JSONField(default=list)
-    card_role_inference_policy_version: models.IntegerField[int, int] = models.IntegerField(
-        default=LATEST_CARD_ROLE_INFERENCE_POLICY_VERSION
+    card_faction_mode: models.TextField[str, str] = models.TextField(
+        default=ImportClassificationMode.automatic
+    )
+    card_faction_override_json = models.JSONField(default=list)
+    template_faction_snapshot_json = models.JSONField(default=list)
+    classification_inference_policy_version: models.IntegerField[int, int] = models.IntegerField(
+        default=LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION
     )
     status: models.TextField[str, str] = models.TextField(default=ImportJobStatus.queued)
     total_items: models.IntegerField[int, int] = models.IntegerField(default=0)
@@ -121,13 +143,15 @@ class ImportJobItem(TimestampedModel):
         blank=True,
     )
     resolved_card_roles_json = models.JSONField(default=list)
-    card_role_inference_json = models.JSONField(default=dict)
+    resolved_card_factions_json = models.JSONField(default=list)
+    classification_inference_json = models.JSONField(default=dict)
     target_card_pool_snapshot: models.TextField[str | None, str | None] = models.TextField(
         default=None,
         null=True,
         blank=True,
     )
     target_card_roles_snapshot_json = models.JSONField(default=list)
+    target_card_factions_snapshot_json = models.JSONField(default=list)
     warnings_json = models.JSONField(default=list)
 
     class Meta:

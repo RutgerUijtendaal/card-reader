@@ -4,7 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
-from card_reader_core.models import DEFAULT_CARD_POOL, CardPool, CardRole, ImportJob, Template
+from card_reader_core.models import (
+    DEFAULT_CARD_POOL,
+    CardFaction,
+    CardPool,
+    CardRole,
+    ImportJob,
+    Template,
+)
 
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
@@ -19,6 +26,7 @@ class ImportJobItemTarget:
     card_version_id: str
     card_pool: CardPool = DEFAULT_CARD_POOL
     card_roles: tuple[CardRole, ...] = ()
+    card_factions: tuple[CardFaction, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -37,6 +45,9 @@ class PreparedImportJobInputs:
     card_role_mode: str
     card_role_override: tuple[CardRole, ...]
     template_roles: tuple[CardRole, ...]
+    card_faction_mode: str
+    card_faction_override: tuple[CardFaction, ...]
+    template_factions: tuple[CardFaction, ...]
     inference_policy_version: int
 
 
@@ -58,6 +69,9 @@ class GroupedReparseSource(Protocol):
 
     @property
     def card_roles(self) -> tuple[CardRole, ...]: ...
+
+    @property
+    def card_factions(self) -> tuple[CardFaction, ...]: ...
 
 
 @dataclass(frozen=True)

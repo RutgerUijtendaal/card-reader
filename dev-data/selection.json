@@ -104,9 +104,16 @@
     "min_cards_by_role": {
       "standard": 1,
       "hero": 70,
+      "boss": 0,
+      "location": 0,
       "boon": 0,
       "event": 0,
-      "location": 0
+      "shop_item": 0
+    },
+    "min_cards_by_faction": {
+      "order": 0,
+      "blood": 0,
+      "darkness": 0
     },
     "min_deprecated_cards": 3,
     "min_card_groups": 5,
@@ -114,6 +121,15 @@
     "required_template_keys": [
       "basic-mana",
       "mtg-like-v1"
+    ],
+    "required_tag_keys": [
+      "hero",
+      "boss",
+      "location",
+      "shop-item",
+      "order",
+      "blood",
+      "darkness"
     ],
     "required_template_role_hints": {}
   }

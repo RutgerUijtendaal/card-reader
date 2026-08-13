@@ -90,6 +90,7 @@ def _group_queryset() -> QuerySet[CardGroup]:
         "anchor_card__latest_version__previous_version",
     ).prefetch_related(
         "anchor_card__role_assignments",
+        "anchor_card__faction_assignments",
         Prefetch(
             "members",
             queryset=CardGroupMember.objects.select_related(
@@ -100,6 +101,7 @@ def _group_queryset() -> QuerySet[CardGroup]:
             )
             .prefetch_related(
                 "card__role_assignments",
+                "card__faction_assignments",
                 Prefetch(
                     "card__latest_version__images",
                     queryset=CardVersionImage.objects.order_by("-created_at"),

@@ -26,6 +26,7 @@ def deck_queryset() -> QuerySet[Deck]:
         "hero_card__latest_version__previous_version",
     ).prefetch_related(
         "hero_card__role_assignments",
+        "hero_card__faction_assignments",
         *deck_metadata_prefetches(),
         *latest_version_metadata_prefetches("hero_card__latest_version"),
         Prefetch(
@@ -37,6 +38,7 @@ def deck_queryset() -> QuerySet[Deck]:
                 "card__latest_version__previous_version",
             ).prefetch_related(
                 "card__role_assignments",
+                "card__faction_assignments",
                 *latest_version_metadata_prefetches("card__latest_version"),
             ).order_by("position", "card_id"),
         ),
@@ -53,6 +55,7 @@ def deck_queryset() -> QuerySet[Deck]:
                     )
                     .prefetch_related(
                         "card__role_assignments",
+                        "card__faction_assignments",
                         *latest_version_metadata_prefetches("card__latest_version"),
                     )
                     .order_by("position", "card_id"),
@@ -69,6 +72,7 @@ def deck_summary_queryset() -> QuerySet[Deck]:
         "hero_card__latest_version",
     ).prefetch_related(
         "hero_card__role_assignments",
+        "hero_card__faction_assignments",
         *deck_metadata_prefetches(),
         Prefetch(
             "hero_card__latest_version__images",
@@ -83,6 +87,7 @@ def deck_summary_queryset() -> QuerySet[Deck]:
             )
             .prefetch_related(
                 "card__role_assignments",
+                "card__faction_assignments",
                 *summary_version_type_prefetches("card__latest_version"),
             )
             .order_by("position", "card_id"),
@@ -98,6 +103,7 @@ def deck_summary_queryset() -> QuerySet[Deck]:
                     )
                     .prefetch_related(
                         "card__role_assignments",
+                        "card__faction_assignments",
                         *summary_version_type_prefetches("card__latest_version"),
                     )
                     .order_by("position", "card_id"),
@@ -113,6 +119,7 @@ def deck_validation_queryset() -> QuerySet[Deck]:
         "hero_card__latest_version",
     ).prefetch_related(
         "hero_card__role_assignments",
+        "hero_card__faction_assignments",
         Prefetch(
             "entries",
             queryset=DeckEntry.objects.select_related(
@@ -120,6 +127,7 @@ def deck_validation_queryset() -> QuerySet[Deck]:
                 "card__latest_version",
             ).prefetch_related(
                 "card__role_assignments",
+                "card__faction_assignments",
                 *summary_version_type_prefetches("card__latest_version"),
             ),
         ),
@@ -133,6 +141,7 @@ def deck_validation_queryset() -> QuerySet[Deck]:
                         "card__latest_version",
                     ).prefetch_related(
                         "card__role_assignments",
+                        "card__faction_assignments",
                         *summary_version_type_prefetches("card__latest_version"),
                     ),
                 )

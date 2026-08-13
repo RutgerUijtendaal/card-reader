@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from argparse import ArgumentParser
 import json
 
 from django.contrib.auth import get_user_model
@@ -21,17 +22,38 @@ from card_reader_core.models import (
     Tag,
     Template,
     Type,
+    normalize_card_factions,
     normalize_card_roles,
 )
-from card_reader_core.operations.developer_data.schema import DeveloperDataSelection
+from card_reader_core.operations.developer_data.schema import (
+    DEVELOPER_DATA_FORMAT_VERSION,
+    SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS,
+    DeveloperDataSelection,
+)
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
 
 
 class Command(BaseCommand):
     help = "Verify that the local developer database is ready for the main application workflows."
 
+    def add_arguments(self, parser: ArgumentParser) -> None:
+        parser.add_argument(
+            "--source-format-version",
+            type=int,
+            choices=SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS,
+            default=DEVELOPER_DATA_FORMAT_VERSION,
+            help=(
+                "Validate only coverage representable by the imported bundle format. "
+                "Defaults to the current format for source-data readiness checks."
+            ),
+        )
+
     def handle(self, *args: object, **options: object) -> None:
         issues: list[str] = []
+        raw_source_format_version = options.get("source_format_version")
+        if not isinstance(raw_source_format_version, int):
+            raise CommandError("A valid source developer-data format version is required.")
+        source_format_version = raw_source_format_version
         executor = MigrationExecutor(connection)
         if executor.migration_plan(executor.loader.graph.leaf_nodes()):
             issues.append("database migrations are not current")
@@ -50,17 +72,51 @@ class Command(BaseCommand):
             selection = DeveloperDataSelection.model_validate(
                 json.loads(selection_path.read_text(encoding="utf-8"))
             )
-            for template_key, required_roles in selection.coverage.required_template_role_hints.items():
+            if source_format_version >= 4:
+                missing_tags = sorted(
+                    set(selection.coverage.required_tag_keys)
+                    - set(Tag.objects.values_list("key", flat=True))
+                )
+                if missing_tags:
+                    issues.append(
+                        f"required inference tags are missing: {', '.join(missing_tags)}"
+                    )
+            role_hint_requirements = (
+                selection.coverage.required_template_role_hints
+                if source_format_version >= 2
+                else {}
+            )
+            for template_key, required_roles in role_hint_requirements.items():
                 template = Template.objects.filter(key=template_key).first()
                 if template is None:
                     issues.append(f"template {template_key} required for inference is missing")
                     continue
-                missing = sorted(
+                missing_roles = sorted(
                     set(required_roles) - set(normalize_card_roles(template.inferred_card_roles_json))
                 )
-                if missing:
+                if missing_roles:
                     issues.append(
-                        f"template {template_key} is missing inference roles: {', '.join(missing)}"
+                        "template "
+                        f"{template_key} is missing inference roles: {', '.join(missing_roles)}"
+                    )
+            faction_hint_requirements = (
+                selection.coverage.required_template_faction_hints
+                if source_format_version >= 4
+                else {}
+            )
+            for template_key, required_factions in faction_hint_requirements.items():
+                template = Template.objects.filter(key=template_key).first()
+                if template is None:
+                    issues.append(f"template {template_key} required for inference is missing")
+                    continue
+                missing_factions = sorted(
+                    set(required_factions)
+                    - set(normalize_card_factions(template.inferred_card_factions_json))
+                )
+                if missing_factions:
+                    issues.append(
+                        "template "
+                        f"{template_key} is missing inference factions: {', '.join(missing_factions)}"
                     )
         active_cards = Card.objects.filter(lifecycle_status="active")
         if not active_cards.filter(

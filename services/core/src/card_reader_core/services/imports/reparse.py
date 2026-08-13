@@ -7,7 +7,13 @@ from django.db import transaction
 
 from card_reader_core.config.settings import settings
 from card_reader_core.imports import GroupedReparseSource, GroupedReparseSummary, ImportJobItemTarget
-from card_reader_core.models import CardPool, CardRole, normalize_card_roles
+from card_reader_core.models import (
+    CardFaction,
+    CardPool,
+    CardRole,
+    normalize_card_factions,
+    normalize_card_roles,
+)
 from card_reader_core.repositories.import_jobs import create_import_job_with_files
 
 
@@ -19,16 +25,17 @@ def queue_grouped_reparse_jobs(
     target_template_id: str | None = None,
 ) -> GroupedReparseSummary:
     grouped: dict[
-        tuple[str, CardPool, tuple[CardRole, ...]],
+        tuple[str, CardPool, tuple[CardRole, ...], tuple[CardFaction, ...]],
         list[GroupedReparseSource],
     ] = defaultdict(list)
     for source in sources:
         template_id = target_template_id or source.template_id
         roles = normalize_card_roles(source.card_roles)
-        grouped[(template_id, source.card_pool, roles)].append(source)
+        factions = normalize_card_factions(source.card_factions)
+        grouped[(template_id, source.card_pool, roles, factions)].append(source)
 
     with transaction.atomic():
-        for (template_id, card_pool, _roles), group in sorted(grouped.items()):
+        for (template_id, card_pool, _roles, _factions), group in sorted(grouped.items()):
             create_import_job_with_files(
                 source_path=(
                     settings.storage_root_dir
@@ -44,6 +51,7 @@ def queue_grouped_reparse_jobs(
                         card_version_id=source.card_version_id,
                         card_pool=source.card_pool,
                         card_roles=normalize_card_roles(source.card_roles),
+                        card_factions=normalize_card_factions(source.card_factions),
                     )
                     for source in group
                 ],

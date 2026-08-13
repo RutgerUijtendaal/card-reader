@@ -100,7 +100,11 @@ class Command(BaseCommand):
                 "Skipping TTS sheet generation. Run reconcile_tts_card_sheets --render later "
                 "to generate them."
             )
-        call_command("doctor_dev_data", stdout=self.stdout)
+        call_command(
+            "doctor_dev_data",
+            source_format_version=lock.format_version,
+            stdout=self.stdout,
+        )
         self.stdout.write(
             self.style.SUCCESS(
                 f"Bootstrapped developer-data bundle {result.bundle_version} "

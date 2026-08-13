@@ -25,6 +25,7 @@ from card_reader_core.models import (
     Template,
     Type,
     CardPool,
+    card_faction_keys,
     card_role_keys,
 )
 from card_reader_core.storage import relativize_image_storage_path, relativize_storage_path
@@ -143,6 +144,7 @@ def _resolve_selection(
         .prefetch_related(
             "aliases",
             "role_assignments",
+            "faction_assignments",
             "versions__template",
             "versions__content_version",
             "versions__images",
@@ -177,6 +179,7 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
                 label=row.label,
                 definition=row.definition_json,
                 inferred_card_roles=list(row.inferred_card_roles_json),
+                inferred_card_factions=list(row.inferred_card_factions_json),
             )
             for row in Template.objects.order_by("key")
         ],
@@ -238,6 +241,7 @@ def _card_record(card: Card) -> CardRecord:
         label=card.label,
         card_pool=cast(CardPool, card.card_pool),
         card_roles=list(card_role_keys(card)),
+        card_factions=list(card_faction_keys(card)),
         deck_building_config=dict(card.deck_building_config_json),
         lifecycle_status=card.lifecycle_status,
         latest_version_number=latest_number,
@@ -351,6 +355,10 @@ def _validate_coverage(
     missing_templates = sorted(set(coverage.required_template_keys) - template_keys)
     if missing_templates:
         errors.append(f"missing required templates: {', '.join(missing_templates)}")
+    tag_keys = {tag.key for tag in payload.tags}
+    missing_tags = sorted(set(coverage.required_tag_keys) - tag_keys)
+    if missing_tags:
+        errors.append(f"missing required tags: {', '.join(missing_tags)}")
     templates_by_key = {template.key: template for template in payload.templates}
     for template_key, required_roles in coverage.required_template_role_hints.items():
         template = templates_by_key.get(template_key)
@@ -361,6 +369,28 @@ def _validate_coverage(
         if missing_roles:
             errors.append(
                 f"template {template_key} is missing inference roles: {', '.join(missing_roles)}"
+            )
+    faction_counts = {
+        faction: sum(faction in card.card_factions for card in payload.cards)
+        for faction in coverage.min_cards_by_faction
+    }
+    for faction, minimum in coverage.min_cards_by_faction.items():
+        if faction_counts[faction] < minimum:
+            errors.append(
+                f"faction {faction} has {faction_counts[faction]} cards; requires {minimum}"
+            )
+    for template_key, required_factions in coverage.required_template_faction_hints.items():
+        template = templates_by_key.get(template_key)
+        if template is None:
+            errors.append(f"missing inference template: {template_key}")
+            continue
+        missing_factions = sorted(
+            set(required_factions) - set(template.inferred_card_factions)
+        )
+        if missing_factions:
+            errors.append(
+                f"template {template_key} is missing inference factions: "
+                + ", ".join(missing_factions)
             )
     if payload.current_card_back is None:
         errors.append("requires a current card back")

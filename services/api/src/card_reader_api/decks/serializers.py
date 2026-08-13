@@ -22,6 +22,7 @@ from card_reader_core.models import (
     DeckEntry,
     DeckSideboard,
     DeckVisibility,
+    card_faction_keys,
     card_role_keys,
 )
 from card_reader_core.repositories.cards import get_card_image
@@ -300,6 +301,7 @@ def deck_hero_summary_payload(
             "label": card.label,
             "card_pool": card.card_pool,
             "card_roles": list(card_role_keys(card)),
+            "card_factions": list(card_faction_keys(card)),
             "name": card.label,
             "image_url": None,
             "symbols": [],
@@ -313,6 +315,7 @@ def deck_hero_summary_payload(
         "label": card.label,
         "card_pool": card.card_pool,
         "card_roles": list(card_role_keys(card)),
+        "card_factions": list(card_faction_keys(card)),
         "name": version.name,
         "image_url": image_url,
         "symbols": [
@@ -354,6 +357,7 @@ def deck_card_payload(
             "label": card.label,
             "card_pool": card.card_pool,
             "card_roles": list(card_role_keys(card)),
+            "card_factions": list(card_faction_keys(card)),
             "deck_building_config": normalize_deck_building_config(card.deck_building_config_json),
             "lifecycle_status": card.lifecycle_status,
             "template_id": "",
@@ -396,6 +400,7 @@ def _restricted_deck_card_summary(card: Card) -> dict[str, object]:
         "label": "Restricted card",
         "card_pool": PLAYER_CARD_POOL,
         "card_roles": [],
+        "card_factions": [],
         "name": "Restricted card",
         "image_url": None,
         "symbols": [],
@@ -411,6 +416,7 @@ def _restricted_deck_card_payload(card: Card) -> dict[str, object]:
         "label": "Restricted card",
         "card_pool": PLAYER_CARD_POOL,
         "card_roles": [],
+        "card_factions": [],
         "deck_building_config": normalize_deck_building_config({}),
         "lifecycle_status": "active",
         "template_id": "",

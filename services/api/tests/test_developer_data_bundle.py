@@ -17,6 +17,7 @@ from card_reader_core.models import (
     Card,
     CardAlias,
     CardBack,
+    CardFactionAssignment,
     CardGroup,
     CardGroupMember,
     CardRoleAssignment,
@@ -59,8 +60,18 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
 
     assert adopted == {
         "cards": [
-            {"key": "hero", "card_pool": "player", "card_roles": ["hero"]},
-            {"key": "standard", "card_pool": "player", "card_roles": []},
+            {
+                "key": "hero",
+                "card_pool": "player",
+                "card_roles": ["hero"],
+                "card_factions": [],
+            },
+            {
+                "key": "standard",
+                "card_pool": "player",
+                "card_roles": [],
+                "card_factions": [],
+            },
         ]
     }
 
@@ -81,6 +92,25 @@ def test_version_two_card_record_rejects_duplicate_roles() -> None:
                 "label": "Duplicate Role Card",
                 "card_pool": "player",
                 "card_roles": ["hero", "hero"],
+                "card_factions": [],
+                "deck_building_config": {},
+                "lifecycle_status": "active",
+                "latest_version_number": None,
+                "aliases": [],
+                "versions": [],
+            }
+        )
+
+
+def test_version_four_card_record_rejects_duplicate_factions() -> None:
+    with pytest.raises(ValueError, match="Card factions must be unique"):
+        CardRecord.model_validate(
+            {
+                "key": "duplicate-faction-card",
+                "label": "Duplicate Faction Card",
+                "card_pool": "evil",
+                "card_roles": ["boss"],
+                "card_factions": ["order", "order"],
                 "deck_building_config": {},
                 "lifecycle_status": "active",
                 "latest_version_number": None,
@@ -102,7 +132,8 @@ def test_version_two_payload_adoption_adds_empty_template_role_hints() -> None:
                 "key": "legacy",
                 "label": "Legacy",
                 "definition": {},
-                "inferred_card_roles": [],
+                    "inferred_card_roles": [],
+                    "inferred_card_factions": [],
             }
         ]
     }
@@ -156,7 +187,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 3
         assert manifest.counts["card_versions"] == 4
-        assert manifest.format_version == 3
+        assert manifest.format_version == 4
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
@@ -175,6 +206,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert "source_file" not in payload_text
         assert '"card_pool"' in payload_text
         assert '"card_roles"' in payload_text
+        assert '"card_factions"' in payload_text
         assert '"is_hero"' not in payload_text
         assert "synthetic-user" not in payload_text
         published_store = PublishedBundleStore(root=tmp_path / "published")
@@ -226,6 +258,13 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
         assert Template.objects.get(key="synthetic-template").inferred_card_roles_json == ["event"]
+        assert Template.objects.get(key="synthetic-template").inferred_card_factions_json == [
+            "blood"
+        ]
+        assert set(
+            Card.objects.get(key="synthetic-mainboard")
+            .faction_assignments.values_list("faction", flat=True)
+        ) == {"order", "blood"}
         latest = Card.objects.get(key="synthetic-hero").latest_version
         assert latest is not None
         assert latest.version_number == 2
@@ -448,7 +487,7 @@ def test_import_rejects_unreferenced_manifest_assets(
         transaction.set_rollback(True)
 
 
-def test_doctor_resolves_symbol_assets_under_symbols_root(
+def test_doctor_resolves_symbol_assets_and_honors_legacy_bundle_coverage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -469,6 +508,8 @@ def test_doctor_resolves_symbol_assets_under_symbols_root(
         )
 
         call_command("doctor_dev_data")
+        Tag.objects.exclude(key="synthetic").delete()
+        call_command("doctor_dev_data", source_format_version=1)
         transaction.set_rollback(True)
 
 
@@ -532,8 +573,8 @@ def _build_alias_collision_archive(source: Path, target: Path, extraction_root: 
         archive.extractall(extraction_root, filter="data")
     data_path = extraction_root / "data.json"
     payload = json.loads(data_path.read_text(encoding="utf-8"))
-    mainboard = next(card for card in payload["cards"] if card["key"] == "synthetic-mainboard")
-    mainboard["aliases"].append({"key": "synthetic-hero-alias", "label": "Collision"})
+    deprecated = next(card for card in payload["cards"] if card["key"] == "synthetic-deprecated")
+    deprecated["aliases"].append({"key": "synthetic-hero-alias", "label": "Collision"})
     serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     data_path.write_bytes(serialized)
     manifest_path = extraction_root / "manifest.json"
@@ -629,6 +670,21 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
 
     keyword = Keyword.objects.create(key="arrival", label="Arrival", identifiers_json=["arrival"])
     tag = Tag.objects.create(key="synthetic", label="Synthetic", identifiers_json=["synthetic"])
+    required_inference_tags = (
+        "hero",
+        "boss",
+        "location",
+        "shop-item",
+        "order",
+        "blood",
+        "darkness",
+    )
+    Tag.objects.bulk_create(
+        [
+            Tag(key=key, label=key.replace("-", " ").title(), identifiers_json=[key])
+            for key in required_inference_tags
+        ]
+    )
     card_type = Type.objects.create(key="creature", label="Creature", identifiers_json=["creature"])
     symbol = Symbol.objects.create(
         key="arcane-mana",
@@ -646,6 +702,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         label="Synthetic Template",
         definition_json={"id": "synthetic-template", "version": 1, "regions": []},
         inferred_card_roles_json=["event"],
+        inferred_card_factions_json=["blood"],
     )
     DeckTag.objects.create(kind="role", key="control", label="Control")
     content_version = ContentVersion.objects.create(
@@ -701,7 +758,17 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     CardVersionSymbol.objects.create(card_version=hero_v2, symbol=symbol)
     CardVersionType.objects.create(card_version=hero_v2, type=card_type)
 
-    mainboard = Card.objects.create(key="synthetic-mainboard", label="Synthetic Mainboard")
+    mainboard = Card.objects.create(
+        key="synthetic-mainboard",
+        label="Synthetic Mainboard",
+        faction_identity_key='["order","blood"]',
+    )
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card=mainboard, faction="order"),
+            CardFactionAssignment(card=mainboard, faction="blood"),
+        ]
+    )
     mainboard_version = _create_version(
         card=mainboard,
         template=template,
@@ -756,12 +823,17 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                 "boon": 0,
                 "event": 0,
                 "location": 1,
+                "boss": 0,
+                "shop_item": 0,
             },
+            "min_cards_by_faction": {"order": 1, "blood": 1, "darkness": 0},
             "min_deprecated_cards": 1,
             "min_card_groups": 1,
             "min_cards_with_multiple_versions": 1,
             "required_template_keys": [template.key],
+            "required_tag_keys": list(required_inference_tags),
             "required_template_role_hints": {template.key: ["event"]},
+            "required_template_faction_hints": {template.key: ["blood"]},
         },
     }
 

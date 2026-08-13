@@ -212,3 +212,105 @@ def test_pool_scoped_identity_reverse_rejects_primary_alias_collisions() -> None
     executor.migrate([("card_reader_core", "0057_location_card_role")])
     executor = MigrationExecutor(connection)
     executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_faction_classification_migration_backfills_empty_namespace_and_nests_evidence() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+    old_apps = executor.loader.project_state(
+        [("card_reader_core", "0059_card_identity_pool_locks")]
+    ).apps
+    OldCard = old_apps.get_model("card_reader_core", "Card")
+    OldCardAlias = old_apps.get_model("card_reader_core", "CardAlias")
+    OldTemplate = old_apps.get_model("card_reader_core", "Template")
+    OldImportJob = old_apps.get_model("card_reader_core", "ImportJob")
+    OldImportJobItem = old_apps.get_model("card_reader_core", "ImportJobItem")
+    card = OldCard.objects.create(key="factionless", label="Factionless")
+    alias = OldCardAlias.objects.create(
+        card_id=card.id,
+        card_pool="player",
+        key="old-factionless",
+        label="Old Factionless",
+    )
+    template = OldTemplate.objects.create(key="migration-template", label="Migration")
+    job = OldImportJob.objects.create(source_path="imports/migration", template_id=template.id)
+    item = OldImportJobItem.objects.create(
+        job_id=job.id,
+        source_file="imports/migration/card.webp",
+        card_role_inference_json={
+            "mode": "automatic",
+            "resolved_roles": ["hero"],
+            "live_classification": {"card_pool": "player", "card_roles": ["hero"]},
+        },
+    )
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0060_faction_classification")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0060_faction_classification")]
+    ).apps
+    Card = apps.get_model("card_reader_core", "Card")
+    CardAlias = apps.get_model("card_reader_core", "CardAlias")
+    CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
+    CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
+    ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
+
+    assert Card.objects.get(id=card.id).faction_identity_key == "[]"
+    assert CardAlias.objects.get(id=alias.id).faction_identity_key == "[]"
+    migrated_evidence = ImportJobItem.objects.get(id=item.id).classification_inference_json
+    assert migrated_evidence["roles"]["resolved_roles"] == ["hero"]
+    assert migrated_evidence["factions"] == {}
+    assert migrated_evidence["live_classification"] == {
+        "card_pool": "player",
+        "card_roles": ["hero"],
+    }
+    assert CardFactionAssignment._meta.get_field("faction").max_length == 64
+    assert CardRoleAssignment._meta.get_field("role").choices == [
+        ("hero", "Hero"),
+        ("boss", "Boss"),
+        ("location", "Location"),
+        ("boon", "Boon"),
+        ("event", "Event"),
+        ("shop_item", "Shop Item"),
+    ]
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+    reversed_apps = executor.loader.project_state(
+        [("card_reader_core", "0059_card_identity_pool_locks")]
+    ).apps
+    ReversedItem = reversed_apps.get_model("card_reader_core", "ImportJobItem")
+    assert ReversedItem.objects.get(id=item.id).card_role_inference_json["resolved_roles"] == [
+        "hero"
+    ]
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_faction_classification_reverse_rejects_faction_data() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0060_faction_classification")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0060_faction_classification")]
+    ).apps
+    Card = apps.get_model("card_reader_core", "Card")
+    CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
+    card = Card.objects.create(
+        key="order-card",
+        label="Order Card",
+        faction_identity_key='["order"]',
+    )
+    assignment = CardFactionAssignment.objects.create(card_id=card.id, faction="order")
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="cannot be reversed while faction data exists"):
+        executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+
+    CardFactionAssignment.objects.filter(id=assignment.id).delete()
+    Card.objects.filter(id=card.id).delete()
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
