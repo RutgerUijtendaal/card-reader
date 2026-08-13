@@ -49,6 +49,12 @@ export const buildWorkspaceGalleryLocation = (
     : '/cards';
 };
 
+export const buildWorkspaceSelectionLocation = (
+  cardPool: CardPool,
+): RouteLocationRaw => cardPool === 'player'
+  ? { path: '/cards', query: { card_pool: 'player' } }
+  : buildWorkspaceGalleryLocation(cardPool);
+
 export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () => {
   const activePool = ref<CardPool>('player');
   const accessiblePools = ref<CardPool[]>(['player']);

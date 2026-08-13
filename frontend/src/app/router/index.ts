@@ -82,6 +82,9 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     }
 
     if (to.path === '/cards') {
+      if (requestedPool === 'player' && rawRequestedPool !== undefined) {
+        return buildWorkspaceGalleryLocation('player', to.query);
+      }
       if (rawRequestedPool !== undefined && requestedPool === undefined) {
         workspace.selectPool('player');
         return buildWorkspaceGalleryLocation('player', to.query);

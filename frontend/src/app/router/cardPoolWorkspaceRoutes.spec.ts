@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { createAppRouter } from '@/app/router';
 import { useAuthStore } from '@/domain/session/store';
 import {
+  buildWorkspaceSelectionLocation,
   CARD_POOL_WORKSPACE_PREFERENCE_KEY,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
@@ -86,4 +87,18 @@ describe('card pool workspace routes', () => {
     expect(router.currentRoute.value.path).toBe('/playtester');
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
+
+  test.each(['evil', 'neutral'] as const)(
+    'switches from %s back to canonical Player Gallery',
+    async (restrictedPool) => {
+      setSession(['player', 'evil', 'neutral']);
+      const router = createAppRouter(createMemoryHistory());
+      await router.push(`/cards?card_pool=${restrictedPool}`);
+
+      await router.push(buildWorkspaceSelectionLocation('player'));
+
+      expect(router.currentRoute.value.fullPath).toBe('/cards');
+      expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+    },
+  );
 });

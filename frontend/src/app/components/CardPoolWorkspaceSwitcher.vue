@@ -49,7 +49,7 @@ import type { Component } from 'vue';
 import type { CardPool } from '@/domain/cards/cardPools';
 import EvilPoolIcon from '@/domain/cards/components/EvilPoolIcon.vue';
 import {
-  buildWorkspaceGalleryLocation,
+  buildWorkspaceSelectionLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
 import InfoTooltip from '@/shared/components/InfoTooltip.vue';
@@ -67,7 +67,7 @@ const poolIcons: Record<CardPool, Component> = {
 };
 
 const selectPool = async (cardPool: CardPool): Promise<void> => {
-  const navigationFailure = await router.push(buildWorkspaceGalleryLocation(cardPool));
+  const navigationFailure = await router.push(buildWorkspaceSelectionLocation(cardPool));
   if (navigationFailure) {
     return;
   }
