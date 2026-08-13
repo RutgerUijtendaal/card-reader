@@ -70,4 +70,18 @@ describe('import evidence presentation', () => {
     expect(evidence).toContainEqual({ label: 'Faction tags', value: 'order' });
     expect(getWarningEvidence({ code: 'future_warning', message: 'Future warning.' })).toEqual([]);
   });
+
+  test('labels historical missing facet evidence as unavailable', () => {
+    const evidence = getInferenceEvidence(item({
+      status: 'completed',
+      classification_inference: {
+        roles: { mode: 'automatic', matched_tag_keys: ['hero'] },
+        factions: {},
+      },
+    }));
+
+    expect(evidence).toContainEqual({ label: 'Role resolution', value: 'Automatic' });
+    expect(evidence).toContainEqual({ label: 'Faction resolution', value: 'Unavailable' });
+    expect(evidence).not.toContainEqual({ label: 'Faction signals', value: 'None matched' });
+  });
 });

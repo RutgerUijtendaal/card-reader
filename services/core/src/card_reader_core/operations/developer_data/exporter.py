@@ -9,6 +9,7 @@ import tempfile
 from typing import Any, cast
 
 from django.db.migrations.recorder import MigrationRecorder
+from django.db.models import Q
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
@@ -115,6 +116,7 @@ def _resolve_selection(
     selection: DeveloperDataSelection,
 ) -> tuple[list[Card], list[CardGroup]]:
     selected_keys = set(selection.card_keys)
+    group_card_ids: set[str] = set()
     group_queryset = CardGroup.objects.filter(
         anchor_card__card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools,
     ).exclude(
@@ -132,14 +134,16 @@ def _resolve_selection(
     if missing_groups:
         raise DeveloperDataError(f"Selected card groups were not found: {', '.join(missing_groups)}")
     for group in groups:
-        selected_keys.add(group.anchor_card.key)
-        selected_keys.update(member.card.key for member in group.members.all())
+        group_card_ids.add(group.anchor_card.id)
+        group_card_ids.update(member.card.id for member in group.members.all())
 
     card_queryset = Card.objects.filter(
         card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools
     )
     if not selection.include_all_cards:
-        card_queryset = card_queryset.filter(key__in=selected_keys)
+        card_queryset = card_queryset.filter(
+            Q(key__in=selected_keys) | Q(id__in=group_card_ids)
+        )
     cards = list(
         card_queryset
         .prefetch_related(
@@ -154,7 +158,7 @@ def _resolve_selection(
             "versions__card_version_symbols__symbol",
             "versions__card_version_types__type",
         )
-        .order_by("key")
+        .order_by("key", "faction_identity_key", "id")
     )
     missing_cards = sorted(selected_keys - {card.key for card in cards})
     if missing_cards:

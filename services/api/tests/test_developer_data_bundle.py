@@ -385,6 +385,44 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
         transaction.set_rollback(True)
 
 
+def test_group_selection_keeps_same_key_faction_twins_out_of_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "group-selection-dev-data.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection.update(
+            {
+                "card_keys": ["synthetic-deprecated"],
+                "card_group_keys": ["synthetic-group"],
+                "coverage": {
+                    **selection["coverage"],  # type: ignore[dict-item]
+                    "min_cards": 3,
+                    "min_cards_by_pool": {"player": 3, "evil": 0, "neutral": 0},
+                },
+            }
+        )
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        manifest = export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="group-selection-test-revision",
+        )
+
+        assert manifest.counts["cards"] == 3
+        _, payload = validate_archive(archive_path)
+        mainboards = [card for card in payload.cards if card.key == "synthetic-mainboard"]
+        assert [card.card_factions for card in mainboards] == [["order", "blood"]]
+        transaction.set_rollback(True)
+
+
 def test_import_removes_assets_copied_before_asset_conflict(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -644,16 +682,26 @@ def _build_reclassified_archive(
         archive.extractall(extraction_root, filter="data")
     data_path = extraction_root / "data.json"
     payload = json.loads(data_path.read_text(encoding="utf-8"))
-    card = next(card for card in payload["cards"] if card["key"] == card_key)
-    card["card_pool"] = card_pool
-    for group in payload["card_groups"]:
-        references = [
+    group_references = [
+        reference
+        for group in payload["card_groups"]
+        for reference in [
             group["anchor_card_ref"],
             *(member["card_ref"] for member in group["members"]),
         ]
-        for reference in references:
-            if reference["key"] == card_key:
-                reference["card_pool"] = card_pool
+        if reference["key"] == card_key
+    ]
+    referenced_factions = group_references[0]["card_factions"] if group_references else None
+    card = next(
+        card
+        for card in payload["cards"]
+        if card["key"] == card_key
+        and (referenced_factions is None or card["card_factions"] == referenced_factions)
+    )
+    card["card_pool"] = card_pool
+    for reference in group_references:
+        if reference["card_factions"] == card["card_factions"]:
+            reference["card_pool"] = card_pool
     serialized = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
     data_path.write_bytes(serialized)
     manifest_path = extraction_root / "manifest.json"

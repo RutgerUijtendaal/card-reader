@@ -14,6 +14,10 @@ keys remain regression anchors that must still exist. The committed
 
 Selection, group validation, archive construction, and archive loading use a fixed canonical Player-only `CardPoolScope`. Selection keys resolve only against Player cards, so same-key Evil or Neutral twins neither override nor invalidate the selected Player card. Archive validation rejects non-Player card records and cross-pool groups even when an archive was produced outside the normal exporter. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive restricted-pool eligibility cannot expand published bundles accidentally.
 
+Cards included through a selected group retain their exact database identity during selection; a
+same-key Player card in another faction namespace is not pulled into the bundle merely because it
+shares the group's member key.
+
 Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
 cards with the public relationships needed for gallery, history, metadata, deck building, and
 Playtester workflows. Version 4 template records include canonical `inferred_card_roles` and
