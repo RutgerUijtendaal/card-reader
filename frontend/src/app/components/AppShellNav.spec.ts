@@ -58,6 +58,7 @@ vi.mock('@/app/components/ThemeModeMenu.vue', () => ({
 const mountNav = async (
   props: { collapsed?: boolean; mobile?: boolean } = {},
   accessiblePools: CardPool[] = ['player'],
+  blockEvilNavigation = false,
 ) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -76,6 +77,9 @@ const mountNav = async (
       { path: '/admin', component: { template: '<div />' } },
     ],
   });
+  if (blockEvilNavigation) {
+    router.beforeEach((to) => to.query.card_pool !== 'evil');
+  }
   await router.push('/cards');
   await router.isReady();
   const pinia = createPinia();
@@ -89,6 +93,7 @@ const mountNav = async (
 
   return {
     container,
+    workspace,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -102,6 +107,7 @@ describe('AppShellNav', () => {
     unreadNotificationCount.value = 3;
     pendingAccessRequestCount.value = 0;
     authState.canAccessStaffRoutes = false;
+    localStorage.clear();
     document.body.innerHTML = '';
   });
 
@@ -174,11 +180,27 @@ describe('AppShellNav', () => {
     expect(evilButton).toBeInstanceOf(HTMLButtonElement);
 
     evilButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     await nextTick();
 
     expect(mounted.container.textContent).not.toContain('Playtester');
     expect(mounted.container.textContent).not.toContain('Build a deck');
     expect(mounted.container.querySelector('a[href="/cards?card_pool=evil"]')).not.toBeNull();
+    mounted.unmount();
+  });
+
+  test('keeps the current workspace mounted when guarded navigation is rejected', async () => {
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], true);
+    const generation = mounted.workspace.generation;
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]');
+
+    evilButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.workspace.activePool).toBe('player');
+    expect(mounted.workspace.generation).toBe(generation);
+    expect(mounted.container.textContent).toContain('Playtester');
     mounted.unmount();
   });
 

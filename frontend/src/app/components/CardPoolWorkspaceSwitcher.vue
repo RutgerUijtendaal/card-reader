@@ -29,7 +29,7 @@
           :aria-describedby="tooltipId"
           :aria-pressed="workspace.activePool === option.value"
           :data-card-pool="option.value"
-          @click="selectPool(option.value)"
+          @click="void selectPool(option.value)"
         >
           <component
             :is="poolIcons[option.value]"
@@ -66,9 +66,12 @@ const poolIcons: Record<CardPool, Component> = {
   neutral: Scale,
 };
 
-const selectPool = (cardPool: CardPool): void => {
+const selectPool = async (cardPool: CardPool): Promise<void> => {
+  const navigationFailure = await router.push(buildWorkspaceGalleryLocation(cardPool));
+  if (navigationFailure) {
+    return;
+  }
   workspace.selectPool(cardPool);
   emit('selected');
-  void router.push(buildWorkspaceGalleryLocation(cardPool));
 };
 </script>

@@ -35,8 +35,16 @@ const gallerySearchParams = ref('');
 const isLoadingMoreCards = ref(false);
 let pendingLoadMorePromise: Promise<void> | null = null;
 let gallerySnapshot: GallerySnapshot<GalleryNavigationCard> | null = null;
+let galleryNavigationGeneration = 0;
+
+const invalidatePendingGalleryLoad = (): void => {
+  galleryNavigationGeneration += 1;
+  pendingLoadMorePromise = null;
+  isLoadingMoreCards.value = false;
+};
 
 export const clearGalleryNavigationState = (): void => {
+  invalidatePendingGalleryLoad();
   galleryCards.value = [];
   galleryTotalCount.value = 0;
   galleryNextPage.value = null;
@@ -171,6 +179,7 @@ export const setGalleryNavigationCards = (
   pageSize: number,
   searchParams: string,
 ): void => {
+  invalidatePendingGalleryLoad();
   galleryCards.value = cards;
   galleryTotalCount.value = totalCount;
   galleryNextPage.value = nextPage;
@@ -200,23 +209,34 @@ const loadMoreGalleryCards = async (): Promise<void> => {
     return;
   }
 
-  pendingLoadMorePromise = (async () => {
+  const requestGeneration = galleryNavigationGeneration;
+  const requestPromise = (async () => {
     isLoadingMoreCards.value = true;
     try {
       const response = await fetchCards<GalleryNavigationCard>(new URLSearchParams(queryString));
+      if (requestGeneration !== galleryNavigationGeneration) {
+        return;
+      }
       const seen = new Set(galleryCards.value.map((card) => `${card.result_type}:${card.id}`));
       const appendedCards = response.results.filter((card) => !seen.has(`${card.result_type}:${card.id}`));
       galleryCards.value = [...galleryCards.value, ...appendedCards];
       galleryTotalCount.value = response.count;
       galleryNextPage.value = response.next_page;
       galleryPageSize.value = response.page_size;
+    } catch (error) {
+      if (requestGeneration === galleryNavigationGeneration) {
+        throw error;
+      }
     } finally {
-      isLoadingMoreCards.value = false;
-      pendingLoadMorePromise = null;
+      if (requestGeneration === galleryNavigationGeneration) {
+        isLoadingMoreCards.value = false;
+        pendingLoadMorePromise = null;
+      }
     }
   })();
+  pendingLoadMorePromise = requestPromise;
 
-  return pendingLoadMorePromise;
+  return requestPromise;
 };
 
 export const useGalleryCardNavigation = (
@@ -272,7 +292,11 @@ export const useGalleryCardNavigation = (
       return;
     }
 
+    const navigationGeneration = galleryNavigationGeneration;
     await loadMoreGalleryCards();
+    if (navigationGeneration !== galleryNavigationGeneration) {
+      return;
+    }
     navigateToCard(nextCard.value);
   };
 

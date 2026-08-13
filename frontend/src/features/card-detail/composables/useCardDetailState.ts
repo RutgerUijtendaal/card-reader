@@ -636,12 +636,9 @@ const uniqueIds = (ids: string[]): string[] => Array.from(new Set(ids));
 export const reconcileCardGroupsAfterPoolChange = (
   groups: CardGroupSummary[],
   cardPool: CardPool,
-): CardGroupSummary[] => groups.flatMap((group) => {
-  if (group.is_anchor) {
-    return [{ ...group, card_pool: cardPool }];
-  }
-  return group.card_pool === cardPool ? [group] : [];
-});
+): CardGroupSummary[] => groups.map((group) =>
+  group.is_anchor ? { ...group, card_pool: cardPool } : group,
+);
 
 export type CardClassificationFields = Pick<
   CardVersionDetail,

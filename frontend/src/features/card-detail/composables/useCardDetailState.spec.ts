@@ -23,7 +23,7 @@ const buildGroup = (
 });
 
 describe('reconcileCardGroupsAfterPoolChange', () => {
-  test('updates anchored groups and removes stale groups anchored in the previous pool', () => {
+  test('updates anchored groups and preserves cross-pool memberships', () => {
     const groups = [
       buildGroup('anchored-group', 'player', true),
       buildGroup('old-pool-group', 'player', false),
@@ -32,6 +32,7 @@ describe('reconcileCardGroupsAfterPoolChange', () => {
 
     expect(reconcileCardGroupsAfterPoolChange(groups, 'evil')).toEqual([
       { ...groups[0], card_pool: 'evil' },
+      groups[1],
       groups[2],
     ]);
   });
