@@ -1,5 +1,7 @@
 # Card Classification Step 2.3: Faction Classification
 
+Later amendment: [Step 3.2](card-classification-step-3-2-admin-owned-inference-rules.md) supersedes this checkpoint's template classification hints and versioned hard-coded tag maps before the feature ships. Faction persistence, pool-plus-exact-faction identity, the canonical role/faction registries, overrides, and mismatch behavior remain unchanged; automatic inference moves to admin-owned pool-specific Tag/Type rules snapshotted per job.
+
 Status: implemented, validated, reviewed, and merged into the classification umbrella branch.
 
 This checkpoint completes the card-classification vocabulary before the Player/Evil/Neutral workspace is built:

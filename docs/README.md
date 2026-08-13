@@ -23,7 +23,7 @@ This directory contains feature descriptions, operational guides, and technical 
 
 ## Implementation plans
 
-The card-pool, role, and faction work is split into eight dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
+The card-pool, role, and faction work is split into nine dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
 
 1. [Card classification Step 1: Foundation](card-classification-step-1-foundation.md) replaces the Hero flag with an initial Player/Game Master pool and multi-valued card roles, migrates existing data, preserves Hero behavior, adds editing/filtering, and establishes restricted-card access protection.
 2. [Card classification Step 1.1: Authorization seam](card-classification-step-1-1-authorization-seam.md) consolidates user entitlement into an explicit core card-pool scope across queries, payloads, derived state, notifications, images, and published artifacts before the surface grows.
@@ -33,6 +33,7 @@ The card-pool, role, and faction work is split into eight dependency-ordered che
 6. [Card classification Step 2.3: Faction classification](card-classification-step-2-3-faction-classification.md) adds Order/Blood/Darkness as a second multi-valued facet, completes the role vocabulary, generalizes import classification mechanics, and scopes natural card identity by pool plus exact faction set.
 7. [Card classification Step 3: Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md) adds the three-way sidenav context, single-pool route and collection scoping, workspace-aware navigation, and the final restricted-pool authorization audit.
 8. [Card classification Step 3.1: Context-preserving workspace switching](card-classification-step-3-1-context-preserving-workspace-switching.md) keeps compatible global and resource routes mounted during workspace changes, centralizes route capability decisions, and limits Gallery fallback navigation to incompatible Player-only routes.
+9. [Card classification Step 3.2: Admin-owned inference rules](card-classification-step-3-2-admin-owned-inference-rules.md) removes template hints and hard-coded tag policies, adds pool-specific Tag/Type inference rules to Admin Catalog, and snapshots those rules for deterministic imports.
 
 ### Classification delivery model
 
@@ -40,4 +41,4 @@ The card-pool, role, and faction work is split into eight dependency-ordered che
 - Each checkpoint is implemented on its own branch with a pull request targeting `feature/card-classification`, not `master`.
 - Merge checkpoint pull requests into the umbrella branch in dependency order. Create the next checkpoint branch from the updated umbrella branch so its diff contains only that checkpoint.
 - CI and automatic review must run on both checkpoint and aggregate pull requests. Do not retarget a checkpoint pull request merely to trigger them.
-- Merge the umbrella pull request to `master` only after all eight checkpoint acceptance criteria pass and the aggregate review is clear.
+- Merge the umbrella pull request to `master` only after all nine checkpoint acceptance criteria pass and the aggregate review is clear.

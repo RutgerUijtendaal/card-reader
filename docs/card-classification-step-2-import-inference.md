@@ -1,5 +1,7 @@
 # Card Classification Step 2: Import Inference
 
+Later amendment: [Step 3.2](card-classification-step-3-2-admin-owned-inference-rules.md) removes this checkpoint's template hints and hard-coded tag-policy implementation before the feature ships. It retains independent automatic/exact facet modes, immutable job configuration, evidence, and existing-card mismatch safety, but automatic classification becomes an admin-owned, pool-specific Tag/Type rule snapshot.
+
 Status: implemented by the Step 2 checkpoint; retained as the executable design and acceptance record.
 
 Target amendment: this document records Step 2's temporary Player/Game Master import values. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces `game_master` with `evil` and `neutral`, requires one of the final three pools for every batch, and keeps inference and override semantics unchanged.
