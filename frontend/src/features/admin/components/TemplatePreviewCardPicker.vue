@@ -52,7 +52,7 @@
             {{ card.name }}
           </div>
           <div class="theme-section-muted truncate text-xs">
-            {{ card.label }} · {{ card.template_id }}
+            {{ cardPoolLabel(card.card_pool) }} · {{ card.label }} · {{ card.template_id }}
           </div>
         </button>
       </div>
@@ -62,6 +62,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import type { TemplatePreviewCardOption, TemplatePreviewScope } from '@/features/admin/types';
 
 const props = defineProps<{

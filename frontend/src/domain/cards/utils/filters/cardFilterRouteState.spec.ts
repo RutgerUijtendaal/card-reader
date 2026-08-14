@@ -3,6 +3,7 @@ import { createEmptyCardFilterState } from '@/domain/cards/utils/filters/cardFil
 import {
   buildCardFilterRouteQuery,
   getCardFilterSignature,
+  isCardFilterStateReady,
   parseCardFilterRouteQuery,
 } from '@/domain/cards/utils/filters/cardFilterRouteState';
 
@@ -113,5 +114,14 @@ describe('cardFilterRouteState', () => {
     );
 
     expect(left).toBe(right);
+  });
+
+  test('marks route-backed actions ready only after filters match the route', () => {
+    const playerState = createEmptyCardFilterState('player');
+    const evilState = createEmptyCardFilterState('evil');
+
+    expect(isCardFilterStateReady(false, evilState, evilState)).toBe(false);
+    expect(isCardFilterStateReady(true, playerState, evilState)).toBe(false);
+    expect(isCardFilterStateReady(true, evilState, evilState)).toBe(true);
   });
 });

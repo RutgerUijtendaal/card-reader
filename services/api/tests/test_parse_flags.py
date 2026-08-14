@@ -95,6 +95,67 @@ def test_evil_parse_flags_follow_the_central_access_capability() -> None:
     assert staff_response.status_code == 201
 
 
+def test_review_lists_are_global_across_every_authorized_card_pool() -> None:
+    _clear_parse_flags()
+    reviewer = _create_user("global-reviewer", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    player_card, player_version = _create_card_version(name="Player Review Flag")
+    evil_card, evil_version = _create_card_version(
+        name="Evil Review Flag",
+        card_pool=EVIL_CARD_POOL,
+    )
+    CardVersion.objects.filter(id__in=[player_version.id, evil_version.id]).update(
+        confidence=0.7
+    )
+    payload = {"items": [{"property_key": "name", "expected_value": "Correct name"}]}
+    assert (
+        client.post(
+            f"/cards/{player_card.id}/versions/{player_version.id}/flags",
+            data=payload,
+            content_type="application/json",
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            f"/cards/{evil_card.id}/versions/{evil_version.id}/flags",
+            data=payload,
+            content_type="application/json",
+        ).status_code
+        == 201
+    )
+
+    flags_response = client.get("/review/parse-flags")
+    confidence_response = client.get("/review/confidence-cards")
+
+    assert flags_response.status_code == 200
+    assert {
+        (row["card"]["name"], row["card"]["card_pool"])
+        for row in flags_response.json()["results"]
+    } == {
+        ("Player Review Flag", "player"),
+        ("Evil Review Flag", "evil"),
+    }
+    assert confidence_response.status_code == 200
+    assert {
+        (row["name"], row["card_pool"])
+        for row in confidence_response.json()["results"]
+    }.issuperset({
+        ("Player Review Flag", "player"),
+        ("Evil Review Flag", "evil"),
+    })
+
+
+def test_regular_user_cannot_read_global_review_lists() -> None:
+    reviewer = _create_user("non-staff-global-reviewer", "password", is_staff=False)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+
+    assert client.get("/review/parse-flags").status_code == 403
+    assert client.get("/review/confidence-cards").status_code == 403
+
+
 def test_authenticated_user_can_create_overall_and_property_flag_items() -> None:
     _clear_parse_flags()
     user = _create_user("parse-flag-overall-user", "password", is_staff=False)

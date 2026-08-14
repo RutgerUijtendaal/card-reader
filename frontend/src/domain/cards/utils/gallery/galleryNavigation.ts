@@ -14,7 +14,7 @@ import {
 import type { GalleryPageState } from '@/domain/cards/utils/gallery/galleryState';
 import { DEFAULT_CARD_PAGE_SIZE } from '@/domain/cards/utils/gallery/pageSize';
 import type { GalleryItem } from '@/domain/cards/types';
-import type { CardPool } from '@/domain/cards/cardPools';
+import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
 
 type GalleryNavigationCard = {
   id: string;
@@ -35,6 +35,22 @@ const gallerySearchParams = ref('');
 const isLoadingMoreCards = ref(false);
 let pendingLoadMorePromise: Promise<void> | null = null;
 let gallerySnapshot: GallerySnapshot<GalleryNavigationCard> | null = null;
+let galleryNavigationGeneration = 0;
+
+const invalidatePendingGalleryLoad = (): void => {
+  galleryNavigationGeneration += 1;
+  pendingLoadMorePromise = null;
+  isLoadingMoreCards.value = false;
+};
+
+export const clearGalleryNavigationState = (): void => {
+  invalidatePendingGalleryLoad();
+  galleryCards.value = [];
+  galleryTotalCount.value = 0;
+  galleryNextPage.value = null;
+  gallerySearchParams.value = '';
+  gallerySnapshot = null;
+};
 
 const normalizeGalleryQuery = (query: LocationQuery): LocationQueryRaw =>
   buildCardFilterRouteQuery(parseCardFilterRouteQuery(query));
@@ -43,8 +59,21 @@ export const getGalleryRouteQuery = (query: LocationQuery): LocationQueryRaw => 
 
 const hasQueryEntries = (query: LocationQueryRaw): boolean => Object.keys(query).length > 0;
 
+const resolveOriginatingCardPool = (query: LocationQuery): CardPool =>
+  isCardPool(query.return_card_pool)
+    ? query.return_card_pool
+    : parseCardFilterRouteQuery(query).cardPool;
+
 export const buildGalleryLocation = (query: LocationQuery): RouteLocationRaw => {
   const galleryQuery = getGalleryRouteQuery(query);
+  const returnCardPool = isCardPool(query.return_card_pool)
+    ? query.return_card_pool
+    : undefined;
+  if (returnCardPool === 'player') {
+    delete galleryQuery.card_pool;
+  } else if (returnCardPool) {
+    galleryQuery.card_pool = returnCardPool;
+  }
   if (!hasQueryEntries(galleryQuery)) {
     return '/cards';
   }
@@ -55,10 +84,23 @@ export const buildCardDetailLocation = (
   cardId: string,
   query: LocationQuery,
   mode: 'detail' | 'edit',
-): RouteLocationRaw => ({
-  path: mode === 'edit' ? `/cards/${cardId}/edit` : `/cards/${cardId}`,
-  query: getGalleryRouteQuery(query),
-});
+  cardPool?: CardPool,
+): RouteLocationRaw => {
+  const cardQuery = getGalleryRouteQuery(query);
+  const sourceCardPool = resolveOriginatingCardPool(query);
+  if (cardPool && cardPool !== sourceCardPool) {
+    cardQuery.return_card_pool = sourceCardPool;
+  }
+  if (cardPool && cardPool !== 'player') {
+    cardQuery.card_pool = cardPool;
+  } else if (cardPool === 'player') {
+    delete cardQuery.card_pool;
+  }
+  return {
+    path: mode === 'edit' ? `/cards/${cardId}/edit` : `/cards/${cardId}`,
+    query: cardQuery,
+  };
+};
 
 export const buildCardGroupDetailLocation = (
   groupId: string,
@@ -66,6 +108,10 @@ export const buildCardGroupDetailLocation = (
   cardPool?: CardPool,
 ): RouteLocationRaw => {
   const groupQuery = getGalleryRouteQuery(query);
+  const sourceCardPool = resolveOriginatingCardPool(query);
+  if (cardPool && cardPool !== sourceCardPool) {
+    groupQuery.return_card_pool = sourceCardPool;
+  }
   if (cardPool && cardPool !== 'player') {
     groupQuery.card_pool = cardPool;
   } else if (cardPool === 'player') {
@@ -133,6 +179,7 @@ export const setGalleryNavigationCards = (
   pageSize: number,
   searchParams: string,
 ): void => {
+  invalidatePendingGalleryLoad();
   galleryCards.value = cards;
   galleryTotalCount.value = totalCount;
   galleryNextPage.value = nextPage;
@@ -162,23 +209,34 @@ const loadMoreGalleryCards = async (): Promise<void> => {
     return;
   }
 
-  pendingLoadMorePromise = (async () => {
+  const requestGeneration = galleryNavigationGeneration;
+  const requestPromise = (async () => {
     isLoadingMoreCards.value = true;
     try {
       const response = await fetchCards<GalleryNavigationCard>(new URLSearchParams(queryString));
+      if (requestGeneration !== galleryNavigationGeneration) {
+        return;
+      }
       const seen = new Set(galleryCards.value.map((card) => `${card.result_type}:${card.id}`));
       const appendedCards = response.results.filter((card) => !seen.has(`${card.result_type}:${card.id}`));
       galleryCards.value = [...galleryCards.value, ...appendedCards];
       galleryTotalCount.value = response.count;
       galleryNextPage.value = response.next_page;
       galleryPageSize.value = response.page_size;
+    } catch (error) {
+      if (requestGeneration === galleryNavigationGeneration) {
+        throw error;
+      }
     } finally {
-      isLoadingMoreCards.value = false;
-      pendingLoadMorePromise = null;
+      if (requestGeneration === galleryNavigationGeneration) {
+        isLoadingMoreCards.value = false;
+        pendingLoadMorePromise = null;
+      }
     }
   })();
+  pendingLoadMorePromise = requestPromise;
 
-  return pendingLoadMorePromise;
+  return requestPromise;
 };
 
 export const useGalleryCardNavigation = (
@@ -234,7 +292,11 @@ export const useGalleryCardNavigation = (
       return;
     }
 
+    const navigationGeneration = galleryNavigationGeneration;
     await loadMoreGalleryCards();
+    if (navigationGeneration !== galleryNavigationGeneration) {
+      return;
+    }
     navigateToCard(nextCard.value);
   };
 

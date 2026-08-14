@@ -3,9 +3,20 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import ReviewQueuePage from '@/features/review-queue/ReviewQueuePage.vue';
 
-const { apiGet, apiPatch, decrementOpenParseFlagItemCount, loadReviewSummary } = vi.hoisted(() => ({
+const {
+  apiGet,
+  apiPatch,
+  collectionOptions,
+  decrementOpenParseFlagItemCount,
+  loadReviewSummary,
+} = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
+  collectionOptions: {
+    buildSearchParams: null as null | (() => URLSearchParams),
+    fetchPage: null as null | ((params: URLSearchParams) => Promise<unknown>),
+    resultSetKey: null as null | { value: unknown },
+  },
   decrementOpenParseFlagItemCount: vi.fn(),
   loadReviewSummary: vi.fn(),
 }));
@@ -19,13 +30,22 @@ vi.mock('@/shared/api/client', () => ({
 }));
 
 vi.mock('@/domain/cards/composables/useCardCollection', () => ({
-  useCardCollection: () => ({
-    cards: ref([]),
-    isLoadingInitial: ref(false),
-    nextPage: ref(null),
-    searchCards: vi.fn(),
-    loadNextPage: vi.fn(),
-  }),
+  useCardCollection: (options: {
+    buildSearchParams: () => URLSearchParams;
+    fetchPage?: (params: URLSearchParams) => Promise<unknown>;
+    resultSetKey?: { value: unknown };
+  }) => {
+    collectionOptions.buildSearchParams = options.buildSearchParams;
+    collectionOptions.fetchPage = options.fetchPage ?? null;
+    collectionOptions.resultSetKey = options.resultSetKey ?? null;
+    return {
+      cards: ref([]),
+      isLoadingInitial: ref(false),
+      nextPage: ref(null),
+      searchCards: vi.fn(),
+      loadNextPage: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('@/domain/review/composables/useReviewSummary', () => ({
@@ -73,7 +93,13 @@ const pagePayload = () => ({
       created_at: '2026-07-23T10:00:00Z',
       updated_at: '2026-07-23T10:01:00Z',
       submitted_by: { id: 'user-1', username: 'reporter' },
-      card: { id: 'card-1', label: 'Card One', name: 'Card One', image_url: null },
+      card: {
+        id: 'card-1',
+        label: 'Card One',
+        name: 'Card One',
+        card_pool: 'player',
+        image_url: null,
+      },
       version: {
         id: 'version-1',
         version_number: 1,
@@ -188,6 +214,22 @@ describe('ReviewQueuePage parse flags', () => {
     expect(lowConfidenceButton?.getAttribute('aria-current')).toBe('page');
     expect(lowConfidenceButton?.classList.contains('theme-selected-surface-strong')).toBe(true);
     expect(mounted.container.textContent).not.toContain('Report Status');
+    mounted.unmount();
+  });
+
+  test('keeps confidence cards and parse flags global across authorized pools', async () => {
+    const mounted = await mountPage();
+
+    expect(collectionOptions.buildSearchParams?.().has('card_pool')).toBe(false);
+    expect(collectionOptions.resultSetKey).toBeNull();
+    expect(apiGet).toHaveBeenCalledWith(
+      '/review/parse-flags?status=open&page=1&page_size=25',
+    );
+    await collectionOptions.fetchPage?.(new URLSearchParams({ page: '1', page_size: '100' }));
+    expect(apiGet).toHaveBeenLastCalledWith(
+      '/review/confidence-cards?page=1&page_size=100',
+    );
+    expect(mounted.container.textContent).toContain('Player');
     mounted.unmount();
   });
 });

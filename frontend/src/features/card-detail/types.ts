@@ -9,6 +9,9 @@ export type CardDetail = {
   id: string;
   label: string;
   name: string;
+  card_pool: CardPool;
+  card_roles: CardRole[];
+  card_factions: CardFaction[];
   lifecycle_status?: CardLifecycleStatus;
   card_groups: CardGroupSummary[];
   deck_references: CardDeckReferenceSummary[];

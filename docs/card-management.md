@@ -18,7 +18,9 @@ Role and faction keys allow up to 64 characters. Their definitions, labels, and 
 
 Staff edit all three dimensions in the Card tab alongside lifecycle state and deck-building configuration. They are intentionally independent of template selection, which remains version-level parsing configuration. The Admin Catalog and reusable staff card-search rows show the pool, roles or Normal, and factions or No faction as visually distinct badge groups.
 
-Card collections accept one pool plus independent role and faction inclusion/exclusion filters with `any` or `all` matching. The ordinary Gallery starts in the Player pool with Hero excluded to keep its default browsing view focused. Staff can explicitly switch the Gallery filter to Evil or Neutral. Filter choices remain unconditional until the later pool-aware filter redesign. Imports require an explicit pool and default to independent automatic role and faction inference from snapshotted template hints and stable metadata signals; workspace-level navigation remains a separate future workflow.
+Admin Catalog and Review are global staff operational surfaces. They query every card pool authorized for the current staff user regardless of the Player/Evil/Neutral shell workspace. Their mixed-pool counts, queues, searches, suggestions, and previews always retain visible pool classification so duplicate names remain distinguishable.
+
+Card collections accept one pool plus independent role and faction inclusion/exclusion filters with `any` or `all` matching. Player, Evil, and Neutral are primary site workspaces selected from the sidenav; the active workspace supplies the Gallery pool and is serialized in shareable Gallery URLs. Player is the safe default, while Evil and Neutral options appear only when the session's ordered pool scope permits them. Every workspace starts with Hero excluded, no faction defaults, and no implicit Neutral overlay. Filter choices remain unconditional until the later pool-aware filter redesign. Imports require an explicit pool, prefill it from the active workspace, and default to independent automatic role and faction inference from snapshotted template hints and stable metadata signals.
 
 Import classification initializes only new card identities. Untargeted imports resolve factions before matching latest image hashes, primary names, and aliases inside the selected pool and exact canonical faction set. The same name or artwork may therefore represent independent cards in different pools or faction namespaces. Existing cards in the matched namespace and targeted reparses retain their authoritative Card-tab pool, roles, and factions. A differing inferred role result after an untargeted match, or any differing targeted-reparse classification, completes with an ordered warning and audit evidence instead of silently reclassifying the card.
 
@@ -48,6 +50,8 @@ Deprecating or reclassifying a card does not silently remove it from existing de
 ## Card groups
 
 Groups collect related card identities, such as alternate printings or variants, in an intentional order. Every group has an active anchor card that acts as its primary public identity.
+
+Groups may intentionally span pools. Public payloads include only members the viewer is authorized to access; staff can see and manage permitted cross-pool members. Linked members retain their own pool classification, show a pool badge when it differs from the active workspace, and preserve the originating workspace for return navigation. The group route uses the anchor's pool rather than borrowing the source card's pool.
 
 Deprecated non-anchor members may remain attached for administrative history but are omitted from active public group views. Changing group membership or order is handled through the group service so anchor and lifecycle invariants remain consistent.
 

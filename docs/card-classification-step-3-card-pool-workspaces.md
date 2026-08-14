@@ -1,6 +1,8 @@
 # Card Classification Step 3: Player, Evil, and Neutral Workspaces
 
-Status: approved implementation plan; blocked on [Step 2.3](card-classification-step-2-3-faction-classification.md).
+Status: implemented.
+
+Navigation amendment: [Step 3.1](card-classification-step-3-1-context-preserving-workspace-switching.md) replaces this step's initial unconditional safe-landing navigation with a centralized route-capability policy. Compatible global and resource routes stay mounted when the workspace changes; Gallery changes pool in place; only incompatible Player-only routes fall back to the target Gallery.
 
 This step turns the card pool into a site-level browsing context. It does not change the classification model or infer new data.
 
@@ -8,7 +10,7 @@ This step turns the card pool into a site-level browsing context. It does not ch
 
 Add a primary Player/Evil/Neutral workspace selector to the sidenav. Player is the default workspace for everyone. Evil and Neutral are initially available only when the session's centralized card-pool scope permits restricted pools, whose initial backend policy is staff-only.
 
-The active workspace scopes navigation and ordinary card collections to exactly one pool. Staff-only operational tools remain available in every permitted workspace. Direct cross-pool relationships remain allowed and render safely without changing a card's classification.
+The active workspace scopes navigation and ordinary card collections to exactly one pool. Staff-only operational tools remain available in every permitted workspace. Admin and Review are global operational surfaces over every pool authorized for the staff user; the workspace picker must not silently filter their data. Direct cross-pool relationships remain allowed and render safely without changing a card's classification.
 
 ## Locked decisions
 
@@ -18,6 +20,7 @@ The active workspace scopes navigation and ordinary card collections to exactly 
 - Player is the default for new sessions, logged-out users, and users whose allowed pool scope contains only Player.
 - Evil and Neutral share one restricted-pool access policy that initially maps to staff. Session/frontend code consumes the ordered allowed-pool scope rather than separate Evil and Neutral booleans.
 - Ordinary card collections are hard-scoped to one pool. An `all pools` option is reserved for explicit staff management tools and must not become a normal workspace.
+- Admin and Review are explicit global staff tools. Their catalogs, counts, queues, searches, linked-card payloads, suggestions, and previews use the viewer's full authorized pool scope and do not change when the shell workspace changes.
 - Neutral is its own stable pool and is not included automatically in Player or Evil. A future product pass may add an explicit Neutral overlay to either workspace, but that must remain an authorized multi-pool query state rather than multiple card ownership or silent request expansion.
 - Hero is excluded by default in each workspace. Boss, Location, Boon, Event, and Shop Item are not globally excluded. Faction filters have no default exclusions.
 - Cross-pool links do not automatically change the active workspace. A linked Player Hero opened from an Evil or Neutral card is visibly labeled Player, while Back/return navigation preserves the originating workspace.
@@ -64,7 +67,7 @@ Update `frontend/src/app/components/AppShellNav.vue` with a prominent three-opti
 - Each Evil or Neutral option appears only when that pool is present in the session's allowed scope.
 - Collapsed desktop navigation uses an accessible compact control or menu with an unambiguous tooltip/label.
 - Mobile navigation exposes the same state and behavior.
-- Switching workspaces closes the mobile drawer and navigates to the target workspace's safe landing route.
+- Switching workspaces closes the mobile drawer. After Step 3.1, compatible routes remain in place, Gallery changes pool in place, and only incompatible routes navigate to the target workspace's safe landing route.
 
 Player workspace navigation initially contains:
 
@@ -85,18 +88,21 @@ Decks, My Decks, Build a deck, and Playtester are intentionally absent from Evil
 
 Staff operational navigation such as Imports, Operations, Review Queue, and Admin stays separated below the existing divider and remains accessible from every permitted workspace. Imports should prefill their pool from the active workspace, while still displaying and requiring the pool field specified in Step 2.
 
+Admin and Review remain global after navigation. The selected shell workspace may change navigation composition and Import defaults, but it must not filter Admin Catalog or Review data. These surfaces show every authorized pool together and retain visible pool badges or explicit pool fields wherever duplicate names or pool-specific configuration could otherwise be ambiguous.
+
 ## Collection and route scoping
 
-Apply the active pool explicitly to every relevant frontend request:
+Apply the active pool explicitly to every workspace-owned frontend request:
 
 - gallery and grouped gallery;
 - card search/select controls;
 - card group views and embedded previews;
-- catalog linked-card previews;
 - exports initiated from a card collection;
 - deck-builder hero and card galleries;
 - Playtester deck/card preview surfaces;
-- any app-wide card counts or suggestions.
+- any workspace-owned card counts or suggestions.
+
+Do not pass the active workspace as an implicit filter to Admin or Review. Their endpoints apply the centralized full card-pool scope for the staff user. Admin Catalog linked-card counts, suggestion occurrences, detail previews, and classification-rule records remain cross-pool; Review confidence cards, parse flags, queues, and summary counts remain cross-pool. Imports may consume the active workspace only as a visible, replaceable default.
 
 Player deck, deck-builder, and Playtester requests always send `card_pool=player`, even if a staff user has Evil or Neutral as the shell workspace. If those routes are reached directly, keep their Player classification explicit and show the Player workspace or route back to a safe restricted-pool page according to the route guard. Once decks have their own explicit pool, Playtester must reject or omit every non-Player deck independently of the cards currently embedded in it.
 
@@ -186,7 +192,7 @@ All visible changes must use semantic theme primitives and be verified in light 
 3. Consume the ordered session pool-scope contract.
 4. Add desktop, collapsed, and mobile sidenav controls.
 5. Make nav item composition workspace-aware.
-6. Synchronize workspace, route query, auth changes, and safe landing routes.
+6. Synchronize workspace, route query, auth changes, and initial safe landing routes; Step 3.1 refines voluntary switching to preserve compatible routes.
 7. Scope gallery and all reusable card collection clients.
 8. Keep existing deck routes Player-scoped, hide them and Playtester from Evil/Neutral navigation, and lock Playtester to Player decks explicitly.
 9. Prefill, but do not hide, the import pool from the active workspace.
@@ -205,10 +211,11 @@ Add or update tests covering:
 - deferred Evil and Neutral responses resolving after access loss and being rejected before they can mutate data, errors, pagination, or loading state;
 - desktop, collapsed, and mobile toggle behavior;
 - workspace-specific nav item composition;
-- safe landing routes and route-query synchronization;
+- safe landing routes and route-query synchronization, followed by Step 3.1 coverage for context-preserving compatible routes;
 - clearing stale collections during a switch and rejecting responses from the previous request generation;
 - gallery Hero-excluded defaults in all three pools;
-- every collection request carrying an explicit pool;
+- every workspace-owned collection request carrying an explicit pool;
+- Admin and Review requests remaining global across the staff user's authorized pools regardless of the selected workspace;
 - deck builder and Playtester remaining Player-scoped;
 - import pool prefill without removing explicit confirmation;
 - direct cross-pool links preserving the originating workspace;
@@ -235,6 +242,7 @@ Do not run prohibited service/integration suites. Run affected permitted fronten
 - Player deck building and Playtester never admit Evil or Neutral cards.
 - Imports visibly prefill the current workspace while retaining explicit pool confirmation.
 - Staff tools remain reachable from every permitted workspace.
+- Admin Catalog and Review retain the same authorized all-pools data when the shell workspace changes.
 - Direct cross-pool relationships render with pool context and no unauthorized data leak.
 - Staff relationship editors can add and anchor cards across pools without an implicit same-pool restriction.
 - Changing the future Evil/Neutral access audience requires a centralized scope-policy change, not data migration.

@@ -2,13 +2,14 @@
   <section class="flex flex-col gap-5">
     <AppPageHeader
       :icon="Images"
-      title="Gallery"
-      subtitle="Browse the card pool and find cards to build around."
+      :title="`${cardPoolLabel(workspace.activePool)} Gallery`"
+      :subtitle="gallerySubtitle"
       title-tag="h2"
       title-class="text-xl"
     >
       <template #actions>
         <AppHeaderAction
+          v-if="workspace.activePool === 'player'"
           :icon="Hammer"
           label="Build a deck"
           short-label="Build a deck"
@@ -29,7 +30,10 @@
           :total-count="totalCount"
           :on-reset="resetFilters"
         >
-          <CardFilterSections :state="filterSectionsState" />
+          <CardFilterSections
+            :state="filterSectionsState"
+            :show-card-pool="false"
+          />
 
           <template #footer>
             <div class="flex w-full flex-col gap-2">
@@ -65,7 +69,7 @@
                 <button
                   class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
                   type="button"
-                  :disabled="isExportingTtsCards"
+                  :disabled="isExportingTtsCards || !exportsReady"
                   @click="exportTtsCards"
                 >
                   <Copy class="h-4 w-4" />
@@ -74,6 +78,7 @@
                 <button
                   class="btn-secondary inline-flex w-fit items-center gap-2 whitespace-nowrap"
                   type="button"
+                  :disabled="!exportsReady"
                   @click="exportCsv"
                 >
                   <Download class="h-4 w-4" />
@@ -135,8 +140,8 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn, useScroll } from '@vueuse/core';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useScroll, useTimeoutFn } from '@vueuse/core';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Copy, Download, Hammer, Images, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/shared/composables/useCsvExport';
@@ -160,6 +165,7 @@ import {
 import {
   buildCardFilterRouteQuery,
   getCardFilterSignature,
+  isCardFilterStateReady,
   parseCardFilterRouteQuery,
   sameCardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterRouteState';
@@ -178,14 +184,19 @@ import { useGalleryOptions } from '@/domain/cards/composables/useGalleryOptions'
 import { useHoverModeSurface } from '@/domain/cards/composables/useHoverModePreferences';
 import { useTtsCardExport } from '@/domain/cards/composables/useTtsCardExport';
 import { buildContextualNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const workspace = useCardPoolWorkspaceStore();
 const scrollContainer = useScrollContainer();
 const { y: scrollTopRef } = useScroll(scrollContainer);
 
-const filterController = useCardFilterController();
+const filterController = useCardFilterController({
+  resultSetKey: computed(() => workspace.generation),
+});
 const {
   query,
   filterSectionsState,
@@ -193,7 +204,6 @@ const {
   selectionState,
   readFilterState,
   applyRouteFilterState,
-  resetFilters: resetCardFilterState,
   updateQuery,
   loadFilters,
 } = filterController;
@@ -222,6 +232,8 @@ const collection = useCardCollection<GalleryItem>({
   filtersLoaded,
   pageSize,
   identity: (card) => `${card.result_type}:${card.id}`,
+  resultSetKey: computed(() => workspace.generation),
+  refreshOnResultSetChange: false,
 });
 const cards = collection.cards;
 const totalCount = collection.totalCount;
@@ -236,12 +248,28 @@ const galleryGridStyle = computed(() => ({
 }));
 const gallerySortOverride = computed(() => overrideSort.value);
 const newDeckLocation = computed(() => buildContextualNewDeckEditorLocation(route.path, route.query));
+const gallerySubtitle = computed(() =>
+  workspace.activePool === 'player'
+    ? 'Browse Player cards and find cards to build around.'
+    : `Browse ${cardPoolLabel(workspace.activePool)} cards.`,
+);
 const loadingShimCount = computed(() => pageSize.value);
 const displayItems = computed(() =>
   (!hasLoadedOnce.value || isRefreshing.value)
     ? createLoadingShimItems(loadingShimCount.value)
     : cards.value,
 );
+const exportsReady = computed(() => isCardFilterStateReady(
+  filtersLoaded.value,
+  readFilterState(),
+  currentRouteFilterState.value,
+));
+let componentActive = true;
+
+const captureExportRequestGuard = (): (() => boolean) => {
+  const expectedGeneration = workspace.generation;
+  return () => componentActive && workspace.generation === expectedGeneration;
+};
 
 const restoreScroll = (value: number): void => {
   window.requestAnimationFrame(() => {
@@ -250,18 +278,29 @@ const restoreScroll = (value: number): void => {
 };
 
 const exportCsv = async (): Promise<void> => {
+  if (!exportsReady.value) {
+    return;
+  }
+  const isRequestCurrent = captureExportRequestGuard();
   const params = buildCardFilterApiSearchParams(selectionState.value);
-  await exportCardsCsv(appendCardSortSearchParam(params, effectiveSort.value));
+  await exportCardsCsv(
+    appendCardSortSearchParam(params, effectiveSort.value),
+    isRequestCurrent,
+  );
 };
 
 const exportTtsCards = async (): Promise<void> => {
+  if (!exportsReady.value) {
+    return;
+  }
+  const isRequestCurrent = captureExportRequestGuard();
   await copyTtsCardExport({
     type: 'gallery',
     filters: {
       ...buildCardFilterApiPayload(selectionState.value),
       sort: effectiveSort.value,
     },
-  });
+  }, isRequestCurrent);
 };
 
 const setGallerySortOverride = (value: typeof effectiveSort.value): void => {
@@ -280,7 +319,7 @@ const clearGalleryHoverModeOverride = (): void => {
   clearOverrideHoverMode();
 };
 
-const debouncedUpdateRoute = useDebounceFn(() => {
+const updateFilterRoute = (): void => {
   if (!filtersLoaded.value) {
     return;
   }
@@ -292,7 +331,11 @@ const debouncedUpdateRoute = useDebounceFn(() => {
     path: '/cards',
     query: buildCardFilterRouteQuery(nextRouteState),
   });
-}, 250);
+};
+const {
+  start: debouncedUpdateRoute,
+  stop: cancelDebouncedUpdateRoute,
+} = useTimeoutFn(updateFilterRoute, 250, { immediate: false });
 
 const observedFilterState = computed(() => selectionState.value);
 const galleryNavigationSearchParams = computed(() => {
@@ -313,6 +356,14 @@ watch(
     debouncedUpdateRoute();
   },
   { deep: true },
+);
+
+watch(
+  () => workspace.generation,
+  () => {
+    cancelDebouncedUpdateRoute();
+  },
+  { flush: 'sync' },
 );
 
 watch(
@@ -370,12 +421,18 @@ watch(
 );
 
 const resetFilters = (): void => {
-  resetCardFilterState();
-  void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(createEmptyCardFilterState()) });
+  const defaults = createEmptyCardFilterState(workspace.activePool);
+  applyRouteFilterState(defaults);
+  void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(defaults) });
 };
 
 onBeforeRouteLeave(() => {
   saveGallerySnapshot(galleryRequestSignature.value, collection.galleryState.value, scrollTopRef.value);
+});
+
+onBeforeUnmount(() => {
+  componentActive = false;
+  cancelDebouncedUpdateRoute();
 });
 
 onMounted(() => {

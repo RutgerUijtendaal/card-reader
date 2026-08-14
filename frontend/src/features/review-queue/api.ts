@@ -1,9 +1,17 @@
 import { api } from '@/shared/api/client';
+import { fetchCardPage } from '@/domain/cards/api';
 import type {
   FlagStatus,
   ParseFlagPage,
   ParseFlagReviewItem,
+  ReviewCard,
 } from '@/features/review-queue/types';
+import type { PaginatedCardsResponse } from '@/domain/cards/types';
+
+export const fetchReviewConfidenceCards = async (
+  params: URLSearchParams,
+): Promise<PaginatedCardsResponse<ReviewCard>> =>
+  fetchCardPage('/review/confidence-cards', params);
 
 export const fetchParseFlagPage = async (
   status: FlagStatus,

@@ -6,21 +6,36 @@ import { getApiErrorMessage } from '@/shared/api/errors';
 
 export type UseTtsCardExportResult = {
   isExportingTtsCards: DeepReadonly<Ref<boolean>>;
-  copyTtsCardExport: (source: TtsCardExportSource) => Promise<void>;
+  copyTtsCardExport: (
+    source: TtsCardExportSource,
+    isRequestCurrent?: () => boolean,
+  ) => Promise<void>;
 };
 
 export const useTtsCardExport = (): UseTtsCardExportResult => {
   const isExportingTtsCards = ref(false);
 
-  const copyTtsCardExport = async (source: TtsCardExportSource): Promise<void> => {
+  const copyTtsCardExport = async (
+    source: TtsCardExportSource,
+    isRequestCurrent: () => boolean = () => true,
+  ): Promise<void> => {
     if (isExportingTtsCards.value) return;
     isExportingTtsCards.value = true;
     try {
       const result = await exportTtsCards(source);
+      if (!isRequestCurrent()) {
+        return;
+      }
       await navigator.clipboard.writeText(result.encodedPayload);
+      if (!isRequestCurrent()) {
+        return;
+      }
       const cardLabel = `${result.exportedCount} TTS card${result.exportedCount === 1 ? '' : 's'} copied to clipboard`;
       toast.success(cardLabel, { description: ttsExportSheetDescription(result) });
     } catch (error) {
+      if (!isRequestCurrent()) {
+        return;
+      }
       console.error('TTS card export failed', error);
       toast.error('TTS card export failed', {
         description: getApiErrorMessage(error, 'The export could not be created.'),

@@ -131,6 +131,9 @@
               >
                 {{ card.name }}
               </RouterLink>
+              <span class="theme-pill ml-2 px-2 py-0.5 text-xs">
+                {{ cardPoolLabel(card.card_pool) }}
+              </span>
               <span class="theme-section-muted"> - {{ card.confidence }}</span>
             </li>
           </ul>
@@ -235,6 +238,9 @@
                       >
                         {{ group.card.name }}
                       </RouterLink>
+                      <span class="theme-pill ml-2 px-2 py-0.5 text-xs">
+                        {{ cardPoolLabel(group.card.card_pool) }}
+                      </span>
                       <p class="theme-section-muted mt-1 text-xs">
                         {{ versionLabel(group) }} · reported by {{ group.submitted_by.username }} on {{ formatDate(group.created_at) }}
                       </p>
@@ -381,11 +387,16 @@ import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import { buildReviewCardEditorLocation } from '@/domain/card-navigation/cardReturnState';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { useCardCollection } from '@/domain/cards/composables/useCardCollection';
 import { useReviewSummary } from '@/domain/review/composables/useReviewSummary';
 import { parseFlagPropertyLabels, type ParseFlagPropertyKey } from '@/domain/review/types';
 import { queryString } from '@/shared/router/routeState';
-import { fetchParseFlagPage, updateParseFlagItem } from '@/features/review-queue/api';
+import {
+  fetchParseFlagPage,
+  fetchReviewConfidenceCards,
+  updateParseFlagItem,
+} from '@/features/review-queue/api';
 import type {
   FlagStatus,
   ParseFlagPage,
@@ -403,6 +414,7 @@ const flagStatus = ref<FlagStatus>(normalizeFlagStatus(queryString(route.query.s
 const flagReports = ref<ParseFlagReviewReport[]>([]);
 const flagPage = ref<ParseFlagPage | null>(null);
 const loadingFlags = ref(false);
+let flagRequestGeneration = 0;
 const updatingItemId = ref<string | null>(null);
 const filtersLoaded = ref(true);
 const { decrementOpenParseFlagItemCount, loadReviewSummary } = useReviewSummary();
@@ -410,9 +422,9 @@ const { decrementOpenParseFlagItemCount, loadReviewSummary } = useReviewSummary(
 const collection = useCardCollection<ReviewCard>({
   buildSearchParams: () => {
     const params = new URLSearchParams();
-    params.set('max_confidence', '0.8');
     return params;
   },
+  fetchPage: fetchReviewConfidenceCards,
   filtersLoaded,
   pageSize: 100,
 });
@@ -476,9 +488,17 @@ const syncQuery = (): void => {
 };
 
 const loadFlagPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
+  const requestGeneration = ++flagRequestGeneration;
+  const status = flagStatus.value;
   loadingFlags.value = true;
   try {
-    const response = await fetchParseFlagPage(flagStatus.value, page, 25);
+    const response = await fetchParseFlagPage(status, page, 25);
+    if (
+      requestGeneration !== flagRequestGeneration
+      || status !== flagStatus.value
+    ) {
+      return;
+    }
     flagPage.value = response;
     flagReports.value = mode === 'append'
       ? [...flagReports.value, ...response.results]
@@ -487,7 +507,9 @@ const loadFlagPage = async (page: number, mode: 'replace' | 'append'): Promise<v
       void loadReviewSummary();
     }
   } finally {
-    loadingFlags.value = false;
+    if (requestGeneration === flagRequestGeneration) {
+      loadingFlags.value = false;
+    }
   }
 };
 

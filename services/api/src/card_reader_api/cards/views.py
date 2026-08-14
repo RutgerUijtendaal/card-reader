@@ -25,12 +25,13 @@ from card_reader_api.cards.serializers import (
     LatestCardReparseSerializer,
     LatestVersionUpdateSerializer,
     card_group_summary_payload,
+    card_list_row_payload,
     card_payload,
     metadata_option,
     symbol_option,
 )
 from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
-from card_reader_api.common.responses import serializer_error
+from card_reader_api.common.responses import paginated_payload, serializer_error
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
     get_card_in_scope,
@@ -117,30 +118,11 @@ class CardListView(APIView):
             page=filters["page"],
             page_size=filters["page_size"],
         )
-        payloads = []
-        for row in cards.results:
-            payloads.append(
-                card_payload(
-                    row.version.card,
-                    row.version,
-                    image_url=card_image_asset_url(row.image, fallback_url=f"/cards/{row.version.card.id}/image"),
-                    metadata={
-                        "keywords": row.keywords,
-                        "tags": row.tags,
-                        "symbols": row.symbols,
-                        "types": row.types,
-                    },
-                )
-            )
         return Response(
-            {
-                "count": cards.count,
-                "next_page": cards.page + 1 if cards.page * cards.page_size < cards.count else None,
-                "previous_page": cards.page - 1 if cards.page > 1 else None,
-                "page": cards.page,
-                "page_size": cards.page_size,
-                "results": payloads,
-            }
+            paginated_payload(
+                cards,
+                [card_list_row_payload(row) for row in cards.results],
+            )
         )
 
 
@@ -215,9 +197,13 @@ class CardDetailView(APIView):
         metadata = get_card_version_metadata(version.id)
         edit_state = get_card_version_edit_state(version)
         card_groups = [
-            card_group_summary_payload(group, card_id=card.id, card_pool=card.card_pool)
+            card_group_summary_payload(
+                group,
+                card_id=card.id,
+                card_pool_scope=card_pool_scope,
+            )
             for group in CardGroupService().get_groups_for_card(card.id)
-            if group.anchor_card.card_pool == card.card_pool
+            if card_pool_scope.allows_card_pool(group.anchor_card.card_pool)
         ]
         viewer_id = str(getattr(request.user, "pk", "")) if is_authenticated(request.user) else None
         deck_references = card_deck_references_payload(

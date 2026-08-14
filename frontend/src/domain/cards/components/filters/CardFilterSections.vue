@@ -5,7 +5,7 @@
       class="space-y-3"
     >
       <label
-        v-if="state.cardPoolOptions.length > 1"
+        v-if="showCardPool && state.cardPoolOptions.length > 1"
         class="block space-y-1"
       >
         <span class="theme-section-title text-sm font-semibold">Card pool</span>
@@ -205,9 +205,12 @@ import type { CardPool } from '@/domain/cards/cardPools';
 
 const props = defineProps<{
   state: CardFilterSectionsState;
+  showCardPool?: boolean;
   visibleSections?: CardFilterSectionKey[];
   defaultOpenSections?: CardFilterSectionKey[];
 }>();
+
+const showCardPool = computed(() => props.showCardPool ?? true);
 
 const visibleSections = computed(() =>
   props.visibleSections ? new Set(props.visibleSections) : null,

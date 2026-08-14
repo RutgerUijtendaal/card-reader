@@ -85,10 +85,10 @@ export type CardFilterSelectionState = {
   typeExcludeIds: string[];
 };
 
-export const createEmptyCardFilterState = (): CardFilterState => ({
+export const createEmptyCardFilterState = (cardPool: CardPool = 'player'): CardFilterState => ({
   query: '',
   lifecycleStatus: DEFAULT_CARD_LIFECYCLE_FILTER,
-  cardPool: 'player',
+  cardPool,
   cardRoleMatch: 'any',
   cardRoleKeys: [],
   cardRoleExcludeKeys: ['hero'],
@@ -123,10 +123,12 @@ export const createEmptyCardFilterState = (): CardFilterState => ({
   typeExcludeKeys: [],
 });
 
-export const createEmptyCardFilterSelectionState = (): CardFilterSelectionState => ({
+export const createEmptyCardFilterSelectionState = (
+  cardPool: CardPool = 'player',
+): CardFilterSelectionState => ({
   query: '',
   lifecycleStatus: DEFAULT_CARD_LIFECYCLE_FILTER,
-  cardPool: 'player',
+  cardPool,
   cardRoleMatch: 'any',
   cardRoleIds: [],
   cardRoleExcludeIds: ['hero'],

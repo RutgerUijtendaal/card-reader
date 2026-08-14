@@ -1,7 +1,8 @@
 import type { PaginatedCardsResponse } from '@/domain/cards/types';
+import type { CardPool } from '@/domain/cards/cardPools';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
 
-export type ReviewCard = { id: string; name: string; confidence: number };
+export type ReviewCard = { id: string; name: string; confidence: number; card_pool: CardPool };
 export type ReviewView = 'confidence' | 'flags';
 export type FlagStatus = 'open' | 'resolved' | 'dismissed' | 'all';
 export type UserSummary = { id: string; username: string };
@@ -31,6 +32,7 @@ export type ParseFlagReviewReport = {
     id: string;
     label: string;
     name: string;
+    card_pool: CardPool;
     image_url: string | null;
   };
   version: {

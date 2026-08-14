@@ -1,8 +1,8 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
 import { useDebounceFn, useLocalStorage } from '@vueuse/core';
-import { fetchCard, fetchCards } from '@/domain/cards/api';
-import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
+import { fetchCard } from '@/domain/cards/api';
 import type { CardListItem } from '@/domain/cards/types';
+import { fetchTemplatePreviewCards } from '@/features/admin/api/templatePreview';
 import type {
   TemplatePreviewCardOption,
   TemplatePreviewRenderRegion,
@@ -21,6 +21,7 @@ type TemplatePreviewCardDetail = {
   id: string;
   label: string;
   name: string;
+  card_pool: CardListItem['card_pool'];
   template_id: string;
   image_url: string | null;
 };
@@ -40,6 +41,7 @@ const toPreviewCardOption = (
   id: value.id,
   label: value.label,
   name: value.name,
+  card_pool: value.card_pool,
   template_id: value.template_id,
   image_url: value.image_url ?? null,
 });
@@ -96,7 +98,9 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
   );
 
   const templateScopedKey = computed(() => templateKey.value.trim());
-  const selectionStorageKey = computed(() => templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY);
+  const selectionStorageKey = computed(() =>
+    templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY,
+  );
   const templateScopeAvailable = computed(() => templateScopedKey.value.length > 0);
   const defaultPreviewScope = computed<TemplatePreviewScope>(() =>
     templateScopeAvailable.value ? 'current-template' : 'all-cards',
@@ -151,10 +155,8 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     const requestId = ++searchRequestId;
     previewLoading.value = true;
     try {
-      const params: Record<string, string | number | boolean | undefined> = {
-        ...managementCardSearchLifecycleParams(),
+      const params: Record<string, string | number | undefined> = {
         page_size: 8,
-        show_groups: false,
       };
       const query = previewSearchQuery.value.trim();
       if (query) {
@@ -164,12 +166,15 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
         params.template_id = templateScopedKey.value;
       }
 
-      const response = await fetchCards<CardListItem>(params);
-      if (requestId !== searchRequestId || expectedStorageKey !== selectionStorageKey.value) {
+      const response = await fetchTemplatePreviewCards(params);
+      if (
+        requestId !== searchRequestId
+        || expectedStorageKey !== selectionStorageKey.value
+      ) {
         return;
       }
 
-      previewCards.value = response.results.filter((row) => row.result_type === 'card').map(toPreviewCardOption);
+      previewCards.value = response.map(toPreviewCardOption);
 
       if (!selectedPreviewCard.value && !previewSearchQuery.value.trim() && previewCards.value.length > 0) {
         setSelectedPreviewCard(previewCards.value[0]);
@@ -204,14 +209,20 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
     try {
       const response = await fetchCard<TemplatePreviewCardDetail>(stored.id);
-      if (requestId !== restoreRequestId || storageKey !== selectionStorageKey.value) {
+      if (
+        requestId !== restoreRequestId
+        || storageKey !== selectionStorageKey.value
+      ) {
         return;
       }
       const restored = toPreviewCardOption(response);
       selectedPreviewCard.value = restored;
       setStoredSelection({ ...restored, scope: previewScope.value });
     } catch {
-      if (requestId !== restoreRequestId || storageKey !== selectionStorageKey.value) {
+      if (
+        requestId !== restoreRequestId
+        || storageKey !== selectionStorageKey.value
+      ) {
         return;
       }
       selectedPreviewCard.value = null;
@@ -272,12 +283,16 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     }
   });
 
-  watch(templateScopedKey, () => {
+  watch(selectionStorageKey, () => {
     if (!hasInitializedSelection.value) {
       return;
     }
+    searchRequestId += 1;
+    restoreRequestId += 1;
+    previewCards.value = [];
+    selectedPreviewCard.value = null;
     void restoreStoredPreviewCard();
-  });
+  }, { flush: 'sync' });
 
   return {
     activePreviewDefinition,

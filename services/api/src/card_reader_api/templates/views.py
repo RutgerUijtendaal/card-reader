@@ -5,9 +5,24 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.common.responses import bad_request, not_found, serializer_error
-from card_reader_api.templates.serializers import TemplateReparseSerializer, TemplateWriteSerializer, template_payload
-from card_reader_core.repositories.cards import list_latest_card_version_reparse_sources
+from card_reader_api.common.auth_access import card_pool_scope_for_user
+from card_reader_api.common.responses import (
+    bad_request,
+    not_found,
+    paginated_payload,
+    serializer_error,
+)
+from card_reader_api.templates.serializers import (
+    TemplatePreviewCardsQuerySerializer,
+    TemplateReparseSerializer,
+    TemplateWriteSerializer,
+    template_preview_card_payload,
+    template_payload,
+)
+from card_reader_core.repositories.cards import (
+    list_cards_in_scope,
+    list_latest_card_version_reparse_sources,
+)
 from card_reader_core.services.imports import queue_grouped_reparse_jobs
 from card_reader_core.services.templates import TemplateService
 
@@ -33,6 +48,26 @@ class TemplateListCreateView(APIView):
         except ValueError as exc:
             return bad_request(str(exc))
         return Response(template_payload(row))
+
+
+class TemplatePreviewCardsView(APIView):
+    def get(self, request: Request) -> Response:
+        serializer = TemplatePreviewCardsQuerySerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        page = list_cards_in_scope(
+            card_pool_scope=card_pool_scope_for_user(request.user),
+            query=serializer.validated_data["q"] or None,
+            template_id=serializer.validated_data["template_id"] or None,
+            lifecycle_status="all",
+            page_size=serializer.validated_data["page_size"],
+        )
+        return Response(
+            paginated_payload(
+                page,
+                [template_preview_card_payload(row) for row in page.results],
+            )
+        )
 
 
 class TemplateDetailView(APIView):

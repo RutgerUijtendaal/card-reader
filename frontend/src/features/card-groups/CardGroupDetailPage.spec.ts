@@ -322,4 +322,31 @@ describe('CardGroupDetailPage', () => {
 
     mounted.unmount();
   });
+
+  test('labels cross-pool members and keeps the originating workspace in their links', async () => {
+    const group = buildGroup();
+    group.members[1] = {
+      ...group.members[1],
+      card: { ...group.members[1].card, card_pool: 'evil' },
+    };
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/card-groups/group-1') {
+        return Promise.resolve({ data: group });
+      }
+      if (url === '/cards/filters') {
+        return Promise.resolve({ data: filters });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+    const mounted = await mountView('/card-groups/group-1');
+    const openLinks = Array.from(mounted.container.querySelectorAll<HTMLAnchorElement>('a'))
+      .filter((link) => link.textContent?.trim() === 'Open card');
+
+    expect(mounted.container.textContent).toContain('Evil');
+    expect(openLinks[1]?.getAttribute('href')).toBe(
+      '/cards/card-2?return_card_pool=player&card_pool=evil',
+    );
+    mounted.unmount();
+  });
 });

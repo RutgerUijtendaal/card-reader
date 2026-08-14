@@ -156,3 +156,9 @@ export const getCardFilterSignature = (state: CardFilterState): string =>
 
 export const sameCardFilterState = (left: CardFilterState, right: CardFilterState): boolean =>
   getCardFilterSignature(left) === getCardFilterSignature(right);
+
+export const isCardFilterStateReady = (
+  filtersLoaded: boolean,
+  currentState: CardFilterState,
+  routeState: CardFilterState,
+): boolean => filtersLoaded && sameCardFilterState(currentState, routeState);

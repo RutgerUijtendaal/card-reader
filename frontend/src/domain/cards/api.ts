@@ -24,15 +24,20 @@ export type TtsCardExportSource =
       content_version_id: string;
     };
 
-export const fetchCards = async <TCard>(
+export const fetchCardPage = async <TCard>(
+  endpoint: string,
   params: URLSearchParams | CardQueryParams,
 ): Promise<PaginatedCardsResponse<TCard>> => {
   const response =
     params instanceof URLSearchParams
-      ? await api.get<PaginatedCardsResponse<TCard>>(`/cards?${params.toString()}`)
-      : await api.get<PaginatedCardsResponse<TCard>>('/cards', { params });
+      ? await api.get<PaginatedCardsResponse<TCard>>(`${endpoint}?${params.toString()}`)
+      : await api.get<PaginatedCardsResponse<TCard>>(endpoint, { params });
   return response.data;
 };
+
+export const fetchCards = async <TCard>(
+  params: URLSearchParams | CardQueryParams,
+): Promise<PaginatedCardsResponse<TCard>> => fetchCardPage('/cards', params);
 
 export const fetchCard = async <TCard>(cardId: string): Promise<TCard> => {
   const response = await api.get<TCard>(`/cards/${cardId}`);

@@ -1,6 +1,8 @@
 # Card Classification Step 2.3: Faction Classification
 
-Status: implemented on the Step 2.3 checkpoint branch and awaiting review/merge into the classification umbrella branch. [Step 3](card-classification-step-3-card-pool-workspaces.md) remains blocked until this checkpoint is validated, reviewed, and merged.
+Later amendment: [Step 3.2](card-classification-step-3-2-admin-owned-inference-rules.md) supersedes this checkpoint's template classification hints and versioned hard-coded tag maps before the feature ships. Faction persistence, pool-plus-exact-faction identity, the canonical role/faction registries, overrides, and mismatch behavior remain unchanged; automatic inference moves to admin-owned pool-specific Tag/Type rules snapshotted per job.
+
+Status: implemented, validated, reviewed, and merged into the classification umbrella branch.
 
 This checkpoint completes the card-classification vocabulary before the Player/Evil/Neutral workspace is built:
 
@@ -11,6 +13,7 @@ This checkpoint completes the card-classification vocabulary before the Player/E
 5. [Import workflow seam consolidation](card-classification-step-2-2-import-workflow-seam.md)
 6. Faction classification (this document)
 7. [Player, Evil, and Neutral workspaces](card-classification-step-3-card-pool-workspaces.md)
+8. [Context-preserving workspace switching](card-classification-step-3-1-context-preserving-workspace-switching.md)
 
 ## Outcome
 

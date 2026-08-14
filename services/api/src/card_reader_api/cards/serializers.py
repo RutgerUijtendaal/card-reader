@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 from rest_framework import serializers
 
+from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
     CARD_POOLS,
@@ -25,13 +26,13 @@ from card_reader_core.models import (
     card_faction_keys,
     normalize_card_lifecycle_filter,
 )
-from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
+from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE, CardListRow
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES, CardFilterParams
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
 
 if TYPE_CHECKING:
-    from card_reader_core.models import CardGroup, Deck
+    from card_reader_core.models import CardGroup, CardPoolScope, Deck
     from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
@@ -110,6 +111,23 @@ def card_payload(
     return payload
 
 
+def card_list_row_payload(row: CardListRow) -> dict[str, object]:
+    return card_payload(
+        row.version.card,
+        row.version,
+        image_url=card_image_asset_url(
+            row.image,
+            fallback_url=f"/cards/{row.version.card.id}/image",
+        ),
+        metadata={
+            "keywords": row.keywords,
+            "tags": row.tags,
+            "symbols": row.symbols,
+            "types": row.types,
+        },
+    )
+
+
 def _content_version_payload(version: CardVersion) -> dict[str, object] | None:
     content_version = version.content_version
     if content_version is None:
@@ -172,12 +190,12 @@ def card_group_summary_payload(
     group: CardGroup,
     *,
     card_id: str | None = None,
-    card_pool: str | None = None,
+    card_pool_scope: CardPoolScope,
 ) -> dict[str, object]:
     members = [
         member
         for member in group.members.all()
-        if card_pool is None or member.card.card_pool == card_pool
+        if card_pool_scope.allows_card_pool(member.card.card_pool)
     ]
     anchor_card_id = group.anchor_card.id
     card_ids = [member.card.id for member in members]
