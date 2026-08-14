@@ -5,18 +5,23 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.common.auth_access import card_pool_scope_for_user
-from card_reader_api.common.responses import bad_request, not_found, serializer_error
+from card_reader_api.common.responses import (
+    bad_request,
+    not_found,
+    paginated_payload,
+    serializer_error,
+)
 from card_reader_api.templates.serializers import (
     TemplatePreviewCardsQuerySerializer,
     TemplateReparseSerializer,
     TemplateWriteSerializer,
+    template_preview_card_payload,
     template_payload,
 )
 from card_reader_core.repositories.cards import (
+    list_cards_in_scope,
     list_latest_card_version_reparse_sources,
-    list_template_preview_cards,
 )
 from card_reader_core.services.imports import queue_grouped_reparse_jobs
 from card_reader_core.services.templates import TemplateService
@@ -50,29 +55,18 @@ class TemplatePreviewCardsView(APIView):
         serializer = TemplatePreviewCardsQuerySerializer(data=request.query_params)
         if not serializer.is_valid():
             return serializer_error(serializer)
-        rows = list_template_preview_cards(
+        page = list_cards_in_scope(
             card_pool_scope=card_pool_scope_for_user(request.user),
             query=serializer.validated_data["q"] or None,
             template_id=serializer.validated_data["template_id"] or None,
-            limit=serializer.validated_data["page_size"],
+            lifecycle_status="all",
+            page_size=serializer.validated_data["page_size"],
         )
         return Response(
-            {
-                "results": [
-                    {
-                        "id": row.version.card.id,
-                        "label": row.version.card.label,
-                        "name": row.version.name,
-                        "card_pool": row.version.card.card_pool,
-                        "template_id": row.version.template.key,
-                        "image_url": card_image_asset_url(
-                            row.image,
-                            fallback_url=f"/cards/{row.version.card.id}/image",
-                        ),
-                    }
-                    for row in rows
-                ]
-            }
+            paginated_payload(
+                page,
+                [template_preview_card_payload(row) for row in page.results],
+            )
         )
 
 

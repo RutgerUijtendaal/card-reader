@@ -4,6 +4,7 @@ import json
 
 from rest_framework import serializers
 
+from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_core.models import (
     CARD_FACTIONS,
     CARD_ROLES,
@@ -11,6 +12,7 @@ from card_reader_core.models import (
     normalize_card_factions,
     normalize_card_roles,
 )
+from card_reader_core.repositories.cards import CardListRow
 
 
 def template_payload(row: Template) -> dict[str, object]:
@@ -22,6 +24,20 @@ def template_payload(row: Template) -> dict[str, object]:
         "inferred_card_roles": list(normalize_card_roles(row.inferred_card_roles_json)),
         "inferred_card_factions": list(
             normalize_card_factions(row.inferred_card_factions_json)
+        ),
+    }
+
+
+def template_preview_card_payload(row: CardListRow) -> dict[str, object]:
+    return {
+        "id": row.version.card.id,
+        "label": row.version.card.label,
+        "name": row.version.name,
+        "card_pool": row.version.card.card_pool,
+        "template_id": row.version.template.key,
+        "image_url": card_image_asset_url(
+            row.image,
+            fallback_url=f"/cards/{row.version.card.id}/image",
         ),
     }
 

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 from rest_framework import serializers
 
+from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_core.metadata import MANA_FAMILIES
 from card_reader_core.models import (
     CARD_POOLS,
@@ -25,7 +26,7 @@ from card_reader_core.models import (
     card_faction_keys,
     normalize_card_lifecycle_filter,
 )
-from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE
+from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE, CardListRow
 from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES, CardFilterParams
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
@@ -108,6 +109,23 @@ def card_payload(
     if edit_state is not None:
         payload.update(edit_state_payload(edit_state))
     return payload
+
+
+def card_list_row_payload(row: CardListRow) -> dict[str, object]:
+    return card_payload(
+        row.version.card,
+        row.version,
+        image_url=card_image_asset_url(
+            row.image,
+            fallback_url=f"/cards/{row.version.card.id}/image",
+        ),
+        metadata={
+            "keywords": row.keywords,
+            "tags": row.tags,
+            "symbols": row.symbols,
+            "types": row.types,
+        },
+    )
 
 
 def _content_version_payload(version: CardVersion) -> dict[str, object] | None:

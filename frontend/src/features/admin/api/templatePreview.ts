@@ -1,16 +1,12 @@
-import { api } from '@/shared/api/client';
+import { fetchCardPage } from '@/domain/cards/api';
 import type { TemplatePreviewCardOption } from '@/features/admin/types';
-
-type TemplatePreviewCardsResponse = {
-  results: TemplatePreviewCardOption[];
-};
 
 export const fetchTemplatePreviewCards = async (
   params: Record<string, string | number | undefined>,
 ): Promise<TemplatePreviewCardOption[]> => {
-  const response = await api.get<TemplatePreviewCardsResponse>(
+  const response = await fetchCardPage<TemplatePreviewCardOption>(
     '/admin/templates/preview-cards',
-    { params },
+    params,
   );
-  return response.data.results;
+  return response.results;
 };

@@ -1,4 +1,5 @@
 import { api } from '@/shared/api/client';
+import { fetchCardPage } from '@/domain/cards/api';
 import type {
   FlagStatus,
   ParseFlagPage,
@@ -9,12 +10,8 @@ import type { PaginatedCardsResponse } from '@/domain/cards/types';
 
 export const fetchReviewConfidenceCards = async (
   params: URLSearchParams,
-): Promise<PaginatedCardsResponse<ReviewCard>> => {
-  const response = await api.get<PaginatedCardsResponse<ReviewCard>>(
-    `/review/confidence-cards?${params.toString()}`,
-  );
-  return response.data;
-};
+): Promise<PaginatedCardsResponse<ReviewCard>> =>
+  fetchCardPage('/review/confidence-cards', params);
 
 export const fetchParseFlagPage = async (
   status: FlagStatus,

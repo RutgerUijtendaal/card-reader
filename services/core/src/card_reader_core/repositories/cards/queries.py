@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import Any, cast
 
 from django.db.models import Count, F, Prefetch, Q, QuerySet
@@ -98,8 +99,6 @@ def list_cards(
     page: int = 1,
     page_size: int = DEFAULT_CARD_PAGE_SIZE,
 ) -> PaginatedCardList:
-    normalized_page = max(page, 1)
-    normalized_page_size = max(1, min(page_size, 100))
     versions = _build_filtered_versions_queryset(
         query=query,
         card_ids=card_ids,
@@ -143,81 +142,43 @@ def list_cards(
         health_max=health_max,
         lifecycle_status=lifecycle_status,
     )
-
-    offset = (normalized_page - 1) * normalized_page_size
-    total_count, page_ids = _paginated_card_version_ids(
+    return _paginate_card_list_rows(
         versions,
         sort=sort,
         card_pool=card_pool,
-        offset=offset,
-        limit=normalized_page_size,
-    )
-    results = get_card_list_rows_by_version_ids(page_ids)
-
-    return PaginatedCardList(
-        count=total_count,
-        page=normalized_page,
-        page_size=normalized_page_size,
-        results=results,
+        page=page,
+        page_size=page_size,
     )
 
 
-def list_review_cards(
+def list_cards_in_scope(
     *,
     card_pool_scope: CardPoolScope,
-    max_confidence: float,
+    query: str | None = None,
+    max_confidence: float | None = None,
+    template_id: str | None = None,
+    lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
     page: int = 1,
     page_size: int = DEFAULT_CARD_PAGE_SIZE,
 ) -> PaginatedCardList:
-    """List low-confidence cards across every pool visible to a staff reviewer."""
+    """List cards across every pool in one explicit authorization scope."""
 
-    normalized_page = max(page, 1)
-    normalized_page_size = max(1, min(page_size, 100))
-    versions = CardVersion.objects.filter(
-        is_latest=True,
-        card__card_pool__in=card_pool_scope.allowed_pools,
-        confidence__lte=max_confidence,
+    versions = _latest_card_versions_queryset(
+        card_pools=card_pool_scope.allowed_pools,
+        query=query,
+        lifecycle_status=lifecycle_status,
     )
-    versions = filter_queryset_by_card_lifecycle(
-        versions,
-        DEFAULT_CARD_LIFECYCLE_FILTER,
-    )
-    offset = (normalized_page - 1) * normalized_page_size
-    total_count = versions.count()
-    page_ids = list(
-        _apply_sql_card_sort(versions, CARD_SORT_UPDATED_DESC)
-        .values_list("id", flat=True)[offset : offset + normalized_page_size]
-    )
-    return PaginatedCardList(
-        count=total_count,
-        page=normalized_page,
-        page_size=normalized_page_size,
-        results=get_card_list_rows_by_version_ids(page_ids),
-    )
-
-
-def list_template_preview_cards(
-    *,
-    card_pool_scope: CardPoolScope,
-    query: str | None,
-    template_id: str | None,
-    limit: int = 8,
-) -> list[CardListRow]:
-    """List management preview cards across every pool visible to staff."""
-
-    normalized_limit = max(1, min(limit, 25))
-    versions = CardVersion.objects.filter(
-        is_latest=True,
-        card__card_pool__in=card_pool_scope.allowed_pools,
-    )
-    versions = apply_card_search(versions, query)
+    if max_confidence is not None:
+        versions = versions.filter(confidence__lte=max_confidence)
     if template_id:
         versions = versions.filter(template__key=template_id)
-    version_ids = list(
-        _apply_sql_card_sort(versions, CARD_SORT_UPDATED_DESC)
-        .values_list("id", flat=True)[:normalized_limit]
+    return _paginate_card_list_rows(
+        versions,
+        sort=CARD_SORT_UPDATED_DESC,
+        card_pool=None,
+        page=page,
+        page_size=page_size,
     )
-    return get_card_list_rows_by_version_ids(version_ids)
 
 
 def list_matching_cards(
@@ -687,7 +648,6 @@ def apply_card_filters(queryset: QuerySet[CardVersion], **filters: object) -> Qu
         queryset = queryset.filter(mana_value__isnull=False, mana_value__lte=filters["mana_cost_max"])
     if filters["template_id"]:
         queryset = queryset.filter(template__key=filters["template_id"])
-    queryset = queryset.filter(card__card_pool=filters["card_pool"])
     queryset = filter_by_card_roles(
         queryset,
         filters["card_roles"],
@@ -903,9 +863,11 @@ def _build_filtered_versions_queryset(
     health_max: int | None,
     lifecycle_status: CardLifecycleFilter,
 ) -> QuerySet[CardVersion]:
-    versions = CardVersion.objects.filter(is_latest=True)
-    versions = apply_card_search(versions, query)
-    versions = filter_queryset_by_card_lifecycle(versions, lifecycle_status)
+    versions = _latest_card_versions_queryset(
+        card_pools=(card_pool,),
+        query=query,
+        lifecycle_status=lifecycle_status,
+    )
     if card_ids:
         versions = versions.filter(card_id__in=list(dict.fromkeys(card_ids)))
     versions = apply_card_filters(
@@ -914,7 +876,6 @@ def _build_filtered_versions_queryset(
         mana_cost_min=mana_cost_min,
         mana_cost_max=mana_cost_max,
         template_id=template_id,
-        card_pool=card_pool,
         card_roles=card_roles,
         card_role_exclude=card_role_exclude,
         card_role_match=card_role_match,
@@ -948,15 +909,57 @@ def _build_filtered_versions_queryset(
     return versions
 
 
+def _latest_card_versions_queryset(
+    *,
+    card_pools: Collection[CardPool],
+    query: str | None,
+    lifecycle_status: CardLifecycleFilter,
+) -> QuerySet[CardVersion]:
+    versions = CardVersion.objects.filter(
+        is_latest=True,
+        card__card_pool__in=tuple(card_pools),
+    )
+    versions = apply_card_search(versions, query)
+    return filter_queryset_by_card_lifecycle(versions, lifecycle_status)
+
+
+def _paginate_card_list_rows(
+    queryset: QuerySet[CardVersion],
+    *,
+    sort: CardSort,
+    card_pool: CardPool | None,
+    page: int,
+    page_size: int,
+) -> PaginatedCardList:
+    normalized_page = max(page, 1)
+    normalized_page_size = max(1, min(page_size, 100))
+    offset = (normalized_page - 1) * normalized_page_size
+    total_count, page_ids = _paginated_card_version_ids(
+        queryset,
+        sort=sort,
+        card_pool=card_pool,
+        offset=offset,
+        limit=normalized_page_size,
+    )
+    return PaginatedCardList(
+        count=total_count,
+        page=normalized_page,
+        page_size=normalized_page_size,
+        results=get_card_list_rows_by_version_ids(page_ids),
+    )
+
+
 def _paginated_card_version_ids(
     queryset: QuerySet[CardVersion],
     *,
     sort: CardSort,
-    card_pool: CardPool,
+    card_pool: CardPool | None,
     offset: int,
     limit: int,
 ) -> tuple[int, list[str]]:
     if sort == CARD_SORT_TYPES_ASC:
+        if card_pool is None:
+            raise ValueError("Type sorting requires one explicit card pool.")
         ordered_ids = _ordered_type_sort_card_version_ids(queryset, card_pool=card_pool)
         return len(ordered_ids), ordered_ids[offset : offset + limit]
     total_count = queryset.count()

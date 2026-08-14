@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { exportTtsCards, type TtsCardExportSource } from '@/domain/cards/api';
+import {
+  exportTtsCards,
+  fetchCardPage,
+  fetchCards,
+  type TtsCardExportSource,
+} from '@/domain/cards/api';
 import { api } from '@/shared/api/client';
 
 vi.mock('@/shared/api/client', () => ({
@@ -35,5 +40,27 @@ describe('card API', () => {
       sheetCount: 2,
     });
     expect(api.post).toHaveBeenCalledWith('/exports/tts/cards', { source });
+  });
+
+  test('loads paginated card contracts from default and focused endpoints', async () => {
+    const page = {
+      count: 0,
+      next_page: null,
+      previous_page: null,
+      page: 1,
+      page_size: 25,
+      results: [],
+    };
+    vi.mocked(api.get).mockResolvedValue({ data: page });
+
+    await expect(
+      fetchCardPage('/review/confidence-cards', new URLSearchParams({ page: '1' })),
+    ).resolves.toEqual(page);
+    await expect(fetchCards({ q: 'hero', page_size: 25 })).resolves.toEqual(page);
+
+    expect(api.get).toHaveBeenNthCalledWith(1, '/review/confidence-cards?page=1');
+    expect(api.get).toHaveBeenNthCalledWith(2, '/cards', {
+      params: { q: 'hero', page_size: 25 },
+    });
   });
 });
