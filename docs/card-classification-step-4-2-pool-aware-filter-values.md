@@ -1,6 +1,14 @@
 # Card Classification Step 4.2: Pool-Aware Gallery Filter Values
 
-Status: planned; not implemented.
+Status: implemented and locally validated on the checkpoint branch; pull-request review pending.
+
+Implementation record:
+
+- `GET /cards/filters` accepts an optional exact `card_pool`; omitted requests preserve the complete legacy catalog, while explicit requests authorize one pool and availability-scope Keywords, Tags, and Types.
+- Keyword and Tag availability use indexed `EXISTS` subqueries; Types retain pool-relative linked-card counts and omit zero-linked rows for exact-pool requests. The measured core service remains fixed at four metadata queries with thirty linked cards and options.
+- Gallery binds filter hydration to both workspace generation and requested pool, discards stale results, and keeps the prior catalog unavailable during transitions.
+- Successful catalogs reconcile Keyword, Tag, Type include, and Type exclude route keys through the cards-domain selection seam. Failed catalogs preserve route state, keep card browsing usable, disable catalog-dependent exports, and expose a read-only retry.
+- No cache, persistence, migration, developer-data, database-diagram, Symbol, role, faction, or facet-visibility contract changed.
 
 Step 4.1 decides which filter sections the ordinary Gallery displays in each Player, Evil, or Neutral workspace. Step 4.2 makes the values inside the currently shared Keyword, Tag, and Type sections relevant to that workspace: a pool-scoped Gallery response includes only values linked to at least one active card's latest version in the selected pool.
 

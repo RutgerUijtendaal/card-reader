@@ -51,4 +51,4 @@ The card-pool, role, and faction work is split into twelve dependency-ordered ch
 - Each checkpoint is implemented on its own branch with a pull request targeting `feature/card-classification`, not `master`.
 - Merge checkpoint pull requests into the umbrella branch in dependency order. Create the next checkpoint branch from the updated umbrella branch so its diff contains only that checkpoint.
 - CI and automatic review must run on both checkpoint and aggregate pull requests. Do not retarget a checkpoint pull request merely to trigger them.
-- Merge the umbrella pull request to `master` only after all eleven checkpoint acceptance criteria and the aggregate review are clear.
+- Merge the umbrella pull request to `master` only after all twelve checkpoint acceptance criteria and the aggregate review are clear.
