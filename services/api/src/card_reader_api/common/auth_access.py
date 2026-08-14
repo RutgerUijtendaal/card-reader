@@ -13,7 +13,11 @@ from card_reader_core.services.user_roles import has_developer_role
 
 
 def is_authenticated(user: Any) -> bool:
-    return bool(user and getattr(user, "is_authenticated", False))
+    return bool(
+        user
+        and getattr(user, "is_authenticated", False)
+        and getattr(user, "is_active", False)
+    )
 
 
 def can_access_admin(user: Any) -> bool:

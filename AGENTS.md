@@ -166,8 +166,7 @@ Core stack:
   - Frontend code should consume `/decks/rules` for defaults and examples, keeping local fallback defaults only for load/error resilience.
 - Deck list surfaces that only need listing metadata should use summary deck records/endpoints and `DeckListRecord`-compatible shared components; fetch full `DeckRecord` only for detail, editor, export, or playtest flows that need full board entries.
 - The card detail editor separates card-level and version-level edits:
-  - Currently, the `Card` tab owns Hero Card, Card Status, and Deck-Building Config.
-  - After card-classification Step 1, the `Card` tab owns Card Pool, multi-valued Card Roles, Card Status, and Deck-Building Config; Standard is shown when no roles are selected.
+  - The `Card` tab owns Card Pool, multi-valued Card Roles and Factions, Card Status, and Deck-Building Config; Normal and No faction are derived when their assignment sets are empty.
   - `Card Version` tab owns parsed scalar fields, symbols, metadata groups, template selection, reset, and reparse actions.
 - User notifications are durable, core-owned in-app records.
   - `NotificationService` is the only public creation API; API views, frontend code, and feature call sites must not write notification rows directly.

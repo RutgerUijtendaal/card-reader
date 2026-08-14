@@ -31,7 +31,7 @@ stopped reporting; they are operational telemetry and do not replace durable imp
 
 Parsing templates describe where fields and symbols appear on a card image and how those regions should be interpreted. Catalogs provide the known keywords, tags, symbols, and card types used to match extracted text and detected artwork to application metadata.
 
-Templates and catalogs are read at processing time. Changing them affects future parsing and explicit reparses; it does not silently rewrite existing card versions. Classification rules are snapshotted when the job is created, so later rule edits, metadata renames, retries, or parser restarts cannot change that job's meaning.
+Templates and catalogs are read at processing time. Changing them affects future parsing and explicit reparses; it does not silently rewrite existing card versions. Classification rules are snapshotted when the job is created, so later rule edits, metadata renames, retries, or parser restarts cannot change that job's meaning. Snapshot validation requires the snapshot and every contained rule to match the job's explicit pool.
 
 Templates configure parsing only; they do not classify cards. Staff manage explicit inference rules under **Admin → Catalog → Card classification**. Each enabled rule maps one existing Tag or Type to one code-owned role or faction in exactly one pool. Automatic classification unions every matching rule from the job snapshot, while role and faction overrides independently bypass all rules for their facet. Selecting no roles intentionally produces Normal; selecting no factions intentionally produces No faction. The pool is always explicit and is never inferred.
 

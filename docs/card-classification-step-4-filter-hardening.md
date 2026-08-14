@@ -1,10 +1,21 @@
 # Card Classification Step 4.0: Classification Acceptance Audit and Cleanup
 
-Status: planned.
+Status: implemented and locally validated; awaiting checkpoint review and merge.
 
 Steps 1 through 3.2 established the Player/Evil/Neutral pool model, multi-valued roles and factions, pool-plus-faction identity, deterministic import classification, restricted-pool authorization, workspace navigation, and admin-owned inference rules. Step 4.0 treats those contracts as one completed feature and validates them as an integrated product surface before the classification umbrella can merge.
 
 This checkpoint is deliberately an audit and cleanup pass. Pool-aware Gallery filter presentation is now owned by Step 4.1. Step 4.0 must not add the superseded role-filter visibility model, Admin configuration, API metadata, migration, or developer-data Version 6 contract from the earlier draft.
+
+## Implementation record
+
+The audit retained the final classification architecture and found two bounded seam defects:
+
+- inactive authenticated sessions could still receive protected capabilities and the all-pools staff scope because the central authenticated-user predicate did not enforce the documented active-user requirement;
+- a classification-rule snapshot with a valid recomputed digest could contain a rule belonging to a different pool because snapshot validation checked supported pool values but not equality with the job pool.
+
+The implementation now treats inactive sessions as unauthenticated at the centralized capability boundary, uses that boundary for parse-flag submission and `/auth/me`, and rejects every snapshot rule whose pool differs from the snapshot/job pool. Focused architecture tests prevent card HTTP surfaces from bypassing the active-user permission seam. A core contract matrix pins the final pool, role, faction, Normal, normalization, and faction-identity ordering.
+
+The remaining identity, migration, inference, developer-data, authorization, workspace, and global Admin/Review matrices passed without requiring architectural changes. No schema, developer-data format, API payload, frontend behavior, or Step 4.1 filter policy was added.
 
 ## Outcome
 

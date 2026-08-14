@@ -267,11 +267,16 @@ class ClassificationRuleService:
         if value.get("digest") != expected_digest:
             raise ClassificationRuleError("Classification rule snapshot digest is invalid.")
         for rule in rules:
+            rule_pool = str(rule.get("card_pool", ""))
             _validate_identity(
-                card_pool=str(rule.get("card_pool", "")),
+                card_pool=rule_pool,
                 target_kind=str(rule.get("target_kind", "")),
                 target_key=str(rule.get("target_key", "")),
             )
+            if rule_pool != card_pool:
+                raise ClassificationRuleError(
+                    "Classification rule snapshot contains a rule from another pool."
+                )
             if rule.get("source_kind") not in {
                 CARD_CLASSIFICATION_SOURCE_TAG,
                 CARD_CLASSIFICATION_SOURCE_TYPE,
