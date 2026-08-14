@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   exportTtsCards,
+  fetchCardFilters,
   fetchCardPage,
   fetchCards,
   type TtsCardExportSource,
@@ -61,6 +62,19 @@ describe('card API', () => {
     expect(api.get).toHaveBeenNthCalledWith(1, '/review/confidence-cards?page=1');
     expect(api.get).toHaveBeenNthCalledWith(2, '/cards', {
       params: { q: 'hero', page_size: 25 },
+    });
+  });
+
+  test('loads global or exact-pool filter metadata explicitly', async () => {
+    const response = { keywords: [], tags: [], symbols: [], types: [] };
+    vi.mocked(api.get).mockResolvedValue({ data: response });
+
+    await expect(fetchCardFilters()).resolves.toEqual(response);
+    await expect(fetchCardFilters('evil')).resolves.toEqual(response);
+
+    expect(api.get).toHaveBeenNthCalledWith(1, '/cards/filters');
+    expect(api.get).toHaveBeenNthCalledWith(2, '/cards/filters', {
+      params: { card_pool: 'evil' },
     });
   });
 });

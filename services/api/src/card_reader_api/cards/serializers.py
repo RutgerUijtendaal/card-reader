@@ -14,6 +14,7 @@ from card_reader_core.models import (
     CARD_LIFECYCLE_STATUSES,
     DEFAULT_CARD_LIFECYCLE_FILTER,
     Card,
+    CardPool,
     CardFaction,
     CardLifecycleFilter,
     CardVersion,
@@ -46,6 +47,14 @@ class CardListFilterParams(CardFilterParams):
     page: int
     page_size: int
     show_groups: bool
+
+
+class CardFilterMetadataScopeSerializer(serializers.Serializer[dict[str, object]]):
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=False)
+
+    def requested_card_pool(self) -> CardPool | None:
+        value = self.validated_data.get("card_pool")
+        return cast(CardPool, value) if isinstance(value, str) else None
 
 
 def card_payload(

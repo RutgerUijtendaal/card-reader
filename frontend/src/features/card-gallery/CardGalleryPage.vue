@@ -35,6 +35,20 @@
             :show-card-pool="false"
             :visible-sections="visibleFilterSections"
           />
+          <div
+            v-if="filtersError"
+            class="theme-section-muted space-y-2 text-xs"
+            role="status"
+          >
+            <p>Filter options could not be loaded. Card browsing is still available.</p>
+            <button
+              class="btn-secondary"
+              type="button"
+              @click="retryFilterLoad"
+            >
+              Retry filter options
+            </button>
+          </div>
 
           <template #footer>
             <div class="flex w-full flex-col gap-2">
@@ -175,6 +189,7 @@ import {
   sameCardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterRouteState';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
+import { reconcileCardFilterStateWithCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
 import {
   getGallerySnapshot,
   clearGalleryNavigationState,
@@ -202,11 +217,14 @@ const { y: scrollTopRef } = useScroll(scrollContainer);
 
 const filterController = useCardFilterController({
   resultSetKey: computed(() => workspace.generation),
+  cardPool: computed(() => workspace.activePool),
 });
 const {
   query,
   filterSectionsState,
   filtersLoaded,
+  filtersError,
+  filterCatalog,
   selectionState,
   readFilterState,
   applyRouteFilterState,
@@ -214,9 +232,14 @@ const {
   loadFilters,
 } = filterController;
 const parsedRouteFilterState = computed(() => parseCardFilterRouteQuery(route.query));
-const currentRouteFilterState = computed(() =>
+const visibleRouteFilterState = computed(() =>
   sanitizeGalleryFilterStateForPool(parsedRouteFilterState.value, workspace.activePool),
 );
+const currentRouteFilterState = computed(() => (
+  filtersLoaded.value
+    ? reconcileCardFilterStateWithCatalog(visibleRouteFilterState.value, filterCatalog.value)
+    : visibleRouteFilterState.value
+));
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
 const visibleFilterSections = computed(() =>
   getGalleryVisibleFilterSections(workspace.activePool),
@@ -243,6 +266,7 @@ const {
   setOverrideHoverMode,
   clearOverrideHoverMode,
 } = useHoverModeSurface('gallery');
+const cardCollectionFiltersReady = computed(() => filtersLoaded.value || filtersError.value !== null);
 const collection = useCardCollection<GalleryItem>({
   buildSearchParams: () => {
     const params = buildCardFilterApiSearchParams(selectionState.value);
@@ -251,7 +275,7 @@ const collection = useCardCollection<GalleryItem>({
     }
     return appendCardSortSearchParam(params, effectiveSort.value);
   },
-  filtersLoaded,
+  filtersLoaded: cardCollectionFiltersReady,
   pageSize,
   identity: (card) => `${card.result_type}:${card.id}`,
   resultSetKey: computed(() => workspace.generation),
@@ -416,7 +440,7 @@ watch(
 );
 
 watch(
-  [galleryRequestSignature, filtersLoaded, () => route.fullPath],
+  [galleryRequestSignature, cardCollectionFiltersReady, () => route.fullPath],
   async ([searchParams, ready]) => {
     if (!ready) {
       return;
@@ -465,6 +489,10 @@ const resetFilters = (): void => {
   void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(defaults) });
 };
 
+const retryFilterLoad = (): void => {
+  void loadFilters().catch(() => undefined);
+};
+
 onBeforeRouteLeave(() => {
   saveGallerySnapshot(galleryRequestSignature.value, collection.galleryState.value, scrollTopRef.value);
 });
@@ -475,6 +503,6 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  void loadFilters();
+  void loadFilters().catch(() => undefined);
 });
 </script>

@@ -3,13 +3,15 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 
 from card_reader_core.models import (
     CardPool,
     CardPoolScope,
     CardVersion,
+    CardVersionKeyword,
     CardVersionSymbol,
+    CardVersionTag,
     Keyword,
     Symbol,
     Tag,
@@ -55,6 +57,7 @@ def list_types_for_card_sort(
     *,
     card_pool: CardPool | None = None,
     card_pool_scope: CardPoolScope | None = None,
+    available_only: bool = False,
 ) -> list[Type]:
     if (card_pool is None) == (card_pool_scope is None):
         raise ValueError("Provide exactly one card pool or card pool scope.")
@@ -68,18 +71,70 @@ def list_types_for_card_sort(
         linked_card_filter &= Q(
             card_version_types__card_version__card__card_pool__in=card_pool_scope.allowed_pools
         )
+    query = Type.objects.annotate(
+        linked_card_count=Count(
+            "card_version_types",
+            filter=linked_card_filter,
+            distinct=True,
+        ),
+    )
+    if available_only:
+        query = query.filter(linked_card_count__gt=0)
     return list(
-        Type.objects.annotate(
-            linked_card_count=Count(
-                "card_version_types",
-                filter=linked_card_filter,
-                distinct=True,
-            ),
-        ).order_by(
+        query.order_by(
             "-linked_card_count",
             "label",
             "id",
         )
+    )
+
+
+def _available_metadata_exists(
+    link_model: Any,
+    *,
+    metadata_field: str,
+    card_pool_scope: CardPoolScope,
+) -> Exists:
+    return Exists(
+        link_model.objects.filter(
+            **{
+                f"{metadata_field}_id": OuterRef("pk"),
+                "card_version__is_latest": True,
+                "card_version__card__card_pool__in": card_pool_scope.allowed_pools,
+            }
+        ).filter(
+            active_card_lifecycle_q(
+                field_path="card_version__card__lifecycle_status",
+            )
+        )
+    )
+
+
+def list_available_keywords(*, card_pool_scope: CardPoolScope) -> list[Keyword]:
+    return list(
+        Keyword.objects.annotate(
+            has_available_card=_available_metadata_exists(
+                CardVersionKeyword,
+                metadata_field="keyword",
+                card_pool_scope=card_pool_scope,
+            )
+        )
+        .filter(has_available_card=True)
+        .order_by("label")
+    )
+
+
+def list_available_tags(*, card_pool_scope: CardPoolScope) -> list[Tag]:
+    return list(
+        Tag.objects.annotate(
+            has_available_card=_available_metadata_exists(
+                CardVersionTag,
+                metadata_field="tag",
+                card_pool_scope=card_pool_scope,
+            )
+        )
+        .filter(has_available_card=True)
+        .order_by("label")
     )
 
 

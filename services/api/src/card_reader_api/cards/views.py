@@ -20,6 +20,7 @@ from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import (
+    CardFilterMetadataScopeSerializer,
     CardFiltersQuerySerializer,
     CardVersionParseFlagCreateSerializer,
     LatestCardReparseSerializer,
@@ -45,6 +46,7 @@ from card_reader_core.models import (
     CARD_FACTION_DEFINITIONS,
     CARD_POOL_DEFINITIONS,
     CARD_ROLE_FILTER_DEFINITIONS,
+    CardPoolScope,
 )
 from card_reader_core.services.card_groups import CardGroupService
 from card_reader_core.services.cards import (
@@ -132,7 +134,24 @@ class CardFiltersView(APIView):
 
     def get(self, request: Request) -> Response:
         card_pool_scope = card_pool_scope_for_user(request.user)
-        metadata = get_filter_metadata(card_pool_scope=card_pool_scope)
+        scope_serializer = CardFilterMetadataScopeSerializer(data=request.query_params)
+        if not scope_serializer.is_valid():
+            return serializer_error(scope_serializer)
+        requested_pool = scope_serializer.requested_card_pool()
+        if requested_pool is not None and not card_pool_scope.allows_card_pool(requested_pool):
+            return Response(
+                {"detail": "Restricted card pools require staff access."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        metadata_scope = (
+            CardPoolScope(frozenset({requested_pool}))
+            if requested_pool is not None
+            else card_pool_scope
+        )
+        metadata = get_filter_metadata(
+            card_pool_scope=metadata_scope,
+            available_only=requested_pool is not None,
+        )
         symbols_by_key = {symbol.key: symbol for symbol in metadata["symbols"]}
         return Response(
             {

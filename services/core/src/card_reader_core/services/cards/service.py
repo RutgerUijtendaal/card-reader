@@ -25,6 +25,8 @@ from card_reader_core.repositories.metadata import (
     get_tags_for_card_versions,
     get_types_for_card_version,
     get_types_for_card_versions,
+    list_available_keywords,
+    list_available_tags,
     list_keywords,
     list_symbols,
     list_tags,
@@ -49,12 +51,27 @@ class CardEditState(TypedDict):
     parse_result: ParseResult | None
 
 
-def get_filter_metadata(*, card_pool_scope: CardPoolScope) -> CardFilterMetadata:
+def get_filter_metadata(
+    *,
+    card_pool_scope: CardPoolScope,
+    available_only: bool = False,
+) -> CardFilterMetadata:
     return {
-        "keywords": list_keywords(),
-        "tags": list_tags(),
+        "keywords": (
+            list_available_keywords(card_pool_scope=card_pool_scope)
+            if available_only
+            else list_keywords()
+        ),
+        "tags": (
+            list_available_tags(card_pool_scope=card_pool_scope)
+            if available_only
+            else list_tags()
+        ),
         "symbols": list_symbols(),
-        "types": list_types_for_card_sort(card_pool_scope=card_pool_scope),
+        "types": list_types_for_card_sort(
+            card_pool_scope=card_pool_scope,
+            available_only=available_only,
+        ),
         "mana_families": MANA_FAMILIES,
     }
 

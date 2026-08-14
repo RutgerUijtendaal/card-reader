@@ -99,4 +99,47 @@ describe('useCardFilterController', () => {
 
     expect(controller.filters.value).toEqual(currentResponse);
   });
+
+  test('binds filter metadata authority to the requested pool', async () => {
+    let resolvePlayer: ((value: typeof emptyFilters) => void) | undefined;
+    const playerResponse = new Promise<typeof emptyFilters>((resolve) => {
+      resolvePlayer = resolve;
+    });
+    const evilResponse = {
+      ...emptyFilters,
+      tags: [{ id: 'evil-tag', label: 'Evil tag', key: 'evil-tag' }],
+    };
+    vi.mocked(fetchCardFilters)
+      .mockReturnValueOnce(playerResponse)
+      .mockResolvedValueOnce(evilResponse);
+    const resultSetKey = ref(0);
+    const cardPool = ref<'player' | 'evil'>('player');
+    const controller = useCardFilterController({ resultSetKey, cardPool });
+
+    const firstLoad = controller.loadFilters();
+    cardPool.value = 'evil';
+    resultSetKey.value = 1;
+    await nextTick();
+    resolvePlayer?.(emptyFilters);
+    await firstLoad;
+    await vi.waitFor(() => {
+      expect(controller.filtersLoaded.value).toBe(true);
+    });
+
+    expect(fetchCardFilters).toHaveBeenNthCalledWith(1, 'player');
+    expect(fetchCardFilters).toHaveBeenNthCalledWith(2, 'evil');
+    expect(controller.filters.value).toEqual(evilResponse);
+  });
+
+  test('records a current request failure without treating it as loaded metadata', async () => {
+    const failure = new Error('filter metadata unavailable');
+    vi.mocked(fetchCardFilters).mockRejectedValueOnce(failure);
+    const controller = useCardFilterController({ cardPool: ref<'player'>('player') });
+
+    await expect(controller.loadFilters()).rejects.toThrow('filter metadata unavailable');
+
+    expect(controller.filtersLoaded.value).toBe(false);
+    expect(controller.filtersError.value).toBe(failure);
+    expect(controller.filters.value).toEqual(emptyFilters);
+  });
 });

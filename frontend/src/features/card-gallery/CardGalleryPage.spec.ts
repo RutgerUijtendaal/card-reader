@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { RouteLocationRaw } from 'vue-router';
 import CardGalleryPage from '@/features/card-gallery/CardGalleryPage.vue';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
+import type { CardFiltersResponse } from '@/domain/cards/types';
 
 const { apiGet } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -22,9 +23,13 @@ vi.mock('@/domain/session/store', () => ({
   useAuthStore: () => ({ canAccessStaffRoutes: false }),
 }));
 
-const filters = {
+const filters: CardFiltersResponse = {
   keywords: [],
-  tags: [],
+  tags: [
+    { id: 'tag-dragon', key: 'dragon', label: 'Dragon' },
+    { id: 'tag-old', key: 'old', label: 'Old' },
+    { id: 'tag-new', key: 'new', label: 'New' },
+  ],
   symbols: [],
   types: [],
   card_pools: [
@@ -70,18 +75,28 @@ const mountGallery = async (
   path: string,
   activePool: 'player' | 'evil' | 'neutral',
   fetchCards = () => Promise.resolve({ data: emptyCardsPage }),
+  fetchFilters: (
+    pool: 'player' | 'evil' | 'neutral',
+  ) => Promise<{ data: CardFiltersResponse }> = () => Promise.resolve({ data: filters }),
 ) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const requestRoutes: string[] = [];
+  const filterRequests: string[] = [];
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/cards', component: CardGalleryPage }],
   });
 
-  apiGet.mockImplementation((url: string) => {
+  apiGet.mockImplementation((
+    url: string,
+    config?: { params?: { card_pool?: 'player' | 'evil' | 'neutral' } },
+  ) => {
     if (url === '/cards/filters') {
-      return Promise.resolve({ data: filters });
+      const pool = config?.params?.card_pool;
+      if (!pool) return Promise.reject(new Error('Gallery filter request omitted its card pool'));
+      filterRequests.push(pool);
+      return fetchFilters(pool);
     }
     if (url.startsWith('/cards?')) {
       requestRoutes.push(router.currentRoute.value.fullPath);
@@ -109,8 +124,10 @@ const mountGallery = async (
 
   return {
     container,
+    filterRequests,
     requestRoutes,
     router,
+    workspace,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -214,6 +231,88 @@ describe('CardGalleryPage pool-aware filters', () => {
       expect(mounted.requestRoutes).toHaveLength(2);
     });
     expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?tag_keys=new');
+
+    mounted.unmount();
+  });
+
+  test('removes unavailable metadata keys after exact-pool hydration', async () => {
+    const evilFilters = {
+      ...filters,
+      keywords: [{ id: 'keyword-evil', key: 'evil-keyword', label: 'Evil Keyword' }],
+      tags: [{ id: 'tag-evil', key: 'evil-tag', label: 'Evil Tag' }],
+      types: [{ id: 'type-evil', key: 'evil-type', label: 'Evil Type' }],
+    };
+    const mounted = await mountGallery(
+      '/cards?card_pool=evil&keyword_match=all&keyword_keys=player-keyword'
+        + '&tag_match=all&tag_keys=evil-tag&tag_keys=player-tag'
+        + '&type_match=all&type_keys=evil-type&type_keys=player-type'
+        + '&type_exclude_keys=missing-type',
+      'evil',
+      undefined,
+      () => Promise.resolve({ data: evilFilters }),
+    );
+
+    expect(mounted.filterRequests).toEqual(['evil']);
+    expect(mounted.router.currentRoute.value.query).toEqual({
+      card_pool: 'evil',
+      tag_match: 'all',
+      tag_keys: ['evil-tag'],
+      type_match: 'all',
+      type_keys: ['evil-type'],
+    });
+    const cardRequest = apiGet.mock.calls.find(([url]) =>
+      typeof url === 'string' && url.startsWith('/cards?'),
+    )?.[0];
+    const params = new URL(String(cardRequest), 'https://cards.test').searchParams;
+    expect(params.getAll('keyword_ids')).toEqual([]);
+    expect(params.getAll('tag_ids')).toEqual(['tag-evil']);
+    expect(params.getAll('type_ids')).toEqual(['type-evil']);
+    expect(params.getAll('type_exclude_ids')).toEqual([]);
+
+    mounted.unmount();
+  });
+
+  test('keeps route metadata intact and browsing usable when facet hydration fails', async () => {
+    const mounted = await mountGallery(
+      '/cards?tag_keys=keep-on-failure',
+      'player',
+      undefined,
+      () => Promise.reject(new Error('facet failure')),
+    );
+
+    expect(mounted.filterRequests).toEqual(['player']);
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?tag_keys=keep-on-failure');
+    expect(mounted.requestRoutes).toEqual(['/cards?tag_keys=keep-on-failure']);
+    expect(mounted.container.textContent).toContain('Filter options could not be loaded');
+
+    mounted.unmount();
+  });
+
+  test('reconciles metadata when switching between pool catalogs', async () => {
+    const poolFilters: Record<'player' | 'evil' | 'neutral', CardFiltersResponse> = {
+      player: {
+        ...filters,
+        tags: [{ id: 'tag-player', key: 'player-tag', label: 'Player Tag' }],
+      },
+      evil: {
+        ...filters,
+        tags: [{ id: 'tag-evil', key: 'evil-tag', label: 'Evil Tag' }],
+      },
+      neutral: { ...filters, tags: [] },
+    };
+    const mounted = await mountGallery(
+      '/cards?tag_keys=player-tag',
+      'player',
+      undefined,
+      (pool) => Promise.resolve({ data: poolFilters[pool] }),
+    );
+
+    mounted.workspace.selectPool('evil');
+    await vi.waitFor(() => {
+      expect(mounted.filterRequests).toEqual(['player', 'evil']);
+      expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?card_pool=evil');
+    });
+    expect(mounted.requestRoutes.at(-1)).toBe('/cards?card_pool=evil');
 
     mounted.unmount();
   });
