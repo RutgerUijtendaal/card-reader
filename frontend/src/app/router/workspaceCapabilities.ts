@@ -3,7 +3,7 @@ import type {
   RouteLocationNormalizedLoaded,
   RouteLocationRaw,
 } from 'vue-router';
-import type { CardPool } from '@/domain/cards/cardPools';
+import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
 import { buildWorkspaceGalleryLocation } from '@/domain/cards/cardPoolWorkspace';
 
 export type WorkspaceRouteCapability = 'global' | 'gallery' | 'resource' | 'player-only';
@@ -22,6 +22,11 @@ export type WorkspaceSelectionDecision =
       location: RouteLocationRaw;
       navigation: 'push' | 'replace';
     };
+
+export type ResourceWorkspaceAccessDecision =
+  | { kind: 'allow' }
+  | { kind: 'fallback-gallery' }
+  | { kind: 'strip-return-context'; location: RouteLocationRaw };
 
 type WorkspaceRoute = Pick<RouteLocationNormalizedLoaded, 'hash' | 'meta' | 'path' | 'query'>;
 
@@ -42,6 +47,36 @@ const buildResourceWorkspaceLocation = (
     path: route.path,
     query,
     hash: route.hash,
+  };
+};
+
+export const resolveResourceWorkspaceAccessDecision = (
+  route: WorkspaceRoute,
+  accessiblePools: readonly CardPool[],
+): ResourceWorkspaceAccessDecision => {
+  const resourcePool = isCardPool(route.query.card_pool)
+    ? route.query.card_pool
+    : undefined;
+  if (resourcePool && !accessiblePools.includes(resourcePool)) {
+    return { kind: 'fallback-gallery' };
+  }
+
+  const returnPool = isCardPool(route.query.return_card_pool)
+    ? route.query.return_card_pool
+    : undefined;
+  if (!returnPool || accessiblePools.includes(returnPool)) {
+    return { kind: 'allow' };
+  }
+
+  const query: LocationQueryRaw = { ...route.query };
+  delete query.return_card_pool;
+  return {
+    kind: 'strip-return-context',
+    location: {
+      path: route.path,
+      query,
+      hash: route.hash,
+    },
   };
 };
 

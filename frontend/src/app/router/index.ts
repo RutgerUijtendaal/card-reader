@@ -22,6 +22,7 @@ import {
   buildWorkspaceGalleryLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
+import { resolveResourceWorkspaceAccessDecision } from '@/app/router/workspaceCapabilities';
 
 const APP_TITLE = "Maity's Card Game";
 const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
@@ -113,17 +114,15 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     }
 
     if (to.meta.workspaceCapability === 'resource') {
-      const resourcePool = isCardPool(rawRequestedPool) ? rawRequestedPool : undefined;
-      if (resourcePool && !workspace.accessiblePools.includes(resourcePool)) {
+      const resourceAccessDecision = resolveResourceWorkspaceAccessDecision(
+        to,
+        workspace.accessiblePools,
+      );
+      if (resourceAccessDecision.kind === 'fallback-gallery') {
         return buildWorkspaceGalleryLocation('player');
       }
-      const returnPool = isCardPool(to.query.return_card_pool)
-        ? to.query.return_card_pool
-        : undefined;
-      if (returnPool && !workspace.accessiblePools.includes(returnPool)) {
-        const query = { ...to.query };
-        delete query.return_card_pool;
-        return { path: to.path, query, hash: to.hash };
+      if (resourceAccessDecision.kind === 'strip-return-context') {
+        return resourceAccessDecision.location;
       }
     }
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { LocationQuery, RouteMeta } from 'vue-router';
 import {
+  resolveResourceWorkspaceAccessDecision,
   resolveWorkspaceSelectionDecision,
   type WorkspaceRouteCapability,
 } from '@/app/router/workspaceCapabilities';
@@ -92,6 +93,37 @@ describe('workspace route capabilities', () => {
       },
       navigation: 'replace',
     });
+  });
+
+  test('preserves a public resource when only its return workspace becomes inaccessible', () => {
+    expect(
+      resolveResourceWorkspaceAccessDecision(
+        route('resource', '/cards/player-card', {
+          return_card_pool: 'evil',
+          tab: 'versions',
+        }),
+        ['player'],
+      ),
+    ).toEqual({
+      kind: 'strip-return-context',
+      location: {
+        path: '/cards/player-card',
+        query: { tab: 'versions' },
+        hash: '',
+      },
+    });
+  });
+
+  test('falls back when the resource itself belongs to an inaccessible pool', () => {
+    expect(
+      resolveResourceWorkspaceAccessDecision(
+        route('resource', '/cards/evil-card', {
+          card_pool: 'evil',
+          return_card_pool: 'player',
+        }),
+        ['player'],
+      ),
+    ).toEqual({ kind: 'fallback-gallery' });
   });
 
   test('falls back from Player-only routes only for restricted workspaces', () => {
