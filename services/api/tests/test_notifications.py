@@ -562,7 +562,7 @@ def test_parse_flag_review_does_not_notify_after_card_moves_to_evil_pool() -> No
     card.save(update_fields=["card_pool"])
     review_client = Client(HTTP_HOST="localhost")
     review_client.force_login(reviewer)
-    flag = review_client.get("/review/parse-flags").json()["results"][0]
+    flag = review_client.get("/review/parse-flags?card_pool=evil").json()["results"][0]
     item_id = flag["items"][0]["id"]
 
     review_response = review_client.patch(
