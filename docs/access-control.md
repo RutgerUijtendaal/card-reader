@@ -15,6 +15,7 @@ The main access levels are:
 - Public visitors can browse Player-card and public deck surfaces and load their public card and symbol assets.
 - Active authenticated users can use account-scoped features and other capabilities granted to ordinary members.
 - Staff users can access administrative workflows including imports, review, catalogs, templates, exports, user management, and developer-data publishing.
+- Admin and Review use the staff user's complete authorized card-pool scope; changing the shell workspace never narrows their catalogs, previews, counts, or queues. Imports may use the workspace only as an explicit, editable default.
 - Superusers can access maintenance operations and the most sensitive administrative views.
 - Developer users can download developer-data bundles even when they are not staff. Staff receive this capability automatically.
 

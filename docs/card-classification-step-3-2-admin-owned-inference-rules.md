@@ -137,7 +137,7 @@ Normal is shown as a read-only derived explanation: it is produced when no roles
 
 Enhance Tag and Type detail responses with reverse classification-rule references. Their Admin Catalog detail view shows which pool-specific roles/factions the entry can infer and links to the corresponding Card Role/Faction editor. Rule CRUD remains one shared API/service path regardless of which side initiated navigation.
 
-Keep the Admin route global under Step 3.1. The active shell workspace must not hide rules for the other pools; pool is an explicit field in the rule editor.
+Keep the Admin route and all Admin Catalog data global under Step 3.1. The active shell workspace must not filter catalog records, linked-card counts, suggestion occurrences, detail previews, searches, reverse references, or rules for another pool. Every authorized pool is visible together; pool is displayed as data and remains an explicit field in the rule editor.
 
 ## Core service and API ownership
 
@@ -283,6 +283,7 @@ Do not run prohibited service/integration suites. Run targeted core and API test
 - Templates contain no role/faction hints in the database, API, UI, job snapshots, or developer data.
 - No hard-coded Tag-to-role/faction policy remains in runtime code.
 - Admin Catalog displays every canonical Card Role and Card Faction and allows staff to manage pool-specific Tag and Type rules.
+- Admin Catalog returns the same authorized all-pools records, counts, previews, and rules in every shell workspace.
 - Rules are explicit per pool and never leak across Player, Evil, or Neutral.
 - One detected Tag/Type can infer several values and automatic results union deterministically.
 - Immutable job snapshots make queued processing and retries independent of later admin edits.

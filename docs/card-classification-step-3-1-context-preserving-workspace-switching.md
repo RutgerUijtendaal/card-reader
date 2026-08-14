@@ -22,6 +22,7 @@ The result should match the user's mental model: the picker changes which part o
 - Keep `accessible_card_pools` and the centralized backend pool scope authoritative. Step 3.1 changes navigation behavior, not access policy.
 - Define workspace compatibility once in app-owned route metadata and one selection coordinator. Components must not maintain their own route-name allowlists.
 - A route that is compatible with every accessible workspace stays mounted during a pool change. Switching context must not erase an in-progress Settings or staff workflow merely because the workspace generation changed.
+- Global compatibility does not imply pool-filtered data. Admin and Review always query the staff user's complete authorized pool scope and ignore the selected shell workspace; Imports alone may consume it as a visible default.
 - Gallery is pool-scoped and represents its workspace in the URL. Selecting Player keeps the canonical clean `/cards` URL; Evil and Neutral use explicit `card_pool` query values.
 - Gallery switching resets pool-sensitive filters, pagination, selection, and export state to the target workspace defaults established by Step 3. It does not carry an implicit Neutral overlay.
 - Card and card-group details are cross-pool-capable resource routes. Keep the current object open when the workspace changes, retain its visible actual-pool classification, and update workspace-owned Back/return context to the selected workspace.
@@ -45,7 +46,7 @@ Extend Vue Router metadata with one explicit, typed workspace behavior. Use name
 
 | Capability | Routes | Selection behavior |
 | --- | --- | --- |
-| `global` | Settings, Notifications, Imports, Operations, Review, Admin, and authentication/setup routes where the picker can appear | Keep the same path and query; change only workspace context. |
+| `global` | Settings, Notifications, Imports, Operations, Review, Admin, and authentication/setup routes where the picker can appear | Keep the same path and query. Admin and Review data remain global; only explicitly context-aware behavior such as a pristine Import default consumes the new workspace. |
 | `gallery` | Card Gallery | Replace the Gallery route with the selected pool and its canonical default filter state. |
 | `resource` | Public card detail, staff card editor, and card-group detail | Keep the same resource id and non-workspace route state; replace only workspace-owned return context. |
 | `player-only` | Deck lists/details/editors/builders and Playtester | Stay in place for Player; selecting Evil or Neutral navigates to that pool's Gallery. |
@@ -78,7 +79,7 @@ Step 3 currently includes `workspace.generation` in the global `RouterView` key,
 - Existing generation, pool, session, and allowed-scope checks remain the boundary against stale responses; component destruction is not a security or consistency mechanism.
 - Any card-derived state that previously relied on the global remount must gain an explicit watcher/reset or guarded request before the generation suffix is removed.
 
-Audit preserved pages for pool-sensitive state. Context-independent form state, open tabs, scroll position, and unsaved edits stay intact. Pool-derived lookups, previews, counts, and suggestions refresh or clear under their owning composable without resetting the whole page.
+Audit preserved pages for genuinely workspace-sensitive state. Context-independent form state, open tabs, scroll position, and unsaved edits stay intact. Workspace-owned lookups refresh or clear under their owning composable without resetting the whole page. Do not misclassify Admin or Review catalogs, previews, counts, searches, or queues as workspace-owned merely because they contain cards.
 
 ## Route-specific behavior
 
@@ -88,7 +89,8 @@ Settings, Notifications, Imports, Operations, Review, and Admin keep their path,
 
 - Navigation items recompute immediately for the selected workspace.
 - Imports may use the new workspace as the default for a pristine classification form, but must not overwrite an explicitly edited pool, a sealed upload attempt, recovered state, or an existing job filter.
-- Review/Admin card searches and previews must issue their next pool-sensitive lookup with an explicit pool and discard stale results, while unrelated page controls remain intact.
+- Review remains one global queue across every pool authorized for the staff user. Confidence cards, parse flags, status tabs, pagination, and summary badges do not filter or refresh merely because the shell workspace changes.
+- Admin remains one global management surface across every pool authorized for the staff user. Catalog counts, suggestion occurrences, detail previews, searches, and classification-rule editors do not filter or refresh merely because the shell workspace changes; pool is shown as data or selected explicitly by the operation.
 - A global route must not add `card_pool` to its URL merely to persist the workspace; the permitted preference is the context source there.
 
 ### Gallery
@@ -159,6 +161,8 @@ Add or update tests covering:
 
 - every route declaring or deliberately inheriting one workspace capability;
 - Settings, Notifications, Imports, Operations, Review, and Admin retaining their route and component instance across all permitted pool selections;
+- Review results and summary counts remaining identical across workspace selections while continuing to enforce the viewer's authorized pool scope;
+- Admin Catalog results, linked-card counts/previews, searches, and pool-specific rule editors remaining identical across workspace selections;
 - preserved local form/tab state on a global route;
 - pristine Import pool defaults following context while edited, sealed, recovered, and job-filter state is preserved;
 - Gallery switching between every Player/Evil/Neutral pair with canonical URLs and target defaults;
@@ -171,7 +175,7 @@ Add or update tests covering:
 - repeated rapid selections committing only the latest accepted intent;
 - mobile drawer closing after both context-only and navigated successful selections, but not treating rejection as success;
 - route components no longer remounting solely because workspace generation changes;
-- every preserved page's pool-derived request carrying the selected pool and rejecting stale generations;
+- every preserved workspace-sensitive request carrying the selected pool and rejecting stale generations, without adding workspace filters to Admin or Review;
 - logout/access loss winning races against pending selections and never restoring restricted state;
 - navigation composition updating immediately without route replacement;
 - no implicit Neutral overlay or mixed-pool ordinary collection.
