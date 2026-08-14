@@ -7,6 +7,7 @@ from django.test import Client
 
 from card_reader_core.models import (
     EVIL_CARD_POOL,
+    PLAYER_CARD_POOL,
     Card,
     CardVersion,
     CardVersionParseFlag,
@@ -93,6 +94,51 @@ def test_evil_parse_flags_follow_the_central_access_capability() -> None:
 
     assert regular_response.status_code == 404
     assert staff_response.status_code == 201
+
+
+def test_parse_flag_review_list_is_scoped_to_one_explicit_card_pool() -> None:
+    _clear_parse_flags()
+    reviewer = _create_user("pool-scoped-flag-reviewer", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(reviewer)
+    player_card, player_version = _create_card_version(name="Player Review Flag")
+    evil_card, evil_version = _create_card_version(
+        name="Evil Review Flag",
+        card_pool=EVIL_CARD_POOL,
+    )
+    payload = {"items": [{"property_key": "name", "expected_value": "Correct name"}]}
+    assert (
+        client.post(
+            f"/cards/{player_card.id}/versions/{player_version.id}/flags",
+            data=payload,
+            content_type="application/json",
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            f"/cards/{evil_card.id}/versions/{evil_version.id}/flags",
+            data=payload,
+            content_type="application/json",
+        ).status_code
+        == 201
+    )
+
+    player_response = client.get(f"/review/parse-flags?card_pool={PLAYER_CARD_POOL}")
+    evil_response = client.get(f"/review/parse-flags?card_pool={EVIL_CARD_POOL}")
+    default_response = client.get("/review/parse-flags")
+    obsolete_response = client.get("/review/parse-flags?card_pool=game_master")
+
+    assert player_response.status_code == 200
+    assert [row["card"]["name"] for row in player_response.json()["results"]] == [
+        "Player Review Flag"
+    ]
+    assert evil_response.status_code == 200
+    assert [row["card"]["name"] for row in evil_response.json()["results"]] == [
+        "Evil Review Flag"
+    ]
+    assert default_response.json()["results"][0]["card"]["name"] == "Player Review Flag"
+    assert obsolete_response.status_code == 400
 
 
 def test_authenticated_user_can_create_overall_and_property_flag_items() -> None:

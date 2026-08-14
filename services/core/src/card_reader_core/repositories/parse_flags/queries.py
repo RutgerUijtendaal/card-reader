@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from django.db.models import Max, Prefetch, Q
 
-from card_reader_core.models import PARSE_FLAG_ITEM_OPEN, CardVersionParseFlag, CardVersionParseFlagItem
+from card_reader_core.models import (
+    PARSE_FLAG_ITEM_OPEN,
+    CardPool,
+    CardVersionParseFlag,
+    CardVersionParseFlagItem,
+)
 
 from .types import PARSE_FLAG_OPEN_STATUS, PaginatedParseFlags, ParseFlagStatusFilter
 from .validation import is_parse_flag_item_status
@@ -28,6 +33,7 @@ def count_open_parse_flag_items() -> int:
 
 def list_parse_flags(
     *,
+    card_pool: CardPool,
     status: ParseFlagStatusFilter = PARSE_FLAG_OPEN_STATUS,
     page: int = 1,
     page_size: int = 50,
@@ -57,6 +63,7 @@ def list_parse_flags(
             Prefetch("card_version__images"),
         )
         .annotate(latest_item_created_at=latest_item_created_at)
+        .filter(card_version__card__card_pool=card_pool)
         .order_by("-latest_item_created_at", "-created_at", "id")
     )
     if status != "all":

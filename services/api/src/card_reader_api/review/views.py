@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import cast
+
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from card_reader_api.common.responses import serializer_error
+from card_reader_api.common.auth_access import card_pool_scope_for_user
 from card_reader_api.review.serializers import (
     ParseFlagItemsQuerySerializer,
     ParseFlagItemUpdateSerializer,
@@ -16,6 +19,7 @@ from card_reader_core.repositories.parse_flags import (
     count_open_parse_flag_items,
     list_parse_flags,
 )
+from card_reader_core.models import CardPool
 from card_reader_core.services.parse_flags import review_parse_flag_item
 
 
@@ -29,7 +33,14 @@ class ParseFlagItemsView(APIView):
         serializer = ParseFlagItemsQuerySerializer(data=request.query_params)
         if not serializer.is_valid():
             return serializer_error(serializer)
+        card_pool = cast(CardPool, serializer.validated_data["card_pool"])
+        if not card_pool_scope_for_user(request.user).allows_card_pool(card_pool):
+            return Response(
+                {"detail": "Restricted card pools require staff access."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         page = list_parse_flags(
+            card_pool=card_pool,
             status=serializer.validated_data["status"],
             page=serializer.validated_data["page"],
             page_size=serializer.validated_data["page_size"],

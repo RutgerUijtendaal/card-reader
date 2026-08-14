@@ -4,14 +4,17 @@ import type {
   ParseFlagPage,
   ParseFlagReviewItem,
 } from '@/features/review-queue/types';
+import type { CardPool } from '@/domain/cards/cardPools';
 
 export const fetchParseFlagPage = async (
   status: FlagStatus,
+  cardPool: CardPool,
   page: number,
   pageSize: number,
 ): Promise<ParseFlagPage> => {
   const params = new URLSearchParams({
     status,
+    card_pool: cardPool,
     page: String(page),
     page_size: String(pageSize),
   });

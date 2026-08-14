@@ -405,6 +405,7 @@ const flagStatus = ref<FlagStatus>(normalizeFlagStatus(queryString(route.query.s
 const flagReports = ref<ParseFlagReviewReport[]>([]);
 const flagPage = ref<ParseFlagPage | null>(null);
 const loadingFlags = ref(false);
+let flagRequestGeneration = 0;
 const updatingItemId = ref<string | null>(null);
 const filtersLoaded = ref(true);
 const { decrementOpenParseFlagItemCount, loadReviewSummary } = useReviewSummary();
@@ -480,9 +481,21 @@ const syncQuery = (): void => {
 };
 
 const loadFlagPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
+  const requestGeneration = ++flagRequestGeneration;
+  const workspaceGeneration = workspace.generation;
+  const cardPool = workspace.activePool;
+  const status = flagStatus.value;
   loadingFlags.value = true;
   try {
-    const response = await fetchParseFlagPage(flagStatus.value, page, 25);
+    const response = await fetchParseFlagPage(status, cardPool, page, 25);
+    if (
+      requestGeneration !== flagRequestGeneration
+      || workspaceGeneration !== workspace.generation
+      || cardPool !== workspace.activePool
+      || status !== flagStatus.value
+    ) {
+      return;
+    }
     flagPage.value = response;
     flagReports.value = mode === 'append'
       ? [...flagReports.value, ...response.results]
@@ -491,7 +504,9 @@ const loadFlagPage = async (page: number, mode: 'replace' | 'append'): Promise<v
       void loadReviewSummary();
     }
   } finally {
-    loadingFlags.value = false;
+    if (requestGeneration === flagRequestGeneration) {
+      loadingFlags.value = false;
+    }
   }
 };
 
@@ -590,6 +605,20 @@ watch(
       void loadFlagPage(1, 'replace');
     }
   },
+);
+
+watch(
+  () => workspace.generation,
+  () => {
+    flagRequestGeneration += 1;
+    loadingFlags.value = false;
+    flagReports.value = [];
+    flagPage.value = null;
+    if (activeView.value === 'flags') {
+      void loadFlagPage(1, 'replace');
+    }
+  },
+  { flush: 'sync' },
 );
 
 onMounted(() => {

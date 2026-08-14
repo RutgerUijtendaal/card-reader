@@ -1,4 +1,4 @@
-import { createApp, nextTick, ref } from 'vue';
+import { createApp, nextTick, reactive, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import ReviewQueuePage from '@/features/review-queue/ReviewQueuePage.vue';
@@ -24,6 +24,7 @@ const {
     generation: 0,
   },
 }));
+const workspaceStore = reactive(workspaceState);
 
 vi.mock('@/shared/api/client', () => ({
   api: {
@@ -51,7 +52,7 @@ vi.mock('@/domain/cards/composables/useCardCollection', () => ({
 }));
 
 vi.mock('@/domain/cards/cardPoolWorkspace', () => ({
-  useCardPoolWorkspaceStore: () => workspaceState,
+  useCardPoolWorkspaceStore: () => workspaceStore,
 }));
 
 vi.mock('@/domain/review/composables/useReviewSummary', () => ({
@@ -226,7 +227,38 @@ describe('ReviewQueuePage parse flags', () => {
 
     expect(collectionOptions.buildSearchParams?.().get('card_pool')).toBe('neutral');
     expect(collectionOptions.resultSetKey?.value).toBe(7);
+    expect(apiGet).toHaveBeenCalledWith(
+      '/review/parse-flags?status=open&card_pool=neutral&page=1&page_size=25',
+    );
 
+    mounted.unmount();
+  });
+
+  test('reloads parse flags for the new workspace and ignores the outgoing response', async () => {
+    let resolvePlayer: ((value: { data: ReturnType<typeof pagePayload> }) => void) | undefined;
+    apiGet
+      .mockReturnValueOnce(new Promise((resolve) => {
+        resolvePlayer = resolve;
+      }))
+      .mockResolvedValueOnce({
+        data: {
+          ...pagePayload(),
+          results: [{ ...pagePayload().results[0], note: 'Neutral report.' }],
+        },
+      });
+    const mounted = await mountPage();
+
+    workspaceStore.activePool = 'neutral';
+    workspaceStore.generation += 1;
+    await flushPromises();
+    resolvePlayer?.({ data: pagePayload() });
+    await flushPromises();
+
+    expect(apiGet).toHaveBeenLastCalledWith(
+      '/review/parse-flags?status=open&card_pool=neutral&page=1&page_size=25',
+    );
+    expect(mounted.container.textContent).toContain('Neutral report.');
+    expect(mounted.container.textContent).not.toContain('Shared context.');
     mounted.unmount();
   });
 });

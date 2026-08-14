@@ -3,11 +3,22 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
-from card_reader_core.models import CardVersion, CardVersionParseFlag, CardVersionParseFlagItem
+from card_reader_core.models import (
+    CARD_POOLS,
+    PLAYER_CARD_POOL,
+    CardVersion,
+    CardVersionParseFlag,
+    CardVersionParseFlagItem,
+)
 from card_reader_core.repositories.cards import get_card_image
 
 
 class ParseFlagItemsQuerySerializer(serializers.Serializer[dict[str, object]]):
+    card_pool = serializers.ChoiceField(
+        choices=CARD_POOLS,
+        required=False,
+        default=PLAYER_CARD_POOL,
+    )
     status = serializers.ChoiceField(choices=["open", "resolved", "dismissed", "all"], required=False, default="open")
     page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(required=False, min_value=1, default=50)
