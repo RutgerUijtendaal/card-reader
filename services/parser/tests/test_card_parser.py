@@ -69,6 +69,16 @@ def _build_parser(*, template: dict[str, object], region_ids: list[str]) -> Card
     parser = CardParser.__new__(CardParser)
     parser._template_service = StubTemplateService(template)
     parser._cropper = StubCropper(region_ids)
+    parser._name_parser = StubRegionParser(
+        {
+            "name_bar": _parser_result(
+                "name_bar",
+                text="Name Only",
+                confidence=0.88,
+                normalized_fields={"name": "Name Only"},
+            )
+        }
+    )
     parser._name_mana_cost_parser = StubRegionParser(
         {"top_bar": _parser_result("top_bar", text="Top", confidence=0.91, normalized_fields={"name": "Spellblade"})}
     )
@@ -188,3 +198,33 @@ def test_card_parser_uses_second_rules_text_region_as_fallback(tmp_path: Path) -
     assert len(parser._rules_text_parser.calls) == 2
     assert parsed.normalized_fields["rules_text"] == "Recovered rules"
     assert parsed.confidence["rules_text"] == 0.61
+
+
+def test_card_parser_dispatches_name_without_mana_inputs(tmp_path: Path) -> None:
+    image_path = tmp_path / "name-only.png"
+    image_path.write_bytes(b"card-image")
+    template = {
+        "regions": [
+            {
+                "region_id": "name_bar",
+                "parser_type": "name",
+                "cut_region": {},
+                "ocr_config": {},
+            }
+        ]
+    }
+    parser = _build_parser(template=template, region_ids=["name_bar"])
+
+    parsed = parser.parse(image_path=image_path, template_id="name-only-v1")
+
+    assert len(parser._name_parser.calls) == 1
+    assert "symbols" not in parser._name_parser.calls[0]
+    assert parser._name_mana_cost_parser.calls == []
+    assert parsed.normalized_fields["name"] == "Name Only"
+    assert parsed.normalized_fields["mana_cost"] == ""
+    assert parsed.normalized_fields["mana_symbols"] == ""
+    assert parsed.normalized_fields["mana_total"] == ""
+    assert parsed.symbol_ids == []
+    assert parsed.confidence["name"] == 0.88
+    assert parsed.confidence["mana_cost"] == 0.0
+    assert parsed.confidence["overall"] == 0.88

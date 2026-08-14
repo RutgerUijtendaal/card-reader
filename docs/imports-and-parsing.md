@@ -35,6 +35,8 @@ Templates and catalogs are read at processing time. Changing them affects future
 
 Templates configure parsing only; they do not classify cards. Staff manage explicit inference rules under **Admin → Catalog → Card classification**. Each enabled rule maps one existing Tag or Type to one code-owned role or faction in exactly one pool. Automatic classification unions every matching rule from the job snapshot, while role and faction overrides independently bypass all rules for their facet. Selecting no roles intentionally produces Normal; selecting no factions intentionally produces No faction. The pool is always explicit and is never inferred.
 
+Template regions use one of these parser types: `name`, `name_mana_cost`, `type_tag`, `rules_text`, `attack`, `health`, or `affinity`. Use `name` when a crop contains only the card name; it performs OCR and shared name cleanup without loading mana symbols or running symbol detection. Use `name_mana_cost` when the crop contains both the name and mana cost. A template may have at most one name-producing region across those two types. Templates without either remain valid and use the source image stem as the final name fallback.
+
 ## Jobs, retries, and cancellation
 
 An import job is the user-facing batch, while import items are the individual units claimed by workers. Item state is durable, allowing the UI to show queued, processing, completed, failed, or cancelled work even if a process restarts.

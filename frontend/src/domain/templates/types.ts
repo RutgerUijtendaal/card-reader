@@ -1,4 +1,5 @@
 import type { JsonObject } from '@/shared/types/json';
+import type { TemplateParserType } from '@/domain/templates/parserTypes';
 
 export type RegionBounds = {
   unit: 'relative' | 'absolute';
@@ -7,14 +8,6 @@ export type RegionBounds = {
   w: number;
   h: number;
 };
-
-export type TemplateParserType =
-  | 'name_mana_cost'
-  | 'type_tag'
-  | 'rules_text'
-  | 'attack'
-  | 'health'
-  | 'affinity';
 
 export type TemplateRegionDefinition = {
   region_id: string;

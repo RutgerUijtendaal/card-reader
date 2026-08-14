@@ -8,9 +8,9 @@ from card_reader_core.models import Symbol
 from PIL import Image
 
 from ..ocr_runner import OcrRunner
-from ..region_config import resolve_region_ocr_config
 from ..symbol_detector import SymbolDetector
 
+from .name_text import normalize_name_text, read_name_ocr_text
 from .types import RegionParseResult
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 class NameManaCostParser:
     _EXPECTED_SYMBOL_TYPES = {"mana"}
-    _star_tail_pattern = re.compile(r"\s*[★☆✪✫✬✭✮✯✰✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿]+.*$")
     _trailing_integer_pattern = re.compile(r"(\d+)\s*$")
     _leading_noise_number_pattern = re.compile(r"^\s*\d+(?:\s+\d+)?\s+")
     _integer_pattern = re.compile(r"\d+")
@@ -44,10 +43,13 @@ class NameManaCostParser:
             image.height,
             sorted(self._EXPECTED_SYMBOL_TYPES),
         )
-        ocr_config = resolve_region_ocr_config(region_spec)
-        ocr_data = self._ocr_runner.run(image, config=ocr_config)
-        filtered_lines = self._safe_lines(ocr_data.get("lines", []))
-        full_text = self._join_line_texts(filtered_lines)
+        ocr_text = read_name_ocr_text(
+            ocr_runner=self._ocr_runner,
+            image=image,
+            region_spec=region_spec,
+        )
+        filtered_lines = ocr_text.lines
+        full_text = ocr_text.text
 
         candidate_symbols = self._select_mana_candidate_symbols(symbols)
         detected_symbols_all = self._symbol_detector.detect(
@@ -102,7 +104,7 @@ class NameManaCostParser:
         logger.info(
             "Name/mana parser finished. region=%s conf=%.3f name=%r mana_cost=%r mana_symbols=%s",
             region_name,
-            self._average_line_confidence(filtered_lines),
+            ocr_text.confidence,
             name,
             mana_cost,
             mana_symbol_keys,
@@ -118,7 +120,7 @@ class NameManaCostParser:
         return RegionParseResult(
             region_name=region_name,
             text=full_text,
-            confidence=self._average_line_confidence(filtered_lines),
+            confidence=ocr_text.confidence,
             lines=filtered_lines,
             detected_symbols=detected_symbols,
             normalized_fields=normalized_fields,
@@ -126,8 +128,8 @@ class NameManaCostParser:
                 "expected_symbol_types": sorted(self._EXPECTED_SYMBOL_TYPES),
                 "full_ocr_text": full_text,
                 "candidate_symbol_count": len(candidate_symbols),
-                "ocr_config": ocr_config,
-                "ocr_line_count_raw": len(self._safe_lines(ocr_data.get("lines", []))),
+                "ocr_config": ocr_text.ocr_config,
+                "ocr_line_count_raw": ocr_text.raw_line_count,
                 "ocr_line_count_filtered": len(filtered_lines),
             },
         )
@@ -150,10 +152,9 @@ class NameManaCostParser:
         return enabled_template
 
     def _extract_name(self, text: str, *, has_mana: bool) -> str:
-        compact = text.replace("\n", " ").strip()
+        compact = normalize_name_text(text)
         if not compact:
             return ""
-        compact = self._star_tail_pattern.sub("", compact)
         if has_mana:
             compact = self._trailing_integer_pattern.sub("", compact).strip()
             compact = self._leading_noise_number_pattern.sub("", compact).strip()
@@ -205,24 +206,4 @@ class NameManaCostParser:
             tokens.append(str(any_color))
         tokens.extend([f"{{{key}}}" for key in symbol_keys])
         return " ".join(tokens).strip()
-
-    def _safe_confidence(self, raw: Any) -> float:
-        try:
-            return float(raw)
-        except (TypeError, ValueError):
-            return 0.0
-
-    def _safe_lines(self, raw: Any) -> list[dict[str, Any]]:
-        return raw if isinstance(raw, list) else []
-
-    def _join_line_texts(self, lines: list[dict[str, Any]]) -> str:
-        return "\n".join(str(row.get("text", "")).strip() for row in lines if row.get("text")).strip()
-
-    def _average_line_confidence(self, lines: list[dict[str, Any]]) -> float:
-        if not lines:
-            return 0.0
-        values = [self._safe_confidence(row.get("confidence", 0.0)) for row in lines]
-        return float(sum(values) / len(values))
-
-
 

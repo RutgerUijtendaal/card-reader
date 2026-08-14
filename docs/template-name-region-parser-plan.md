@@ -1,6 +1,6 @@
 # Template Parser: Name-Only Region
 
-Status: planned; not implemented.
+Status: implemented.
 
 ## Goal
 
@@ -128,7 +128,7 @@ For a `name` region, its `RegionParseResult.normalized_fields` contains only `na
 
 ## Documentation
 
-After implementation, update [Imports and parsing](imports-and-parsing.md) with the supported region parser types and when to choose `name` versus `name_mana_cost`. Mark this plan implemented and record any compatibility finding. No database diagram update is expected.
+[Imports and parsing](imports-and-parsing.md) records the supported region parser types and when to choose `name` versus `name_mana_cost`. Existing seed and persisted template contracts remain compatible because `name_mana_cost` is unchanged, templates without a name-producing region remain valid, and the parser type is stored in existing definition JSON. No database diagram update or migration was required.
 
 ## Execution sequence
 
