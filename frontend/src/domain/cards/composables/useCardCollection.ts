@@ -64,9 +64,9 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     hasLoadedOnce.value = false;
   };
 
-  const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
+  const loadCardsPage = async (page: number, mode: 'replace' | 'append'): Promise<boolean> => {
     if (enabled && !enabled.value) {
-      return;
+      return false;
     }
     const requestId = ++latestSearchRequestId;
     const params = buildSearchParams();
@@ -84,7 +84,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     try {
       const response = await fetchPage(params);
       if (requestId !== latestSearchRequestId) {
-        return;
+        return false;
       }
       onResults?.(response.results);
       galleryState.value =
@@ -92,6 +92,12 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
           ? replaceGalleryPage(response)
           : appendGalleryPage(galleryState.value, response, identity);
       hasLoadedOnce.value = true;
+      return true;
+    } catch (error) {
+      if (requestId === latestSearchRequestId) {
+        throw error;
+      }
+      return false;
     } finally {
       if (requestId === latestSearchRequestId) {
         isLoadingInitial.value = false;
@@ -101,9 +107,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     }
   };
 
-  const searchCards = async (): Promise<void> => {
-    await loadCardsPage(1, 'replace');
-  };
+  const searchCards = async (): Promise<boolean> => loadCardsPage(1, 'replace');
 
   const loadNextPage = async (): Promise<void> => {
     if ((enabled && !enabled.value) || isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {

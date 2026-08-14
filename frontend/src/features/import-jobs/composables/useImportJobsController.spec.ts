@@ -121,10 +121,11 @@ const mountController = (cardPool: CardPool = 'player') => {
   );
   const pinia = createPinia();
   const workspace = useCardPoolWorkspaceStore(pinia);
-  workspace.synchronizeSession(['player', 'evil', 'neutral'], 'test-staff', cardPool);
+  workspace.synchronizeSession(['player', 'evil', 'neutral'], 'test-staff');
+  workspace.selectPool(cardPool);
   app.use(pinia);
   app.mount(host);
-  return { app, controller };
+  return { app, controller, workspace };
 };
 
 describe('useImportJobsController', () => {
@@ -165,6 +166,87 @@ describe('useImportJobsController', () => {
 
     expect(controller.cardPool.value).toBe('neutral');
     app.unmount();
+  });
+
+  test('follows workspace changes only while the import pool is pristine', () => {
+    const mounted = mountController();
+
+    mounted.workspace.selectPool('evil');
+    expect(mounted.controller.cardPool.value).toBe('evil');
+
+    mounted.controller.setCardPool('player');
+    mounted.workspace.selectPool('neutral');
+    expect(mounted.controller.cardPool.value).toBe('player');
+
+    mounted.app.unmount();
+  });
+
+  test('preserves a sealed import pool while the workspace changes', async () => {
+    const mounted = mountController('evil');
+    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
+    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
+    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
+    mounted.controller.pickedFiles.value = [
+      new File(['image'], 'card.png', { type: 'image/png' }),
+    ];
+
+    const createPromise = mounted.controller.createJobFromPicker();
+    expect(mounted.controller.formLocked.value).toBe(true);
+    mounted.workspace.selectPool('neutral');
+    expect(mounted.controller.cardPool.value).toBe('evil');
+
+    createResult.resolve({
+      ...activeJob('sealed-job'),
+      job_id: 'sealed-job',
+      idempotent_replay: false,
+    });
+    await createPromise;
+    expect(mounted.controller.cardPool.value).toBe('neutral');
+
+    mounted.app.unmount();
+  });
+
+  test('re-syncs a pristine pool after a definitive failure unlocks the form', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
+    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
+    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
+    mounted.controller.pickedFiles.value = [
+      new File(['image'], 'card.png', { type: 'image/png' }),
+    ];
+
+    const createPromise = mounted.controller.createJobFromPicker();
+    mounted.workspace.selectPool('evil');
+    expect(mounted.controller.cardPool.value).toBe('player');
+    createResult.reject({ response: { status: 400, data: { detail: 'Invalid import.' } } });
+    await createPromise;
+
+    expect(mounted.controller.formLocked.value).toBe(false);
+    expect(mounted.controller.cardPool.value).toBe('evil');
+    mounted.app.unmount();
+  });
+
+  test('re-syncs a pristine pool after an uncertain attempt is abandoned', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
+    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
+    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
+    mounted.controller.pickedFiles.value = [
+      new File(['image'], 'card.png', { type: 'image/png' }),
+    ];
+
+    const createPromise = mounted.controller.createJobFromPicker();
+    mounted.workspace.selectPool('neutral');
+    createResult.reject(new Error('connection lost'));
+    await createPromise;
+    expect(mounted.controller.createState.value.phase).toBe('uncertain');
+    expect(mounted.controller.cardPool.value).toBe('player');
+
+    mounted.controller.abandonPendingAttempt();
+
+    expect(mounted.controller.formLocked.value).toBe(false);
+    expect(mounted.controller.cardPool.value).toBe('neutral');
+    mounted.app.unmount();
   });
 
   afterEach(() => {

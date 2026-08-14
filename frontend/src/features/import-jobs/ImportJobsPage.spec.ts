@@ -1,9 +1,11 @@
 import { computed, createApp, h, ref } from 'vue';
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router';
+import { createPinia } from 'pinia';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import ImportJobsPage from '@/features/import-jobs/ImportJobsPage.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
 import type { ImportCreateState } from '@/features/import-jobs/composables/useImportJobsController';
+import { useAuthStore } from '@/domain/session/store';
 
 vi.mock('@/features/import-jobs/composables/useImportJobsController', () => ({
   useImportJobsController: vi.fn(),
@@ -80,6 +82,7 @@ describe('ImportJobsPage', () => {
       viewJobDetail: vi.fn(),
       closeJobDetail: vi.fn(),
       setPickedFiles: vi.fn(),
+      setCardPool: vi.fn(),
       clearPickedFiles: vi.fn(),
       abandonPendingAttempt: vi.fn(),
       pollJobs: vi.fn(),
@@ -102,6 +105,20 @@ describe('ImportJobsPage', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const app = createApp({ render: () => h(RouterView) });
+    const pinia = createPinia();
+    const auth = useAuthStore(pinia);
+    auth.$patch({
+      initialized: true,
+      user: {
+        authenticated: true,
+        id: 'staff-1',
+        username: 'staff',
+        is_staff: true,
+        can_access_admin: true,
+        accessible_card_pools: ['player', 'evil', 'neutral'],
+      },
+    });
+    app.use(pinia);
     app.use(router);
     app.mount(host);
 
@@ -185,6 +202,22 @@ describe('ImportJobsPage', () => {
     await router.push('/other');
     expect(confirmLeave).toHaveBeenCalledOnce();
     expect(router.currentRoute.value.path).toBe('/operations');
+
+    auth.$patch({ user: null });
+    await router.push('/other');
+    expect(router.currentRoute.value.path).toBe('/other');
+
+    auth.$patch({
+      user: {
+        authenticated: true,
+        id: 'staff-1',
+        username: 'staff',
+        is_staff: true,
+        can_access_admin: true,
+        accessible_card_pools: ['player', 'evil', 'neutral'],
+      },
+    });
+    await router.push('/operations');
 
     confirmLeave.mockReturnValue(true);
     await router.push('/other');

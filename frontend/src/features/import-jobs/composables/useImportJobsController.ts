@@ -1,8 +1,8 @@
 import { useEventListener } from '@vueuse/core';
-import { computed, onMounted, ref, shallowRef } from 'vue';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';
-import type { CardPool } from '@/domain/cards/cardPools';
+import { isCardPool, type CardPool } from '@/domain/cards/cardPools';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { fetchTemplates } from '@/domain/templates/api';
 import type { TemplateRecord } from '@/domain/templates/types';
@@ -47,6 +47,7 @@ export const useImportJobsController = () => {
   const workspace = useCardPoolWorkspaceStore();
   const pickerTemplateId = ref('mtg-like-v1');
   const cardPool = ref<CardPool>(workspace.activePool);
+  const cardPoolWasEdited = ref(false);
   const cardRoleMode = ref<'automatic' | 'override'>('automatic');
   const cardRoleOverride = ref<CardRole[]>([]);
   const cardFactionMode = ref<'automatic' | 'override'>('automatic');
@@ -105,6 +106,25 @@ export const useImportJobsController = () => {
     ['submitting', 'reconciling', 'uncertain'].includes(createState.value.phase),
   );
   const hasUnresolvedCreateAttempt = computed(() => pendingAttempt.value !== null);
+
+  const setCardPool = (value: string | number | null): void => {
+    if (formLocked.value || !isCardPool(value)) {
+      return;
+    }
+    cardPool.value = value;
+    cardPoolWasEdited.value = true;
+  };
+
+  watch(
+    [() => workspace.activePool, formLocked, hasUnresolvedCreateAttempt],
+    ([nextPool, locked, hasUnresolvedAttempt]) => {
+      if (cardPoolWasEdited.value || locked || hasUnresolvedAttempt) {
+        return;
+      }
+      cardPool.value = nextPool;
+    },
+    { flush: 'sync' },
+  );
 
   const loadTemplates = async (): Promise<void> => {
     templates.value = await fetchTemplates();
@@ -176,6 +196,8 @@ export const useImportJobsController = () => {
     cardRoleOverride.value = [];
     cardFactionMode.value = 'automatic';
     cardFactionOverride.value = [];
+    cardPoolWasEdited.value = false;
+    cardPool.value = workspace.activePool;
     creationKey.value = newCreationKey();
   };
 
@@ -316,6 +338,7 @@ export const useImportJobsController = () => {
     viewJobDetail,
     closeJobDetail,
     setPickedFiles,
+    setCardPool,
     clearPickedFiles,
     abandonPendingAttempt,
     pollJobs,

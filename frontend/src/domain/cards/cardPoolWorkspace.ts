@@ -21,13 +21,9 @@ export const normalizeAccessibleCardPools = (
 
 export const resolveCardPoolWorkspace = (
   accessibleCardPools: readonly CardPool[],
-  routeCardPool: unknown,
   preferredCardPool: unknown,
 ): CardPool => {
   const accessible = new Set(normalizeAccessibleCardPools(accessibleCardPools));
-  if (isCardPool(routeCardPool) && accessible.has(routeCardPool)) {
-    return routeCardPool;
-  }
   if (isCardPool(preferredCardPool) && accessible.has(preferredCardPool)) {
     return preferredCardPool;
   }
@@ -49,12 +45,6 @@ export const buildWorkspaceGalleryLocation = (
     : '/cards';
 };
 
-export const buildWorkspaceSelectionLocation = (
-  cardPool: CardPool,
-): RouteLocationRaw => cardPool === 'player'
-  ? { path: '/cards', query: { card_pool: 'player' } }
-  : buildWorkspaceGalleryLocation(cardPool);
-
 export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () => {
   const activePool = ref<CardPool>('player');
   const accessiblePools = ref<CardPool[]>(['player']);
@@ -74,7 +64,6 @@ export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () =
   const synchronizeSession = (
     nextAccessiblePools: readonly CardPool[],
     nextSessionKey: string,
-    routeCardPool?: unknown,
   ): boolean => {
     const normalizedPools = normalizeAccessibleCardPools(nextAccessiblePools);
     const scopeChanged = normalizedPools.join(':') !== accessiblePools.value.join(':');
@@ -82,10 +71,9 @@ export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () =
     const nextPool = initialized.value
       ? resolveCardPoolWorkspace(
           normalizedPools,
-          routeCardPool,
           normalizedPools.includes(activePool.value) ? activePool.value : preferredPool.value,
         )
-      : resolveCardPoolWorkspace(normalizedPools, routeCardPool, preferredPool.value);
+      : resolveCardPoolWorkspace(normalizedPools, preferredPool.value);
     const poolChanged = nextPool !== activePool.value;
 
     accessiblePools.value = normalizedPools;

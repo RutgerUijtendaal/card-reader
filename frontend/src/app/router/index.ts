@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import type { RouterHistory } from 'vue-router';
+import type { RouteRecordRaw, RouterHistory } from 'vue-router';
 import { useAuthStore } from '@/domain/session/store';
 import LoginPage from '@/features/auth/LoginPage.vue';
 import PasswordSetupPage from '@/features/auth/PasswordSetupPage.vue';
@@ -22,20 +22,45 @@ import {
   buildWorkspaceGalleryLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
+import { resolveResourceWorkspaceAccessDecision } from '@/app/router/workspaceCapabilities';
 
 const APP_TITLE = "Maity's Card Game";
 const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
 
+export const APP_ROUTES: RouteRecordRaw[] = [
+  { path: '/', redirect: '/cards' },
+  { path: '/cards', component: CardGalleryPage, meta: { workspaceCapability: 'gallery', title: 'Gallery' } },
+  { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card' } },
+  { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { workspaceCapability: 'resource', title: 'Card Group' } },
+  { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks', workspaceCapability: 'player-only' } },
+  { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck', workspaceCapability: 'player-only' } },
+  { path: '/playtester', component: PlaytesterPage, meta: { title: 'Playtester', workspaceCapability: 'player-only' } },
+  { path: '/playtester/:deckId', component: PlaytesterPage, meta: { title: 'Playtester', workspaceCapability: 'player-only' } },
+  { path: '/login', component: LoginPage, meta: { public: true, title: 'Sign In', workspaceCapability: 'global' } },
+  { path: '/password-setup', component: PasswordSetupPage, meta: { public: true, title: 'Password Setup', workspaceCapability: 'global' } },
+  { path: '/my/decks', component: DeckIndexPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'My Decks' } },
+  { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'My Deck' }, props: true },
+  { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'New Deck' } },
+  { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, workspaceCapability: 'player-only', title: 'Edit Deck' }, props: true },
+  { path: '/notifications', component: NotificationsPage, meta: { requiresAuth: true, title: 'Notifications', workspaceCapability: 'global' } },
+  { path: '/settings', component: SettingsPage, meta: { title: 'Settings', workspaceCapability: 'global' } },
+  { path: '/imports', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Imports', workspaceCapability: 'global' } },
+  { path: '/operations', component: OperationsPage, meta: { requiresStaff: true, title: 'Operations', workspaceCapability: 'global' } },
+  { path: '/import-jobs', redirect: '/imports' },
+  { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { workspaceCapability: 'resource', requiresStaff: true, title: 'Edit Card' } },
+  { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue', workspaceCapability: 'global' } },
+  { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin', workspaceCapability: 'global' } },
+];
+
 const resolveRouteWorkspacePool = (
-  path: string,
-  isWorkspaceRoute: boolean,
+  workspaceCapability: unknown,
   cardPool: unknown,
   returnCardPool: unknown,
 ): CardPool | undefined => {
-  if (path === '/cards') {
+  if (workspaceCapability === 'gallery') {
     return isCardPool(cardPool) ? cardPool : undefined;
   }
-  if (!isWorkspaceRoute) {
+  if (workspaceCapability !== 'resource') {
     return undefined;
   }
   if (isCardPool(returnCardPool)) {
@@ -47,30 +72,7 @@ const resolveRouteWorkspacePool = (
 export const createAppRouter = (history: RouterHistory = createWebHistory()) => {
   const router = createRouter({
     history,
-    routes: [
-      { path: '/', redirect: '/cards' },
-      { path: '/cards', component: CardGalleryPage, meta: { cardPoolWorkspace: true, title: 'Gallery' } },
-      { path: '/cards/:id', component: CardPublicDetailPage, props: true, meta: { cardPoolWorkspace: true, title: 'Card' } },
-      { path: '/card-groups/:id', component: CardGroupDetailPage, props: true, meta: { cardPoolWorkspace: true, title: 'Card Group' } },
-      { path: '/decks', component: DeckIndexPage, meta: { title: 'Decks', playerWorkspace: true } },
-      { path: '/decks/:id', component: DeckDetailPage, props: true, meta: { title: 'Deck', playerWorkspace: true } },
-      { path: '/playtester', component: PlaytesterPage, meta: { title: 'Playtester', playerWorkspace: true } },
-      { path: '/playtester/:deckId', component: PlaytesterPage, meta: { title: 'Playtester', playerWorkspace: true } },
-      { path: '/login', component: LoginPage, meta: { public: true, title: 'Sign In' } },
-      { path: '/password-setup', component: PasswordSetupPage, meta: { public: true, title: 'Password Setup' } },
-      { path: '/my/decks', component: DeckIndexPage, meta: { requiresAuth: true, playerWorkspace: true, title: 'My Decks' } },
-      { path: '/my/decks/:id', component: DeckDetailPage, meta: { requiresAuth: true, playerWorkspace: true, title: 'My Deck' }, props: true },
-      { path: '/my/decks/new', component: DeckEditorPage, meta: { requiresAuth: true, playerWorkspace: true, title: 'New Deck' } },
-      { path: '/my/decks/:id/edit', component: DeckEditorPage, meta: { requiresAuth: true, playerWorkspace: true, title: 'Edit Deck' }, props: true },
-      { path: '/notifications', component: NotificationsPage, meta: { requiresAuth: true, title: 'Notifications' } },
-      { path: '/settings', component: SettingsPage, meta: { title: 'Settings' } },
-      { path: '/imports', component: ImportJobsPage, meta: { requiresStaff: true, title: 'Imports' } },
-      { path: '/operations', component: OperationsPage, meta: { requiresStaff: true, title: 'Operations' } },
-      { path: '/import-jobs', redirect: '/imports' },
-      { path: '/cards/:id/edit', component: CardDetailPage, props: true, meta: { cardPoolWorkspace: true, requiresStaff: true, title: 'Edit Card' } },
-      { path: '/review', component: ReviewQueuePage, meta: { requiresStaff: true, title: 'Review Queue' } },
-      { path: '/admin', component: AdminPage, meta: { requiresStaff: true, title: 'Admin' } },
-    ],
+    routes: APP_ROUTES,
   });
 
   router.beforeEach(async (to) => {
@@ -84,16 +86,7 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     const sessionKey = auth.authenticated
       ? `user:${auth.user?.id ?? auth.user?.username ?? 'authenticated'}`
       : 'anonymous';
-    workspace.synchronizeSession(
-      auth.accessibleCardPools,
-      sessionKey,
-      resolveRouteWorkspacePool(
-        to.path,
-        to.meta.cardPoolWorkspace === true,
-        rawRequestedPool,
-        to.query.return_card_pool,
-      ),
-    );
+    workspace.synchronizeSession(auth.accessibleCardPools, sessionKey);
 
     if (to.meta.requiresAuth && !auth.authenticated) {
       return {
@@ -112,10 +105,7 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       };
     }
 
-    if (to.meta.playerWorkspace) {
-      if (workspace.activePool !== 'player') {
-        workspace.selectPool('player');
-      }
+    if (to.meta.workspaceCapability === 'player-only') {
       if (rawRequestedPool !== undefined) {
         const query = { ...to.query };
         delete query.card_pool;
@@ -123,21 +113,42 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       }
     }
 
-    if (requestedPool && !workspace.accessiblePools.includes(requestedPool)) {
-      workspace.selectPool('player');
+    if (to.meta.workspaceCapability === 'resource') {
+      const resourceAccessDecision = resolveResourceWorkspaceAccessDecision(
+        to,
+        workspace.accessiblePools,
+      );
+      if (resourceAccessDecision.kind === 'fallback-gallery') {
+        return buildWorkspaceGalleryLocation('player');
+      }
+      if (resourceAccessDecision.kind === 'strip-return-context') {
+        return resourceAccessDecision.location;
+      }
+    }
+
+    const routeWorkspacePool = resolveRouteWorkspacePool(
+      to.meta.workspaceCapability,
+      rawRequestedPool,
+      to.query.return_card_pool,
+    );
+    if (routeWorkspacePool && !workspace.accessiblePools.includes(routeWorkspacePool)) {
       return buildWorkspaceGalleryLocation('player');
     }
 
-    if (to.path === '/cards') {
+    if (to.meta.workspaceCapability === 'gallery') {
       if (requestedPool === 'player' && rawRequestedPool !== undefined) {
         return buildWorkspaceGalleryLocation('player', to.query);
       }
       if (rawRequestedPool !== undefined && requestedPool === undefined) {
-        workspace.selectPool('player');
         return buildWorkspaceGalleryLocation('player', to.query);
       }
-      const representedPool = requestedPool ?? 'player';
-      if (representedPool !== workspace.activePool) {
+      const redirectedFromExplicitPool = to.redirectedFrom?.meta.workspaceCapability === 'gallery'
+        && to.redirectedFrom.query.card_pool !== undefined;
+      if (
+        rawRequestedPool === undefined
+        && !redirectedFromExplicitPool
+        && workspace.activePool !== 'player'
+      ) {
         return buildWorkspaceGalleryLocation(workspace.activePool, to.query);
       }
     }
@@ -149,7 +160,27 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     return true;
   });
 
-  router.afterEach((to) => {
+  router.afterEach((to, _from, failure) => {
+    if (failure) {
+      return;
+    }
+    const workspace = useCardPoolWorkspaceStore();
+    let acceptedWorkspacePool: CardPool | undefined;
+    if (to.meta.workspaceCapability === 'gallery') {
+      acceptedWorkspacePool = isCardPool(to.query.card_pool) ? to.query.card_pool : 'player';
+    } else if (to.meta.workspaceCapability === 'player-only') {
+      acceptedWorkspacePool = 'player';
+    } else if (to.meta.workspaceCapability === 'resource') {
+      acceptedWorkspacePool = resolveRouteWorkspacePool(
+        to.meta.workspaceCapability,
+        to.query.card_pool,
+        to.query.return_card_pool,
+      );
+    }
+    if (acceptedWorkspacePool) {
+      workspace.selectPool(acceptedWorkspacePool);
+    }
+
     if (typeof document === 'undefined') {
       return;
     }

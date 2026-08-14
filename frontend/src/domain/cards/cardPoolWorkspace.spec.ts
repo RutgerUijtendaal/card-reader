@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import {
   buildWorkspaceGalleryLocation,
-  buildWorkspaceSelectionLocation,
   normalizeAccessibleCardPools,
   resolveCardPoolWorkspace,
   useCardPoolWorkspaceStore,
@@ -22,15 +21,15 @@ describe('card pool workspace', () => {
     ]);
   });
 
-  test('prefers an accessible route pool, then a permitted preference, then Player', () => {
-    expect(resolveCardPoolWorkspace(['player', 'evil'], 'evil', 'player')).toBe('evil');
-    expect(resolveCardPoolWorkspace(['player', 'evil'], undefined, 'evil')).toBe('evil');
-    expect(resolveCardPoolWorkspace(['player'], 'evil', 'neutral')).toBe('player');
+  test('prefers a permitted preference, then Player', () => {
+    expect(resolveCardPoolWorkspace(['player', 'evil'], 'evil')).toBe('evil');
+    expect(resolveCardPoolWorkspace(['player'], 'neutral')).toBe('player');
   });
 
   test('falls back synchronously and advances the generation when access is lost', () => {
     const workspace = useCardPoolWorkspaceStore();
-    workspace.synchronizeSession(['player', 'evil', 'neutral'], 'staff:1', 'evil');
+    workspace.synchronizeSession(['player', 'evil', 'neutral'], 'staff:1');
+    workspace.selectPool('evil');
     const restrictedGeneration = workspace.generation;
 
     const changed = workspace.synchronizeSession(['player'], 'user:1');
@@ -59,14 +58,4 @@ describe('card pool workspace', () => {
     });
   });
 
-  test('builds an explicit internal Player selection that the router can canonicalize', () => {
-    expect(buildWorkspaceSelectionLocation('player')).toEqual({
-      path: '/cards',
-      query: { card_pool: 'player' },
-    });
-    expect(buildWorkspaceSelectionLocation('neutral')).toEqual({
-      path: '/cards',
-      query: { card_pool: 'neutral' },
-    });
-  });
 });

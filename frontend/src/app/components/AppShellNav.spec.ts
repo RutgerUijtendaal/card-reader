@@ -5,6 +5,11 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import AppShellNav from '@/app/components/AppShellNav.vue';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import type { CardPool } from '@/domain/cards/cardPools';
+import {
+  clearGalleryNavigationState,
+  setGalleryNavigationCards,
+  useGalleryCardNavigation,
+} from '@/domain/cards/utils/gallery/galleryNavigation';
 
 const authState = {
   authenticated: true,
@@ -58,34 +63,48 @@ vi.mock('@/app/components/ThemeModeMenu.vue', () => ({
 const mountNav = async (
   props: { collapsed?: boolean; mobile?: boolean } = {},
   accessiblePools: CardPool[] = ['player'],
-  blockEvilNavigation = false,
+  blockEvilNavigation: boolean | (() => Promise<boolean>) = false,
+  initialPath = '/cards',
 ) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/cards', component: { template: '<div />' } },
-      { path: '/decks', component: { template: '<div />' } },
-      { path: '/playtester', component: { template: '<div />' } },
-      { path: '/my/decks', component: { template: '<div />' } },
-      { path: '/my/decks/new', component: { template: '<div />' } },
-      { path: '/notifications', component: { template: '<div />' } },
-      { path: '/settings', component: { template: '<div />' } },
-      { path: '/import-jobs', component: { template: '<div />' } },
-      { path: '/review', component: { template: '<div />' } },
-      { path: '/admin', component: { template: '<div />' } },
+      { path: '/cards', component: { template: '<div />' }, meta: { workspaceCapability: 'gallery' } },
+      { path: '/cards/:id/edit', component: { template: '<div />' }, meta: { workspaceCapability: 'resource' } },
+      { path: '/decks', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
+      { path: '/playtester', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
+      { path: '/my/decks', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
+      { path: '/my/decks/new', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
+      { path: '/notifications', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
+      { path: '/settings', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
+      { path: '/imports', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
+      { path: '/operations', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
+      { path: '/review', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
+      { path: '/admin', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
     ],
   });
   if (blockEvilNavigation) {
-    router.beforeEach((to) => to.query.card_pool !== 'evil');
+    router.beforeEach((to) => {
+      if (to.query.card_pool !== 'evil') {
+        return true;
+      }
+      return typeof blockEvilNavigation === 'function'
+        ? blockEvilNavigation()
+        : false;
+    });
   }
-  await router.push('/cards');
+  await router.push(initialPath);
   await router.isReady();
   const pinia = createPinia();
   const workspace = useCardPoolWorkspaceStore(pinia);
   workspace.synchronizeSession(accessiblePools, 'test-user');
-  const app = createApp(AppShellNav, props);
+  const closeMobile = vi.fn();
+  const app = createApp(AppShellNav, {
+    ...props,
+    onCloseMobile: closeMobile,
+  });
   app.use(pinia);
   app.use(router);
   app.mount(container);
@@ -95,6 +114,7 @@ const mountNav = async (
     container,
     router,
     workspace,
+    closeMobile,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -109,6 +129,7 @@ describe('AppShellNav', () => {
     pendingAccessRequestCount.value = 0;
     authState.canAccessStaffRoutes = false;
     localStorage.clear();
+    clearGalleryNavigationState();
     document.body.innerHTML = '';
   });
 
@@ -204,8 +225,209 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
+  test.each([
+    '/settings?section=appearance',
+    '/notifications',
+    '/imports',
+    '/operations',
+    '/review?view=flags',
+    '/admin?tab=catalog',
+  ])('switches context without leaving the global route %s', async (initialPath) => {
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      false,
+      initialPath,
+    );
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
+
+    evilButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe(initialPath);
+    expect(mounted.workspace.activePool).toBe('evil');
+    mounted.unmount();
+  });
+
+  test('keeps a resource open and updates only its workspace return context', async () => {
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      false,
+      '/cards/card-1/edit?card_pool=evil&return_card_pool=player&tab=card-version',
+    );
+    const neutralButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Neutral workspace"]',
+    );
+
+    neutralButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.router.currentRoute.value.path).toBe('/cards/card-1/edit');
+    expect(mounted.router.currentRoute.value.query).toEqual({
+      card_pool: 'evil',
+      return_card_pool: 'neutral',
+      tab: 'card-version',
+    });
+    expect(mounted.workspace.activePool).toBe('neutral');
+    mounted.unmount();
+  });
+
+  test('clears stale Gallery paging when a resource return workspace changes', async () => {
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      false,
+      '/cards/card-1/edit?return_card_pool=player',
+    );
+    setGalleryNavigationCards(
+      [
+        { id: 'card-1', result_type: 'card' },
+        { id: 'card-2', result_type: 'card' },
+      ],
+      2,
+      null,
+      50,
+      'card_pool=player',
+    );
+    const galleryNavigation = useGalleryCardNavigation(
+      mounted.router.currentRoute.value,
+      mounted.router,
+      'edit',
+    );
+    expect(galleryNavigation.nextCardId.value).toBe('card-2');
+
+    mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(galleryNavigation.hasGalleryContext.value).toBe(false);
+    expect(galleryNavigation.nextCardId.value).toBeNull();
+    mounted.unmount();
+  });
+
+  test('falls back from a Player-only route only after navigation is accepted', async () => {
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      false,
+      '/my/decks/new',
+    );
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
+
+    evilButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?card_pool=evil');
+    expect(mounted.workspace.activePool).toBe('evil');
+    mounted.unmount();
+  });
+
+  test('closes the mobile drawer after a context-only selection succeeds', async () => {
+    const mounted = await mountNav(
+      { mobile: true },
+      ['player', 'evil', 'neutral'],
+      false,
+      '/settings',
+    );
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
+
+    evilButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.closeMobile).toHaveBeenCalledOnce();
+    mounted.unmount();
+  });
+
+  test('commits only the latest rapid workspace selection', async () => {
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
+    const neutralButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Neutral workspace"]',
+    );
+
+    evilButton?.click();
+    neutralButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?card_pool=neutral');
+    expect(mounted.workspace.activePool).toBe('neutral');
+    mounted.unmount();
+  });
+
+  test('counter-navigates a pending restricted selection when Player is reselected', async () => {
+    let releaseNavigation!: (accepted: boolean) => void;
+    const navigationGate = new Promise<boolean>((resolve) => {
+      releaseNavigation = resolve;
+    });
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      () => navigationGate,
+    );
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
+    const playerButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Player workspace"]',
+    );
+
+    evilButton?.click();
+    playerButton?.click();
+    releaseNavigation(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?card_pool=player');
+    expect(mounted.workspace.activePool).toBe('player');
+    mounted.unmount();
+  });
+
+  test('lets access loss win a pending restricted workspace selection', async () => {
+    let releaseNavigation!: (accepted: boolean) => void;
+    const navigationGate = new Promise<boolean>((resolve) => {
+      releaseNavigation = resolve;
+    });
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      () => navigationGate,
+    );
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
+
+    evilButton?.click();
+    mounted.workspace.synchronizeSession(['player'], 'reduced-user');
+    releaseNavigation(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.workspace.activePool).toBe('player');
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
+    mounted.unmount();
+  });
+
   test('keeps the current workspace mounted when guarded navigation is rejected', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], true);
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      true,
+      '/my/decks/new',
+    );
     const generation = mounted.workspace.generation;
     const evilButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]');
 
@@ -215,6 +437,7 @@ describe('AppShellNav', () => {
 
     expect(mounted.workspace.activePool).toBe('player');
     expect(mounted.workspace.generation).toBe(generation);
+    expect(mounted.router.currentRoute.value.path).toBe('/my/decks/new');
     expect(mounted.container.textContent).toContain('Playtester');
     mounted.unmount();
   });

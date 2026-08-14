@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { createMemoryHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
-import { createAppRouter } from '@/app/router';
+import { APP_ROUTES, createAppRouter } from '@/app/router';
 import { useAuthStore } from '@/domain/session/store';
 import {
-  buildWorkspaceSelectionLocation,
   CARD_POOL_WORKSPACE_PREFERENCE_KEY,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
@@ -64,6 +63,31 @@ describe('card pool workspace routes', () => {
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
 
+  test('rejects a restricted Gallery deep link with a trailing slash', async () => {
+    setSession(['player']);
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/cards/?card_pool=evil');
+
+    expect(router.currentRoute.value.fullPath).toBe('/cards');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+  });
+
+  test('does not commit route-derived workspace state when a later guard rejects navigation', async () => {
+    setSession(['player', 'evil', 'neutral']);
+    const router = createAppRouter(createMemoryHistory());
+    router.beforeEach((to) => to.query.card_pool !== 'evil');
+    await router.push('/cards');
+    const workspace = useCardPoolWorkspaceStore();
+    const generation = workspace.generation;
+
+    await router.push('/cards?card_pool=evil');
+
+    expect(router.currentRoute.value.fullPath).toBe('/cards');
+    expect(workspace.activePool).toBe('player');
+    expect(workspace.generation).toBe(generation);
+  });
+
   test('removes unauthorized pool context from direct card routes', async () => {
     setSession(['player']);
     const router = createAppRouter(createMemoryHistory());
@@ -71,6 +95,22 @@ describe('card pool workspace routes', () => {
     await router.push('/cards/restricted-card?card_pool=evil');
 
     expect(router.currentRoute.value.fullPath).toBe('/cards');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+  });
+
+  test.each([
+    '/cards/player-card?card_pool=player&return_card_pool=evil&tab=versions',
+    '/card-groups/player-group?return_card_pool=neutral&view=compact',
+  ])('keeps a public resource while removing an inaccessible return pool from %s', async (url) => {
+    setSession(['player']);
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push(url);
+
+    expect(router.currentRoute.value.path).toMatch(/^\/(?:cards|card-groups)\//);
+    expect(router.currentRoute.value.query.return_card_pool).toBeUndefined();
+    expect(router.currentRoute.value.query.card_pool).not.toBe('evil');
+    expect(router.currentRoute.value.query.card_pool).not.toBe('neutral');
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
 
@@ -144,9 +184,16 @@ describe('card pool workspace routes', () => {
     setSession(['player', 'evil', 'neutral']);
     const router = createAppRouter(createMemoryHistory());
 
-    expect(router.resolve('/cards/restricted-card').meta.cardPoolWorkspace).toBe(true);
-    expect(router.resolve('/card-groups/restricted-group').meta.cardPoolWorkspace).toBe(true);
-    expect(router.resolve('/settings').meta.cardPoolWorkspace).toBeUndefined();
+    expect(router.resolve('/cards/restricted-card').meta.workspaceCapability).toBe('resource');
+    expect(router.resolve('/card-groups/restricted-group').meta.workspaceCapability).toBe('resource');
+    expect(router.resolve('/settings').meta.workspaceCapability).toBe('global');
+  });
+
+  test('declares one workspace capability for every user-visible route', () => {
+    const userVisibleRoutes = APP_ROUTES.filter((route) => !('redirect' in route));
+
+    expect(userVisibleRoutes.length).toBeGreaterThan(0);
+    expect(userVisibleRoutes.every((route) => route.meta?.workspaceCapability)).toBe(true);
   });
 
   test.each(['evil', 'neutral'] as const)(
@@ -156,7 +203,7 @@ describe('card pool workspace routes', () => {
       const router = createAppRouter(createMemoryHistory());
       await router.push(`/cards?card_pool=${restrictedPool}`);
 
-      await router.push(buildWorkspaceSelectionLocation('player'));
+      await router.push({ path: '/cards', query: { card_pool: 'player' } });
 
       expect(router.currentRoute.value.fullPath).toBe('/cards');
       expect(useCardPoolWorkspaceStore().activePool).toBe('player');

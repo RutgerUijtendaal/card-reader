@@ -98,7 +98,7 @@ import { provideScrollContainer } from '@/shared/composables/useScrollContainer'
 import { usePrimarySearchHotkeys } from '@/shared/composables/usePrimarySearch';
 import { useAuthStore } from '@/domain/session/store';
 import { buildContextualNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState';
-import { resolveWorkspaceAwareRouteViewKey } from '@/app/router/routeViewKey';
+import { resolveRouteViewKey } from '@/app/router/routeViewKey';
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
 import {
   handleHoverPreviewScaleWheel,
@@ -112,6 +112,7 @@ import {
 } from '@/domain/cards/cardPoolWorkspace';
 import { isCardPool } from '@/domain/cards/cardPools';
 import { clearGalleryNavigationState } from '@/domain/cards/utils/gallery/galleryNavigation';
+import { resolveResourceWorkspaceAccessDecision } from '@/app/router/workspaceCapabilities';
 
 const route = useRoute();
 const router = useRouter();
@@ -145,11 +146,7 @@ const hoverModeOverrides = {
   notifications: hoverModePreferences.getOverrideHoverMode('notifications'),
 } satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
 const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
-const routeViewKey = computed(() => resolveWorkspaceAwareRouteViewKey(
-  route.path,
-  workspace.generation,
-  route.meta.cardPoolWorkspace === true,
-));
+const routeViewKey = computed(() => resolveRouteViewKey(route.path));
 const hoverModeHotkeyActions = computed(() => {
   if (!globalHotkeysEnabled.value) {
     return null;
@@ -235,12 +232,19 @@ watch(
     const lostRestrictedWorkspace = previousPool !== 'player'
       && workspace.activePool === 'player'
       && !workspace.accessiblePools.includes(previousPool);
+    const resourceAccessDecision = route.meta.workspaceCapability === 'resource'
+      ? resolveResourceWorkspaceAccessDecision(route, workspace.accessiblePools)
+      : { kind: 'allow' } as const;
     if (route.meta.requiresStaff && !auth.canAccessStaffRoutes) {
       void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
+    } else if (resourceAccessDecision.kind === 'fallback-gallery') {
+      void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
+    } else if (resourceAccessDecision.kind === 'strip-return-context') {
+      void router.replace(resourceAccessDecision.location);
     } else if (
       routePoolIsNoLongerAccessible
-      || (changedPool && route.path === '/cards')
-      || (lostRestrictedWorkspace && route.meta.cardPoolWorkspace)
+      || (changedPool && route.meta.workspaceCapability === 'gallery')
+      || (lostRestrictedWorkspace && route.meta.workspaceCapability === 'gallery')
     ) {
       void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
     }

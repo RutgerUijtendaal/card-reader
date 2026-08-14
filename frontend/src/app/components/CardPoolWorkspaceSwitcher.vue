@@ -44,22 +44,19 @@
 
 <script setup lang="ts">
 import { Scale, Shield } from 'lucide-vue-next';
-import { useRouter } from 'vue-router';
 import type { Component } from 'vue';
+import { useCardPoolWorkspaceSelection } from '@/app/composables/useCardPoolWorkspaceSelection';
 import type { CardPool } from '@/domain/cards/cardPools';
 import EvilPoolIcon from '@/domain/cards/components/EvilPoolIcon.vue';
-import {
-  buildWorkspaceSelectionLocation,
-  useCardPoolWorkspaceStore,
-} from '@/domain/cards/cardPoolWorkspace';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import InfoTooltip from '@/shared/components/InfoTooltip.vue';
 
 withDefaults(defineProps<{ collapsed?: boolean }>(), {
   collapsed: false,
 });
 const emit = defineEmits<{ selected: [] }>();
-const router = useRouter();
 const workspace = useCardPoolWorkspaceStore();
+const workspaceSelection = useCardPoolWorkspaceSelection();
 const poolIcons: Record<CardPool, Component> = {
   player: Shield,
   evil: EvilPoolIcon,
@@ -67,14 +64,10 @@ const poolIcons: Record<CardPool, Component> = {
 };
 
 const selectPool = async (cardPool: CardPool): Promise<void> => {
-  if (cardPool === workspace.activePool) {
+  const selected = await workspaceSelection.selectPool(cardPool);
+  if (!selected) {
     return;
   }
-  const navigationFailure = await router.push(buildWorkspaceSelectionLocation(cardPool));
-  if (navigationFailure) {
-    return;
-  }
-  workspace.selectPool(cardPool);
   emit('selected');
 };
 </script>
