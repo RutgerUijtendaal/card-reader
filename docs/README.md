@@ -40,6 +40,10 @@ The card-pool, role, and faction work is split into eleven dependency-ordered ch
 1. [Card classification Step 4.0: Classification acceptance audit and cleanup](card-classification-step-4-filter-hardening.md) validates the completed classification feature as one system, fixes in-scope defects, and removes obsolete intermediate compatibility and duplication without adding new filter persistence.
 2. [Card classification Step 4.1: Pool-aware Gallery filter surfaces](card-classification-step-4-1-pool-aware-gallery-filters.md) removes Roles from ordinary Gallery browsing, shows Factions only in Evil, shows Mana/Affinity/Devotion only in Player, and sanitizes hidden route and request state.
 
+### Parser implementation plans
+
+- [Template parser: Name-only region](template-name-region-parser-plan.md) adds a `name` region that performs OCR/name extraction without mana or symbol work, while consolidating parser-type definitions within the Python and frontend runtimes.
+
 ### Classification delivery model
 
 - `feature/card-classification` is the umbrella integration branch. Its aggregate pull request targets `master` and remains open so CI and review can evaluate the complete feature as it grows.
