@@ -54,6 +54,23 @@ def test_card_http_surfaces_do_not_read_staff_policy_directly() -> None:
     assert offenders == []
 
 
+def test_card_http_surfaces_do_not_bypass_active_user_permissions() -> None:
+    scoped_roots = (
+        API_SOURCE / "cards",
+        API_SOURCE / "card_groups",
+        API_SOURCE / "decks",
+        API_SOURCE / "exports",
+    )
+    offenders = [
+        path.relative_to(REPO_ROOT).as_posix()
+        for root in scoped_roots
+        for path in sorted(root.rglob("*.py"))
+        if "IsAuthenticated" in path.read_text(encoding="utf-8")
+    ]
+
+    assert offenders == []
+
+
 def test_public_artifact_modules_do_not_request_all_pool_scope() -> None:
     public_artifact_paths = (
         CORE_SOURCE / "operations" / "developer_data",

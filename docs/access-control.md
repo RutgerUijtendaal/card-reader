@@ -6,7 +6,7 @@ Card Reader combines public browsing with session-authenticated management tools
 
 The web application uses Django session authentication. Login and session responses include a CSRF token, and unsafe browser requests require CSRF protection.
 
-Inactive users cannot authenticate or continue using protected capabilities. Sensitive token-based flows also re-check the issuing account instead of assuming that access remains valid for the token's entire lifetime.
+Inactive users cannot authenticate or continue using protected capabilities. The central authenticated-user predicate includes active status, so an existing session whose account becomes inactive is reported as unauthenticated, loses staff and other protected capabilities, and receives only the public Player card scope. Sensitive token-based flows also re-check the issuing account instead of assuming that access remains valid for the token's entire lifetime.
 
 ## Access levels
 

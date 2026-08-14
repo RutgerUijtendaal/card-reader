@@ -68,6 +68,25 @@ def test_anonymous_user_cannot_create_parse_flag() -> None:
     assert response.status_code in {401, 403}
 
 
+def test_inactive_session_cannot_create_parse_flag() -> None:
+    _clear_parse_flags()
+    user = _create_user("inactive-parse-flag-user", "password", is_staff=False)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    card, version = _create_card_version(name="Inactive Session Flag Card")
+
+    response = client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={"items": [{"property_key": "name"}]},
+        content_type="application/json",
+    )
+
+    assert response.status_code in {401, 403}
+    assert CardVersionParseFlag.objects.count() == 0
+
+
 def test_evil_parse_flags_follow_the_central_access_capability() -> None:
     _clear_parse_flags()
     card, version = _create_card_version(

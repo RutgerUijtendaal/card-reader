@@ -196,3 +196,23 @@ def test_snapshot_pool_and_digest_are_validated() -> None:
 
     with pytest.raises(ValueError, match="snapshot digest is invalid"):
         classify_import_card(value)
+
+
+def test_snapshot_rejects_a_valid_rule_from_another_pool() -> None:
+    value = classification_input(
+        rules=(
+            rule(
+                "player-hero-rule",
+                target_kind="role",
+                target_key="hero",
+                source_kind="tag",
+                source_id="hero-tag",
+                source_key="hero",
+                card_pool="player",
+            ),
+        ),
+        tags=(("hero-tag", "hero"),),
+    )
+
+    with pytest.raises(ValueError, match="rule from another pool"):
+        classify_import_card(value)

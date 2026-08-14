@@ -1137,6 +1137,21 @@ def test_current_user_reports_unauthenticated_when_no_session() -> None:
     assert isinstance(payload["csrf_token"], str)
 
 
+def test_current_user_treats_an_inactive_session_as_unauthenticated() -> None:
+    user = _create_user("inactive-session-user", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+
+    response = client.get("/auth/me")
+
+    assert response.status_code == 200
+    assert response.json()["authenticated"] is False
+    assert response.json()["can_access_admin"] is False
+    assert response.json()["accessible_card_pools"] == ["player"]
+
+
 def test_cards_list_returns_paginated_payload() -> None:
     first_card, first_version = _create_editable_card_version(name="Paged One")
     second_card, second_version = _create_editable_card_version(name="Paged Two")
@@ -1318,6 +1333,20 @@ def test_restricted_card_collections_and_objects_enforce_pool_scope(
     assert [row["id"] for row in staff_list.json()["results"]] == [card.id]
     assert staff.get(f"/cards/{card.id}").status_code == 200
     assert staff.get(f"/cards/{card.id}/generations").status_code == 200
+
+
+def test_inactive_staff_session_loses_restricted_card_scope() -> None:
+    card, _version = _create_editable_card_version(name="Inactive Staff Restricted Card")
+    card.card_pool = "evil"
+    card.save(update_fields=["card_pool"])
+    user = _create_user("inactive-restricted-staff", "password", is_staff=True)
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+
+    assert client.get("/cards", {"card_pool": "evil"}).status_code == 403
+    assert client.get(f"/cards/{card.id}").status_code == 404
 
 
 def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:

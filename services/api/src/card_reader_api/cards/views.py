@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.http import FileResponse, Http404
 from django.utils.http import http_date, quote_etag
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -31,6 +31,7 @@ from card_reader_api.cards.serializers import (
     symbol_option,
 )
 from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
+from card_reader_api.common.permissions import AuthenticatedAllowed
 from card_reader_api.common.responses import paginated_payload, serializer_error
 from card_reader_api.cards.services import CardActionService, CardReparseError
 from card_reader_core.repositories.cards import (
@@ -321,7 +322,7 @@ class CardVersionPromoteView(APIView):
 
 
 class CardVersionParseFlagView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AuthenticatedAllowed]
 
     def post(self, request: Request, card_id: str, version_id: str) -> Response:
         card_pool_scope = card_pool_scope_for_user(request.user)
