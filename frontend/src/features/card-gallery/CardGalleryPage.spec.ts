@@ -288,6 +288,45 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
+  test('does not restore an unfiltered fallback snapshot after facet retry succeeds', async () => {
+    let filterRequestCount = 0;
+    const mounted = await mountGallery(
+      '/cards?tag_keys=recovered-tag',
+      'player',
+      undefined,
+      () => {
+        filterRequestCount += 1;
+        if (filterRequestCount === 1) {
+          return Promise.reject(new Error('facet failure'));
+        }
+        return Promise.resolve({
+          data: {
+            ...filters,
+            tags: [{ id: 'tag-recovered', key: 'recovered-tag', label: 'Recovered Tag' }],
+          },
+        });
+      },
+    );
+
+    const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Retry filter options',
+    );
+    expect(retryButton).toBeDefined();
+    retryButton?.click();
+
+    await vi.waitFor(() => {
+      expect(mounted.requestRoutes).toHaveLength(2);
+    });
+    const cardRequests = apiGet.mock.calls.filter(([url]) =>
+      typeof url === 'string' && url.startsWith('/cards?'),
+    );
+    expect(cardRequests).toHaveLength(2);
+    const recoveredParams = new URL(String(cardRequests[1]?.[0]), 'https://cards.test').searchParams;
+    expect(recoveredParams.getAll('tag_ids')).toEqual(['tag-recovered']);
+
+    mounted.unmount();
+  });
+
   test('reconciles metadata when switching between pool catalogs', async () => {
     const poolFilters: Record<'player' | 'evil' | 'neutral', CardFiltersResponse> = {
       player: {

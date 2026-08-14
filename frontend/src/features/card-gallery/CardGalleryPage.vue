@@ -396,7 +396,7 @@ const galleryNavigationSearchParams = computed(() => {
   return params.toString();
 });
 const galleryRequestSignature = computed(
-  () => `${currentRouteSignature.value}::${showCardGroups.value ? 'groups' : 'cards'}::${effectiveSort.value}::${pageSize.value}`,
+  () => `${filtersLoaded.value ? 'catalog' : 'fallback'}::${currentRouteSignature.value}::${showCardGroups.value ? 'groups' : 'cards'}::${effectiveSort.value}::${pageSize.value}`,
 );
 
 watch(
