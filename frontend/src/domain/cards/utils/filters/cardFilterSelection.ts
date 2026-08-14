@@ -59,6 +59,32 @@ export const createCardFilterCatalog = (filters: CardFiltersResponse): CardFilte
   };
 };
 
+const retainAvailableKeys = (keys: string[], options: MetadataOption[]): string[] => {
+  const availableKeys = new Set(options.map((option) => option.key));
+  return keys.filter((key) => availableKeys.has(key));
+};
+
+export const reconcileCardFilterStateWithCatalog = (
+  state: CardFilterState,
+  catalog: CardFilterCatalog,
+): CardFilterState => {
+  const normalized = normalizeCardFilterState(state);
+  const keywordKeys = retainAvailableKeys(normalized.keywordKeys, catalog.keywords);
+  const tagKeys = retainAvailableKeys(normalized.tagKeys, catalog.tags);
+  const typeKeys = retainAvailableKeys(normalized.typeKeys, catalog.types);
+  const typeExcludeKeys = retainAvailableKeys(normalized.typeExcludeKeys, catalog.types);
+  return normalizeCardFilterState({
+    ...normalized,
+    keywordKeys,
+    keywordMatch: keywordKeys.length > 0 ? normalized.keywordMatch : 'any',
+    tagKeys,
+    tagMatch: tagKeys.length > 0 ? normalized.tagMatch : 'any',
+    typeKeys,
+    typeExcludeKeys,
+    typeMatch: typeKeys.length > 0 || typeExcludeKeys.length > 0 ? normalized.typeMatch : 'any',
+  });
+};
+
 const resolveIdsFromKeys = (keys: string[], options: MetadataOption[]): string[] => {
   const idByKey = new Map(options.map((option) => [option.key, option.id]));
   return keys.map((key) => idByKey.get(key)).filter((id): id is string => typeof id === 'string');

@@ -6,6 +6,7 @@ import type {
 } from '@/domain/cards/types';
 import type { CardFilterApiPayload } from '@/domain/cards/utils/filters/cardFilterRequest';
 import type { CardSort } from '@/domain/cards/utils/gallery/cardSort';
+import type { CardPool } from '@/domain/cards/cardPools';
 import {
   mapTtsExportResponse,
   type TtsExportApiResponse,
@@ -49,8 +50,10 @@ export const fetchCardVersions = async (cardId: string): Promise<CardVersionDeta
   return response.data;
 };
 
-export const fetchCardFilters = async (): Promise<CardFiltersResponse> => {
-  const response = await api.get<CardFiltersResponse>('/cards/filters');
+export const fetchCardFilters = async (cardPool?: CardPool): Promise<CardFiltersResponse> => {
+  const response = cardPool
+    ? await api.get<CardFiltersResponse>('/cards/filters', { params: { card_pool: cardPool } })
+    : await api.get<CardFiltersResponse>('/cards/filters');
   return response.data;
 };
 

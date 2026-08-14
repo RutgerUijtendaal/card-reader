@@ -3,6 +3,7 @@ import {
   buildCardFilterSelectionState,
   buildCardFilterStateFromSelection,
   createCardFilterCatalog,
+  reconcileCardFilterStateWithCatalog,
 } from './cardFilterSelection';
 import type { CardFiltersResponse } from '@/domain/cards/types';
 import { createEmptyCardFilterState } from './cardFilterState';
@@ -267,5 +268,64 @@ describe('cardFilterSelection', () => {
     const catalog = createCardFilterCatalog({ ...filters, mana_families: undefined });
 
     expect(catalog.manaSymbols.map((row) => row.id)).toEqual(['legacy-mana-symbol:sym-1']);
+  });
+
+  test('reconciles only unavailable keyword, tag, and type keys', () => {
+    const catalog = createCardFilterCatalog(filters);
+    const state = {
+      ...createEmptyCardFilterState('evil'),
+      query: 'dragon',
+      keywordMatch: 'all' as const,
+      keywordKeys: ['flying', 'missing-keyword'],
+      tagMatch: 'all' as const,
+      tagKeys: ['missing-tag'],
+      typeMatch: 'all' as const,
+      typeKeys: ['creature', 'missing-type'],
+      typeExcludeKeys: ['spell', 'missing-excluded-type'],
+      otherSymbolKeys: ['missing-symbol'],
+    };
+
+    const reconciled = reconcileCardFilterStateWithCatalog(state, catalog);
+
+    expect(reconciled).toMatchObject({
+      cardPool: 'evil',
+      query: 'dragon',
+      keywordMatch: 'all',
+      keywordKeys: ['flying'],
+      tagMatch: 'any',
+      tagKeys: [],
+      typeMatch: 'all',
+      typeKeys: ['creature'],
+      typeExcludeKeys: ['spell'],
+      otherSymbolKeys: ['missing-symbol'],
+    });
+    expect(reconcileCardFilterStateWithCatalog(reconciled, catalog)).toEqual(reconciled);
+  });
+
+  test('resets type match only after both include and exclude selections disappear', () => {
+    const catalog = createCardFilterCatalog(filters);
+
+    const includeRemoved = reconcileCardFilterStateWithCatalog(
+      {
+        ...createEmptyCardFilterState(),
+        typeMatch: 'all',
+        typeKeys: ['missing'],
+        typeExcludeKeys: ['spell'],
+      },
+      catalog,
+    );
+    const allRemoved = reconcileCardFilterStateWithCatalog(
+      {
+        ...createEmptyCardFilterState(),
+        typeMatch: 'all',
+        typeKeys: ['missing'],
+        typeExcludeKeys: ['also-missing'],
+      },
+      catalog,
+    );
+
+    expect(includeRemoved.typeMatch).toBe('all');
+    expect(includeRemoved.typeExcludeKeys).toEqual(['spell']);
+    expect(allRemoved.typeMatch).toBe('any');
   });
 });
