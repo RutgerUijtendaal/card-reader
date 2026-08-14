@@ -23,7 +23,7 @@ This directory contains feature descriptions, operational guides, and technical 
 
 ## Implementation plans
 
-The card-pool, role, and faction work is split into eleven dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
+The card-pool, role, and faction work is split into twelve dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
 
 1. [Card classification Step 1: Foundation](card-classification-step-1-foundation.md) replaces the Hero flag with an initial Player/Game Master pool and multi-valued card roles, migrates existing data, preserves Hero behavior, adds editing/filtering, and establishes restricted-card access protection.
 2. [Card classification Step 1.1: Authorization seam](card-classification-step-1-1-authorization-seam.md) consolidates user entitlement into an explicit core card-pool scope across queries, payloads, derived state, notifications, images, and published artifacts before the surface grows.
@@ -39,6 +39,7 @@ The card-pool, role, and faction work is split into eleven dependency-ordered ch
 
 1. [Card classification Step 4.0: Classification acceptance audit and cleanup](card-classification-step-4-filter-hardening.md) validates the completed classification feature as one system, fixes in-scope defects, and removes obsolete intermediate compatibility and duplication without adding new filter persistence.
 2. [Card classification Step 4.1: Pool-aware Gallery filter surfaces](card-classification-step-4-1-pool-aware-gallery-filters.md) removes Roles from ordinary Gallery browsing, shows Factions only in Evil, shows Mana/Affinity/Devotion only in Player, and sanitizes hidden route and request state.
+3. [Card classification Step 4.2: Pool-aware Gallery filter values](card-classification-step-4-2-pool-aware-filter-values.md) limits Gallery Keyword, Tag, and Type options to active/latest Cards in the selected pool, reconciles unavailable route values, and measures the bounded query path before adding any cache.
 
 ### Parser implementation plans
 
