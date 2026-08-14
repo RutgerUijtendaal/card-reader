@@ -19,7 +19,6 @@ export const useTtsCardExport = (): UseTtsCardExportResult => {
 
   const invalidateTtsCardExport = (): void => {
     exportGeneration += 1;
-    isExportingTtsCards.value = false;
   };
 
   const copyTtsCardExport = async (
@@ -28,20 +27,22 @@ export const useTtsCardExport = (): UseTtsCardExportResult => {
   ): Promise<void> => {
     if (isExportingTtsCards.value) return;
     const generation = exportGeneration;
+    const requestIsCurrent = (): boolean =>
+      generation === exportGeneration && isRequestCurrent();
     isExportingTtsCards.value = true;
     try {
       const result = await exportTtsCards(source);
-      if (!isRequestCurrent()) {
+      if (!requestIsCurrent()) {
         return;
       }
       await navigator.clipboard.writeText(result.encodedPayload);
-      if (!isRequestCurrent()) {
+      if (!requestIsCurrent()) {
         return;
       }
       const cardLabel = `${result.exportedCount} TTS card${result.exportedCount === 1 ? '' : 's'} copied to clipboard`;
       toast.success(cardLabel, { description: ttsExportSheetDescription(result) });
     } catch (error) {
-      if (!isRequestCurrent()) {
+      if (!requestIsCurrent()) {
         return;
       }
       console.error('TTS card export failed', error);
@@ -49,9 +50,7 @@ export const useTtsCardExport = (): UseTtsCardExportResult => {
         description: getApiErrorMessage(error, 'The export could not be created.'),
       });
     } finally {
-      if (generation === exportGeneration) {
-        isExportingTtsCards.value = false;
-      }
+      isExportingTtsCards.value = false;
     }
   };
 

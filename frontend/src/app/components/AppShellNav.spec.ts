@@ -5,6 +5,11 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import AppShellNav from '@/app/components/AppShellNav.vue';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import type { CardPool } from '@/domain/cards/cardPools';
+import {
+  clearGalleryNavigationState,
+  setGalleryNavigationCards,
+  useGalleryCardNavigation,
+} from '@/domain/cards/utils/gallery/galleryNavigation';
 
 const authState = {
   authenticated: true,
@@ -124,6 +129,7 @@ describe('AppShellNav', () => {
     pendingAccessRequestCount.value = 0;
     authState.canAccessStaffRoutes = false;
     localStorage.clear();
+    clearGalleryNavigationState();
     document.body.innerHTML = '';
   });
 
@@ -268,6 +274,39 @@ describe('AppShellNav', () => {
       tab: 'card-version',
     });
     expect(mounted.workspace.activePool).toBe('neutral');
+    mounted.unmount();
+  });
+
+  test('clears stale Gallery paging when a resource return workspace changes', async () => {
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      false,
+      '/cards/card-1/edit?return_card_pool=player',
+    );
+    setGalleryNavigationCards(
+      [
+        { id: 'card-1', result_type: 'card' },
+        { id: 'card-2', result_type: 'card' },
+      ],
+      2,
+      null,
+      50,
+      'card_pool=player',
+    );
+    const galleryNavigation = useGalleryCardNavigation(
+      mounted.router.currentRoute.value,
+      mounted.router,
+      'edit',
+    );
+    expect(galleryNavigation.nextCardId.value).toBe('card-2');
+
+    mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(galleryNavigation.hasGalleryContext.value).toBe(false);
+    expect(galleryNavigation.nextCardId.value).toBeNull();
     mounted.unmount();
   });
 

@@ -98,18 +98,27 @@ describe('useTtsCardExport', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  test('invalidates an outgoing export without clearing a newer export state', async () => {
-    let resolveOld!: (value: Awaited<ReturnType<typeof exportTtsCards>>) => void;
-    let resolveNew!: (value: Awaited<ReturnType<typeof exportTtsCards>>) => void;
-    const oldExport = new Promise<Awaited<ReturnType<typeof exportTtsCards>>>((resolve) => {
-      resolveOld = resolve;
+  test('keeps exports serialized until an invalidated clipboard write settles', async () => {
+    let resolveOldClipboard!: () => void;
+    const oldClipboardWrite = new Promise<void>((resolve) => {
+      resolveOldClipboard = resolve;
     });
-    const newExport = new Promise<Awaited<ReturnType<typeof exportTtsCards>>>((resolve) => {
-      resolveNew = resolve;
-    });
+    clipboardWriteText
+      .mockReturnValueOnce(oldClipboardWrite)
+      .mockResolvedValueOnce(undefined);
     vi.mocked(exportTtsCards)
-      .mockReturnValueOnce(oldExport)
-      .mockReturnValueOnce(newExport);
+      .mockResolvedValueOnce({
+        encodedPayload: 'old-payload',
+        exportedCount: 1,
+        skippedCount: 0,
+        sheetCount: 1,
+      })
+      .mockResolvedValueOnce({
+        encodedPayload: 'new-payload',
+        exportedCount: 1,
+        skippedCount: 0,
+        sheetCount: 1,
+      });
     let oldRequestIsCurrent = true;
     const exportState = useTtsCardExport();
 
@@ -117,31 +126,33 @@ describe('useTtsCardExport', () => {
       { type: 'content_version', content_version_id: 'old-version' },
       () => oldRequestIsCurrent,
     );
+    await vi.waitFor(() => {
+      expect(clipboardWriteText).toHaveBeenCalledWith('old-payload');
+    });
     oldRequestIsCurrent = false;
     exportState.invalidateTtsCardExport();
-    const newRequest = exportState.copyTtsCardExport({
+    await exportState.copyTtsCardExport({
       type: 'content_version',
       content_version_id: 'new-version',
     });
 
-    resolveOld({
-      encodedPayload: 'old-payload',
-      exportedCount: 1,
-      skippedCount: 0,
-      sheetCount: 1,
-    });
-    await oldRequest;
+    expect(exportTtsCards).toHaveBeenCalledTimes(1);
     expect(exportState.isExportingTtsCards.value).toBe(true);
-    expect(clipboardWriteText).not.toHaveBeenCalledWith('old-payload');
 
-    resolveNew({
-      encodedPayload: 'new-payload',
-      exportedCount: 1,
-      skippedCount: 0,
-      sheetCount: 1,
-    });
-    await newRequest;
+    resolveOldClipboard();
+    await oldRequest;
     expect(exportState.isExportingTtsCards.value).toBe(false);
-    expect(clipboardWriteText).toHaveBeenCalledWith('new-payload');
+    expect(toast.success).not.toHaveBeenCalled();
+
+    await exportState.copyTtsCardExport({
+      type: 'content_version',
+      content_version_id: 'new-version',
+    });
+
+    expect(exportState.isExportingTtsCards.value).toBe(false);
+    expect(clipboardWriteText.mock.calls.map(([payload]) => payload)).toEqual([
+      'old-payload',
+      'new-payload',
+    ]);
   });
 });

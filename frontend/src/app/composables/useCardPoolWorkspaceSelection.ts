@@ -47,7 +47,11 @@ export const useCardPoolWorkspaceSelection = () => {
         clearGalleryNavigationState();
         return false;
       }
-      if (decision.kind === 'replace-gallery' || decision.kind === 'fallback-gallery') {
+      if (
+        decision.kind === 'replace-gallery'
+        || decision.kind === 'update-resource-context'
+        || decision.kind === 'fallback-gallery'
+      ) {
         clearGalleryNavigationState();
       }
       workspace.selectPool(cardPool);
