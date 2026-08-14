@@ -333,7 +333,7 @@ describe('useCardCollection', () => {
     resultSetKey.value = 'evil';
     pendingRequest.reject(new Error('Outgoing workspace failed'));
 
-    await expect(search).resolves.toBeUndefined();
+    await expect(search).resolves.toBe(false);
     expect(collection.cards.value).toEqual([]);
     expect(collection.hasLoadedOnce.value).toBe(false);
   });

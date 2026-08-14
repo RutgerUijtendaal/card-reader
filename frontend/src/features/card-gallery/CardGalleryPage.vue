@@ -421,7 +421,10 @@ watch(
     }
 
     scrollTopRef.value = 0;
-    await collection.searchCards();
+    const requestApplied = await collection.searchCards();
+    if (!requestApplied) {
+      return;
+    }
     saveGallerySnapshot(searchParams, collection.galleryState.value, scrollTopRef.value);
   },
   { immediate: true },

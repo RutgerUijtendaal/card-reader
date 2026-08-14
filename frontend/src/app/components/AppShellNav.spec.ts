@@ -329,6 +329,34 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
+  test('counter-navigates a pending restricted selection when Player is reselected', async () => {
+    let releaseNavigation!: (accepted: boolean) => void;
+    const navigationGate = new Promise<boolean>((resolve) => {
+      releaseNavigation = resolve;
+    });
+    const mounted = await mountNav(
+      {},
+      ['player', 'evil', 'neutral'],
+      () => navigationGate,
+    );
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
+    const playerButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Player workspace"]',
+    );
+
+    evilButton?.click();
+    playerButton?.click();
+    releaseNavigation(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?card_pool=player');
+    expect(mounted.workspace.activePool).toBe('player');
+    mounted.unmount();
+  });
+
   test('lets access loss win a pending restricted workspace selection', async () => {
     let releaseNavigation!: (accepted: boolean) => void;
     const navigationGate = new Promise<boolean>((resolve) => {

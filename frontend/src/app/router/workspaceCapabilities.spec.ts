@@ -53,6 +53,18 @@ describe('workspace route capabilities', () => {
       location: { path: '/cards', query: { card_pool: 'player' } },
       navigation: 'replace',
     });
+    expect(
+      resolveWorkspaceSelectionDecision(
+        route('gallery', '/cards', { card_pool: 'evil' }),
+        'player',
+        'player',
+        ['player', 'evil', 'neutral'],
+      ),
+    ).toEqual({
+      kind: 'replace-gallery',
+      location: { path: '/cards', query: { card_pool: 'player' } },
+      navigation: 'replace',
+    });
   });
 
   test('keeps resource identity and rewrites only its workspace return context', () => {

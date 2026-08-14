@@ -66,7 +66,11 @@ export const useCardPoolWorkspaceSelection = () => {
     const attempt = selectionAttempt;
     pendingPool = cardPool;
     selectingPool.value = cardPool;
-    const selection = executeSelection(cardPool, attempt).finally(() => {
+    const previousSelection = pendingSelection;
+    const selection = (previousSelection
+      ? previousSelection.then(() => executeSelection(cardPool, attempt))
+      : executeSelection(cardPool, attempt)
+    ).finally(() => {
       if (attempt === selectionAttempt) {
         pendingPool = null;
         pendingSelection = null;

@@ -55,7 +55,23 @@ export const resolveWorkspaceSelectionDecision = (
     return { kind: 'reject' };
   }
   if (requestedPool === activePool) {
-    return { kind: 'stay' };
+    const representedGalleryPool = route.meta.workspaceCapability === 'gallery'
+      ? (route.query.card_pool ?? 'player')
+      : undefined;
+    const representedResourcePool = route.meta.workspaceCapability === 'resource'
+      ? route.query.return_card_pool
+      : undefined;
+    const routeAlreadyRepresentsPool = (
+      route.meta.workspaceCapability !== 'gallery'
+      || representedGalleryPool === requestedPool
+    ) && (
+      route.meta.workspaceCapability !== 'resource'
+      || representedResourcePool === undefined
+      || representedResourcePool === requestedPool
+    );
+    if (routeAlreadyRepresentsPool) {
+      return { kind: 'stay' };
+    }
   }
 
   switch (route.meta.workspaceCapability) {
