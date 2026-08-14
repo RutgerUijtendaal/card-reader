@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 from django.db import transaction
 
 from card_reader_core.models import (
@@ -13,7 +11,6 @@ from card_reader_core.models import (
     CardPool,
     CardRoleAssignment,
     CardVersion,
-    card_faction_keys,
     is_card_pool,
     is_card_lifecycle_status,
     now_utc,
@@ -126,8 +123,8 @@ def update_latest_card_version(
             field_sources["metadata"]["symbols"] = FIELD_SOURCE_MANUAL
             symbol_links_changed = True
         classification_changed = False
-        destination_card_pool: CardPool = cast(CardPool, card.card_pool)
-        destination_card_factions: tuple[CardFaction, ...] = card_faction_keys(card)
+        destination_card_pool: CardPool | None = None
+        destination_card_factions: tuple[CardFaction, ...] | None = None
         if "card_pool" in updates:
             card_pool = str(updates["card_pool"])
             if not is_card_pool(card_pool):

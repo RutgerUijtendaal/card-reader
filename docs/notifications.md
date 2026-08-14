@@ -2,7 +2,7 @@
 
 Card Reader currently delivers notifications through one durable channel: the authenticated in-app inbox. `UserNotification` rows are the source of truth for inbox history and the unread badge.
 
-Card-linked notification flows are currently Player-workspace flows and use the canonical Player-only `CardPoolScope`. They do not create parse-review or deck-version notifications for out-of-scope cards. When a Player card is reclassified into Evil or Neutral, existing notifications whose structured metadata identifies that card or a merged source identity redirected to it are archived: the durable rows remain stored, but they no longer appear in inbox lists, unread counts, or update endpoints. Query-time filtering follows the same redirects so a cleanup failure cannot expose a restricted snapshot.
+Card-linked inbox reads use the recipient's authorized `CardPoolScope`. Parse-review notifications therefore remain available to staff submitters for Player, Evil, and Neutral cards, while the same rows are hidden from an ordinary recipient if a referenced Player card later moves into a restricted pool. Card-pool transitions do not destroy or archive the durable history; list, unread-count, and mutation queries apply the recipient's current scope and follow merged source redirects before exposing a row. Deck-version notifications remain Player-only because decks are still a Player workflow, so moving a referenced card into Evil or Neutral stops future deck delivery.
 
 The inbox is one chronological feed. New rows retain an unread indicator until opened, event-type filters are applied server-side, and older results append through the shared load-more pattern.
 

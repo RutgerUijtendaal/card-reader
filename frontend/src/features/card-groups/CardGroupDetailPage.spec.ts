@@ -4,6 +4,7 @@ import { createPinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CardGroupDetailPage from '@/features/card-groups/CardGroupDetailPage.vue';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import type { CardDeckReferenceSummary } from '@/domain/card-deck-references/types';
 import type { CardFiltersResponse, CardVersionDetail } from '@/domain/cards/types';
 import type { CardGroupDetail } from '@/features/card-groups/types';
@@ -193,8 +194,9 @@ const mountView = async (path: string, options: { flush?: boolean } = {}) => {
   await router.isReady();
 
   const app = createApp(CardGroupDetailPage);
+  const pinia = createPinia();
   app.use(router);
-  app.use(createPinia());
+  app.use(pinia);
   app.mount(container);
   if (options.flush ?? true) {
     await flushPromises();
@@ -203,6 +205,7 @@ const mountView = async (path: string, options: { flush?: boolean } = {}) => {
 
   return {
     container,
+    workspace: useCardPoolWorkspaceStore(pinia),
     unmount: () => {
       app.unmount();
       container.remove();
@@ -290,6 +293,38 @@ describe('CardGroupDetailPage', () => {
     expect(mounted.container.querySelector('[aria-label="Loading card group detail"]')).not.toBeNull();
     expect(mounted.container.textContent).not.toContain('Anchor Card');
 
+    mounted.unmount();
+  });
+
+  test('discards a restricted group response after the workspace scope changes', async () => {
+    let resolveInitialGroup: ((value: { data: CardGroupDetail }) => void) | undefined;
+    let groupRequestCount = 0;
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/card-groups/group-1') {
+        groupRequestCount += 1;
+        if (groupRequestCount === 1) {
+          return new Promise((resolve) => {
+            resolveInitialGroup = resolve;
+          });
+        }
+        return new Promise(() => {});
+      }
+      if (url === '/cards/filters') {
+        return Promise.resolve({ data: filters });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    const mounted = await mountView('/card-groups/group-1', { flush: false });
+    await vi.waitFor(() => expect(groupRequestCount).toBe(1));
+
+    mounted.workspace.synchronizeSession(['player'], 'signed-in-user');
+    await vi.waitFor(() => expect(groupRequestCount).toBe(2));
+    resolveInitialGroup?.({ data: buildGroup() });
+    await flushPromises();
+    await nextTick();
+
+    expect(mounted.container.textContent).not.toContain('Anchor Card');
+    expect(mounted.container.querySelector('[aria-label="Loading card group detail"]')).not.toBeNull();
     mounted.unmount();
   });
 

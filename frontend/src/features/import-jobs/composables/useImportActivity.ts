@@ -77,6 +77,17 @@ export const useImportActivity = () => {
       && (hasActiveJobs.value || hasRefreshableDetail.value),
   );
 
+  const preserveAuthoritativeCancellation = (detail: ImportJobDetail): ImportJobDetail => {
+    const activityJob = activeJobs.value.find((job) => job.id === detail.id);
+    if (
+      activityJob?.status === 'canceling'
+      && (detail.status === 'queued' || detail.status === 'running')
+    ) {
+      return { ...detail, status: 'canceling' };
+    }
+    return detail;
+  };
+
   const loadActiveJobs = async (): Promise<string[]> => {
     const requestId = ++activeJobsRequestId;
     activeJobsRefreshing.value = true;
@@ -179,7 +190,7 @@ export const useImportActivity = () => {
         && selectionRevision === detailSelectionRevision
         && selectedJobId.value === jobId
       ) {
-        selectedJobDetail.value = nextDetail;
+        selectedJobDetail.value = preserveAuthoritativeCancellation(nextDetail);
         detailErrorMessage.value = '';
       }
     } catch (error) {
@@ -287,7 +298,7 @@ export const useImportActivity = () => {
       : activeJobs.value.map((job) => (job.id === jobId ? cancelledJob : job));
     const selectedDetail = selectedJobDetail.value;
     const cancelledDetailIsOpen = selectedJobId.value === jobId;
-    if (cancelledDetailIsOpen && isTerminalImportStatus(cancelledJob.status)) {
+    if (cancelledDetailIsOpen) {
       detailRequestId += 1;
       detailLoading.value = false;
     }

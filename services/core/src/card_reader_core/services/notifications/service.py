@@ -16,7 +16,6 @@ from card_reader_core.models import (
 )
 from card_reader_core.repositories.notifications import (
     NotificationInput,
-    archive_notifications_for_card,
     create_or_coalesce_notification,
 )
 
@@ -60,8 +59,6 @@ class NotificationService:
 
         version = flag.card_version
         card = version.card
-        if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool):
-            return None
         status_label: ParseFlagReviewStatus = "resolved" if item.status == "resolved" else "dismissed"
         reviewer_name = _username(item.reviewed_by)
         flag_item_label = _parse_flag_item_label(item.property_key)
@@ -134,9 +131,6 @@ class NotificationService:
             if notification is not None:
                 notifications.append(notification)
         return notifications
-
-    def archive_card_notifications(self, card_id: str) -> int:
-        return archive_notifications_for_card(card_id)
 
     def notify_deck_owner_card_version_changed(
         self,

@@ -317,10 +317,63 @@ def test_faction_classification_reverse_rejects_faction_data() -> None:
     assignment = CardFactionAssignment.objects.create(card_id=card.id, faction="order")
 
     executor = MigrationExecutor(connection)
-    with pytest.raises(RuntimeError, match="cannot be reversed while faction data exists"):
+    with pytest.raises(RuntimeError, match="cannot be reversed while classification data exists"):
         executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
 
     CardFactionAssignment.objects.filter(id=assignment.id).delete()
+    Card.objects.filter(id=card.id).delete()
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_faction_classification_reverse_rejects_new_role_data() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0060_faction_classification")])
+    apps = executor.loader.project_state([("card_reader_core", "0060_faction_classification")]).apps
+    Card = apps.get_model("card_reader_core", "Card")
+    CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
+    Template = apps.get_model("card_reader_core", "Template")
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
+    card = Card.objects.create(key="new-role-card", label="New Role Card")
+    assignment = CardRoleAssignment.objects.create(card_id=card.id, role="boss")
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="new card role assignments"):
+        executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+
+    CardRoleAssignment.objects.filter(id=assignment.id).delete()
+    template = Template.objects.create(
+        key="new-role-template",
+        label="New Role Template",
+        inferred_card_roles_json=["shop_item"],
+    )
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="new template role hints"):
+        executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+
+    Template.objects.filter(id=template.id).update(inferred_card_roles_json=[])
+    job = ImportJob.objects.create(
+        source_path="imports/new-role",
+        template_id=template.id,
+        classification_inference_policy_version=2,
+    )
+    item = ImportJobItem.objects.create(
+        job_id=job.id,
+        source_file="imports/new-role/card.webp",
+        classification_inference_json={
+            "queued_target_classification": {"card_roles": ["boss"]}
+        },
+    )
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="new import item role snapshots"):
+        executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+
+    ImportJobItem.objects.filter(id=item.id).update(classification_inference_json={})
+    ImportJob.objects.filter(id=job.id).update(status="completed")
     Card.objects.filter(id=card.id).delete()
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { fetchCard, fetchCardFilters, fetchCardVersions } from '@/domain/cards/api';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { useAuthStore } from '@/domain/session/store';
 import {
   buildCardEditorReturnLocation,
@@ -29,6 +30,7 @@ export const useCardPublicDetailState = () => {
   const route = useRoute();
   const router = useRouter();
   const auth = useAuthStore();
+  const workspace = useCardPoolWorkspaceStore();
 
   const card = ref<CardDetail | null>(null);
   const versions = ref<CardVersionDetail[]>([]);
@@ -47,8 +49,13 @@ export const useCardPublicDetailState = () => {
 
   const loadCard = async (): Promise<void> => {
     const requestId = ++loadRequestId;
+    const workspaceGeneration = workspace.generation;
     const cardId = String(route.params.id);
     isLoadingInitial.value = true;
+    card.value = null;
+    versions.value = [];
+    selectedVersionId.value = '';
+    symbolByKey.value = {};
     try {
       const [cardResponse, versionsResponse, filtersResponse] = await Promise.all([
         fetchCard<CardDetail>(cardId),
@@ -56,7 +63,7 @@ export const useCardPublicDetailState = () => {
         fetchCardFilters(),
       ]);
 
-      if (requestId !== loadRequestId) {
+      if (requestId !== loadRequestId || workspaceGeneration !== workspace.generation) {
         return;
       }
 
@@ -67,7 +74,7 @@ export const useCardPublicDetailState = () => {
       );
       selectedVersionId.value = resolvePublicCardVersionId(versions.value, route.query.version_id);
     } finally {
-      if (requestId === loadRequestId) {
+      if (requestId === loadRequestId && workspaceGeneration === workspace.generation) {
         isLoadingInitial.value = false;
       }
     }
@@ -119,6 +126,7 @@ export const useCardPublicDetailState = () => {
   });
 
   watch(() => route.params.id, loadCard);
+  watch(() => workspace.generation, loadCard, { flush: 'sync' });
   watch(
     () => route.query.version_id,
     (versionId) => {

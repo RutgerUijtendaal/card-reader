@@ -1,6 +1,6 @@
 # Card Classification Step 2.1: Pool-Scoped Card Identity
 
-Status: implemented, validated, and merged into the classification umbrella branch. [Step 2.2](card-classification-step-2-2-import-workflow-seam.md) is also merged; [Step 2.3](card-classification-step-2-3-faction-classification.md) is the active design checkpoint.
+Status: implemented, validated, and merged into the classification umbrella branch. All dependent classification checkpoints through Step 3.2 are also implemented and merged.
 
 Target amendment: this document records the implemented pool-scoped identity seam. [Step 2.3](card-classification-step-2-3-faction-classification.md) extends that seam so normalized names, aliases, and untargeted image matching are scoped by pool plus the exact canonical faction set, allowing same-name cards in different factions within one pool.
 
@@ -296,7 +296,7 @@ Audit selectors that can show multiple pools, especially Admin Catalog and merge
 - APIs and routes continue addressing each duplicate-name card independently by id.
 - session pool metadata returns Player only for ordinary users and Player/Evil/Neutral for staff without separate per-pool booleans;
 - unauthorized Evil/Neutral collection requests return `403`, while their direct objects and assets return `404`;
-- Player-only TTS, developer-data, notification, deck, and embedded-payload behavior excludes both restricted pools through the shared scope;
+- Player-only TTS, developer-data, deck, and embedded-payload behavior excludes both restricted pools through the shared scope; notification inboxes use each recipient's scope while deck-version delivery remains Player-only;
 
 ## Validation
 

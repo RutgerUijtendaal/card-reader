@@ -13,6 +13,7 @@ from card_reader_core.config import settings
 from card_reader_core.models import (
     NOTIFICATION_EVENT_DECK_CARD_VERSION_CHANGED,
     NOTIFICATION_EVENT_PARSE_FLAG_ITEM_REVIEWED,
+    ALL_CARD_POOLS_SCOPE,
     Card,
     CardRoleAssignment,
     CardVersion,
@@ -90,6 +91,7 @@ def test_notification_examples_seed_real_layout_data_idempotently() -> None:
     set_notification_read_state(
         notification_id=card_change.id,
         recipient_id=str(user.pk),
+        card_pool_scope=ALL_CARD_POOLS_SCOPE,
         read=True,
     )
     third = seed_notification_examples(username=user.username)

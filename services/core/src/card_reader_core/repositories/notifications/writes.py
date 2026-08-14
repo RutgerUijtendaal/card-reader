@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db import IntegrityError, transaction
 from django.db.models import F, QuerySet
 
-from card_reader_core.models import CardMergeRedirect, UserNotification, now_utc
+from card_reader_core.models import CardPoolScope, UserNotification, now_utc
 
 from .queries import notification_queryset
 from .types import NotificationInput, NotificationReadStateConflict
@@ -89,19 +89,21 @@ def set_notification_read_state(
     *,
     notification_id: str,
     recipient_id: str,
+    card_pool_scope: CardPoolScope,
     read: bool,
 ) -> UserNotification | None:
-    notification = notification_queryset(recipient_id).filter(id=notification_id).first()
+    notification = notification_queryset(
+        recipient_id,
+        card_pool_scope=card_pool_scope,
+    ).filter(id=notification_id).first()
     if notification is None:
         return None
     if not read and notification.dedupe_key:
         conflicting_notification = (
-            UserNotification.objects.select_related("recipient", "actor")
+            notification_queryset(recipient_id, card_pool_scope=card_pool_scope)
             .filter(
-                recipient_id=recipient_id,
                 dedupe_key=notification.dedupe_key,
                 read_at__isnull=True,
-                archived_at__isnull=True,
             )
             .exclude(id=notification.id)
             .order_by("-last_event_at", "-created_at")
@@ -115,22 +117,10 @@ def set_notification_read_state(
     return notification
 
 
-def mark_all_notifications_read(recipient_id: str) -> int:
+def mark_all_notifications_read(recipient_id: str, *, card_pool_scope: CardPoolScope) -> int:
     now = now_utc()
     return (
-        notification_queryset(recipient_id)
+        notification_queryset(recipient_id, card_pool_scope=card_pool_scope)
         .filter(read_at__isnull=True)
         .update(read_at=now, updated_at=now)
     )
-
-
-def archive_notifications_for_card(card_id: str) -> int:
-    now = now_utc()
-    referenced_card_ids = [
-        card_id,
-        *CardMergeRedirect.objects.filter(target_card_id=card_id).values_list("old_card_id", flat=True),
-    ]
-    return UserNotification.objects.filter(
-        metadata_json__card_id__in=referenced_card_ids,
-        archived_at__isnull=True,
-    ).update(archived_at=now, updated_at=now)

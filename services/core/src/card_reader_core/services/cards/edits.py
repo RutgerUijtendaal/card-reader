@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from django.db import transaction
 
-from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, Card, CardVersion
+from card_reader_core.models import Card, CardVersion
 from card_reader_core.repositories.cards import (
     promote_card_version,
     update_latest_card_version,
@@ -29,13 +29,7 @@ def _run_reconciliation_action(*, card_id: str, action_name: str, action: Callab
         )
 
 
-def _reconcile_card_classification(*, card_id: str, archive_notifications: bool) -> None:
-    if archive_notifications:
-        _run_reconciliation_action(
-            card_id=card_id,
-            action_name="archive_notifications",
-            action=lambda: NotificationService().archive_card_notifications(card_id),
-        )
+def _reconcile_card_classification(*, card_id: str) -> None:
     _run_reconciliation_action(
         card_id=card_id,
         action_name="sync_tts_card_sheets",
@@ -66,7 +60,6 @@ def update_latest_card_version_with_notifications(
         transaction.on_commit(
             lambda: _reconcile_card_classification(
                 card_id=card.id,
-                archive_notifications=not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool),
             )
         )
     return updated

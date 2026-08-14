@@ -448,6 +448,39 @@ def test_bundle_selection_can_include_complete_card_and_group_catalogs(
         transaction.set_rollback(True)
 
 
+def test_complete_catalog_selection_still_validates_required_card_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    archive_path = tmp_path / "complete-catalog-missing-selection.tar.gz"
+    selection_path = tmp_path / "selection.json"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection.update(
+            {
+                "include_all_cards": True,
+                "card_keys": ["missing-required-card"],
+                "card_group_keys": [],
+            }
+        )
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+        with pytest.raises(
+            DeveloperDataError,
+            match="Selected cards were not found: missing-required-card",
+        ):
+            export_developer_data(
+                selection_path=selection_path,
+                output_path=archive_path,
+                source_revision="complete-catalog-missing-selection-test",
+            )
+        transaction.set_rollback(True)
+
+
 def test_group_selection_keeps_same_key_faction_twins_out_of_bundle(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -144,23 +144,21 @@ def _resolve_selection(
         group_card_ids.update(member.card.id for member in group.members.all())
 
     card_queryset = Card.objects.filter(card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools)
-    if not selection.include_all_cards:
-        explicit_matches: dict[str, list[str]] = {}
-        for card_id, card_key in card_queryset.filter(key__in=selected_keys).values_list(
-            "id", "key"
-        ):
-            explicit_matches.setdefault(card_key, []).append(card_id)
-        missing_cards = sorted(selected_keys - explicit_matches.keys())
-        if missing_cards:
-            raise DeveloperDataError(f"Selected cards were not found: {', '.join(missing_cards)}")
-        ambiguous_cards = sorted(
-            card_key for card_key, card_ids in explicit_matches.items() if len(card_ids) > 1
+    explicit_matches: dict[str, list[str]] = {}
+    for card_id, card_key in card_queryset.filter(key__in=selected_keys).values_list("id", "key"):
+        explicit_matches.setdefault(card_key, []).append(card_id)
+    missing_cards = sorted(selected_keys - explicit_matches.keys())
+    if missing_cards:
+        raise DeveloperDataError(f"Selected cards were not found: {', '.join(missing_cards)}")
+    ambiguous_cards = sorted(
+        card_key for card_key, card_ids in explicit_matches.items() if len(card_ids) > 1
+    )
+    if ambiguous_cards:
+        raise DeveloperDataError(
+            "Selected card keys are ambiguous across faction namespaces: "
+            f"{', '.join(ambiguous_cards)}"
         )
-        if ambiguous_cards:
-            raise DeveloperDataError(
-                "Selected card keys are ambiguous across faction namespaces: "
-                f"{', '.join(ambiguous_cards)}"
-            )
+    if not selection.include_all_cards:
         selected_card_ids = group_card_ids | {card_ids[0] for card_ids in explicit_matches.values()}
         card_queryset = card_queryset.filter(id__in=selected_card_ids)
     cards = list(
