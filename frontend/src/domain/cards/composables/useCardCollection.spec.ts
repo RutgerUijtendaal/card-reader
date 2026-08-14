@@ -32,10 +32,12 @@ const buildPage = (results: TestCard[], nextPage: number | null = null) =>
 
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((innerResolve) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
     resolve = innerResolve;
+    reject = innerReject;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 };
 
 describe('useCardCollection', () => {
@@ -313,5 +315,26 @@ describe('useCardCollection', () => {
 
     expect(collection.cards.value).toEqual([]);
     expect(mockedGet).toHaveBeenCalledTimes(1);
+  });
+
+  test('suppresses errors from a request invalidated by a result-set change', async () => {
+    const pendingRequest = createDeferred<ReturnType<typeof buildResponse>>();
+    mockedGet.mockReturnValueOnce(pendingRequest.promise);
+    const resultSetKey = ref('player');
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded: ref(true),
+      resultSetKey,
+      refreshOnResultSetChange: false,
+      pageSize: 30,
+    });
+
+    const search = collection.searchCards();
+    resultSetKey.value = 'evil';
+    pendingRequest.reject(new Error('Outgoing workspace failed'));
+
+    await expect(search).resolves.toBeUndefined();
+    expect(collection.cards.value).toEqual([]);
+    expect(collection.hasLoadedOnce.value).toBe(false);
   });
 });

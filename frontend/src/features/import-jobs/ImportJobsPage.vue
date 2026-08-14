@@ -71,10 +71,11 @@
                 <label class="field-label">
                   Card pool
                   <AppSelect
-                    v-model="cardPool"
+                    :model-value="cardPool"
                     :options="cardPoolOptions"
                     :disabled="formLocked"
                     required
+                    @update:model-value="setCardPool"
                   />
                 </label>
                 <fieldset class="theme-divider space-y-3 border-t pt-4 md:col-span-2">
@@ -379,6 +380,7 @@ import { onBeforeRouteLeave } from 'vue-router';
 import ImportActivityPanel from '@/features/import-jobs/components/ImportActivityPanel.vue';
 import ImportSourcePicker from '@/features/import-jobs/components/ImportSourcePicker.vue';
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
+import { useAuthStore } from '@/domain/session/store';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppFormSection from '@/shared/components/app/AppFormSection.vue';
@@ -426,9 +428,11 @@ const {
   viewJobDetail,
   closeJobDetail,
   setPickedFiles,
+  setCardPool,
   clearPickedFiles,
   abandonPendingAttempt,
 } = useImportJobsController();
+const auth = useAuthStore();
 
 const templateOptions = computed(() =>
   templates.value.map((item) => ({ value: item.key, label: `${item.label} (${item.key})` })),
@@ -438,6 +442,7 @@ const cardRoleOptions = CARD_ROLE_OPTIONS;
 const cardFactionOptions = CARD_FACTION_OPTIONS;
 
 onBeforeRouteLeave(() => {
+  if (!auth.canAccessStaffRoutes) return true;
   if (!hasUnresolvedCreateAttempt.value) return true;
   if (createState.value.phase !== 'uncertain') return false;
   return globalThis.confirm(

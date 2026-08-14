@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import {
   buildWorkspaceGalleryLocation,
-  buildWorkspaceSelectionLocation,
   normalizeAccessibleCardPools,
   resolveCardPoolWorkspace,
   useCardPoolWorkspaceStore,
@@ -59,14 +58,4 @@ describe('card pool workspace', () => {
     });
   });
 
-  test('builds an explicit internal Player selection that the router can canonicalize', () => {
-    expect(buildWorkspaceSelectionLocation('player')).toEqual({
-      path: '/cards',
-      query: { card_pool: 'player' },
-    });
-    expect(buildWorkspaceSelectionLocation('neutral')).toEqual({
-      path: '/cards',
-      query: { card_pool: 'neutral' },
-    });
-  });
 });

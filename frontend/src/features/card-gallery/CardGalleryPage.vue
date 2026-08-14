@@ -172,6 +172,7 @@ import {
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
 import {
   getGallerySnapshot,
+  clearGalleryNavigationState,
   saveGallerySnapshot,
   setGalleryNavigationCards,
 } from '@/domain/cards/utils/gallery/galleryNavigation';
@@ -211,7 +212,11 @@ const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.q
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const { exportCardsCsv } = useCsvExport();
-const { copyTtsCardExport, isExportingTtsCards } = useTtsCardExport();
+const {
+  copyTtsCardExport,
+  invalidateTtsCardExport,
+  isExportingTtsCards,
+} = useTtsCardExport();
 const { cardScale, showCardGroups, pageSize } = useGalleryOptions();
 const { defaultSort, overrideSort, effectiveSort, setOverrideSort, clearOverrideSort } = useCardSortSurface('gallery');
 const {
@@ -362,6 +367,8 @@ watch(
   () => workspace.generation,
   () => {
     cancelDebouncedUpdateRoute();
+    invalidateTtsCardExport();
+    clearGalleryNavigationState();
   },
   { flush: 'sync' },
 );

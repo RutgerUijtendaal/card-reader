@@ -92,6 +92,10 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
           ? replaceGalleryPage(response)
           : appendGalleryPage(galleryState.value, response, identity);
       hasLoadedOnce.value = true;
+    } catch (error) {
+      if (requestId === latestSearchRequestId) {
+        throw error;
+      }
     } finally {
       if (requestId === latestSearchRequestId) {
         isLoadingInitial.value = false;

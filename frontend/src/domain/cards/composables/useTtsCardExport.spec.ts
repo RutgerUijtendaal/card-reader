@@ -97,4 +97,51 @@ describe('useTtsCardExport', () => {
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
   });
+
+  test('invalidates an outgoing export without clearing a newer export state', async () => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof exportTtsCards>>) => void;
+    let resolveNew!: (value: Awaited<ReturnType<typeof exportTtsCards>>) => void;
+    const oldExport = new Promise<Awaited<ReturnType<typeof exportTtsCards>>>((resolve) => {
+      resolveOld = resolve;
+    });
+    const newExport = new Promise<Awaited<ReturnType<typeof exportTtsCards>>>((resolve) => {
+      resolveNew = resolve;
+    });
+    vi.mocked(exportTtsCards)
+      .mockReturnValueOnce(oldExport)
+      .mockReturnValueOnce(newExport);
+    let oldRequestIsCurrent = true;
+    const exportState = useTtsCardExport();
+
+    const oldRequest = exportState.copyTtsCardExport(
+      { type: 'content_version', content_version_id: 'old-version' },
+      () => oldRequestIsCurrent,
+    );
+    oldRequestIsCurrent = false;
+    exportState.invalidateTtsCardExport();
+    const newRequest = exportState.copyTtsCardExport({
+      type: 'content_version',
+      content_version_id: 'new-version',
+    });
+
+    resolveOld({
+      encodedPayload: 'old-payload',
+      exportedCount: 1,
+      skippedCount: 0,
+      sheetCount: 1,
+    });
+    await oldRequest;
+    expect(exportState.isExportingTtsCards.value).toBe(true);
+    expect(clipboardWriteText).not.toHaveBeenCalledWith('old-payload');
+
+    resolveNew({
+      encodedPayload: 'new-payload',
+      exportedCount: 1,
+      skippedCount: 0,
+      sheetCount: 1,
+    });
+    await newRequest;
+    expect(exportState.isExportingTtsCards.value).toBe(false);
+    expect(clipboardWriteText).toHaveBeenCalledWith('new-payload');
+  });
 });

@@ -10,16 +10,24 @@ export type UseTtsCardExportResult = {
     source: TtsCardExportSource,
     isRequestCurrent?: () => boolean,
   ) => Promise<void>;
+  invalidateTtsCardExport: () => void;
 };
 
 export const useTtsCardExport = (): UseTtsCardExportResult => {
   const isExportingTtsCards = ref(false);
+  let exportGeneration = 0;
+
+  const invalidateTtsCardExport = (): void => {
+    exportGeneration += 1;
+    isExportingTtsCards.value = false;
+  };
 
   const copyTtsCardExport = async (
     source: TtsCardExportSource,
     isRequestCurrent: () => boolean = () => true,
   ): Promise<void> => {
     if (isExportingTtsCards.value) return;
+    const generation = exportGeneration;
     isExportingTtsCards.value = true;
     try {
       const result = await exportTtsCards(source);
@@ -41,12 +49,15 @@ export const useTtsCardExport = (): UseTtsCardExportResult => {
         description: getApiErrorMessage(error, 'The export could not be created.'),
       });
     } finally {
-      isExportingTtsCards.value = false;
+      if (generation === exportGeneration) {
+        isExportingTtsCards.value = false;
+      }
     }
   };
 
   return {
     isExportingTtsCards: readonly(isExportingTtsCards),
     copyTtsCardExport,
+    invalidateTtsCardExport,
   };
 };

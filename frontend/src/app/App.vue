@@ -98,7 +98,7 @@ import { provideScrollContainer } from '@/shared/composables/useScrollContainer'
 import { usePrimarySearchHotkeys } from '@/shared/composables/usePrimarySearch';
 import { useAuthStore } from '@/domain/session/store';
 import { buildContextualNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState';
-import { resolveWorkspaceAwareRouteViewKey } from '@/app/router/routeViewKey';
+import { resolveRouteViewKey } from '@/app/router/routeViewKey';
 import type { HoverMode } from '@/domain/cards/utils/gallery/hoverMode';
 import {
   handleHoverPreviewScaleWheel,
@@ -145,11 +145,7 @@ const hoverModeOverrides = {
   notifications: hoverModePreferences.getOverrideHoverMode('notifications'),
 } satisfies Record<HoverModeSurface, ReturnType<typeof hoverModePreferences.getOverrideHoverMode>>;
 const activeHoverModeSurface = computed(() => resolveHoverModeSurfacePath(route.path));
-const routeViewKey = computed(() => resolveWorkspaceAwareRouteViewKey(
-  route.path,
-  workspace.generation,
-  route.meta.cardPoolWorkspace === true,
-));
+const routeViewKey = computed(() => resolveRouteViewKey(route.path));
 const hoverModeHotkeyActions = computed(() => {
   if (!globalHotkeysEnabled.value) {
     return null;
@@ -240,7 +236,10 @@ watch(
     } else if (
       routePoolIsNoLongerAccessible
       || (changedPool && route.path === '/cards')
-      || (lostRestrictedWorkspace && route.meta.cardPoolWorkspace)
+      || (lostRestrictedWorkspace && (
+        route.meta.workspaceCapability === 'gallery'
+        || route.meta.workspaceCapability === 'resource'
+      ))
     ) {
       void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
     }
