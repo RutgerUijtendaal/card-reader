@@ -35,10 +35,15 @@ The card-pool, role, and faction work is split into nine dependency-ordered chec
 8. [Card classification Step 3.1: Context-preserving workspace switching](card-classification-step-3-1-context-preserving-workspace-switching.md) keeps compatible global and resource routes mounted during workspace changes, centralizes route capability decisions, and limits Gallery fallback navigation to incompatible Player-only routes.
 9. [Card classification Step 3.2: Admin-owned inference rules](card-classification-step-3-2-admin-owned-inference-rules.md) removes template hints and hard-coded tag policies, adds pool-specific Tag/Type inference rules to Admin Catalog, and snapshots those rules for deterministic imports.
 
+### Post-classification hardening plans
+
+1. [Card classification Step 4.0: Classification acceptance audit and cleanup](card-classification-step-4-filter-hardening.md) validates the completed classification feature as one system, fixes in-scope defects, and removes obsolete intermediate compatibility and duplication without adding new filter persistence.
+2. [Card classification Step 4.1: Pool-aware Gallery filter surfaces](card-classification-step-4-1-pool-aware-gallery-filters.md) removes Roles from ordinary Gallery browsing, shows Factions only in Evil, shows Mana/Affinity/Devotion only in Player, and sanitizes hidden route and request state.
+
 ### Classification delivery model
 
 - `feature/card-classification` is the umbrella integration branch. Its aggregate pull request targets `master` and remains open so CI and review can evaluate the complete feature as it grows.
 - Each checkpoint is implemented on its own branch with a pull request targeting `feature/card-classification`, not `master`.
 - Merge checkpoint pull requests into the umbrella branch in dependency order. Create the next checkpoint branch from the updated umbrella branch so its diff contains only that checkpoint.
 - CI and automatic review must run on both checkpoint and aggregate pull requests. Do not retarget a checkpoint pull request merely to trigger them.
-- Merge the umbrella pull request to `master` only after all nine checkpoint acceptance criteria pass and the aggregate review is clear.
+- Merge the umbrella pull request to `master` only after all nine implementation checkpoint acceptance criteria, Steps 4.0 and 4.1, and the aggregate review are clear.
