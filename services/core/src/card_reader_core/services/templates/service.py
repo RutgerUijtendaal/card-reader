@@ -14,15 +14,11 @@ from card_reader_core.repositories.templates import (
     template_key_exists,
     update_template,
 )
-
-SUPPORTED_TEMPLATE_PARSER_TYPES = {
-    "name_mana_cost",
-    "type_tag",
-    "rules_text",
-    "attack",
-    "health",
-    "affinity",
-}
+from .parser_types import (
+    NAME_PRODUCING_TEMPLATE_PARSER_TYPES,
+    SUPPORTED_TEMPLATE_PARSER_TYPES,
+    TEMPLATE_PARSER_TYPES,
+)
 
 
 class TemplateService:
@@ -123,6 +119,7 @@ class TemplateService:
             raise ValueError("definition_json.regions must be a non-empty array")
 
         seen_region_ids: set[str] = set()
+        name_region: tuple[int, str, str] | None = None
         normalized_regions: list[dict[str, Any]] = []
         for index, region in enumerate(regions):
             if not isinstance(region, dict):
@@ -137,10 +134,20 @@ class TemplateService:
 
             parser_type = str(region.get("parser_type", "")).strip()
             if parser_type not in SUPPORTED_TEMPLATE_PARSER_TYPES:
-                supported = ", ".join(sorted(SUPPORTED_TEMPLATE_PARSER_TYPES))
+                supported = ", ".join(TEMPLATE_PARSER_TYPES)
                 raise ValueError(
                     f"definition_json.regions[{index}].parser_type must be one of: {supported}"
                 )
+            if parser_type in NAME_PRODUCING_TEMPLATE_PARSER_TYPES:
+                if name_region is not None:
+                    previous_index, previous_region_id, previous_parser_type = name_region
+                    raise ValueError(
+                        f"definition_json.regions[{index}].parser_type conflicts with "
+                        f"name-producing region '{previous_region_id}' at index "
+                        f"{previous_index} ({previous_parser_type}); only one of name or "
+                        "name_mana_cost may be configured"
+                    )
+                name_region = (index, region_id, parser_type)
 
             cut_region = region.get("cut_region")
             if not isinstance(cut_region, dict):

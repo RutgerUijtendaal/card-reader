@@ -21,28 +21,21 @@
 
 <script setup lang="ts">
 import type { TemplatePreviewRenderRegion } from '@/features/admin/types';
-import type { TemplateParserType } from '@/domain/templates/types';
+import type { TemplateParserType } from '@/domain/templates/parserTypes';
 
 defineProps<{
   regions: TemplatePreviewRenderRegion[];
 }>();
 
-const regionClass = (parserType: TemplateParserType): string => {
-  if (parserType === 'name_mana_cost') {
-    return 'border-sky-300 bg-sky-500/10 text-white';
-  }
-  if (parserType === 'type_tag') {
-    return 'border-emerald-300 bg-emerald-500/10 text-white';
-  }
-  if (parserType === 'rules_text') {
-    return 'border-amber-300 bg-amber-500/10 text-white';
-  }
-  if (parserType === 'attack') {
-    return 'border-rose-300 bg-rose-500/10 text-white';
-  }
-  if (parserType === 'health') {
-    return 'border-orange-300 bg-orange-500/10 text-white';
-  }
-  return 'border-violet-300 bg-violet-500/10 text-white';
-};
+const REGION_CLASSES = {
+  name: 'border-cyan-300 bg-cyan-500/10 text-white',
+  name_mana_cost: 'border-sky-300 bg-sky-500/10 text-white',
+  type_tag: 'border-emerald-300 bg-emerald-500/10 text-white',
+  rules_text: 'border-amber-300 bg-amber-500/10 text-white',
+  attack: 'border-rose-300 bg-rose-500/10 text-white',
+  health: 'border-orange-300 bg-orange-500/10 text-white',
+  affinity: 'border-violet-300 bg-violet-500/10 text-white',
+} as const satisfies Readonly<Record<TemplateParserType, string>>;
+
+const regionClass = (parserType: TemplateParserType): string => REGION_CLASSES[parserType];
 </script>

@@ -1,6 +1,6 @@
 # Card Classification Step 4.1: Pool-Aware Gallery Filter Surfaces
 
-Status: implemented and locally validated; awaiting checkpoint review and merge.
+Status: implemented, validated, reviewed, and merged into the classification umbrella branch.
 
 Step 4.1 is a deliberately small frontend-only change that makes the ordinary Card Gallery's filter surface match the active Player, Evil, or Neutral workspace. It removes the Roles facet from Gallery browsing and hides pool-irrelevant Factions, Mana, Affinity, and Devotion facets without changing their backend data, query capabilities, classification behavior, or global staff-management use.
 

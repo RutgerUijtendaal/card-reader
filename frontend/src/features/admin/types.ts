@@ -1,4 +1,4 @@
-import type { TemplateParserType } from '@/domain/templates/types';
+import type { TemplateParserType } from '@/domain/templates/parserTypes';
 import type { JsonObject } from '@/shared/types/json';
 import type { CardRole } from '@/domain/cards/cardRoles';
 import type { CardFaction } from '@/domain/cards/cardFactions';

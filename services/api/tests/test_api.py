@@ -66,14 +66,18 @@ from card_reader_api.imports.creation import StagedImportUpload  # noqa: E402
 from card_reader_api.seeds.users import seed_users  # noqa: E402
 
 
-def _valid_template_definition(*, region_id: str = "top_bar") -> dict[str, object]:
+def _valid_template_definition(
+    *,
+    region_id: str = "top_bar",
+    parser_type: str = "name_mana_cost",
+) -> dict[str, object]:
     return {
         "id": "mtg-like-v1",
         "version": 7,
         "regions": [
             {
                 "region_id": region_id,
-                "parser_type": "name_mana_cost",
+                "parser_type": parser_type,
                 "cut_region": {
                     "unit": "relative",
                     "x": 0.04,
@@ -986,6 +990,91 @@ def test_staff_can_manage_templates() -> None:
     assert "inferred_card_factions" not in create_response.json()
     created_template = Template.objects.get(key="staff-template")
     assert created_template.label == "Staff Template"
+
+
+def test_staff_can_create_name_only_template() -> None:
+    client = _staff_client("staff-name-only-template-user")
+
+    response = client.post(
+        "/admin/templates",
+        data={
+            "label": "Name Only Template",
+            "key": "name-only-template",
+            "definition_json": _valid_template_definition(parser_type="name"),
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["definition_json"]["regions"][0]["parser_type"] == "name"
+    assert Template.objects.get(key="name-only-template").definition_json["regions"][0][
+        "parser_type"
+    ] == "name"
+
+
+def test_staff_can_update_template_to_name_only() -> None:
+    client = _staff_client("staff-update-name-only-template-user")
+    template = Template.objects.create(
+        key="update-name-only-template",
+        label="Update Name Only Template",
+        definition_json=_valid_template_definition(),
+    )
+
+    response = client.patch(
+        f"/admin/templates/{template.id}",
+        data={"definition_json": _valid_template_definition(parser_type="name")},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["definition_json"]["regions"][0]["parser_type"] == "name"
+    template.refresh_from_db()
+    assert template.definition_json["regions"][0]["parser_type"] == "name"
+
+
+@pytest.mark.parametrize(
+    ("first_parser_type", "second_parser_type"),
+    [
+        ("name", "name"),
+        ("name_mana_cost", "name_mana_cost"),
+        ("name", "name_mana_cost"),
+    ],
+)
+def test_template_create_rejects_multiple_name_producers(
+    first_parser_type: str,
+    second_parser_type: str,
+) -> None:
+    client = _staff_client(
+        f"staff-name-conflict-{first_parser_type}-{second_parser_type}"
+    )
+    definition = _valid_template_definition(parser_type=first_parser_type)
+    definition["regions"].append(  # type: ignore[union-attr]
+        {
+            "region_id": "second_name_bar",
+            "parser_type": second_parser_type,
+            "cut_region": {
+                "unit": "relative",
+                "x": 0.04,
+                "y": 0.12,
+                "w": 0.92,
+                "h": 0.07,
+            },
+            "ocr_config": {},
+        }
+    )
+
+    response = client.post(
+        "/admin/templates",
+        data={
+            "label": "Conflicting Name Template",
+            "key": f"conflicting-{first_parser_type}-{second_parser_type}",
+            "definition_json": definition,
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert "only one of name or name_mana_cost may be configured" in response.json()["detail"]
 
 
 def test_template_preview_cards_are_global_across_authorized_pools() -> None:

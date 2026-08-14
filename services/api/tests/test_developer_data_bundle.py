@@ -360,6 +360,9 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             tag__key="blood",
             enabled=True,
         ).exists()
+        assert Template.objects.get(key="synthetic-template").definition_json["regions"][0][
+            "parser_type"
+        ] == "name"
         assert set(
             Card.objects.get(
                 key="synthetic-mainboard",
@@ -952,7 +955,24 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     template = Template.objects.create(
         key="synthetic-template",
         label="Synthetic Template",
-        definition_json={"id": "synthetic-template", "version": 1, "regions": []},
+        definition_json={
+            "id": "synthetic-template",
+            "version": 1,
+            "regions": [
+                {
+                    "region_id": "name_bar",
+                    "parser_type": "name",
+                    "cut_region": {
+                        "unit": "relative",
+                        "x": 0.04,
+                        "y": 0.02,
+                        "w": 0.92,
+                        "h": 0.07,
+                    },
+                    "ocr_config": {},
+                }
+            ],
+        },
     )
     rule_definitions = [
         ("player", "role", "hero", "hero"),

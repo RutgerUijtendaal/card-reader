@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+NAME = "name"
+NAME_MANA_COST = "name_mana_cost"
+TYPE_TAG = "type_tag"
+RULES_TEXT = "rules_text"
+ATTACK = "attack"
+HEALTH = "health"
+AFFINITY = "affinity"
+
+TEMPLATE_PARSER_TYPES = (
+    NAME,
+    NAME_MANA_COST,
+    TYPE_TAG,
+    RULES_TEXT,
+    ATTACK,
+    HEALTH,
+    AFFINITY,
+)
+SUPPORTED_TEMPLATE_PARSER_TYPES = frozenset(TEMPLATE_PARSER_TYPES)
+NAME_PRODUCING_TEMPLATE_PARSER_TYPES = frozenset((NAME, NAME_MANA_COST))
+
+__all__ = [
+    "AFFINITY",
+    "ATTACK",
+    "HEALTH",
+    "NAME",
+    "NAME_MANA_COST",
+    "NAME_PRODUCING_TEMPLATE_PARSER_TYPES",
+    "RULES_TEXT",
+    "SUPPORTED_TEMPLATE_PARSER_TYPES",
+    "TEMPLATE_PARSER_TYPES",
+    "TYPE_TAG",
+]
