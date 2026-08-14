@@ -4,6 +4,8 @@ Status: implemented.
 
 Navigation amendment: [Step 3.1](card-classification-step-3-1-context-preserving-workspace-switching.md) replaces this step's initial unconditional safe-landing navigation with a centralized route-capability policy. Compatible global and resource routes stay mounted when the workspace changes; Gallery changes pool in place; only incompatible Player-only routes fall back to the target Gallery.
 
+Filter-default amendment: [Step 4.1](card-classification-step-4-1-pool-aware-gallery-filters.md) removes the ordinary Gallery Roles facet and its former default Hero exclusion. Deck-building retains explicit purpose-owned Hero filtering.
+
 This step turns the card pool into a site-level browsing context. It does not change the classification model or infer new data.
 
 ## Outcome

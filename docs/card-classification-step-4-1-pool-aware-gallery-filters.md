@@ -1,10 +1,18 @@
 # Card Classification Step 4.1: Pool-Aware Gallery Filter Surfaces
 
-Status: planned; blocked on Step 4.0.
+Status: implemented and locally validated; awaiting checkpoint review and merge.
 
 Step 4.1 is a deliberately small frontend-only change that makes the ordinary Card Gallery's filter surface match the active Player, Evil, or Neutral workspace. It removes the Roles facet from Gallery browsing and hides pool-irrelevant Factions, Mana, Affinity, and Devotion facets without changing their backend data, query capabilities, classification behavior, or global staff-management use.
 
-This is presentation and route-state policy, not authorization or card validity. Hidden filters must be absent from both the visible Gallery and the Gallery request so an invisible constraint can never affect results.
+This is presentation and route-state policy, not authorization or card validity. Values for hidden facets must be reset before the Gallery request so invisible constraints can never affect results. Removing the Roles facet also removes the former code-owned Hero exclusion from ordinary Gallery defaults; deck-building workflows continue applying their purpose-specific Hero rules explicitly.
+
+## Implementation record
+
+- `GALLERY_VISIBLE_FILTER_SECTIONS` is the single readonly Player/Evil/Neutral matrix in the cards domain.
+- `sanitizeGalleryFilterStateForPool` resets hidden semantic groups before canonical route replacement and before the existing key-to-selection-to-request conversion path.
+- `CardFilterSections` now controls Roles and Factions independently while retaining its complete default surface for global Admin and maintenance consumers.
+- Gallery route reconciliation watches the actual route as well as its sanitized signature, replaces incompatible direct or historical URLs before fetching, and uses sanitized state for results, CSV, TTS, summaries, and reset behavior.
+- No backend, API, persistence, Admin configuration, developer-data, or database-diagram contract changed.
 
 ## Outcome
 
@@ -126,7 +134,7 @@ Clear key-based Gallery route state before the existing conversion path builds i
 
 - direct URLs with hidden role/faction/mana/affinity/devotion parameters normalize before the first request;
 - Player-to-Evil, Evil-to-Neutral, Neutral-to-Player, browser-back, and browser-forward transitions remove only newly hidden fields;
-- no hidden route parameter reaches `buildCardFilterApiPayload` for Gallery requests or exports;
+- no hidden role value reaches `buildCardFilterApiPayload` for Gallery requests or exports;
 - visible Evil faction and Player mana/affinity/devotion parameters survive round trips;
 - removed match-mode parameters return to defaults;
 - stale pre-switch responses cannot replace the new pool's results.
@@ -177,7 +185,7 @@ The normal PR pipeline still validates the untouched backend. Do not run prohibi
 - Factions appear only in Evil Gallery.
 - Mana, including mana cost, appears only in Player Gallery.
 - Affinity and Devotion appear only in Player Gallery.
-- Every hidden facet is removed from canonical Gallery routes, requests, exports, active-filter summaries, and reset state before results load.
+- Every hidden facet value is reset before canonical Gallery routes, requests, exports, active-filter summaries, and result loading.
 - Returning to a pool does not resurrect values removed when they became hidden.
 - Admin, Review, maintenance, Card editing, imports, and explicit API queries retain complete role/classification capabilities.
 - Deck Builder and Playtester retain their existing Player-only behavior.

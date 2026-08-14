@@ -48,7 +48,7 @@ describe('useCardFilterController', () => {
 
     expect(controller.selectionState.value.cardPool).toBe('evil');
     expect(controller.selectionState.value.cardRoleIds).toEqual([]);
-    expect(controller.selectionState.value.cardRoleExcludeIds).toEqual(['hero']);
+    expect(controller.selectionState.value.cardRoleExcludeIds).toEqual([]);
     expect(controller.selectionState.value.cardRoleMatch).toBe('any');
     expect(controller.selectionState.value.cardFactionIds).toEqual(['order']);
     expect(controller.selectionState.value.cardFactionExcludeIds).toEqual(['blood']);
@@ -67,7 +67,7 @@ describe('useCardFilterController', () => {
     expect(controller.selectionState.value.typeExcludeIds).toEqual([]);
     expect(controller.selectionState.value.typeMatch).toBe('any');
     expect(controller.selectionState.value.cardPool).toBe('evil');
-    expect(controller.selectionState.value.cardRoleExcludeIds).toEqual(['hero']);
+    expect(controller.selectionState.value.cardRoleExcludeIds).toEqual([]);
     expect(controller.selectionState.value.cardFactionIds).toEqual([]);
     expect(controller.selectionState.value.cardFactionExcludeIds).toEqual([]);
     expect(controller.selectionState.value.cardFactionMatch).toBe('any');

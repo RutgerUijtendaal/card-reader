@@ -27,7 +27,7 @@ export const useCardFilterState = (catalog: Ref<CardFilterCatalog>) => {
   const cardPool = ref<CardPool>('player');
   const cardRoleMatch = ref<'any' | 'all'>('any');
   const cardRoleIds = ref<CardRoleFilter[]>([]);
-  const cardRoleExcludeIds = ref<CardRoleFilter[]>(['hero']);
+  const cardRoleExcludeIds = ref<CardRoleFilter[]>([]);
   const cardFactionMatch = ref<'any' | 'all'>('any');
   const cardFactionIds = ref<CardFaction[]>([]);
   const cardFactionExcludeIds = ref<CardFaction[]>([]);
