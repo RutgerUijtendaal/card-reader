@@ -13,6 +13,7 @@ from card_reader_api.catalog.serializers import (
     CatalogEntryWriteSerializer,
     SuggestionAcceptSerializer,
     SuggestionStatusQuerySerializer,
+    ClassificationRuleWriteSerializer,
     SymbolAssetUploadSerializer,
     SymbolWriteSerializer,
     keyword_detail_payload,
@@ -29,13 +30,18 @@ from card_reader_api.catalog.assets import ALLOWED_SYMBOL_ASSET_SUFFIXES, store_
 from card_reader_api.common.auth_access import card_pool_scope_for_user
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.catalog import CatalogService
+from card_reader_core.services.classification_rules import (
+    ClassificationRuleDuplicateError,
+    ClassificationRuleError,
+    ClassificationRuleNotFoundError,
+    ClassificationRuleService,
+    classification_rule_payload,
+)
 
 
 class CatalogView(APIView):
     def get(self, request: Request) -> Response:
-        data = CatalogService().list_catalog(
-            card_pool_scope=card_pool_scope_for_user(request.user)
-        )
+        data = CatalogService().list_catalog(card_pool_scope=card_pool_scope_for_user(request.user))
         return Response(
             {
                 "known": {
@@ -48,8 +54,62 @@ class CatalogView(APIView):
                     "tags": [suggestion_payload(item) for item in data["suggested"]["tags"]],
                     "types": [suggestion_payload(item) for item in data["suggested"]["types"]],
                 },
+                "classification": ClassificationRuleService().definition_catalog(
+                    card_pool_scope=card_pool_scope_for_user(request.user)
+                ),
             }
         )
+
+
+class ClassificationRuleListCreateView(APIView):
+    def get(self, _request: Request) -> Response:
+        return Response(
+            [classification_rule_payload(rule) for rule in ClassificationRuleService().list_rules()]
+        )
+
+    def post(self, request: Request) -> Response:
+        serializer = ClassificationRuleWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        try:
+            rule = ClassificationRuleService().create_rule(**serializer.validated_data)
+        except ClassificationRuleDuplicateError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ClassificationRuleError as exc:
+            return bad_request(str(exc))
+        return Response(classification_rule_payload(rule), status=status.HTTP_201_CREATED)
+
+
+class ClassificationRuleDetailView(APIView):
+    def get(self, _request: Request, rule_id: str) -> Response:
+        rule = ClassificationRuleService().get_rule(rule_id)
+        if rule is None:
+            return not_found("Classification rule not found")
+        return Response(classification_rule_payload(rule))
+
+    def patch(self, request: Request, rule_id: str) -> Response:
+        serializer = ClassificationRuleWriteSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return serializer_error(serializer)
+        try:
+            rule = ClassificationRuleService().update_rule(
+                rule_id=rule_id,
+                **serializer.validated_data,
+            )
+        except ClassificationRuleNotFoundError:
+            return not_found("Classification rule not found")
+        except ClassificationRuleDuplicateError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ClassificationRuleError as exc:
+            return bad_request(str(exc))
+        return Response(classification_rule_payload(rule))
+
+    def delete(self, _request: Request, rule_id: str) -> Response:
+        try:
+            ClassificationRuleService().delete_rule(rule_id=rule_id)
+        except ClassificationRuleNotFoundError:
+            return not_found("Classification rule not found")
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class KeywordCreateView(APIView):
@@ -68,7 +128,9 @@ class KeywordDetailView(APIView):
         return Response(keyword_detail_payload(detail))
 
     def patch(self, request: Request, entry_id: str) -> Response:
-        return _update_simple(request, entry_id, "keyword", keyword_payload, include_identifiers=True)
+        return _update_simple(
+            request, entry_id, "keyword", keyword_payload, include_identifiers=True
+        )
 
     def delete(self, _request: Request, entry_id: str) -> Response:
         return _delete_simple(entry_id, "keyword", "Keyword")
@@ -187,7 +249,9 @@ class SymbolAssetUploadView(APIView):
         filename = Path(upload.name or "").name
         suffix = Path(filename).suffix.lower()
         if suffix not in ALLOWED_SYMBOL_ASSET_SUFFIXES:
-            return bad_request("Unsupported symbol asset file type. Use png/jpg/jpeg/webp/bmp/tif/tiff.")
+            return bad_request(
+                "Unsupported symbol asset file type. Use png/jpg/jpeg/webp/bmp/tif/tiff."
+            )
 
         target_path = store_symbol_asset(upload, filename, suffix)
         if target_path.stat().st_size == 0:
@@ -204,7 +268,9 @@ class SymbolAssetUploadView(APIView):
 
 class SuggestionListView(APIView):
     def get(self, request: Request, kind: str) -> Response:
-        serializer = SuggestionStatusQuerySerializer(data={"status": request.query_params.get("status")})
+        serializer = SuggestionStatusQuerySerializer(
+            data={"status": request.query_params.get("status")}
+        )
         if not serializer.is_valid():
             return serializer_error(serializer)
         try:
@@ -341,7 +407,10 @@ def _update_simple(
 
 
 def _delete_simple(entry_id: str, kind: str, label: str) -> Response:
-    deleted = getattr(CatalogService(), f"delete_{kind}")(entry_id=entry_id)
+    try:
+        deleted = getattr(CatalogService(), f"delete_{kind}")(entry_id=entry_id)
+    except ValueError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     if not deleted:
         return not_found(f"{label} not found")
     return Response(status=status.HTTP_204_NO_CONTENT)

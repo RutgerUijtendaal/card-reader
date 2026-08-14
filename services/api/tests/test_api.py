@@ -9,7 +9,30 @@ from uuid import uuid4
 
 import pytest
 
-from card_reader_core.models import Card, CardAlias, CardFactionAssignment, CardGroup, CardGroupMember, CardMergeRedirect, CardRoleAssignment, CardVersion, CardVersionImage, CardVersionMetadataSuggestion, ContentVersion, Deck, DeckEntry, ImportJob, ImportJobItem, Keyword, MetadataSuggestion, ParseResult, Symbol, Tag, Template, Type  # noqa: E402
+from card_reader_core.models import (
+    Card,
+    CardAlias,
+    CardFactionAssignment,
+    CardGroup,
+    CardGroupMember,
+    CardMergeRedirect,
+    CardRoleAssignment,
+    CardVersion,
+    CardVersionImage,
+    CardVersionMetadataSuggestion,
+    ContentVersion,
+    Deck,
+    DeckEntry,
+    ImportJob,
+    ImportJobItem,
+    Keyword,
+    MetadataSuggestion,
+    ParseResult,
+    Symbol,
+    Tag,
+    Template,
+    Type,
+)  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
 from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
@@ -23,9 +46,14 @@ from card_reader_core.repositories.metadata import (  # noqa: E402
     update_symbol,
 )
 from card_reader_core.services.imports import ImportService  # noqa: E402
+from card_reader_core.services.classification_rules import ClassificationRuleService  # noqa: E402
 from card_reader_core.services.parser_jobs import ImportProcessorService  # noqa: E402
 from card_reader_core.config.settings import settings  # noqa: E402
-from card_reader_core.storage import build_storage_relative_path, relativize_image_storage_path, resolve_storage_path  # noqa: E402
+from card_reader_core.storage import (
+    build_storage_relative_path,
+    relativize_image_storage_path,
+    resolve_storage_path,
+)  # noqa: E402
 from django.contrib.auth import get_user_model  # noqa: E402
 from django.apps import apps  # noqa: E402
 from django.db import connection  # noqa: E402
@@ -76,7 +104,9 @@ def test_create_import_upload_rejects_unknown_template() -> None:
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
     assert response.status_code == 400
@@ -110,7 +140,9 @@ def test_create_import_upload_stores_relative_paths() -> None:
             "content_version_base": "14.1",
             "content_version_description": "Test import version.",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
 
@@ -309,12 +341,15 @@ def test_create_import_upload_rejects_conflicting_creation_key_and_supports_look
     assert ImportJob.objects.filter(creation_key=creation_key).count() == 1
 
 
-def test_import_upload_snapshots_template_roles_and_defaults_to_automatic() -> None:
+def test_import_upload_snapshots_rules_and_defaults_to_automatic() -> None:
     template = Template.objects.get(key="mtg-like-v1")
-    template.inferred_card_roles_json = ["location", "event", "boon"]
-    template.inferred_card_factions_json = ["darkness", "order"]
-    template.save(
-        update_fields=["inferred_card_roles_json", "inferred_card_factions_json"]
+    hero_tag = Tag.objects.create(key="hero-snapshot", label="Hero Snapshot")
+    rule = ClassificationRuleService().create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=hero_tag.id,
     )
 
     response = _staff_client("import-template-snapshot-user").post(
@@ -334,16 +369,27 @@ def test_import_upload_snapshots_template_roles_and_defaults_to_automatic() -> N
     job = ImportJob.objects.get(id=response.json()["job_id"])
     assert job.card_role_mode == "automatic"
     assert job.card_role_override_json == []
-    assert job.template_role_snapshot_json == ["location", "boon", "event"]
     assert job.card_faction_mode == "automatic"
     assert job.card_faction_override_json == []
-    assert job.template_faction_snapshot_json == ["order", "darkness"]
-    assert job.classification_inference_policy_version == 3
-    template.inferred_card_roles_json = []
-    template.save(update_fields=["inferred_card_roles_json"])
+    snapshot = job.classification_rule_snapshot_json
+    assert snapshot["card_pool"] == "player"
+    assert snapshot["rules"] == [
+        {
+            "rule_id": rule.id,
+            "card_pool": "player",
+            "source_kind": "tag",
+            "source_id": hero_tag.id,
+            "source_key": "hero-snapshot",
+            "source_label": "Hero Snapshot",
+            "source_identifiers": [],
+            "target_kind": "role",
+            "target_key": "hero",
+        }
+    ]
+    original_digest = snapshot["digest"]
+    ClassificationRuleService().update_rule(rule_id=rule.id, enabled=False)
     job.refresh_from_db()
-    assert job.template_role_snapshot_json == ["location", "boon", "event"]
-    assert job.template_faction_snapshot_json == ["order", "darkness"]
+    assert job.classification_rule_snapshot_json["digest"] == original_digest
 
 
 @pytest.mark.parametrize("base_version", ["", "14", "14.1.2", "v14.1", "14.a"])
@@ -358,7 +404,9 @@ def test_create_import_upload_rejects_invalid_content_version_base(base_version:
             "content_version_base": base_version,
             "content_version_description": "Test import version.",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
 
@@ -377,7 +425,9 @@ def test_create_import_upload_rejects_blank_content_version_description() -> Non
             "content_version_base": "14.1",
             "content_version_description": "   ",
             "options_json": "{}",
-            "files": SimpleUploadedFile("card.png", b"fake-image-content", content_type="image/png"),
+            "files": SimpleUploadedFile(
+                "card.png", b"fake-image-content", content_type="image/png"
+            ),
         },
     )
 
@@ -397,13 +447,17 @@ def test_create_import_upload_increments_content_version_patch() -> None:
                 "content_version_base": "98.7",
                 "content_version_description": "Test import version.",
                 "options_json": "{}",
-                "files": SimpleUploadedFile(filename, b"fake-image-content", content_type="image/png"),
+                "files": SimpleUploadedFile(
+                    filename, b"fake-image-content", content_type="image/png"
+                ),
             },
         )
         assert response.status_code == 201
 
     versions = list(
-        ContentVersion.objects.filter(base_version="98.7").order_by("patch").values_list("version_number", flat=True)
+        ContentVersion.objects.filter(base_version="98.7")
+        .order_by("patch")
+        .values_list("version_number", flat=True)
     )
     assert versions == ["98.7.0", "98.7.1"]
 
@@ -471,6 +525,11 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
         template_id="mtg-like-v1",
         options={},
         files=[image_one, image_two],
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+        ),
     )
 
     class InterruptingParser:
@@ -509,6 +568,77 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
     assert job.status == "cancelled"
     assert job.processed_items == 2
     assert [item.status for item in items] == ["completed", "cancelled"]
+
+
+def test_processor_uses_frozen_classification_detector_inputs() -> None:
+    tag = Tag.objects.create(
+        key="frozen-parser-source",
+        label="Original Hero Source",
+        identifiers_json=["original hero term"],
+    )
+    classification_rules = ClassificationRuleService()
+    classification_rules.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=tag.id,
+    )
+    image = settings.storage_root_dir / "uploads" / "frozen-parser-job" / "0001.png"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"frozen-parser-image")
+    job = create_import_job_with_files(
+        source_path=image.parent,
+        template_id="mtg-like-v1",
+        options={},
+        files=[image],
+        classification_rule_snapshot=classification_rules.build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+        ),
+    )
+
+    tag.label = "Edited Hero Source"
+    tag.identifiers_json = ["edited hero term"]
+    tag.save(update_fields=["label", "identifiers_json", "updated_at"])
+
+    class SnapshotInspectingParser:
+        def parse(
+            self,
+            image_path: Path,
+            template_id: str,
+            **resources: object,
+        ) -> SimpleNamespace:
+            known_tags = resources["known_tags"]
+            assert isinstance(known_tags, list)
+            frozen_tag = next(row for row in known_tags if isinstance(row, Tag) and row.id == tag.id)
+            assert frozen_tag.label == "Original Hero Source"
+            assert frozen_tag.identifiers_json == ["original hero term"]
+            return SimpleNamespace(
+                checksum="frozen-parser-checksum",
+                normalized_fields={
+                    "name": "Frozen Snapshot Card",
+                    "type_line": "Type",
+                    "mana_cost": "",
+                    "attack": "",
+                    "health": "",
+                    "rules_text": "",
+                },
+                confidence={"overall": 0.9},
+                raw_ocr={"source": str(image_path), "template_id": template_id},
+                keyword_ids=[],
+                tag_ids=[tag.id],
+                type_ids=[],
+                symbol_ids=[],
+                tag_suggestions=[],
+                type_suggestions=[],
+            )
+
+    ImportProcessorService(SnapshotInspectingParser()).process_job(job.id)
+
+    card = Card.objects.get(key="frozen-snapshot-card")
+    assert CardRoleAssignment.objects.filter(card=card, role="hero").exists()
 
 
 def test_card_gallery_routes_are_public() -> None:
@@ -649,7 +779,9 @@ def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
         label="Deprecated Only Keyword",
         identifiers_json=[],
     )
-    deprecated_card, deprecated_version = _create_editable_card_version(name="Deprecated Catalog Link Card")
+    deprecated_card, deprecated_version = _create_editable_card_version(
+        name="Deprecated Catalog Link Card"
+    )
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
     replace_card_version_keywords(card_version_id=deprecated_version.id, keyword_ids=[keyword.id])
@@ -659,7 +791,9 @@ def test_catalog_detail_linked_cards_exclude_deprecated_cards() -> None:
 
     assert list_response.status_code == 200
     assert detail_response.status_code == 200
-    list_keyword = next(row for row in list_response.json()["known"]["keywords"] if row["id"] == keyword.id)
+    list_keyword = next(
+        row for row in list_response.json()["known"]["keywords"] if row["id"] == keyword.id
+    )
     detail_payload = detail_response.json()
     assert list_keyword["linked_card_count"] == 0
     assert detail_payload["linked_card_count"] == 0
@@ -841,8 +975,6 @@ def test_staff_can_manage_templates() -> None:
             "label": "Staff Template",
             "key": "staff-template",
             "definition_json": _valid_template_definition(),
-            "inferred_card_roles": ["location", "event", "hero"],
-            "inferred_card_factions": ["darkness", "order"],
         },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
@@ -850,11 +982,10 @@ def test_staff_can_manage_templates() -> None:
 
     assert list_response.status_code == 200
     assert create_response.status_code == 200
-    assert create_response.json()["inferred_card_roles"] == ["hero", "location", "event"]
-    assert create_response.json()["inferred_card_factions"] == ["order", "darkness"]
+    assert "inferred_card_roles" not in create_response.json()
+    assert "inferred_card_factions" not in create_response.json()
     created_template = Template.objects.get(key="staff-template")
-    assert created_template.inferred_card_roles_json == ["hero", "location", "event"]
-    assert created_template.inferred_card_factions_json == ["order", "darkness"]
+    assert created_template.label == "Staff Template"
 
 
 def test_template_preview_cards_are_global_across_authorized_pools() -> None:
@@ -868,10 +999,7 @@ def test_template_preview_cards_are_global_across_authorized_pools() -> None:
     )
 
     assert response.status_code == 200
-    assert {
-        (row["name"], row["card_pool"])
-        for row in response.json()["results"]
-    } == {
+    assert {(row["name"], row["card_pool"]) for row in response.json()["results"]} == {
         ("Player Global Preview", "player"),
         ("Evil Global Preview", "evil"),
         ("Neutral Global Preview", "neutral"),
@@ -879,28 +1007,27 @@ def test_template_preview_cards_are_global_across_authorized_pools() -> None:
 
 
 def test_template_preview_cards_require_staff_access() -> None:
-    user = _create_user(
-        "non-staff-template-preview-user", "password", is_staff=False
-    )
+    user = _create_user("non-staff-template-preview-user", "password", is_staff=False)
     client = Client(HTTP_HOST="localhost")
     client.force_login(user)
 
     assert client.get("/admin/templates/preview-cards").status_code == 403
 
 
-def test_template_rejects_duplicate_inferred_roles() -> None:
+def test_template_payload_does_not_expose_removed_classification_hints() -> None:
     response = _staff_client("staff-template-role-validation-user").post(
         "/admin/templates",
         data={
-            "label": "Invalid Role Template",
-            "key": "invalid-role-template",
+            "label": "Parser Only Template",
+            "key": "parser-only-template",
             "definition_json": _valid_template_definition(),
-            "inferred_card_roles": ["event", "event"],
         },
         content_type="application/json",
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 200
+    assert "inferred_card_roles" not in response.json()
+    assert "inferred_card_factions" not in response.json()
 
 
 def test_template_key_cannot_be_updated() -> None:
@@ -1195,9 +1322,7 @@ def test_restricted_card_collections_and_objects_enforce_pool_scope(
 
 def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:
     player_card, _player_version = _create_editable_card_version(name="Visible Player Card")
-    evil_card, evil_version = _create_editable_card_version(
-        name="Restricted Evil Version"
-    )
+    evil_card, evil_version = _create_editable_card_version(name="Restricted Evil Version")
     _create_card_image(evil_version)
     evil_card.card_pool = "evil"
     evil_card.save(update_fields=["card_pool"])
@@ -1210,9 +1335,7 @@ def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> N
 def test_shared_immutable_image_remains_public_when_any_owning_card_is_player() -> None:
     player_card, player_version = _create_editable_card_version(name="Shared Player Image")
     player_image = _create_card_image(player_version)
-    evil_card, evil_version = _create_editable_card_version(
-        name="Shared Evil Image"
-    )
+    evil_card, evil_version = _create_editable_card_version(name="Shared Evil Image")
     evil_card.card_pool = "evil"
     evil_card.save(update_fields=["card_pool"])
     CardVersionImage.objects.create(
@@ -1222,9 +1345,7 @@ def test_shared_immutable_image_remains_public_when_any_owning_card_is_player() 
         checksum=player_image.checksum,
     )
 
-    response = Client(HTTP_HOST="localhost").get(
-        f"/card-images/{player_image.stored_path}"
-    )
+    response = Client(HTTP_HOST="localhost").get(f"/card-images/{player_image.stored_path}")
 
     assert response.status_code == 200
     assert player_card.id
@@ -1332,7 +1453,9 @@ def test_admin_content_version_cards_returns_cards_for_selected_version() -> Non
     other_version.content_version = other_content_version
     other_version.save(update_fields=["content_version"])
 
-    response = _staff_client("content-version-cards-user").get(f"/admin/content-versions/{content_version.id}/cards")
+    response = _staff_client("content-version-cards-user").get(
+        f"/admin/content-versions/{content_version.id}/cards"
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -1453,7 +1576,9 @@ def test_card_group_payloads_use_immutable_preview_image_urls() -> None:
     member_card, member_version = _create_editable_card_version(name="Immutable Group Member")
     anchor_image = _create_card_image(anchor_version)
     member_image = _create_card_image(member_version)
-    group = _create_card_group("immutable-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+    group = _create_card_group(
+        "immutable-group", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     response = Client(HTTP_HOST="localhost").get(f"/card-groups/{group.id}")
 
@@ -1539,7 +1664,9 @@ def test_filters_payload_uses_the_canonical_card_role_registry() -> None:
 
 def test_filters_payload_includes_the_ordered_mana_family_catalog() -> None:
     arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+    arcane_affinity = _get_or_create_symbol(
+        key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity"
+    )
 
     response = Client(HTTP_HOST="localhost").get("/cards/filters")
 
@@ -1572,9 +1699,7 @@ def test_filters_payload_includes_type_linked_card_counts() -> None:
 def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
     counted_type = _create_type(key="filters-pool-counted-type", label="Filters Pool Counted Type")
     _player_card, player_version = _create_editable_card_version(name="Filters Player Counted Card")
-    evil_card, evil_version = _create_editable_card_version(
-        name="Filters Evil Counted Card"
-    )
+    evil_card, evil_version = _create_editable_card_version(name="Filters Evil Counted Card")
     evil_card.card_pool = "evil"
     evil_card.save(update_fields=["card_pool"])
     replace_card_version_types(card_version_id=player_version.id, type_ids=[counted_type.id])
@@ -1585,7 +1710,9 @@ def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
 
     assert public_response.status_code == 200
     assert staff_response.status_code == 200
-    public_type = next(row for row in public_response.json()["types"] if row["id"] == counted_type.id)
+    public_type = next(
+        row for row in public_response.json()["types"] if row["id"] == counted_type.id
+    )
     staff_type = next(row for row in staff_response.json()["types"] if row["id"] == counted_type.id)
     assert public_type["linked_card_count"] == 1
     assert staff_type["linked_card_count"] == 2
@@ -1640,7 +1767,9 @@ def test_storage_paths_resolve_relative_to_storage_root(tmp_path: Path, monkeypa
 
     resolved = resolve_storage_path("images/example-card.png")
     from_dev_absolute = relativize_image_storage_path(str(tmp_path / "images" / "example-card.png"))
-    from_prd_absolute = relativize_image_storage_path("/var/lib/card-reader/images/example-card.png")
+    from_prd_absolute = relativize_image_storage_path(
+        "/var/lib/card-reader/images/example-card.png"
+    )
 
     assert resolved == tmp_path / "images" / "example-card.png"
     assert from_dev_absolute == "images/example-card.png"
@@ -1667,7 +1796,9 @@ def test_cards_list_pagination_honors_page_and_page_size() -> None:
     assert second_response.json()["page"] == 2
     assert second_response.json()["previous_page"] == 1
     assert capped_response.json()["page_size"] == 100
-    returned_ids = {row["id"] for row in first_response.json()["results"] + second_response.json()["results"]}
+    returned_ids = {
+        row["id"] for row in first_response.json()["results"] + second_response.json()["results"]
+    }
     assert set(created).issubset(returned_ids)
 
 
@@ -1696,7 +1827,9 @@ def test_cards_list_filters_preserve_count() -> None:
     replace_card_version_keywords(card_version_id=version_b.id, keyword_ids=[keyword.id])
     replace_card_version_keywords(card_version_id=version_c.id, keyword_ids=[other_keyword.id])
 
-    response = Client(HTTP_HOST="localhost").get("/cards", {"keyword_ids": [keyword.id], "page_size": 1})
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards", {"keyword_ids": [keyword.id], "page_size": 1}
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -1739,7 +1872,9 @@ def test_cards_list_metadata_match_modes() -> None:
     _create_card_image(version_none)
 
     replace_card_version_keywords(card_version_id=version_any.id, keyword_ids=[keywords[0].id])
-    replace_card_version_keywords(card_version_id=version_all.id, keyword_ids=[keywords[0].id, keywords[1].id])
+    replace_card_version_keywords(
+        card_version_id=version_all.id, keyword_ids=[keywords[0].id, keywords[1].id]
+    )
     replace_card_version_keywords(card_version_id=version_none.id, keyword_ids=[keywords[1].id])
 
     replace_card_version_tags(card_version_id=version_any.id, tag_ids=[tags[0].id])
@@ -1807,7 +1942,9 @@ def test_cards_list_type_exclusions_combine_with_any_and_all_inclusions() -> Non
 
     replace_card_version_types(card_version_id=version_allowed.id, type_ids=[types[0].id])
     replace_card_version_types(card_version_id=version_excluded.id, type_ids=[types[1].id])
-    replace_card_version_types(card_version_id=version_mixed.id, type_ids=[types[0].id, types[1].id])
+    replace_card_version_types(
+        card_version_id=version_mixed.id, type_ids=[types[0].id, types[1].id]
+    )
     replace_card_version_types(card_version_id=version_all.id, type_ids=[types[0].id, types[2].id])
 
     client = Client(HTTP_HOST="localhost")
@@ -1863,12 +2000,21 @@ def test_cards_list_symbol_group_match_modes() -> None:
     _create_card_image(version_any)
     _create_card_image(version_all)
     _create_card_image(version_none)
-    replace_card_version_symbols(card_version_id=version_any.id, symbol_ids=[mana_symbols[0].id, affinity_symbols[0].id])
+    replace_card_version_symbols(
+        card_version_id=version_any.id, symbol_ids=[mana_symbols[0].id, affinity_symbols[0].id]
+    )
     replace_card_version_symbols(
         card_version_id=version_all.id,
-        symbol_ids=[mana_symbols[0].id, mana_symbols[1].id, affinity_symbols[0].id, affinity_symbols[1].id],
+        symbol_ids=[
+            mana_symbols[0].id,
+            mana_symbols[1].id,
+            affinity_symbols[0].id,
+            affinity_symbols[1].id,
+        ],
     )
-    replace_card_version_symbols(card_version_id=version_none.id, symbol_ids=[affinity_symbols[1].id])
+    replace_card_version_symbols(
+        card_version_id=version_none.id, symbol_ids=[affinity_symbols[1].id]
+    )
 
     client = Client(HTTP_HOST="localhost")
 
@@ -1934,8 +2080,12 @@ def test_cards_list_symbol_group_exclude_modes() -> None:
     _create_card_image(version_red_green)
 
     replace_card_version_symbols(card_version_id=version_red.id, symbol_ids=[mana_symbols[0].id])
-    replace_card_version_symbols(card_version_id=version_blue_white.id, symbol_ids=[mana_symbols[1].id, mana_symbols[2].id])
-    replace_card_version_symbols(card_version_id=version_red_green.id, symbol_ids=[mana_symbols[0].id, mana_symbols[2].id])
+    replace_card_version_symbols(
+        card_version_id=version_blue_white.id, symbol_ids=[mana_symbols[1].id, mana_symbols[2].id]
+    )
+    replace_card_version_symbols(
+        card_version_id=version_red_green.id, symbol_ids=[mana_symbols[0].id, mana_symbols[2].id]
+    )
 
     client = Client(HTTP_HOST="localhost")
 
@@ -2048,7 +2198,9 @@ def test_cards_list_can_return_card_groups() -> None:
     _create_card_image(member_version)
     _create_card_image(extra_version)
     _create_card_image(standalone_version)
-    _create_card_group("transform-group", anchor_card=anchor_card, members=[anchor_card, member_card, extra_card])
+    _create_card_group(
+        "transform-group", anchor_card=anchor_card, members=[anchor_card, member_card, extra_card]
+    )
 
     response = Client(HTTP_HOST="localhost").get("/cards", {"show_groups": "true"})
 
@@ -2080,7 +2232,9 @@ def test_grouped_gallery_preview_images_do_not_query_per_member() -> None:
 
     client = Client(HTTP_HOST="localhost")
     with CaptureQueriesContext(connection) as queries:
-        response = client.get("/cards", {"show_groups": "true", "q": "Grouped Query Member", "page_size": 100})
+        response = client.get(
+            "/cards", {"show_groups": "true", "q": "Grouped Query Member", "page_size": 100}
+        )
 
     assert response.status_code == 200
     group = next(row for row in response.json()["results"] if row["result_type"] == "card_group")
@@ -2090,29 +2244,47 @@ def test_grouped_gallery_preview_images_do_not_query_per_member() -> None:
 
 def test_grouped_gallery_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Lifecycle Group Anchor")
-    deprecated_card, deprecated_version = _create_editable_card_version(name="Lifecycle Group Deprecated")
+    deprecated_card, deprecated_version = _create_editable_card_version(
+        name="Lifecycle Group Deprecated"
+    )
     _create_card_image(anchor_version)
     _create_card_image(deprecated_version)
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
-    _create_card_group("lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card])
+    _create_card_group(
+        "lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
-    default_response = client.get("/cards", {"show_groups": "true", "q": "Lifecycle Group", "page_size": 100})
+    default_response = client.get(
+        "/cards", {"show_groups": "true", "q": "Lifecycle Group", "page_size": 100}
+    )
     all_response = client.get(
         "/cards",
-        {"show_groups": "true", "q": "Lifecycle Group", "lifecycle_status": "all", "page_size": 100},
+        {
+            "show_groups": "true",
+            "q": "Lifecycle Group",
+            "lifecycle_status": "all",
+            "page_size": 100,
+        },
     )
 
     assert default_response.status_code == 200
     assert all_response.status_code == 200
-    default_group = next(row for row in default_response.json()["results"] if row["result_type"] == "card_group")
-    all_group = next(row for row in all_response.json()["results"] if row["result_type"] == "card_group")
+    default_group = next(
+        row for row in default_response.json()["results"] if row["result_type"] == "card_group"
+    )
+    all_group = next(
+        row for row in all_response.json()["results"] if row["result_type"] == "card_group"
+    )
     assert default_group["anchor_card_id"] == anchor_card.id
     assert default_group["member_count"] == 1
     assert [row["card_id"] for row in default_group["preview_cards"]] == [anchor_card.id]
     assert all_group["member_count"] == 2
-    assert [row["card_id"] for row in all_group["preview_cards"]] == [anchor_card.id, deprecated_card.id]
+    assert [row["card_id"] for row in all_group["preview_cards"]] == [
+        anchor_card.id,
+        deprecated_card.id,
+    ]
 
 
 def test_cards_list_rejects_unknown_sort() -> None:
@@ -2160,7 +2332,9 @@ def test_cards_list_supports_name_and_mana_sorting() -> None:
 
 def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> None:
     arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    dark_affinity = _get_or_create_symbol(key="dark-affinity", label="Dark Affinity", symbol_type="affinity")
+    dark_affinity = _get_or_create_symbol(
+        key="dark-affinity", label="Dark Affinity", symbol_type="affinity"
+    )
     cards_and_versions = [
         _create_editable_card_version(name="Family Sort Zeta Arcane"),
         _create_editable_card_version(name="Family Sort Alpha Dark"),
@@ -2169,8 +2343,12 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
     ]
     for _card, version in cards_and_versions:
         _create_card_image(version)
-    replace_card_version_symbols(card_version_id=cards_and_versions[0][1].id, symbol_ids=[arcane_mana.id])
-    replace_card_version_symbols(card_version_id=cards_and_versions[1][1].id, symbol_ids=[dark_affinity.id])
+    replace_card_version_symbols(
+        card_version_id=cards_and_versions[0][1].id, symbol_ids=[arcane_mana.id]
+    )
+    replace_card_version_symbols(
+        card_version_id=cards_and_versions[1][1].id, symbol_ids=[dark_affinity.id]
+    )
     replace_card_version_symbols(
         card_version_id=cards_and_versions[2][1].id,
         symbol_ids=[arcane_mana.id, dark_affinity.id],
@@ -2211,7 +2389,9 @@ def test_cards_list_supports_indexed_mana_family_sorting_and_pagination() -> Non
 
 def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> None:
     arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+    arcane_affinity = _get_or_create_symbol(
+        key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity"
+    )
     dark_mana = _get_or_create_symbol(key="dark-mana", label="Dark Mana", symbol_type="mana")
     rows = [
         _create_editable_card_version(name="Family Filter Mana"),
@@ -2223,7 +2403,9 @@ def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> 
         _create_card_image(version)
     replace_card_version_symbols(card_version_id=rows[0][1].id, symbol_ids=[arcane_mana.id])
     replace_card_version_symbols(card_version_id=rows[1][1].id, symbol_ids=[arcane_affinity.id])
-    replace_card_version_symbols(card_version_id=rows[2][1].id, symbol_ids=[arcane_affinity.id, dark_mana.id])
+    replace_card_version_symbols(
+        card_version_id=rows[2][1].id, symbol_ids=[arcane_affinity.id, dark_mana.id]
+    )
     replace_card_version_symbols(card_version_id=rows[3][1].id, symbol_ids=[dark_mana.id])
 
     client = Client(HTTP_HOST="localhost")
@@ -2256,7 +2438,9 @@ def test_cards_list_filters_mana_families_across_mana_and_affinity_aliases() -> 
 
 
 def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() -> None:
-    symbol = _get_or_create_symbol(key="family-sync-unmatched", label="Family Sync", symbol_type="affinity")
+    symbol = _get_or_create_symbol(
+        key="family-sync-unmatched", label="Family Sync", symbol_type="affinity"
+    )
     _card, version = _create_editable_card_version(name="Family Synchronization")
     replace_card_version_symbols(card_version_id=version.id, symbol_ids=[symbol.id])
     version.refresh_from_db()
@@ -2292,10 +2476,18 @@ def test_cards_list_supports_type_sorting() -> None:
     zeta_card, zeta_version = _create_editable_card_version(name="Sort Type Zeta Solo")
     untyped_card, untyped_version = _create_editable_card_version(name="Sort Type Untyped")
     mana_card, mana_version = _create_editable_card_version(name="Sort Type Mana Solo")
-    _filler_spell_card, filler_spell_version = _create_editable_card_version(name="Priority Spell Filler")
-    _filler_mana_one_card, filler_mana_one_version = _create_editable_card_version(name="Priority Mana Filler One")
-    _filler_mana_two_card, filler_mana_two_version = _create_editable_card_version(name="Priority Mana Filler Two")
-    _filler_mana_three_card, filler_mana_three_version = _create_editable_card_version(name="Priority Mana Filler Three")
+    _filler_spell_card, filler_spell_version = _create_editable_card_version(
+        name="Priority Spell Filler"
+    )
+    _filler_mana_one_card, filler_mana_one_version = _create_editable_card_version(
+        name="Priority Mana Filler One"
+    )
+    _filler_mana_two_card, filler_mana_two_version = _create_editable_card_version(
+        name="Priority Mana Filler Two"
+    )
+    _filler_mana_three_card, filler_mana_three_version = _create_editable_card_version(
+        name="Priority Mana Filler Three"
+    )
 
     for version in (
         arcane_version,
@@ -2312,8 +2504,12 @@ def test_cards_list_supports_type_sorting() -> None:
     ):
         _create_card_image(version)
 
-    replace_card_version_types(card_version_id=arcane_version.id, type_ids=[creature_type.id, spell_type.id])
-    replace_card_version_types(card_version_id=hybrid_version.id, type_ids=[spell_type.id, mana_type.id])
+    replace_card_version_types(
+        card_version_id=arcane_version.id, type_ids=[creature_type.id, spell_type.id]
+    )
+    replace_card_version_types(
+        card_version_id=hybrid_version.id, type_ids=[spell_type.id, mana_type.id]
+    )
     replace_card_version_types(card_version_id=blade_version.id, type_ids=[creature_type.id])
     replace_card_version_types(card_version_id=alpha_version.id, type_ids=[alpha_type.id])
     replace_card_version_types(card_version_id=zeta_version.id, type_ids=[zeta_type.id])
@@ -2321,7 +2517,9 @@ def test_cards_list_supports_type_sorting() -> None:
     replace_card_version_types(card_version_id=filler_spell_version.id, type_ids=[spell_type.id])
     replace_card_version_types(card_version_id=filler_mana_one_version.id, type_ids=[mana_type.id])
     replace_card_version_types(card_version_id=filler_mana_two_version.id, type_ids=[mana_type.id])
-    replace_card_version_types(card_version_id=filler_mana_three_version.id, type_ids=[mana_type.id])
+    replace_card_version_types(
+        card_version_id=filler_mana_three_version.id, type_ids=[mana_type.id]
+    )
 
     response = Client(HTTP_HOST="localhost").get("/cards", {"sort": "types_asc", "q": "Sort Type"})
 
@@ -2344,12 +2542,20 @@ def test_cards_list_type_sorting_happens_before_pagination() -> None:
     mana_type = _create_type(key="mana", label="Mana")
 
     priority_card, priority_version = _create_editable_card_version(name="Sort Page Type Priority")
-    secondary_card, secondary_version = _create_editable_card_version(name="Sort Page Type Secondary")
+    secondary_card, secondary_version = _create_editable_card_version(
+        name="Sort Page Type Secondary"
+    )
     untyped_card, untyped_version = _create_editable_card_version(name="Sort Page Type Untyped")
     mana_card, mana_version = _create_editable_card_version(name="Sort Page Type Mana")
     filler_card, filler_version = _create_editable_card_version(name="Sort Page Filler Priority")
 
-    for version in (priority_version, secondary_version, untyped_version, mana_version, filler_version):
+    for version in (
+        priority_version,
+        secondary_version,
+        untyped_version,
+        mana_version,
+        filler_version,
+    ):
         _create_card_image(version)
 
     replace_card_version_types(card_version_id=priority_version.id, type_ids=[priority_type.id])
@@ -2383,7 +2589,9 @@ def test_cards_list_type_sorting_happens_before_pagination() -> None:
 def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Sort Group Zephyr Group")
     member_card, member_version = _create_editable_card_version(name="Sort Group Zephyr Member")
-    standalone_card, standalone_version = _create_editable_card_version(name="Sort Group Amber Solo")
+    standalone_card, standalone_version = _create_editable_card_version(
+        name="Sort Group Amber Solo"
+    )
     _create_card_image(anchor_version)
     _create_card_image(member_version)
     _create_card_image(standalone_version)
@@ -2410,15 +2618,21 @@ def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
 
 def test_grouped_gallery_mana_family_sort_uses_the_anchor_version() -> None:
     arcane_mana = _get_or_create_symbol(key="arcane-mana", label="Arcane Mana", symbol_type="mana")
-    dark_affinity = _get_or_create_symbol(key="dark-affinity", label="Dark Affinity", symbol_type="affinity")
+    dark_affinity = _get_or_create_symbol(
+        key="dark-affinity", label="Dark Affinity", symbol_type="affinity"
+    )
     group_anchor, anchor_version = _create_editable_card_version(name="Family Group Zeta Anchor")
     group_member, member_version = _create_editable_card_version(name="Family Group Alpha Member")
-    standalone, standalone_version = _create_editable_card_version(name="Family Group Beta Standalone")
+    standalone, standalone_version = _create_editable_card_version(
+        name="Family Group Beta Standalone"
+    )
     for version in (anchor_version, member_version, standalone_version):
         _create_card_image(version)
     replace_card_version_symbols(card_version_id=anchor_version.id, symbol_ids=[arcane_mana.id])
     replace_card_version_symbols(card_version_id=member_version.id, symbol_ids=[dark_affinity.id])
-    replace_card_version_symbols(card_version_id=standalone_version.id, symbol_ids=[dark_affinity.id])
+    replace_card_version_symbols(
+        card_version_id=standalone_version.id, symbol_ids=[dark_affinity.id]
+    )
     _create_card_group(
         "mana-family-sorted-group",
         anchor_card=group_anchor,
@@ -2445,7 +2659,9 @@ def test_grouped_gallery_paginates_before_hydrating_payloads() -> None:
     zeta_card, zeta_version = _create_editable_card_version(name="Paged Group Zeta Solo")
     for version in (anchor_version, member_version, alpha_version, zeta_version):
         _create_card_image(version)
-    _create_card_group("paged-group-beta", anchor_card=anchor_card, members=[anchor_card, member_card])
+    _create_card_group(
+        "paged-group-beta", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
     first_response = client.get(
@@ -2475,8 +2691,12 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
 
     anchor_card, anchor_version = _create_editable_card_version(name="Sort Type Group Mana Anchor")
     member_card, member_version = _create_editable_card_version(name="Sort Type Group Spell Member")
-    standalone_card, standalone_version = _create_editable_card_version(name="Sort Type Group Creature Solo")
-    _filler_spell_card, filler_spell_version = _create_editable_card_version(name="Grouped Priority Spell Filler")
+    standalone_card, standalone_version = _create_editable_card_version(
+        name="Sort Type Group Creature Solo"
+    )
+    _filler_spell_card, filler_spell_version = _create_editable_card_version(
+        name="Grouped Priority Spell Filler"
+    )
 
     for version in (anchor_version, member_version, standalone_version, filler_spell_version):
         _create_card_image(version)
@@ -2485,7 +2705,9 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
     replace_card_version_types(card_version_id=member_version.id, type_ids=[spell_type.id])
     replace_card_version_types(card_version_id=standalone_version.id, type_ids=[creature_type.id])
     replace_card_version_types(card_version_id=filler_spell_version.id, type_ids=[spell_type.id])
-    _create_card_group("sorted-type-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+    _create_card_group(
+        "sorted-type-group", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     response = Client(HTTP_HOST="localhost").get(
         "/cards",
@@ -2510,7 +2732,9 @@ def test_export_cards_csv_honors_selected_sort() -> None:
     zebra_version.save(update_fields=["updated_at"])
     alpha_version.save(update_fields=["updated_at"])
 
-    response = _staff_client("csv-export-sort-user").get("/exports/csv", {"sort": "name_asc", "q": "Sort Export"})
+    response = _staff_client("csv-export-sort-user").get(
+        "/exports/csv", {"sort": "name_asc", "q": "Sort Export"}
+    )
 
     assert response.status_code == 200
     rows = response.content.decode("utf-8").splitlines()
@@ -2519,7 +2743,9 @@ def test_export_cards_csv_honors_selected_sort() -> None:
 
 
 def test_export_cards_csv_honors_mana_family_sort() -> None:
-    arcane_affinity = _get_or_create_symbol(key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity")
+    arcane_affinity = _get_or_create_symbol(
+        key="arcane-affinity", label="Arcane Affinity", symbol_type="affinity"
+    )
     dark_mana = _get_or_create_symbol(key="dark-mana", label="Dark Mana", symbol_type="mana")
     _dark_card, dark_version = _create_editable_card_version(name="Family Export Alpha Dark")
     _arcane_card, arcane_version = _create_editable_card_version(name="Family Export Zeta Arcane")
@@ -2544,7 +2770,9 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     member_card, member_version = _create_editable_card_version(name="Detail Member")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    group = _create_card_group("detail-group", anchor_card=anchor_card, members=[anchor_card, member_card])
+    group = _create_card_group(
+        "detail-group", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
     card_response = client.get(f"/cards/{member_card.id}")
@@ -2558,17 +2786,16 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     assert card_payload["card_groups"][0]["card_pool"] == "player"
     assert card_payload["card_groups"][0]["is_anchor"] is False
     assert group_payload["id"] == group.id
-    assert [member["card"]["id"] for member in group_payload["members"]] == [anchor_card.id, member_card.id]
+    assert [member["card"]["id"] for member in group_payload["members"]] == [
+        anchor_card.id,
+        member_card.id,
+    ]
     assert group_payload["members"][0]["is_anchor"] is True
 
 
 def test_cross_pool_group_relationships_only_expose_authorized_members() -> None:
-    player_card, player_version = _create_editable_card_version(
-        name="Cross Pool Group Player"
-    )
-    evil_card, evil_version = _create_editable_card_version(
-        name="Cross Pool Group Evil"
-    )
+    player_card, player_version = _create_editable_card_version(name="Cross Pool Group Player")
+    evil_card, evil_version = _create_editable_card_version(name="Cross Pool Group Evil")
     evil_card.card_pool = "evil"
     evil_card.save(update_fields=["card_pool"])
     _create_card_image(player_version)
@@ -2579,30 +2806,24 @@ def test_cross_pool_group_relationships_only_expose_authorized_members() -> None
         members=[player_card, evil_card],
     )
 
-    anonymous_group_response = Client(HTTP_HOST="localhost").get(
-        f"/card-groups/{group.id}"
-    )
-    anonymous_card_response = Client(HTTP_HOST="localhost").get(
-        f"/cards/{player_card.id}"
-    )
+    anonymous_group_response = Client(HTTP_HOST="localhost").get(f"/card-groups/{group.id}")
+    anonymous_card_response = Client(HTTP_HOST="localhost").get(f"/cards/{player_card.id}")
     staff_client = _staff_client("cross-pool-group-staff")
     staff_group_response = staff_client.get(f"/card-groups/{group.id}")
     staff_evil_card_response = staff_client.get(f"/cards/{evil_card.id}")
 
     assert anonymous_group_response.status_code == 200
-    assert [
-        member["card"]["id"]
-        for member in anonymous_group_response.json()["members"]
-    ] == [player_card.id]
-    assert anonymous_card_response.json()["card_groups"][0]["id"] == group.id
-    assert anonymous_card_response.json()["card_groups"][0]["member_count"] == 1
-    assert anonymous_card_response.json()["card_groups"][0]["card_ids"] == [
+    assert [member["card"]["id"] for member in anonymous_group_response.json()["members"]] == [
         player_card.id
     ]
+    assert anonymous_card_response.json()["card_groups"][0]["id"] == group.id
+    assert anonymous_card_response.json()["card_groups"][0]["member_count"] == 1
+    assert anonymous_card_response.json()["card_groups"][0]["card_ids"] == [player_card.id]
     assert staff_group_response.status_code == 200
-    assert [
-        member["card"]["id"] for member in staff_group_response.json()["members"]
-    ] == [player_card.id, evil_card.id]
+    assert [member["card"]["id"] for member in staff_group_response.json()["members"]] == [
+        player_card.id,
+        evil_card.id,
+    ]
     assert staff_group_response.json()["members"][1]["card"]["card_pool"] == "evil"
     assert staff_evil_card_response.json()["card_groups"][0]["id"] == group.id
     assert staff_evil_card_response.json()["card_groups"][0]["card_pool"] == "player"
@@ -2679,7 +2900,9 @@ def test_card_detail_limits_deck_references_to_three_latest() -> None:
 
     assert response.status_code == 200
     references = response.json()["deck_references"]
-    assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
+    assert [reference["id"] for reference in references] == [
+        deck.id for deck in reversed(decks[-3:])
+    ]
 
 
 def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> None:
@@ -2690,7 +2913,9 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
     _create_card_image(anchor_version)
     _create_card_image(member_version)
     CardRoleAssignment.objects.create(card=anchor_card, role="hero")
-    group = _create_card_group("group-deck-reference", anchor_card=anchor_card, members=[anchor_card, member_card])
+    group = _create_card_group(
+        "group-deck-reference", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
     owner_deck = Deck.objects.create(
         owner=owner,
         name="Owner Private Group Deck",
@@ -2723,12 +2948,18 @@ def test_card_group_detail_includes_anchor_viewer_visible_deck_references() -> N
 
 def test_card_group_detail_limits_anchor_deck_references_to_three_latest() -> None:
     owner = _create_user("group-deck-reference-limit-owner", "password", is_staff=False)
-    anchor_card, anchor_version = _create_editable_card_version(name="Group Deck Reference Limit Anchor")
-    member_card, member_version = _create_editable_card_version(name="Group Deck Reference Limit Member")
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Group Deck Reference Limit Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Group Deck Reference Limit Member"
+    )
     _create_card_image(anchor_version)
     _create_card_image(member_version)
     CardRoleAssignment.objects.create(card=anchor_card, role="hero")
-    group = _create_card_group("group-deck-reference-limit", anchor_card=anchor_card, members=[anchor_card, member_card])
+    group = _create_card_group(
+        "group-deck-reference-limit", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
     decks = []
     for index in range(4):
         deck = Deck.objects.create(
@@ -2746,17 +2977,23 @@ def test_card_group_detail_limits_anchor_deck_references_to_three_latest() -> No
 
     assert response.status_code == 200
     references = response.json()["anchor_deck_references"]
-    assert [reference["id"] for reference in references] == [deck.id for deck in reversed(decks[-3:])]
+    assert [reference["id"] for reference in references] == [
+        deck.id for deck in reversed(decks[-3:])
+    ]
 
 
 def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Detail Lifecycle Anchor")
-    deprecated_card, deprecated_version = _create_editable_card_version(name="Detail Lifecycle Deprecated")
+    deprecated_card, deprecated_version = _create_editable_card_version(
+        name="Detail Lifecycle Deprecated"
+    )
     _create_card_image(anchor_version)
     _create_card_image(deprecated_version)
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
-    group = _create_card_group("detail-lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card])
+    group = _create_card_group(
+        "detail-lifecycle-group", anchor_card=anchor_card, members=[anchor_card, deprecated_card]
+    )
 
     client = Client(HTTP_HOST="localhost")
     default_response = client.get(f"/card-groups/{group.id}")
@@ -2765,7 +3002,9 @@ def test_public_card_group_detail_hides_deprecated_linked_cards_by_default() -> 
     assert default_response.status_code == 200
     assert all_response.status_code == 200
     assert default_response.json()["member_count"] == 1
-    assert [member["card"]["id"] for member in default_response.json()["members"]] == [anchor_card.id]
+    assert [member["card"]["id"] for member in default_response.json()["members"]] == [
+        anchor_card.id
+    ]
     assert all_response.json()["member_count"] == 2
     assert [member["card"]["id"] for member in all_response.json()["members"]] == [
         anchor_card.id,
@@ -2784,7 +3023,9 @@ def test_card_group_anchor_cannot_be_deprecated() -> None:
     member_card, member_version = _create_editable_card_version(name="Lifecycle Anchor Member")
     _create_card_image(anchor_version)
     _create_card_image(member_version)
-    _create_card_group("lifecycle-anchor-guard", anchor_card=anchor_card, members=[anchor_card, member_card])
+    _create_card_group(
+        "lifecycle-anchor-guard", anchor_card=anchor_card, members=[anchor_card, member_card]
+    )
 
     response = client.patch(
         f"/cards/{anchor_card.id}/latest-version",
@@ -2808,7 +3049,9 @@ def test_card_group_management_rejects_deprecated_anchor_but_allows_deprecated_m
 
     active_anchor, _active_version = _create_editable_card_version(name="Group Active Anchor")
     active_member, _member_version = _create_editable_card_version(name="Group Active Member")
-    deprecated_card, _deprecated_version = _create_editable_card_version(name="Group Deprecated Candidate")
+    deprecated_card, _deprecated_version = _create_editable_card_version(
+        name="Group Deprecated Candidate"
+    )
     deprecated_card.lifecycle_status = "deprecated"
     deprecated_card.save(update_fields=["lifecycle_status"])
 
@@ -2861,7 +3104,9 @@ def test_staff_can_manage_card_groups() -> None:
 
     anchor_card, _anchor_version = _create_editable_card_version(name="Staff Group Anchor")
     member_card, _member_version = _create_editable_card_version(name="Staff Group Member")
-    replacement_card, _replacement_version = _create_editable_card_version(name="Staff Group Replacement")
+    replacement_card, _replacement_version = _create_editable_card_version(
+        name="Staff Group Replacement"
+    )
     member_card.card_pool = "evil"
     member_card.save(update_fields=["card_pool"])
     CardFactionAssignment.objects.create(card=member_card, faction="darkness")
@@ -2905,9 +3150,18 @@ def test_staff_can_manage_card_groups() -> None:
     assert list_response.status_code == 200
     assert delete_response.status_code == 204
     assert patch_response.json()["anchor_card_id"] == replacement_card.id
-    assert [member["card_id"] for member in patch_response.json()["members"]] == [replacement_card.id, member_card.id]
-    assert [member["card_pool"] for member in patch_response.json()["members"]] == ["player", "evil"]
-    assert [member["card_factions"] for member in patch_response.json()["members"]] == [[], ["darkness"]]
+    assert [member["card_id"] for member in patch_response.json()["members"]] == [
+        replacement_card.id,
+        member_card.id,
+    ]
+    assert [member["card_pool"] for member in patch_response.json()["members"]] == [
+        "player",
+        "evil",
+    ]
+    assert [member["card_factions"] for member in patch_response.json()["members"]] == [
+        [],
+        ["darkness"],
+    ]
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
 
@@ -2951,8 +3205,14 @@ def test_staff_can_preview_and_apply_card_merge() -> None:
         card_pool="player",
         key=source_card.key,
     ).exists()
-    assert CardMergeRedirect.objects.filter(old_card_id=source_card.id, target_card_id=target_card.id).exists()
-    assert list(CardVersion.objects.filter(card_id=target_card.id).order_by("version_number").values_list("id", flat=True)) == [
+    assert CardMergeRedirect.objects.filter(
+        old_card_id=source_card.id, target_card_id=target_card.id
+    ).exists()
+    assert list(
+        CardVersion.objects.filter(card_id=target_card.id)
+        .order_by("version_number")
+        .values_list("id", flat=True)
+    ) == [
         source_version.id,
         target_version.id,
     ]
@@ -3109,7 +3369,9 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
         content_version=content_version,
         total_items=1,
     )
-    source_file = resolve_storage_path(build_storage_relative_path("uploads", "content-version-card.png"))
+    source_file = resolve_storage_path(
+        build_storage_relative_path("uploads", "content-version-card.png")
+    )
     source_file.parent.mkdir(parents=True, exist_ok=True)
     _write_test_png(source_file)
     item = ImportJobItem.objects.create(
@@ -3230,7 +3492,9 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
             "symbols": "auto",
         },
     }
-    target_version.save(update_fields=["content_version", "image_hash", "name", "field_sources_json"])
+    target_version.save(
+        update_fields=["content_version", "image_hash", "name", "field_sources_json"]
+    )
     replace_card_version_tags(card_version_id=target_version.id, tag_ids=[manual_tag.id])
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "content-version-snapshot.png"),
@@ -3238,7 +3502,9 @@ def test_ordinary_import_matching_latest_checksum_creates_new_content_version_sn
         content_version=next_content_version,
         total_items=1,
     )
-    source_file = resolve_storage_path(build_storage_relative_path("uploads", "content-version-snapshot.png"))
+    source_file = resolve_storage_path(
+        build_storage_relative_path("uploads", "content-version-snapshot.png")
+    )
     source_file.parent.mkdir(parents=True, exist_ok=True)
     _write_test_png(source_file)
     item = ImportJobItem.objects.create(
@@ -3356,46 +3622,48 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
         classification_evidence={
             "roles": {
                 "mode": "automatic",
-                "policy_version": 3,
-                "template_roles": ["event"],
-                "matched_tag_keys": ["hero", "order", "darkness"],
-                "tag_roles": ["hero"],
+                "matched_tag_sources": [{"id": "tag-hero", "key": "hero"}],
+                "matched_type_sources": [],
+                "matched_rules": [],
                 "override_roles": [],
                 "resolved_roles": ["hero", "event"],
+                "snapshot_digest": "test-digest",
             },
             "factions": {
                 "mode": "automatic",
-                "policy_version": 3,
-                "template_factions": [],
-                "matched_tag_keys": ["hero", "order", "darkness"],
-                "tag_factions": ["order", "darkness"],
+                "matched_tag_sources": [
+                    {"id": "tag-order", "key": "order"},
+                    {"id": "tag-darkness", "key": "darkness"},
+                ],
+                "matched_type_sources": [],
+                "matched_rules": [],
                 "override_factions": [],
                 "resolved_factions": ["order", "darkness"],
+                "snapshot_digest": "test-digest",
             },
         },
     )
 
     item.refresh_from_db()
     assert version.card.card_pool == "evil"
+    assert list(version.card.role_assignments.order_by("role").values_list("role", flat=True)) == [
+        "event",
+        "hero",
+    ]
     assert list(
-        version.card.role_assignments.order_by("role").values_list("role", flat=True)
-    ) == ["event", "hero"]
-    assert list(
-        version.card.faction_assignments.order_by("faction").values_list(
-            "faction", flat=True
-        )
+        version.card.faction_assignments.order_by("faction").values_list("faction", flat=True)
     ) == ["darkness", "order"]
     assert item.status == "completed"
     assert item.resolved_card_roles_json == ["hero", "event"]
     assert item.resolved_card_factions_json == ["order", "darkness"]
-    assert item.classification_inference_json["roles"]["tag_roles"] == ["hero"]
-    assert item.classification_inference_json["factions"]["tag_factions"] == [
-        "order",
-        "darkness",
+    assert item.classification_inference_json["roles"]["matched_tag_sources"] == [
+        {"id": "tag-hero", "key": "hero"}
     ]
 
 
-def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifecycle_warning() -> None:
+def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifecycle_warning() -> (
+    None
+):
     card, target_version = _create_editable_card_version(name="Classification Mismatch Card")
     card.lifecycle_status = "deprecated"
     card.card_pool = "evil"
@@ -3425,13 +3693,24 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
         card_pool="evil",
         resolved_card_roles=("event",),
         classification_evidence={
-            "mode": "automatic",
-            "policy_version": 1,
-            "template_roles": ["event"],
-            "matched_tag_keys": [],
-            "tag_roles": [],
-            "override_roles": [],
-            "resolved_roles": ["event"],
+            "roles": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_rules": [],
+                "override_roles": [],
+                "resolved_roles": ["event"],
+                "snapshot_digest": "test-digest",
+            },
+            "factions": {
+                "mode": "automatic",
+                "matched_tag_sources": [],
+                "matched_type_sources": [],
+                "matched_rules": [],
+                "override_factions": [],
+                "resolved_factions": [],
+                "snapshot_digest": "test-digest",
+            },
         },
     )
 
@@ -3487,7 +3766,9 @@ def test_untargeted_import_does_not_match_same_name_or_image_hash_across_pools()
 
 def test_targeted_reparse_rolls_back_name_conflict() -> None:
     card, version = _create_editable_card_version(name="Rollback Target")
-    _conflicting_card, _conflicting_version = _create_editable_card_version(name="Rollback Conflict")
+    _conflicting_card, _conflicting_version = _create_editable_card_version(
+        name="Rollback Conflict"
+    )
     job = ImportJob.objects.create(
         source_path=build_storage_relative_path("uploads", "rollback-target.png"),
         template=Template.objects.get(key="mtg-like-v1"),
@@ -3709,7 +3990,9 @@ def test_latest_version_patch_can_restore_and_unlock() -> None:
             },
         }
     )
-    version.save(update_fields=["rules_text", "type_line", "field_sources_json", "parsed_snapshot_json"])
+    version.save(
+        update_fields=["rules_text", "type_line", "field_sources_json", "parsed_snapshot_json"]
+    )
 
     response = client.patch(
         f"/cards/{card.id}/latest-version",

@@ -103,7 +103,7 @@
                     </label>
                   </div>
                   <p class="theme-section-muted mt-1 text-sm">
-                    Automatic combines role hints from the template with detected card metadata.
+                    Automatic uses matching Tag and Type rules for this pool. Override uses exactly these roles for every card in the batch.
                   </p>
                   <div
                     v-if="cardRoleMode === 'override'"
@@ -155,7 +155,7 @@
                     </label>
                   </div>
                   <p class="theme-section-muted mt-1 text-sm">
-                    Automatic combines faction hints from the template with detected card metadata.
+                    Automatic uses matching Tag and Type rules for this pool. Override uses exactly these factions for every card in the batch.
                   </p>
                   <div
                     v-if="cardFactionMode === 'override'"

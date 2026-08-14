@@ -24,11 +24,14 @@ export type ImportJob = {
   card_pool: CardPool;
   card_role_mode: 'automatic' | 'override';
   card_role_override: CardRole[];
-  template_role_snapshot: CardRole[];
   card_faction_mode: 'automatic' | 'override';
   card_faction_override: CardFaction[];
-  template_faction_snapshot: CardFaction[];
-  classification_inference_policy_version: number;
+  classification_rule_snapshot: {
+    schema_version: number;
+    card_pool: CardPool;
+    rules: Array<Record<string, unknown>>;
+    digest: string;
+  };
 };
 
 export type ImportWarning = {

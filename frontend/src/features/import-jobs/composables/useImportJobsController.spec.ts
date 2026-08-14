@@ -50,11 +50,14 @@ const activeJob = (id = 'active-job'): ImportJob => ({
   card_pool: 'player',
   card_role_mode: 'automatic',
   card_role_override: [],
-  template_role_snapshot: [],
   card_faction_mode: 'automatic',
   card_faction_override: [],
-  template_faction_snapshot: [],
-  classification_inference_policy_version: 3,
+  classification_rule_snapshot: {
+    schema_version: 1,
+    card_pool: 'player',
+    rules: [],
+    digest: 'abc123',
+  },
 });
 
 const importJobDetail = (id: string): ImportJobDetail => ({
@@ -136,8 +139,6 @@ describe('useImportJobsController', () => {
         key: 'mtg-like-v1',
         label: 'Default card',
         definition_json: '{}',
-        inferred_card_roles: [],
-        inferred_card_factions: [],
       },
     ]);
     vi.mocked(fetchCurrentContentVersion).mockResolvedValue(currentVersion);

@@ -17,6 +17,7 @@ import type {
   TypeRecord,
   DeckTagRecord,
   CatalogKind,
+  ClassificationDefinitionRecord,
 } from '@/features/admin/types';
 import {
   parseAdminCatalogKind,
@@ -29,6 +30,7 @@ import {
   catalogRowToFormEntry,
   detectionConfigExample,
   isKnownCatalogKind,
+  isClassificationCatalogKind,
   isSuggestedCatalogKind,
   kindItemLabel,
   kindLabel,
@@ -52,6 +54,7 @@ export const useCatalogAdmin = () => {
   const selectedEntryId = ref<string | null>(null);
   const isCreatingNew = computed(() => selectedEntryId.value === null);
   const isSuggestedKind = computed(() => isSuggestedCatalogKind(catalogData.selectedKind.value));
+  const isClassificationKind = computed(() => isClassificationCatalogKind(catalogData.selectedKind.value));
   const canCreateSelectedKind = computed(() => isKnownCatalogKind(catalogData.selectedKind.value));
   const suggestionExistingTargetId = ref('');
   const suggestionNewLabel = ref('');
@@ -75,12 +78,21 @@ export const useCatalogAdmin = () => {
       ? selectedSuggestionDetail.value
       : selectedRow.value as SuggestionRecord;
   });
-  const selectedKnownRow = computed(() => {
-    if (!selectedRow.value || 'status' in selectedRow.value) {
+  const selectedKnownRow = computed<KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | null>(() => {
+    if (
+      !selectedRow.value
+      || 'status' in selectedRow.value
+      || 'target_kind' in selectedRow.value
+    ) {
       return null;
     }
     return selectedKnownDetail.value ?? selectedRow.value;
   });
+  const selectedClassificationRow = computed<ClassificationDefinitionRecord | null>(() =>
+    isClassificationKind.value
+      ? selectedRow.value as ClassificationDefinitionRecord | null
+      : null,
+  );
   const selectedSuggestionKind = computed<CatalogKind | null>(() =>
     isSuggestedCatalogKind(catalogData.selectedKind.value) ? catalogData.selectedKind.value : null,
   );
@@ -134,6 +146,10 @@ export const useCatalogAdmin = () => {
       kind: catalogData.selectedKind.value,
       entryId: row.id,
     });
+    if (isClassificationKind.value) {
+      selectedKnownDetail.value = null;
+      return;
+    }
     await loadKnownDetail(row.id);
   };
 
@@ -378,9 +394,11 @@ export const useCatalogAdmin = () => {
     selectedEntryId,
     selectedRow,
     selectedKnownRow,
+    selectedClassificationRow,
     selectedSuggestionRow,
     isCreatingNew,
     isSuggestedKind,
+    isClassificationKind,
     canCreateSelectedKind,
     editorEntry,
     existingSuggestionOptions,

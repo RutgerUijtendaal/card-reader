@@ -14,7 +14,7 @@ from card_reader_core.models import (
     normalize_card_factions,
     normalize_card_roles,
 )
-from card_reader_core.repositories.import_jobs import create_import_job_with_files
+from .service import ImportService
 
 
 def queue_grouped_reparse_jobs(
@@ -36,14 +36,13 @@ def queue_grouped_reparse_jobs(
 
     with transaction.atomic():
         for (template_id, card_pool, _roles, _factions), group in sorted(grouped.items()):
-            create_import_job_with_files(
+            ImportService().create_reparse_job_with_files(
                 source_path=(
                     settings.storage_root_dir
                     / source_root
                     / f"{source_name_prefix}-{template_id}"
                 ),
                 template_id=template_id,
-                options={"reparse_existing": True},
                 files=[source.image_path for source in group],
                 item_targets=[
                     ImportJobItemTarget(

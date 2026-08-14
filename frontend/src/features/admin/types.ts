@@ -6,7 +6,8 @@ import type { CardPool } from '@/domain/cards/cardPools';
 
 export type KnownCatalogKind = 'keywords' | 'tags' | 'symbols' | 'types' | 'deck-roles' | 'deck-types';
 export type SuggestedCatalogKind = 'suggested-tags' | 'suggested-types' | 'suggested-deck-types';
-export type CatalogKind = KnownCatalogKind | SuggestedCatalogKind;
+export type ClassificationCatalogKind = 'card-roles' | 'card-factions';
+export type CatalogKind = KnownCatalogKind | SuggestedCatalogKind | ClassificationCatalogKind;
 
 export type CatalogSearchState = Record<CatalogKind, string>;
 
@@ -212,6 +213,7 @@ export type TagRecord = {
   identifiers_text: string;
   linked_cards?: LinkedCardPreview[];
   linked_card_count?: number;
+  classification_rules?: ClassificationRuleRecord[];
 };
 
 export type TypeRecord = {
@@ -222,6 +224,45 @@ export type TypeRecord = {
   identifiers_text: string;
   linked_cards?: LinkedCardPreview[];
   linked_card_count?: number;
+  classification_rules?: ClassificationRuleRecord[];
+};
+
+export type ClassificationTargetKind = 'role' | 'faction';
+export type ClassificationSourceKind = 'tag' | 'type';
+
+export type ClassificationRuleRecord = {
+  id: string;
+  card_pool: CardPool;
+  target_kind: ClassificationTargetKind;
+  target_key: string;
+  source_kind: ClassificationSourceKind;
+  source_id: string;
+  source_key: string;
+  source_label: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClassificationDefinitionRecord = {
+  id: string;
+  key: string;
+  label: string;
+  rank: number;
+  target_kind: ClassificationTargetKind;
+  derived: boolean;
+  linked_card_counts: Partial<Record<CardPool, number>>;
+  rule_counts: Partial<Record<CardPool, Record<ClassificationSourceKind, number>>>;
+  rules: ClassificationRuleRecord[];
+};
+
+export type ClassificationRuleUpsertRequest = {
+  card_pool: CardPool;
+  target_kind: ClassificationTargetKind;
+  target_key: string;
+  source_kind: ClassificationSourceKind;
+  source_id: string;
+  enabled: boolean;
 };
 
 export type SymbolRecord = {
@@ -249,6 +290,10 @@ export type CatalogResponse = {
   suggested: {
     tags: SuggestionRecord[];
     types: SuggestionRecord[];
+  };
+  classification: {
+    roles: ClassificationDefinitionRecord[];
+    factions: ClassificationDefinitionRecord[];
   };
 };
 
@@ -281,6 +326,10 @@ export type CatalogApiResponse = {
   suggested: {
     tags: SuggestionApiRecord[];
     types: SuggestionApiRecord[];
+  };
+  classification?: {
+    roles: ClassificationDefinitionRecord[];
+    factions: ClassificationDefinitionRecord[];
   };
 };
 
@@ -379,7 +428,7 @@ export type DeckTagCatalogApiResponse = {
   suggested_types: Array<Omit<SuggestionApiRecord, 'occurrences'> & { linked_decks?: LinkedDeckPreview[] }>;
 };
 
-export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | SuggestionRecord;
+export type CatalogRow = KeywordRecord | TagRecord | TypeRecord | SymbolRecord | DeckTagRecord | SuggestionRecord | ClassificationDefinitionRecord;
 
 export type CatalogFormEntry = {
   label: string;

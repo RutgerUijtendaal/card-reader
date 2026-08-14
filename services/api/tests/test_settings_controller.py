@@ -28,7 +28,7 @@ from card_reader_core.repositories.cards import (
     change_card_identity,
 )
 from card_reader_core.services.cards import convert_card_images_to_webp
-import card_reader_core.services.imports.reparse as import_reparse
+from card_reader_core.services.imports import ImportService
 from card_reader_core.services.templates import TemplateService
 from card_reader_core.config.settings import settings
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
@@ -353,7 +353,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
     ]
     creation_count = 0
 
-    def fail_second_group(**kwargs: object) -> ImportJob:
+    def fail_second_group(_service: ImportService, **kwargs: object) -> ImportJob:
         nonlocal creation_count
         creation_count += 1
         if creation_count == 2:
@@ -363,11 +363,7 @@ def test_maintenance_reparse_rolls_back_every_group_when_later_creation_fails(
             template=Template.objects.get(key=str(kwargs["template_id"])),
         )
 
-    monkeypatch.setattr(
-        import_reparse,
-        "create_import_job_with_files",
-        fail_second_group,
-    )
+    monkeypatch.setattr(ImportService, "create_reparse_job_with_files", fail_second_group)
 
     with pytest.raises(RuntimeError, match="simulated grouped creation failure"):
         MaintenanceService()._queue_reparse_sources(
@@ -639,17 +635,17 @@ def test_template_reparse_rolls_back_every_group_when_later_creation_fails(
             checksum=f"atomic-reparse-{index}",
         )
 
-    original_create = import_reparse.create_import_job_with_files
+    original_create = ImportService.create_reparse_job_with_files
     creation_count = 0
 
-    def fail_second_group(**kwargs: object) -> ImportJob:
+    def fail_second_group(service: ImportService, **kwargs: object) -> ImportJob:
         nonlocal creation_count
         creation_count += 1
         if creation_count == 2:
             raise RuntimeError("simulated grouped creation failure")
-        return original_create(**kwargs)
+        return original_create(service, **kwargs)
 
-    monkeypatch.setattr(import_reparse, "create_import_job_with_files", fail_second_group)
+    monkeypatch.setattr(ImportService, "create_reparse_job_with_files", fail_second_group)
 
     username = "staff-atomic-template-reparse-user"
     password = "password"

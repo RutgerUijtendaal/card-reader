@@ -14,6 +14,7 @@ from card_reader_core.models import (
     PLAYER_CARD_POOL,
     Card,
     CardBack,
+    CardClassificationRule,
     CardGroup,
     CardVersionImage,
     DeckTag,
@@ -22,8 +23,6 @@ from card_reader_core.models import (
     Tag,
     Template,
     Type,
-    normalize_card_factions,
-    normalize_card_roles,
 )
 from card_reader_core.operations.developer_data.schema import (
     DEVELOPER_DATA_FORMAT_VERSION,
@@ -31,6 +30,13 @@ from card_reader_core.operations.developer_data.schema import (
     DeveloperDataSelection,
 )
 from card_reader_core.storage import build_storage_relative_path, resolve_storage_path
+
+
+def _classification_rule_source_key(rule: CardClassificationRule) -> str:
+    source = rule.tag if rule.source_kind == "tag" else rule.type
+    if source is None:
+        return ""
+    return source.key
 
 
 class Command(BaseCommand):
@@ -78,46 +84,34 @@ class Command(BaseCommand):
                     - set(Tag.objects.values_list("key", flat=True))
                 )
                 if missing_tags:
-                    issues.append(
-                        f"required inference tags are missing: {', '.join(missing_tags)}"
+                    issues.append(f"required inference tags are missing: {', '.join(missing_tags)}")
+            if source_format_version >= 5:
+                available_rules = {
+                    (
+                        rule.card_pool,
+                        rule.target_kind,
+                        rule.target_key,
+                        rule.source_kind,
+                        _classification_rule_source_key(rule),
+                        rule.enabled,
                     )
-            role_hint_requirements = (
-                selection.coverage.required_template_role_hints
-                if source_format_version >= 3
-                else {}
-            )
-            for template_key, required_roles in role_hint_requirements.items():
-                template = Template.objects.filter(key=template_key).first()
-                if template is None:
-                    issues.append(f"template {template_key} required for inference is missing")
-                    continue
-                missing_roles = sorted(
-                    set(required_roles) - set(normalize_card_roles(template.inferred_card_roles_json))
-                )
-                if missing_roles:
-                    issues.append(
-                        "template "
-                        f"{template_key} is missing inference roles: {', '.join(missing_roles)}"
+                    for rule in CardClassificationRule.objects.select_related("tag", "type")
+                }
+                for rule in selection.coverage.required_classification_rules:
+                    identity = (
+                        rule.card_pool,
+                        rule.target_kind,
+                        rule.target_key,
+                        rule.source_kind,
+                        rule.source_key,
+                        rule.enabled,
                     )
-            faction_hint_requirements = (
-                selection.coverage.required_template_faction_hints
-                if source_format_version >= 4
-                else {}
-            )
-            for template_key, required_factions in faction_hint_requirements.items():
-                template = Template.objects.filter(key=template_key).first()
-                if template is None:
-                    issues.append(f"template {template_key} required for inference is missing")
-                    continue
-                missing_factions = sorted(
-                    set(required_factions)
-                    - set(normalize_card_factions(template.inferred_card_factions_json))
-                )
-                if missing_factions:
-                    issues.append(
-                        "template "
-                        f"{template_key} is missing inference factions: {', '.join(missing_factions)}"
-                    )
+                    if identity not in available_rules:
+                        issues.append(
+                            "required classification rule is missing: "
+                            f"{rule.card_pool}/{rule.target_kind}:{rule.target_key}"
+                            f"<-{rule.source_kind}:{rule.source_key}"
+                        )
         active_cards = Card.objects.filter(lifecycle_status="active")
         if not active_cards.filter(
             card_pool=PLAYER_CARD_POOL,
@@ -134,7 +128,11 @@ class Command(BaseCommand):
             issues.append("at least 15 unique active mainboard cards are required")
         if not CardGroup.objects.exists():
             issues.append("representative card groups are missing")
-        if not get_user_model().objects.filter(is_active=True, is_staff=True, is_superuser=True).exists():
+        if (
+            not get_user_model()
+            .objects.filter(is_active=True, is_staff=True, is_superuser=True)
+            .exists()
+        ):
             issues.append("an active local admin user is missing")
         card_back = CardBack.objects.filter(is_current=True).first()
         if card_back is None:
@@ -142,13 +140,17 @@ class Command(BaseCommand):
         elif not resolve_storage_path(card_back.stored_path).is_file():
             issues.append("the current card-back asset is missing")
         missing_images = 0
-        for stored_path in CardVersionImage.objects.values_list("stored_path", flat=True).iterator():
+        for stored_path in CardVersionImage.objects.values_list(
+            "stored_path", flat=True
+        ).iterator():
             if stored_path and not resolve_storage_path(stored_path).is_file():
                 missing_images += 1
         if missing_images:
             issues.append(f"{missing_images} card-version image assets are missing")
         missing_symbol_assets = 0
-        for reference_assets in Symbol.objects.values_list("reference_assets_json", flat=True).iterator():
+        for reference_assets in Symbol.objects.values_list(
+            "reference_assets_json", flat=True
+        ).iterator():
             for stored_path in reference_assets:
                 if stored_path:
                     symbol_asset_path = build_storage_relative_path("symbols", stored_path)

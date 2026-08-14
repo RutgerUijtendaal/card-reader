@@ -40,8 +40,13 @@ const asCardFactions = (value: unknown): CardFaction[] =>
     )
     : [];
 
-const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+const sourceLabels = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.flatMap((item) => {
+      const source = asRecord(item);
+      return typeof source?.key === 'string' ? [source.key] : [];
+    })
+    : [];
 
 export const formatImportRoles = (value: unknown): string => {
   const roles = asCardRoles(value);
@@ -86,37 +91,37 @@ export const getInferenceEvidence = (item: ImportJobItem): ImportEvidenceEntry[]
     { label: 'Role resolution', value: roleMode },
     { label: 'Faction resolution', value: factionMode },
   ];
-  const templateRoles = asCardRoles(roleEvidence.template_roles);
-  const roleMatchedTags = asStringArray(roleEvidence.matched_tag_keys);
+  const roleMatchedTags = sourceLabels(roleEvidence.matched_tag_sources);
+  const roleMatchedTypes = sourceLabels(roleEvidence.matched_type_sources);
   const overrideRoles = asCardRoles(roleEvidence.override_roles);
-  const templateFactions = asCardFactions(factionEvidence.template_factions);
-  const factionMatchedTags = asStringArray(factionEvidence.matched_tag_keys);
+  const factionMatchedTags = sourceLabels(factionEvidence.matched_tag_sources);
+  const factionMatchedTypes = sourceLabels(factionEvidence.matched_type_sources);
   const overrideFactions = asCardFactions(factionEvidence.override_factions);
 
-  if (roleEvidence.mode && templateRoles.length > 0) {
-    entries.push({ label: 'Template hints', value: templateRoles.map(cardRoleLabel).join(', ') });
-  }
   if (roleEvidence.mode && roleMatchedTags.length > 0) {
     entries.push({ label: 'Role tags', value: roleMatchedTags.join(', ') });
+  }
+  if (roleEvidence.mode && roleMatchedTypes.length > 0) {
+    entries.push({ label: 'Role types', value: roleMatchedTypes.join(', ') });
   }
   if (roleEvidence.mode === 'override') {
     entries.push({ label: 'Override roles', value: formatImportRoles(overrideRoles) });
   }
-  if (templateRoles.length === 0 && roleMatchedTags.length === 0 && roleEvidence.mode === 'automatic') {
+  if (roleMatchedTags.length === 0 && roleMatchedTypes.length === 0 && roleEvidence.mode === 'automatic') {
     entries.push({ label: 'Role signals', value: 'None matched' });
-  }
-  if (factionEvidence.mode && templateFactions.length > 0) {
-    entries.push({ label: 'Template faction hints', value: formatImportFactions(templateFactions) });
   }
   if (factionEvidence.mode && factionMatchedTags.length > 0) {
     entries.push({ label: 'Faction tags', value: factionMatchedTags.join(', ') });
+  }
+  if (factionEvidence.mode && factionMatchedTypes.length > 0) {
+    entries.push({ label: 'Faction types', value: factionMatchedTypes.join(', ') });
   }
   if (factionEvidence.mode === 'override') {
     entries.push({ label: 'Override factions', value: formatImportFactions(overrideFactions) });
   }
   if (
-    templateFactions.length === 0
-    && factionMatchedTags.length === 0
+    factionMatchedTags.length === 0
+    && factionMatchedTypes.length === 0
     && factionEvidence.mode === 'automatic'
   ) {
     entries.push({ label: 'Faction signals', value: 'None matched' });

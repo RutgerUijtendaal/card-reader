@@ -68,12 +68,14 @@ class TagDetail(TypedDict):
     entry: Tag
     linked_cards: list[LinkedCardPreview]
     linked_card_count: int
+    classification_rules: list[dict[str, object]]
 
 
 class TypeDetail(TypedDict):
     entry: Type
     linked_cards: list[LinkedCardPreview]
     linked_card_count: int
+    classification_rules: list[dict[str, object]]
 
 
 class SymbolDetail(TypedDict):

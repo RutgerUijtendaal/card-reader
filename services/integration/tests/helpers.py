@@ -38,6 +38,7 @@ def load_case(case_path: Path) -> dict[str, Any]:
 
 def run_case(case_path: Path, parser: CardParser) -> dict[str, Any]:
     from card_reader_core.repositories.import_jobs import create_import_job
+    from card_reader_core.services.classification_rules import ClassificationRuleService
     from card_reader_core.services.parser_jobs import ImportProcessorService
 
     case = load_case(case_path)
@@ -49,6 +50,11 @@ def run_case(case_path: Path, parser: CardParser) -> dict[str, Any]:
         source_path=image_path,
         template_id=str(case["input"]["template_key"]),
         options=_job_options(case),
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+        ),
     )
     processor.process_job(job.id)
 

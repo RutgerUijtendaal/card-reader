@@ -35,11 +35,9 @@ def import_job_payload(job: ImportJob) -> dict[str, object]:
         "card_pool": job.card_pool,
         "card_role_mode": job.card_role_mode,
         "card_role_override": list(job.card_role_override_json),
-        "template_role_snapshot": list(job.template_role_snapshot_json),
         "card_faction_mode": job.card_faction_mode,
         "card_faction_override": list(job.card_faction_override_json),
-        "template_faction_snapshot": list(job.template_faction_snapshot_json),
-        "classification_inference_policy_version": job.classification_inference_policy_version,
+        "classification_rule_snapshot": job.classification_rule_snapshot_json,
     }
 
 
@@ -138,31 +136,21 @@ class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
             raise serializers.ValidationError("card_role_override roles must be unique")
         invalid = sorted({str(role) for role in payload if role not in CARD_ROLES})
         if invalid:
-            raise serializers.ValidationError(
-                f"Unsupported card roles: {', '.join(invalid)}"
-            )
+            raise serializers.ValidationError(f"Unsupported card roles: {', '.join(invalid)}")
         return [role for role in CARD_ROLES if role in payload]
 
     def validate_card_faction_override(self, value: str) -> list[str]:
         try:
             payload = json.loads(value)
         except json.JSONDecodeError as exc:
-            raise serializers.ValidationError(
-                "card_faction_override must be valid JSON"
-            ) from exc
+            raise serializers.ValidationError("card_faction_override must be valid JSON") from exc
         if not isinstance(payload, list):
-            raise serializers.ValidationError(
-                "card_faction_override must decode to an array"
-            )
+            raise serializers.ValidationError("card_faction_override must decode to an array")
         if len(payload) != len(set(map(str, payload))):
-            raise serializers.ValidationError(
-                "card_faction_override factions must be unique"
-            )
+            raise serializers.ValidationError("card_faction_override factions must be unique")
         invalid = sorted({str(faction) for faction in payload if faction not in CARD_FACTIONS})
         if invalid:
-            raise serializers.ValidationError(
-                f"Unsupported card factions: {', '.join(invalid)}"
-            )
+            raise serializers.ValidationError(f"Unsupported card factions: {', '.join(invalid)}")
         return [faction for faction in CARD_FACTIONS if faction in payload]
 
     def validate(self, attrs: dict[str, object]) -> dict[str, object]:
@@ -170,14 +158,8 @@ class ImportUploadSerializer(serializers.Serializer[dict[str, object]]):
             raise serializers.ValidationError(
                 {"card_role_override": "Automatic role inference cannot include overrides."}
             )
-        if attrs.get("card_faction_mode") == "automatic" and attrs.get(
-            "card_faction_override"
-        ):
+        if attrs.get("card_faction_mode") == "automatic" and attrs.get("card_faction_override"):
             raise serializers.ValidationError(
-                {
-                    "card_faction_override": (
-                        "Automatic faction inference cannot include overrides."
-                    )
-                }
+                {"card_faction_override": ("Automatic faction inference cannot include overrides.")}
             )
         return attrs

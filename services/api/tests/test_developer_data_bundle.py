@@ -17,6 +17,7 @@ from card_reader_core.models import (
     Card,
     CardAlias,
     CardBack,
+    CardClassificationRule,
     CardFactionAssignment,
     CardGroup,
     CardGroupMember,
@@ -49,7 +50,9 @@ from card_reader_core.operations.developer_data import (
     validate_archive,
 )
 from card_reader_core.operations.developer_data.importer import validate_import_readiness
+from card_reader_core.operations.developer_data.exporter import _build_payload
 from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
+from card_reader_core.services.classification_rules import ClassificationRuleService
 
 
 def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
@@ -59,6 +62,7 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
     )
 
     assert adopted == {
+        "classification_rules": [],
         "cards": [
             {
                 "key": "hero",
@@ -72,11 +76,13 @@ def test_version_one_payload_adoption_maps_heroes_to_player_roles() -> None:
                 "card_roles": [],
                 "card_factions": [],
             },
-        ]
+        ],
     }
 
 
-@pytest.mark.parametrize("legacy_card", [{"key": "missing"}, {"key": "wrong-type", "is_hero": "true"}])
+@pytest.mark.parametrize(
+    "legacy_card", [{"key": "missing"}, {"key": "wrong-type", "is_hero": "true"}]
+)
 def test_version_one_payload_adoption_rejects_invalid_hero_fields(
     legacy_card: dict[str, object],
 ) -> None:
@@ -102,7 +108,7 @@ def test_version_two_card_record_rejects_duplicate_roles() -> None:
         )
 
 
-def test_version_four_card_record_rejects_duplicate_factions() -> None:
+def test_version_five_card_record_rejects_duplicate_factions() -> None:
     with pytest.raises(ValueError, match="Card factions must be unique"):
         CardRecord.model_validate(
             {
@@ -120,23 +126,72 @@ def test_version_four_card_record_rejects_duplicate_factions() -> None:
         )
 
 
-def test_version_two_payload_adoption_adds_empty_template_role_hints() -> None:
+def test_version_two_payload_adoption_adds_empty_rule_catalog() -> None:
     adopted = adopt_payload_for_format(
         {"templates": [{"key": "legacy", "label": "Legacy", "definition": {}}]},
         format_version=2,
     )
 
     assert adopted == {
+        "classification_rules": [],
         "templates": [
             {
                 "key": "legacy",
                 "label": "Legacy",
                 "definition": {},
-                    "inferred_card_roles": [],
-                    "inferred_card_factions": [],
             }
-        ]
+        ],
     }
+
+
+def test_version_three_payload_adoption_removes_template_inference_hints() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "templates": [
+                {
+                    "key": "legacy",
+                    "label": "Legacy",
+                    "definition": {},
+                    "inferred_card_roles": ["hero"],
+                    "inferred_card_factions": ["order"],
+                }
+            ]
+        },
+        format_version=3,
+    )
+
+    assert adopted == {
+        "classification_rules": [],
+        "templates": [{"key": "legacy", "label": "Legacy", "definition": {}}],
+    }
+
+
+def test_classification_rule_export_order_uses_source_natural_keys() -> None:
+    zeta = Tag.objects.create(key="zeta-export-rule", label="Zeta")
+    alpha = Tag.objects.create(key="alpha-export-rule", label="Alpha")
+    service = ClassificationRuleService()
+    service.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=zeta.id,
+    )
+    service.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=alpha.id,
+    )
+
+    payload = _build_payload(cards=[], groups=[])
+    source_keys = [
+        rule.source_key
+        for rule in payload.classification_rules
+        if rule.target_kind == "role" and rule.target_key == "hero"
+    ]
+    assert source_keys == ["alpha-export-rule", "zeta-export-rule"]
 
 
 def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
@@ -176,7 +231,7 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
     ]
 
 
-def test_developer_data_coverage_rejects_missing_required_template_role_hint(
+def test_developer_data_coverage_rejects_missing_required_classification_rule(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -188,12 +243,14 @@ def test_developer_data_coverage_rejects_missing_required_template_role_hint(
         _clear_domain_data()
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
         selection = _build_synthetic_source(source_storage)
-        template = Template.objects.get(key="synthetic-template")
-        template.inferred_card_roles_json = []
-        template.save(update_fields=["inferred_card_roles_json"])
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="role",
+            target_key="hero",
+        ).delete()
         selection_path.write_text(json.dumps(selection), encoding="utf-8")
 
-        with pytest.raises(DeveloperDataError, match="missing inference roles: event"):
+        with pytest.raises(DeveloperDataError, match="missing required classification rules"):
             export_developer_data(
                 selection_path=selection_path,
                 output_path=archive_path,
@@ -225,7 +282,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 4
         assert manifest.counts["card_versions"] == 5
-        assert manifest.format_version == 4
+        assert manifest.format_version == 5
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
@@ -295,20 +352,25 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         ).exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
-        assert Template.objects.get(key="synthetic-template").inferred_card_roles_json == ["event"]
-        assert Template.objects.get(key="synthetic-template").inferred_card_factions_json == [
-            "blood"
-        ]
+        assert CardClassificationRule.objects.count() == 7
+        assert CardClassificationRule.objects.filter(
+            card_pool="evil",
+            target_kind="faction",
+            target_key="blood",
+            tag__key="blood",
+            enabled=True,
+        ).exists()
         assert set(
             Card.objects.get(
                 key="synthetic-mainboard",
                 faction_identity_key='["order","blood"]',
-            )
-            .faction_assignments.values_list("faction", flat=True)
+            ).faction_assignments.values_list("faction", flat=True)
         ) == {"order", "blood"}
         assert Card.objects.filter(key="synthetic-mainboard").count() == 2
         imported_group = CardGroup.objects.get(key="synthetic-group")
-        assert imported_group.members.get(position=2).card.faction_identity_key == '["order","blood"]'
+        assert (
+            imported_group.members.get(position=2).card.faction_identity_key == '["order","blood"]'
+        )
         latest = Card.objects.get(key="synthetic-hero").latest_version
         assert latest is not None
         assert latest.version_number == 2
@@ -447,8 +509,7 @@ def test_explicit_card_selection_rejects_same_key_faction_twins(
         with pytest.raises(
             DeveloperDataError,
             match=(
-                "Selected card keys are ambiguous across faction namespaces: "
-                "synthetic-mainboard"
+                "Selected card keys are ambiguous across faction namespaces: synthetic-mainboard"
             ),
         ):
             export_developer_data(
@@ -630,12 +691,15 @@ def test_doctor_resolves_symbol_assets_and_honors_legacy_bundle_coverage(
         )
 
         call_command("doctor_dev_data")
-        template = Template.objects.get(key="synthetic-template")
-        template.inferred_card_roles_json = []
-        template.save(update_fields=["inferred_card_roles_json"])
-        call_command("doctor_dev_data", source_format_version=2)
-        with pytest.raises(CommandError, match="missing inference roles: event"):
-            call_command("doctor_dev_data", source_format_version=3)
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="role",
+            target_key="hero",
+        ).delete()
+        call_command("doctor_dev_data", source_format_version=3)
+        with pytest.raises(CommandError, match="required classification rule is missing"):
+            call_command("doctor_dev_data", source_format_version=5)
+        CardClassificationRule.objects.all().delete()
         Tag.objects.exclude(key="synthetic").delete()
         call_command("doctor_dev_data", source_format_version=1)
         transaction.set_rollback(True)
@@ -676,7 +740,9 @@ def test_archive_validation_rejects_restricted_cards_and_cross_pool_groups(
     with transaction.atomic():
         _clear_domain_data()
         monkeypatch.setattr(settings, "app_data_dir", source_storage)
-        selection_path.write_text(json.dumps(_build_synthetic_source(source_storage)), encoding="utf-8")
+        selection_path.write_text(
+            json.dumps(_build_synthetic_source(source_storage)), encoding="utf-8"
+        )
         export_developer_data(
             selection_path=selection_path,
             output_path=archive_path,
@@ -710,7 +776,9 @@ def _build_alias_collision_archive(source: Path, target: Path, extraction_root: 
     data_entry = next(entry for entry in manifest["files"] if entry["path"] == "data.json")
     data_entry["sha256"] = hashlib.sha256(serialized).hexdigest()
     data_entry["size_bytes"] = len(serialized)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     with tarfile.open(target, "w:gz") as archive:
         for path in sorted(extraction_root.rglob("*")):
             archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
@@ -756,7 +824,9 @@ def _build_reclassified_archive(
     data_entry = next(entry for entry in manifest["files"] if entry["path"] == "data.json")
     data_entry["sha256"] = hashlib.sha256(serialized).hexdigest()
     data_entry["size_bytes"] = len(serialized)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     with tarfile.open(target, "w:gz") as archive:
         for path in sorted(extraction_root.rglob("*")):
             archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
@@ -794,7 +864,9 @@ def _build_archive_with_unreferenced_asset(
             "size_bytes": len(content),
         }
     )
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     with tarfile.open(target, "w:gz") as archive:
         for path in sorted(extraction_root.rglob("*")):
             archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
@@ -848,9 +920,26 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         key="synthetic-template",
         label="Synthetic Template",
         definition_json={"id": "synthetic-template", "version": 1, "regions": []},
-        inferred_card_roles_json=["event"],
-        inferred_card_factions_json=["blood"],
     )
+    rule_definitions = [
+        ("player", "role", "hero", "hero"),
+        ("evil", "role", "boss", "boss"),
+        ("evil", "role", "location", "location"),
+        ("evil", "faction", "order", "order"),
+        ("evil", "faction", "blood", "blood"),
+        ("evil", "faction", "darkness", "darkness"),
+        ("neutral", "role", "shop_item", "shop-item"),
+    ]
+    classification_rule_service = ClassificationRuleService()
+    tags_by_key = {row.key: row for row in Tag.objects.filter(key__in=required_inference_tags)}
+    for card_pool, target_kind, target_key, source_key in rule_definitions:
+        classification_rule_service.create_rule(
+            card_pool=card_pool,
+            target_kind=target_kind,
+            target_key=target_key,
+            source_kind="tag",
+            source_id=tags_by_key[source_key].id,
+        )
     DeckTag.objects.create(kind="role", key="control", label="Control")
     content_version = ContentVersion.objects.create(
         version_number="1.0.0",
@@ -959,7 +1048,9 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     deprecated.latest_version = deprecated_version
     deprecated.save(update_fields=["latest_version"])
 
-    group = CardGroup.objects.create(key="synthetic-group", name="Synthetic Group", anchor_card=hero)
+    group = CardGroup.objects.create(
+        key="synthetic-group", name="Synthetic Group", anchor_card=hero
+    )
     CardGroupMember.objects.create(group=group, card=hero, position=1)
     CardGroupMember.objects.create(group=group, card=mainboard, position=2)
     card_back_content = assets["images/card-back.webp"]
@@ -995,8 +1086,17 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
             "min_cards_with_multiple_versions": 1,
             "required_template_keys": [template.key],
             "required_tag_keys": list(required_inference_tags),
-            "required_template_role_hints": {template.key: ["event"]},
-            "required_template_faction_hints": {template.key: ["blood"]},
+            "required_classification_rules": [
+                {
+                    "card_pool": card_pool,
+                    "target_kind": target_kind,
+                    "target_key": target_key,
+                    "source_kind": "tag",
+                    "source_key": source_key,
+                    "enabled": True,
+                }
+                for card_pool, target_kind, target_key, source_key in rule_definitions
+            ],
         },
     }
 
@@ -1053,6 +1153,7 @@ def _clear_domain_data() -> None:
     Card.objects.all().delete()
     CardBack.objects.all().delete()
     MetadataSuggestion.objects.all().delete()
+    CardClassificationRule.objects.all().delete()
     ContentVersion.objects.all().delete()
     DeckTag.objects.all().delete()
     Keyword.objects.all().delete()

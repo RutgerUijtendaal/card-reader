@@ -18,19 +18,20 @@ Cards included through a selected group retain their exact database identity dur
 same-key Player card in another faction namespace is not pulled into the bundle merely because it
 shares the group's member key.
 
-Bundles contain complete catalogs, templates, deck tags, symbol assets, the current card back, and
-cards with the public relationships needed for gallery, history, metadata, deck building, and
-Playtester workflows. Version 4 template records include canonical `inferred_card_roles` and
-`inferred_card_factions` hints used by automatic import classification. Card records include the
+Bundles contain complete catalogs, parsing-only templates, pool-specific classification rules, deck
+tags, symbol assets, the current card back, and cards with the public relationships needed for
+gallery, history, metadata, deck building, and Playtester workflows. Version 5 classification-rule
+records identify their Tag or Type source by stable natural key; template records contain no role or
+faction hints. Card records include the
 required `card_pool`, canonical `card_roles`, and canonical `card_factions` fields; they never emit
 the removed Hero boolean or internal faction identity key. Card-group anchors and members use a
 structured card reference containing the pool, canonical faction set, and normalized card key, so
 same-key cards in different faction namespaces remain distinct throughout validation and import.
 
-The importer supports current Version 4 archives and explicitly adopts pinned Versions 1 through 3.
+The importer supports current Version 5 archives and explicitly adopts pinned Versions 1 through 3.
 Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to the Hero role
-before strict current-schema validation. Older templates adopt the hint fields introduced after their
-format, and every pre-Version-4 card and template adopts empty factions. Import reconstructs the
+before strict current-schema validation. Older card formats adopt empty factions and an empty rule
+catalog; Version 4's temporary template-hint semantics are intentionally not adopted. Import reconstructs the
 pool-plus-faction natural identity namespace rather than trusting a serialized internal key. This
 compatibility keeps older immutable bundles usable without making current classification fields optional.
 
@@ -41,14 +42,15 @@ roles and Order, Blood, and Darkness may remain at zero until reviewed source da
 lock file is still generated only by publishing a validated immutable bundle and must not be edited by
 hand.
 
-`required_tag_keys`, `required_template_role_hints`, and `required_template_faction_hints` in the
-reviewed selection make expected inference inputs explicit. Version 4 bundle validation and normal
-`doctor_dev_data` source-readiness checks fail when a stable tag or named template hint is missing.
+`required_tag_keys` and `required_classification_rules` in the reviewed selection make expected
+inference inputs explicit. Version 5 bundle validation and normal `doctor_dev_data` source-readiness
+checks fail when a source Tag/Type or exact pool/target/source rule is missing.
 `bootstrap_dev` passes the pinned source format to the doctor so adopted immutable Version 1-3 bundles
 are checked only against fields that their format can represent. Templates and catalogs are supplied
 by developer-data on a clean checkout; there is no parallel built-in catalog seed to keep in sync. The
-existing lock remains valid until staff publish and validate a real Version 4 bundle and commit its
-generated checksum.
+existing Version 4 lock cannot satisfy the new schema. A staff-operated Version 5 publish and its
+generated lock commit are required before `bootstrap:dev` can consume this branch end to end; never
+hand-edit the lock as a substitute for that publish.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw
 OCR, parse flags, suggestions, logs, debug crops, credentials, and source or server paths.

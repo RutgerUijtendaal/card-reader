@@ -11,9 +11,12 @@ from django.db import transaction
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    CARD_FACTIONS,
+    CARD_ROLES,
     Card,
     CardAlias,
     CardBack,
+    CardClassificationRule,
     CardGroup,
     CardGroupMember,
     CardFactionAssignment,
@@ -35,6 +38,7 @@ from card_reader_core.models import (
     card_faction_identity_key,
 )
 from card_reader_core.repositories.cards import lock_card_identity_pools
+from card_reader_core.services.classification_rules import ClassificationRuleService
 from card_reader_core.metadata import mana_family_sort_key
 
 from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle, sha256_file
@@ -64,10 +68,15 @@ def import_developer_data(
     if expected_archive_sha256 is not None:
         actual_archive_sha256 = sha256_file(archive_path)
         if actual_archive_sha256 != expected_archive_sha256:
-            raise DeveloperDataError("Developer-data archive checksum does not match the lock file.")
+            raise DeveloperDataError(
+                "Developer-data archive checksum does not match the lock file."
+            )
     with extracted_archive(archive_path) as extraction_root:
         manifest, payload = load_extracted_bundle(extraction_root)
-        if expected_bundle_version is not None and manifest.bundle_version != expected_bundle_version:
+        if (
+            expected_bundle_version is not None
+            and manifest.bundle_version != expected_bundle_version
+        ):
             raise DeveloperDataError(
                 f"Expected developer-data bundle {expected_bundle_version}, found {manifest.bundle_version}."
             )
@@ -129,6 +138,7 @@ def _ensure_domain_is_empty(payload: DeveloperDataPayload) -> None:
     for model in (
         Card,
         CardBack,
+        CardClassificationRule,
         CardGroup,
         ContentVersion,
         Keyword,
@@ -194,10 +204,18 @@ def _copy_assets(
         try:
             target.relative_to(storage_root)
         except ValueError as exc:
-            raise DeveloperDataError(f"Asset target escapes storage root: {relative_storage_path}") from exc
+            raise DeveloperDataError(
+                f"Asset target escapes storage root: {relative_storage_path}"
+            ) from exc
         if target.exists():
-            if not target.is_file() or target.stat().st_size != entry.size_bytes or sha256_file(target) != entry.sha256:
-                raise DeveloperDataError(f"Conflicting local asset already exists: {relative_storage_path}")
+            if (
+                not target.is_file()
+                or target.stat().st_size != entry.size_bytes
+                or sha256_file(target) != entry.sha256
+            ):
+                raise DeveloperDataError(
+                    f"Conflicting local asset already exists: {relative_storage_path}"
+                )
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
@@ -217,8 +235,7 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             detection_config_json=row.detection_config,
             text_enrichment_json=row.text_enrichment,
             reference_assets_json=[
-                _symbol_reference_asset_path(asset_path)
-                for asset_path in row.reference_assets
+                _symbol_reference_asset_path(asset_path) for asset_path in row.reference_assets
             ],
             text_token=row.text_token,
             enabled=row.enabled,
@@ -230,11 +247,21 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
             key=row.key,
             label=row.label,
             definition_json=row.definition,
-            inferred_card_roles_json=row.inferred_card_roles,
-            inferred_card_factions_json=row.inferred_card_factions,
         )
         for row in payload.templates
     }
+    classification_rule_service = ClassificationRuleService()
+    for row in payload.classification_rules:
+        source_rows = tags if row.source_kind == "tag" else types
+        source = source_rows[row.source_key]
+        classification_rule_service.create_rule(
+            card_pool=row.card_pool,
+            target_kind=row.target_kind,
+            target_key=row.target_key,
+            source_kind=row.source_kind,
+            source_id=source.id,
+            enabled=row.enabled,
+        )
     for deck_tag_record in payload.deck_tags:
         DeckTag.objects.update_or_create(
             kind=deck_tag_record.kind,
@@ -333,13 +360,19 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
                 ]
             )
             CardVersionKeyword.objects.bulk_create(
-                [CardVersionKeyword(card_version=model, keyword=keywords[key]) for key in version.keyword_keys]
+                [
+                    CardVersionKeyword(card_version=model, keyword=keywords[key])
+                    for key in version.keyword_keys
+                ]
             )
             CardVersionTag.objects.bulk_create(
                 [CardVersionTag(card_version=model, tag=tags[key]) for key in version.tag_keys]
             )
             CardVersionSymbol.objects.bulk_create(
-                [CardVersionSymbol(card_version=model, symbol=symbols[key]) for key in version.symbol_keys]
+                [
+                    CardVersionSymbol(card_version=model, symbol=symbols[key])
+                    for key in version.symbol_keys
+                ]
             )
             CardVersionType.objects.bulk_create(
                 [CardVersionType(card_version=model, type=types[key]) for key in version.type_keys]
@@ -406,6 +439,28 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
     symbol_keys = {row.key for row in payload.symbols}
     template_keys = {row.key for row in payload.templates}
     content_versions = {row.version_number for row in payload.content_versions}
+    rule_identities: set[tuple[str, str, str, str, str]] = set()
+    for rule in payload.classification_rules:
+        identity = (
+            rule.card_pool,
+            rule.target_kind,
+            rule.target_key,
+            rule.source_kind,
+            rule.source_key,
+        )
+        if identity in rule_identities:
+            issues.append("classification rule identities are not unique")
+        rule_identities.add(identity)
+        available_targets = CARD_ROLES if rule.target_kind == "role" else CARD_FACTIONS
+        if rule.target_key not in available_targets:
+            issues.append(
+                f"classification rule references unknown {rule.target_kind} {rule.target_key}"
+            )
+        available_sources = tag_keys if rule.source_kind == "tag" else type_keys
+        if rule.source_key not in available_sources:
+            issues.append(
+                f"classification rule references unknown {rule.source_kind} {rule.source_key}"
+            )
     card_identities = {_payload_card_identity(row) for row in payload.cards}
     if len(card_identities) != len(payload.cards):
         issues.append("card identities are not unique")
@@ -419,13 +474,23 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
         for version in card.versions:
             if version.template_key not in template_keys:
                 issues.append(f"card {card.key} references unknown template {version.template_key}")
-            if version.previous_version_number is not None and version.previous_version_number not in version_numbers:
+            if (
+                version.previous_version_number is not None
+                and version.previous_version_number not in version_numbers
+            ):
                 issues.append(f"card {card.key} has an invalid previous version")
-            if version.content_version_number is not None and version.content_version_number not in content_versions:
+            if (
+                version.content_version_number is not None
+                and version.content_version_number not in content_versions
+            ):
                 issues.append(f"card {card.key} references an unknown content version")
-            _append_missing_reference_issue(issues, card.key, "keywords", version.keyword_keys, keyword_keys)
+            _append_missing_reference_issue(
+                issues, card.key, "keywords", version.keyword_keys, keyword_keys
+            )
             _append_missing_reference_issue(issues, card.key, "tags", version.tag_keys, tag_keys)
-            _append_missing_reference_issue(issues, card.key, "symbols", version.symbol_keys, symbol_keys)
+            _append_missing_reference_issue(
+                issues, card.key, "symbols", version.symbol_keys, symbol_keys
+            )
             _append_missing_reference_issue(issues, card.key, "types", version.type_keys, type_keys)
     for group in payload.card_groups:
         referenced = {
@@ -508,7 +573,8 @@ def _validate_payload_assets(
     missing = sorted(referenced_assets - set(asset_checksums))
     if missing:
         raise DeveloperDataError(
-            "Developer-data payload references assets missing from the manifest: " + ", ".join(missing)
+            "Developer-data payload references assets missing from the manifest: "
+            + ", ".join(missing)
         )
     unreferenced = sorted(set(asset_checksums) - referenced_assets)
     if unreferenced:

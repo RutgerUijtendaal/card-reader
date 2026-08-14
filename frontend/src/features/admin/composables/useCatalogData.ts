@@ -10,6 +10,7 @@ import type {
   TagRecord,
   TypeRecord,
   DeckTagRecord,
+  ClassificationDefinitionRecord,
 } from '@/features/admin/types';
 
 export const useCatalogData = (resetNewEntryForm: () => void) => {
@@ -21,6 +22,8 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: '',
     'suggested-tags': '',
     'suggested-types': '',
+    'card-roles': '',
+    'card-factions': '',
     'deck-roles': '',
     'deck-types': '',
     'suggested-deck-types': '',
@@ -32,6 +35,8 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: TypeRecord[];
     'suggested-tags': SuggestionRecord[];
     'suggested-types': SuggestionRecord[];
+    'card-roles': ClassificationDefinitionRecord[];
+    'card-factions': ClassificationDefinitionRecord[];
     'deck-roles': DeckTagRecord[];
     'deck-types': DeckTagRecord[];
     'suggested-deck-types': SuggestionRecord[];
@@ -42,6 +47,8 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     types: [],
     'suggested-tags': [],
     'suggested-types': [],
+    'card-roles': [],
+    'card-factions': [],
     'deck-roles': [],
     'deck-types': [],
     'suggested-deck-types': [],
@@ -75,6 +82,8 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
     catalog.types = data.known.types ?? [];
     catalog['suggested-tags'] = data.suggested.tags ?? [];
     catalog['suggested-types'] = data.suggested.types ?? [];
+    catalog['card-roles'] = data.classification?.roles ?? [];
+    catalog['card-factions'] = data.classification?.factions ?? [];
     catalog['deck-roles'] = deckTagData.roles;
     catalog['deck-types'] = deckTagData.types;
     catalog['suggested-deck-types'] = deckTagData.suggestedTypes;

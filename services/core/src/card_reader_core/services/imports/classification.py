@@ -5,32 +5,33 @@ from dataclasses import dataclass
 from typing import Literal, TypeVar, cast
 
 from card_reader_core.models import (
-    BLOOD_CARD_FACTION,
-    BOSS_CARD_ROLE,
+    CARD_CLASSIFICATION_SOURCE_TAG,
+    CARD_CLASSIFICATION_SOURCE_TYPE,
+    CARD_CLASSIFICATION_TARGET_FACTION,
+    CARD_CLASSIFICATION_TARGET_ROLE,
     CARD_FACTIONS,
     CARD_ROLES,
-    DARKNESS_CARD_FACTION,
-    HERO_CARD_ROLE,
-    LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION as CORE_LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
-    LOCATION_CARD_ROLE,
-    ORDER_CARD_FACTION,
-    SHOP_ITEM_CARD_ROLE,
     CardClassificationInferenceEvidence,
     CardFaction,
     CardFactionInferenceEvidence,
     CardPool,
     CardRole,
     CardRoleInferenceEvidence,
+    ClassificationRuleEvidence,
+    ClassificationSourceEvidence,
     normalize_card_factions,
     normalize_card_roles,
 )
+from card_reader_core.services.classification_rules import ClassificationRuleService
 
-SUPPORTED_CLASSIFICATION_INFERENCE_POLICY_VERSIONS = (1, 2, 3)
-LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION = (
-    CORE_LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION
-)
 CardClassificationMode = Literal["automatic", "override"]
 _FacetValue = TypeVar("_FacetValue", CardRole, CardFaction)
+
+
+@dataclass(frozen=True)
+class DetectedClassificationSource:
+    id: str
+    key: str
 
 
 @dataclass(frozen=True)
@@ -38,12 +39,11 @@ class CardClassificationInput:
     card_pool: CardPool
     role_mode: CardClassificationMode
     override_roles: tuple[CardRole, ...]
-    template_roles: tuple[CardRole, ...]
     faction_mode: CardClassificationMode
     override_factions: tuple[CardFaction, ...]
-    template_factions: tuple[CardFaction, ...]
-    inference_policy_version: int
-    matched_tag_keys: tuple[str, ...]
+    rule_snapshot: dict[str, object]
+    matched_tags: tuple[DetectedClassificationSource, ...]
+    matched_types: tuple[DetectedClassificationSource, ...]
 
 
 @dataclass(frozen=True)
@@ -54,105 +54,85 @@ class CardClassificationResult:
     evidence: CardClassificationInferenceEvidence
 
 
-_TAG_ROLE_POLICIES: dict[int, dict[str, CardRole]] = {
-    1: {"hero": HERO_CARD_ROLE},
-    2: {"hero": HERO_CARD_ROLE, "location": LOCATION_CARD_ROLE},
-    3: {
-        "hero": HERO_CARD_ROLE,
-        "boss": BOSS_CARD_ROLE,
-        "location": LOCATION_CARD_ROLE,
-        "shop-item": SHOP_ITEM_CARD_ROLE,
-    },
-}
-_TAG_FACTION_POLICIES: dict[int, dict[str, CardFaction]] = {
-    1: {},
-    2: {},
-    3: {
-        "order": ORDER_CARD_FACTION,
-        "blood": BLOOD_CARD_FACTION,
-        "darkness": DARKNESS_CARD_FACTION,
-    },
-}
-
-
 def _resolve_facet(
     *,
     mode: CardClassificationMode,
-    template_values: tuple[_FacetValue, ...],
+    inferred_values: tuple[_FacetValue, ...],
     override_values: tuple[_FacetValue, ...],
-    tag_values: tuple[_FacetValue, ...],
     normalize: Callable[[Iterable[object]], tuple[_FacetValue, ...]],
     facet_label: str,
 ) -> tuple[_FacetValue, ...]:
     if mode == "override":
         return normalize(override_values)
     if mode == "automatic":
-        return normalize((*template_values, *tag_values))
+        return normalize(inferred_values)
     raise ValueError(f"Unsupported card {facet_label} mode: {mode}")
 
 
 def classify_import_card(value: CardClassificationInput) -> CardClassificationResult:
-    role_policy = _TAG_ROLE_POLICIES.get(value.inference_policy_version)
-    faction_policy = _TAG_FACTION_POLICIES.get(value.inference_policy_version)
-    if role_policy is None or faction_policy is None:
-        raise ValueError(
-            "Unsupported card-classification inference policy version: "
-            f"{value.inference_policy_version}"
+    snapshot = ClassificationRuleService().validate_snapshot(
+        value.rule_snapshot,
+        card_pool=value.card_pool,
+    )
+    rules = cast(list[dict[str, object]], snapshot["rules"])
+    digest = cast(str, snapshot["digest"])
+    tags_by_id = {source.id: source for source in value.matched_tags}
+    types_by_id = {source.id: source for source in value.matched_types}
+    role_rules = (
+        _matching_rules(
+            rules,
+            target_kind=CARD_CLASSIFICATION_TARGET_ROLE,
+            tags_by_id=tags_by_id,
+            types_by_id=types_by_id,
         )
-
-    template_roles = normalize_card_roles(value.template_roles)
+        if value.role_mode == "automatic"
+        else []
+    )
+    faction_rules = (
+        _matching_rules(
+            rules,
+            target_kind=CARD_CLASSIFICATION_TARGET_FACTION,
+            tags_by_id=tags_by_id,
+            types_by_id=types_by_id,
+        )
+        if value.faction_mode == "automatic"
+        else []
+    )
+    inferred_roles = normalize_card_roles(rule["target_key"] for rule in role_rules)
+    inferred_factions = normalize_card_factions(rule["target_key"] for rule in faction_rules)
     override_roles = normalize_card_roles(value.override_roles)
-    template_factions = normalize_card_factions(value.template_factions)
     override_factions = normalize_card_factions(value.override_factions)
-    matched_tag_keys = tuple(
-        sorted({key.strip().lower() for key in value.matched_tag_keys if key.strip()})
-    )
-    tag_roles = normalize_card_roles(
-        role_policy[key] for key in matched_tag_keys if key in role_policy
-    )
-    tag_factions = normalize_card_factions(
-        faction_policy[key] for key in matched_tag_keys if key in faction_policy
-    )
-    matched_role_tag_keys = tuple(key for key in matched_tag_keys if key in role_policy)
-    matched_faction_tag_keys = tuple(
-        key for key in matched_tag_keys if key in faction_policy
-    )
     resolved_roles = _resolve_facet(
         mode=value.role_mode,
-        template_values=template_roles,
+        inferred_values=inferred_roles,
         override_values=override_roles,
-        tag_values=tag_roles,
         normalize=normalize_card_roles,
         facet_label="role",
     )
     resolved_factions = _resolve_facet(
         mode=value.faction_mode,
-        template_values=template_factions,
+        inferred_values=inferred_factions,
         override_values=override_factions,
-        tag_values=tag_factions,
         normalize=normalize_card_factions,
         facet_label="faction",
     )
-
     role_evidence: CardRoleInferenceEvidence = {
         "mode": value.role_mode,
-        "policy_version": value.inference_policy_version,
-        "template_roles": list(template_roles),
-        "matched_tag_keys": list(matched_role_tag_keys),
-        "tag_roles": list(tag_roles),
+        "matched_tag_sources": _matched_source_evidence(role_rules, tags_by_id, "tag"),
+        "matched_type_sources": _matched_source_evidence(role_rules, types_by_id, "type"),
+        "matched_rules": cast(list[ClassificationRuleEvidence], role_rules),
         "override_roles": list(override_roles) if value.role_mode == "override" else [],
         "resolved_roles": list(resolved_roles),
+        "snapshot_digest": digest,
     }
     faction_evidence: CardFactionInferenceEvidence = {
         "mode": value.faction_mode,
-        "policy_version": value.inference_policy_version,
-        "template_factions": list(template_factions),
-        "matched_tag_keys": list(matched_faction_tag_keys),
-        "tag_factions": list(tag_factions),
-        "override_factions": (
-            list(override_factions) if value.faction_mode == "override" else []
-        ),
+        "matched_tag_sources": _matched_source_evidence(faction_rules, tags_by_id, "tag"),
+        "matched_type_sources": _matched_source_evidence(faction_rules, types_by_id, "type"),
+        "matched_rules": cast(list[ClassificationRuleEvidence], faction_rules),
+        "override_factions": list(override_factions) if value.faction_mode == "override" else [],
         "resolved_factions": list(resolved_factions),
+        "snapshot_digest": digest,
     }
     return CardClassificationResult(
         card_pool=value.card_pool,
@@ -160,6 +140,45 @@ def classify_import_card(value: CardClassificationInput) -> CardClassificationRe
         factions=resolved_factions,
         evidence={"roles": role_evidence, "factions": faction_evidence},
     )
+
+
+def _matching_rules(
+    rules: list[dict[str, object]],
+    *,
+    target_kind: str,
+    tags_by_id: dict[str, DetectedClassificationSource],
+    types_by_id: dict[str, DetectedClassificationSource],
+) -> list[dict[str, object]]:
+    matched: list[dict[str, object]] = []
+    for rule in rules:
+        if rule.get("target_kind") != target_kind:
+            continue
+        source_id = rule.get("source_id")
+        source_kind = rule.get("source_kind")
+        if not isinstance(source_id, str):
+            continue
+        if source_kind == CARD_CLASSIFICATION_SOURCE_TAG and source_id in tags_by_id:
+            matched.append(rule)
+        elif source_kind == CARD_CLASSIFICATION_SOURCE_TYPE and source_id in types_by_id:
+            matched.append(rule)
+    return matched
+
+
+def _matched_source_evidence(
+    rules: list[dict[str, object]],
+    sources_by_id: dict[str, DetectedClassificationSource],
+    source_kind: Literal["tag", "type"],
+) -> list[ClassificationSourceEvidence]:
+    matched_ids = {
+        cast(str, rule["source_id"])
+        for rule in rules
+        if rule.get("source_kind") == source_kind and rule.get("source_id") in sources_by_id
+    }
+    return [
+        {"id": source.id, "key": source.key}
+        for source in sorted(sources_by_id.values(), key=lambda item: (item.key, item.id))
+        if source.id in matched_ids
+    ]
 
 
 def normalize_classification_mode(
@@ -170,12 +189,6 @@ def normalize_classification_mode(
     if value not in {"automatic", "override"}:
         raise ValueError(f"{field_name} must be either 'automatic' or 'override'.")
     return cast(CardClassificationMode, value)
-
-
-def validate_inference_policy_version(value: int) -> int:
-    if value not in SUPPORTED_CLASSIFICATION_INFERENCE_POLICY_VERSIONS:
-        raise ValueError(f"Unsupported card-classification inference policy version: {value}")
-    return value
 
 
 def validate_card_roles(values: object, *, field_name: str) -> tuple[CardRole, ...]:

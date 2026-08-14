@@ -55,18 +55,18 @@ describe('import evidence presentation', () => {
       classification_inference: {
         roles: {
           mode: 'automatic',
-          template_roles: ['location'],
-          matched_tag_keys: ['event'],
+          matched_tag_sources: [{ id: 'tag-event', key: 'event' }],
+          matched_type_sources: [{ id: 'type-location', key: 'location' }],
         },
         factions: {
           mode: 'automatic',
-          matched_tag_keys: ['order'],
+          matched_tag_sources: [{ id: 'tag-order', key: 'order' }],
         },
       },
     }));
 
-    expect(evidence).toContainEqual({ label: 'Template hints', value: 'Location' });
     expect(evidence).toContainEqual({ label: 'Role tags', value: 'event' });
+    expect(evidence).toContainEqual({ label: 'Role types', value: 'location' });
     expect(evidence).toContainEqual({ label: 'Faction tags', value: 'order' });
     expect(getWarningEvidence({ code: 'future_warning', message: 'Future warning.' })).toEqual([]);
   });
@@ -75,7 +75,7 @@ describe('import evidence presentation', () => {
     const evidence = getInferenceEvidence(item({
       status: 'completed',
       classification_inference: {
-        roles: { mode: 'automatic', matched_tag_keys: ['hero'] },
+        roles: { mode: 'automatic', matched_tag_sources: [{ id: 'tag-hero', key: 'hero' }] },
         factions: {},
       },
     }));

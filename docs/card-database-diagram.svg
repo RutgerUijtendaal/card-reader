@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1250" viewBox="0 0 2000 1250" role="img" aria-labelledby="title desc">
   <title id="title">Card Reader card database relationships</title>
-  <desc id="desc">Linear database diagram with Card pool, role, faction, identity namespace, and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, imported and parsed version data on the right, and import lineage above.</desc>
+  <desc id="desc">Linear database diagram with Card pool, role, faction, identity namespace, and persistent TTS sheet assignments in the center, card consumers and deck tags on the left, parsed version data and pool-specific classification rules on the right, and import lineage above.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
@@ -56,7 +56,7 @@
   <rect class="box version" x="1245" y="195" width="205" height="86"/>
   <text class="title" x="1285" y="230">Template</text>
   <text class="field" x="1269" y="252">parser definition</text>
-  <text class="small" x="1254" y="272">inferred role/faction hints</text>
+  <text class="small" x="1254" y="272">parsing regions only</text>
 
   <rect class="box external" x="1540" y="195" width="185" height="86"/>
   <text class="title" x="1585" y="230">Auth User</text>
@@ -205,6 +205,12 @@
   <text class="title" x="1500" y="697">ParseResult</text>
   <text class="field" x="1482" y="721">OCR/raw fields</text>
 
+  <rect class="box meta" x="1125" y="660" width="250" height="100"/>
+  <text class="title-small" x="1150" y="690">CardClassificationRule</text>
+  <text class="field" x="1145" y="716">pool + role/faction target</text>
+  <text class="field" x="1145" y="738">exactly one Tag or Type source</text>
+  <text class="small" x="1145" y="756">enabled • protected source</text>
+
   <rect class="box meta" x="1350" y="775" width="260" height="66"/>
   <text class="title" x="1375" y="804">CardVersionType</text>
   <text class="field" x="1377" y="826">version + type</text>
@@ -261,6 +267,8 @@
   <text class="label" x="610" y="378">content release marker</text>
   <path class="line" d="M1245 255 C1210 320, 1210 390, 1245 455"/>
   <text class="label" x="1125" y="360">CardVersion.template</text>
+  <path class="soft" d="M610 281 C700 345, 900 510, 1125 690"/>
+  <text class="label" x="810" y="442">immutable rule snapshot</text>
   <path class="thin" d="M1725 238 L1765 238"/>
   <text class="label" x="1652" y="190">notification recipient/actor</text>
 
@@ -326,6 +334,10 @@
   <path class="line" d="M1610 988 L1665 988"/>
   <path class="line" d="M1610 1078 L1665 1078"/>
   <path class="line" d="M1610 1168 L1665 1168"/>
+
+  <path class="thin" d="M1375 700 C1550 700, 1600 790, 1665 808"/>
+  <path class="thin" d="M1375 730 C1540 810, 1585 1015, 1665 1078"/>
+  <text class="label" x="1450" y="758">Type or Tag source</text>
 
   <path class="thin" d="M1850 1155 C1965 1115, 1975 835, 1850 808"/>
   <path class="thin" d="M1850 1175 C1955 1150, 1970 1090, 1850 1078"/>

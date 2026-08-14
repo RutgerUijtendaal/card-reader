@@ -125,13 +125,17 @@ const emit = defineEmits<{
 }>();
 
 const searchPlaceholder = computed(() =>
-  props.canCreate
+  props.selectedKind === 'card-roles' || props.selectedKind === 'card-factions'
+    ? `Search ${props.kindLabel(props.selectedKind).toLowerCase()} by label or key`
+    : props.canCreate
     ? `Search ${props.kindLabel(props.selectedKind).toLowerCase()} by label, key, or metadata`
     : `Search ${props.kindLabel(props.selectedKind).toLowerCase()} suggestions`,
 );
 
 const emptyState = computed(() =>
-  props.canCreate
+  props.selectedKind === 'card-roles' || props.selectedKind === 'card-factions'
+    ? 'No supported classification values were returned.'
+    : props.canCreate
     ? `No entries yet. Create the first ${props.kindItemLabel(props.selectedKind).toLowerCase()} from here.`
     : `No suggestions yet.`,
 );
@@ -153,6 +157,9 @@ const metadataToneForKind = (kind: CatalogKind): string => {
     case 'deck-types':
     case 'suggested-deck-types':
       return 'theme-pill-keyword';
+    case 'card-roles':
+    case 'card-factions':
+      return 'theme-pill-accent';
     default:
       return 'theme-pill-neutral';
   }
@@ -197,6 +204,20 @@ const entryBadges = (entry: CatalogRow): { label: string; tone: string }[] => {
     ];
   }
 
+  if ('target_kind' in entry) {
+    const linkedCount = Object.values(entry.linked_card_counts).reduce(
+      (total, count) => total + (count ?? 0),
+      0,
+    );
+    return [
+      { label: String(linkedCount), tone: 'theme-pill-accent' },
+      {
+        label: entry.derived ? 'derived' : `${entry.rules.length} rules`,
+        tone: entry.derived ? 'theme-pill-neutral' : metadataToneForKind(props.selectedKind),
+      },
+    ];
+  }
+
   if ('kind' in entry && !('status' in entry)) {
     return [
       { label: String(entry.linked_deck_count ?? 0), tone: 'theme-pill-accent' },
@@ -235,6 +256,13 @@ const entryPreview = (entry: CatalogRow): string => {
 
   if ('symbol_type' in entry) {
     return entry.text_token ? `Token ${entry.text_token}` : 'No text token';
+  }
+
+
+  if ('target_kind' in entry) {
+    return entry.derived
+      ? 'Derived empty state'
+      : `${entry.rules.length} inference rules across all pools`;
   }
 
   if (entry.identifiers.length === 0) {

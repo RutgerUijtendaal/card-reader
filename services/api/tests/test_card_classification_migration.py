@@ -12,11 +12,15 @@ def test_card_classification_migration_backfills_and_reverses_hero_roles() -> No
     old_apps = executor.loader.project_state([("card_reader_core", "0053_deck_creation")]).apps
     OldCard = old_apps.get_model("card_reader_core", "Card")
     hero = OldCard.objects.create(key="migration-hero", label="Migration Hero", is_hero=True)
-    standard = OldCard.objects.create(key="migration-standard", label="Migration Standard", is_hero=False)
+    standard = OldCard.objects.create(
+        key="migration-standard", label="Migration Standard", is_hero=False
+    )
 
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0054_card_classification")])
-    new_apps = executor.loader.project_state([("card_reader_core", "0054_card_classification")]).apps
+    new_apps = executor.loader.project_state(
+        [("card_reader_core", "0054_card_classification")]
+    ).apps
     NewCard = new_apps.get_model("card_reader_core", "Card")
     CardRoleAssignment = new_apps.get_model("card_reader_core", "CardRoleAssignment")
 
@@ -49,9 +53,7 @@ def test_location_role_migration_widens_role_keys_and_preserves_uniqueness() -> 
 
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0057_location_card_role")])
-    new_apps = executor.loader.project_state(
-        [("card_reader_core", "0057_location_card_role")]
-    ).apps
+    new_apps = executor.loader.project_state([("card_reader_core", "0057_location_card_role")]).apps
     CardRoleAssignment = new_apps.get_model("card_reader_core", "CardRoleAssignment")
     role_field = CardRoleAssignment._meta.get_field("role")
 
@@ -94,7 +96,9 @@ def test_pool_scoped_identity_migration_backfills_aliases_and_allows_cross_pool_
     assert CardAlias.objects.get(id=alias.id).card_pool == "player"
     evil = Card.objects.create(key="shared-name", label="Shared Name", card_pool="evil")
     neutral = Card.objects.create(key="shared-name", label="Shared Name", card_pool="neutral")
-    CardAlias.objects.create(card_id=evil.id, card_pool="evil", key="shared-alias", label="Shared Alias")
+    CardAlias.objects.create(
+        card_id=evil.id, card_pool="evil", key="shared-alias", label="Shared Alias"
+    )
     CardAlias.objects.create(
         card_id=neutral.id,
         card_pool="neutral",
@@ -150,7 +154,9 @@ def test_pool_scoped_identity_migration_rejects_temporary_game_master_values() -
     executor.migrate([("card_reader_core", "0057_location_card_role")])
     old_apps = executor.loader.project_state([("card_reader_core", "0057_location_card_role")]).apps
     OldCard = old_apps.get_model("card_reader_core", "Card")
-    invalid = OldCard.objects.create(key="temporary-gm", label="Temporary GM", card_pool="game_master")
+    invalid = OldCard.objects.create(
+        key="temporary-gm", label="Temporary GM", card_pool="game_master"
+    )
 
     executor = MigrationExecutor(connection)
     with pytest.raises(RuntimeError, match="intentionally does not guess Evil versus Neutral"):
@@ -169,7 +175,9 @@ def test_pool_scoped_identity_migration_rejects_primary_alias_collisions() -> No
     OldCard = old_apps.get_model("card_reader_core", "Card")
     OldCardAlias = old_apps.get_model("card_reader_core", "CardAlias")
     primary = OldCard.objects.create(key="forward-collision", label="Primary", card_pool="player")
-    alias_owner = OldCard.objects.create(key="forward-alias-owner", label="Alias Owner", card_pool="player")
+    alias_owner = OldCard.objects.create(
+        key="forward-alias-owner", label="Alias Owner", card_pool="player"
+    )
     alias = OldCardAlias.objects.create(
         card_id=alias_owner.id,
         key=primary.key,
@@ -252,9 +260,7 @@ def test_faction_classification_migration_backfills_empty_namespace_and_nests_ev
 
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0060_faction_classification")])
-    apps = executor.loader.project_state(
-        [("card_reader_core", "0060_faction_classification")]
-    ).apps
+    apps = executor.loader.project_state([("card_reader_core", "0060_faction_classification")]).apps
     Card = apps.get_model("card_reader_core", "Card")
     CardAlias = apps.get_model("card_reader_core", "CardAlias")
     CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
@@ -270,10 +276,7 @@ def test_faction_classification_migration_backfills_empty_namespace_and_nests_ev
         "card_pool": "player",
         "card_roles": ["hero"],
     }
-    assert (
-        ImportJobItem.objects.get(id=empty_evidence_item.id).classification_inference_json
-        == {}
-    )
+    assert ImportJobItem.objects.get(id=empty_evidence_item.id).classification_inference_json == {}
     assert CardFactionAssignment._meta.get_field("faction").max_length == 64
     assert CardRoleAssignment._meta.get_field("role").choices == [
         ("hero", "Hero"),
@@ -294,6 +297,7 @@ def test_faction_classification_migration_backfills_empty_namespace_and_nests_ev
         "hero"
     ]
     assert ReversedItem.objects.get(id=empty_evidence_item.id).card_role_inference_json == {}
+    OldImportJob.objects.filter(id=job.id).update(status="completed")
     executor = MigrationExecutor(connection)
     executor.migrate(executor.loader.graph.leaf_nodes())
 
@@ -302,9 +306,7 @@ def test_faction_classification_migration_backfills_empty_namespace_and_nests_ev
 def test_faction_classification_reverse_rejects_faction_data() -> None:
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0060_faction_classification")])
-    apps = executor.loader.project_state(
-        [("card_reader_core", "0060_faction_classification")]
-    ).apps
+    apps = executor.loader.project_state([("card_reader_core", "0060_faction_classification")]).apps
     Card = apps.get_model("card_reader_core", "Card")
     CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
     card = Card.objects.create(
@@ -330,9 +332,7 @@ def test_faction_classification_reverse_rejects_faction_data() -> None:
 def test_faction_classification_reverse_rejects_policy_version_three_jobs() -> None:
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0060_faction_classification")])
-    apps = executor.loader.project_state(
-        [("card_reader_core", "0060_faction_classification")]
-    ).apps
+    apps = executor.loader.project_state([("card_reader_core", "0060_faction_classification")]).apps
     Template = apps.get_model("card_reader_core", "Template")
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
     template = Template.objects.create(key="policy-three-template", label="Policy Three")
@@ -349,8 +349,77 @@ def test_faction_classification_reverse_rejects_policy_version_three_jobs() -> N
     ):
         executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
 
-    ImportJob.objects.filter(id=job.id).update(classification_inference_policy_version=2)
+    ImportJob.objects.filter(id=job.id).update(
+        classification_inference_policy_version=2,
+        status="completed",
+    )
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0059_card_identity_pool_locks")])
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_owned_classification_rule_migration_preflights_jobs_and_removes_hints() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0060_faction_classification")])
+    old_apps = executor.loader.project_state(
+        [("card_reader_core", "0060_faction_classification")]
+    ).apps
+    Template = old_apps.get_model("card_reader_core", "Template")
+    ImportJob = old_apps.get_model("card_reader_core", "ImportJob")
+    template = Template.objects.create(
+        key="classification-rule-migration",
+        label="Classification Rule Migration",
+        inferred_card_roles_json=["hero"],
+        inferred_card_factions_json=["order"],
+    )
+    job = ImportJob.objects.create(
+        source_path="imports/classification-rule-migration",
+        template_id=template.id,
+        status="queued",
+    )
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="Finish, cancel, or reset these jobs first"):
+        executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+
+    ImportJob.objects.filter(id=job.id).update(status="completed")
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0061_admin_owned_classification_rules")]
+    ).apps
+    NewTemplate = apps.get_model("card_reader_core", "Template")
+    NewImportJob = apps.get_model("card_reader_core", "ImportJob")
+    Rule = apps.get_model("card_reader_core", "CardClassificationRule")
+    Tag = apps.get_model("card_reader_core", "Tag")
+
+    assert "inferred_card_roles_json" not in {
+        field.name for field in NewTemplate._meta.get_fields()
+    }
+    assert "inferred_card_factions_json" not in {
+        field.name for field in NewTemplate._meta.get_fields()
+    }
+    job_fields = {field.name for field in NewImportJob._meta.get_fields()}
+    assert "classification_rule_snapshot_json" in job_fields
+    assert "classification_inference_policy_version" not in job_fields
+    tag = Tag.objects.create(key="migration-rule-tag", label="Migration Rule Tag")
+    Rule.objects.create(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        tag_id=tag.id,
+    )
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Rule.objects.create(
+            card_pool="player",
+            target_kind="role",
+            target_key="hero",
+            source_kind="tag",
+            tag_id=tag.id,
+        )
+
     executor = MigrationExecutor(connection)
     executor.migrate(executor.loader.graph.leaf_nodes())

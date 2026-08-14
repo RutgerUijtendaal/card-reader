@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 
 from card_reader_core.models import (
     ALL_CARD_POOLS_SCOPE,
@@ -58,6 +61,10 @@ from card_reader_core.repositories.metadata import (
     update_tag,
     update_type,
 )
+from card_reader_core.services.classification_rules import (
+    ClassificationRuleService,
+    classification_rule_payload,
+)
 from .input_normalization import CatalogInputNormalizer
 from .types import (
     CatalogData,
@@ -69,6 +76,18 @@ from .types import (
     TagDetail,
     TypeDetail,
 )
+
+
+def _protected_rule_message(label: str, rules: Sequence[object]) -> str:
+    rule_labels = sorted(
+        {
+            f"{getattr(rule, 'card_pool')} {getattr(rule, 'target_kind')} "
+            f"{getattr(rule, 'target_key')}"
+            for rule in rules
+        }
+    )
+    details = ", ".join(rule_labels) if rule_labels else "classification rules"
+    return f"{label} is used by {details}. Remove or repoint those rules first."
 
 
 class CatalogService:
@@ -102,8 +121,7 @@ class CatalogService:
             status=status,
         )
         return [
-            self._suggestion_detail_from_row(row, card_pool_scope=card_pool_scope)
-            for row in rows
+            self._suggestion_detail_from_row(row, card_pool_scope=card_pool_scope) for row in rows
         ]
 
     def get_suggestion_detail(
@@ -150,9 +168,7 @@ class CatalogService:
             "linked_card_count": linked_card_count,
         }
 
-    def get_tag_detail(
-        self, *, entry_id: str, card_pool_scope: CardPoolScope
-    ) -> TagDetail | None:
+    def get_tag_detail(self, *, entry_id: str, card_pool_scope: CardPoolScope) -> TagDetail | None:
         entry = get_tag(entry_id)
         if entry is None:
             return None
@@ -166,6 +182,13 @@ class CatalogService:
             "entry": entry,
             "linked_cards": linked_cards,
             "linked_card_count": linked_card_count,
+            "classification_rules": [
+                classification_rule_payload(rule)
+                for rule in ClassificationRuleService().rules_for_source(
+                    source_kind="tag",
+                    source_id=entry_id,
+                )
+            ],
         }
 
     def get_type_detail(
@@ -184,6 +207,13 @@ class CatalogService:
             "entry": entry,
             "linked_cards": linked_cards,
             "linked_card_count": linked_card_count,
+            "classification_rules": [
+                classification_rule_payload(rule)
+                for rule in ClassificationRuleService().rules_for_source(
+                    source_kind="type",
+                    source_id=entry_id,
+                )
+            ],
         }
 
     def get_symbol_detail(
@@ -242,7 +272,9 @@ class CatalogService:
         if suggestion is None:
             return None
 
-        chosen_label = self._normalizer.normalize_label(label or suggestion.display_value or suggestion.normalized_value)
+        chosen_label = self._normalizer.normalize_label(
+            label or suggestion.display_value or suggestion.normalized_value
+        )
         with transaction.atomic():
             if suggestion.kind == "tag":
                 target_tag = self.create_tag(
@@ -273,7 +305,9 @@ class CatalogService:
         return create_keyword(
             key=normalized_key,
             label=normalized_label,
-            identifiers_json=self._normalizer.normalize_identifiers_json(normalized_label, identifiers),
+            identifiers_json=self._normalizer.normalize_identifiers_json(
+                normalized_label, identifiers
+            ),
         )
 
     def create_tag(
@@ -289,7 +323,9 @@ class CatalogService:
         return create_tag(
             key=normalized_key,
             label=normalized_label,
-            identifiers_json=self._normalizer.normalize_identifiers_json(normalized_label, identifiers),
+            identifiers_json=self._normalizer.normalize_identifiers_json(
+                normalized_label, identifiers
+            ),
         )
 
     def create_type(
@@ -305,7 +341,9 @@ class CatalogService:
         return create_type(
             key=normalized_key,
             label=normalized_label,
-            identifiers_json=self._normalizer.normalize_identifiers_json(normalized_label, identifiers),
+            identifiers_json=self._normalizer.normalize_identifiers_json(
+                normalized_label, identifiers
+            ),
         )
 
     def update_keyword(
@@ -329,7 +367,9 @@ class CatalogService:
             self._ensure_unique("keyword", normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
         if identifiers is not None:
-            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(current_label, identifiers)
+            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(
+                current_label, identifiers
+            )
         return update_keyword(entry_id=entry_id, updates=updates)
 
     def update_tag(
@@ -353,7 +393,9 @@ class CatalogService:
             self._ensure_unique("tag", normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
         if identifiers is not None:
-            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(current_label, identifiers)
+            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(
+                current_label, identifiers
+            )
         return update_tag(entry_id=entry_id, updates=updates)
 
     def update_type(
@@ -377,7 +419,9 @@ class CatalogService:
             self._ensure_unique("type", normalized_key, exclude_id=row.id)
             updates["key"] = normalized_key
         if identifiers is not None:
-            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(current_label, identifiers)
+            updates["identifiers_json"] = self._normalizer.normalize_identifiers_json(
+                current_label, identifiers
+            )
         return update_type(entry_id=entry_id, updates=updates)
 
     def create_symbol(
@@ -471,10 +515,24 @@ class CatalogService:
         return delete_keyword(entry_id=entry_id)
 
     def delete_tag(self, *, entry_id: str) -> bool:
-        return delete_tag(entry_id=entry_id)
+        try:
+            return delete_tag(entry_id=entry_id)
+        except ProtectedError as exc:
+            rules = ClassificationRuleService().rules_for_source(
+                source_kind="tag",
+                source_id=entry_id,
+            )
+            raise ValueError(_protected_rule_message("Tag", rules)) from exc
 
     def delete_type(self, *, entry_id: str) -> bool:
-        return delete_type(entry_id=entry_id)
+        try:
+            return delete_type(entry_id=entry_id)
+        except ProtectedError as exc:
+            rules = ClassificationRuleService().rules_for_source(
+                source_kind="type",
+                source_id=entry_id,
+            )
+            raise ValueError(_protected_rule_message("Type", rules)) from exc
 
     def delete_symbol(self, *, entry_id: str) -> bool:
         return delete_symbol(entry_id=entry_id)
@@ -501,7 +559,9 @@ class CatalogService:
                 detection_config_json,
             )
         if text_enrichment_json is not None:
-            self._normalizer.validate_symbol_config_json(text_enrichment_json, None, field_name="text_enrichment_json")
+            self._normalizer.validate_symbol_config_json(
+                text_enrichment_json, None, field_name="text_enrichment_json"
+            )
             updates["text_enrichment_json"] = self._normalizer.normalize_object_json(
                 text_enrichment_json,
                 field_name="text_enrichment_json",

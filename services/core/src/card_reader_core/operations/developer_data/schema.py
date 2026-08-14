@@ -17,7 +17,7 @@ from card_reader_core.models import (
     normalize_card_factions,
 )
 
-DEVELOPER_DATA_FORMAT_VERSION = 4
+DEVELOPER_DATA_FORMAT_VERSION = 5
 SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, DEVELOPER_DATA_FORMAT_VERSION)
 
 
@@ -26,9 +26,7 @@ def _default_pool_coverage() -> dict[CardPool, int]:
 
 
 def _default_role_coverage() -> dict[CardRoleFilter, int]:
-    coverage: dict[CardRoleFilter, int] = {
-        role: 0 for role in CARD_ROLE_FILTER_VALUES
-    }
+    coverage: dict[CardRoleFilter, int] = {role: 0 for role in CARD_ROLE_FILTER_VALUES}
     coverage[STANDARD_CARD_ROLE] = 1
     coverage[HERO_CARD_ROLE] = 1
     return coverage
@@ -42,26 +40,40 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ClassificationRuleRecord(StrictModel):
+    card_pool: CardPool
+    target_kind: str
+    target_key: str
+    source_kind: str
+    source_key: str
+    enabled: bool = True
+
+    @field_validator("target_kind")
+    @classmethod
+    def validate_target_kind(cls, value: str) -> str:
+        if value not in {"role", "faction"}:
+            raise ValueError("Classification rule target_kind must be role or faction.")
+        return value
+
+    @field_validator("source_kind")
+    @classmethod
+    def validate_source_kind(cls, value: str) -> str:
+        if value not in {"tag", "type"}:
+            raise ValueError("Classification rule source_kind must be tag or type.")
+        return value
+
+
 class CoverageRequirements(StrictModel):
     min_cards: int = Field(default=1, ge=0)
-    min_cards_by_pool: dict[CardPool, int] = Field(
-        default_factory=_default_pool_coverage
-    )
-    min_cards_by_role: dict[CardRoleFilter, int] = Field(
-        default_factory=_default_role_coverage
-    )
-    min_cards_by_faction: dict[CardFaction, int] = Field(
-        default_factory=_default_faction_coverage
-    )
+    min_cards_by_pool: dict[CardPool, int] = Field(default_factory=_default_pool_coverage)
+    min_cards_by_role: dict[CardRoleFilter, int] = Field(default_factory=_default_role_coverage)
+    min_cards_by_faction: dict[CardFaction, int] = Field(default_factory=_default_faction_coverage)
     min_deprecated_cards: int = Field(default=1, ge=0)
     min_card_groups: int = Field(default=1, ge=0)
     min_cards_with_multiple_versions: int = Field(default=1, ge=0)
     required_template_keys: list[str] = Field(default_factory=list)
     required_tag_keys: list[str] = Field(default_factory=list)
-    required_template_role_hints: dict[str, list[CardRole]] = Field(default_factory=dict)
-    required_template_faction_hints: dict[str, list[CardFaction]] = Field(
-        default_factory=dict
-    )
+    required_classification_rules: list[ClassificationRuleRecord] = Field(default_factory=list)
 
 
 class DeveloperDataSelection(StrictModel):
@@ -95,28 +107,6 @@ class TemplateRecord(StrictModel):
     key: str
     label: str
     definition: dict[str, Any]
-    inferred_card_roles: list[CardRole]
-    inferred_card_factions: list[CardFaction]
-
-    @field_validator("inferred_card_roles")
-    @classmethod
-    def validate_unique_inferred_card_roles(
-        cls,
-        value: list[CardRole],
-    ) -> list[CardRole]:
-        if len(value) != len(set(value)):
-            raise ValueError("Template inferred card roles must be unique.")
-        return value
-
-    @field_validator("inferred_card_factions")
-    @classmethod
-    def validate_unique_inferred_card_factions(
-        cls,
-        value: list[CardFaction],
-    ) -> list[CardFaction]:
-        if len(value) != len(set(value)):
-            raise ValueError("Template inferred card factions must be unique.")
-        return value
 
 
 class DeckTagRecord(StrictModel):
@@ -261,6 +251,7 @@ class DeveloperDataPayload(StrictModel):
     types: list[CatalogRecord]
     symbols: list[SymbolRecord]
     templates: list[TemplateRecord]
+    classification_rules: list[ClassificationRuleRecord]
     deck_tags: list[DeckTagRecord]
     content_versions: list[ContentVersionRecord]
     cards: list[CardRecord]
@@ -306,17 +297,14 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     if format_version not in {1, 2, 3} or not isinstance(value, dict):
         return value
     adopted = dict(value)
+    adopted["classification_rules"] = []
     templates = adopted.get("templates")
     if isinstance(templates, list):
         adopted["templates"] = [
             {
-                **template,
-                **(
-                    {"inferred_card_roles": []}
-                    if "inferred_card_roles" not in template
-                    else {}
-                ),
-                "inferred_card_factions": [],
+                key: item
+                for key, item in template.items()
+                if key not in {"inferred_card_roles", "inferred_card_factions"}
             }
             if isinstance(template, dict)
             else template
