@@ -1,48 +1,45 @@
 <template>
   <div class="space-y-3">
-    <div
-      v-if="isSectionVisible('classification')"
-      class="space-y-3"
+    <label
+      v-if="showCardPool && state.cardPoolOptions.length > 1"
+      class="block space-y-1"
     >
-      <label
-        v-if="showCardPool && state.cardPoolOptions.length > 1"
-        class="block space-y-1"
+      <span class="theme-section-title text-sm font-semibold">Card pool</span>
+      <select
+        v-model="cardPool"
+        class="input-base w-full"
       >
-        <span class="theme-section-title text-sm font-semibold">Card pool</span>
-        <select
-          v-model="cardPool"
-          class="input-base w-full"
+        <option
+          v-for="option in state.cardPoolOptions"
+          :key="option.key"
+          :value="option.key"
         >
-          <option
-            v-for="option in state.cardPoolOptions"
-            :key="option.key"
-            :value="option.key"
-          >
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
+          {{ option.label }}
+        </option>
+      </select>
+    </label>
 
-      <MetadataPillGroup
-        v-model:included-value="selectedCardRoles"
-        v-model:excluded-value="excludedCardRoles"
-        v-model:match-mode="cardRoleMatch"
-        :default-open="isSectionOpenByDefault('classification', true)"
-        label="Card roles"
-        :options="state.cardRoleOptions"
-        @reset="state.resetCardRoleGroup"
-      />
+    <MetadataPillGroup
+      v-if="isSectionVisible('roles')"
+      v-model:included-value="selectedCardRoles"
+      v-model:excluded-value="excludedCardRoles"
+      v-model:match-mode="cardRoleMatch"
+      :default-open="isSectionOpenByDefault('roles', true)"
+      label="Card roles"
+      :options="state.cardRoleOptions"
+      @reset="state.resetCardRoleGroup"
+    />
 
-      <MetadataPillGroup
-        v-model:included-value="selectedCardFactions"
-        v-model:excluded-value="excludedCardFactions"
-        v-model:match-mode="cardFactionMatch"
-        :default-open="isSectionOpenByDefault('classification', true)"
-        label="Factions"
-        :options="state.cardFactionOptions"
-        @reset="state.resetCardFactionGroup"
-      />
-    </div>
+    <MetadataPillGroup
+      v-if="isSectionVisible('factions')"
+      v-model:included-value="selectedCardFactions"
+      v-model:excluded-value="excludedCardFactions"
+      v-model:match-mode="cardFactionMatch"
+      :default-open="isSectionOpenByDefault('factions', true)"
+      label="Factions"
+      :options="state.cardFactionOptions"
+      @reset="state.resetCardFactionGroup"
+    />
 
     <SymbolToggleGroup
       v-if="isSectionVisible('mana')"
@@ -206,8 +203,8 @@ import type { CardPool } from '@/domain/cards/cardPools';
 const props = defineProps<{
   state: CardFilterSectionsState;
   showCardPool?: boolean;
-  visibleSections?: CardFilterSectionKey[];
-  defaultOpenSections?: CardFilterSectionKey[];
+  visibleSections?: readonly CardFilterSectionKey[];
+  defaultOpenSections?: readonly CardFilterSectionKey[];
 }>();
 
 const showCardPool = computed(() => props.showCardPool ?? true);

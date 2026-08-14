@@ -1,5 +1,7 @@
 # Card Classification Step 3.1: Context-Preserving Workspace Switching
 
+Filter-default amendment: [Step 4.1](card-classification-step-4-1-pool-aware-gallery-filters.md) removes the ordinary Gallery Roles facet and its former default Hero exclusion. Workspace switching now resets Gallery roles to an unconstrained empty state.
+
 Status: implemented.
 
 This checkpoint refines the Step 3 Player/Evil/Neutral picker so it changes the site's active card-pool context without unnecessarily sending the user back to Gallery. It does not change card classification, authorization, or the set of routes available in each workspace.

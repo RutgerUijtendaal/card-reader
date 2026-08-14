@@ -181,6 +181,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     isRefreshing,
     isLoadingPage,
     hasLoadedOnce,
+    invalidatePendingLoads,
     searchCards,
     loadNextPage,
     setLoadMoreSentinel,

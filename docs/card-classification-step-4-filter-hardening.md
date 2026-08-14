@@ -1,6 +1,6 @@
 # Card Classification Step 4.0: Classification Acceptance Audit and Cleanup
 
-Status: implemented and locally validated; awaiting checkpoint review and merge.
+Status: implemented, validated, reviewed, and merged into the classification umbrella.
 
 Steps 1 through 3.2 established the Player/Evil/Neutral pool model, multi-valued roles and factions, pool-plus-faction identity, deterministic import classification, restricted-pool authorization, workspace navigation, and admin-owned inference rules. Step 4.0 treats those contracts as one completed feature and validates them as an integrated product surface before the classification umbrella can merge.
 

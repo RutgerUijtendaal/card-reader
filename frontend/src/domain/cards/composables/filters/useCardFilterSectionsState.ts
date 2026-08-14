@@ -49,7 +49,7 @@ export const useCardFilterSectionsState = (
 ) => {
   const resetCardRoleGroup = (): void => {
     filterState.cardRoleIds.value = [];
-    filterState.cardRoleExcludeIds.value = ['hero'];
+    filterState.cardRoleExcludeIds.value = [];
     filterState.cardRoleMatch.value = 'any';
   };
   const resetCardFactionGroup = (): void => {

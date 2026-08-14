@@ -8,7 +8,8 @@ export type MatchMode = 'any' | 'all';
 export type LifecycleFilterValue = CardLifecycleFilterValue;
 export type SymbolFilterTriState = TriStateSelection;
 export type CardFilterSectionKey =
-  | 'classification'
+  | 'roles'
+  | 'factions'
   | 'mana'
   | 'types'
   | 'affinity'

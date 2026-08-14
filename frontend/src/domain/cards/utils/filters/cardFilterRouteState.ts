@@ -40,9 +40,7 @@ export const parseCardFilterRouteQuery = (query: LocationQuery): CardFilterState
     cardPool: normalizeCardPool(query.card_pool),
     cardRoleMatch: query.card_role_match === 'all' ? 'all' : 'any',
     cardRoleKeys: readCardRoleValues(query.card_roles),
-    cardRoleExcludeKeys: query.card_role_exclude === undefined
-      ? ['hero']
-      : readCardRoleValues(query.card_role_exclude),
+    cardRoleExcludeKeys: readCardRoleValues(query.card_role_exclude),
     cardFactionMatch: query.card_faction_match === 'all' ? 'all' : 'any',
     cardFactionKeys: readCardFactionValues(query.card_factions),
     cardFactionExcludeKeys: readCardFactionValues(query.card_faction_exclude),
@@ -90,11 +88,9 @@ export const buildCardFilterRouteQuery = (state: CardFilterState): LocationQuery
   if (normalized.cardPool !== 'player') query.card_pool = normalized.cardPool;
   if (normalized.cardRoleMatch === 'all') query.card_role_match = 'all';
   if (normalized.cardRoleKeys.length > 0) query.card_roles = normalized.cardRoleKeys;
-  if (normalized.cardRoleExcludeKeys.length === 0) query.card_role_exclude = 'none';
-  else if (
-    normalized.cardRoleExcludeKeys.length !== 1
-    || normalized.cardRoleExcludeKeys[0] !== 'hero'
-  ) query.card_role_exclude = normalized.cardRoleExcludeKeys;
+  if (normalized.cardRoleExcludeKeys.length > 0) {
+    query.card_role_exclude = normalized.cardRoleExcludeKeys;
+  }
   if (normalized.cardFactionMatch === 'all') query.card_faction_match = 'all';
   if ((normalized.cardFactionKeys?.length ?? 0) > 0) query.card_factions = normalized.cardFactionKeys;
   if ((normalized.cardFactionExcludeKeys?.length ?? 0) > 0) {

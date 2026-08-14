@@ -33,6 +33,7 @@
           <CardFilterSections
             :state="filterSectionsState"
             :show-card-pool="false"
+            :visible-sections="visibleFilterSections"
           />
 
           <template #footer>
@@ -159,6 +160,10 @@ import {
   createEmptyCardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterState';
 import {
+  getGalleryVisibleFilterSections,
+  sanitizeGalleryFilterStateForPool,
+} from '@/domain/cards/utils/filters/cardGalleryFacetPolicy';
+import {
   buildCardFilterApiPayload,
   buildCardFilterApiSearchParams,
 } from '@/domain/cards/utils/filters/cardFilterRequest';
@@ -208,8 +213,20 @@ const {
   updateQuery,
   loadFilters,
 } = filterController;
-const currentRouteFilterState = computed(() => parseCardFilterRouteQuery(route.query));
+const parsedRouteFilterState = computed(() => parseCardFilterRouteQuery(route.query));
+const currentRouteFilterState = computed(() =>
+  sanitizeGalleryFilterStateForPool(parsedRouteFilterState.value, workspace.activePool),
+);
 const currentRouteSignature = computed(() => getCardFilterSignature(currentRouteFilterState.value));
+const visibleFilterSections = computed(() =>
+  getGalleryVisibleFilterSections(workspace.activePool),
+);
+const canonicalRouteQuery = computed(() =>
+  buildCardFilterRouteQuery(currentRouteFilterState.value),
+);
+const canonicalRouteFullPath = computed(() =>
+  router.resolve({ path: '/cards', query: canonicalRouteQuery.value }).fullPath,
+);
 const loadMoreSentinelRef = ref<HTMLElement | null>(null);
 const { exportCardsCsv } = useCsvExport();
 const {
@@ -328,7 +345,10 @@ const updateFilterRoute = (): void => {
   if (!filtersLoaded.value) {
     return;
   }
-  const nextRouteState = readFilterState();
+  const nextRouteState = sanitizeGalleryFilterStateForPool(
+    readFilterState(),
+    workspace.activePool,
+  );
   if (sameCardFilterState(nextRouteState, currentRouteFilterState.value)) {
     return;
   }
@@ -396,13 +416,19 @@ watch(
 );
 
 watch(
-  [galleryRequestSignature, filtersLoaded],
+  [galleryRequestSignature, filtersLoaded, () => route.fullPath],
   async ([searchParams, ready]) => {
     if (!ready) {
       return;
     }
 
+    collection.invalidatePendingLoads();
     const routeState = currentRouteFilterState.value;
+    if (route.fullPath !== canonicalRouteFullPath.value) {
+      await router.replace({ path: '/cards', query: canonicalRouteQuery.value });
+      return;
+    }
+
     if (!sameCardFilterState(readFilterState(), routeState)) {
       applyRouteFilterState(routeState);
     }
@@ -431,7 +457,10 @@ watch(
 );
 
 const resetFilters = (): void => {
-  const defaults = createEmptyCardFilterState(workspace.activePool);
+  const defaults = sanitizeGalleryFilterStateForPool(
+    createEmptyCardFilterState(workspace.activePool),
+    workspace.activePool,
+  );
   applyRouteFilterState(defaults);
   void router.replace({ path: '/cards', query: buildCardFilterRouteQuery(defaults) });
 };

@@ -23,7 +23,7 @@ This directory contains feature descriptions, operational guides, and technical 
 
 ## Implementation plans
 
-The card-pool, role, and faction work is split into nine dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
+The card-pool, role, and faction work is split into eleven dependency-ordered checkpoints. These documents describe intended work unless their status says they are implemented:
 
 1. [Card classification Step 1: Foundation](card-classification-step-1-foundation.md) replaces the Hero flag with an initial Player/Game Master pool and multi-valued card roles, migrates existing data, preserves Hero behavior, adds editing/filtering, and establishes restricted-card access protection.
 2. [Card classification Step 1.1: Authorization seam](card-classification-step-1-1-authorization-seam.md) consolidates user entitlement into an explicit core card-pool scope across queries, payloads, derived state, notifications, images, and published artifacts before the surface grows.
@@ -46,4 +46,4 @@ The card-pool, role, and faction work is split into nine dependency-ordered chec
 - Each checkpoint is implemented on its own branch with a pull request targeting `feature/card-classification`, not `master`.
 - Merge checkpoint pull requests into the umbrella branch in dependency order. Create the next checkpoint branch from the updated umbrella branch so its diff contains only that checkpoint.
 - CI and automatic review must run on both checkpoint and aggregate pull requests. Do not retarget a checkpoint pull request merely to trigger them.
-- Merge the umbrella pull request to `master` only after all nine implementation checkpoint acceptance criteria, Steps 4.0 and 4.1, and the aggregate review are clear.
+- Merge the umbrella pull request to `master` only after all eleven checkpoint acceptance criteria and the aggregate review are clear.
