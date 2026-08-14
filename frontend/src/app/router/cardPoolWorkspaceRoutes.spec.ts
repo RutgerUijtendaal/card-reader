@@ -63,6 +63,16 @@ describe('card pool workspace routes', () => {
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
 
+  test('rejects a restricted Gallery deep link with a trailing slash', async () => {
+    setSession(['player']);
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push('/cards/?card_pool=evil');
+
+    expect(router.currentRoute.value.fullPath).toBe('/cards');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+  });
+
   test('does not commit route-derived workspace state when a later guard rejects navigation', async () => {
     setSession(['player', 'evil', 'neutral']);
     const router = createAppRouter(createMemoryHistory());

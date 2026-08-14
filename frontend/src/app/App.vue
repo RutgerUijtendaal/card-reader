@@ -235,7 +235,7 @@ watch(
       void router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
     } else if (
       routePoolIsNoLongerAccessible
-      || (changedPool && route.path === '/cards')
+      || (changedPool && route.meta.workspaceCapability === 'gallery')
       || (lostRestrictedWorkspace && (
         route.meta.workspaceCapability === 'gallery'
         || route.meta.workspaceCapability === 'resource'

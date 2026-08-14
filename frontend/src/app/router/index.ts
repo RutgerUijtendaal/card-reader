@@ -52,12 +52,11 @@ export const APP_ROUTES: RouteRecordRaw[] = [
 ];
 
 const resolveRouteWorkspacePool = (
-  path: string,
   workspaceCapability: unknown,
   cardPool: unknown,
   returnCardPool: unknown,
 ): CardPool | undefined => {
-  if (path === '/cards') {
+  if (workspaceCapability === 'gallery') {
     return isCardPool(cardPool) ? cardPool : undefined;
   }
   if (workspaceCapability !== 'resource') {
@@ -129,7 +128,6 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     }
 
     const routeWorkspacePool = resolveRouteWorkspacePool(
-      to.path,
       to.meta.workspaceCapability,
       rawRequestedPool,
       to.query.return_card_pool,
@@ -138,14 +136,14 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       return buildWorkspaceGalleryLocation('player');
     }
 
-    if (to.path === '/cards') {
+    if (to.meta.workspaceCapability === 'gallery') {
       if (requestedPool === 'player' && rawRequestedPool !== undefined) {
         return buildWorkspaceGalleryLocation('player', to.query);
       }
       if (rawRequestedPool !== undefined && requestedPool === undefined) {
         return buildWorkspaceGalleryLocation('player', to.query);
       }
-      const redirectedFromExplicitPool = to.redirectedFrom?.path === '/cards'
+      const redirectedFromExplicitPool = to.redirectedFrom?.meta.workspaceCapability === 'gallery'
         && to.redirectedFrom.query.card_pool !== undefined;
       if (
         rawRequestedPool === undefined
@@ -175,7 +173,6 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       acceptedWorkspacePool = 'player';
     } else if (to.meta.workspaceCapability === 'resource') {
       acceptedWorkspacePool = resolveRouteWorkspacePool(
-        to.path,
         to.meta.workspaceCapability,
         to.query.card_pool,
         to.query.return_card_pool,
