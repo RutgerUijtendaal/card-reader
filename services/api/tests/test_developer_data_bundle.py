@@ -50,6 +50,7 @@ from card_reader_core.operations.developer_data import (
     validate_archive,
 )
 from card_reader_core.operations.developer_data.importer import validate_import_readiness
+from card_reader_core.operations.developer_data.exporter import _build_payload
 from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
 from card_reader_core.services.classification_rules import ClassificationRuleService
 
@@ -141,6 +142,56 @@ def test_version_two_payload_adoption_adds_empty_rule_catalog() -> None:
             }
         ],
     }
+
+
+def test_version_three_payload_adoption_removes_template_inference_hints() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "templates": [
+                {
+                    "key": "legacy",
+                    "label": "Legacy",
+                    "definition": {},
+                    "inferred_card_roles": ["hero"],
+                    "inferred_card_factions": ["order"],
+                }
+            ]
+        },
+        format_version=3,
+    )
+
+    assert adopted == {
+        "classification_rules": [],
+        "templates": [{"key": "legacy", "label": "Legacy", "definition": {}}],
+    }
+
+
+def test_classification_rule_export_order_uses_source_natural_keys() -> None:
+    zeta = Tag.objects.create(key="zeta-export-rule", label="Zeta")
+    alpha = Tag.objects.create(key="alpha-export-rule", label="Alpha")
+    service = ClassificationRuleService()
+    service.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=zeta.id,
+    )
+    service.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=alpha.id,
+    )
+
+    payload = _build_payload(cards=[], groups=[])
+    source_keys = [
+        rule.source_key
+        for rule in payload.classification_rules
+        if rule.target_kind == "role" and rule.target_key == "hero"
+    ]
+    assert source_keys == ["alpha-export-rule", "zeta-export-rule"]
 
 
 def test_legacy_payload_adoption_namespaces_card_group_references() -> None:

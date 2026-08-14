@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, cast
+from typing import Callable, TypeVar, cast
 
 from card_reader_core.models import (
     CardFaction,
@@ -10,6 +10,8 @@ from card_reader_core.models import (
     ImportJob,
     ImportJobItem,
     ImportJobStatus,
+    Tag,
+    Type,
 )
 from card_reader_core.repositories.import_jobs import (
     bump_job_processed,
@@ -27,6 +29,7 @@ from card_reader_core.repositories.metadata import (
     SuggestionCandidate,
 )
 from card_reader_core.services.cards import save_parsed_card_with_notifications
+from card_reader_core.services.classification_rules import ClassificationRuleService
 from card_reader_core.services.imports import (
     CardClassificationInput,
     CardClassificationMode,
@@ -38,6 +41,7 @@ from .resources import ParserJobContextLoader
 from .types import CardParserProtocol, ItemProcessingResult, JobOptions, ParserResources
 
 logger = logging.getLogger(__name__)
+_MetadataSource = TypeVar("_MetadataSource", Tag, Type)
 
 
 class ImportProcessorService:
@@ -138,16 +142,25 @@ class ImportProcessorService:
         resources: ParserResources,
     ) -> ItemProcessingResult:
         template_id = job.template.key
+        snapshot = cast(dict[str, object], job.classification_rule_snapshot_json)
+        frozen_tags, frozen_types = ClassificationRuleService().detector_sources_from_snapshot(
+            snapshot,
+            card_pool=cast(CardPool, job.card_pool),
+        )
+        detection_tags = _merge_metadata_sources(resources.known_tags, frozen_tags)
+        detection_types = _merge_metadata_sources(resources.known_types, frozen_types)
         parsed = self._parser.parse(
             resolve_storage_path(item.source_file),
             template_id,
             symbols=resources.detectable_symbols,
             known_keywords=resources.known_keywords,
-            known_tags=resources.known_tags,
-            known_types=resources.known_types,
+            known_tags=detection_tags,
+            known_types=detection_types,
         )
-        tag_keys_by_id = {tag.id: tag.key for tag in resources.known_tags}
-        type_keys_by_id = {type_row.id: type_row.key for type_row in resources.known_types}
+        tag_keys_by_id = {tag.id: tag.key for tag in detection_tags}
+        type_keys_by_id = {type_row.id: type_row.key for type_row in detection_types}
+        live_tag_ids = {tag.id for tag in resources.known_tags}
+        live_type_ids = {type_row.id for type_row in resources.known_types}
         matched_tags = tuple(
             DetectedClassificationSource(id=tag_id, key=tag_keys_by_id[tag_id])
             for tag_id in parsed.tag_ids
@@ -167,7 +180,7 @@ class ImportProcessorService:
                 override_factions=cast(
                     tuple[CardFaction, ...], tuple(job.card_faction_override_json)
                 ),
-                rule_snapshot=cast(dict[str, object], job.classification_rule_snapshot_json),
+                rule_snapshot=snapshot,
                 matched_tags=matched_tags,
                 matched_types=matched_types,
             )
@@ -180,8 +193,8 @@ class ImportProcessorService:
             confidence=parsed.confidence,
             raw_ocr=parsed.raw_ocr,
             keyword_ids=parsed.keyword_ids,
-            tag_ids=parsed.tag_ids,
-            type_ids=parsed.type_ids,
+            tag_ids=[tag_id for tag_id in parsed.tag_ids if tag_id in live_tag_ids],
+            type_ids=[type_id for type_id in parsed.type_ids if type_id in live_type_ids],
             symbol_ids=parsed.symbol_ids,
             tag_suggestions=[
                 SuggestionCandidate(
@@ -231,3 +244,13 @@ class ImportProcessorService:
             result.checksum,
             result.confidence,
         )
+
+
+def _merge_metadata_sources(
+    live_sources: list[_MetadataSource],
+    frozen_sources: list[_MetadataSource],
+) -> list[_MetadataSource]:
+    frozen_by_id = {source.id: source for source in frozen_sources}
+    merged = [source for source in live_sources if source.id not in frozen_by_id]
+    merged.extend(frozen_sources)
+    return sorted(merged, key=lambda source: (source.key, source.id))

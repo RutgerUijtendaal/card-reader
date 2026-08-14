@@ -5,8 +5,12 @@ from collections.abc import Sequence
 
 from django.db import IntegrityError, transaction
 
-from card_reader_core.models import CardFaction, CardPool, CardRole, ImportJob
-from card_reader_core.imports import ImportJobCreationResult, ImportJobInputValidationError
+from card_reader_core.models import CardFaction, CardPool, CardRole, ImportClassificationMode, ImportJob
+from card_reader_core.imports import (
+    ImportJobCreationResult,
+    ImportJobInputValidationError,
+    ImportJobItemTarget,
+)
 from card_reader_core.repositories.content_versions import (
     create_next_content_version,
     normalize_description,
@@ -15,9 +19,11 @@ from card_reader_core.repositories.content_versions import (
 from card_reader_core.repositories.import_jobs import (
     cancel_import_job,
     create_import_job,
+    create_import_job_with_files,
     fetch_job_by_creation_key,
     prepare_import_job_inputs,
 )
+from card_reader_core.services.classification_rules import ClassificationRuleService
 from .classification import CardClassificationMode
 
 
@@ -65,6 +71,11 @@ class ImportService:
 
         try:
             with transaction.atomic():
+                rule_snapshot = self._build_rule_snapshot(
+                    card_pool=card_pool,
+                    card_role_mode=card_role_mode,
+                    card_faction_mode=card_faction_mode,
+                )
                 content_version = create_next_content_version(
                     base_version=content_version_base,
                     description=content_version_description,
@@ -81,6 +92,7 @@ class ImportService:
                     card_role_override=card_role_override,
                     card_faction_mode=card_faction_mode,
                     card_faction_override=card_faction_override,
+                    classification_rule_snapshot=rule_snapshot,
                 )
         except ImportJobInputValidationError as exc:
             raise ImportCreationRejected(str(exc)) from exc
@@ -93,6 +105,31 @@ class ImportService:
                 outcome="replayed",
             )
         return ImportJobCreationResult(job=job, outcome="created")
+
+    def create_reparse_job_with_files(
+        self,
+        *,
+        source_path: Path,
+        template_id: str,
+        files: list[Path],
+        item_targets: Sequence[ImportJobItemTarget],
+        card_pool: CardPool,
+    ) -> ImportJob:
+        with transaction.atomic():
+            rule_snapshot = self._build_rule_snapshot(
+                card_pool=card_pool,
+                card_role_mode=ImportClassificationMode.automatic,
+                card_faction_mode=ImportClassificationMode.automatic,
+            )
+            return create_import_job_with_files(
+                source_path=source_path,
+                template_id=template_id,
+                options={"reparse_existing": True},
+                files=files,
+                item_targets=item_targets,
+                card_pool=card_pool,
+                classification_rule_snapshot=rule_snapshot,
+            )
 
     def prevalidate_job_creation(
         self,
@@ -132,3 +169,16 @@ class ImportService:
 
     def cancel_job(self, *, job_id: str) -> ImportJob | None:
         return cancel_import_job(job_id)
+
+    @staticmethod
+    def _build_rule_snapshot(
+        *,
+        card_pool: CardPool,
+        card_role_mode: str,
+        card_faction_mode: str,
+    ) -> dict[str, object]:
+        return ClassificationRuleService().build_snapshot(
+            card_pool=card_pool,
+            include_roles=card_role_mode == ImportClassificationMode.automatic,
+            include_factions=card_faction_mode == ImportClassificationMode.automatic,
+        )

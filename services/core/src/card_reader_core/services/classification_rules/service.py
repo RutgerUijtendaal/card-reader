@@ -281,9 +281,61 @@ class ClassificationRuleService:
                 raise ClassificationRuleError("Snapshot rule source_id is required.")
             if not isinstance(rule.get("source_key"), str) or not rule["source_key"]:
                 raise ClassificationRuleError("Snapshot rule source_key is required.")
+            if not isinstance(rule.get("source_label"), str):
+                raise ClassificationRuleError("Snapshot rule source_label must be a string.")
+            source_identifiers = rule.get("source_identifiers")
+            if not isinstance(source_identifiers, list) or not all(
+                isinstance(identifier, str) for identifier in source_identifiers
+            ):
+                raise ClassificationRuleError(
+                    "Snapshot rule source_identifiers must be an array of strings."
+                )
             if not isinstance(rule.get("rule_id"), str) or not rule["rule_id"]:
                 raise ClassificationRuleError("Snapshot rule rule_id is required.")
         return cast(dict[str, object], value)
+
+    def detector_sources_from_snapshot(
+        self,
+        value: object,
+        *,
+        card_pool: CardPool,
+    ) -> tuple[list[Tag], list[Type]]:
+        snapshot = self.validate_snapshot(value, card_pool=card_pool)
+        rules = cast(list[dict[str, object]], snapshot["rules"])
+        tags: dict[str, Tag] = {}
+        types: dict[str, Type] = {}
+        source_definitions: dict[tuple[str, str], tuple[str, str, tuple[str, ...]]] = {}
+        for rule in rules:
+            source_kind = cast(str, rule["source_kind"])
+            source_id = cast(str, rule["source_id"])
+            source_key = cast(str, rule["source_key"])
+            source_label = cast(str, rule["source_label"])
+            source_identifiers = tuple(cast(list[str], rule["source_identifiers"]))
+            identity = (source_kind, source_id)
+            definition = (source_key, source_label, source_identifiers)
+            previous = source_definitions.setdefault(identity, definition)
+            if previous != definition:
+                raise ClassificationRuleError(
+                    "Snapshot contains conflicting definitions for one metadata source."
+                )
+            if source_kind == CARD_CLASSIFICATION_SOURCE_TAG:
+                tags[source_id] = Tag(
+                    id=source_id,
+                    key=source_key,
+                    label=source_label,
+                    identifiers_json=list(source_identifiers),
+                )
+            else:
+                types[source_id] = Type(
+                    id=source_id,
+                    key=source_key,
+                    label=source_label,
+                    identifiers_json=list(source_identifiers),
+                )
+        return (
+            sorted(tags.values(), key=lambda source: (source.key, source.id)),
+            sorted(types.values(), key=lambda source: (source.key, source.id)),
+        )
 
     def definition_catalog(
         self, *, card_pool_scope: CardPoolScope
@@ -413,12 +465,17 @@ class ClassificationRuleService:
             target_key=rule.target_key,
         )
         payload = classification_rule_payload(rule)
+        source = rule.tag if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG else rule.type
+        if source is None:
+            raise ClassificationRuleError(f"Rule {rule.id} has an invalid source reference.")
         return {
             "rule_id": payload["id"],
             "card_pool": payload["card_pool"],
             "source_kind": payload["source_kind"],
             "source_id": payload["source_id"],
             "source_key": payload["source_key"],
+            "source_label": source.label,
+            "source_identifiers": list(source.identifiers_json),
             "target_kind": payload["target_kind"],
             "target_key": payload["target_key"],
         }

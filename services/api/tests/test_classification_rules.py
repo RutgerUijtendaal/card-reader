@@ -162,6 +162,44 @@ def test_snapshots_are_pool_scoped_and_exclude_disabled_rules() -> None:
     assert disabled.id not in {rule["rule_id"] for rule in snapshot["rules"]}
 
 
+def test_snapshot_detector_sources_survive_later_catalog_edits_and_deletion() -> None:
+    tag = Tag.objects.create(
+        key="frozen-hero",
+        label="Frozen Hero",
+        identifiers_json=["original hero term"],
+    )
+    service = ClassificationRuleService()
+    rule = service.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=tag.id,
+    )
+    snapshot = service.build_snapshot(
+        card_pool="player",
+        include_roles=True,
+        include_factions=True,
+    )
+    original_tag_id = tag.id
+
+    tag.key = "renamed-hero"
+    tag.label = "Renamed Hero"
+    tag.identifiers_json = ["replacement term"]
+    tag.save(update_fields=["key", "label", "identifiers_json"])
+    service.delete_rule(rule_id=rule.id)
+    tag.delete()
+
+    frozen_tags, frozen_types = service.detector_sources_from_snapshot(
+        snapshot,
+        card_pool="player",
+    )
+    assert frozen_types == []
+    assert [(row.id, row.key, row.label, row.identifiers_json) for row in frozen_tags] == [
+        (original_tag_id, "frozen-hero", "Frozen Hero", ["original hero term"])
+    ]
+
+
 @pytest.mark.parametrize(
     ("target_kind", "target_key"),
     [("role", "unknown"), ("faction", "unknown"), ("unknown", "hero")],

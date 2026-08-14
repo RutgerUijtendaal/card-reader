@@ -30,6 +30,8 @@ def rule(
         "source_kind": source_kind,
         "source_id": source_id,
         "source_key": source_key,
+        "source_label": source_key,
+        "source_identifiers": [],
     }
 
 

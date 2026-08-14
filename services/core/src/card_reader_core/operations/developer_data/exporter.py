@@ -11,7 +11,12 @@ from typing import Any, cast
 from django.db.migrations.recorder import MigrationRecorder
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
+    CARD_CLASSIFICATION_SOURCE_TAG,
+    CARD_CLASSIFICATION_TARGET_ROLE,
+    CARD_FACTION_DEFINITIONS,
+    CARD_POOL_DEFINITIONS,
     CARD_POOLS,
+    CARD_ROLE_DEFINITIONS,
     PLAYER_CARD_POOL_SCOPE,
     Card,
     CardBack,
@@ -195,12 +200,13 @@ def _build_payload(*, cards: list[Card], groups: list[CardGroup]) -> DeveloperDa
             )
             for row in Template.objects.order_by("key")
         ],
-        classification_rules=[
-            _classification_rule_record(row)
-            for row in CardClassificationRule.objects.select_related("tag", "type").order_by(
-                "card_pool", "target_kind", "target_key", "source_kind", "id"
-            )
-        ],
+        classification_rules=sorted(
+            (
+                _classification_rule_record(row)
+                for row in CardClassificationRule.objects.select_related("tag", "type")
+            ),
+            key=_classification_rule_sort_key,
+        ),
         deck_tags=[
             DeckTagRecord(kind=row.kind, key=row.key, label=row.label)
             for row in DeckTag.objects.order_by("kind", "key")
@@ -238,6 +244,30 @@ def _classification_rule_record(
         source_key=source.key,
         enabled=row.enabled,
     )
+
+
+def _classification_rule_sort_key(
+    rule: ClassificationRuleRecord,
+) -> tuple[int, int, int, int, str]:
+    pool_rank = next(
+        definition.rank for definition in CARD_POOL_DEFINITIONS if definition.key == rule.card_pool
+    )
+    if rule.target_kind == CARD_CLASSIFICATION_TARGET_ROLE:
+        target_kind_rank = 0
+        target_rank = next(
+            definition.rank
+            for definition in CARD_ROLE_DEFINITIONS
+            if definition.key == rule.target_key
+        )
+    else:
+        target_kind_rank = 1
+        target_rank = next(
+            definition.rank
+            for definition in CARD_FACTION_DEFINITIONS
+            if definition.key == rule.target_key
+        )
+    source_kind_rank = 0 if rule.source_kind == CARD_CLASSIFICATION_SOURCE_TAG else 1
+    return pool_rank, target_kind_rank, target_rank, source_kind_rank, rule.source_key
 
 
 def _catalog_record(row: Keyword | Tag | Type) -> CatalogRecord:

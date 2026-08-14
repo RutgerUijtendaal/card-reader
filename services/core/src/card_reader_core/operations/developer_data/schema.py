@@ -298,6 +298,18 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
         return value
     adopted = dict(value)
     adopted["classification_rules"] = []
+    templates = adopted.get("templates")
+    if isinstance(templates, list):
+        adopted["templates"] = [
+            {
+                key: item
+                for key, item in template.items()
+                if key not in {"inferred_card_roles", "inferred_card_factions"}
+            }
+            if isinstance(template, dict)
+            else template
+            for template in templates
+        ]
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted

@@ -26,7 +26,6 @@ from card_reader_core.models import (
     normalize_card_roles,
 )
 from card_reader_core.repositories.templates import get_template_by_key
-from card_reader_core.services.classification_rules import ClassificationRuleService
 from card_reader_core.storage import relativize_storage_path
 
 from .files import collect_supported_files
@@ -46,6 +45,7 @@ def create_import_job(
     card_role_override: Sequence[CardRole] = (),
     card_faction_mode: str = ImportClassificationMode.automatic,
     card_faction_override: Sequence[CardFaction] = (),
+    classification_rule_snapshot: dict[str, object],
 ) -> ImportJob:
     files = collect_supported_files(source_path)
     return create_import_job_with_files(
@@ -62,6 +62,7 @@ def create_import_job(
         card_role_override=card_role_override,
         card_faction_mode=card_faction_mode,
         card_faction_override=card_faction_override,
+        classification_rule_snapshot=classification_rule_snapshot,
     )
 
 
@@ -80,6 +81,7 @@ def create_import_job_with_files(
     card_role_override: Sequence[CardRole] = (),
     card_faction_mode: str = ImportClassificationMode.automatic,
     card_faction_override: Sequence[CardFaction] = (),
+    classification_rule_snapshot: dict[str, object],
 ) -> ImportJob:
     normalized_targets = list(item_targets) if item_targets is not None else [None] * len(files)
     if len(normalized_targets) != len(files):
@@ -96,11 +98,6 @@ def create_import_job_with_files(
     resolved_fingerprint = creation_fingerprint or f"internal:{resolved_creation_key}"
 
     with transaction.atomic():
-        rule_snapshot = ClassificationRuleService().build_snapshot(
-            card_pool=card_pool,
-            include_roles=prepared.card_role_mode == ImportClassificationMode.automatic,
-            include_factions=prepared.card_faction_mode == ImportClassificationMode.automatic,
-        )
         job = ImportJob.objects.create(
             source_path=relativize_storage_path(
                 source_path,
@@ -117,7 +114,7 @@ def create_import_job_with_files(
             card_role_override_json=list(prepared.card_role_override),
             card_faction_mode=prepared.card_faction_mode,
             card_faction_override_json=list(prepared.card_faction_override),
-            classification_rule_snapshot_json=rule_snapshot,
+            classification_rule_snapshot_json=classification_rule_snapshot,
             total_items=len(files),
             processed_items=0,
         )

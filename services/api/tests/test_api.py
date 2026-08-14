@@ -380,6 +380,8 @@ def test_import_upload_snapshots_rules_and_defaults_to_automatic() -> None:
             "source_kind": "tag",
             "source_id": hero_tag.id,
             "source_key": "hero-snapshot",
+            "source_label": "Hero Snapshot",
+            "source_identifiers": [],
             "target_kind": "role",
             "target_key": "hero",
         }
@@ -523,6 +525,11 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
         template_id="mtg-like-v1",
         options={},
         files=[image_one, image_two],
+        classification_rule_snapshot=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+        ),
     )
 
     class InterruptingParser:
@@ -561,6 +568,77 @@ def test_processor_honors_running_job_cancellation_after_current_item() -> None:
     assert job.status == "cancelled"
     assert job.processed_items == 2
     assert [item.status for item in items] == ["completed", "cancelled"]
+
+
+def test_processor_uses_frozen_classification_detector_inputs() -> None:
+    tag = Tag.objects.create(
+        key="frozen-parser-source",
+        label="Original Hero Source",
+        identifiers_json=["original hero term"],
+    )
+    classification_rules = ClassificationRuleService()
+    classification_rules.create_rule(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        source_id=tag.id,
+    )
+    image = settings.storage_root_dir / "uploads" / "frozen-parser-job" / "0001.png"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"frozen-parser-image")
+    job = create_import_job_with_files(
+        source_path=image.parent,
+        template_id="mtg-like-v1",
+        options={},
+        files=[image],
+        classification_rule_snapshot=classification_rules.build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+        ),
+    )
+
+    tag.label = "Edited Hero Source"
+    tag.identifiers_json = ["edited hero term"]
+    tag.save(update_fields=["label", "identifiers_json", "updated_at"])
+
+    class SnapshotInspectingParser:
+        def parse(
+            self,
+            image_path: Path,
+            template_id: str,
+            **resources: object,
+        ) -> SimpleNamespace:
+            known_tags = resources["known_tags"]
+            assert isinstance(known_tags, list)
+            frozen_tag = next(row for row in known_tags if isinstance(row, Tag) and row.id == tag.id)
+            assert frozen_tag.label == "Original Hero Source"
+            assert frozen_tag.identifiers_json == ["original hero term"]
+            return SimpleNamespace(
+                checksum="frozen-parser-checksum",
+                normalized_fields={
+                    "name": "Frozen Snapshot Card",
+                    "type_line": "Type",
+                    "mana_cost": "",
+                    "attack": "",
+                    "health": "",
+                    "rules_text": "",
+                },
+                confidence={"overall": 0.9},
+                raw_ocr={"source": str(image_path), "template_id": template_id},
+                keyword_ids=[],
+                tag_ids=[tag.id],
+                type_ids=[],
+                symbol_ids=[],
+                tag_suggestions=[],
+                type_suggestions=[],
+            )
+
+    ImportProcessorService(SnapshotInspectingParser()).process_job(job.id)
+
+    card = Card.objects.get(key="frozen-snapshot-card")
+    assert CardRoleAssignment.objects.filter(card=card, role="hero").exists()
 
 
 def test_card_gallery_routes_are_public() -> None:
