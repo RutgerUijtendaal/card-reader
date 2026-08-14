@@ -5,13 +5,14 @@ import {
   useCardPublicDetailState,
 } from '@/features/card-detail/composables/useCardPublicDetailState';
 
-const { apiGet, replaceRoute, route } = vi.hoisted(() => ({
+const { apiGet, replaceRoute, route, workspaceState } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   replaceRoute: vi.fn(),
   route: {
     params: { id: 'card-1' },
     query: { version_id: 'version-2', return_to: 'gallery' },
   },
+  workspaceState: { generation: 0 },
 }));
 
 vi.mock('@vueuse/core', () => ({
@@ -32,6 +33,10 @@ vi.mock('@/domain/session/store', () => ({
   useAuthStore: () => ({ canAccessStaffRoutes: false }),
 }));
 
+vi.mock('@/domain/cards/cardPoolWorkspace', () => ({
+  useCardPoolWorkspaceStore: () => workspaceState,
+}));
+
 vi.mock('@/domain/cards/utils/gallery/galleryNavigation', () => ({
   useGalleryCardNavigation: () => ({
     hasGalleryContext: { value: false },
@@ -49,6 +54,7 @@ describe('useCardPublicDetailState version navigation', () => {
   afterEach(() => {
     vi.clearAllMocks();
     route.query = { version_id: 'version-2', return_to: 'gallery' };
+    workspaceState.generation = 0;
   });
 
   test('selects a requested version and keeps later selections in the URL', async () => {
@@ -92,5 +98,35 @@ describe('useCardPublicDetailState version navigation', () => {
 
     expect(resolvePublicCardVersionId(versions, undefined)).toBe('version-1');
     expect(resolvePublicCardVersionId(versions, 'missing-version')).toBe('version-1');
+  });
+
+  test('does not publish a detail response from an obsolete workspace generation', async () => {
+    let resolveCard: ((value: { data: { id: string } }) => void) | undefined;
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/cards/card-1') {
+        return new Promise((resolve) => {
+          resolveCard = resolve;
+        });
+      }
+      if (url.endsWith('/generations')) {
+        return Promise.resolve({ data: [{ version_id: 'version-1', is_latest: true }] });
+      }
+      if (url === '/cards/filters') {
+        return Promise.resolve({ data: { symbols: [] } });
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    const scope = effectScope();
+    const state = scope.run(() => useCardPublicDetailState());
+
+    const loadPromise = state?.loadCard();
+    await Promise.resolve();
+    workspaceState.generation += 1;
+    resolveCard?.({ data: { id: 'restricted-card' } });
+    await loadPromise;
+
+    expect(state?.card.value).toBeNull();
+    expect(state?.versions.value).toEqual([]);
+    scope.stop();
   });
 });

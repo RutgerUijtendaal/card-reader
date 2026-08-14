@@ -6,7 +6,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.common.auth_access import is_authenticated
+from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
 from card_reader_api.common.responses import serializer_error
 from card_reader_api.notifications.serializers import (
     NotificationQuerySerializer,
@@ -29,7 +29,14 @@ class NotificationSummaryView(APIView):
         user_id = _notification_user_id(request)
         if user_id is None:
             return Response({"unread_count": 0})
-        return Response({"unread_count": count_unread_notifications(user_id)})
+        return Response(
+            {
+                "unread_count": count_unread_notifications(
+                    user_id,
+                    card_pool_scope=card_pool_scope_for_user(request.user),
+                )
+            }
+        )
 
 
 class NotificationListView(APIView):
@@ -53,6 +60,7 @@ class NotificationListView(APIView):
             )
         page = list_notifications(
             user_id,
+            card_pool_scope=card_pool_scope_for_user(request.user),
             status=serializer.validated_data["status"],
             event_type=serializer.validated_data.get("event_type"),
             page=serializer.validated_data["page"],
@@ -84,6 +92,7 @@ class NotificationDetailView(APIView):
             notification = set_notification_read_state(
                 notification_id=notification_id,
                 recipient_id=user_id,
+                card_pool_scope=card_pool_scope_for_user(request.user),
                 read=bool(serializer.validated_data["read"]),
             )
         except NotificationReadStateConflict as exc:
@@ -106,7 +115,10 @@ class MarkAllNotificationsReadView(APIView):
         user_id = _notification_user_id(request)
         if user_id is None:
             return Response({"detail": "Authentication required."}, status=status.HTTP_403_FORBIDDEN)
-        updated_count = mark_all_notifications_read(user_id)
+        updated_count = mark_all_notifications_read(
+            user_id,
+            card_pool_scope=card_pool_scope_for_user(request.user),
+        )
         return Response({"updated_count": updated_count, "unread_count": 0})
 
 

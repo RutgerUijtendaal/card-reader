@@ -146,26 +146,30 @@ let groupRequestId = 0;
 const loadGroup = async (): Promise<void> => {
   const requestId = groupRequestId + 1;
   groupRequestId = requestId;
+  const workspaceGeneration = workspace.generation;
   isLoadingInitial.value = true;
+  group.value = null;
+  symbolByKey.value = {};
   const groupId = String(route.params.id);
   try {
     const [groupResponse, filtersResponse] = await Promise.all([
       fetchCardGroupDetail(groupId, groupRequestParams.value),
       fetchCardFilters(),
     ]);
-    if (requestId !== groupRequestId) return;
+    if (requestId !== groupRequestId || workspaceGeneration !== workspace.generation) return;
     group.value = groupResponse;
     symbolByKey.value = Object.fromEntries(
       (filtersResponse.symbols ?? []).map((row) => [row.key, row]),
     );
   } finally {
-    if (requestId === groupRequestId) {
+    if (requestId === groupRequestId && workspaceGeneration === workspace.generation) {
       isLoadingInitial.value = false;
     }
   }
 };
 
 watch(() => [route.params.id, route.query.lifecycle_status, route.query.card_pool], loadGroup);
+watch(() => workspace.generation, loadGroup, { flush: 'sync' });
 onMounted(loadGroup);
 
 const {

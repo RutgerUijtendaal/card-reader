@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import card_reader_core.repositories.cards.edits as card_edits_repository
 
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
@@ -20,6 +21,7 @@ from card_reader_core.repositories.cards import (
     ensure_card_alias,
     resolve_card_by_name_key,
     save_parsed_card,
+    update_latest_card_version,
 )
 from card_reader_core.storage import build_storage_relative_path
 from card_reader_core.services.card_merges import preview_card_merge
@@ -116,6 +118,55 @@ def test_name_pool_and_faction_move_is_atomic_and_moves_every_alias() -> None:
         ("neutral", '["order","darkness"]', "old-alias"),
         ("neutral", '["order","darkness"]', "moving-card"),
     }
+
+
+@pytest.mark.django_db
+def test_pool_only_edit_preserves_a_concurrent_faction_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = Template.objects.create(key="concurrent-classification", label="Concurrent")
+    card, _created = create_card_identity(
+        name="Concurrent Classification",
+        card_pool="player",
+        card_factions=(),
+    )
+    version = CardVersion.objects.create(
+        card=card,
+        template=template,
+        image_hash="concurrent-classification",
+        name=card.label,
+    )
+    card.latest_version = version
+    card.save(update_fields=["latest_version"])
+    original_change_card_identity = card_edits_repository.change_card_identity
+    simulated_overlap = False
+
+    def change_after_stale_read(**kwargs: object):
+        nonlocal simulated_overlap
+        if not simulated_overlap:
+            simulated_overlap = True
+            original_change_card_identity(card=card, card_factions=("blood",))
+        return original_change_card_identity(**kwargs)
+
+    monkeypatch.setattr(
+        card_edits_repository,
+        "change_card_identity",
+        change_after_stale_read,
+    )
+
+    updated = update_latest_card_version(
+        card_id=card.id,
+        updates={"card_pool": "evil"},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+
+    assert updated is not None
+    card.refresh_from_db()
+    assert card.card_pool == "evil"
+    assert card_faction_keys(card) == ("blood",)
 
 
 @pytest.mark.django_db

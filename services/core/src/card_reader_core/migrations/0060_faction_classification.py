@@ -9,6 +9,17 @@ import card_reader_core.models.base
 
 
 EMPTY_FACTION_IDENTITY_KEY = "[]"
+NEW_CARD_ROLES = frozenset({"boss", "shop_item"})
+
+
+def _contains_new_card_role(value: object) -> bool:
+    if isinstance(value, str):
+        return value in NEW_CARD_ROLES
+    if isinstance(value, dict):
+        return any(_contains_new_card_role(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(_contains_new_card_role(item) for item in value)
+    return False
 
 
 def nest_classification_evidence(apps: Any, _schema_editor: Any) -> None:
@@ -37,6 +48,7 @@ def guard_and_flatten_classification_evidence(apps: Any, _schema_editor: Any) ->
     CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
     Card = apps.get_model("card_reader_core", "Card")
     CardAlias = apps.get_model("card_reader_core", "CardAlias")
+    CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
     Template = apps.get_model("card_reader_core", "Template")
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
     ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
@@ -60,9 +72,32 @@ def guard_and_flatten_classification_evidence(apps: Any, _schema_editor: Any) ->
         unsupported.append("resolved import factions")
     if ImportJobItem.objects.exclude(target_card_factions_snapshot_json=[]).exists():
         unsupported.append("target faction snapshots")
+    if CardRoleAssignment.objects.filter(role__in=NEW_CARD_ROLES).exists():
+        unsupported.append("new card role assignments")
+    if any(
+        _contains_new_card_role(value)
+        for value in Template.objects.values_list("inferred_card_roles_json", flat=True)
+    ):
+        unsupported.append("new template role hints")
+    if any(
+        _contains_new_card_role(value)
+        for field_name in ("card_role_override_json", "template_role_snapshot_json")
+        for value in ImportJob.objects.values_list(field_name, flat=True)
+    ):
+        unsupported.append("new import role snapshots")
+    if any(
+        _contains_new_card_role(value)
+        for field_name in (
+            "resolved_card_roles_json",
+            "target_card_roles_snapshot_json",
+            "classification_inference_json",
+        )
+        for value in ImportJobItem.objects.values_list(field_name, flat=True)
+    ):
+        unsupported.append("new import item role snapshots")
     if unsupported:
         raise RuntimeError(
-            "Migration 0060 cannot be reversed while faction data exists in: "
+            "Migration 0060 cannot be reversed while classification data exists in: "
             + ", ".join(unsupported)
             + "."
         )

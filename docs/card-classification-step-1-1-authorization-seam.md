@@ -17,6 +17,8 @@ Do not grow import or workspace behavior until this step's acceptance criteria a
 
 Target amendment: this document preserves the implemented Step 1.1 names. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces the temporary Game-Master-specific entitlement/session vocabulary with a Player/Evil/Neutral pool scope. Evil and Neutral share the same initially staff-only restricted-pool policy.
 
+Final implementation amendment: card-linked inbox reads use the recipient's current scope instead of destructively retiring history during a pool transition. This permits global staff Review notifications for restricted cards while continuing to hide those rows from recipients whose current scope does not include the card. Deck-version notification creation remains Player-only with the deck workflow.
+
 ## Outcome
 
 Keep the current single entitlement decision—Game Master access initially maps to staff—but replace scattered downstream authorization booleans and repeated pool checks with one explicit card-pool visibility scope.
@@ -136,8 +138,8 @@ Card, group, catalog, deck, notification, and export serializers should compose 
 
 Treat durable and generated outputs as separate authorization failure domains:
 
-- archive card-linked notification rows when a Player card becomes Game Master;
-- suppress current Player-workspace notification events for Game Master cards;
+- retain card-linked notification history and filter inbox reads and mutations through the recipient's current scope;
+- suppress deck-version notification events for cards outside the Player-only deck workflow;
 - reject capability-unsafe idempotent replay without returning embedded restricted references;
 - invalidate or rerender public TTS material after a pool transition;
 - keep developer-data and public TTS generation fixed to Player-only scope;
@@ -217,7 +219,7 @@ Also validate the authorization matrix in CI and manually inspect representative
 - Search, counts, ordering, validation, rules, notifications, replay, images, exports, TTS, and developer-data cannot expose out-of-scope card data.
 - Public derived artifacts remain Player-only regardless of which users receive the Game Master capability.
 - Current `403`, `404`, restricted-placeholder, reference-preservation, and invalid-state behavior remains compatible; restricted deck placeholders use opaque identifiers rather than stable Game Master card ids.
-- Notification retirement and query filtering resolve merged source identities before deciding whether a card-linked snapshot is visible.
+- Notification query filtering resolves merged source identities before deciding whether a card-linked snapshot is visible, without destroying history that remains valid for a broader recipient scope.
 - The authorization matrix passes for anonymous, authenticated non-staff, and staff viewers.
 - Architecture guards prevent the seam from scattering again.
 - Lint, typecheck, Django checks, affected frontend tests, CI backend tests, and documentation validation pass.

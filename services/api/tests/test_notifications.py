@@ -538,7 +538,7 @@ def test_parse_flag_review_creates_submitter_notification() -> None:
     assert payload["metadata"] == notification.metadata_json
 
 
-def test_parse_flag_review_does_not_notify_after_card_moves_to_evil_pool() -> None:
+def test_parse_flag_review_notification_is_hidden_after_card_moves_out_of_submitter_scope() -> None:
     _clear_notifications()
     submitter = _create_user("notification-gm-flag-submit", "password")
     reviewer = _create_user("notification-gm-flag-reviewer", "password", is_staff=True)
@@ -572,7 +572,37 @@ def test_parse_flag_review_does_not_notify_after_card_moves_to_evil_pool() -> No
     )
 
     assert review_response.status_code == 200
-    assert not UserNotification.objects.filter(recipient_id=str(submitter.pk)).exists()
+    assert UserNotification.objects.filter(recipient_id=str(submitter.pk)).exists()
+    assert submit_client.get("/notifications?status=all").json()["count"] == 0
+
+
+def test_staff_submitter_receives_parse_review_notification_for_evil_card() -> None:
+    _clear_notifications()
+    submitter = _create_user("notification-evil-flag-submit", "password", is_staff=True)
+    reviewer = _create_user("notification-evil-flag-reviewer", "password", is_staff=True)
+    card, version = _create_card_version(name="Notification Evil Flag Card")
+    card.card_pool = "evil"
+    card.save(update_fields=["card_pool"])
+    submit_client = Client(HTTP_HOST="localhost")
+    submit_client.force_login(submitter)
+    submit_response = submit_client.post(
+        f"/cards/{card.id}/versions/{version.id}/flags",
+        data={"items": [{"property_key": "name", "expected_value": "Corrected Evil Card"}]},
+        content_type="application/json",
+    )
+    assert submit_response.status_code == 201
+    reviewer_client = Client(HTTP_HOST="localhost")
+    reviewer_client.force_login(reviewer)
+    flag = reviewer_client.get("/review/parse-flags").json()["results"][0]
+
+    response = reviewer_client.patch(
+        f"/review/parse-flags/items/{flag['items'][0]['id']}",
+        data={"status": "resolved"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert submit_client.get("/notifications?status=all").json()["count"] == 1
 
 
 def test_parse_flag_self_review_creates_notification_in_development(monkeypatch) -> None:
@@ -739,7 +769,7 @@ def test_card_version_change_notifies_hero_deck_owner_but_not_actor() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_evil_reclassification_archives_card_notifications_and_stops_future_delivery() -> None:
+def test_evil_reclassification_hides_card_notifications_and_stops_future_deck_delivery() -> None:
     _clear_notifications()
     owner = _create_user("notification-reclassified-owner", "password")
     hero = _create_card(name="Notification Reclassified Hero", hero=True)
@@ -801,7 +831,7 @@ def test_evil_reclassification_archives_card_notifications_and_stops_future_deli
     )
 
     assert updated is not None
-    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 0
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 3
     client = Client(HTTP_HOST="localhost")
     client.force_login(owner)
     assert client.get("/notifications?status=all").json()["count"] == 0
@@ -811,11 +841,11 @@ def test_evil_reclassification_archives_card_notifications_and_stops_future_deli
         previous_card_version_id=None,
         cause=DECK_CARD_VERSION_CHANGE_VERSION_PROMOTED,
     ) == []
-    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 0
+    assert UserNotification.objects.filter(recipient_id=str(owner.pk), archived_at__isnull=True).count() == 3
 
 
 @pytest.mark.django_db(transaction=True)
-def test_evil_reclassification_is_authoritative_when_cleanup_fails(
+def test_evil_reclassification_keeps_notifications_stored_while_reconciling_tts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_notifications()
@@ -851,14 +881,10 @@ def test_evil_reclassification_is_authoritative_when_cleanup_fails(
     )
     synced_card_ids: list[str] = []
 
-    def fail_archive(_service: NotificationService, _card_id: str) -> int:
-        raise RuntimeError("simulated notification archival failure")
-
     def record_sync(_service: TtsCardSheetService, card_ids: list[str]) -> set[str]:
         synced_card_ids.extend(card_ids)
         return set()
 
-    monkeypatch.setattr(NotificationService, "archive_card_notifications", fail_archive)
     monkeypatch.setattr(TtsCardSheetService, "sync_cards", record_sync)
 
     updated = update_latest_card_version_with_notifications(

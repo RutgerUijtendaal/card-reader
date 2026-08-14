@@ -7,7 +7,6 @@ from .types import (
     PaginatedNotifications,
 )
 from .writes import (
-    archive_notifications_for_card,
     create_or_coalesce_notification,
     mark_all_notifications_read,
     set_notification_read_state,
@@ -19,7 +18,6 @@ __all__ = [
     "NotificationReadStateConflict",
     "NotificationStatusFilter",
     "PaginatedNotifications",
-    "archive_notifications_for_card",
     "count_unread_notifications",
     "create_or_coalesce_notification",
     "is_notification_status_filter",
