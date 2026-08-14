@@ -13,7 +13,7 @@ vi.mock('@/shared/api/client', () => ({
 }));
 
 const mockedGet = vi.mocked(api.get);
-const selectionKey = (templateKey: string): string => `player:${templateKey}`;
+const selectionKey = (templateKey: string): string => templateKey;
 
 const relativeDefinitionJson = JSON.stringify({
   id: 'mtg-like-v1',
@@ -76,7 +76,7 @@ describe('useTemplatePreview', () => {
     useCardPoolWorkspaceStore().synchronizeSession(['player', 'evil', 'neutral'], 'staff:1');
     mockedGet.mockReset();
     mockedGet.mockImplementation(async (url) => {
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -154,6 +154,7 @@ describe('useTemplatePreview', () => {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'current-template',
@@ -173,7 +174,7 @@ describe('useTemplatePreview', () => {
           },
         };
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -207,6 +208,7 @@ describe('useTemplatePreview', () => {
           id: 'missing-card',
           label: 'Missing Card',
           name: 'Missing Card',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/missing-card/image',
           scope: 'current-template',
@@ -217,7 +219,7 @@ describe('useTemplatePreview', () => {
       if (url === '/cards/missing-card') {
         throw new Error('Not found');
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -252,6 +254,7 @@ describe('useTemplatePreview', () => {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'current-template',
@@ -260,6 +263,7 @@ describe('useTemplatePreview', () => {
           id: 'card-2',
           label: 'Card Two',
           name: 'Card Two',
+          card_pool: 'evil',
           template_id: 'mtg-like-v2',
           image_url: '/cards/card-2/image',
           scope: 'all-cards',
@@ -291,7 +295,7 @@ describe('useTemplatePreview', () => {
           },
         };
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -334,6 +338,7 @@ describe('useTemplatePreview', () => {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'all-cards',
@@ -353,7 +358,7 @@ describe('useTemplatePreview', () => {
           },
         };
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         const params = config && typeof config === 'object' && 'params' in config ? config.params : {};
         const results =
           params && typeof params === 'object' && 'template_id' in params && params.template_id === 'mtg-like-v2'
@@ -363,6 +368,7 @@ describe('useTemplatePreview', () => {
                   id: 'unrelated-card',
                   label: 'Unrelated Card',
                   name: 'Unrelated Card',
+                  card_pool: 'neutral',
                   template_id: 'other-template',
                   image_url: '/cards/unrelated-card/image',
                   result_type: 'card',
@@ -408,7 +414,7 @@ describe('useTemplatePreview', () => {
     const secondTemplateSearch = createDeferred<CardsResponse>();
 
     mockedGet.mockImplementation((async (url, config) => {
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         const params = config && typeof config === 'object' && 'params' in config ? config.params : {};
         if (params && typeof params === 'object' && 'template_id' in params && params.template_id === 'mtg-like-v1') {
           return firstTemplateSearch.promise;
@@ -444,6 +450,7 @@ describe('useTemplatePreview', () => {
             id: 'stale-card',
             label: 'Stale Card',
             name: 'Stale Card',
+            card_pool: 'evil',
             template_id: 'mtg-like-v1',
             image_url: '/cards/stale-card/image',
             result_type: 'card',
@@ -484,6 +491,7 @@ describe('useTemplatePreview', () => {
           id: 'card-1',
           label: 'Card One',
           name: 'Card One',
+          card_pool: 'player',
           template_id: 'mtg-like-v1',
           image_url: '/cards/card-1/image',
           scope: 'current-template',
@@ -494,7 +502,7 @@ describe('useTemplatePreview', () => {
       if (url === '/cards/card-1') {
         return savedCardDetail.promise;
       }
-      if (url === '/cards') {
+      if (url === '/admin/templates/preview-cards') {
         return {
           data: {
             count: 0,
@@ -520,6 +528,7 @@ describe('useTemplatePreview', () => {
       id: 'card-2',
       label: 'Card Two',
       name: 'Card Two',
+      card_pool: 'evil',
       template_id: 'mtg-like-v1',
       image_url: '/cards/card-2/image',
     });
@@ -529,6 +538,7 @@ describe('useTemplatePreview', () => {
         id: 'card-1',
         label: 'Card One',
         name: 'Card One',
+        card_pool: 'player',
         template_id: 'mtg-like-v1',
         image_url: '/cards/card-1/image',
       },
@@ -551,7 +561,7 @@ describe('useTemplatePreview', () => {
     await flushDebounce();
 
     expect(mockedGet).toHaveBeenCalledWith(
-      '/cards',
+      '/admin/templates/preview-cards',
       expect.objectContaining({
         params: expect.objectContaining({
           template_id: 'mtg-like-v1',
@@ -560,30 +570,31 @@ describe('useTemplatePreview', () => {
     );
   });
 
-  test('switches preview selection and searches to the active workspace', async () => {
-    mockedGet.mockImplementation(async (url, config) => {
-      if (url !== '/cards') {
+  test('keeps preview selection and search global when the shell workspace changes', async () => {
+    mockedGet.mockImplementation(async (url) => {
+      if (url !== '/admin/templates/preview-cards') {
         throw new Error(`Unhandled request: ${String(url)}`);
       }
-      const params = config && typeof config === 'object' && 'params' in config ? config.params : {};
-      const pool = params && typeof params === 'object' && 'card_pool' in params
-        ? params.card_pool
-        : 'player';
       return {
         data: {
-          count: 1,
-          next_page: null,
-          previous_page: null,
-          page: 1,
-          page_size: 8,
-          results: [{
-            id: `${String(pool)}-card`,
-            label: `${String(pool)} Card`,
-            name: `${String(pool)} Card`,
-            template_id: 'mtg-like-v1',
-            image_url: null,
-            result_type: 'card',
-          }],
+          results: [
+            {
+              id: 'player-card',
+              label: 'Shared Card',
+              name: 'Shared Card',
+              card_pool: 'player',
+              template_id: 'mtg-like-v1',
+              image_url: null,
+            },
+            {
+              id: 'evil-card',
+              label: 'Shared Card',
+              name: 'Shared Card',
+              card_pool: 'evil',
+              template_id: 'mtg-like-v1',
+              image_url: null,
+            },
+          ],
         },
       };
     });
@@ -594,18 +605,23 @@ describe('useTemplatePreview', () => {
     });
 
     await preview.restorePreviewCard();
+    await vi.runOnlyPendingTimersAsync();
+    await nextTick();
     expect(preview.selectedPreviewCard.value?.id).toBe('player-card');
+    expect(preview.previewCards.value.map((card) => card.card_pool)).toEqual(['player', 'evil']);
+    const requestCount = mockedGet.mock.calls.length;
 
     workspace.selectPool('evil');
     await nextTick();
     await vi.runOnlyPendingTimersAsync();
     await nextTick();
 
-    expect(preview.selectedPreviewCard.value?.id).toBe('evil-card');
+    expect(preview.selectedPreviewCard.value?.id).toBe('player-card');
+    expect(mockedGet).toHaveBeenCalledTimes(requestCount);
     expect(mockedGet).toHaveBeenLastCalledWith(
-      '/cards',
+      '/admin/templates/preview-cards',
       expect.objectContaining({
-        params: expect.objectContaining({ card_pool: 'evil' }),
+        params: expect.not.objectContaining({ card_pool: expect.anything() }),
       }),
     );
   });

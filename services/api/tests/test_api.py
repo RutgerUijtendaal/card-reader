@@ -857,6 +857,37 @@ def test_staff_can_manage_templates() -> None:
     assert created_template.inferred_card_factions_json == ["order", "darkness"]
 
 
+def test_template_preview_cards_are_global_across_authorized_pools() -> None:
+    client = _staff_client("global-template-preview-user")
+    _create_editable_card_version(name="Player Global Preview", card_pool="player")
+    _create_editable_card_version(name="Evil Global Preview", card_pool="evil")
+    _create_editable_card_version(name="Neutral Global Preview", card_pool="neutral")
+
+    response = client.get(
+        "/admin/templates/preview-cards?q=Global%20Preview&template_id=mtg-like-v1"
+    )
+
+    assert response.status_code == 200
+    assert {
+        (row["name"], row["card_pool"])
+        for row in response.json()["results"]
+    } == {
+        ("Player Global Preview", "player"),
+        ("Evil Global Preview", "evil"),
+        ("Neutral Global Preview", "neutral"),
+    }
+
+
+def test_template_preview_cards_require_staff_access() -> None:
+    user = _create_user(
+        "non-staff-template-preview-user", "password", is_staff=False
+    )
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(user)
+
+    assert client.get("/admin/templates/preview-cards").status_code == 403
+
+
 def test_template_rejects_duplicate_inferred_roles() -> None:
     response = _staff_client("staff-template-role-validation-user").post(
         "/admin/templates",
@@ -3958,11 +3989,17 @@ def _get_or_create_symbol(*, key: str, label: str, symbol_type: str) -> Symbol:
     return symbol
 
 
-def _create_editable_card_version(*, name: str) -> tuple[Card, CardVersion]:
+def _create_editable_card_version(
+    *, name: str, card_pool: str = "player"
+) -> tuple[Card, CardVersion]:
     from card_reader_core.models import Template
 
     template = Template.objects.get(key="mtg-like-v1")
-    card = Card.objects.create(key=name.lower().replace(" ", "-"), label=name)
+    card = Card.objects.create(
+        key=name.lower().replace(" ", "-"),
+        label=name,
+        card_pool=card_pool,
+    )
     version = CardVersion.objects.create(
         card_id=card.id,
         version_number=1,

@@ -1,9 +1,8 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
 import { useDebounceFn, useLocalStorage } from '@vueuse/core';
-import { fetchCard, fetchCards } from '@/domain/cards/api';
-import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
-import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
+import { fetchCard } from '@/domain/cards/api';
 import type { CardListItem } from '@/domain/cards/types';
+import { fetchTemplatePreviewCards } from '@/features/admin/api/templatePreview';
 import type {
   TemplatePreviewCardOption,
   TemplatePreviewRenderRegion,
@@ -42,12 +41,12 @@ const toPreviewCardOption = (
   id: value.id,
   label: value.label,
   name: value.name,
+  card_pool: value.card_pool,
   template_id: value.template_id,
   image_url: value.image_url ?? null,
 });
 
 export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplatePreviewOptions) => {
-  const workspace = useCardPoolWorkspaceStore();
   const previewSearchQuery = ref('');
   const previewScope = ref<TemplatePreviewScope>('current-template');
   const previewCards = ref<TemplatePreviewCardOption[]>([]);
@@ -100,7 +99,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
   const templateScopedKey = computed(() => templateKey.value.trim());
   const selectionStorageKey = computed(() =>
-    `${workspace.activePool}:${templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY}`,
+    templateScopedKey.value || UNSAVED_TEMPLATE_PREVIEW_STORAGE_KEY,
   );
   const templateScopeAvailable = computed(() => templateScopedKey.value.length > 0);
   const defaultPreviewScope = computed<TemplatePreviewScope>(() =>
@@ -154,15 +153,10 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
   const searchPreviewCards = async (expectedStorageKey = selectionStorageKey.value): Promise<void> => {
     const requestId = ++searchRequestId;
-    const expectedWorkspaceGeneration = workspace.generation;
-    const cardPool = workspace.activePool;
     previewLoading.value = true;
     try {
-      const params: Record<string, string | number | boolean | undefined> = {
-        ...managementCardSearchLifecycleParams(),
-        card_pool: cardPool,
+      const params: Record<string, string | number | undefined> = {
         page_size: 8,
-        show_groups: false,
       };
       const query = previewSearchQuery.value.trim();
       if (query) {
@@ -172,16 +166,15 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
         params.template_id = templateScopedKey.value;
       }
 
-      const response = await fetchCards<CardListItem>(params);
+      const response = await fetchTemplatePreviewCards(params);
       if (
         requestId !== searchRequestId
         || expectedStorageKey !== selectionStorageKey.value
-        || expectedWorkspaceGeneration !== workspace.generation
       ) {
         return;
       }
 
-      previewCards.value = response.results.filter((row) => row.result_type === 'card').map(toPreviewCardOption);
+      previewCards.value = response.map(toPreviewCardOption);
 
       if (!selectedPreviewCard.value && !previewSearchQuery.value.trim() && previewCards.value.length > 0) {
         setSelectedPreviewCard(previewCards.value[0]);
@@ -199,8 +192,6 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
 
   const restoreStoredPreviewCard = async (): Promise<void> => {
     const requestId = ++restoreRequestId;
-    const expectedWorkspaceGeneration = workspace.generation;
-    const cardPool = workspace.activePool;
     const storageKey = selectionStorageKey.value;
     const stored = storedSelections.value[storageKey] ?? null;
     isRestoringSelection.value = true;
@@ -221,12 +212,8 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
       if (
         requestId !== restoreRequestId
         || storageKey !== selectionStorageKey.value
-        || expectedWorkspaceGeneration !== workspace.generation
       ) {
         return;
-      }
-      if (response.card_pool !== cardPool) {
-        throw new Error('Stored preview card belongs to another workspace.');
       }
       const restored = toPreviewCardOption(response);
       selectedPreviewCard.value = restored;
@@ -235,7 +222,6 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
       if (
         requestId !== restoreRequestId
         || storageKey !== selectionStorageKey.value
-        || expectedWorkspaceGeneration !== workspace.generation
       ) {
         return;
       }
@@ -297,7 +283,7 @@ export const useTemplatePreview = ({ definitionJson, templateKey }: UseTemplateP
     }
   });
 
-  watch([selectionStorageKey, () => workspace.generation], () => {
+  watch(selectionStorageKey, () => {
     if (!hasInitializedSelection.value) {
       return;
     }

@@ -14,6 +14,7 @@ export type TemplatePreviewCardOption = {
   id: string;
   label: string;
   name: string;
+  card_pool: CardPool;
   template_id: string;
   image_url: string | null;
 };

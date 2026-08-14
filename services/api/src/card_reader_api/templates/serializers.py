@@ -64,3 +64,9 @@ class TemplateWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 class TemplateReparseSerializer(serializers.Serializer[dict[str, object]]):
     source_template_id = serializers.CharField(required=True, allow_blank=False)
+
+
+class TemplatePreviewCardsQuerySerializer(serializers.Serializer[dict[str, object]]):
+    q = serializers.CharField(required=False, allow_blank=True, default="")
+    template_id = serializers.CharField(required=False, allow_blank=True, default="")
+    page_size = serializers.IntegerField(required=False, min_value=1, max_value=25, default=8)

@@ -196,6 +196,30 @@ def list_review_cards(
     )
 
 
+def list_template_preview_cards(
+    *,
+    card_pool_scope: CardPoolScope,
+    query: str | None,
+    template_id: str | None,
+    limit: int = 8,
+) -> list[CardListRow]:
+    """List management preview cards across every pool visible to staff."""
+
+    normalized_limit = max(1, min(limit, 25))
+    versions = CardVersion.objects.filter(
+        is_latest=True,
+        card__card_pool__in=card_pool_scope.allowed_pools,
+    )
+    versions = apply_card_search(versions, query)
+    if template_id:
+        versions = versions.filter(template__key=template_id)
+    version_ids = list(
+        _apply_sql_card_sort(versions, CARD_SORT_UPDATED_DESC)
+        .values_list("id", flat=True)[:normalized_limit]
+    )
+    return get_card_list_rows_by_version_ids(version_ids)
+
+
 def list_matching_cards(
     *,
     query: str | None,

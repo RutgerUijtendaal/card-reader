@@ -26,6 +26,7 @@ from .queries import (
     list_matching_card_candidates,
     list_matching_cards,
     list_review_cards,
+    list_template_preview_cards,
     list_filtered_latest_card_version_reparse_sources,
     list_latest_card_version_reparse_sources,
 )
@@ -129,6 +130,7 @@ __all__ = [
     "list_matching_card_candidates",
     "list_matching_cards",
     "list_review_cards",
+    "list_template_preview_cards",
     "list_filtered_latest_card_version_reparse_sources",
     "list_latest_card_version_reparse_sources",
     "list_latest_active_card_image_sources",
