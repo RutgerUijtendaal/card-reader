@@ -121,7 +121,8 @@ const mountController = (cardPool: CardPool = 'player') => {
   );
   const pinia = createPinia();
   const workspace = useCardPoolWorkspaceStore(pinia);
-  workspace.synchronizeSession(['player', 'evil', 'neutral'], 'test-staff', cardPool);
+  workspace.synchronizeSession(['player', 'evil', 'neutral'], 'test-staff');
+  workspace.selectPool(cardPool);
   app.use(pinia);
   app.mount(host);
   return { app, controller, workspace };

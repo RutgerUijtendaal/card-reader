@@ -21,13 +21,9 @@ export const normalizeAccessibleCardPools = (
 
 export const resolveCardPoolWorkspace = (
   accessibleCardPools: readonly CardPool[],
-  routeCardPool: unknown,
   preferredCardPool: unknown,
 ): CardPool => {
   const accessible = new Set(normalizeAccessibleCardPools(accessibleCardPools));
-  if (isCardPool(routeCardPool) && accessible.has(routeCardPool)) {
-    return routeCardPool;
-  }
   if (isCardPool(preferredCardPool) && accessible.has(preferredCardPool)) {
     return preferredCardPool;
   }
@@ -68,7 +64,6 @@ export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () =
   const synchronizeSession = (
     nextAccessiblePools: readonly CardPool[],
     nextSessionKey: string,
-    routeCardPool?: unknown,
   ): boolean => {
     const normalizedPools = normalizeAccessibleCardPools(nextAccessiblePools);
     const scopeChanged = normalizedPools.join(':') !== accessiblePools.value.join(':');
@@ -76,10 +71,9 @@ export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () =
     const nextPool = initialized.value
       ? resolveCardPoolWorkspace(
           normalizedPools,
-          routeCardPool,
           normalizedPools.includes(activePool.value) ? activePool.value : preferredPool.value,
         )
-      : resolveCardPoolWorkspace(normalizedPools, routeCardPool, preferredPool.value);
+      : resolveCardPoolWorkspace(normalizedPools, preferredPool.value);
     const poolChanged = nextPool !== activePool.value;
 
     accessiblePools.value = normalizedPools;
