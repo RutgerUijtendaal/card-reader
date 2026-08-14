@@ -1012,6 +1012,26 @@ def test_staff_can_create_name_only_template() -> None:
     ] == "name"
 
 
+def test_staff_can_update_template_to_name_only() -> None:
+    client = _staff_client("staff-update-name-only-template-user")
+    template = Template.objects.create(
+        key="update-name-only-template",
+        label="Update Name Only Template",
+        definition_json=_valid_template_definition(),
+    )
+
+    response = client.patch(
+        f"/admin/templates/{template.id}",
+        data={"definition_json": _valid_template_definition(parser_type="name")},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["definition_json"]["regions"][0]["parser_type"] == "name"
+    template.refresh_from_db()
+    assert template.definition_json["regions"][0]["parser_type"] == "name"
+
+
 @pytest.mark.parametrize(
     ("first_parser_type", "second_parser_type"),
     [
