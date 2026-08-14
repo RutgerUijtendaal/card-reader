@@ -2,6 +2,7 @@ import { createApp, h, nextTick } from 'vue';
 import { createPinia } from 'pinia';
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import type { RouteLocationRaw } from 'vue-router';
 import CardGalleryPage from '@/features/card-gallery/CardGalleryPage.vue';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 
@@ -57,7 +58,19 @@ const flushPromises = async (): Promise<void> => {
   }
 };
 
-const mountGallery = async (path: string, activePool: 'player' | 'evil' | 'neutral') => {
+const createDeferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
+
+const mountGallery = async (
+  path: string,
+  activePool: 'player' | 'evil' | 'neutral',
+  fetchCards = () => Promise.resolve({ data: emptyCardsPage }),
+) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const requestRoutes: string[] = [];
@@ -72,7 +85,7 @@ const mountGallery = async (path: string, activePool: 'player' | 'evil' | 'neutr
     }
     if (url.startsWith('/cards?')) {
       requestRoutes.push(router.currentRoute.value.fullPath);
-      return Promise.resolve({ data: emptyCardsPage });
+      return fetchCards();
     }
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });
@@ -83,9 +96,7 @@ const mountGallery = async (path: string, activePool: 'player' | 'evil' | 'neutr
   const pinia = createPinia();
   const workspace = useCardPoolWorkspaceStore(pinia);
   workspace.synchronizeSession(['player', 'evil', 'neutral'], 'staff-user');
-  if (activePool !== 'player') {
-    workspace.selectPool(activePool);
-  }
+  workspace.selectPool(activePool);
 
   const app = createApp({ render: () => h(RouterView) });
   app.use(router);
@@ -166,6 +177,43 @@ describe('CardGalleryPage pool-aware filters', () => {
     expect(text).not.toContain('Mana');
     expect(text).not.toContain('Affinity');
     expect(text).not.toContain('Devotion');
+
+    mounted.unmount();
+  });
+
+  test('invalidates an in-flight request before awaiting canonical route replacement', async () => {
+    const staleResponse = createDeferred<{ data: typeof emptyCardsPage }>();
+    const releaseCanonicalReplace = createDeferred<void>();
+    let requestCount = 0;
+    const mounted = await mountGallery('/cards?tag_keys=old', 'player', () => {
+      requestCount += 1;
+      return requestCount === 1
+        ? staleResponse.promise
+        : Promise.resolve({ data: emptyCardsPage });
+    });
+    const originalReplace = mounted.router.replace.bind(mounted.router);
+    const replaceSpy = vi.spyOn(mounted.router, 'replace').mockImplementation(
+      async (to: RouteLocationRaw) => {
+        await releaseCanonicalReplace.promise;
+        return originalReplace(to);
+      },
+    );
+
+    await mounted.router.push('/cards?card_roles=hero&tag_keys=new');
+    await vi.waitFor(() => {
+      expect(replaceSpy).toHaveBeenCalledTimes(1);
+    });
+
+    staleResponse.resolve({ data: { ...emptyCardsPage, count: 37 } });
+    await flushPromises();
+
+    expect(mounted.container.textContent).not.toContain('37 results');
+
+    releaseCanonicalReplace.resolve();
+    await vi.waitFor(() => {
+      expect(mounted.requestRoutes).toHaveLength(2);
+    });
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?tag_keys=new');
 
     mounted.unmount();
   });

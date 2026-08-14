@@ -422,6 +422,7 @@ watch(
       return;
     }
 
+    collection.invalidatePendingLoads();
     const routeState = currentRouteFilterState.value;
     if (route.fullPath !== canonicalRouteFullPath.value) {
       await router.replace({ path: '/cards', query: canonicalRouteQuery.value });
