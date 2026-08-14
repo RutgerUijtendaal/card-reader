@@ -131,6 +131,9 @@
               >
                 {{ card.name }}
               </RouterLink>
+              <span class="theme-pill ml-2 px-2 py-0.5 text-xs">
+                {{ cardPoolLabel(card.card_pool) }}
+              </span>
               <span class="theme-section-muted"> - {{ card.confidence }}</span>
             </li>
           </ul>
@@ -235,6 +238,9 @@
                       >
                         {{ group.card.name }}
                       </RouterLink>
+                      <span class="theme-pill ml-2 px-2 py-0.5 text-xs">
+                        {{ cardPoolLabel(group.card.card_pool) }}
+                      </span>
                       <p class="theme-section-muted mt-1 text-xs">
                         {{ versionLabel(group) }} · reported by {{ group.submitted_by.username }} on {{ formatDate(group.created_at) }}
                       </p>
@@ -381,12 +387,16 @@ import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import { buildReviewCardEditorLocation } from '@/domain/card-navigation/cardReturnState';
-import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
+import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { useCardCollection } from '@/domain/cards/composables/useCardCollection';
 import { useReviewSummary } from '@/domain/review/composables/useReviewSummary';
 import { parseFlagPropertyLabels, type ParseFlagPropertyKey } from '@/domain/review/types';
 import { queryString } from '@/shared/router/routeState';
-import { fetchParseFlagPage, updateParseFlagItem } from '@/features/review-queue/api';
+import {
+  fetchParseFlagPage,
+  fetchReviewConfidenceCards,
+  updateParseFlagItem,
+} from '@/features/review-queue/api';
 import type {
   FlagStatus,
   ParseFlagPage,
@@ -399,7 +409,6 @@ import type {
 
 const route = useRoute();
 const router = useRouter();
-const workspace = useCardPoolWorkspaceStore();
 const activeView = ref<ReviewView>(queryString(route.query.view) === 'confidence' ? 'confidence' : 'flags');
 const flagStatus = ref<FlagStatus>(normalizeFlagStatus(queryString(route.query.status)));
 const flagReports = ref<ParseFlagReviewReport[]>([]);
@@ -413,13 +422,11 @@ const { decrementOpenParseFlagItemCount, loadReviewSummary } = useReviewSummary(
 const collection = useCardCollection<ReviewCard>({
   buildSearchParams: () => {
     const params = new URLSearchParams();
-    params.set('max_confidence', '0.8');
-    params.set('card_pool', workspace.activePool);
     return params;
   },
+  fetchPage: fetchReviewConfidenceCards,
   filtersLoaded,
   pageSize: 100,
-  resultSetKey: computed(() => workspace.generation),
 });
 const cards = collection.cards;
 const isLoadingInitial = collection.isLoadingInitial;
@@ -482,16 +489,12 @@ const syncQuery = (): void => {
 
 const loadFlagPage = async (page: number, mode: 'replace' | 'append'): Promise<void> => {
   const requestGeneration = ++flagRequestGeneration;
-  const workspaceGeneration = workspace.generation;
-  const cardPool = workspace.activePool;
   const status = flagStatus.value;
   loadingFlags.value = true;
   try {
-    const response = await fetchParseFlagPage(status, cardPool, page, 25);
+    const response = await fetchParseFlagPage(status, page, 25);
     if (
       requestGeneration !== flagRequestGeneration
-      || workspaceGeneration !== workspace.generation
-      || cardPool !== workspace.activePool
       || status !== flagStatus.value
     ) {
       return;
@@ -605,20 +608,6 @@ watch(
       void loadFlagPage(1, 'replace');
     }
   },
-);
-
-watch(
-  () => workspace.generation,
-  () => {
-    flagRequestGeneration += 1;
-    loadingFlags.value = false;
-    flagReports.value = [];
-    flagPage.value = null;
-    if (activeView.value === 'flags') {
-      void loadFlagPage(1, 'replace');
-    }
-  },
-  { flush: 'sync' },
 );
 
 onMounted(() => {

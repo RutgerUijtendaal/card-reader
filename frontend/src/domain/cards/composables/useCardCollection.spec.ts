@@ -27,6 +27,9 @@ const buildResponse = (results: TestCard[], nextPage: number | null = null) => (
   },
 });
 
+const buildPage = (results: TestCard[], nextPage: number | null = null) =>
+  buildResponse(results, nextPage).data;
+
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((innerResolve) => {
@@ -69,6 +72,27 @@ describe('useCardCollection', () => {
     expect(collection.isRefreshing.value).toBe(false);
     expect(collection.hasLoadedOnce.value).toBe(true);
     expect(collection.cards.value).toEqual([{ id: 'card-1', name: 'First Card' }]);
+  });
+
+  test('uses an injected page loader for focused card collections', async () => {
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValue(buildPage([{ id: 'review-card', name: 'Review Card' }]));
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams('max_confidence=0.9'),
+      filtersLoaded: ref(true),
+      pageSize: 25,
+      fetchPage,
+    });
+
+    await collection.searchCards();
+
+    expect(fetchPage).toHaveBeenCalledOnce();
+    expect(fetchPage.mock.calls[0]?.[0].toString()).toBe(
+      'max_confidence=0.9&page=1&page_size=25',
+    );
+    expect(mockedGet).not.toHaveBeenCalled();
+    expect(collection.cards.value).toEqual([{ id: 'review-card', name: 'Review Card' }]);
   });
 
   test('preserves existing cards during refresh loads', async () => {

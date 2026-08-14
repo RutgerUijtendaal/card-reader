@@ -1,4 +1,4 @@
-import { createApp, nextTick, reactive, ref } from 'vue';
+import { createApp, nextTick, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import ReviewQueuePage from '@/features/review-queue/ReviewQueuePage.vue';
@@ -9,22 +9,17 @@ const {
   collectionOptions,
   decrementOpenParseFlagItemCount,
   loadReviewSummary,
-  workspaceState,
 } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
   collectionOptions: {
     buildSearchParams: null as null | (() => URLSearchParams),
+    fetchPage: null as null | ((params: URLSearchParams) => Promise<unknown>),
     resultSetKey: null as null | { value: unknown },
   },
   decrementOpenParseFlagItemCount: vi.fn(),
   loadReviewSummary: vi.fn(),
-  workspaceState: {
-    activePool: 'player' as 'player' | 'evil' | 'neutral',
-    generation: 0,
-  },
 }));
-const workspaceStore = reactive(workspaceState);
 
 vi.mock('@/shared/api/client', () => ({
   api: {
@@ -37,9 +32,11 @@ vi.mock('@/shared/api/client', () => ({
 vi.mock('@/domain/cards/composables/useCardCollection', () => ({
   useCardCollection: (options: {
     buildSearchParams: () => URLSearchParams;
+    fetchPage?: (params: URLSearchParams) => Promise<unknown>;
     resultSetKey?: { value: unknown };
   }) => {
     collectionOptions.buildSearchParams = options.buildSearchParams;
+    collectionOptions.fetchPage = options.fetchPage ?? null;
     collectionOptions.resultSetKey = options.resultSetKey ?? null;
     return {
       cards: ref([]),
@@ -49,10 +46,6 @@ vi.mock('@/domain/cards/composables/useCardCollection', () => ({
       loadNextPage: vi.fn(),
     };
   },
-}));
-
-vi.mock('@/domain/cards/cardPoolWorkspace', () => ({
-  useCardPoolWorkspaceStore: () => workspaceStore,
 }));
 
 vi.mock('@/domain/review/composables/useReviewSummary', () => ({
@@ -100,7 +93,13 @@ const pagePayload = () => ({
       created_at: '2026-07-23T10:00:00Z',
       updated_at: '2026-07-23T10:01:00Z',
       submitted_by: { id: 'user-1', username: 'reporter' },
-      card: { id: 'card-1', label: 'Card One', name: 'Card One', image_url: null },
+      card: {
+        id: 'card-1',
+        label: 'Card One',
+        name: 'Card One',
+        card_pool: 'player',
+        image_url: null,
+      },
       version: {
         id: 'version-1',
         version_number: 1,
@@ -147,8 +146,6 @@ const mountPage = async () => {
 
 describe('ReviewQueuePage parse flags', () => {
   beforeEach(() => {
-    workspaceState.activePool = 'player';
-    workspaceState.generation = 0;
     apiGet.mockResolvedValue({ data: pagePayload() });
     apiPatch.mockResolvedValue({ data: { ...overallItem, status: 'dismissed' } });
   });
@@ -220,45 +217,19 @@ describe('ReviewQueuePage parse flags', () => {
     mounted.unmount();
   });
 
-  test('scopes confidence cards and their result set to the active workspace', async () => {
-    workspaceState.activePool = 'neutral';
-    workspaceState.generation = 7;
+  test('keeps confidence cards and parse flags global across authorized pools', async () => {
     const mounted = await mountPage();
 
-    expect(collectionOptions.buildSearchParams?.().get('card_pool')).toBe('neutral');
-    expect(collectionOptions.resultSetKey?.value).toBe(7);
+    expect(collectionOptions.buildSearchParams?.().has('card_pool')).toBe(false);
+    expect(collectionOptions.resultSetKey).toBeNull();
     expect(apiGet).toHaveBeenCalledWith(
-      '/review/parse-flags?status=open&card_pool=neutral&page=1&page_size=25',
+      '/review/parse-flags?status=open&page=1&page_size=25',
     );
-
-    mounted.unmount();
-  });
-
-  test('reloads parse flags for the new workspace and ignores the outgoing response', async () => {
-    let resolvePlayer: ((value: { data: ReturnType<typeof pagePayload> }) => void) | undefined;
-    apiGet
-      .mockReturnValueOnce(new Promise((resolve) => {
-        resolvePlayer = resolve;
-      }))
-      .mockResolvedValueOnce({
-        data: {
-          ...pagePayload(),
-          results: [{ ...pagePayload().results[0], note: 'Neutral report.' }],
-        },
-      });
-    const mounted = await mountPage();
-
-    workspaceStore.activePool = 'neutral';
-    workspaceStore.generation += 1;
-    await flushPromises();
-    resolvePlayer?.({ data: pagePayload() });
-    await flushPromises();
-
+    await collectionOptions.fetchPage?.(new URLSearchParams({ page: '1', page_size: '100' }));
     expect(apiGet).toHaveBeenLastCalledWith(
-      '/review/parse-flags?status=open&card_pool=neutral&page=1&page_size=25',
+      '/review/confidence-cards?page=1&page_size=100',
     );
-    expect(mounted.container.textContent).toContain('Neutral report.');
-    expect(mounted.container.textContent).not.toContain('Shared context.');
+    expect(mounted.container.textContent).toContain('Player');
     mounted.unmount();
   });
 });

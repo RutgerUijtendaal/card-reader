@@ -1,27 +1,28 @@
 from __future__ import annotations
 
+from typing import cast
+
 from rest_framework import serializers
 
 from card_reader_api.cards.public_urls import card_image_asset_url
 from card_reader_core.models import (
-    CARD_POOLS,
-    PLAYER_CARD_POOL,
     CardVersion,
     CardVersionParseFlag,
     CardVersionParseFlagItem,
+    CardPool,
 )
 from card_reader_core.repositories.cards import get_card_image
 
 
 class ParseFlagItemsQuerySerializer(serializers.Serializer[dict[str, object]]):
-    card_pool = serializers.ChoiceField(
-        choices=CARD_POOLS,
-        required=False,
-        default=PLAYER_CARD_POOL,
-    )
     status = serializers.ChoiceField(choices=["open", "resolved", "dismissed", "all"], required=False, default="open")
     page = serializers.IntegerField(required=False, min_value=1, default=1)
     page_size = serializers.IntegerField(required=False, min_value=1, default=50)
+
+
+class ReviewConfidenceCardsQuerySerializer(serializers.Serializer[dict[str, object]]):
+    page = serializers.IntegerField(required=False, min_value=1, default=1)
+    page_size = serializers.IntegerField(required=False, min_value=1, max_value=100, default=100)
 
 
 class ParseFlagItemUpdateSerializer(serializers.Serializer[dict[str, object]]):
@@ -44,7 +45,13 @@ def parse_flag_payload(flag: CardVersionParseFlag) -> dict[str, object]:
             "id": str(submitted_by.pk),
             "username": submitted_by.get_username(),
         },
-        "card": _card_payload(card_id=card.id, card_label=card.label, card_name=version.name, image_url=image_url),
+        "card": _card_payload(
+            card_id=card.id,
+            card_label=card.label,
+            card_name=version.name,
+            card_pool=cast(CardPool, card.card_pool),
+            image_url=image_url,
+        ),
         "version": _version_payload(version),
         "items": [_parse_flag_item_fields(item) for item in flag.items.all()],
     }
@@ -64,7 +71,13 @@ def parse_flag_item_payload(item: CardVersionParseFlagItem) -> dict[str, object]
             "id": str(submitted_by.pk),
             "username": submitted_by.get_username(),
         },
-        "card": _card_payload(card_id=card.id, card_label=card.label, card_name=version.name, image_url=image_url),
+        "card": _card_payload(
+            card_id=card.id,
+            card_label=card.label,
+            card_name=version.name,
+            card_pool=cast(CardPool, card.card_pool),
+            image_url=image_url,
+        ),
         "version": _version_payload(version),
     }
 
@@ -92,11 +105,19 @@ def _parse_flag_item_fields(item: CardVersionParseFlagItem) -> dict[str, object]
     }
 
 
-def _card_payload(*, card_id: str, card_label: str, card_name: str, image_url: str | None) -> dict[str, object]:
+def _card_payload(
+    *,
+    card_id: str,
+    card_label: str,
+    card_name: str,
+    card_pool: CardPool,
+    image_url: str | None,
+) -> dict[str, object]:
     return {
         "id": card_id,
         "label": card_label,
         "name": card_name,
+        "card_pool": card_pool,
         "image_url": image_url,
     }
 

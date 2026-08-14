@@ -3,18 +3,26 @@ import type {
   FlagStatus,
   ParseFlagPage,
   ParseFlagReviewItem,
+  ReviewCard,
 } from '@/features/review-queue/types';
-import type { CardPool } from '@/domain/cards/cardPools';
+import type { PaginatedCardsResponse } from '@/domain/cards/types';
+
+export const fetchReviewConfidenceCards = async (
+  params: URLSearchParams,
+): Promise<PaginatedCardsResponse<ReviewCard>> => {
+  const response = await api.get<PaginatedCardsResponse<ReviewCard>>(
+    `/review/confidence-cards?${params.toString()}`,
+  );
+  return response.data;
+};
 
 export const fetchParseFlagPage = async (
   status: FlagStatus,
-  cardPool: CardPool,
   page: number,
   pageSize: number,
 ): Promise<ParseFlagPage> => {
   const params = new URLSearchParams({
     status,
-    card_pool: cardPool,
     page: String(page),
     page_size: String(pageSize),
   });

@@ -162,6 +162,40 @@ def list_cards(
     )
 
 
+def list_review_cards(
+    *,
+    card_pool_scope: CardPoolScope,
+    max_confidence: float,
+    page: int = 1,
+    page_size: int = DEFAULT_CARD_PAGE_SIZE,
+) -> PaginatedCardList:
+    """List low-confidence cards across every pool visible to a staff reviewer."""
+
+    normalized_page = max(page, 1)
+    normalized_page_size = max(1, min(page_size, 100))
+    versions = CardVersion.objects.filter(
+        is_latest=True,
+        card__card_pool__in=card_pool_scope.allowed_pools,
+        confidence__lte=max_confidence,
+    )
+    versions = filter_queryset_by_card_lifecycle(
+        versions,
+        DEFAULT_CARD_LIFECYCLE_FILTER,
+    )
+    offset = (normalized_page - 1) * normalized_page_size
+    total_count = versions.count()
+    page_ids = list(
+        _apply_sql_card_sort(versions, CARD_SORT_UPDATED_DESC)
+        .values_list("id", flat=True)[offset : offset + normalized_page_size]
+    )
+    return PaginatedCardList(
+        count=total_count,
+        page=normalized_page,
+        page_size=normalized_page_size,
+        results=get_card_list_rows_by_version_ids(page_ids),
+    )
+
+
 def list_matching_cards(
     *,
     query: str | None,

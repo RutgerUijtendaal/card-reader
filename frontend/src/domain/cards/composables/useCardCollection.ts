@@ -2,6 +2,7 @@ import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
 import { computed, shallowRef, ref, watch } from 'vue';
 import type { Ref, WatchSource } from 'vue';
 import { fetchCards } from '@/domain/cards/api';
+import type { PaginatedCardsResponse } from '@/domain/cards/types';
 import { appendGalleryPage, createEmptyGalleryPageState, replaceGalleryPage } from '@/domain/cards/utils/gallery/galleryState';
 
 type IdentifiableCard = {
@@ -19,6 +20,7 @@ type UseCardCollectionOptions<TCard extends IdentifiableCard> = {
   watchSource?: WatchSource<unknown> | WatchSource<unknown>[];
   onResults?: (results: TCard[]) => void;
   identity?: (card: TCard) => string;
+  fetchPage?: (params: URLSearchParams) => Promise<PaginatedCardsResponse<TCard>>;
 };
 
 const readPageSize = (value: number | Ref<number>): number =>
@@ -35,6 +37,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   watchSource,
   onResults,
   identity,
+  fetchPage = fetchCards,
 }: UseCardCollectionOptions<TCard>) => {
   const galleryState = shallowRef(createEmptyGalleryPageState<TCard>());
   const isLoadingInitial = ref(false);
@@ -79,7 +82,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
     }
 
     try {
-      const response = await fetchCards<TCard>(params);
+      const response = await fetchPage(params);
       if (requestId !== latestSearchRequestId) {
         return;
       }

@@ -4,7 +4,7 @@ from django.db.models import Max, Prefetch, Q
 
 from card_reader_core.models import (
     PARSE_FLAG_ITEM_OPEN,
-    CardPool,
+    CardPoolScope,
     CardVersionParseFlag,
     CardVersionParseFlagItem,
 )
@@ -27,13 +27,16 @@ def get_parse_flag(flag_id: str) -> CardVersionParseFlag | None:
     )
 
 
-def count_open_parse_flag_items() -> int:
-    return CardVersionParseFlagItem.objects.filter(status=PARSE_FLAG_ITEM_OPEN).count()
+def count_open_parse_flag_items(*, card_pool_scope: CardPoolScope) -> int:
+    return CardVersionParseFlagItem.objects.filter(
+        status=PARSE_FLAG_ITEM_OPEN,
+        flag__card_version__card__card_pool__in=card_pool_scope.allowed_pools,
+    ).count()
 
 
 def list_parse_flags(
     *,
-    card_pool: CardPool,
+    card_pool_scope: CardPoolScope,
     status: ParseFlagStatusFilter = PARSE_FLAG_OPEN_STATUS,
     page: int = 1,
     page_size: int = 50,
@@ -63,7 +66,7 @@ def list_parse_flags(
             Prefetch("card_version__images"),
         )
         .annotate(latest_item_created_at=latest_item_created_at)
-        .filter(card_version__card__card_pool=card_pool)
+        .filter(card_version__card__card_pool__in=card_pool_scope.allowed_pools)
         .order_by("-latest_item_created_at", "-created_at", "id")
     )
     if status != "all":
