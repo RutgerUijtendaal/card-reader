@@ -30,6 +30,7 @@ from card_reader_core.services.cards import save_parsed_card_with_notifications
 from card_reader_core.services.imports import (
     CardClassificationInput,
     CardClassificationMode,
+    DetectedClassificationSource,
     classify_import_card,
 )
 from card_reader_core.storage import resolve_storage_path
@@ -105,7 +106,7 @@ class ImportProcessorService:
         item: ImportJobItem,
         options: JobOptions,
         resources: ParserResources,
-        ) -> int:
+    ) -> int:
         try:
             result = self._process_queued_item(job, item, options, resources)
             self._log_item_processed(job, item, result)
@@ -146,24 +147,29 @@ class ImportProcessorService:
             known_types=resources.known_types,
         )
         tag_keys_by_id = {tag.id: tag.key for tag in resources.known_tags}
-        matched_tag_keys = tuple(
-            tag_keys_by_id[tag_id] for tag_id in parsed.tag_ids if tag_id in tag_keys_by_id
+        type_keys_by_id = {type_row.id: type_row.key for type_row in resources.known_types}
+        matched_tags = tuple(
+            DetectedClassificationSource(id=tag_id, key=tag_keys_by_id[tag_id])
+            for tag_id in parsed.tag_ids
+            if tag_id in tag_keys_by_id
+        )
+        matched_types = tuple(
+            DetectedClassificationSource(id=type_id, key=type_keys_by_id[type_id])
+            for type_id in parsed.type_ids
+            if type_id in type_keys_by_id
         )
         classification = classify_import_card(
             CardClassificationInput(
                 card_pool=cast(CardPool, job.card_pool),
                 role_mode=cast(CardClassificationMode, job.card_role_mode),
                 override_roles=cast(tuple[CardRole, ...], tuple(job.card_role_override_json)),
-                template_roles=cast(tuple[CardRole, ...], tuple(job.template_role_snapshot_json)),
                 faction_mode=cast(CardClassificationMode, job.card_faction_mode),
                 override_factions=cast(
                     tuple[CardFaction, ...], tuple(job.card_faction_override_json)
                 ),
-                template_factions=cast(
-                    tuple[CardFaction, ...], tuple(job.template_faction_snapshot_json)
-                ),
-                inference_policy_version=job.classification_inference_policy_version,
-                matched_tag_keys=matched_tag_keys,
+                rule_snapshot=cast(dict[str, object], job.classification_rule_snapshot_json),
+                matched_tags=matched_tags,
+                matched_types=matched_types,
             )
         )
         save_parsed_card_with_notifications(

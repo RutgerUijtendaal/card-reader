@@ -40,10 +40,6 @@ class TemplateListCreateView(APIView):
                 label=serializer.validated_data["label"],
                 key=serializer.validated_data.get("key"),
                 definition_json=serializer.validated_data["definition_json"],
-                inferred_card_roles=serializer.validated_data.get("inferred_card_roles", []),
-                inferred_card_factions=serializer.validated_data.get(
-                    "inferred_card_factions", []
-                ),
             )
         except ValueError as exc:
             return bad_request(str(exc))
@@ -81,10 +77,6 @@ class TemplateDetailView(APIView):
                 label=serializer.validated_data.get("label"),
                 key=serializer.validated_data.get("key"),
                 definition_json=serializer.validated_data.get("definition_json"),
-                inferred_card_roles=serializer.validated_data.get("inferred_card_roles"),
-                inferred_card_factions=serializer.validated_data.get(
-                    "inferred_card_factions"
-                ),
             )
         except ValueError as exc:
             return bad_request(str(exc))
@@ -118,7 +110,9 @@ class TemplateReparseView(APIView):
             if source.template_id == source_template_id
         ]
         if not matching_sources:
-            return Response({"message": "No latest card versions found for the selected source template."})
+            return Response(
+                {"message": "No latest card versions found for the selected source template."}
+            )
 
         queue_grouped_reparse_jobs(
             sources=matching_sources,

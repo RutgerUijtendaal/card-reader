@@ -18,11 +18,14 @@ const activeJob: ImportJob = {
   card_pool: 'player',
   card_role_mode: 'automatic',
   card_role_override: [],
-  template_role_snapshot: [],
   card_faction_mode: 'automatic',
   card_faction_override: [],
-  template_faction_snapshot: [],
-  classification_inference_policy_version: 3,
+  classification_rule_snapshot: {
+    schema_version: 1,
+    card_pool: 'player',
+    rules: [],
+    digest: 'abc123',
+  },
 };
 
 const recentJob: OperationsQueueItem = {
@@ -181,8 +184,14 @@ describe('ImportActivityPanel', () => {
           resolved_card_roles: ['event'],
           resolved_card_factions: ['order'],
           classification_inference: {
-            roles: { mode: 'automatic', template_roles: ['event'] },
-            factions: { mode: 'automatic', matched_tag_keys: ['order'] },
+            roles: {
+              mode: 'automatic',
+              matched_type_sources: [{ id: 'type-event', key: 'event' }],
+            },
+            factions: {
+              mode: 'automatic',
+              matched_tag_sources: [{ id: 'tag-order', key: 'order' }],
+            },
           },
           target_card_id: 'card-id',
           target_card_version_id: 'version-id',
@@ -198,7 +207,7 @@ describe('ImportActivityPanel', () => {
     expect(mounted.host.textContent).toContain('Matched a deprecated card.');
     expect(mounted.host.textContent).toContain('Inferred roles differ from the existing card.');
     expect(mounted.host.textContent).toContain('Classification changed while queued.');
-    expect(mounted.host.textContent).toContain('Template hints');
+    expect(mounted.host.textContent).toContain('Role types');
     expect(mounted.host.textContent).toContain('Inferred');
     expect(mounted.host.textContent).toContain('Evil');
     expect(mounted.host.textContent).toContain('Existing');

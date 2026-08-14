@@ -27,15 +27,11 @@ def create_template(
     key: str,
     label: str,
     definition_json: dict[str, object],
-    inferred_card_roles_json: list[str],
-    inferred_card_factions_json: list[str],
 ) -> Template:
     return Template.objects.create(
         key=key,
         label=label,
         definition_json=definition_json,
-        inferred_card_roles_json=inferred_card_roles_json,
-        inferred_card_factions_json=inferred_card_factions_json,
     )
 
 

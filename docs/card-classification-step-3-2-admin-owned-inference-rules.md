@@ -1,6 +1,6 @@
 # Card Classification Step 3.2: Admin-Owned Inference Rules
 
-Status: planned. Begin only after Step 3.1 is merged into the classification umbrella branch.
+Status: implemented.
 
 This checkpoint replaces template hints and hard-coded tag mappings with one admin-owned, pool-scoped rule catalog. Automatic import classification uses the tags and types actually detected on each card; exact batch overrides remain available independently for roles and factions.
 

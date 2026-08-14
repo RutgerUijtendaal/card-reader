@@ -44,11 +44,8 @@ class PreparedImportJobInputs:
     template: Template
     card_role_mode: str
     card_role_override: tuple[CardRole, ...]
-    template_roles: tuple[CardRole, ...]
     card_faction_mode: str
     card_faction_override: tuple[CardFaction, ...]
-    template_factions: tuple[CardFaction, ...]
-    inference_policy_version: int
 
 
 class GroupedReparseSource(Protocol):

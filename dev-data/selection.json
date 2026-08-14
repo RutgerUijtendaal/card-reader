@@ -131,6 +131,63 @@
       "blood",
       "darkness"
     ],
-    "required_template_role_hints": {}
+    "required_classification_rules": [
+      {
+        "card_pool": "player",
+        "target_kind": "role",
+        "target_key": "hero",
+        "source_kind": "tag",
+        "source_key": "hero",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "boss",
+        "source_kind": "tag",
+        "source_key": "boss",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "location",
+        "source_kind": "tag",
+        "source_key": "location",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "order",
+        "source_kind": "tag",
+        "source_key": "order",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "blood",
+        "source_kind": "tag",
+        "source_key": "blood",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "darkness",
+        "source_kind": "tag",
+        "source_key": "darkness",
+        "enabled": true
+      },
+      {
+        "card_pool": "neutral",
+        "target_kind": "role",
+        "target_key": "shop_item",
+        "source_kind": "tag",
+        "source_key": "shop-item",
+        "enabled": true
+      }
+    ]
   }
 }

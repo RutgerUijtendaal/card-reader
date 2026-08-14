@@ -61,8 +61,6 @@ describe('ImportJobsPage', () => {
           key: 'mtg-like-v1',
           label: 'Default card',
           definition_json: '{}',
-          inferred_card_roles: [],
-          inferred_card_factions: [],
         },
       ]),
       selectedJobDetail: ref(null),

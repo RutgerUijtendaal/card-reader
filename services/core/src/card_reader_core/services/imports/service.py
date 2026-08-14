@@ -18,10 +18,7 @@ from card_reader_core.repositories.import_jobs import (
     fetch_job_by_creation_key,
     prepare_import_job_inputs,
 )
-from .classification import (
-    LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
-    CardClassificationMode,
-)
+from .classification import CardClassificationMode
 
 
 class ImportCreationKeyConflict(ValueError):
@@ -84,7 +81,6 @@ class ImportService:
                     card_role_override=card_role_override,
                     card_faction_mode=card_faction_mode,
                     card_faction_override=card_faction_override,
-                    inference_policy_version=LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
                 )
         except ImportJobInputValidationError as exc:
             raise ImportCreationRejected(str(exc)) from exc
@@ -120,7 +116,6 @@ class ImportService:
                 card_role_override=card_role_override,
                 card_faction_mode=card_faction_mode,
                 card_faction_override=card_faction_override,
-                inference_policy_version=LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
             )
         except ValueError as exc:
             raise ImportCreationRejected(str(exc)) from exc

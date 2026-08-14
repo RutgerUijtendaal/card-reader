@@ -221,6 +221,10 @@
                         : 'Faction override: None'
                   }}
                 </p>
+                <p class="theme-section-muted font-mono text-[0.68rem]">
+                  {{ job.classification_rule_snapshot?.rules?.length ?? 0 }} snapshotted rules ·
+                  {{ job.classification_rule_snapshot?.digest?.slice(0, 12) || 'legacy' }}
+                </p>
               </div>
               <span class="theme-section-muted shrink-0 text-xs">
                 {{ job.processed_items }}/{{ job.total_items }}

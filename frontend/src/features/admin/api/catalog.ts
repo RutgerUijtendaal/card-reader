@@ -19,6 +19,8 @@ import type {
   TagUpsertRequest,
   TypeRecord,
   TypeUpsertRequest,
+  ClassificationRuleRecord,
+  ClassificationRuleUpsertRequest,
 } from '@/features/admin/types';
 import {
   isKnownCatalogKind,
@@ -40,6 +42,28 @@ const pathForKindAndId = (kind: KnownCatalogKind, id: string): string =>
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
   const response = await api.get<CatalogApiResponse>('/admin/catalog');
   return normalizeCatalogResponse(response.data);
+};
+
+export const createClassificationRule = async (
+  payload: ClassificationRuleUpsertRequest,
+): Promise<ClassificationRuleRecord> => {
+  const response = await api.post<ClassificationRuleRecord>('/admin/classification-rules', payload);
+  return response.data;
+};
+
+export const updateClassificationRule = async (
+  ruleId: string,
+  payload: Partial<ClassificationRuleUpsertRequest>,
+): Promise<ClassificationRuleRecord> => {
+  const response = await api.patch<ClassificationRuleRecord>(
+    `/admin/classification-rules/${ruleId}`,
+    payload,
+  );
+  return response.data;
+};
+
+export const deleteClassificationRule = async (ruleId: string): Promise<void> => {
+  await api.delete(`/admin/classification-rules/${ruleId}`);
 };
 
 export const fetchDeckTagCatalog = async (): Promise<{

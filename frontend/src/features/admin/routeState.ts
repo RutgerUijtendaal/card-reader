@@ -26,6 +26,8 @@ const CATALOG_KINDS: CatalogKind[] = [
   'types',
   'suggested-tags',
   'suggested-types',
+  'card-roles',
+  'card-factions',
   'deck-roles',
   'deck-types',
   'suggested-deck-types',

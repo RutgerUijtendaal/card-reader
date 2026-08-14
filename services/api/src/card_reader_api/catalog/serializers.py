@@ -5,7 +5,15 @@ import json
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
-from card_reader_core.models import Keyword, Symbol, Tag, Type
+from card_reader_core.models import (
+    CARD_CLASSIFICATION_SOURCE_KIND_CHOICES,
+    CARD_CLASSIFICATION_TARGET_KIND_CHOICES,
+    CARD_POOLS,
+    Keyword,
+    Symbol,
+    Tag,
+    Type,
+)
 from card_reader_core.services.catalog import (
     CatalogSuggestionDetail,
     KeywordDetail,
@@ -123,6 +131,7 @@ def tag_detail_payload(row: TagDetail) -> dict[str, object]:
     payload = tag_payload(row["entry"])
     payload["linked_cards"] = [linked_card_payload(item) for item in row["linked_cards"]]
     payload["linked_card_count"] = row["linked_card_count"]
+    payload["classification_rules"] = row["classification_rules"]
     return payload
 
 
@@ -130,6 +139,7 @@ def type_detail_payload(row: TypeDetail) -> dict[str, object]:
     payload = type_payload(row["entry"])
     payload["linked_cards"] = [linked_card_payload(item) for item in row["linked_cards"]]
     payload["linked_card_count"] = row["linked_card_count"]
+    payload["classification_rules"] = row["classification_rules"]
     return payload
 
 
@@ -201,3 +211,18 @@ class SuggestionStatusQuerySerializer(serializers.Serializer[dict[str, object]])
         required=False,
         allow_null=True,
     )
+
+
+class ClassificationRuleWriteSerializer(serializers.Serializer[dict[str, object]]):
+    card_pool = serializers.ChoiceField(choices=CARD_POOLS, required=True)
+    target_kind = serializers.ChoiceField(
+        choices=[choice[0] for choice in CARD_CLASSIFICATION_TARGET_KIND_CHOICES],
+        required=True,
+    )
+    target_key = serializers.CharField(required=True, allow_blank=False, max_length=64)
+    source_kind = serializers.ChoiceField(
+        choices=[choice[0] for choice in CARD_CLASSIFICATION_SOURCE_KIND_CHOICES],
+        required=True,
+    )
+    source_id = serializers.CharField(required=True, allow_blank=False)
+    enabled = serializers.BooleanField(required=False, default=True)

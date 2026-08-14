@@ -4,6 +4,8 @@ from django.urls import path
 
 from .views import (
     CatalogView,
+    ClassificationRuleDetailView,
+    ClassificationRuleListCreateView,
     KeywordCreateView,
     KeywordDetailView,
     SymbolAssetUploadView,
@@ -21,6 +23,8 @@ from .views import (
 
 urlpatterns = [
     path("admin/catalog", CatalogView.as_view()),
+    path("admin/classification-rules", ClassificationRuleListCreateView.as_view()),
+    path("admin/classification-rules/<str:rule_id>", ClassificationRuleDetailView.as_view()),
     path("admin/keywords", KeywordCreateView.as_view()),
     path("admin/keywords/<str:entry_id>", KeywordDetailView.as_view()),
     path("admin/tags", TagCreateView.as_view()),

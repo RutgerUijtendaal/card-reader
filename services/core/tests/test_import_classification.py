@@ -1,106 +1,186 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 import pytest
 
-from card_reader_core.services.imports import CardClassificationInput, classify_import_card
+from card_reader_core.services.imports import (
+    CardClassificationInput,
+    DetectedClassificationSource,
+    classify_import_card,
+)
+
+
+def rule(
+    rule_id: str,
+    *,
+    target_kind: str,
+    target_key: str,
+    source_kind: str,
+    source_id: str,
+    source_key: str,
+    card_pool: str = "evil",
+) -> dict[str, object]:
+    return {
+        "rule_id": rule_id,
+        "card_pool": card_pool,
+        "target_kind": target_kind,
+        "target_key": target_key,
+        "source_kind": source_kind,
+        "source_id": source_id,
+        "source_key": source_key,
+    }
+
+
+def snapshot(*rules: dict[str, object], card_pool: str = "evil") -> dict[str, object]:
+    body: dict[str, object] = {
+        "schema_version": 1,
+        "card_pool": card_pool,
+        "rules": list(rules),
+    }
+    body["digest"] = hashlib.sha256(
+        json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return body
 
 
 def classification_input(
     *,
-    policy: int,
+    rules: tuple[dict[str, object], ...] = (),
     role_mode: str = "automatic",
-    roles: tuple[str, ...] = (),
     role_override: tuple[str, ...] = (),
     faction_mode: str = "automatic",
-    factions: tuple[str, ...] = (),
     faction_override: tuple[str, ...] = (),
-    tags: tuple[str, ...] = (),
+    tags: tuple[tuple[str, str], ...] = (),
+    types: tuple[tuple[str, str], ...] = (),
 ) -> CardClassificationInput:
     return CardClassificationInput(
         card_pool="evil",
         role_mode=role_mode,  # type: ignore[arg-type]
         override_roles=role_override,  # type: ignore[arg-type]
-        template_roles=roles,  # type: ignore[arg-type]
         faction_mode=faction_mode,  # type: ignore[arg-type]
         override_factions=faction_override,  # type: ignore[arg-type]
-        template_factions=factions,  # type: ignore[arg-type]
-        inference_policy_version=policy,
-        matched_tag_keys=tags,
+        rule_snapshot=snapshot(*rules),
+        matched_tags=tuple(DetectedClassificationSource(id=id_, key=key) for id_, key in tags),
+        matched_types=tuple(DetectedClassificationSource(id=id_, key=key) for id_, key in types),
     )
 
 
-def test_policy_versions_preserve_historical_role_and_faction_behavior() -> None:
-    version_one = classify_import_card(
-        classification_input(policy=1, tags=("location", "hero", "order"))
+def test_automatic_inference_unions_tag_and_type_rules_canonically() -> None:
+    rules = (
+        rule(
+            "rule-event",
+            target_kind="role",
+            target_key="event",
+            source_kind="type",
+            source_id="type-event",
+            source_key="event",
+        ),
+        rule(
+            "rule-boss",
+            target_kind="role",
+            target_key="boss",
+            source_kind="tag",
+            source_id="tag-boss",
+            source_key="boss",
+        ),
+        rule(
+            "rule-order-tag",
+            target_kind="faction",
+            target_key="order",
+            source_kind="tag",
+            source_id="tag-order",
+            source_key="order",
+        ),
+        rule(
+            "rule-order-type",
+            target_kind="faction",
+            target_key="order",
+            source_kind="type",
+            source_id="type-order",
+            source_key="order-card",
+        ),
     )
-    version_two = classify_import_card(
-        classification_input(
-            policy=2,
-            roles=("event", "location"),
-            tags=("location", "hero", "order"),
-        )
-    )
-
-    assert version_one.roles == ("hero",)
-    assert version_one.factions == ()
-    assert version_one.evidence["roles"]["tag_roles"] == ["hero"]
-    assert version_two.roles == ("hero", "location", "event")
-    assert version_two.factions == ()
-    assert version_two.evidence["roles"]["tag_roles"] == ["hero", "location"]
-
-
-def test_policy_three_unions_and_orders_role_and_faction_signals() -> None:
     result = classify_import_card(
         classification_input(
-            policy=3,
-            roles=("event", "boon"),
-            factions=("darkness",),
-            tags=("order", "shop-item", "boss", "hero", "order"),
+            rules=rules,
+            tags=(("tag-order", "order"), ("tag-boss", "boss")),
+            types=(("type-event", "event"), ("type-order", "order-card")),
         )
     )
 
-    assert result.roles == ("hero", "boss", "boon", "event", "shop_item")
-    assert result.factions == ("order", "darkness")
-    assert result.evidence["roles"]["matched_tag_keys"] == [
-        "boss",
-        "hero",
-        "shop-item",
+    assert result.roles == ("boss", "event")
+    assert result.factions == ("order",)
+    assert result.evidence["roles"]["matched_tag_sources"] == [{"id": "tag-boss", "key": "boss"}]
+    assert result.evidence["roles"]["matched_type_sources"] == [
+        {"id": "type-event", "key": "event"}
     ]
-    assert result.evidence["factions"]["matched_tag_keys"] == ["order"]
-    assert result.evidence["factions"]["tag_factions"] == ["order"]
+    assert {item["rule_id"] for item in result.evidence["factions"]["matched_rules"]} == {
+        "rule-order-tag",
+        "rule-order-type",
+    }
 
 
 def test_role_and_faction_overrides_are_independent_and_exact() -> None:
+    rules = (
+        rule(
+            "rule-boss",
+            target_kind="role",
+            target_key="boss",
+            source_kind="tag",
+            source_id="tag-boss",
+            source_key="boss",
+        ),
+        rule(
+            "rule-order",
+            target_kind="faction",
+            target_key="order",
+            source_kind="tag",
+            source_id="tag-order",
+            source_key="order",
+        ),
+    )
     role_override = classify_import_card(
         classification_input(
-            policy=3,
+            rules=rules,
             role_mode="override",
             role_override=("boon",),
-            factions=("blood",),
-            tags=("hero", "order"),
+            tags=(("tag-boss", "boss"), ("tag-order", "order")),
         )
     )
     faction_override = classify_import_card(
         classification_input(
-            policy=3,
-            roles=("event",),
+            rules=rules,
             faction_mode="override",
             faction_override=(),
-            factions=("blood",),
-            tags=("hero", "order"),
+            tags=(("tag-boss", "boss"), ("tag-order", "order")),
         )
     )
 
     assert role_override.roles == ("boon",)
-    assert role_override.factions == ("order", "blood")
-    assert role_override.evidence["roles"]["mode"] == "override"
-    assert faction_override.roles == ("hero", "event")
+    assert role_override.factions == ("order",)
+    assert role_override.evidence["roles"]["matched_rules"] == []
+    assert faction_override.roles == ("boss",)
     assert faction_override.factions == ()
-    assert faction_override.evidence["factions"]["mode"] == "override"
+    assert faction_override.evidence["factions"]["matched_rules"] == []
 
 
-def test_empty_role_and_faction_results_are_explicit_empty_facets() -> None:
-    result = classify_import_card(classification_input(policy=3))
+def test_unmatched_rules_are_a_resolved_empty_classification() -> None:
+    result = classify_import_card(
+        classification_input(
+            rules=(
+                rule(
+                    "rule-boss",
+                    target_kind="role",
+                    target_key="boss",
+                    source_kind="tag",
+                    source_id="tag-boss",
+                    source_key="boss",
+                ),
+            ),
+        )
+    )
 
     assert result.roles == ()
     assert result.factions == ()
@@ -108,9 +188,9 @@ def test_empty_role_and_faction_results_are_explicit_empty_facets() -> None:
     assert result.evidence["factions"]["resolved_factions"] == []
 
 
-def test_unknown_inference_policy_is_not_reinterpreted_as_latest() -> None:
-    with pytest.raises(
-        ValueError,
-        match="Unsupported card-classification inference policy version",
-    ):
-        classify_import_card(classification_input(policy=999, tags=("hero",)))
+def test_snapshot_pool_and_digest_are_validated() -> None:
+    value = classification_input()
+    value.rule_snapshot["digest"] = "tampered"
+
+    with pytest.raises(ValueError, match="snapshot digest is invalid"):
+        classify_import_card(value)

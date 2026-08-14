@@ -45,15 +45,13 @@ describe('TemplatesAdminView', () => {
     document.body.innerHTML = '';
   });
 
-  test('edits inferred roles and factions separately from the parsing definition', async () => {
+  test('edits only parsing configuration and does not expose classification hints', async () => {
     fetchTemplates.mockResolvedValue([
       {
         id: 'template-id',
         key: 'event-v1',
         label: 'Event',
         definition_json: '{"regions":[]}',
-        inferred_card_roles: ['event'],
-        inferred_card_factions: ['order'],
       },
     ]);
     updateTemplate.mockResolvedValue(undefined);
@@ -65,18 +63,8 @@ describe('TemplatesAdminView', () => {
     await flushPromises();
     await nextTick();
 
-    const checkboxes = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
-    expect(checkboxes).toHaveLength(9);
-
-    const labels = Array.from(host.querySelectorAll('label'));
-    const locationInput = labels.find((label) => label.textContent?.includes('Location'))
-      ?.querySelector<HTMLInputElement>('input');
-    const bloodInput = labels.find((label) => label.textContent?.includes('Blood'))
-      ?.querySelector<HTMLInputElement>('input');
-    expect(locationInput?.checked).toBe(false);
-    expect(bloodInput?.checked).toBe(false);
-    locationInput?.click();
-    bloodInput?.click();
+    expect(host.textContent).not.toContain('Inferred card roles');
+    expect(host.textContent).not.toContain('Inferred card factions');
     Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
       .find((button) => button.textContent?.trim() === 'Save Changes')
       ?.click();
@@ -86,8 +74,6 @@ describe('TemplatesAdminView', () => {
     expect(updateTemplate).toHaveBeenCalledWith('template-id', {
       label: 'Event',
       definition_json: { regions: [] },
-      inferred_card_roles: ['event', 'location'],
-      inferred_card_factions: ['order', 'blood'],
     });
 
     app.unmount();

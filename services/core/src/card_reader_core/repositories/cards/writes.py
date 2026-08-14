@@ -15,7 +15,6 @@ from card_reader_core.models import (
     CardVersion,
     ImportJobItem,
     ImportJobStatus,
-    LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
     ParseResult,
     card_faction_identity_key,
     card_faction_keys,
@@ -121,21 +120,21 @@ def save_parsed_card_result(
     resolved_evidence: CardClassificationInferenceEvidence = classification_evidence or {
         "roles": {
             "mode": "automatic",
-            "policy_version": LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
-            "template_roles": [],
-            "matched_tag_keys": [],
-            "tag_roles": [],
+            "matched_tag_sources": [],
+            "matched_type_sources": [],
+            "matched_rules": [],
             "override_roles": [],
             "resolved_roles": list(resolved_card_roles),
+            "snapshot_digest": "",
         },
         "factions": {
             "mode": "automatic",
-            "policy_version": LATEST_CLASSIFICATION_INFERENCE_POLICY_VERSION,
-            "template_factions": [],
-            "matched_tag_keys": [],
-            "tag_factions": [],
+            "matched_tag_sources": [],
+            "matched_type_sources": [],
+            "matched_rules": [],
             "override_factions": [],
             "resolved_factions": list(resolved_card_factions),
+            "snapshot_digest": "",
         },
     }
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
@@ -173,9 +172,7 @@ def save_parsed_card_result(
                     image_hash=checksum,
                     is_latest=True,
                     card__card_pool=card_pool,
-                    card__faction_identity_key=card_faction_identity_key(
-                        resolved_card_factions
-                    ),
+                    card__faction_identity_key=card_faction_identity_key(resolved_card_factions),
                 )
                 .order_by("-updated_at")
                 .first()
