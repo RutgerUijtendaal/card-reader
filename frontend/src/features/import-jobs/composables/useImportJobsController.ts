@@ -116,9 +116,9 @@ export const useImportJobsController = () => {
   };
 
   watch(
-    () => workspace.activePool,
-    (nextPool) => {
-      if (cardPoolWasEdited.value || formLocked.value || hasUnresolvedCreateAttempt.value) {
+    [() => workspace.activePool, formLocked, hasUnresolvedCreateAttempt],
+    ([nextPool, locked, hasUnresolvedAttempt]) => {
+      if (cardPoolWasEdited.value || locked || hasUnresolvedAttempt) {
         return;
       }
       cardPool.value = nextPool;

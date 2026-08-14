@@ -113,6 +113,21 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
       }
     }
 
+    if (to.meta.workspaceCapability === 'resource') {
+      const resourcePool = isCardPool(rawRequestedPool) ? rawRequestedPool : undefined;
+      if (resourcePool && !workspace.accessiblePools.includes(resourcePool)) {
+        return buildWorkspaceGalleryLocation('player');
+      }
+      const returnPool = isCardPool(to.query.return_card_pool)
+        ? to.query.return_card_pool
+        : undefined;
+      if (returnPool && !workspace.accessiblePools.includes(returnPool)) {
+        const query = { ...to.query };
+        delete query.return_card_pool;
+        return { path: to.path, query, hash: to.hash };
+      }
+    }
+
     const routeWorkspacePool = resolveRouteWorkspacePool(
       to.path,
       to.meta.workspaceCapability,

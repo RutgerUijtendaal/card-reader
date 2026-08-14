@@ -88,6 +88,22 @@ describe('card pool workspace routes', () => {
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
   });
 
+  test.each([
+    '/cards/player-card?card_pool=player&return_card_pool=evil&tab=versions',
+    '/card-groups/player-group?return_card_pool=neutral&view=compact',
+  ])('keeps a public resource while removing an inaccessible return pool from %s', async (url) => {
+    setSession(['player']);
+    const router = createAppRouter(createMemoryHistory());
+
+    await router.push(url);
+
+    expect(router.currentRoute.value.path).toMatch(/^\/(?:cards|card-groups)\//);
+    expect(router.currentRoute.value.query.return_card_pool).toBeUndefined();
+    expect(router.currentRoute.value.query.card_pool).not.toBe('evil');
+    expect(router.currentRoute.value.query.card_pool).not.toBe('neutral');
+    expect(useCardPoolWorkspaceStore().activePool).toBe('player');
+  });
+
   test('initializes a resource workspace from its explicit card pool', async () => {
     localStorage.setItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY, 'player');
     setSession(['player', 'evil', 'neutral']);

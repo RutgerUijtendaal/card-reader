@@ -206,6 +206,49 @@ describe('useImportJobsController', () => {
     mounted.app.unmount();
   });
 
+  test('re-syncs a pristine pool after a definitive failure unlocks the form', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
+    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
+    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
+    mounted.controller.pickedFiles.value = [
+      new File(['image'], 'card.png', { type: 'image/png' }),
+    ];
+
+    const createPromise = mounted.controller.createJobFromPicker();
+    mounted.workspace.selectPool('evil');
+    expect(mounted.controller.cardPool.value).toBe('player');
+    createResult.reject({ response: { status: 400, data: { detail: 'Invalid import.' } } });
+    await createPromise;
+
+    expect(mounted.controller.formLocked.value).toBe(false);
+    expect(mounted.controller.cardPool.value).toBe('evil');
+    mounted.app.unmount();
+  });
+
+  test('re-syncs a pristine pool after an uncertain attempt is abandoned', async () => {
+    const mounted = mountController();
+    await vi.waitFor(() => expect(mounted.controller.formLoaded.value).toBe(true));
+    const createResult = deferred<Awaited<ReturnType<typeof createImportJob>>>();
+    vi.mocked(createImportJob).mockReturnValueOnce(createResult.promise);
+    mounted.controller.pickedFiles.value = [
+      new File(['image'], 'card.png', { type: 'image/png' }),
+    ];
+
+    const createPromise = mounted.controller.createJobFromPicker();
+    mounted.workspace.selectPool('neutral');
+    createResult.reject(new Error('connection lost'));
+    await createPromise;
+    expect(mounted.controller.createState.value.phase).toBe('uncertain');
+    expect(mounted.controller.cardPool.value).toBe('player');
+
+    mounted.controller.abandonPendingAttempt();
+
+    expect(mounted.controller.formLocked.value).toBe(false);
+    expect(mounted.controller.cardPool.value).toBe('neutral');
+    mounted.app.unmount();
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = '';
