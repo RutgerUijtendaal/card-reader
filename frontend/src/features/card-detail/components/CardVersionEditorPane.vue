@@ -43,83 +43,87 @@
         v-if="activeEditorTab === 'card'"
         class="space-y-4"
       >
-        <div class="theme-muted-panel p-3">
-          <div class="space-y-4">
+        <div class="theme-muted-panel p-4">
+          <div>
             <div class="min-w-0">
               <p class="theme-section-title text-sm font-semibold">
                 Card Classification
               </p>
               <p class="theme-section-muted text-xs">
-                Pool controls audience access. Roles and factions may be combined independently;
-                no selected roles means Normal.
+                Set where this card belongs and how it is classified in the game.
               </p>
             </div>
-            <div class="grid gap-4 md:grid-cols-[minmax(0,12rem)_1fr]">
-              <label class="space-y-1">
-                <span class="theme-section-title text-xs font-semibold">Pool</span>
-                <select
-                  :value="form.card_pool"
-                  class="input-base w-full"
-                  :disabled="!version.editable || isBusy"
-                  @change="$emit('update-card-pool', ($event.target as HTMLSelectElement).value as CardPool)"
-                >
-                  <option
-                    v-for="option in cardPoolOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-              </label>
-              <fieldset class="space-y-2">
-                <legend class="theme-section-title text-xs font-semibold">
+
+            <div class="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-[5rem_minmax(0,1fr)] sm:items-center">
+              <p class="theme-section-title text-xs font-semibold">
+                Pool
+              </p>
+              <AppSelect
+                :model-value="form.card_pool"
+                :options="cardPoolOptions"
+                wrapper-class="w-full sm:max-w-48"
+                aria-label="Card pool"
+                :disabled="!version.editable || isBusy"
+                @update:model-value="handleCardPoolChange"
+              />
+
+              <p class="theme-section-title self-start pt-2 text-xs font-semibold">
+                Roles
+              </p>
+              <fieldset>
+                <legend class="sr-only">
                   Roles
                 </legend>
-                <div class="flex flex-wrap gap-2">
-                  <label
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
                     v-for="option in cardRoleOptions"
                     :key="option.value"
-                    class="theme-pill theme-pill-neutral flex items-center gap-2 px-3 py-2 text-xs font-semibold"
+                    type="button"
+                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
+                    :class="form.card_roles.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    :aria-pressed="form.card_roles.includes(option.value)"
+                    :disabled="!version.editable || isBusy"
+                    :data-testid="`card-role-option-${option.value}`"
+                    @click="$emit('toggle-card-role', option.value, !form.card_roles.includes(option.value))"
                   >
-                    <input
-                      :checked="form.card_roles.includes(option.value)"
-                      type="checkbox"
-                      class="theme-checkbox h-4 w-4"
-                      :disabled="!version.editable || isBusy"
-                      @change="$emit('toggle-card-role', option.value, ($event.target as HTMLInputElement).checked)"
-                    >
                     {{ option.label }}
-                  </label>
+                  </button>
                   <span
                     v-if="form.card_roles.length === 0"
-                    class="theme-pill theme-pill-accent px-3 py-2 text-xs font-semibold"
-                  >Normal</span>
+                    class="theme-section-muted text-xs"
+                  >
+                    Normal
+                  </span>
                 </div>
               </fieldset>
-              <fieldset class="space-y-2">
-                <legend class="field-label">
+
+              <p class="theme-section-title self-start pt-2 text-xs font-semibold">
+                Factions
+              </p>
+              <fieldset>
+                <legend class="sr-only">
                   Factions
                 </legend>
-                <div class="flex flex-wrap gap-2">
-                  <label
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
                     v-for="option in cardFactionOptions"
                     :key="option.value"
-                    class="theme-pill theme-pill-success flex items-center gap-2 px-3 py-2 text-xs font-semibold"
+                    type="button"
+                    class="theme-section-title min-h-9 rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
+                    :class="form.card_factions.includes(option.value) ? 'theme-selected-surface' : 'theme-card-frame-muted'"
+                    :aria-pressed="form.card_factions.includes(option.value)"
+                    :disabled="!version.editable || isBusy"
+                    :data-testid="`card-faction-option-${option.value}`"
+                    @click="$emit('toggle-card-faction', option.value, !form.card_factions.includes(option.value))"
                   >
-                    <input
-                      :checked="form.card_factions.includes(option.value)"
-                      type="checkbox"
-                      class="theme-checkbox h-4 w-4"
-                      :disabled="!version.editable || isBusy"
-                      @change="$emit('toggle-card-faction', option.value, ($event.target as HTMLInputElement).checked)"
-                    >
                     {{ option.label }}
-                  </label>
+                  </button>
                   <span
                     v-if="form.card_factions.length === 0"
-                    class="theme-pill theme-pill-neutral px-3 py-2 text-xs font-semibold"
-                  >No faction</span>
+                    class="theme-section-muted text-xs"
+                  >
+                    No faction
+                  </span>
                 </div>
               </fieldset>
             </div>
@@ -607,7 +611,7 @@ import type {
   SymbolFilterOption,
 } from '@/domain/cards/types';
 import type { ParseFlagPropertyKey } from '@/domain/review/types';
-import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
+import { CARD_POOL_OPTIONS, isCardPool, type CardPool } from '@/domain/cards/cardPools';
 import type { EditorForm, MetadataSearchState, ReparseTemplateOption } from '@/features/card-detail/types';
 import { metadataGroups, scalarFields } from '@/features/card-detail/types';
 
@@ -847,6 +851,12 @@ const applyAutocompleteOption = async (symbolKey: string): Promise<void> => {
 const handleReparseTemplateChange = (value: string | number | null): void => {
   if (typeof value === 'string') {
     emit('update-reparse-template', value);
+  }
+};
+
+const handleCardPoolChange = (value: string | number | null): void => {
+  if (isCardPool(value)) {
+    emit('update-card-pool', value);
   }
 };
 </script>
