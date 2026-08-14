@@ -4,7 +4,7 @@ Card imports turn one or more uploaded images into card records that can be revi
 
 ## End-to-end flow
 
-1. A staff user uploads supported image files from the staff-only `/imports` interface, explicitly selecting the Player, Evil, or Neutral pool and choosing Automatic or an exact batch-wide Override independently for roles and factions. The pool field is prefilled from the active site workspace but remains visible and editable before submission.
+1. A staff user uploads supported image files from the staff-only `/imports` interface, explicitly selecting the Player, Evil, or Neutral pool and choosing Automatic or an exact batch-wide Override independently for roles and factions. The pool field follows the active site workspace only while that field is pristine. An explicit pool edit or sealed upload attempt remains authoritative across later workspace changes.
 2. The API admission boundary fingerprints the immutable request, stages and checksum-verifies each source file before atomically publishing it under the client-generated creation key, then asks core to create the content version, import job, and queued items in one transaction. Replaying the same key and payload returns the existing job; reusing the key for a different payload is rejected.
 3. The parser worker polls for work and atomically claims a queued item.
 4. The parser loads the selected parsing template and current catalog resources, then crops regions, runs OCR, extracts fields, and detects symbols.

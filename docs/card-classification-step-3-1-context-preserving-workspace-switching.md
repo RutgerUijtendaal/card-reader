@@ -1,6 +1,6 @@
 # Card Classification Step 3.1: Context-Preserving Workspace Switching
 
-Status: planned. Begin only after Step 3 is merged into the classification umbrella branch.
+Status: implemented.
 
 This checkpoint refines the Step 3 Player/Evil/Neutral picker so it changes the site's active card-pool context without unnecessarily sending the user back to Gallery. It does not change card classification, authorization, or the set of routes available in each workspace.
 
