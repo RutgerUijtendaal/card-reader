@@ -164,13 +164,13 @@
 
   <rect class="box tts" x="725" y="935" width="270" height="104"/>
   <text class="title" x="785" y="970">TtsCardSheet</text>
-  <text class="field" x="750" y="996">layout + allocation cursor</text>
-  <text class="field" x="750" y="1020">desired/rendered revision</text>
+  <text class="field" x="750" y="994">card_pool + allocation cursor</text>
+  <text class="field" x="750" y="1016">layout + desired/rendered revision</text>
 
   <rect class="box tts" x="725" y="1070" width="270" height="142"/>
   <text class="title-small" x="765" y="1105">TtsCardSheetSlot</text>
-  <text class="field" x="750" y="1131">sheet + permanent slot_index</text>
-  <text class="field" x="750" y="1155">card_identity_id</text>
+  <text class="field" x="750" y="1131">sheet + pool + permanent slot</text>
+  <text class="field" x="750" y="1155">identity unique per pool</text>
   <text class="field" x="750" y="1179">resolved_card + card_version</text>
   <text class="field" x="750" y="1203">image snapshot</text>
 

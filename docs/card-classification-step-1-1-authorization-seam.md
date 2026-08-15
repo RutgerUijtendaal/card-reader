@@ -17,6 +17,8 @@ Do not grow import or workspace behavior until this step's acceptance criteria a
 
 Target amendment: this document preserves the implemented Step 1.1 names. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces the temporary Game-Master-specific entitlement/session vocabulary with a Player/Evil/Neutral pool scope. Evil and Neutral share the same initially staff-only restricted-pool policy.
 
+Post-feature TTS amendment: the authorization seam now also supports pool-partitioned persistent TTS sheets. Player sheets remain public; Evil and Neutral sheet reads require the centralized user scope or an exact-revision signed export capability. Gallery and content-version exports may use every pool in the requesting staff user's scope, while deck exports remain fixed to the Player workflow. The original public-artifact statements below describe this checkpoint's deliberately narrower starting contract.
+
 Final implementation amendment: card-linked inbox reads use the recipient's current scope instead of destructively retiring history during a pool transition. This permits global staff Review notifications for restricted cards while continuing to hide those rows from recipients whose current scope does not include the card. Deck-version notification creation remains Player-only with the deck workflow.
 
 ## Outcome

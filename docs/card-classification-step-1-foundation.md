@@ -1,5 +1,7 @@
 # Card Classification Step 1: Foundation
 
+Post-feature amendment: Step 1 intentionally established Player-only public TTS atlases as its first secure boundary. Umbrella review later generalized Gallery and content-version TTS export to pool-partitioned sheets: Player sheets remain public, while Evil and Neutral sheets require the user's pool scope or a signed capability bound to one rendered checksum. Developer-data and the deck workflow remain Player-only. The original statements below describe this checkpoint's implementation target rather than the final aggregate behavior.
+
 Status: implemented and validated.
 
 This is the first of eight ordered checkpoints:

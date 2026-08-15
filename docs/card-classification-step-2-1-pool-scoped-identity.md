@@ -1,5 +1,7 @@
 # Card Classification Step 2.1: Pool-Scoped Card Identity
 
+Post-feature TTS amendment: pool-scoped identity is now also carried by persistent TTS sheets and slots. Player sheets remain public; Evil and Neutral sheets are available only through the centralized restricted-pool scope or a signed capability bound to one rendered checksum. Gallery and content-version exports can use authorized restricted pools, while developer-data and decks retain their explicit Player-only product scope. References below to all public artifacts remaining Player-only describe this checkpoint's initial boundary.
+
 Status: implemented, validated, and merged into the classification umbrella branch. All dependent classification checkpoints through Step 3.2 are also implemented and merged.
 
 Target amendment: this document records the implemented pool-scoped identity seam. [Step 2.3](card-classification-step-2-3-faction-classification.md) extends that seam so normalized names, aliases, and untargeted image matching are scoped by pool plus the exact canonical faction set, allowing same-name cards in different factions within one pool.

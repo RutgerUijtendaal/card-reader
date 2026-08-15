@@ -14,7 +14,6 @@ from django.db.models import F, Max, Prefetch, Q, QuerySet
 from PIL import Image
 
 from card_reader_core.models import (
-    PLAYER_CARD_POOL_SCOPE,
     TTS_CARD_SHEET_CAPACITY,
     TTS_CARD_SHEET_LAYOUT_VERSION,
     Card,
@@ -34,8 +33,6 @@ _RENDERER_FINGERPRINT_VERSION = 2
 _SQLITE_WRITE_RETRY_ATTEMPTS = 6
 _SLOT_RESERVATION_ATTEMPTS = 16
 _CLAIM_RESERVATION_ATTEMPTS = 16
-PUBLIC_TTS_CARD_POOL_SCOPE = PLAYER_CARD_POOL_SCOPE
-
 _RetryResult = TypeVar("_RetryResult")
 
 
@@ -58,6 +55,7 @@ class TtsCardImageSource:
 @dataclass(frozen=True)
 class TtsCardSheetAssignment:
     card_id: str
+    card_pool: str
     sheet_id: str
     sheet_sequence: int
     layout_version: int
@@ -89,7 +87,6 @@ def iter_usable_card_source_batches(
 
 def _card_source_queryset(card_ids: list[str] | None) -> QuerySet[Card]:
     cards = Card.objects.filter(
-        card_pool__in=PUBLIC_TTS_CARD_POOL_SCOPE.allowed_pools,
         latest_version__isnull=False,
     ).select_related("latest_version")
     if card_ids is not None:
@@ -149,13 +146,19 @@ def _retry_sqlite_write(operation: Callable[[], _RetryResult]) -> _RetryResult:
 def _sync_card_sources_once(sources: list[TtsCardImageSource]) -> set[str]:
     affected_sheet_ids: set[str] = set()
     for source in sources:
-        canonical = TtsCardSheetSlot.objects.filter(card_identity_id=source.card.id).first()
+        canonical = TtsCardSheetSlot.objects.filter(
+            card_identity_id=source.card.id,
+            card_pool=source.card.card_pool,
+        ).first()
         if canonical is None:
             canonical = _allocate_slot(source)
         affected_sheet_ids.add(str(canonical.sheet_id))
 
         slots = list(
-            TtsCardSheetSlot.objects.select_for_update().filter(resolved_card_id=source.card.id)
+            TtsCardSheetSlot.objects.select_for_update().filter(
+                resolved_card_id=source.card.id,
+                card_pool=source.card.card_pool,
+            )
         )
         if canonical.id not in {slot.id for slot in slots}:
             slots.append(canonical)
@@ -229,10 +232,15 @@ def sync_merged_card_source(
 
 
 def get_card_sheet_assignments(card_ids: list[str]) -> dict[str, TtsCardSheetAssignment]:
-    slots = TtsCardSheetSlot.objects.filter(card_identity_id__in=card_ids).select_related("sheet")
+    slots = TtsCardSheetSlot.objects.filter(
+        card_identity_id__in=card_ids,
+        card_pool=F("resolved_card__card_pool"),
+        sheet__card_pool=F("card_pool"),
+    ).select_related("sheet")
     return {
         slot.card_identity_id: TtsCardSheetAssignment(
             card_id=slot.card_identity_id,
+            card_pool=slot.card_pool,
             sheet_id=str(slot.sheet_id),
             sheet_sequence=slot.sheet.sequence,
             layout_version=slot.sheet.layout_version,
@@ -411,15 +419,36 @@ def _refresh_card_source_visibility_once(card_ids: list[str] | None) -> set[str]
     return sheet_ids
 
 
-def list_non_player_card_ids_on_sheet(sheet_id: str) -> list[str]:
+def refresh_sheet_source_visibility(sheet_id: str) -> None:
+    _retry_sqlite_write(lambda: _refresh_sheet_source_visibility_once(sheet_id))
+
+
+@transaction.atomic
+def _refresh_sheet_source_visibility_once(sheet_id: str) -> None:
+    _refresh_sheet_fingerprints({sheet_id})
+
+
+def list_out_of_pool_card_ids_on_sheet(sheet_id: str) -> list[str]:
     return list(
         TtsCardSheetSlot.objects.filter(
             sheet_id=sheet_id,
+            resolved_card__isnull=False,
         )
-        .exclude(resolved_card__card_pool__in=PUBLIC_TTS_CARD_POOL_SCOPE.allowed_pools)
+        .filter(
+            ~Q(card_pool=F("sheet__card_pool"))
+            | ~Q(resolved_card__card_pool=F("sheet__card_pool"))
+        )
         .order_by("slot_index")
         .values_list("resolved_card_id", flat=True)
     )
+
+
+def sheet_has_incompatible_slots(sheet_id: str) -> bool:
+    return TtsCardSheetSlot.objects.filter(sheet_id=sheet_id).filter(
+        Q(resolved_card__isnull=True)
+        | ~Q(card_pool=F("sheet__card_pool"))
+        | ~Q(resolved_card__card_pool=F("sheet__card_pool"))
+    ).exists()
 
 
 def get_sheet_rendered_checksums(sheet_ids: list[str]) -> dict[str, str]:
@@ -532,12 +561,16 @@ def mark_render_failed(*, sheet_id: str, claimed_at: datetime, error: str) -> bo
 
 def _allocate_slot(source: TtsCardImageSource) -> TtsCardSheetSlot:
     for _attempt in range(_SLOT_RESERVATION_ATTEMPTS):
-        canonical = TtsCardSheetSlot.objects.filter(card_identity_id=source.card.id).first()
+        canonical = TtsCardSheetSlot.objects.filter(
+            card_identity_id=source.card.id,
+            card_pool=source.card.card_pool,
+        ).first()
         if canonical is not None:
             return canonical
 
         sheet = (
             TtsCardSheet.objects.filter(
+                card_pool=source.card.card_pool,
                 layout_version=TTS_CARD_SHEET_LAYOUT_VERSION,
                 next_slot_index__lt=TTS_CARD_SHEET_CAPACITY,
             )
@@ -549,6 +582,7 @@ def _allocate_slot(source: TtsCardImageSource) -> TtsCardSheetSlot:
                 with transaction.atomic():
                     max_sequence = TtsCardSheet.objects.aggregate(value=Max("sequence"))["value"] or 0
                     sheet = TtsCardSheet.objects.create(
+                        card_pool=source.card.card_pool,
                         sequence=max_sequence + 1,
                         layout_version=TTS_CARD_SHEET_LAYOUT_VERSION,
                     )
@@ -571,6 +605,7 @@ def _allocate_slot(source: TtsCardImageSource) -> TtsCardSheetSlot:
                     raise _SlotReservationLost
                 return TtsCardSheetSlot.objects.create(
                     sheet=sheet,
+                    card_pool=source.card.card_pool,
                     slot_index=slot_index,
                     card_identity_id=source.card.id,
                     resolved_card=source.card,
@@ -582,7 +617,10 @@ def _allocate_slot(source: TtsCardImageSource) -> TtsCardSheetSlot:
         except _SlotReservationLost:
             continue
         except IntegrityError:
-            canonical = TtsCardSheetSlot.objects.filter(card_identity_id=source.card.id).first()
+            canonical = TtsCardSheetSlot.objects.filter(
+                card_identity_id=source.card.id,
+                card_pool=source.card.card_pool,
+            ).first()
             if canonical is not None:
                 return canonical
     raise TtsCardSheetAllocationError(
@@ -607,6 +645,7 @@ def _refresh_sheet_fingerprints(sheet_ids: set[str]) -> None:
                 {
                     "renderer": _RENDERER_FINGERPRINT_VERSION,
                     "layout": sheet.layout_version,
+                    "card_pool": sheet.card_pool,
                     "slots": slots,
                 },
                 separators=(",", ":"),
@@ -644,17 +683,19 @@ __all__ = [
     "get_sheet_with_slots",
     "iter_usable_card_source_batches",
     "list_all_sheet_ids",
-    "list_non_player_card_ids_on_sheet",
+    "list_out_of_pool_card_ids_on_sheet",
     "list_sheet_ids_needing_render",
     "list_usable_card_sources",
     "mark_render_failed",
     "mark_render_succeeded",
     "prioritize_sheets",
     "refresh_card_source_visibility",
+    "refresh_sheet_source_visibility",
     "release_expired_render_claims",
     "release_render_claim",
     "request_sheet_rerender",
     "resolve_tts_card_image_path",
+    "sheet_has_incompatible_slots",
     "sync_card_sources",
     "sync_merged_card_source",
     "upgrade_sheet_layouts",
