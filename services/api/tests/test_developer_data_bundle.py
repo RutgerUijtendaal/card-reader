@@ -352,7 +352,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         ).exists()
         assert CardAlias.objects.filter(key="synthetic-hero-alias").exists()
         assert CardGroup.objects.filter(key="synthetic-group").exists()
-        assert CardClassificationRule.objects.count() == 7
+        assert CardClassificationRule.objects.count() == 8
         assert CardClassificationRule.objects.filter(
             card_pool="evil",
             target_kind="faction",
@@ -360,6 +360,14 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
             tag__key="blood",
             enabled=True,
         ).exists()
+        assert set(
+            CardClassificationRule.objects.filter(
+                card_pool="evil",
+                target_kind="faction",
+                target_key__in=("dark", "metal"),
+                enabled=True,
+            ).values_list("target_key", "tag__key")
+        ) == {("dark", "dark"), ("metal", "metal")}
         assert Template.objects.get(key="synthetic-template").definition_json["regions"][0][
             "parser_type"
         ] == "name"
@@ -913,7 +921,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "images/hero-v1.webp": b"hero-v1",
         "images/hero-v2.webp": b"hero-v2",
         "images/mainboard.webp": b"mainboard",
-        "images/mainboard-darkness.webp": b"mainboard-darkness",
+        "images/mainboard-dark.webp": b"mainboard-dark",
         "images/deprecated.webp": b"deprecated",
         "images/card-back.webp": b"card-back",
         "symbols/defaults/arcane.webp": b"symbol",
@@ -932,7 +940,8 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         "shop-item",
         "order",
         "blood",
-        "darkness",
+        "dark",
+        "metal",
     )
     Tag.objects.bulk_create(
         [
@@ -980,7 +989,8 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
         ("evil", "role", "location", "location"),
         ("evil", "faction", "order", "order"),
         ("evil", "faction", "blood", "blood"),
-        ("evil", "faction", "darkness", "darkness"),
+        ("evil", "faction", "dark", "dark"),
+        ("evil", "faction", "metal", "metal"),
         ("neutral", "role", "shop_item", "shop-item"),
     ]
     classification_rule_service = ClassificationRuleService()
@@ -1068,22 +1078,22 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
     )
     mainboard.latest_version = mainboard_version
     mainboard.save(update_fields=["latest_version"])
-    darkness_mainboard = Card.objects.create(
+    dark_mainboard = Card.objects.create(
         key="synthetic-mainboard",
-        label="Synthetic Mainboard Darkness",
-        faction_identity_key='["darkness"]',
+        label="Synthetic Mainboard Dark",
+        faction_identity_key='["dark"]',
     )
-    CardFactionAssignment.objects.create(card=darkness_mainboard, faction="darkness")
-    darkness_mainboard_version = _create_version(
-        card=darkness_mainboard,
+    CardFactionAssignment.objects.create(card=dark_mainboard, faction="dark")
+    dark_mainboard_version = _create_version(
+        card=dark_mainboard,
         template=template,
         content_version=content_version,
         version_number=1,
-        stored_path="images/mainboard-darkness.webp",
-        content=assets["images/mainboard-darkness.webp"],
+        stored_path="images/mainboard-dark.webp",
+        content=assets["images/mainboard-dark.webp"],
     )
-    darkness_mainboard.latest_version = darkness_mainboard_version
-    darkness_mainboard.save(update_fields=["latest_version"])
+    dark_mainboard.latest_version = dark_mainboard_version
+    dark_mainboard.save(update_fields=["latest_version"])
     deprecated = Card.objects.create(
         key="synthetic-deprecated",
         label="Synthetic Deprecated",
@@ -1133,7 +1143,7 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                 "boss": 0,
                 "shop_item": 0,
             },
-            "min_cards_by_faction": {"order": 1, "blood": 1, "darkness": 0},
+            "min_cards_by_faction": {"order": 1, "blood": 1, "dark": 0, "metal": 0},
             "min_deprecated_cards": 1,
             "min_card_groups": 1,
             "min_cards_with_multiple_versions": 1,

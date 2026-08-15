@@ -122,7 +122,7 @@ Core stack:
 - The target card classification model has three independent card-level dimensions:
   - `card_pool` is exactly one of `player`, `evil`, or `neutral`; `game_master` is a temporary undeployed value removed by Step 2.1 and must not remain as a compatibility alias.
   - `card_roles` is a set of zero or more code-owned roles: `hero`, `boss`, `location`, `boon`, `event`, and `shop_item`; roles may coexist.
-  - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, and `darkness`; factions may coexist.
+  - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, `dark`, and `metal`; factions may coexist.
   - Normal is the product label for the derived empty-role state and must not be persisted as a role. Keep `standard` only as the existing internal/query sentinel for that derived state.
   - Pool/role/faction conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
   - Pool, roles, and factions belong to the stable `Card` record; template remains version/parser configuration.

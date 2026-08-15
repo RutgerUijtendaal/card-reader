@@ -42,7 +42,7 @@ def test_card_identity_is_scoped_by_pool_and_exact_faction_set() -> None:
     multi_card, multi_created = create_card_identity(
         name="Shared Name",
         card_pool="evil",
-        card_factions=("darkness", "order"),
+        card_factions=("dark", "order"),
     )
     repeated_order, repeated_created = create_card_identity(
         name="Shared Name",
@@ -57,7 +57,7 @@ def test_card_identity_is_scoped_by_pool_and_exact_faction_set() -> None:
     assert resolve_card_by_name_key(
         name="Shared Name",
         card_pool="evil",
-        card_factions=("order", "darkness"),
+        card_factions=("order", "dark"),
     ) == multi_card
 
     ensure_card_alias(card=order_card, key="shared-alias", label="Shared Alias")
@@ -103,11 +103,11 @@ def test_name_pool_and_faction_move_is_atomic_and_moves_every_alias() -> None:
         card=moving,
         label="Moved Card",
         card_pool="neutral",
-        card_factions=("darkness", "order"),
+        card_factions=("dark", "order"),
     )
     moving.refresh_from_db()
     assert moving.card_pool == "neutral"
-    assert card_faction_keys(moving) == ("order", "darkness")
+    assert card_faction_keys(moving) == ("order", "dark")
     assert set(
         CardAlias.objects.filter(card=moving).values_list(
             "card_pool",
@@ -115,8 +115,8 @@ def test_name_pool_and_faction_move_is_atomic_and_moves_every_alias() -> None:
             "key",
         )
     ) == {
-        ("neutral", '["order","darkness"]', "old-alias"),
-        ("neutral", '["order","darkness"]', "moving-card"),
+        ("neutral", '["order","dark"]', "old-alias"),
+        ("neutral", '["order","dark"]', "moving-card"),
     }
 
 
