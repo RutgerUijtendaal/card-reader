@@ -54,6 +54,20 @@ describe('cardSort type sorting', () => {
     )).toBeLessThan(0);
   });
 
+  test('uses the Type key before card identity when counts and labels tie', () => {
+    const lookup = buildTypeSortLookup([
+      { key: 'zeta', label: 'Shared', linked_card_count: 1 },
+      { key: 'alpha', label: 'Shared', linked_card_count: 1 },
+    ]);
+
+    expect(compareCardSort(
+      buildCard('alpha-type-card', 'Zulu Card', [{ key: 'alpha', label: 'Shared' }]),
+      buildCard('zeta-type-card', 'Alpha Card', [{ key: 'zeta', label: 'Shared' }]),
+      'types_asc',
+      { cardPool: 'player', typeSortLookup: lookup },
+    )).toBeLessThan(0);
+  });
+
   test('uses the highest priority non-mana type for multi-type cards', () => {
     const lookup = buildTypeSortLookup([
       { key: 'mana', label: 'Mana', linked_card_count: 10 },

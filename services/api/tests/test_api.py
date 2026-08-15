@@ -2906,6 +2906,32 @@ def test_cards_list_type_sorting_happens_before_pagination() -> None:
     ]
 
 
+def test_cards_list_type_sort_uses_type_key_when_counts_and_labels_tie() -> None:
+    alpha_type = _create_type(key="sort-type-tie-alpha", label="Sort Type Tie")
+    zeta_type = _create_type(key="sort-type-tie-zeta", label="Sort Type Tie")
+    alpha_card, alpha_version = _create_editable_card_version(
+        name="Sort Type Tie Zulu Card"
+    )
+    zeta_card, zeta_version = _create_editable_card_version(
+        name="Sort Type Tie Alpha Card"
+    )
+    for version in (alpha_version, zeta_version):
+        _create_card_image(version)
+    replace_card_version_types(card_version_id=alpha_version.id, type_ids=[alpha_type.id])
+    replace_card_version_types(card_version_id=zeta_version.id, type_ids=[zeta_type.id])
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"sort": "types_asc", "q": "Sort Type Tie"},
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"][:2]] == [
+        alpha_card.id,
+        zeta_card.id,
+    ]
+
+
 def test_grouped_gallery_sort_uses_anchor_card_values() -> None:
     anchor_card, anchor_version = _create_editable_card_version(name="Sort Group Zephyr Group")
     member_card, member_version = _create_editable_card_version(name="Sort Group Zephyr Member")
@@ -3086,6 +3112,54 @@ def test_grouped_gallery_default_sort_uses_anchor_card_values() -> None:
     assert results[0]["id"] == standalone_card.id
     assert results[1]["result_type"] == "card_group"
     assert results[1]["anchor_card_id"] == anchor_card.id
+
+
+def test_grouped_gallery_default_sort_uses_group_identity_for_shared_anchors() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Duplicate Anchor Default Card"
+    )
+    _create_card_image(anchor_version)
+    alpha_group = _create_card_group(
+        "duplicate-anchor-alpha",
+        anchor_card=anchor_card,
+        members=[anchor_card],
+    )
+    zeta_group = _create_card_group(
+        "duplicate-anchor-zeta",
+        anchor_card=anchor_card,
+        members=[anchor_card],
+    )
+    expected_ids = sorted([alpha_group.id, zeta_group.id])
+    client = Client(HTTP_HOST="localhost")
+
+    first_response = client.get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "q": "Duplicate Anchor Default",
+            "page": 1,
+            "page_size": 1,
+        },
+    )
+    second_response = client.get(
+        "/cards",
+        {
+            "show_groups": "true",
+            "sort": "default",
+            "q": "Duplicate Anchor Default",
+            "page": 2,
+            "page_size": 1,
+        },
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["count"] == 2
+    assert [
+        first_response.json()["results"][0]["id"],
+        second_response.json()["results"][0]["id"],
+    ] == expected_ids
 
 
 def test_export_cards_csv_honors_selected_sort() -> None:

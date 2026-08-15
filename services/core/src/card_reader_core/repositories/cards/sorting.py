@@ -113,23 +113,23 @@ def build_type_sort_lookup(*, card_pool: CardPool) -> TypeSortLookup:
 def card_type_sort_key(
     types: Sequence[Type],
     type_sort_lookup: TypeSortLookup,
-) -> tuple[int, int, str]:
+) -> tuple[int, int, str, str]:
     if not types:
-        return (1, 0, "")
+        return (1, 0, "", "")
 
-    best_value: tuple[int, int, str] | None = None
+    best_value: tuple[int, int, str, str] | None = None
     for row in types:
         key = str(row.key).strip().casefold()
         label = str(row.label).casefold()
         if key == MANA_TYPE_KEY:
-            candidate = (2, 0, "")
+            candidate = (2, 0, "", key)
         else:
             linked_card_count, ranked_label = type_sort_lookup.get(key, (0, label))
-            candidate = (0, -linked_card_count, ranked_label)
+            candidate = (0, -linked_card_count, ranked_label, key)
         if best_value is None or candidate < best_value:
             best_value = candidate
 
-    return best_value or (1, 0, "")
+    return best_value or (1, 0, "", "")
 
 
 def card_default_sort_key(

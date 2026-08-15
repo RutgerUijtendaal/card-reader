@@ -174,7 +174,8 @@ export const buildTypeSortBuckets = (types: TypeSortMetadata[]): TypeSortBucket[
     if (leftIsMana !== rightIsMana) return leftIsMana ? 1 : -1;
     const countDiff = (right.linked_card_count ?? 0) - (left.linked_card_count ?? 0);
     if (countDiff !== 0) return countDiff;
-    return left.label.localeCompare(right.label) || left.key.localeCompare(right.key);
+    return left.label.toLocaleLowerCase().localeCompare(right.label.toLocaleLowerCase())
+      || normalizeTypeKey(left.key).localeCompare(normalizeTypeKey(right.key));
   }).map((type) => ({
     key: type.key,
     normalizedKey: normalizeTypeKey(type.key),
@@ -198,16 +199,22 @@ export const buildTypeSortLookup = (types: TypeSortMetadata[]): TypeSortLookup =
 const getCardTypeSortValue = (
   card: SortableCardLike,
   typeSortLookup?: TypeSortLookup,
-): { bucket: number; linkedCardCount: number; typeLabel: string } => {
+): { bucket: number; linkedCardCount: number; typeLabel: string; typeKey: string } => {
   if (!card.types || card.types.length === 0) {
     return {
       bucket: UNTYPED_TYPE_SORT_BUCKET,
       linkedCardCount: 0,
       typeLabel: '',
+      typeKey: '',
     };
   }
 
-  let bestValue: { bucket: number; linkedCardCount: number; typeLabel: string } | null = null;
+  let bestValue: {
+    bucket: number;
+    linkedCardCount: number;
+    typeLabel: string;
+    typeKey: string;
+  } | null = null;
   for (const type of card.types) {
     const normalizedKey = normalizeTypeKey(type.key);
     const fallbackLabel = type.label.toLocaleLowerCase();
@@ -216,12 +223,14 @@ const getCardTypeSortValue = (
       ? {
           bucket: MANA_TYPE_SORT_BUCKET,
           linkedCardCount: 0,
-          typeLabel: fallbackLabel,
+          typeLabel: '',
+          typeKey: normalizedKey,
         }
       : {
           bucket: 0,
           linkedCardCount: lookupEntry?.linkedCardCount ?? 0,
           typeLabel: lookupEntry?.label ?? fallbackLabel,
+          typeKey: normalizedKey,
         };
     if (
       bestValue === null
@@ -230,7 +239,13 @@ const getCardTypeSortValue = (
       || (
         candidate.bucket === bestValue.bucket
         && candidate.linkedCardCount === bestValue.linkedCardCount
-        && candidate.typeLabel.localeCompare(bestValue.typeLabel) < 0
+        && (
+          candidate.typeLabel.localeCompare(bestValue.typeLabel) < 0
+          || (
+            candidate.typeLabel === bestValue.typeLabel
+            && candidate.typeKey.localeCompare(bestValue.typeKey) < 0
+          )
+        )
       )
     ) {
       bestValue = candidate;
@@ -241,6 +256,7 @@ const getCardTypeSortValue = (
     bucket: UNTYPED_TYPE_SORT_BUCKET,
     linkedCardCount: 0,
     typeLabel: '',
+    typeKey: '',
   };
 };
 
@@ -273,7 +289,8 @@ const compareCardTypeSort = (
   const rightType = getCardTypeSortValue(right, typeSortLookup);
   return leftType.bucket - rightType.bucket
     || rightType.linkedCardCount - leftType.linkedCardCount
-    || leftType.typeLabel.localeCompare(rightType.typeLabel);
+    || leftType.typeLabel.localeCompare(rightType.typeLabel)
+    || leftType.typeKey.localeCompare(rightType.typeKey);
 };
 
 const effectiveRoleSortOrder = (

@@ -38,7 +38,7 @@ from .snapshots import (
     decode_field_sources,
     decode_parsed_snapshot,
 )
-from .sorting import build_type_sort_lookup, card_default_sort_key
+from .sorting import build_type_sort_lookup, card_default_sort_key, card_type_sort_key
 from .types import (
     CARD_SORT_DEFAULT,
     CARD_SORT_MANA_ASC,
@@ -116,6 +116,7 @@ __all__ = [
     "CardSort",
     "build_type_sort_lookup",
     "card_default_sort_key",
+    "card_type_sort_key",
     "decode_field_sources",
     "decode_parsed_snapshot",
     "change_card_identity",

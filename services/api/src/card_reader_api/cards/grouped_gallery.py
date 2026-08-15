@@ -19,6 +19,7 @@ from card_reader_core.repositories.cards import (
     CARD_SORT_TYPES_ASC,
     build_type_sort_lookup,
     card_default_sort_key,
+    card_type_sort_key,
     get_card_list_rows_by_version_ids,
     list_matching_card_candidates,
 )
@@ -28,8 +29,6 @@ from card_reader_core.services.cards import get_card_versions_metadata
 if TYPE_CHECKING:
     from card_reader_core.models import CardFaction, CardGroup, CardPool, CardRole, Type
     from card_reader_core.repositories.cards import CardLifecycleFilter, CardSort
-
-MANA_TYPE_KEY = "mana"
 
 
 class GroupedGalleryItem(TypedDict):
@@ -299,15 +298,18 @@ def _grouped_gallery_sort_key(
     updated_at = item["updated_at"]
 
     if sort == CARD_SORT_DEFAULT:
-        return card_default_sort_key(
-            card_pool=card_pool,
-            card_id=item["sort_card_id"],
-            label=item["label"],
-            name=item["name"],
-            mana_family_sort_key=item["mana_family_sort_key"],
-            mana_value=item["mana_value"],
-            card_roles=item["card_roles"],
-            card_factions=item["card_factions"],
+        return (
+            *card_default_sort_key(
+                card_pool=card_pool,
+                card_id=item["sort_card_id"],
+                label=item["label"],
+                name=item["name"],
+                mana_family_sort_key=item["mana_family_sort_key"],
+                mana_value=item["mana_value"],
+                card_roles=item["card_roles"],
+                card_factions=item["card_factions"],
+            ),
+            item_id,
         )
     if sort == CARD_SORT_NAME_ASC:
         return (name, label, item_id)
@@ -323,32 +325,10 @@ def _grouped_gallery_sort_key(
             item["sort_card_id"],
         )
     if sort == CARD_SORT_TYPES_ASC:
-        bucket, linked_card_count, type_label = _grouped_gallery_type_sort_value(
-            item["types"], type_sort_lookup
+        return (
+            *card_type_sort_key(item["types"], type_sort_lookup or {}),
+            name,
+            label,
+            item_id,
         )
-        return (bucket, -linked_card_count, type_label, name, label, item_id)
     return (-updated_at.timestamp(), label, item_id)
-
-
-def _grouped_gallery_type_sort_value(
-    types: list["Type"],
-    type_sort_lookup: dict[str, tuple[int, str]] | None,
-) -> tuple[int, int, str]:
-    if not types:
-        return (1, 0, "")
-
-    best_value: tuple[int, int, str] | None = None
-    for row in types:
-        key = str(row.key).strip().casefold()
-        label = str(row.label).casefold()
-        if key == MANA_TYPE_KEY:
-            candidate = (2, 0, label)
-        else:
-            linked_card_count, ranked_label = (type_sort_lookup or {}).get(key, (0, label))
-            candidate = (0, -linked_card_count, ranked_label)
-        if best_value is None or candidate < best_value:
-            best_value = candidate
-
-    if best_value is None:
-        return (1, 0, "")
-    return (best_value[0], -best_value[1], best_value[2])
