@@ -332,6 +332,7 @@ describe('DeckDetailPage type grouping', () => {
   test('renders mainboard cards grouped by type order by default and exposes the option in view options', async () => {
     const mounted = await mountPage();
 
+    expect(apiGetMock).toHaveBeenCalledWith('/cards/filters', { params: { card_pool: 'player' } });
     expect(readTypeGroupKeys(mounted.container)).toEqual(['spell', 'creature', 'untyped', 'mana']);
     expect(mounted.container.querySelector('[data-testid="group-by-type-option"]')?.textContent).toContain('Group by Type');
     expect(mounted.container.querySelector<HTMLInputElement>('[data-testid="group-by-type-option"] input')?.checked).toBe(true);

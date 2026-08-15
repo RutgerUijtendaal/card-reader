@@ -173,6 +173,7 @@ describe('CardGalleryPage pool-aware filters', () => {
       typeof url === 'string' && url.startsWith('/cards?'),
     )?.[0];
     const params = new URL(String(cardRequest), 'https://cards.test').searchParams;
+    expect(params.get('sort')).toBe('default');
     expect(params.get('card_pool')).toBe('evil');
     expect(params.getAll('card_factions')).toEqual(['blood']);
     expect(params.get('card_faction_match')).toBe('all');

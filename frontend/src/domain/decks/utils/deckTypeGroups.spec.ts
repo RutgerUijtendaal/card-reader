@@ -40,7 +40,7 @@ describe('groupDeckEntriesByType', () => {
     expect(groups[0]?.entries.map((entry) => entry.card.id)).toEqual(['multi']);
   });
 
-  test('places untyped cards before mana cards and omits empty buckets', () => {
+  test('places catalog-missing and untyped cards before mana cards and omits empty buckets', () => {
     const groups = groupDeckEntriesByType(
       [
         buildEntry('mana-card', 'Mana Card', [{ key: 'mana', label: 'Mana' }]),
@@ -50,11 +50,26 @@ describe('groupDeckEntriesByType', () => {
       typeBuckets,
     );
 
-    expect(groups.map((group) => group.label)).toEqual(['Untyped', 'Mana']);
+    expect(groups.map((group) => group.label)).toEqual(['Unknown', 'Untyped', 'Mana']);
     expect(groups.map((group) => group.entries.map((entry) => entry.card.id))).toEqual([
-      ['blank-card', 'unknown-card'],
+      ['unknown-card'],
+      ['blank-card'],
       ['mana-card'],
     ]);
+  });
+
+  test('creates a bucket for a card Type missing from the active catalog', () => {
+    const groups = groupDeckEntriesByType(
+      [
+        buildEntry('deprecated-card', 'Deprecated Card', [
+          { key: 'legacy-type', label: 'Legacy Type' },
+        ]),
+      ],
+      typeBuckets,
+    );
+
+    expect(groups.map((group) => group.label)).toEqual(['Legacy Type']);
+    expect(groups[0]?.entries.map((entry) => entry.card.id)).toEqual(['deprecated-card']);
   });
 
   test('keeps cards inside a bucket in name, label, id order', () => {

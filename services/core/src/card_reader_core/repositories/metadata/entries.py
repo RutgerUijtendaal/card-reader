@@ -4,6 +4,7 @@ from typing import Any
 
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models.functions import Lower
 
 from card_reader_core.models import (
     CardPool,
@@ -83,7 +84,8 @@ def list_types_for_card_sort(
     return list(
         query.order_by(
             "-linked_card_count",
-            "label",
+            Lower("label"),
+            Lower("key"),
             "id",
         )
     )
