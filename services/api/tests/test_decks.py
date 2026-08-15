@@ -3534,6 +3534,78 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
     assert tampered.status_code == 400
 
 
+def test_idless_duplicate_name_sideboards_round_trip_by_exact_or_position() -> None:
+    owner = _create_user("duplicate-sideboard-name-owner", "password")
+    hero = _create_card(name="Duplicate Sideboard Hero", hero=True)
+    restricted = _create_card(name="Duplicate Sideboard Restricted", hero=False)
+    first_visible = _create_card(name="Duplicate Sideboard First Visible", hero=False)
+    second_visible = _create_card(name="Duplicate Sideboard Second Visible", hero=False)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Duplicate Sideboard Names",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[],
+        sideboards=[
+            DeckSideboardInput(
+                name="Shared Name",
+                entries=[
+                    DeckEntryInput(card_id=restricted.id, quantity=1),
+                    DeckEntryInput(card_id=first_visible.id, quantity=1),
+                ],
+            ),
+            DeckSideboardInput(
+                name="Shared Name",
+                entries=[
+                    DeckEntryInput(card_id=restricted.id, quantity=2),
+                    DeckEntryInput(card_id=second_visible.id, quantity=1),
+                ],
+            ),
+        ],
+    )
+    restricted.card_pool = "evil"
+    restricted.save(update_fields=["card_pool", "updated_at"])
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    payload = client.get(f"/my/decks/{deck.id}").json()
+
+    submitted_sideboards = []
+    for sideboard in payload["sideboards"]:
+        entries = [
+            {
+                "card_id": entry["card"]["id"],
+                "quantity": (
+                    entry["quantity"] + 1
+                    if not entry["card"].get("restricted", False)
+                    else entry["quantity"]
+                ),
+            }
+            for entry in sideboard["entries"]
+        ]
+        submitted_sideboards.append({"name": sideboard["name"], "entries": entries})
+
+    response = client.patch(
+        f"/my/decks/{deck.id}",
+        data={"sideboards": submitted_sideboards},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    deck.refresh_from_db()
+    persisted_entry_sets = {
+        frozenset(
+            (entry.card_id, int(entry.quantity))
+            for entry in sideboard.entries.all()
+        )
+        for sideboard in deck.sideboards.all()
+    }
+    assert persisted_entry_sets == {
+        frozenset({(restricted.id, 1), (first_visible.id, 2)}),
+        frozenset({(restricted.id, 2), (second_visible.id, 2)}),
+    }
+
+
 def test_standard_cannot_match_all_with_persisted_roles() -> None:
     response = Client(HTTP_HOST="localhost").get(
         "/cards",

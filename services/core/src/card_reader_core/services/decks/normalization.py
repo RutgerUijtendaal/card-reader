@@ -38,7 +38,9 @@ def _validate_preserved_restricted_sideboard_entries(
 ) -> None:
     restricted_card_ids: set[str] = set()
     existing_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
-    existing_by_name = {sideboard.name: sideboard for sideboard in existing_sideboards}
+    existing_by_name: dict[str, list[DeckSideboard]] = {}
+    for existing_sideboard in existing_sideboards:
+        existing_by_name.setdefault(existing_sideboard.name, []).append(existing_sideboard)
     expected_quantities: dict[tuple[str, str], int] = {}
     for existing_sideboard in existing_sideboards:
         for existing_entry in existing_sideboard.entries.all():
@@ -50,14 +52,13 @@ def _validate_preserved_restricted_sideboard_entries(
             )
     used_source_sideboard_ids: set[str] = set()
     for submitted_sideboard in sideboards:
-        source_sideboard = (
-            existing_by_id.get(submitted_sideboard.source_id)
-            if submitted_sideboard.source_id is not None
-            else None
-        ) or existing_by_name.get(submitted_sideboard.name)
+        source_sideboard = _resolve_source_sideboard(
+            submitted_sideboard,
+            existing_by_id=existing_by_id,
+            existing_by_name=existing_by_name,
+            used_source_sideboard_ids=used_source_sideboard_ids,
+        )
         if source_sideboard is not None:
-            if source_sideboard.id in used_source_sideboard_ids:
-                raise ValueError("Each existing sideboard can only be submitted once.")
             used_source_sideboard_ids.add(source_sideboard.id)
         for submitted_entry in submitted_sideboard.entries:
             if submitted_entry.card_id not in restricted_card_ids:
@@ -71,6 +72,46 @@ def _validate_preserved_restricted_sideboard_entries(
                 submitted_entry.quantity
             ):
                 raise ValueError("Restricted sideboard references can only be preserved unchanged.")
+
+
+def _resolve_source_sideboard(
+    submitted_sideboard: DeckSideboardInput,
+    *,
+    existing_by_id: dict[str, DeckSideboard],
+    existing_by_name: dict[str, list[DeckSideboard]],
+    used_source_sideboard_ids: set[str],
+) -> DeckSideboard | None:
+    source_sideboard = (
+        existing_by_id.get(submitted_sideboard.source_id)
+        if submitted_sideboard.source_id is not None
+        else None
+    )
+    if source_sideboard is not None:
+        if source_sideboard.id in used_source_sideboard_ids:
+            raise ValueError("Each existing sideboard can only be submitted once.")
+        return source_sideboard
+
+    named_candidates = existing_by_name.get(submitted_sideboard.name, [])
+    available_candidates = [
+        sideboard
+        for sideboard in named_candidates
+        if sideboard.id not in used_source_sideboard_ids
+    ]
+    if not available_candidates:
+        if named_candidates:
+            raise ValueError("Each existing sideboard can only be submitted once.")
+        return None
+
+    submitted_entries = [
+        (entry.card_id, int(entry.quantity)) for entry in submitted_sideboard.entries
+    ]
+    exact_candidates = [
+        sideboard
+        for sideboard in available_candidates
+        if [(entry.card.id, int(entry.quantity)) for entry in sideboard.entries.all()]
+        == submitted_entries
+    ]
+    return exact_candidates[0] if len(exact_candidates) == 1 else available_candidates[0]
 
 
 class DeckPayloadNormalizer:
