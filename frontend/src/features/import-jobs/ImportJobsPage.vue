@@ -1,7 +1,7 @@
 <template>
   <section class="flex flex-col gap-6">
     <AppPageHeader
-      :icon="Upload"
+      :icon="APP_SECTION_ICONS.imports"
       title="Imports"
       subtitle="Configure card image imports and follow their progress."
       title-tag="h2"
@@ -374,7 +374,7 @@
 import { CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
 import { CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
 import { CARD_POOL_OPTIONS } from '@/domain/cards/cardPools';
-import { Info, Upload } from 'lucide-vue-next';
+import { Info } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import ImportActivityPanel from '@/features/import-jobs/components/ImportActivityPanel.vue';
@@ -382,6 +382,7 @@ import ImportSourcePicker from '@/features/import-jobs/components/ImportSourcePi
 import { useImportJobsController } from '@/features/import-jobs/composables/useImportJobsController';
 import { useAuthStore } from '@/domain/session/store';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppFormSection from '@/shared/components/app/AppFormSection.vue';
 import AppSelect from '@/shared/components/app/AppSelect.vue';

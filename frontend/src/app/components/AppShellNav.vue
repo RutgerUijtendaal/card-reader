@@ -90,6 +90,7 @@
           <component
             :is="item.icon"
             class="h-[1.125rem] w-[1.125rem] shrink-0"
+            :data-card-pool-icon="item.cardPool"
           />
           <span v-if="!collapsed">{{ item.label }}</span>
           <span
@@ -126,6 +127,7 @@
           <component
             :is="item.icon"
             class="h-[1.125rem] w-[1.125rem] shrink-0"
+            :data-card-pool-icon="item.cardPool"
           />
           <span v-if="!collapsed">{{ item.label }}</span>
           <span
@@ -196,7 +198,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Activity, Bell, BookOpen, ChevronRight, ClipboardCheck, Folders, Gamepad2, Hammer, Images, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Settings, SlidersHorizontal, Upload, X } from 'lucide-vue-next';
+import type { Component } from 'vue';
+import { ChevronRight, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-vue-next';
 import { RouterLink, useRouter } from 'vue-router';
 import type { RouteLocationRaw } from 'vue-router';
 import AppHotkeysPanel from '@/app/components/AppHotkeysPanel.vue';
@@ -210,11 +213,15 @@ import {
   buildWorkspaceGalleryLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
+import { CARD_POOL_ICONS } from '@/domain/cards/cardPoolIcons';
+import type { CardPool } from '@/domain/cards/cardPools';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 
 type NavItem = {
   label: string;
   to: RouteLocationRaw;
-  icon: typeof Images;
+  icon: Component;
+  cardPool?: CardPool;
   requiresStaff?: boolean;
   requiresAuth?: boolean;
   requiresAuthenticatedUser?: boolean;
@@ -249,19 +256,24 @@ const { pendingAccessRequestCount } = useAccessRequestSummary();
 
 const galleryLocation = computed(() => buildWorkspaceGalleryLocation(workspace.activePool));
 const items = computed<NavItem[]>(() => [
-  { label: 'Gallery', to: galleryLocation.value, icon: Images },
+  {
+    label: 'Gallery',
+    to: galleryLocation.value,
+    icon: CARD_POOL_ICONS[workspace.activePool],
+    cardPool: workspace.activePool,
+  },
   ...(workspace.activePool === 'player' ? [
-    { label: 'Decks', to: '/decks', icon: BookOpen },
-    { label: 'Playtester', to: '/playtester', icon: Gamepad2 },
-    { label: 'My Decks', to: '/my/decks', icon: Folders, requiresAuth: true },
-    { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: Hammer, requiresAuth: true },
+    { label: 'Decks', to: '/decks', icon: APP_SECTION_ICONS.decks },
+    { label: 'Playtester', to: '/playtester', icon: APP_SECTION_ICONS.playtester },
+    { label: 'My Decks', to: '/my/decks', icon: APP_SECTION_ICONS.myDecks, requiresAuth: true },
+    { label: 'Build a deck', to: '/my/decks/new?return_to=my_decks', icon: APP_SECTION_ICONS.deckBuilder, requiresAuth: true },
   ] : []),
-  { label: 'Notifications', to: '/notifications', icon: Bell, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },
-  { label: 'Settings', to: '/settings', icon: SlidersHorizontal },
-  { label: 'Imports', to: '/imports', icon: Upload, requiresStaff: true },
-  { label: 'Operations', to: '/operations', icon: Activity, requiresStaff: true },
-  { label: 'Review Queue', to: '/review', icon: ClipboardCheck, requiresStaff: true, badgeCount: openParseFlagItemCount.value },
-  { label: 'Admin', to: '/admin', icon: Settings, requiresStaff: true, badgeCount: pendingAccessRequestCount.value },
+  { label: 'Notifications', to: '/notifications', icon: APP_SECTION_ICONS.notifications, requiresAuthenticatedUser: true, badgeCount: unreadNotificationCount.value },
+  { label: 'Settings', to: '/settings', icon: APP_SECTION_ICONS.settings },
+  { label: 'Imports', to: '/imports', icon: APP_SECTION_ICONS.imports, requiresStaff: true },
+  { label: 'Operations', to: '/operations', icon: APP_SECTION_ICONS.operations, requiresStaff: true },
+  { label: 'Review Queue', to: '/review', icon: APP_SECTION_ICONS.review, requiresStaff: true, badgeCount: openParseFlagItemCount.value },
+  { label: 'Admin', to: '/admin', icon: APP_SECTION_ICONS.admin, requiresStaff: true, badgeCount: pendingAccessRequestCount.value },
 ]);
 
 const canShowItem = (item: NavItem): boolean => {

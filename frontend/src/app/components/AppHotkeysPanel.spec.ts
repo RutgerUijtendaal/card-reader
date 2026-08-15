@@ -85,6 +85,7 @@ describe('AppHotkeysPanel', () => {
     expect(mounted.container.textContent).toContain('Search');
     expect(mounted.container.textContent).toContain('New Deck');
     expect(mounted.container.textContent).not.toContain('Shuffle');
+    expect(mounted.container.querySelector('[data-hotkey-count]')?.getAttribute('data-hotkey-count')).toBe('4');
 
     mounted.unmount();
   });
@@ -110,6 +111,7 @@ describe('AppHotkeysPanel', () => {
 
     expect(mounted.container.textContent).toContain('Search');
     expect(mounted.container.textContent).not.toContain('New Deck');
+    expect(mounted.container.querySelector('[data-hotkey-count]')?.getAttribute('data-hotkey-count')).toBe('3');
 
     mounted.unmount();
   });

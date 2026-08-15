@@ -32,7 +32,7 @@
           @click="void selectPool(option.value)"
         >
           <component
-            :is="poolIcons[option.value]"
+            :is="CARD_POOL_ICONS[option.value]"
             :class="collapsed ? 'h-5 w-5' : 'h-7 w-7'"
             aria-hidden="true"
           />
@@ -43,11 +43,9 @@
 </template>
 
 <script setup lang="ts">
-import { Scale, Shield } from 'lucide-vue-next';
-import type { Component } from 'vue';
 import { useCardPoolWorkspaceSelection } from '@/app/composables/useCardPoolWorkspaceSelection';
 import type { CardPool } from '@/domain/cards/cardPools';
-import EvilPoolIcon from '@/domain/cards/components/EvilPoolIcon.vue';
+import { CARD_POOL_ICONS } from '@/domain/cards/cardPoolIcons';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import InfoTooltip from '@/shared/components/InfoTooltip.vue';
 
@@ -57,11 +55,6 @@ withDefaults(defineProps<{ collapsed?: boolean }>(), {
 const emit = defineEmits<{ selected: [] }>();
 const workspace = useCardPoolWorkspaceStore();
 const workspaceSelection = useCardPoolWorkspaceSelection();
-const poolIcons: Record<CardPool, Component> = {
-  player: Shield,
-  evil: EvilPoolIcon,
-  neutral: Scale,
-};
 
 const selectPool = async (cardPool: CardPool): Promise<void> => {
   const selected = await workspaceSelection.selectPool(cardPool);

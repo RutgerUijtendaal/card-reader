@@ -1,7 +1,7 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="ServerCog"
+      :icon="APP_SECTION_ICONS.operations"
       title="Operations"
       subtitle="Monitor background workers and the durable queues they process."
       title-tag="h2"
@@ -264,10 +264,11 @@
 </template>
 
 <script setup lang="ts">
-import { RefreshCw, ServerCog } from 'lucide-vue-next';
+import { RefreshCw } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';
 import OperationsQueueItemRow from '@/features/operations/components/OperationsQueueItemRow.vue';

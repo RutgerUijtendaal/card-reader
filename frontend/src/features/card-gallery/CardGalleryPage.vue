@@ -1,7 +1,7 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="Images"
+      :icon="CARD_POOL_ICONS[workspace.activePool]"
       :title="`${cardPoolLabel(workspace.activePool)} Gallery`"
       :subtitle="gallerySubtitle"
       title-tag="h2"
@@ -10,7 +10,7 @@
       <template #actions>
         <AppHeaderAction
           v-if="workspace.activePool === 'player'"
-          :icon="Hammer"
+          :icon="APP_SECTION_ICONS.deckBuilder"
           label="Build a deck"
           short-label="Build a deck"
           variant="primary"
@@ -157,7 +157,7 @@
 <script setup lang="ts">
 import { useScroll, useTimeoutFn } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Copy, Download, Hammer, Images, Pencil } from 'lucide-vue-next';
+import { Copy, Download, Pencil } from 'lucide-vue-next';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useCsvExport } from '@/shared/composables/useCsvExport';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
@@ -165,6 +165,7 @@ import { createLoadingShimItems } from '@/domain/cards/utils/galleryDisplayItems
 import { useScrollContainer } from '@/shared/composables/useScrollContainer';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import CardGalleryItem from '@/domain/cards/components/CardGalleryItem.vue';
 import CardSortMenu from '@/domain/cards/components/CardSortMenu.vue';
 import GalleryOptionsMenu from '@/domain/cards/components/GalleryOptionsMenu.vue';
@@ -207,6 +208,7 @@ import { useTtsCardExport } from '@/domain/cards/composables/useTtsCardExport';
 import { buildContextualNewDeckEditorLocation } from '@/domain/decks/utils/deckRouteState';
 import { cardPoolLabel } from '@/domain/cards/cardPools';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
+import { CARD_POOL_ICONS } from '@/domain/cards/cardPoolIcons';
 
 const route = useRoute();
 const router = useRouter();

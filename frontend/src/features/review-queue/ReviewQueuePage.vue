@@ -1,7 +1,7 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="ClipboardCheck"
+      :icon="APP_SECTION_ICONS.review"
       title="Review Queue"
       subtitle="Review low-confidence parses and user-reported parse issues."
       title-tag="h2"
@@ -375,7 +375,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { ClipboardCheck } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import type { LocationQuery, RouteLocationRaw } from 'vue-router';
@@ -383,6 +382,7 @@ import { toAbsoluteApiUrl } from '@/shared/api/client';
 import { getApiErrorMessage as extractErrorMessage } from '@/shared/api/errors';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';

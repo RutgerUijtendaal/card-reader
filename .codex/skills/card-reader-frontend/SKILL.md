@@ -16,6 +16,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Keep reusable card queries, filters, gallery behavior, sorting, symbols, preferences, and card UI in `frontend/src/domain/cards`.
 - Keep reusable deck contracts, clients, constraints, calculations, exports, route helpers, tags, and deck UI in `frontend/src/domain/decks`; use `frontend/src/domain/deck-building` for contracts shared with cards.
 - Keep app bootstrap, routing, shell navigation/hotkeys, theme orchestration, and global styles in `frontend/src/app`.
+- Keep icons consistent across matching sidebar links and page headers. Source stable section icons from `frontend/src/shared/components/app/appSectionIcons.ts`, and pool-aware Gallery icons from the cards-domain pool icon mapping; never import separate icons for the two surfaces.
 - Keep generic API infrastructure, form/modal/layout controls, floating UI, keyboard/pointer helpers, and generic composables in `frontend/src/shared`.
 - Keep Axios calls in the focused `api.ts` or `api/*` client owned by the relevant feature or domain. Pages, components, stores, and workflow composables consume typed client functions instead of the shared Axios instance.
 - Co-locate unit and component specs with their source. Use a feature `tests/` directory only for scenarios spanning several source files.
@@ -86,6 +87,7 @@ Follow `AGENTS.md` first. Use this skill both when implementing frontend changes
 - Page layouts that reintroduce max-height primary list containers instead of using shell page scroll with sticky/bounded asides
 - Routed pages that show empty states, partial controls, or text-only loading while initial page data is still loading
 - Theme drift from raw colors, light-only assumptions, or component-local styling systems
+- Sidebar and page-header icons that represent the same section but do not consume the same shared icon definition
 - Unnecessary framed containers where divider-separated, background-floating content would be clearer and more consistent
 - UI changes verified in one theme only
 - Missing validation for touched frontend behavior

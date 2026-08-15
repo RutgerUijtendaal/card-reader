@@ -1,7 +1,7 @@
 <template>
   <section class="flex flex-col gap-5">
     <AppPageHeader
-      :icon="Bell"
+      :icon="APP_SECTION_ICONS.notifications"
       title="Notifications"
       subtitle="Review updates tied to your decks, submitted flags, and account activity."
       title-tag="h2"
@@ -158,12 +158,13 @@
 </template>
 
 <script setup lang="ts">
-import { Bell, CheckCheck, Flag, Inbox, RefreshCw } from 'lucide-vue-next';
+import { CheckCheck, Flag, Inbox, RefreshCw } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import type { Component } from 'vue';
 import { toast } from 'vue-sonner';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';
 import AppStickyAside from '@/shared/components/app/AppStickyAside.vue';

@@ -141,6 +141,20 @@ describe('CardGalleryPage pool-aware filters', () => {
     document.body.innerHTML = '';
   });
 
+  test.each([
+    ['player', '/cards', '.lucide-shield'],
+    ['evil', '/cards?card_pool=evil', '.card-pool-icon-evil'],
+    ['neutral', '/cards?card_pool=neutral', '.lucide-scale'],
+  ] as const)('uses the %s pool icon in the Gallery header', async (activePool, path, iconSelector) => {
+    const mounted = await mountGallery(path, activePool);
+
+    expect(mounted.container.querySelector(
+      `.app-page-header-primary ${iconSelector}`,
+    )).not.toBeNull();
+
+    mounted.unmount();
+  });
+
   test('canonicalizes an Evil direct URL before requesting cards', async () => {
     const mounted = await mountGallery(
       '/cards?card_pool=evil&card_roles=boss&card_role_match=all'

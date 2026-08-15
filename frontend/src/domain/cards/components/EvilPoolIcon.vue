@@ -1,5 +1,6 @@
 <template>
   <svg
+    class="card-pool-icon-evil"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"

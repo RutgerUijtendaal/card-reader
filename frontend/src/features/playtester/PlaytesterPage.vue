@@ -4,7 +4,7 @@
     :class="isPreSetupStage ? 'playtester-page-pre-setup' : ''"
   >
     <AppPageHeader
-      :icon="Gamepad2"
+      :icon="APP_SECTION_ICONS.playtester"
       :title="pageTitle"
       :subtitle="pageSubtitle"
       :back-to="isPreSetupStage ? null : '/playtester'"
@@ -252,10 +252,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useEventListener } from '@vueuse/core';
-import { BookOpenText, Gamepad2 } from 'lucide-vue-next';
+import { BookOpenText } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { toAbsoluteApiUrl } from '@/shared/api/client';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import ConfirmModal from '@/shared/components/modals/ConfirmModal.vue';
 import { useAuthStore } from '@/domain/session/store';

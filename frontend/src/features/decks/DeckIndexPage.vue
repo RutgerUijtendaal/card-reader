@@ -9,7 +9,7 @@
     >
       <template #actions>
         <AppHeaderAction
-          :icon="Hammer"
+          :icon="APP_SECTION_ICONS.deckBuilder"
           label="Build a deck"
           short-label="Build a deck"
           variant="primary"
@@ -289,13 +289,14 @@
 
 <script setup lang="ts">
 import { useDebounceFn, useIntersectionObserver } from '@vueuse/core';
-import { BookOpen, Folders, Gamepad2, Hammer, Pencil, Share2, Tags, Trash2 } from 'lucide-vue-next';
+import { Gamepad2, Pencil, Share2, Tags, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { useRoute, useRouter } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 import ExtraActionsMenu from '@/shared/components/app/ExtraActionsMenu.vue';
 import TtsCopyIcon from '@/shared/components/icons/TtsCopyIcon.vue';
@@ -385,7 +386,9 @@ const {
 
 const isOwnedMode = computed(() => route.path === '/my/decks');
 const canUseOwnedDecks = computed(() => auth.authenticated || isOwnedMode.value);
-const activeHeaderIcon = computed(() => (isOwnedMode.value ? Folders : BookOpen));
+const activeHeaderIcon = computed(() => (
+  isOwnedMode.value ? APP_SECTION_ICONS.myDecks : APP_SECTION_ICONS.decks
+));
 const activeTitle = computed(() => (isOwnedMode.value ? 'My Decks' : 'Decks'));
 const activeSubtitle = computed(() =>
   isOwnedMode.value
