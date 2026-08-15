@@ -105,6 +105,7 @@ class _ResolvedTtsCardSelection:
     source_metadata: dict[str, object]
     entries: list[_ResolvedTtsCardSelectionEntry]
     skipped: list[TtsCardExportSkippedCard]
+    hide_out_of_scope_details: bool = False
 
 
 class TtsCardExportService:
@@ -250,6 +251,7 @@ class TtsCardExportService:
                 source_metadata=source_metadata,
                 entries=entries,
                 skipped=skipped,
+                hide_out_of_scope_details=True,
             ),
             card_pool_scope=card_pool_scope,
         )
@@ -260,6 +262,12 @@ class TtsCardExportService:
         *,
         card_pool_scope: CardPoolScope,
     ) -> TtsCardExportData:
+        if selection.hide_out_of_scope_details and any(
+            not card_pool_scope.allows_card_pool(entry.row.version.card.card_pool)
+            for entry in selection.entries
+        ):
+            raise _deck_source_unavailable()
+
         card_back = CardBackService().get_current()
         card_back_asset_path = (
             resolve_card_back_image_asset_path(card_back) if card_back is not None else None
@@ -275,6 +283,8 @@ class TtsCardExportService:
         for entry in selection.entries:
             row = entry.row
             if not card_pool_scope.allows_card_pool(row.version.card.card_pool):
+                if selection.hide_out_of_scope_details:
+                    raise _deck_source_unavailable()
                 if entry.required:
                     raise _required_card_unavailable(
                         row.version.name,
@@ -325,6 +335,12 @@ class TtsCardExportService:
         for entry, image in usable_entries:
             row = entry.row
             assignment = assignments.get(row.version.card.id)
+            if assignment is not None and not card_pool_scope.allows_card_pool(
+                assignment.card_pool
+            ):
+                if selection.hide_out_of_scope_details:
+                    raise _deck_source_unavailable()
+                assignment = None
             if assignment is None:
                 if entry.required:
                     raise _required_card_unavailable(
@@ -421,4 +437,11 @@ def _required_card_unavailable(name: str, reason: str) -> TtsCardExportError:
     return TtsCardExportError(
         TtsCardExportErrorCode.REQUIRED_CARD_UNAVAILABLE,
         f"Required deck hero '{name}' {reason}.",
+    )
+
+
+def _deck_source_unavailable() -> TtsCardExportError:
+    return TtsCardExportError(
+        TtsCardExportErrorCode.DECK_SOURCE_NOT_FOUND,
+        "Deck not found",
     )

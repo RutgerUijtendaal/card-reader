@@ -68,3 +68,18 @@ export const buildDeckUpsertPayload = (form: DeckForm): DeckUpsertRequest => ({
   tag_ids: [...form.tag_ids],
   suggested_type_labels: [...form.suggested_type_labels],
 });
+
+export const reconcilePersistedSideboardSourceIds = (
+  form: DeckForm,
+  submittedEditorIds: readonly string[],
+  deck: { sideboards: ReadonlyArray<{ id: string }> },
+): void => {
+  const persistedSideboards = deck.sideboards ?? [];
+  submittedEditorIds.forEach((editorId, index) => {
+    const persistedSideboard = persistedSideboards[index];
+    const currentSideboard = form.sideboards.find((sideboard) => sideboard.id === editorId);
+    if (persistedSideboard && currentSideboard) {
+      currentSideboard.source_id = persistedSideboard.id;
+    }
+  });
+};

@@ -210,6 +210,39 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
     assert restricted_sideboard_response.status_code == 404
 
 
+def test_deck_tts_export_rechecks_pool_scope_in_authoritative_snapshot(monkeypatch) -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-reclassification-owner", "password")
+    hero = _create_card(name="TTS Reclassification Hero", hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Reclassification Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    restricted_card = mainboard_cards[0]
+
+    def reclassify_after_visibility_check(*_args, **_kwargs) -> bool:
+        Card.objects.filter(id=restricted_card.id).update(card_pool="evil")
+        return False
+
+    monkeypatch.setattr(
+        "card_reader_api.exports.views.deck_export_uses_out_of_scope_card",
+        reclassify_after_visibility_check,
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Deck not found"}
+    assert restricted_card.latest_version is not None
+    assert restricted_card.latest_version.name not in response.content.decode("utf-8")
+
+
 def test_tts_export_can_target_one_sideboard() -> None:
     TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-target-sideboard-owner", "password")
