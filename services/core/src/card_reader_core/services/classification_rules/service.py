@@ -6,7 +6,6 @@ from collections import defaultdict
 from typing import cast
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count
 
 from card_reader_core.models import (
     CARD_CLASSIFICATION_SOURCE_TAG,
@@ -18,14 +17,10 @@ from card_reader_core.models import (
     CARD_POOL_DEFINITIONS,
     CARD_ROLE_DEFINITIONS,
     CARD_ROLES,
-    ACTIVE_CARD_LIFECYCLE_STATUS,
     STANDARD_CARD_ROLE,
-    Card,
     CardClassificationRule,
-    CardFactionAssignment,
     CardPool,
     CardPoolScope,
-    CardRoleAssignment,
     Tag,
     Type,
     is_card_pool,
@@ -33,6 +28,7 @@ from card_reader_core.models import (
 from card_reader_core.repositories.classification_rules import (
     create_classification_rule,
     delete_classification_rule,
+    get_classification_usage_counts,
     get_classification_rule,
     list_classification_rules,
     list_rules_for_source,
@@ -351,42 +347,7 @@ class ClassificationRuleService:
             for definition in CARD_POOL_DEFINITIONS
             if definition.key in card_pool_scope.allowed_pools
         )
-        role_usage: dict[tuple[str, str], int] = defaultdict(int)
-        for row in (
-            CardRoleAssignment.objects.filter(
-                card__card_pool__in=allowed_pools,
-                card__lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
-            )
-            .values("role", "card__card_pool")
-            .annotate(count=Count("card_id"))
-        ):
-            role_usage[(str(row["role"]), str(row["card__card_pool"]))] = int(row["count"])
-        faction_usage: dict[tuple[str, str], int] = defaultdict(int)
-        for row in (
-            CardFactionAssignment.objects.filter(
-                card__card_pool__in=allowed_pools,
-                card__lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
-            )
-            .values("faction", "card__card_pool")
-            .annotate(count=Count("card_id"))
-        ):
-            faction_usage[(str(row["faction"]), str(row["card__card_pool"]))] = int(row["count"])
-        normal_usage: dict[str, int] = {
-            pool: Card.objects.filter(
-                card_pool=pool,
-                lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
-                role_assignments__isnull=True,
-            ).count()
-            for pool in allowed_pools
-        }
-        no_faction_usage: dict[str, int] = {
-            pool: Card.objects.filter(
-                card_pool=pool,
-                lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
-                faction_assignments__isnull=True,
-            ).count()
-            for pool in allowed_pools
-        }
+        usage_counts = get_classification_usage_counts(card_pools=allowed_pools)
         rule_counts: dict[tuple[str, str, str, str], int] = defaultdict(int)
         rules_by_target: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
         for rule in list_classification_rules():
@@ -440,7 +401,7 @@ class ClassificationRuleService:
                 rank=0,
                 target_kind=CARD_CLASSIFICATION_TARGET_ROLE,
                 derived=True,
-                derived_usage=normal_usage,
+                derived_usage=usage_counts.normal,
             ),
             *[
                 build_row(
@@ -449,7 +410,7 @@ class ClassificationRuleService:
                     rank=definition.rank,
                     target_kind=CARD_CLASSIFICATION_TARGET_ROLE,
                     derived=False,
-                    usage=role_usage,
+                    usage=usage_counts.roles,
                 )
                 for definition in CARD_ROLE_DEFINITIONS
             ],
@@ -461,7 +422,7 @@ class ClassificationRuleService:
                 rank=0,
                 target_kind=CARD_CLASSIFICATION_TARGET_FACTION,
                 derived=True,
-                derived_usage=no_faction_usage,
+                derived_usage=usage_counts.no_faction,
             ),
             *[
                 build_row(
@@ -470,7 +431,7 @@ class ClassificationRuleService:
                     rank=definition.rank,
                     target_kind=CARD_CLASSIFICATION_TARGET_FACTION,
                     derived=False,
-                    usage=faction_usage,
+                    usage=usage_counts.factions,
                 )
                 for definition in CARD_FACTION_DEFINITIONS
             ],

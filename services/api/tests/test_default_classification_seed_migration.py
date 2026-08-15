@@ -8,6 +8,7 @@ import pytest
 
 
 BASE_MIGRATION = ("card_reader_core", "0054_card_classification_final_state")
+PRE_CLASSIFICATION_MIGRATION = ("card_reader_core", "0053_deck_creation")
 SEED_MIGRATION = (
     "card_reader_core",
     "0055_seed_classification_rules_and_full_height_template",
@@ -236,4 +237,36 @@ def test_seed_migration_preserves_existing_rule_and_template_customizations() ->
         id=existing_template.id,
         label="Customized full height",
     ).exists()
+    _restore_leaf()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_seed_reverse_preserves_a_staff_modified_seeded_rule() -> None:
+    _migrate_to(BASE_MIGRATION)
+    apps = _migrate_to(SEED_MIGRATION)
+    CardClassificationRule = apps.get_model(
+        "card_reader_core",
+        "CardClassificationRule",
+    )
+    seeded_rule = CardClassificationRule.objects.get(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="type",
+        type__key="hero",
+    )
+    seeded_rule.enabled = False
+    seeded_rule.save(update_fields=["enabled", "updated_at"])
+
+    reversed_apps = _migrate_to(BASE_MIGRATION)
+    ReversedRule = reversed_apps.get_model("card_reader_core", "CardClassificationRule")
+    assert list(ReversedRule.objects.values_list("id", "enabled")) == [
+        (seeded_rule.id, False)
+    ]
+
+    with pytest.raises(RuntimeError, match="classification rules"):
+        _migrate_to(PRE_CLASSIFICATION_MIGRATION)
+
+    ReversedRule.objects.filter(id=seeded_rule.id).delete()
+    _migrate_to(PRE_CLASSIFICATION_MIGRATION)
     _restore_leaf()

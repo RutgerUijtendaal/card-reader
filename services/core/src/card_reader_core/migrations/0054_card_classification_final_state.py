@@ -84,19 +84,60 @@ def populate_master_data(apps: Any, _schema_editor: Any) -> None:
 
 def restore_master_hero_flags(apps: Any, _schema_editor: Any) -> None:
     Card = apps.get_model("card_reader_core", "Card")
+    CardAlias = apps.get_model("card_reader_core", "CardAlias")
     CardClassificationRule = apps.get_model("card_reader_core", "CardClassificationRule")
+    CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
     CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
+    TtsCardSheet = apps.get_model("card_reader_core", "TtsCardSheet")
+    TtsCardSheetSlot = apps.get_model("card_reader_core", "TtsCardSheetSlot")
+
+    unsupported: list[str] = []
     if CardClassificationRule.objects.exists():
-        raise RuntimeError(
-            "Card classification migration 0054 cannot be reversed while classification rules "
-            "exist. Remove the rules explicitly before rolling back."
-        )
+        unsupported.append("classification rules")
+    if Card.objects.exclude(card_pool="player").exists():
+        unsupported.append("non-Player cards")
+    if CardRoleAssignment.objects.exclude(role="hero").exists():
+        unsupported.append("non-Hero role assignments")
+    if CardFactionAssignment.objects.exists():
+        unsupported.append("faction assignments")
+    if Card.objects.exclude(faction_identity_key=EMPTY_FACTION_IDENTITY_KEY).exists():
+        unsupported.append("card faction identity namespaces")
+    if CardAlias.objects.exclude(card_pool="player").exists():
+        unsupported.append("non-Player aliases")
+    if CardAlias.objects.exclude(faction_identity_key=EMPTY_FACTION_IDENTITY_KEY).exists():
+        unsupported.append("alias faction identity namespaces")
+    if (
+        ImportJob.objects.exclude(card_pool="player").exists()
+        or ImportJob.objects.exclude(card_role_mode="automatic").exists()
+        or ImportJob.objects.exclude(card_role_override_json=[]).exists()
+        or ImportJob.objects.exclude(card_faction_mode="automatic").exists()
+        or ImportJob.objects.exclude(card_faction_override_json=[]).exists()
+    ):
+        unsupported.append("import classification configuration")
     if ImportJob.objects.exclude(classification_rule_snapshot_json={}).exists():
+        unsupported.append("classification rule snapshots")
+    if (
+        ImportJobItem.objects.exclude(classification_inference_json={}).exists()
+        or ImportJobItem.objects.exclude(resolved_card_roles_json=[]).exists()
+        or ImportJobItem.objects.exclude(resolved_card_factions_json=[]).exists()
+        or ImportJobItem.objects.filter(target_card_pool_snapshot__isnull=False).exists()
+        or ImportJobItem.objects.exclude(target_card_roles_snapshot_json=[]).exists()
+        or ImportJobItem.objects.exclude(target_card_factions_snapshot_json=[]).exists()
+    ):
+        unsupported.append("import item classification evidence")
+    if (
+        TtsCardSheet.objects.exclude(card_pool="player").exists()
+        or TtsCardSheetSlot.objects.exclude(card_pool="player").exists()
+    ):
+        unsupported.append("non-Player TTS sheet data")
+    if unsupported:
         raise RuntimeError(
-            "Card classification migration 0054 cannot be reversed while import jobs retain "
-            "classification rule snapshots. Preserve or remove those audit snapshots explicitly "
-            "before rolling back."
+            "Card classification migration 0054 cannot be reversed while non-representable "
+            "classification data exists in: "
+            + ", ".join(unsupported)
+            + ". Preserve or remove that data explicitly before rolling back."
         )
     hero_card_ids = CardRoleAssignment.objects.filter(role="hero").values_list(
         "card_id", flat=True

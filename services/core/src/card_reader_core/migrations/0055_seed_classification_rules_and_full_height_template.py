@@ -165,9 +165,22 @@ def remove_seeded_classification_rules(
     _schema_editor: BaseDatabaseSchemaEditor,
 ) -> None:
     CardClassificationRule = apps.get_model("card_reader_core", "CardClassificationRule")
-    CardClassificationRule.objects.filter(
-        id__in=[_classification_rule_id(rule) for rule in CLASSIFICATION_RULES]
-    ).delete()
+    for rule_definition in CLASSIFICATION_RULES:
+        card_pool, target_kind, target_key, source_kind, source_key = rule_definition
+        source_fields = (
+            {"tag__key": source_key, "type_id": None}
+            if source_kind == "tag"
+            else {"tag_id": None, "type__key": source_key}
+        )
+        CardClassificationRule.objects.filter(
+            id=_classification_rule_id(rule_definition),
+            card_pool=card_pool,
+            target_kind=target_kind,
+            target_key=target_key,
+            source_kind=source_kind,
+            enabled=True,
+            **source_fields,
+        ).delete()
 
 
 class Migration(migrations.Migration):

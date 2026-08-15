@@ -638,7 +638,18 @@ def _validate_payload_references(payload: DeveloperDataPayload) -> None:
             _symbol_reference_asset_path(asset_path)
     for card in payload.cards:
         version_numbers = {version.version_number for version in card.versions}
-        if card.latest_version_number not in version_numbers:
+        latest_markers = [
+            version.version_number for version in card.versions if version.is_latest
+        ]
+        valid_latest_version = (
+            card.latest_version_number is None
+            and not version_numbers
+            and not latest_markers
+        ) or (
+            card.latest_version_number in version_numbers
+            and latest_markers == [card.latest_version_number]
+        )
+        if not valid_latest_version:
             issues.append(f"card {card.key} has an invalid latest version")
         for version in card.versions:
             if version.template_key not in template_keys:

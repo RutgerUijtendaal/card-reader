@@ -51,7 +51,10 @@ from card_reader_core.operations.developer_data import (
     sha256_file,
     validate_archive,
 )
-from card_reader_core.operations.developer_data.importer import validate_import_readiness
+from card_reader_core.operations.developer_data.importer import (
+    _validate_payload_references,
+    validate_import_readiness,
+)
 from card_reader_core.operations.developer_data.exporter import _build_payload
 from card_reader_core.operations.developer_data.schema import CardRecord, adopt_payload_for_format
 from card_reader_core.services.classification_rules import ClassificationRuleService
@@ -399,6 +402,42 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
 
         with pytest.raises(DeveloperDataError, match="requires an empty domain database"):
             import_developer_data(archive_path=archive_path)
+        transaction.set_rollback(True)
+
+
+@pytest.mark.parametrize("marked_version_number", [1, 2])
+def test_bundle_validation_rejects_inconsistent_latest_version_markers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    marked_version_number: int,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "latest-version-markers.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="latest-version-marker-test",
+        )
+        _, payload = validate_archive(archive_path)
+        hero = next(card for card in payload.cards if card.key == "synthetic-hero")
+        for version in hero.versions:
+            version.is_latest = version.version_number == marked_version_number
+        if marked_version_number == hero.latest_version_number:
+            hero.versions[0].is_latest = True
+
+        with pytest.raises(
+            DeveloperDataError,
+            match=f"card {hero.key} has an invalid latest version",
+        ):
+            _validate_payload_references(payload)
         transaction.set_rollback(True)
 
 

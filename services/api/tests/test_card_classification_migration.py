@@ -116,7 +116,7 @@ def test_final_state_reverse_rejects_classification_rule_data() -> None:
         tag_id=tag.id,
     )
 
-    with pytest.raises(RuntimeError, match="while classification rules exist"):
+    with pytest.raises(RuntimeError, match="classification rules"):
         _migrate_to(BASE_MIGRATION)
 
     CardClassificationRule.objects.filter(id=rule.id).delete()
@@ -130,10 +130,90 @@ def test_final_state_reverse_rejects_classification_rule_data() -> None:
         classification_rule_snapshot_json={"schema_version": 1, "digest": "preserved"},
     )
 
-    with pytest.raises(RuntimeError, match="retain classification rule snapshots"):
+    with pytest.raises(RuntimeError, match="classification rule snapshots"):
         _migrate_to(BASE_MIGRATION)
 
     ImportJob.objects.filter(id=job.id).update(classification_rule_snapshot_json={})
+    _migrate_to(BASE_MIGRATION)
+    _restore_leaf()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_final_state_reverse_rejects_nonrepresentable_classification_state() -> None:
+    apps = _migrate_to(FINAL_MIGRATION)
+    Card = apps.get_model("card_reader_core", "Card")
+    CardAlias = apps.get_model("card_reader_core", "CardAlias")
+    CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
+    CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
+    Template = apps.get_model("card_reader_core", "Template")
+    TtsCardSheet = apps.get_model("card_reader_core", "TtsCardSheet")
+    TtsCardSheetSlot = apps.get_model("card_reader_core", "TtsCardSheetSlot")
+
+    card = Card.objects.create(
+        key="rollback-evil-order",
+        label="Rollback Evil Order",
+        card_pool="evil",
+        faction_identity_key='["order"]',
+    )
+    CardAlias.objects.create(
+        card_id=card.id,
+        key="rollback-evil-order-alias",
+        label="Rollback Evil Order Alias",
+        card_pool="evil",
+        faction_identity_key='["order"]',
+    )
+    CardRoleAssignment.objects.create(card_id=card.id, role="boss")
+    CardFactionAssignment.objects.create(card_id=card.id, faction="order")
+    template = Template.objects.create(key="rollback-classification", label="Rollback")
+    job = ImportJob.objects.create(
+        source_path="imports/rollback-classification",
+        template_id=template.id,
+        card_pool="evil",
+        card_role_mode="override",
+        card_role_override_json=["boss"],
+        card_faction_mode="override",
+        card_faction_override_json=["order"],
+    )
+    ImportJobItem.objects.create(
+        job_id=job.id,
+        source_file="rollback.png",
+        classification_inference_json={"roles": {"resolved_roles": ["boss"]}},
+        resolved_card_roles_json=["boss"],
+        resolved_card_factions_json=["order"],
+        target_card_pool_snapshot="evil",
+        target_card_roles_snapshot_json=["boss"],
+        target_card_factions_snapshot_json=["order"],
+    )
+    sheet = TtsCardSheet.objects.create(sequence=994, card_pool="evil")
+    TtsCardSheetSlot.objects.create(
+        sheet_id=sheet.id,
+        card_pool="evil",
+        slot_index=0,
+        card_identity_id=card.id,
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        _migrate_to(BASE_MIGRATION)
+
+    message = str(exc_info.value)
+    for category in (
+        "non-Player cards",
+        "non-Hero role assignments",
+        "faction assignments",
+        "card faction identity namespaces",
+        "non-Player aliases",
+        "alias faction identity namespaces",
+        "import classification configuration",
+        "import item classification evidence",
+        "non-Player TTS sheet data",
+    ):
+        assert category in message
+
+    sheet.delete()
+    job.delete()
+    card.delete()
     _migrate_to(BASE_MIGRATION)
     _restore_leaf()
 
