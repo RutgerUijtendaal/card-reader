@@ -4,7 +4,7 @@ import base64
 from io import BytesIO
 import json
 from itertools import count
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
 from django.test import Client
 from PIL import Image
@@ -541,7 +541,7 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
     ]
 
 
-def test_restricted_gallery_tts_export_uses_pool_sheet_capability_urls() -> None:
+def test_restricted_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
     TtsCardSheet.objects.all().delete()
     staff = _create_user("tts-evil-gallery-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="cards.example")
@@ -572,13 +572,10 @@ def test_restricted_gallery_tts_export_uses_pool_sheet_capability_urls() -> None
     sheet = payload["sheets"][0]
     assert sheet["card_pool"] == "evil"
     face_url = urlsplit(sheet["face_url"])
-    token = parse_qs(face_url.query)["access_token"][0]
-    anonymous_response = Client(HTTP_HOST="cards.example").get(
-        face_url.path,
-        {"access_token": token},
-    )
+    assert face_url.query == ""
+    anonymous_response = Client(HTTP_HOST="cards.example").get(face_url.path)
     assert anonymous_response.status_code == 200
-    assert anonymous_response["Cache-Control"] == "private, no-cache"
+    assert anonymous_response["Cache-Control"] == "public, no-cache"
     anonymous_response.close()
 
 

@@ -8,13 +8,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
-from card_reader_api.cards.tts_sheet_access import validate_tts_sheet_access_token
-from card_reader_api.common.auth_access import card_pool_scope_for_user
-from card_reader_core.models import PLAYER_CARD_POOL, TtsCardSheet
+from card_reader_core.models import TtsCardSheet
 from card_reader_core.services.tts_card_sheets import TtsCardSheetService, tts_card_sheet_path
 
 
 class TtsCardSheetImageView(APIView):
+    authentication_classes: list[type] = []
     permission_classes = [AllowAny]
 
     def get(self, request: Request, sheet_id: str) -> HttpResponse:
@@ -29,8 +28,6 @@ def _sheet_response(request: Request, sheet_id: str, *, include_body: bool) -> H
     for attempt in range(2):
         sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
         if sheet is None:
-            return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
-        if not _can_access_sheet(request, sheet):
             return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
         if not sheet_service.ensure_sheet_current(sheet_id):
             break
@@ -89,28 +86,12 @@ def _apply_sheet_headers(
     etag: str,
 ) -> HttpResponse:
     assert sheet.published_at is not None
-    response["Cache-Control"] = (
-        "public, no-cache" if sheet.card_pool == PLAYER_CARD_POOL else "private, no-cache"
-    )
+    response["Cache-Control"] = "public, no-cache"
     response["ETag"] = etag
     response["Last-Modified"] = http_date(sheet.published_at.timestamp())
     response["X-Card-Reader-TTS-Sheet-ID"] = str(sheet.id)
     response["X-Card-Reader-TTS-Sheet-Revision"] = str(sheet.rendered_revision)
     return response
-
-
-def _can_access_sheet(request: Request, sheet: TtsCardSheet) -> bool:
-    if sheet.card_pool == PLAYER_CARD_POOL:
-        return True
-    if card_pool_scope_for_user(request.user).allows_card_pool(sheet.card_pool):
-        return True
-    token = request.query_params.get("access_token", "")
-    return bool(token) and validate_tts_sheet_access_token(
-        token,
-        sheet_id=str(sheet.id),
-        rendered_revision=sheet.rendered_revision,
-        rendered_checksum=sheet.rendered_checksum,
-    )
 
 
 def _request_cache_is_current(request: Request, *, etag: str, modified_epoch: int) -> bool:

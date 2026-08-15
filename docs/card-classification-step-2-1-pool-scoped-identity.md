@@ -1,6 +1,6 @@
 # Card Classification Step 2.1: Pool-Scoped Card Identity
 
-Post-feature TTS amendment: pool-scoped identity is now also carried by persistent TTS sheets and slots. Player sheets remain public; Evil and Neutral sheets are available only through the centralized restricted-pool scope or a signed capability bound to one rendered checksum. Gallery and content-version exports can use authorized restricted pools, while developer-data and decks retain their explicit Player-only product scope. References below to all public artifacts remaining Player-only describe this checkpoint's initial boundary.
+Post-feature TTS amendment: pool-scoped identity is now also carried by persistent TTS sheets and slots. Player, Evil, and Neutral each allocate into separate sheet buckets, while every pool uses the same stable public sheet URL so existing TTS objects see later rerenders. Gallery and content-version export creation can use authorized restricted pools, while developer-data and decks retain their explicit Player-only product scope. References below to all public artifacts remaining Player-only describe this checkpoint's initial boundary.
 
 Status: implemented, validated, and merged into the classification umbrella branch. All dependent classification checkpoints through Step 3.2 are also implemented and merged.
 

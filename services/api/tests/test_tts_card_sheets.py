@@ -9,13 +9,11 @@ import time
 from uuid import uuid4
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.db import close_old_connections
 from django.test import Client
 from PIL import Image
 
 from card_reader_api.management.commands.run_tts_sheet_renderer import _process_claimed_sheet
-from card_reader_api.cards.tts_sheet_access import create_tts_sheet_access_token
 from card_reader_core.config.settings import settings
 from card_reader_core.models import (
     TTS_CARD_SHEET_LAYOUT_VERSION,
@@ -77,7 +75,7 @@ def test_unreadable_images_are_not_assigned_to_sheets() -> None:
     assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
 
 
-def test_tts_sheets_are_pool_partitioned_and_restricted_sheets_require_a_capability() -> None:
+def test_tts_sheets_are_pool_partitioned_with_stable_public_urls() -> None:
     TtsCardSheet.objects.all().delete()
     player = _create_sheet_card("player-source", color=(20, 30, 40))
     evil = _create_sheet_card("evil-source", color=(80, 30, 40), card_pool="evil")
@@ -97,32 +95,14 @@ def test_tts_sheets_are_pool_partitioned_and_restricted_sheets_require_a_capabil
     assert player_slot.sheet.card_pool == "player"
     assert evil_slot.sheet.card_pool == "evil"
     assert player_slot.sheet_id != evil_slot.sheet_id
-    token = create_tts_sheet_access_token(
-        sheet_id=str(evil_slot.sheet_id),
-        rendered_revision=evil_slot.sheet.rendered_revision,
-        rendered_checksum=evil_slot.sheet.rendered_checksum,
-    )
-
     anonymous = Client(HTTP_HOST="localhost")
     player_response = anonymous.get(f"/tts/card-sheets/{player_slot.sheet_id}/image.webp")
-    restricted_response = anonymous.get(f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp")
+    evil_response = anonymous.get(f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp")
     assert player_response.status_code == 200
     assert player_response["Cache-Control"] == "public, no-cache"
-    assert restricted_response.status_code == 404
-
-    capability_response = anonymous.get(
-        f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp",
-        {"access_token": token},
-    )
-    assert capability_response.status_code == 200
-    assert capability_response["Cache-Control"] == "private, no-cache"
-    assert (
-        anonymous.get(
-            f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp",
-            {"access_token": f"{token}tampered"},
-        ).status_code
-        == 404
-    )
+    assert evil_response.status_code == 200
+    assert evil_response["Cache-Control"] == "public, no-cache"
+    original_etag = evil_response["ETag"]
 
     previous = evil.latest_version
     assert previous is not None
@@ -138,27 +118,12 @@ def test_tts_sheets_are_pool_partitioned_and_restricted_sheets_require_a_capabil
     evil.save(update_fields=["latest_version", "updated_at"])
     changed_sheet_ids = service.sync_cards([evil.id])
     service.render_sheets_now(sorted(changed_sheet_ids))
-    assert (
-        anonymous.get(
-            f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp",
-            {"access_token": token},
-        ).status_code
-        == 404
-    )
-
-    staff = get_user_model().objects.create_user(
-        username="tts-sheet-staff",
-        password="password",
-        is_staff=True,
-    )
-    staff_client = Client(HTTP_HOST="localhost")
-    staff_client.force_login(staff)
-    staff_response = staff_client.head(f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp")
-    assert staff_response.status_code == 200
-    assert staff_response["Cache-Control"] == "private, no-cache"
+    refreshed_response = anonymous.get(f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp")
+    assert refreshed_response.status_code == 200
+    assert refreshed_response["ETag"] != original_etag
     player_response.close()
-    capability_response.close()
-    staff_response.close()
+    evil_response.close()
+    refreshed_response.close()
 
 
 def test_assignment_snapshots_the_readable_source_file_fallback() -> None:

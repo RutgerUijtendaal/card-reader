@@ -4,11 +4,8 @@ import base64
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from urllib.parse import urlencode
 
-from card_reader_api.cards.tts_sheet_access import create_tts_sheet_access_token
-from card_reader_core.models import PLAYER_CARD_POOL
-from card_reader_core.services.exports import TtsCardExportData, TtsCardExportSheet
+from card_reader_core.services.exports import TtsCardExportData
 
 TTS_CARD_EXPORT_SCHEMA = "card-reader.tts-cards.v2"
 
@@ -55,7 +52,9 @@ def build_tts_card_export_payload(
         "sheets": [
             {
                 "sheet_id": sheet.sheet_id,
-                "face_url": absolute_url(_sheet_face_path(sheet)),
+                "face_url": absolute_url(
+                    f"/tts/card-sheets/{sheet.sheet_id}/image.webp"
+                ),
                 "card_pool": sheet.card_pool,
                 "columns": sheet.columns,
                 "rows": sheet.rows,
@@ -93,19 +92,6 @@ def build_tts_card_export_payload(
             for card in export.skipped
         ],
     }
-
-
-def _sheet_face_path(sheet: TtsCardExportSheet) -> str:
-    sheet_id = sheet.sheet_id
-    path = f"/tts/card-sheets/{sheet_id}/image.webp"
-    if sheet.card_pool == PLAYER_CARD_POOL:
-        return path
-    token = create_tts_sheet_access_token(
-        sheet_id=sheet_id,
-        rendered_revision=sheet.revision,
-        rendered_checksum=sheet.image_checksum,
-    )
-    return f"{path}?{urlencode({'access_token': token})}"
 
 
 def _optional_role(payload: dict[str, object], role: str | None) -> dict[str, object]:
