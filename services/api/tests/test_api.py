@@ -2670,6 +2670,12 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
     blood_boss, blood_boss_version = _create_editable_card_version(
         name="Default Evil Blood Boss", card_pool="evil"
     )
+    dark_boss, dark_boss_version = _create_editable_card_version(
+        name="Default Evil Dark Boss", card_pool="evil"
+    )
+    metal_boss, metal_boss_version = _create_editable_card_version(
+        name="Default Evil Metal Boss", card_pool="evil"
+    )
     no_faction_boss, no_faction_boss_version = _create_editable_card_version(
         name="Default Evil No Faction Boss", card_pool="evil"
     )
@@ -2679,6 +2685,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
         (order_normal_low_version, 1),
         (order_normal_high_version, 5),
         (blood_boss_version, 0),
+        (dark_boss_version, 0),
+        (metal_boss_version, 0),
         (no_faction_boss_version, 0),
     ):
         _create_card_image(version)
@@ -2691,6 +2699,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
             CardFactionAssignment(card=order_normal_low, faction="order"),
             CardFactionAssignment(card=order_normal_high, faction="order"),
             CardFactionAssignment(card=blood_boss, faction="blood"),
+            CardFactionAssignment(card=dark_boss, faction="dark"),
+            CardFactionAssignment(card=metal_boss, faction="metal"),
         ]
     )
     CardRoleAssignment.objects.bulk_create(
@@ -2698,6 +2708,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
             CardRoleAssignment(card=order_boss, role="boss"),
             CardRoleAssignment(card=order_location, role="location"),
             CardRoleAssignment(card=blood_boss, role="boss"),
+            CardRoleAssignment(card=dark_boss, role="boss"),
+            CardRoleAssignment(card=metal_boss, role="boss"),
             CardRoleAssignment(card=no_faction_boss, role="boss"),
         ]
     )
@@ -2713,6 +2725,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
         order_normal_low.id,
         order_normal_high.id,
         blood_boss.id,
+        dark_boss.id,
+        metal_boss.id,
         no_faction_boss.id,
     ]
 

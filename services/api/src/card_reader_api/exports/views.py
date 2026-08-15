@@ -98,6 +98,7 @@ class CardTtsExportView(APIView):
     permission_classes = [StaffAllowed]
 
     def post(self, request: Request) -> HttpResponse | Response:
+        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = TtsCardExportRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return serializer_error(serializer)
@@ -114,10 +115,19 @@ class CardTtsExportView(APIView):
         try:
             if source["type"] == "gallery":
                 assert gallery_filters is not None
-                export_data = service.build_gallery_export(gallery_filters)
+                if not card_pool_scope.allows_card_pool(gallery_filters["card_pool"]):
+                    return Response(
+                        {"detail": "Restricted card pools require staff access."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                export_data = service.build_gallery_export(
+                    gallery_filters,
+                    card_pool_scope=card_pool_scope,
+                )
             else:
                 export_data = service.build_content_version_export(
-                    str(source["content_version_id"])
+                    str(source["content_version_id"]),
+                    card_pool_scope=card_pool_scope,
                 )
         except TtsCardExportError as exc:
             return _tts_card_export_error_response(exc)
@@ -154,6 +164,7 @@ class DeckTtsExportView(APIView):
         try:
             export_data = TtsCardExportService().build_deck_export(
                 str(deck.id),
+                card_pool_scope=PLAYER_CARD_POOL_SCOPE,
                 sideboard_id=sideboard_id,
             )
         except TtsCardExportError as exc:

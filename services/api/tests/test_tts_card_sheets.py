@@ -75,16 +75,55 @@ def test_unreadable_images_are_not_assigned_to_sheets() -> None:
     assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
 
 
-def test_evil_cards_are_not_allocated_to_public_tts_sheets() -> None:
+def test_tts_sheets_are_pool_partitioned_with_stable_public_urls() -> None:
     TtsCardSheet.objects.all().delete()
-    card = _create_sheet_card("game-master-source", color=(20, 30, 40))
-    card.card_pool = "evil"
-    card.save(update_fields=["card_pool"])
+    player = _create_sheet_card("player-source", color=(20, 30, 40))
+    evil = _create_sheet_card("evil-source", color=(80, 30, 40), card_pool="evil")
+    service = TtsCardSheetService()
 
-    sheet_ids = TtsCardSheetService().sync_cards([card.id])
+    sheet_ids = service.sync_cards([player.id, evil.id])
+    service.render_sheets_now(sorted(sheet_ids))
 
-    assert sheet_ids == set()
-    assert not TtsCardSheetSlot.objects.filter(card_identity_id=card.id).exists()
+    player_slot = TtsCardSheetSlot.objects.select_related("sheet").get(
+        card_identity_id=player.id,
+        card_pool="player",
+    )
+    evil_slot = TtsCardSheetSlot.objects.select_related("sheet").get(
+        card_identity_id=evil.id,
+        card_pool="evil",
+    )
+    assert player_slot.sheet.card_pool == "player"
+    assert evil_slot.sheet.card_pool == "evil"
+    assert player_slot.sheet_id != evil_slot.sheet_id
+    anonymous = Client(HTTP_HOST="localhost")
+    player_response = anonymous.get(f"/tts/card-sheets/{player_slot.sheet_id}/image.webp")
+    evil_response = anonymous.get(f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp")
+    assert player_response.status_code == 200
+    assert player_response["Cache-Control"] == "public, no-cache"
+    assert evil_response.status_code == 200
+    assert evil_response["Cache-Control"] == "public, no-cache"
+    original_etag = evil_response["ETag"]
+
+    previous = evil.latest_version
+    assert previous is not None
+    previous.is_latest = False
+    previous.save(update_fields=["is_latest", "updated_at"])
+    latest = _create_version(
+        evil,
+        "evil-source-latest",
+        color=(120, 50, 30),
+        version_number=2,
+    )
+    evil.latest_version = latest
+    evil.save(update_fields=["latest_version", "updated_at"])
+    changed_sheet_ids = service.sync_cards([evil.id])
+    service.render_sheets_now(sorted(changed_sheet_ids))
+    refreshed_response = anonymous.get(f"/tts/card-sheets/{evil_slot.sheet_id}/image.webp")
+    assert refreshed_response.status_code == 200
+    assert refreshed_response["ETag"] != original_etag
+    player_response.close()
+    evil_response.close()
+    refreshed_response.close()
 
 
 def test_assignment_snapshots_the_readable_source_file_fallback() -> None:
@@ -257,7 +296,9 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
 
 
 @pytest.mark.django_db(transaction=True)
-def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerendered() -> None:
+def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerendered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     TtsCardSheet.objects.all().delete()
     card = _create_sheet_card("reclassified", color=(120, 40, 60))
     service = TtsCardSheetService()
@@ -272,13 +313,29 @@ def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerend
 
     preparing = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
     assert preparing.status_code == 503
+    retired_slot = TtsCardSheetSlot.objects.get(
+        sheet_id=sheet_id,
+        card_identity_id=card.id,
+    )
+    assert retired_slot.card_version_id is None
+    assert retired_slot.image_id is None
+    assert retired_slot.image_checksum == ""
+    assert retired_slot.image_stored_path == ""
 
     service.render_sheets_now([sheet_id])
+
+    def fail_redundant_sync(_self: TtsCardSheetService, _card_ids: list[str]) -> set[str]:
+        raise AssertionError("A retired source-pool slot must not trigger another card sync.")
+
+    monkeypatch.setattr(TtsCardSheetService, "sync_cards", fail_redundant_sync)
     response = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
     body = b"".join(response.streaming_content)
     response.close()
     with Image.open(BytesIO(body)) as rendered:
         assert rendered.getpixel((10, 10)) == (0, 0, 0)
+    repeated = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
+    assert repeated.status_code == 200
+    repeated.close()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -616,11 +673,13 @@ def _create_sheet_card(
     *,
     color: tuple[int, int, int],
     image_size: tuple[int, int] = (50, 70),
+    card_pool: str = "player",
 ) -> Card:
     suffix = uuid4().hex
     card = Card.objects.create(
         key=f"tts-sheet-{label}-{suffix}",
         label=f"TTS Sheet {label}",
+        card_pool=card_pool,
     )
     version = _create_version(
         card,

@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import F, Q
 
 from .base import TimestampedModel, uuid_str
+from .card import CARD_POOL_CHOICES, DEFAULT_CARD_POOL, CardPool
 
 if TYPE_CHECKING:
     from django.db.models.manager import Manager
@@ -26,6 +27,12 @@ class TtsCardSheet(TimestampedModel):
         slots: Manager[TtsCardSheetSlot]
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_pool: models.CharField[CardPool, CardPool] = models.CharField(
+        max_length=16,
+        choices=CARD_POOL_CHOICES,
+        default=DEFAULT_CARD_POOL,
+        db_index=True,
+    )
     sequence: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(unique=True)
     layout_version: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField(
         default=TTS_CARD_SHEET_LAYOUT_VERSION
@@ -91,6 +98,12 @@ class TtsCardSheetSlot(TimestampedModel):
         image_id: str | None
 
     id: models.TextField[str, str] = models.TextField(default=uuid_str, primary_key=True)
+    card_pool: models.CharField[CardPool, CardPool] = models.CharField(
+        max_length=16,
+        choices=CARD_POOL_CHOICES,
+        default=DEFAULT_CARD_POOL,
+        db_index=True,
+    )
     sheet: models.ForeignKey[TtsCardSheet, TtsCardSheet] = models.ForeignKey(
         TtsCardSheet,
         on_delete=models.CASCADE,
@@ -98,7 +111,7 @@ class TtsCardSheetSlot(TimestampedModel):
         db_column="sheet_id",
     )
     slot_index: models.PositiveSmallIntegerField[int, int] = models.PositiveSmallIntegerField()
-    card_identity_id: models.TextField[str, str] = models.TextField(unique=True)
+    card_identity_id: models.TextField[str, str] = models.TextField(db_index=True)
     resolved_card: models.ForeignKey[Card | None, Card | None] = models.ForeignKey(
         "Card",
         on_delete=models.SET_NULL,
@@ -133,6 +146,10 @@ class TtsCardSheetSlot(TimestampedModel):
             models.UniqueConstraint(
                 fields=["sheet", "slot_index"],
                 name="ux_tts_sheet_slot_position",
+            ),
+            models.UniqueConstraint(
+                fields=["card_pool", "card_identity_id"],
+                name="ux_tts_sheet_slot_pool_identity",
             ),
             models.CheckConstraint(
                 condition=Q(slot_index__lt=TTS_CARD_SHEET_CAPACITY),

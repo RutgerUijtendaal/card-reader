@@ -134,7 +134,7 @@ const compareStableText = (left: string, right: string): number => {
   return left < right ? -1 : 1;
 };
 
-const EVIL_FACTION_SORT_ORDER: readonly CardFaction[] = ['order', 'blood', 'darkness'];
+const EVIL_FACTION_SORT_ORDER: readonly CardFaction[] = ['order', 'blood', 'dark', 'metal'];
 const DEFAULT_ROLE_SORT_ORDER: readonly CardRoleFilter[] = [
   STANDARD_CARD_ROLE,
   'hero',

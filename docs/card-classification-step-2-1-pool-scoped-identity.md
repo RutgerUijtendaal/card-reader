@@ -1,5 +1,7 @@
 # Card Classification Step 2.1: Pool-Scoped Card Identity
 
+Post-feature TTS amendment: pool-scoped identity is now also carried by persistent TTS sheets and slots. Player, Evil, and Neutral each allocate into separate sheet buckets, while every pool uses the same stable public sheet URL so existing TTS objects see later rerenders. Gallery and content-version export creation can use authorized restricted pools, while developer-data and decks retain their explicit Player-only product scope. References below to all public artifacts remaining Player-only describe this checkpoint's initial boundary.
+
 Status: implemented, validated, and merged into the classification umbrella branch. All dependent classification checkpoints through Step 3.2 are also implemented and merged.
 
 Target amendment: this document records the implemented pool-scoped identity seam. [Step 2.3](card-classification-step-2-3-faction-classification.md) extends that seam so normalized names, aliases, and untargeted image matching are scoped by pool plus the exact canonical faction set, allowing same-name cards in different factions within one pool.
@@ -134,7 +136,7 @@ The API auth boundary continues mapping a user to `CardPoolScope`:
 
 Rename any public `can_access_game_master_cards` session field and internal `allow_game_master_cards` vocabulary rather than cloning it for each restricted pool. Expose `accessible_card_pools` in canonical order and let frontend pool controls derive their permitted options from that list. The centralized policy remains the only place where staff maps to the restricted pools.
 
-Audit derived behavior through the scope rather than adding Evil/Neutral branches: embedded payloads, groups, catalog previews/counts, exports, TTS allocation and rendering, notifications, deck validation/placeholders, parse flags, and developer-data. Public artifacts remain Player-only even if the restricted-pool audience changes later.
+Audit derived behavior through the scope rather than adding Evil/Neutral branches: embedded payloads, groups, catalog previews/counts, exports, TTS allocation and rendering, notifications, deck validation/placeholders, parse flags, and developer-data. Developer-data remains Player-only; TTS allocation and rendering use explicit pool buckets with stable public sheet URLs.
 
 ## Core identity seam
 
@@ -296,7 +298,7 @@ Audit selectors that can show multiple pools, especially Admin Catalog and merge
 - APIs and routes continue addressing each duplicate-name card independently by id.
 - session pool metadata returns Player only for ordinary users and Player/Evil/Neutral for staff without separate per-pool booleans;
 - unauthorized Evil/Neutral collection requests return `403`, while their direct objects and assets return `404`;
-- Player-only TTS, developer-data, deck, and embedded-payload behavior excludes both restricted pools through the shared scope; notification inboxes use each recipient's scope while deck-version delivery remains Player-only;
+- developer-data, deck, and embedded-payload behavior excludes both restricted pools through the shared scope; TTS sheets are pool-partitioned public artifacts, notification inboxes use each recipient's scope, and deck-version delivery remains Player-only;
 
 ## Validation
 

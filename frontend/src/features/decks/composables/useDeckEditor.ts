@@ -13,6 +13,11 @@ import {
   updateDeck,
 } from '@/domain/decks/api';
 import { useDeckEditorDraft } from '@/features/decks/composables/useDeckEditorDraft';
+import {
+  reconcilePersistedSideboardSourceIds,
+  snapshotSubmittedSideboards,
+  type DeckSideboardSubmissionSnapshot,
+} from '@/features/decks/composables/deckEditorDraftModel';
 import type {
   DeckEditorMode,
   DeckFormEntry,
@@ -454,6 +459,21 @@ export const useDeckEditor = () => {
     return payloadSignature.value;
   };
 
+  const reconcilePersistedDeckState = (
+    record: DeckRecord,
+    persistedSignature: string,
+    submittedSideboards: readonly DeckSideboardSubmissionSnapshot[],
+  ): string => {
+    const draftStillMatchesRequest = payloadSignature.value === persistedSignature;
+    reconcilePersistedTagState(record, persistedSignature);
+    reconcilePersistedSideboardSourceIds(
+      deck.form,
+      submittedSideboards,
+      record,
+    );
+    return draftStillMatchesRequest ? payloadSignature.value : persistedSignature;
+  };
+
   const showTagSuggestionFeedback = (record: DeckRecord): void => {
     const feedback = getDeckTagSuggestionFeedback(record.tag_suggestion_results);
     if (feedback) {
@@ -535,7 +555,11 @@ export const useDeckEditor = () => {
     record: DeckRecord,
     savedSignature: string,
   ): Promise<void> => {
-    const reconciledSignature = reconcilePersistedTagState(record, savedSignature);
+    const reconciledSignature = reconcilePersistedDeckState(
+      record,
+      savedSignature,
+      snapshotSubmittedSideboards(deck.form),
+    );
     showTagSuggestionFeedback(record);
     shouldApplyHeroCardPreset.value = true;
     activateCards();
@@ -627,8 +651,13 @@ export const useDeckEditor = () => {
     manualSaving.value = !options.silent;
     try {
       const persistedSignature = payloadSignature.value;
+      const submittedSideboards = snapshotSubmittedSideboards(deck.form);
       const record = await persistDeck();
-      const savedSignature = reconcilePersistedTagState(record, persistedSignature);
+      const savedSignature = reconcilePersistedDeckState(
+        record,
+        persistedSignature,
+        submittedSideboards,
+      );
       showTagSuggestionFeedback(record);
       markSavedPayload(savedSignature);
       if (!options.silent) {

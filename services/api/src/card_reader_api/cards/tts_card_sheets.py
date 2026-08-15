@@ -29,7 +29,7 @@ def _sheet_response(request: Request, sheet_id: str, *, include_body: bool) -> H
         sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
         if sheet is None:
             return HttpResponse("TTS card sheet not found.", status=404, content_type="text/plain")
-        if not sheet_service.ensure_public_sheet_current(sheet_id):
+        if not sheet_service.ensure_sheet_current(sheet_id):
             break
         sheet = TtsCardSheet.objects.filter(id=sheet_id).first()
         if sheet is None:

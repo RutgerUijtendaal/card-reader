@@ -124,8 +124,16 @@ const normalizeEntries = (value: unknown): DeckFormEntry[] | null => {
 
 const normalizeSideboard = (value: unknown): DeckFormSideboard | null => {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') return null;
+  if (value.source_id !== undefined && typeof value.source_id !== 'string') return null;
   const entries = normalizeEntries(value.entries);
-  return entries === null ? null : { id: value.id, name: value.name, entries };
+  return entries === null
+    ? null
+    : {
+        id: value.id,
+        ...(value.source_id ? { source_id: value.source_id } : {}),
+        name: value.name,
+        entries,
+      };
 };
 
 const normalizeForm = (value: unknown): DeckForm | null => {

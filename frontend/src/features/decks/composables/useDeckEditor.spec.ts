@@ -1811,6 +1811,48 @@ describe('useDeckEditor', () => {
     mounted.unmount();
   });
 
+  test('uses refreshed persisted sideboard ids on the save after replacement', async () => {
+    const mounted = await mountController();
+    mounted.controller.deck.form.sideboards = [
+      {
+        id: 'editor-sideboard-1',
+        source_id: 'persisted-sideboard-old',
+        name: 'Original name',
+        entries: [],
+      },
+    ];
+    updateDeckMock
+      .mockResolvedValueOnce({
+        id: 'deck-1',
+        sideboards: [{ id: 'persisted-sideboard-new', name: 'Original name', entries: [] }],
+        status: { is_valid: true },
+      })
+      .mockResolvedValueOnce({
+        id: 'deck-1',
+        sideboards: [{ id: 'persisted-sideboard-newer', name: 'Renamed', entries: [] }],
+        status: { is_valid: true },
+      });
+
+    await mounted.controller.saveDeck();
+    mounted.controller.deck.renameSideboard('editor-sideboard-1', 'Renamed');
+    await mounted.controller.saveDeck();
+
+    expect(updateDeckMock).toHaveBeenNthCalledWith(
+      2,
+      'deck-1',
+      expect.objectContaining({
+        sideboards: [
+          expect.objectContaining({
+            id: 'persisted-sideboard-new',
+            name: 'Renamed',
+          }),
+        ],
+      }),
+    );
+
+    mounted.unmount();
+  });
+
   test('pauses autosync retries after failure until the draft changes again', async () => {
     updateDeckMock.mockRejectedValueOnce(new Error('offline'));
     const mounted = await mountController();

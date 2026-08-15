@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from PIL import Image, ImageOps
 
 from card_reader_core.config.settings import settings
-from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, TtsCardSheet
+from card_reader_core.models import TtsCardSheet
 from card_reader_core.repositories.tts_card_sheets import (
     get_sheet_with_slots,
     mark_render_failed,
@@ -81,8 +81,10 @@ def render_claimed_sheet(claimed_sheet: TtsCardSheet) -> TtsCardSheet:
         output_dir.mkdir(parents=True, exist_ok=True)
         canvas = Image.new("RGB", layout.image_size, _BACKGROUND)
         for slot in sheet.slots.all():
-            if slot.resolved_card is None or not PLAYER_CARD_POOL_SCOPE.allows_card_pool(
-                slot.resolved_card.card_pool
+            if (
+                slot.resolved_card is None
+                or slot.card_pool != sheet.card_pool
+                or slot.resolved_card.card_pool != sheet.card_pool
             ):
                 continue
             image_path = resolve_storage_path(slot.image_stored_path)

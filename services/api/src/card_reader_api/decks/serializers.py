@@ -492,6 +492,7 @@ class SideboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 
 class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
+    id = serializers.CharField(required=False, allow_blank=False)
     name = serializers.CharField(required=True, allow_blank=False)
     entries = SideboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
 
@@ -516,6 +517,17 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
         allow_empty=True,
         default=list,
     )
+
+    def validate_sideboards(
+        self,
+        value: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        source_ids = [str(sideboard["id"]) for sideboard in value if "id" in sideboard]
+        if len(source_ids) != len(set(source_ids)):
+            raise serializers.ValidationError(
+                "Each existing sideboard can only be submitted once."
+            )
+        return value
 
 
 class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):

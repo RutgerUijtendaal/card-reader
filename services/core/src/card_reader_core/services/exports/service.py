@@ -6,6 +6,7 @@ from enum import StrEnum
 from card_reader_core.models import (
     ACTIVE_CARD_LIFECYCLE_STATUS,
     ALL_CARD_LIFECYCLE_FILTER,
+    CardPoolScope,
     CardVersionImage,
 )
 from card_reader_core.repositories.cards import (
@@ -17,10 +18,7 @@ from card_reader_core.repositories.cards import (
 )
 from card_reader_core.repositories.content_versions import get_content_version
 from card_reader_core.repositories.decks import get_deck_export_snapshot
-from card_reader_core.repositories.tts_card_sheets import (
-    PUBLIC_TTS_CARD_POOL_SCOPE,
-    resolve_tts_card_image_path,
-)
+from card_reader_core.repositories.tts_card_sheets import resolve_tts_card_image_path
 from card_reader_core.services.card_backs import (
     CardBackService,
     resolve_card_back_image_asset_path,
@@ -48,6 +46,7 @@ class TtsCardExportCard:
 @dataclass(frozen=True)
 class TtsCardExportSheet:
     sheet_id: str
+    card_pool: str
     sequence: int
     columns: int
     rows: int
@@ -106,10 +105,16 @@ class _ResolvedTtsCardSelection:
     source_metadata: dict[str, object]
     entries: list[_ResolvedTtsCardSelectionEntry]
     skipped: list[TtsCardExportSkippedCard]
+    hide_out_of_scope_details: bool = False
 
 
 class TtsCardExportService:
-    def build_gallery_export(self, filters: CardFilterParams) -> TtsCardExportData:
+    def build_gallery_export(
+        self,
+        filters: CardFilterParams,
+        *,
+        card_pool_scope: CardPoolScope,
+    ) -> TtsCardExportData:
         selection = _ResolvedTtsCardSelection(
             collection_name="Card Reader Gallery",
             collection_description=None,
@@ -120,9 +125,14 @@ class TtsCardExportService:
             entries=_selection_entries(list_matching_cards(**filters)),
             skipped=[],
         )
-        return self._build_export(selection)
+        return self._build_export(selection, card_pool_scope=card_pool_scope)
 
-    def build_content_version_export(self, content_version_id: str) -> TtsCardExportData:
+    def build_content_version_export(
+        self,
+        content_version_id: str,
+        *,
+        card_pool_scope: CardPoolScope,
+    ) -> TtsCardExportData:
         content_version = get_content_version(content_version_id)
         if content_version is None:
             raise TtsCardExportError(
@@ -164,13 +174,15 @@ class TtsCardExportService:
                 },
                 entries=_selection_entries(rows),
                 skipped=skipped,
-            )
+            ),
+            card_pool_scope=card_pool_scope,
         )
 
     def build_deck_export(
         self,
         deck_id: str,
         *,
+        card_pool_scope: CardPoolScope,
         sideboard_id: str | None = None,
     ) -> TtsCardExportData:
         snapshot = get_deck_export_snapshot(deck_id, sideboard_id=sideboard_id)
@@ -239,10 +251,23 @@ class TtsCardExportService:
                 source_metadata=source_metadata,
                 entries=entries,
                 skipped=skipped,
-            )
+                hide_out_of_scope_details=True,
+            ),
+            card_pool_scope=card_pool_scope,
         )
 
-    def _build_export(self, selection: _ResolvedTtsCardSelection) -> TtsCardExportData:
+    def _build_export(
+        self,
+        selection: _ResolvedTtsCardSelection,
+        *,
+        card_pool_scope: CardPoolScope,
+    ) -> TtsCardExportData:
+        if selection.hide_out_of_scope_details and any(
+            not card_pool_scope.allows_card_pool(entry.row.version.card.card_pool)
+            for entry in selection.entries
+        ):
+            raise _deck_source_unavailable()
+
         card_back = CardBackService().get_current()
         card_back_asset_path = (
             resolve_card_back_image_asset_path(card_back) if card_back is not None else None
@@ -257,18 +282,20 @@ class TtsCardExportService:
         skipped = list(selection.skipped)
         for entry in selection.entries:
             row = entry.row
-            if not PUBLIC_TTS_CARD_POOL_SCOPE.allows_card_pool(row.version.card.card_pool):
+            if not card_pool_scope.allows_card_pool(row.version.card.card_pool):
+                if selection.hide_out_of_scope_details:
+                    raise _deck_source_unavailable()
                 if entry.required:
                     raise _required_card_unavailable(
                         row.version.name,
-                        "does not belong to the Player pool",
+                        "is outside the authorized card-pool scope",
                     )
                 skipped.append(
                     TtsCardExportSkippedCard(
                         card_id=row.version.card.id,
                         name=row.version.name,
                         quantity=entry.quantity,
-                        reason="Restricted cards are not available in public TTS sheets.",
+                        reason="Card is outside the authorized TTS export scope.",
                         role=entry.role,
                     )
                 )
@@ -308,6 +335,12 @@ class TtsCardExportService:
         for entry, image in usable_entries:
             row = entry.row
             assignment = assignments.get(row.version.card.id)
+            if assignment is not None and not card_pool_scope.allows_card_pool(
+                assignment.card_pool
+            ):
+                if selection.hide_out_of_scope_details:
+                    raise _deck_source_unavailable()
+                assignment = None
             if assignment is None:
                 if entry.required:
                     raise _required_card_unavailable(
@@ -353,6 +386,7 @@ class TtsCardExportService:
         sheets = [
             TtsCardExportSheet(
                 sheet_id=assignment.sheet_id,
+                card_pool=assignment.card_pool,
                 sequence=assignment.sheet_sequence,
                 columns=get_tts_card_sheet_layout(assignment.layout_version).columns,
                 rows=get_tts_card_sheet_layout(assignment.layout_version).rows,
@@ -403,4 +437,11 @@ def _required_card_unavailable(name: str, reason: str) -> TtsCardExportError:
     return TtsCardExportError(
         TtsCardExportErrorCode.REQUIRED_CARD_UNAVAILABLE,
         f"Required deck hero '{name}' {reason}.",
+    )
+
+
+def _deck_source_unavailable() -> TtsCardExportError:
+    return TtsCardExportError(
+        TtsCardExportErrorCode.DECK_SOURCE_NOT_FOUND,
+        "Deck not found",
     )

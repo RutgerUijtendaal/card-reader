@@ -27,9 +27,13 @@ Player is the public/default card pool. Evil and Neutral are separate restricted
 
 An unauthorized collection request that explicitly selects Evil or Neutral returns `403` with generic restricted-pool copy. Direct restricted card, version, image, and immutable-asset lookups return `404` so they do not disclose whether an identity exists. The same policy applies to grouped cards, exports, selectors, filter counts, and other card-derived public data. If a Player card already referenced by an ordinary user's deck is reclassified, the deck reference and invalid-state warning remain, but the embedded restricted card content and image are replaced by a generic placeholder. Deck rules and validation details returned to that owner are computed from visible Player cards or replaced with a generic restricted-card issue, so restricted card configuration and type behavior are not exposed indirectly.
 
-Unauthenticated TTS sheets and developer-data bundles are public derived artifacts and therefore
-contain Player-pool cards only. That artifact scope is separate from the access capability: changing
-who may receive restricted-pool access does not implicitly publish Evil or Neutral card data.
+Developer-data bundles remain fixed Player-only public artifacts. Persistent TTS sheets are instead
+partitioned by card pool and served through stable public sheet URLs for Player, Evil, and Neutral.
+This is a deliberate exception to direct restricted-card asset authorization: staff control creation
+of Gallery and content-version exports, but Tabletop Simulator can keep loading an exported sheet
+without a Django session and sees later card-art updates at the same URL. Deck TTS exports remain
+Player-only because decks are currently a Player workflow, not because TTS cards have a Player-only
+format.
 
 Card-derived search, counts, ordering, validation, previews, notifications, and generated outputs apply their scope before exposing results. Direct restricted identities still use the established `404` policy, while an explicitly forbidden Evil or Neutral collection selection remains `403`.
 

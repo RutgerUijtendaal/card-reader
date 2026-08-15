@@ -170,6 +170,7 @@ export type DeckUpsertRequest = {
   hero_card_id: string;
   entries: DeckEntryInput[];
   sideboards: Array<{
+    id?: string;
     name: string;
     entries: DeckEntryInput[];
   }>;

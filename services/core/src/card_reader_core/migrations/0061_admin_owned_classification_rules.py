@@ -25,6 +25,22 @@ def preflight_non_terminal_import_jobs(apps: Any, _schema_editor: Any) -> None:
         )
 
 
+def guard_reverse_classification_data(apps: Any, _schema_editor: Any) -> None:
+    CardClassificationRule = apps.get_model("card_reader_core", "CardClassificationRule")
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    if CardClassificationRule.objects.exists():
+        raise RuntimeError(
+            "Card classification migration 0061 cannot be reversed while classification rules "
+            "exist. Remove the rules explicitly before rolling back."
+        )
+    if ImportJob.objects.exclude(classification_rule_snapshot_json={}).exists():
+        raise RuntimeError(
+            "Card classification migration 0061 cannot be reversed while import jobs retain "
+            "classification rule snapshots. Preserve or remove those audit snapshots explicitly "
+            "before rolling back."
+        )
+
+
 class Migration(migrations.Migration):
     dependencies = [("card_reader_core", "0060_faction_classification")]
 
@@ -154,4 +170,5 @@ class Migration(migrations.Migration):
                 fields=["card_pool", "enabled", "type"], name="ix_class_rule_pool_type"
             ),
         ),
+        migrations.RunPython(migrations.RunPython.noop, guard_reverse_classification_data),
     ]

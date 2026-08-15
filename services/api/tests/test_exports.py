@@ -4,6 +4,7 @@ import base64
 from io import BytesIO
 import json
 from itertools import count
+from urllib.parse import urlsplit
 
 from django.test import Client
 from PIL import Image
@@ -207,6 +208,39 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
     assert mainboard_response.status_code == 200
     assert player_sideboard_response.status_code == 200
     assert restricted_sideboard_response.status_code == 404
+
+
+def test_deck_tts_export_rechecks_pool_scope_in_authoritative_snapshot(monkeypatch) -> None:
+    TtsCardSheet.objects.all().delete()
+    owner = _create_user("tts-export-reclassification-owner", "password")
+    hero = _create_card(name="TTS Reclassification Hero", hero=True)
+    mainboard_cards = _build_mainboard_cards()
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="TTS Reclassification Deck",
+        description=None,
+        visibility="public",
+        hero_card_id=hero.id,
+        entries=[DeckEntryInput(card_id=card.id, quantity=4) for card in mainboard_cards],
+        sideboards=[],
+    )
+    restricted_card = mainboard_cards[0]
+
+    def reclassify_after_visibility_check(*_args, **_kwargs) -> bool:
+        Card.objects.filter(id=restricted_card.id).update(card_pool="evil")
+        return False
+
+    monkeypatch.setattr(
+        "card_reader_api.exports.views.deck_export_uses_out_of_scope_card",
+        reclassify_after_visibility_check,
+    )
+
+    response = Client(HTTP_HOST="localhost").get(f"/decks/{deck.id}/exports/tts")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Deck not found"}
+    assert restricted_card.latest_version is not None
+    assert restricted_card.latest_version.name not in response.content.decode("utf-8")
 
 
 def test_tts_export_can_target_one_sideboard() -> None:
@@ -538,6 +572,44 @@ def test_gallery_tts_card_export_uses_all_matching_cards_and_reports_missing_ima
             "reason": "Card has no usable latest image.",
         }
     ]
+
+
+def test_restricted_gallery_tts_export_uses_stable_pool_sheet_urls() -> None:
+    TtsCardSheet.objects.all().delete()
+    staff = _create_user("tts-evil-gallery-staff", "password", is_staff=True)
+    client = Client(HTTP_HOST="cards.example")
+    client.force_login(staff)
+    _create_current_card_back("evil-gallery")
+    evil = _create_card(name="Evil Gallery TTS Card", hero=False)
+    evil.card_pool = "evil"
+    evil.save(update_fields=["card_pool", "updated_at"])
+    _create_card_image(evil.latest_version, content=b"evil-gallery")
+
+    response = client.post(
+        "/exports/tts/cards",
+        data={
+            "source": {
+                "type": "gallery",
+                "filters": {"q": "Evil Gallery TTS Card", "card_pool": "evil"},
+            }
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    response_payload = response.json()
+    assert response_payload["exported_count"] == 1
+    assert response_payload["skipped_count"] == 0
+    payload = _decode_tts_card_export(response_payload["encoded_payload"])
+    assert [card["card_id"] for card in payload["cards"]] == [evil.id]
+    sheet = payload["sheets"][0]
+    assert sheet["card_pool"] == "evil"
+    face_url = urlsplit(sheet["face_url"])
+    assert face_url.query == ""
+    anonymous_response = Client(HTTP_HOST="cards.example").get(face_url.path)
+    assert anonymous_response.status_code == 200
+    assert anonymous_response["Cache-Control"] == "public, no-cache"
+    anonymous_response.close()
 
 
 def test_content_version_tts_card_export_deduplicates_identity_and_uses_latest_artwork() -> None:

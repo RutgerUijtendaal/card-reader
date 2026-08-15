@@ -82,19 +82,34 @@ def replace_mainboard_entries(*, deck: Deck, entries: list[tuple[str, int]]) -> 
 
 @transaction.atomic
 def replace_sideboards(*, deck: Deck, sideboards: list[dict[str, object]]) -> None:
-    DeckSideboard.objects.filter(deck=deck).delete()
+    existing_by_id = {
+        sideboard.id: sideboard
+        for sideboard in DeckSideboard.objects.filter(deck=deck)
+    }
+    retained_sideboard_ids: set[str] = set()
     for sideboard in sideboards:
-        created_sideboard = DeckSideboard.objects.create(
-            deck=deck,
-            name=str(sideboard["name"]),
+        source_id = sideboard.get("source_id")
+        persisted_sideboard = (
+            existing_by_id.get(str(source_id)) if source_id is not None else None
         )
+        if persisted_sideboard is None:
+            persisted_sideboard = DeckSideboard.objects.create(
+                deck=deck,
+                name=str(sideboard["name"]),
+            )
+        else:
+            persisted_sideboard.name = str(sideboard["name"])
+            persisted_sideboard.updated_at = now_utc()
+            persisted_sideboard.save(update_fields=["name", "updated_at"])
+            persisted_sideboard.entries.all().delete()
+        retained_sideboard_ids.add(persisted_sideboard.id)
         entries = sideboard["entries"]
         if not isinstance(entries, list) or len(entries) == 0:
             continue
         DeckSideboardEntry.objects.bulk_create(
             [
                 DeckSideboardEntry(
-                    sideboard=created_sideboard,
+                    sideboard=persisted_sideboard,
                     card_id=str(card_id),
                     quantity=int(quantity),
                     position=index,
@@ -102,3 +117,4 @@ def replace_sideboards(*, deck: Deck, sideboards: list[dict[str, object]]) -> No
                 for index, (card_id, quantity) in enumerate(entries, start=1)
             ]
         )
+    DeckSideboard.objects.filter(deck=deck).exclude(id__in=retained_sideboard_ids).delete()

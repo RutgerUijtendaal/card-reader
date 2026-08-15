@@ -17,6 +17,8 @@ Do not grow import or workspace behavior until this step's acceptance criteria a
 
 Target amendment: this document preserves the implemented Step 1.1 names. [Step 2.1](card-classification-step-2-1-pool-scoped-identity.md) replaces the temporary Game-Master-specific entitlement/session vocabulary with a Player/Evil/Neutral pool scope. Evil and Neutral share the same initially staff-only restricted-pool policy.
 
+Post-feature TTS amendment: persistent TTS sheets are partitioned into Player, Evil, and Neutral buckets and every bucket uses the same stable public sheet URL contract. Gallery and content-version export creation may use every pool in the requesting staff user's scope, while the resulting TTS client can reload later sheet revisions without a Django session. Deck exports remain fixed to the Player workflow. The original public-artifact statements below describe this checkpoint's deliberately narrower starting contract.
+
 Final implementation amendment: card-linked inbox reads use the recipient's current scope instead of destructively retiring history during a pool transition. This permits global staff Review notifications for restricted cards while continuing to hide those rows from recipients whose current scope does not include the card. Deck-version notification creation remains Player-only with the deck workflow.
 
 ## Outcome
@@ -54,7 +56,7 @@ Some distribution is unavoidable because those outputs have distinct failure dom
 - Define canonical Player-only and all-pools scopes. Do not construct anonymous sets of pool strings throughout the codebase.
 - The API auth boundary owns `card_pool_scope_for_user(user)`. It is the only user-aware mapper from entitlement to core scope.
 - Core repositories and services consume `CardPoolScope`; they do not inspect users, sessions, `is_staff`, or API capability helpers.
-- Public artifacts such as developer-data bundles and unauthenticated TTS sheets always use the canonical Player-only scope. They do not use the requesting user's scope.
+- Developer-data bundles always use the canonical Player-only scope. Persistent TTS sheets instead use an explicit pool partition and stable public URL; restricted-pool export creation still uses the requesting user's centralized scope.
 - The current deck builder, deck validation, deck exports, and Playtester remain Player-only. A future explicit deck pool must not be inferred from contained cards.
 - Direct unauthorized Game Master identities remain `404`; an unauthorized collection request that explicitly selects Game Master remains `403`. Transport status policy stays at the API boundary.
 - Existing deck and group references remain intact when a card moves pools. Unauthorized payloads preserve only the already-approved restricted placeholder and generic invalid state.
@@ -141,8 +143,8 @@ Treat durable and generated outputs as separate authorization failure domains:
 - retain card-linked notification history and filter inbox reads and mutations through the recipient's current scope;
 - suppress deck-version notification events for cards outside the Player-only deck workflow;
 - reject capability-unsafe idempotent replay without returning embedded restricted references;
-- invalidate or rerender public TTS material after a pool transition;
-- keep developer-data and public TTS generation fixed to Player-only scope;
+- invalidate and rerender the source-pool TTS slot after a pool transition while allocating the destination-pool slot;
+- keep developer-data fixed to Player-only scope and TTS generation partitioned by explicit pool;
 - authorize immutable shared image bytes when at least one owning card is visible in the supplied scope.
 
 Central scope vocabulary must be shared, but cleanup and failure semantics remain owned by each workflow. A cleanup failure must not reverse a successfully persisted classification edit; it must leave the derived surface unavailable until reconciliation succeeds.
@@ -217,7 +219,7 @@ Also validate the authorization matrix in CI and manually inspect representative
 - Public-facing card-derived repository and payload APIs require an explicit scope or a previously validated selected pool.
 - No first-party `allow_game_master_cards` payload parameter remains.
 - Search, counts, ordering, validation, rules, notifications, replay, images, exports, TTS, and developer-data cannot expose out-of-scope card data.
-- Public derived artifacts remain Player-only regardless of which users receive the Game Master capability.
+- Developer-data remains Player-only regardless of entitlement changes; persistent TTS sheets remain public, stable, and partitioned by explicit pool.
 - Current `403`, `404`, restricted-placeholder, reference-preservation, and invalid-state behavior remains compatible; restricted deck placeholders use opaque identifiers rather than stable Game Master card ids.
 - Notification query filtering resolves merged source identities before deciding whether a card-linked snapshot is visible, without destroying history that remains valid for a broader recipient scope.
 - The authorization matrix passes for anonymous, authenticated non-staff, and staff viewers.

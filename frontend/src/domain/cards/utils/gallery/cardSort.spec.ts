@@ -136,6 +136,8 @@ describe('cardSort default sorting', () => {
     const cards = [
       { ...buildCard('none-boss', 'None Boss', []), mana_value: 0, card_factions: [], card_roles: ['boss'] as const },
       { ...buildCard('blood-boss', 'Blood Boss', []), mana_value: 0, card_factions: ['blood'] as const, card_roles: ['boss'] as const },
+      { ...buildCard('dark-boss', 'Dark Boss', []), mana_value: 0, card_factions: ['dark'] as const, card_roles: ['boss'] as const },
+      { ...buildCard('metal-boss', 'Metal Boss', []), mana_value: 0, card_factions: ['metal'] as const, card_roles: ['boss'] as const },
       { ...buildCard('order-normal-high', 'Order Normal High', []), mana_value: 5, card_factions: ['order'] as const, card_roles: [] },
       { ...buildCard('order-location', 'Order Location', []), mana_value: 0, card_factions: ['order'] as const, card_roles: ['location'] as const },
       { ...buildCard('order-normal-low', 'Order Normal Low', []), mana_value: 1, card_factions: ['order'] as const, card_roles: [] },
@@ -150,6 +152,8 @@ describe('cardSort default sorting', () => {
       'order-normal-low',
       'order-normal-high',
       'blood-boss',
+      'dark-boss',
+      'metal-boss',
       'none-boss',
     ]);
   });
