@@ -35,7 +35,7 @@ def _validate_preserved_restricted_sideboard_entries(
     *,
     sideboards: list[DeckSideboardInput],
     existing_sideboards: list[DeckSideboard],
-) -> None:
+) -> list[str | None]:
     restricted_card_ids: set[str] = set()
     existing_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
     existing_by_name: dict[str, list[DeckSideboard]] = {}
@@ -50,13 +50,31 @@ def _validate_preserved_restricted_sideboard_entries(
             expected_quantities[(existing_sideboard.id, existing_entry.card.id)] = int(
                 existing_entry.quantity
             )
+    explicitly_referenced_source_ids = [
+        source.id
+        for submitted_sideboard in sideboards
+        if submitted_sideboard.source_id is not None
+        if (source := existing_by_id.get(submitted_sideboard.source_id)) is not None
+    ]
+    if len(explicitly_referenced_source_ids) != len(set(explicitly_referenced_source_ids)):
+        raise ValueError("Each existing sideboard can only be submitted once.")
+    reserved_source_sideboard_ids = set(explicitly_referenced_source_ids)
     used_source_sideboard_ids: set[str] = set()
+    resolved_source_sideboard_ids: list[str | None] = []
     for submitted_sideboard in sideboards:
+        requires_source = any(
+            entry.card_id in restricted_card_ids for entry in submitted_sideboard.entries
+        )
         source_sideboard = _resolve_source_sideboard(
             submitted_sideboard,
             existing_by_id=existing_by_id,
             existing_by_name=existing_by_name,
+            reserved_source_sideboard_ids=reserved_source_sideboard_ids,
             used_source_sideboard_ids=used_source_sideboard_ids,
+            requires_source=requires_source,
+        )
+        resolved_source_sideboard_ids.append(
+            source_sideboard.id if source_sideboard is not None else None
         )
         if source_sideboard is not None:
             used_source_sideboard_ids.add(source_sideboard.id)
@@ -72,6 +90,7 @@ def _validate_preserved_restricted_sideboard_entries(
                 submitted_entry.quantity
             ):
                 raise ValueError("Restricted sideboard references can only be preserved unchanged.")
+    return resolved_source_sideboard_ids
 
 
 def _resolve_source_sideboard(
@@ -79,7 +98,9 @@ def _resolve_source_sideboard(
     *,
     existing_by_id: dict[str, DeckSideboard],
     existing_by_name: dict[str, list[DeckSideboard]],
+    reserved_source_sideboard_ids: set[str],
     used_source_sideboard_ids: set[str],
+    requires_source: bool,
 ) -> DeckSideboard | None:
     source_sideboard = (
         existing_by_id.get(submitted_sideboard.source_id)
@@ -96,9 +117,10 @@ def _resolve_source_sideboard(
         sideboard
         for sideboard in named_candidates
         if sideboard.id not in used_source_sideboard_ids
+        and sideboard.id not in reserved_source_sideboard_ids
     ]
     if not available_candidates:
-        if named_candidates:
+        if named_candidates and requires_source:
             raise ValueError("Each existing sideboard can only be submitted once.")
         return None
 
@@ -131,6 +153,7 @@ class DeckPayloadNormalizer:
             sideboards=sideboards,
             retained_mainboard_cards_by_id={},
             retained_sideboard_cards_by_id={},
+            sideboard_source_ids=[None] * len(sideboards),
         )
 
     def normalize_deck_update(
@@ -167,8 +190,9 @@ class DeckPayloadNormalizer:
                 entries=entries,
                 existing_entries=existing_mainboard_entries,
             )
+        sideboard_source_ids: list[str | None] = [None] * len(sideboards)
         if update_sideboards:
-            _validate_preserved_restricted_sideboard_entries(
+            sideboard_source_ids = _validate_preserved_restricted_sideboard_entries(
                 sideboards=sideboards,
                 existing_sideboards=existing_sideboards,
             )
@@ -178,6 +202,7 @@ class DeckPayloadNormalizer:
             sideboards=sideboards,
             retained_mainboard_cards_by_id=retained_mainboard_cards_by_id,
             retained_sideboard_cards_by_id=retained_sideboard_cards_by_id,
+            sideboard_source_ids=sideboard_source_ids,
         )
 
     def _normalize_resolved_deck_payload(
@@ -188,6 +213,7 @@ class DeckPayloadNormalizer:
         sideboards: list[DeckSideboardInput],
         retained_mainboard_cards_by_id: dict[str, Card],
         retained_sideboard_cards_by_id: dict[str, Card],
+        sideboard_source_ids: list[str | None],
     ) -> tuple[Card, list[tuple[str, int]], list[dict[str, object]]]:
         if PLAYER_CARD_POOL_SCOPE.allows_card_pool(hero_card.card_pool) and not card_has_role(
             hero_card,
@@ -236,6 +262,7 @@ class DeckPayloadNormalizer:
             sideboards=sideboards,
             hero_card=hero_card,
             cards_by_id=sideboard_cards_by_id,
+            source_ids=sideboard_source_ids,
         )
         constraint_hero = (
             hero_card if PLAYER_CARD_POOL_SCOPE.allows_card_pool(hero_card.card_pool) else None
@@ -305,10 +332,11 @@ class DeckPayloadNormalizer:
         sideboards: list[DeckSideboardInput],
         hero_card: Card,
         cards_by_id: dict[str, Card],
+        source_ids: list[str | None],
     ) -> tuple[list[dict[str, object]], list[DeckConstraintEntry]]:
         normalized_sideboards: list[dict[str, object]] = []
         constraint_entries: list[DeckConstraintEntry] = []
-        for sideboard in sideboards:
+        for sideboard, source_id in zip(sideboards, source_ids, strict=True):
             normalized_sideboard_name = self.normalize_sideboard_name(sideboard.name)
             ordered_sideboard_entry_ids = [
                 entry.card_id.strip()
@@ -329,7 +357,7 @@ class DeckPayloadNormalizer:
                 {
                     "name": normalized_sideboard_name,
                     "entries": normalized_sideboard_entries,
-                    "source_id": sideboard.source_id,
+                    "source_id": source_id,
                 }
             )
         return normalized_sideboards, constraint_entries

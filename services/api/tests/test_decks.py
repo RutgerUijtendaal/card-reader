@@ -3478,6 +3478,25 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
     current_sideboard_id = deck.sideboards.get().id
     assert current_sideboard_id == sideboard_id
 
+    stale_id_fallback = client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "sideboards": [
+                {
+                    "id": "stale-sideboard-id",
+                    "name": "Renamed Restricted Tech",
+                    "entries": [
+                        {"card_id": restricted_id, "quantity": 2},
+                        {"card_id": visible.id, "quantity": 4},
+                    ],
+                }
+            ]
+        },
+        content_type="application/json",
+    )
+    assert stale_id_fallback.status_code == 200
+    assert deck.sideboards.get().id == current_sideboard_id
+
     duplicate_source = client.patch(
         f"/my/decks/{deck.id}",
         data={
@@ -3527,6 +3546,34 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
         }
         assert deck.sideboards.count() == 1
 
+    existing_sideboard_payload = client.get(f"/my/decks/{deck.id}").json()["sideboards"][0]
+    duplicate_name_new_sideboard = client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "sideboards": [
+                {
+                    "id": current_sideboard_id,
+                    "name": "Renamed Restricted Tech",
+                    "entries": [
+                        {
+                            "card_id": entry["card"]["id"],
+                            "quantity": entry["quantity"],
+                        }
+                        for entry in existing_sideboard_payload["entries"]
+                    ],
+                },
+                {
+                    "name": "Renamed Restricted Tech",
+                    "entries": [{"card_id": visible.id, "quantity": 1}],
+                },
+            ]
+        },
+        content_type="application/json",
+    )
+    assert duplicate_name_new_sideboard.status_code == 200
+    assert deck.sideboards.filter(id=current_sideboard_id).exists()
+    assert deck.sideboards.count() == 2
+
     tampered = client.patch(
         f"/my/decks/{deck.id}",
         data={"entries": [{"card_id": restricted_id, "quantity": 2}]},
@@ -3570,6 +3617,7 @@ def test_idless_duplicate_name_sideboards_round_trip_by_exact_or_position() -> N
     client = Client(HTTP_HOST="localhost")
     client.force_login(owner)
     payload = client.get(f"/my/decks/{deck.id}").json()
+    original_sideboard_ids = {sideboard["id"] for sideboard in payload["sideboards"]}
 
     submitted_sideboards = []
     for sideboard in payload["sideboards"]:
@@ -3594,6 +3642,7 @@ def test_idless_duplicate_name_sideboards_round_trip_by_exact_or_position() -> N
 
     assert response.status_code == 200
     deck.refresh_from_db()
+    assert set(deck.sideboards.values_list("id", flat=True)) == original_sideboard_ids
     persisted_entry_sets = {
         frozenset(
             (entry.card_id, int(entry.quantity))

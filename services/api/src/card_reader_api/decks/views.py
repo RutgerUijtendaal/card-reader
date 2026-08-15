@@ -97,23 +97,51 @@ def _restore_unchanged_restricted_deck_references(
                 existing_sideboard
             )
         submitted_sideboards = cast(list[dict[str, object]], validated_data["sideboards"])
+        explicitly_referenced_source_ids = [
+            source.id
+            for submitted_sideboard in submitted_sideboards
+            if (
+                source := existing_sideboards_by_id.get(
+                    str(submitted_sideboard.get("id", ""))
+                )
+            )
+            is not None
+        ]
+        if len(explicitly_referenced_source_ids) != len(
+            set(explicitly_referenced_source_ids)
+        ):
+            raise ValueError("Each existing sideboard can only be submitted once.")
+        reserved_source_sideboard_ids = set(explicitly_referenced_source_ids)
+        restricted_reference_ids = {
+            deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope)
+            for existing_sideboard in existing_sideboards
+            for entry in existing_sideboard.entries.all()
+            if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+        }
         restored_sideboards: list[dict[str, object]] = []
         used_source_sideboard_ids: set[str] = set()
         for sideboard in submitted_sideboards:
+            submitted_entries = cast(list[dict[str, object]], sideboard["entries"])
             source_sideboard = _existing_sideboard_for_submission(
                 sideboard,
                 existing_sideboards_by_id=existing_sideboards_by_id,
                 existing_sideboards_by_name=existing_sideboards_by_name,
+                reserved_source_sideboard_ids=reserved_source_sideboard_ids,
                 used_source_sideboard_ids=used_source_sideboard_ids,
                 card_pool_scope=card_pool_scope,
+                requires_source=any(
+                    str(entry.get("card_id", "")) in restricted_reference_ids
+                    for entry in submitted_entries
+                ),
             )
             if source_sideboard is not None:
                 used_source_sideboard_ids.add(source_sideboard.id)
             restored_sideboards.append(
                 {
                     **sideboard,
+                    **({"id": source_sideboard.id} if source_sideboard is not None else {}),
                     "entries": _restore_restricted_entry_references(
-                        cast(list[dict[str, object]], sideboard["entries"]),
+                        submitted_entries,
                         existing_entries=(
                             list(source_sideboard.entries.all())
                             if source_sideboard is not None
@@ -145,8 +173,10 @@ def _existing_sideboard_for_submission(
     *,
     existing_sideboards_by_id: dict[str, DeckSideboard],
     existing_sideboards_by_name: dict[str, list[DeckSideboard]],
+    reserved_source_sideboard_ids: set[str],
     used_source_sideboard_ids: set[str],
     card_pool_scope: CardPoolScope,
+    requires_source: bool,
 ) -> DeckSideboard | None:
     requested_id = str(submitted_sideboard.get("id", ""))
     source_sideboard = existing_sideboards_by_id.get(requested_id)
@@ -160,9 +190,10 @@ def _existing_sideboard_for_submission(
         sideboard
         for sideboard in named_candidates
         if sideboard.id not in used_source_sideboard_ids
+        and sideboard.id not in reserved_source_sideboard_ids
     ]
     if not available_candidates:
-        if named_candidates:
+        if named_candidates and requires_source:
             raise ValueError("Each existing sideboard can only be submitted once.")
         return None
 
