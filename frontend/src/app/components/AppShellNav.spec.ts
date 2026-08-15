@@ -193,6 +193,7 @@ describe('AppShellNav', () => {
 
     expect(adminLink).not.toBeNull();
     expect(adminLink?.querySelector('.nav-badge')?.textContent).toContain('2');
+    expect(mounted.container.querySelector('a[href="/operations"] .lucide-activity')).not.toBeNull();
     mounted.unmount();
   });
 
@@ -208,6 +209,30 @@ describe('AppShellNav', () => {
     expect(mounted.container.textContent).not.toContain('Playtester');
     expect(mounted.container.textContent).not.toContain('Build a deck');
     expect(mounted.container.querySelector('a[href="/cards?card_pool=evil"]')).not.toBeNull();
+    mounted.unmount();
+  });
+
+  test('uses the active pool icon for the Gallery link in every workspace', async () => {
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+
+    expect(mounted.container.querySelector(
+      'a[href="/cards"] [data-card-pool-icon="player"]',
+    )).not.toBeNull();
+
+    mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+    expect(mounted.container.querySelector(
+      'a[href="/cards?card_pool=evil"] [data-card-pool-icon="evil"]',
+    )).not.toBeNull();
+
+    mounted.container.querySelector<HTMLButtonElement>('[aria-label="Neutral workspace"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+    expect(mounted.container.querySelector(
+      'a[href="/cards?card_pool=neutral"] [data-card-pool-icon="neutral"]',
+    )).not.toBeNull();
+
     mounted.unmount();
   });
 

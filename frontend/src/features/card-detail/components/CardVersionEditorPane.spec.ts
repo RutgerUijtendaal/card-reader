@@ -104,15 +104,19 @@ const emptyOptions = (): [] => [];
 
 const mountPane = async ({
   deprecatedStatusDisabled = false,
+  formOverrides = {},
 }: {
   deprecatedStatusDisabled?: boolean;
+  formOverrides?: Partial<EditorForm>;
 } = {}) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const updateLifecycleStatus = vi.fn();
   const saveCard = vi.fn();
   const saveVersion = vi.fn();
-  const form = reactive(buildForm());
+  const toggleCardRole = vi.fn();
+  const toggleCardFaction = vi.fn();
+  const form = reactive(buildForm(formOverrides));
   const reparseTemplateId = ref('template-1');
   const reparseTemplates: ReparseTemplateOption[] = [
     { id: 'template-1', key: 'template-1', label: 'Default' },
@@ -169,6 +173,8 @@ const mountPane = async ({
             onSaveCard: saveCard,
             onSaveVersion: saveVersion,
             onUpdateLifecycleStatus: updateLifecycleStatus,
+            onToggleCardRole: toggleCardRole,
+            onToggleCardFaction: toggleCardFaction,
           });
       },
     }),
@@ -181,6 +187,8 @@ const mountPane = async ({
     saveCard,
     saveVersion,
     updateLifecycleStatus,
+    toggleCardRole,
+    toggleCardFaction,
     unmount: () => {
       app.unmount();
       container.remove();
@@ -277,6 +285,42 @@ describe('CardVersionEditorPane tabs', () => {
     expect(document.body.textContent).toContain('Deck-building config example');
     expect(document.body.textContent).toContain('mainboard_copy_limit');
     expect(document.body.textContent).toContain('whole_deck');
+
+    mounted.unmount();
+  });
+
+  test('presents roles and factions as compact multi-select buttons', async () => {
+    const mounted = await mountPane({
+      formOverrides: {
+        card_roles: ['boss'],
+        card_factions: ['order'],
+      },
+    });
+    await clickButton(mounted.container, 'Card');
+
+    const boss = mounted.container.querySelector('[data-testid="card-role-option-boss"]');
+    const hero = mounted.container.querySelector('[data-testid="card-role-option-hero"]');
+    const order = mounted.container.querySelector('[data-testid="card-faction-option-order"]');
+
+    expect(boss?.getAttribute('aria-pressed')).toBe('true');
+    expect(hero?.getAttribute('aria-pressed')).toBe('false');
+    expect(order?.getAttribute('aria-pressed')).toBe('true');
+
+    (hero as HTMLButtonElement).click();
+    (order as HTMLButtonElement).click();
+    await nextTick();
+
+    expect(mounted.toggleCardRole).toHaveBeenCalledWith('hero', true);
+    expect(mounted.toggleCardFaction).toHaveBeenCalledWith('order', false);
+    mounted.unmount();
+  });
+
+  test('explains empty role and faction selections as derived states', async () => {
+    const mounted = await mountPane();
+    await clickButton(mounted.container, 'Card');
+
+    expect(mounted.container.textContent).toContain('Normal');
+    expect(mounted.container.textContent).toContain('No faction');
 
     mounted.unmount();
   });

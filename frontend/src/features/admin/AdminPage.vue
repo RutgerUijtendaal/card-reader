@@ -1,7 +1,7 @@
 <template>
   <section class="app-page-content space-y-6">
     <AppPageHeader
-      :icon="Settings"
+      :icon="APP_SECTION_ICONS.admin"
       title="Admin"
       subtitle="Manage catalog data, versions, templates, card groups, users, and maintenance tools."
       title-tag="h2"
@@ -101,9 +101,10 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { Database, GitMerge, History, Images, Layers3, LayoutTemplate, Settings, Tags, Users } from 'lucide-vue-next';
+import { Database, GitMerge, History, Images, Layers3, LayoutTemplate, Tags, Users } from 'lucide-vue-next';
 import AppHeaderAction from '@/shared/components/app/AppHeaderAction.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import { useAccessRequestSummary } from '@/domain/access-requests/composables/useAccessRequestSummary';
 import { useAuthStore } from '@/domain/session/store';
 import {

@@ -1,7 +1,7 @@
 <template>
   <section class="flex w-full flex-col gap-6">
     <AppPageHeader
-      :icon="SlidersHorizontal"
+      :icon="APP_SECTION_ICONS.settings"
       title="Settings"
       subtitle="Configure default browsing and viewing preferences."
       title-tag="h2"
@@ -239,11 +239,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ArrowUpDown, Database, Eye, MousePointer2, SlidersHorizontal } from 'lucide-vue-next';
+import { ArrowUpDown, Database, Eye, MousePointer2 } from 'lucide-vue-next';
 import type { Component } from 'vue';
 import { useRoute } from 'vue-router';
 import AppPageLayout from '@/shared/components/app/AppPageLayout.vue';
 import AppPageHeader from '@/shared/components/app/AppPageHeader.vue';
+import { APP_SECTION_ICONS } from '@/shared/components/app/appSectionIcons';
 import AppSelect from '@/shared/components/app/AppSelect.vue';
 import AppSideNav from '@/shared/components/app/AppSideNav.vue';
 import AppSideNavItem from '@/shared/components/app/AppSideNavItem.vue';

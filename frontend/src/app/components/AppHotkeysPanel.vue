@@ -67,6 +67,7 @@
     <div
       v-else
       class="theme-hotkeys-panel"
+      :data-hotkey-count="globalHotkeys.length"
     >
       <div class="flex items-center gap-2">
         <span class="theme-hotkeys-icon-wrap">
