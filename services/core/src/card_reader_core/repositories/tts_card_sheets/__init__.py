@@ -336,20 +336,22 @@ def claim_next_renderable_sheet() -> TtsCardSheet | None:
 
 def _claim_next_renderable_sheet_once() -> TtsCardSheet | None:
     for _attempt in range(_CLAIM_RESERVATION_ATTEMPTS):
-        now = now_utc()
-        stale_before = now - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT
+        query_time = now_utc()
+        stale_before = query_time - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT
         claimable = (
             TtsCardSheet.objects.filter(desired_revision__gt=F("rendered_revision"))
-            .filter(Q(render_not_before__isnull=True) | Q(render_not_before__lte=now))
+            .filter(Q(render_not_before__isnull=True) | Q(render_not_before__lte=query_time))
             .filter(Q(render_claimed_at__isnull=True) | Q(render_claimed_at__lt=stale_before))
         )
-        sheet_id = (
+        candidate = (
             claimable.order_by("-render_priority", "render_not_before", "sequence")
-            .values_list("id", flat=True)
+            .values_list("id", "updated_at")
             .first()
         )
-        if sheet_id is None:
+        if candidate is None:
             return None
+        sheet_id, updated_at = candidate
+        now = _next_claim_timestamp(updated_at)
         claimed = claimable.filter(id=sheet_id).update(render_claimed_at=now, updated_at=now)
         if claimed == 1:
             return TtsCardSheet.objects.filter(id=sheet_id, render_claimed_at=now).first()
@@ -374,7 +376,12 @@ def _claim_sheet_for_render_once(
     *,
     respect_not_before: bool,
 ) -> TtsCardSheet | None:
-    now = now_utc()
+    updated_at = (
+        TtsCardSheet.objects.filter(id=sheet_id).values_list("updated_at", flat=True).first()
+    )
+    if updated_at is None:
+        return None
+    now = _next_claim_timestamp(updated_at)
     stale_before = now - TTS_CARD_SHEET_RENDER_CLAIM_TIMEOUT
     claimable = (
         TtsCardSheet.objects.filter(id=sheet_id, desired_revision__gt=F("rendered_revision"))
@@ -388,6 +395,13 @@ def _claim_sheet_for_render_once(
     if claimed != 1:
         return None
     return TtsCardSheet.objects.filter(id=sheet_id, render_claimed_at=now).first()
+
+
+def _next_claim_timestamp(updated_at: datetime) -> datetime:
+    current = now_utc()
+    if current <= updated_at:
+        return updated_at + timedelta(microseconds=1)
+    return current
 
 
 def get_sheet_with_slots(sheet_id: str) -> TtsCardSheet | None:
@@ -477,9 +491,12 @@ def list_sheet_ids_needing_render(sheet_ids: list[str]) -> list[str]:
 def release_render_claim(*, sheet_id: str, claimed_at: datetime | None = None) -> None:
     if claimed_at is None:
         return
+    released_at = now_utc()
+    if released_at <= claimed_at:
+        released_at = claimed_at + timedelta(microseconds=1)
     TtsCardSheet.objects.filter(id=sheet_id, render_claimed_at=claimed_at).update(
         render_claimed_at=None,
-        updated_at=now_utc(),
+        updated_at=released_at,
     )
 
 
