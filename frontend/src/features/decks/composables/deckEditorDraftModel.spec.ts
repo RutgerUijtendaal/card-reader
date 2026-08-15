@@ -4,6 +4,7 @@ import {
   buildDeckUpsertPayload,
   createEmptyDeckForm,
   reconcilePersistedSideboardSourceIds,
+  snapshotSubmittedSideboards,
 } from '@/features/decks/composables/deckEditorDraftModel';
 
 describe('deckEditorDraftModel', () => {
@@ -45,20 +46,21 @@ describe('deckEditorDraftModel', () => {
     ]);
   });
 
-  test('refreshes persisted source ids without replacing editor identities', () => {
+  test('matches persisted source ids by identity and content instead of response order', () => {
     const form = createEmptyDeckForm();
     form.sideboards = [
       { id: 'local-a', source_id: 'stale-a', name: 'A', entries: [] },
       { id: 'local-b', source_id: 'stale-b', name: 'B', entries: [] },
     ];
+    const submittedSideboards = snapshotSubmittedSideboards(form);
     const deck = {
       sideboards: [
-        { id: 'fresh-a' },
-        { id: 'fresh-b' },
+        { id: 'fresh-b', name: 'B', entries: [] },
+        { id: 'fresh-a', name: 'A', entries: [] },
       ],
     };
 
-    reconcilePersistedSideboardSourceIds(form, ['local-a', 'local-b'], deck);
+    reconcilePersistedSideboardSourceIds(form, submittedSideboards, deck);
 
     expect(form.sideboards).toEqual([
       { id: 'local-a', source_id: 'fresh-a', name: 'A', entries: [] },

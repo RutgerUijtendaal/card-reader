@@ -13,7 +13,11 @@ import {
   updateDeck,
 } from '@/domain/decks/api';
 import { useDeckEditorDraft } from '@/features/decks/composables/useDeckEditorDraft';
-import { reconcilePersistedSideboardSourceIds } from '@/features/decks/composables/deckEditorDraftModel';
+import {
+  reconcilePersistedSideboardSourceIds,
+  snapshotSubmittedSideboards,
+  type DeckSideboardSubmissionSnapshot,
+} from '@/features/decks/composables/deckEditorDraftModel';
 import type {
   DeckEditorMode,
   DeckFormEntry,
@@ -458,13 +462,13 @@ export const useDeckEditor = () => {
   const reconcilePersistedDeckState = (
     record: DeckRecord,
     persistedSignature: string,
-    submittedSideboardEditorIds: readonly string[],
+    submittedSideboards: readonly DeckSideboardSubmissionSnapshot[],
   ): string => {
     const draftStillMatchesRequest = payloadSignature.value === persistedSignature;
     reconcilePersistedTagState(record, persistedSignature);
     reconcilePersistedSideboardSourceIds(
       deck.form,
-      submittedSideboardEditorIds,
+      submittedSideboards,
       record,
     );
     return draftStillMatchesRequest ? payloadSignature.value : persistedSignature;
@@ -554,7 +558,7 @@ export const useDeckEditor = () => {
     const reconciledSignature = reconcilePersistedDeckState(
       record,
       savedSignature,
-      deck.form.sideboards.map((sideboard) => sideboard.id),
+      snapshotSubmittedSideboards(deck.form),
     );
     showTagSuggestionFeedback(record);
     shouldApplyHeroCardPreset.value = true;
@@ -647,12 +651,12 @@ export const useDeckEditor = () => {
     manualSaving.value = !options.silent;
     try {
       const persistedSignature = payloadSignature.value;
-      const submittedSideboardEditorIds = deck.form.sideboards.map((sideboard) => sideboard.id);
+      const submittedSideboards = snapshotSubmittedSideboards(deck.form);
       const record = await persistDeck();
       const savedSignature = reconcilePersistedDeckState(
         record,
         persistedSignature,
-        submittedSideboardEditorIds,
+        submittedSideboards,
       );
       showTagSuggestionFeedback(record);
       markSavedPayload(savedSignature);
