@@ -129,14 +129,26 @@ def _identity_updates(
     CardAlias = apps.get_model("card_reader_core", "CardAlias")
     CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
 
+    affected_card_ids = {
+        str(card_id)
+        for card_id in CardFactionAssignment.objects.filter(faction=source).values_list(
+            "card_id", flat=True
+        )
+    }
+    if not affected_card_ids:
+        return {}, []
+
     assignments_by_card: dict[str, list[str]] = defaultdict(list)
-    for card_id, faction in CardFactionAssignment.objects.values_list("card_id", "faction"):
+    for card_id, faction in CardFactionAssignment.objects.filter(
+        card_id__in=affected_card_ids
+    ).values_list("card_id", "faction"):
         assignments_by_card[str(card_id)].append(target if faction == source else str(faction))
 
-    identity_by_card: dict[str, str] = {}
-    seen_identities: dict[tuple[str, str, str], str] = {}
-    for card in Card.objects.order_by("id"):
-        requested = set(assignments_by_card.get(str(card.id), []))
+    projected_faction_keys: dict[str, str] = {}
+    identity_updates: dict[str, str] = {}
+    for card in Card.objects.filter(id__in=affected_card_ids).order_by("id"):
+        card_id = str(card.id)
+        requested = set(assignments_by_card.get(card_id, []))
         unsupported = requested.difference(canonical_factions)
         if unsupported:
             raise RuntimeError(
@@ -147,21 +159,43 @@ def _identity_updates(
             [faction for faction in canonical_factions if faction in requested],
             separators=(",", ":"),
         )
-        identity_by_card[str(card.id)] = faction_key
-        identity = (str(card.card_pool), faction_key, str(card.key))
-        if identity in seen_identities:
-            raise RuntimeError("Card faction rename would create a duplicate card identity.")
-        seen_identities[identity] = f"card:{card.id}"
+        projected_faction_keys[card_id] = faction_key
+        if faction_key != card.faction_identity_key:
+            identity_updates[card_id] = faction_key
 
     alias_updates: list[tuple[str, str]] = []
+    for alias in CardAlias.objects.filter(card_id__in=affected_card_ids).order_by("id"):
+        faction_key = projected_faction_keys[str(alias.card_id)]
+        if faction_key != alias.faction_identity_key:
+            alias_updates.append((str(alias.id), faction_key))
+
+    seen_identities: dict[tuple[str, str, str], str] = {}
+    for card in Card.objects.order_by("id"):
+        card_id = str(card.id)
+        faction_key = projected_faction_keys.get(card_id, str(card.faction_identity_key))
+        identity = (str(card.card_pool), faction_key, str(card.key))
+        existing_card_id = seen_identities.get(identity)
+        if (
+            existing_card_id is not None
+            and existing_card_id != card_id
+            and (existing_card_id in affected_card_ids or card_id in affected_card_ids)
+        ):
+            raise RuntimeError("Card faction rename would create a duplicate card identity.")
+        seen_identities.setdefault(identity, card_id)
+
     for alias in CardAlias.objects.order_by("id"):
-        faction_key = identity_by_card[str(alias.card_id)]
+        card_id = str(alias.card_id)
+        faction_key = projected_faction_keys.get(card_id, str(alias.faction_identity_key))
         identity = (str(alias.card_pool), faction_key, str(alias.key))
-        if identity in seen_identities:
+        existing_card_id = seen_identities.get(identity)
+        if (
+            existing_card_id is not None
+            and existing_card_id != card_id
+            and (existing_card_id in affected_card_ids or card_id in affected_card_ids)
+        ):
             raise RuntimeError("Card faction rename would create a duplicate card or alias identity.")
-        seen_identities[identity] = f"alias:{alias.id}"
-        alias_updates.append((str(alias.id), faction_key))
-    return identity_by_card, alias_updates
+        seen_identities.setdefault(identity, card_id)
+    return identity_updates, alias_updates
 
 
 def _payload_uses_faction(value: object, faction: str) -> bool:

@@ -740,6 +740,44 @@ def test_dark_faction_migration_rewrites_identity_rules_and_import_history() -> 
 
 
 @pytest.mark.django_db(transaction=True)
+def test_dark_faction_migration_ignores_unrelated_self_alias() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0061_admin_owned_classification_rules")]
+    ).apps
+    Card = apps.get_model("card_reader_core", "Card")
+    CardAlias = apps.get_model("card_reader_core", "CardAlias")
+    card = Card.objects.create(
+        key="migration-self-alias",
+        label="Migration Self Alias",
+        card_pool="player",
+        faction_identity_key="[]",
+    )
+    alias = CardAlias.objects.create(
+        card_id=card.id,
+        card_pool="player",
+        faction_identity_key="[]",
+        key=card.key,
+        label=card.label,
+    )
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0062_dark_and_metal_factions")])
+    migrated_apps = executor.loader.project_state(
+        [("card_reader_core", "0062_dark_and_metal_factions")]
+    ).apps
+    MigratedCard = migrated_apps.get_model("card_reader_core", "Card")
+    MigratedAlias = migrated_apps.get_model("card_reader_core", "CardAlias")
+
+    assert MigratedCard.objects.get(id=card.id).faction_identity_key == "[]"
+    assert MigratedAlias.objects.get(id=alias.id).faction_identity_key == "[]"
+
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
 def test_dark_faction_migration_preflights_non_terminal_imports() -> None:
     executor = MigrationExecutor(connection)
     executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
