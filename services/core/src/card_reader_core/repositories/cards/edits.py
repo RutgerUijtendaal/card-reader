@@ -81,7 +81,7 @@ def update_latest_card_version(
         for group_name in restore_metadata_groups:
             if group_name not in field_sources["metadata"]:
                 continue
-            restore_metadata_group_from_snapshot(version.id, group_name, snapshot)
+            restore_metadata_group_from_snapshot(version, group_name, snapshot)
             field_sources["metadata"][group_name] = FIELD_SOURCE_AUTO
             if group_name == "symbols":
                 symbol_links_changed = True
@@ -116,7 +116,7 @@ def update_latest_card_version(
             )
             field_sources["metadata"]["types"] = FIELD_SOURCE_MANUAL
         if "symbol_ids" in updates:
-            replace_card_version_symbols(
+            version.mana_family_sort_key = replace_card_version_symbols(
                 card_version_id=version.id,
                 symbol_ids=string_list(updates.get("symbol_ids")),
             )

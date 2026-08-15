@@ -345,7 +345,10 @@ def create_parsed_card_version(
     replace_card_version_keywords(card_version_id=version.id, keyword_ids=keyword_ids)
     replace_card_version_tags(card_version_id=version.id, tag_ids=tag_ids)
     replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
-    replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids)
+    version.mana_family_sort_key = replace_card_version_symbols(
+        card_version_id=version.id,
+        symbol_ids=symbol_ids,
+    )
     parse_result = save_parse_result(version, raw_ocr, normalized_fields, confidence)
     replace_card_version_metadata_suggestions(
         card_version_id=version.id,
@@ -477,7 +480,7 @@ def clone_card_version_for_content_version_snapshot(
         card_version_id=version.id,
         type_ids=[row.id for row in get_types_for_card_version(source_version.id)],
     )
-    replace_card_version_symbols(
+    version.mana_family_sort_key = replace_card_version_symbols(
         card_version_id=version.id,
         symbol_ids=[row.id for row in get_symbols_for_card_version(source_version.id)],
     )
@@ -858,6 +861,9 @@ def apply_parsed_output_to_version(
     if field_sources["metadata"]["types"] == FIELD_SOURCE_AUTO:
         replace_card_version_types(card_version_id=version.id, type_ids=type_ids)
     if field_sources["metadata"]["symbols"] == FIELD_SOURCE_AUTO:
-        replace_card_version_symbols(card_version_id=version.id, symbol_ids=symbol_ids)
+        version.mana_family_sort_key = replace_card_version_symbols(
+            card_version_id=version.id,
+            symbol_ids=symbol_ids,
+        )
 
     version.confidence = float(confidence.get("overall", 0.0))

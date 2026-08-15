@@ -31,15 +31,15 @@ def replace_card_version_types(*, card_version_id: str, type_ids: list[str]) -> 
 
 
 @transaction.atomic
-def replace_card_version_symbols(*, card_version_id: str, symbol_ids: list[str]) -> None:
+def replace_card_version_symbols(*, card_version_id: str, symbol_ids: list[str]) -> int:
     _replace_links(CardVersionSymbol, card_version_id, "symbol_id", symbol_ids)
-    refresh_card_version_mana_family_sort_keys([card_version_id])
+    return refresh_card_version_mana_family_sort_keys([card_version_id])[card_version_id]
 
 
-def refresh_card_version_mana_family_sort_keys(card_version_ids: list[str]) -> None:
+def refresh_card_version_mana_family_sort_keys(card_version_ids: list[str]) -> dict[str, int]:
     normalized_ids = list(dict.fromkeys(card_version_ids))
     if not normalized_ids:
-        return
+        return {}
     symbol_keys_by_version_id: dict[str, list[str]] = {version_id: [] for version_id in normalized_ids}
     for version_id, symbol_key in CardVersionSymbol.objects.filter(
         card_version_id__in=normalized_ids,
@@ -47,9 +47,12 @@ def refresh_card_version_mana_family_sort_keys(card_version_ids: list[str]) -> N
         symbol_keys_by_version_id.setdefault(str(version_id), []).append(str(symbol_key))
 
     versions = list(CardVersion.objects.filter(id__in=normalized_ids))
+    sort_keys_by_version_id: dict[str, int] = {}
     for version in versions:
         version.mana_family_sort_key = mana_family_sort_key(symbol_keys_by_version_id.get(version.id, []))
+        sort_keys_by_version_id[version.id] = version.mana_family_sort_key
     CardVersion.objects.bulk_update(versions, ["mana_family_sort_key"], batch_size=500)
+    return sort_keys_by_version_id
 
 
 def get_keywords_for_card_version(card_version_id: str) -> list[Keyword]:

@@ -34,7 +34,11 @@ from card_reader_core.models import (
     Type,
 )  # noqa: E402
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE  # noqa: E402
-from card_reader_core.repositories.cards import get_latest_card_version, save_parsed_card  # noqa: E402
+from card_reader_core.repositories.cards import (  # noqa: E402
+    get_latest_card_version,
+    save_parsed_card,
+    update_latest_card_version,
+)
 from card_reader_core.repositories.import_jobs import create_import_job_with_files  # noqa: E402
 from card_reader_core.repositories.metadata import (  # noqa: E402
     delete_symbol,
@@ -2581,6 +2585,25 @@ def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() 
     version.refresh_from_db()
     assert version.mana_family_sort_key == 63
 
+    arcane_symbol = _get_or_create_symbol(
+        key="arcane-mana",
+        label="Arcane Mana",
+        symbol_type="mana",
+    )
+    updated = update_latest_card_version(
+        card_id=_card.id,
+        updates={"symbol_ids": [arcane_symbol.id]},
+        restore_fields=[],
+        restore_metadata_groups=[],
+        unlock_fields=[],
+        unlock_metadata_groups=[],
+    )
+    assert updated is not None
+    _updated_card, updated_version = updated
+    assert updated_version.mana_family_sort_key == 0
+    updated_version.refresh_from_db()
+    assert updated_version.mana_family_sort_key == 0
+
 
 def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
     arcane_hero, arcane_hero_version = _create_editable_card_version(
@@ -3856,6 +3879,11 @@ def test_import_assigns_content_version_to_created_card_version() -> None:
 
 def test_targeted_reparse_preserves_existing_card_version_content_version() -> None:
     _card, target_version = _create_editable_card_version(name="Content Version Reparse")
+    primal_symbol = _get_or_create_symbol(
+        key="primal-affinity",
+        label="Primal Affinity",
+        symbol_type="affinity",
+    )
     original_content_version = ContentVersion.objects.create(
         version_number="171.1.0",
         base_version="171.1",
@@ -3901,11 +3929,15 @@ def test_targeted_reparse_preserves_existing_card_version_content_version() -> N
         },
         confidence={"overall": 0.8},
         raw_ocr={},
+        symbol_ids=[primal_symbol.id],
         reparse_existing=False,
     )
 
     assert version.id == target_version.id
     assert version.content_version == original_content_version
+    assert version.mana_family_sort_key == 5
+    version.refresh_from_db()
+    assert version.mana_family_sort_key == 5
 
 
 def test_ordinary_import_matching_latest_checksum_creates_new_content_version_snapshot() -> None:

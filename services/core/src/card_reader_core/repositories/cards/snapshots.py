@@ -158,29 +158,29 @@ def coerce_optional_int(value: object) -> int | None:
 
 
 def restore_metadata_group_from_snapshot(
-    card_version_id: str,
+    card_version: CardVersion,
     group_name: str,
     snapshot: ParsedSnapshotPayload,
 ) -> None:
     metadata = snapshot.get("metadata", {})
     if group_name == "keywords":
         replace_card_version_keywords(
-            card_version_id=card_version_id,
+            card_version_id=card_version.id,
             keyword_ids=string_list(metadata.get("keyword_ids")),
         )
     elif group_name == "tags":
         replace_card_version_tags(
-            card_version_id=card_version_id,
+            card_version_id=card_version.id,
             tag_ids=string_list(metadata.get("tag_ids")),
         )
     elif group_name == "types":
         replace_card_version_types(
-            card_version_id=card_version_id,
+            card_version_id=card_version.id,
             type_ids=string_list(metadata.get("type_ids")),
         )
     elif group_name == "symbols":
-        replace_card_version_symbols(
-            card_version_id=card_version_id,
+        card_version.mana_family_sort_key = replace_card_version_symbols(
+            card_version_id=card_version.id,
             symbol_ids=string_list(metadata.get("symbol_ids")),
         )
 
