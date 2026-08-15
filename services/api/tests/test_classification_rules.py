@@ -206,8 +206,8 @@ def test_snapshots_are_pool_scoped_and_exclude_disabled_rules() -> None:
 
 
 def test_dark_and_metal_are_supported_faction_rule_targets() -> None:
-    dark_tag = Tag.objects.create(key="dark", label="Dark")
-    metal_tag = Tag.objects.create(key="metal", label="Metal")
+    dark_tag = Tag.objects.get(key="dark")
+    metal_tag = Tag.objects.get(key="metal")
     service = ClassificationRuleService()
 
     dark_rule = service.create_rule(
