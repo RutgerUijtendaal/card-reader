@@ -72,7 +72,7 @@ export const buildDeckUpsertPayload = (form: DeckForm): DeckUpsertRequest => ({
   entries: form.entries.map((entry) => ({ ...entry })),
   sideboards: form.sideboards.map((sideboard) => ({
     ...(sideboard.source_id ? { id: sideboard.source_id } : {}),
-    name: sideboard.name.trim(),
+    name: normalizeSideboardName(sideboard.name),
     entries: sideboard.entries.map((entry) => ({ ...entry })),
   })),
   tag_ids: [...form.tag_ids],
@@ -146,8 +146,10 @@ export const snapshotSubmittedSideboards = (
 ): DeckSideboardSubmissionSnapshot[] => form.sideboards.map((sideboard) => ({
   editorId: sideboard.id,
   ...(sideboard.source_id ? { sourceId: sideboard.source_id } : {}),
-  name: sideboard.name.trim(),
+  name: normalizeSideboardName(sideboard.name),
   entries: sideboard.entries.map((entry) => ({ ...entry })),
 }));
 
 const sideboardEntrySignature = (entries: readonly DeckFormEntry[]): string => JSON.stringify(entries);
+
+const normalizeSideboardName = (name: string): string => name.trim().replace(/\s+/g, ' ');

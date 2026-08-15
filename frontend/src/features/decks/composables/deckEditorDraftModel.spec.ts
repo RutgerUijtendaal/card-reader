@@ -67,4 +67,35 @@ describe('deckEditorDraftModel', () => {
       { id: 'local-b', source_id: 'fresh-b', name: 'B', entries: [] },
     ]);
   });
+
+  test('matches persisted source ids after canonical sideboard name normalization', () => {
+    const form = createEmptyDeckForm();
+    form.sideboards = [
+      {
+        id: 'local-sideboard',
+        name: '  Side  \t Board  ',
+        entries: [{ card_id: 'card-1', quantity: 1 }],
+      },
+    ];
+    const submittedSideboards = snapshotSubmittedSideboards(form);
+    const deck = {
+      sideboards: [
+        {
+          id: 'persisted-sideboard',
+          name: 'Side Board',
+          entries: [{ card: { id: 'card-1' }, quantity: 1 }],
+        },
+      ],
+    };
+
+    reconcilePersistedSideboardSourceIds(form, submittedSideboards, deck);
+
+    expect(buildDeckUpsertPayload(form).sideboards).toEqual([
+      {
+        id: 'persisted-sideboard',
+        name: 'Side Board',
+        entries: [{ card_id: 'card-1', quantity: 1 }],
+      },
+    ]);
+  });
 });
