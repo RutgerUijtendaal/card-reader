@@ -15,15 +15,15 @@ from card_reader_core.repositories.tts_card_sheets import (
     get_sheet_rendered_checksums,
     iter_usable_card_source_batches,
     list_all_sheet_ids,
-    list_out_of_pool_card_ids_on_sheet,
     list_sheet_ids_needing_render,
     list_usable_card_sources,
     prioritize_sheets,
     refresh_card_source_visibility,
-    refresh_sheet_source_visibility,
+    retire_incompatible_sheet_slots,
     release_expired_render_claims,
     request_sheet_rerender,
     sheet_has_incompatible_slots,
+    sheet_has_unretired_incompatible_slots,
     sync_card_sources,
     sync_merged_card_source,
     upgrade_sheet_layouts,
@@ -56,10 +56,8 @@ class TtsCardSheetService:
     def ensure_sheet_current(self, sheet_id: str) -> bool:
         if not sheet_has_incompatible_slots(sheet_id):
             return True
-        out_of_pool_card_ids = list_out_of_pool_card_ids_on_sheet(sheet_id)
-        if out_of_pool_card_ids:
-            self.sync_cards(out_of_pool_card_ids)
-        refresh_sheet_source_visibility(sheet_id)
+        if sheet_has_unretired_incompatible_slots(sheet_id):
+            retire_incompatible_sheet_slots(sheet_id)
         return sheet_id not in list_sheet_ids_needing_render([sheet_id])
 
     def reconcile_all(

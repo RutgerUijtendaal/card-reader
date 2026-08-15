@@ -518,6 +518,17 @@ class DeckWriteSerializer(serializers.Serializer[dict[str, object]]):
         default=list,
     )
 
+    def validate_sideboards(
+        self,
+        value: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        source_ids = [str(sideboard["id"]) for sideboard in value if "id" in sideboard]
+        if len(source_ids) != len(set(source_ids)):
+            raise serializers.ValidationError(
+                "Each existing sideboard can only be submitted once."
+            )
+        return value
+
 
 class DeckListQuerySerializer(serializers.Serializer[dict[str, object]]):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)

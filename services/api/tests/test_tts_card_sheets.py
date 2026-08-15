@@ -296,7 +296,9 @@ def test_public_sheet_endpoint_changes_headers_and_bytes_after_latest_artwork_ch
 
 
 @pytest.mark.django_db(transaction=True)
-def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerendered() -> None:
+def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerendered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     TtsCardSheet.objects.all().delete()
     card = _create_sheet_card("reclassified", color=(120, 40, 60))
     service = TtsCardSheetService()
@@ -311,13 +313,29 @@ def test_reclassifying_a_player_card_revokes_old_public_tts_artwork_until_rerend
 
     preparing = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
     assert preparing.status_code == 503
+    retired_slot = TtsCardSheetSlot.objects.get(
+        sheet_id=sheet_id,
+        card_identity_id=card.id,
+    )
+    assert retired_slot.card_version_id is None
+    assert retired_slot.image_id is None
+    assert retired_slot.image_checksum == ""
+    assert retired_slot.image_stored_path == ""
 
     service.render_sheets_now([sheet_id])
+
+    def fail_redundant_sync(_self: TtsCardSheetService, _card_ids: list[str]) -> set[str]:
+        raise AssertionError("A retired source-pool slot must not trigger another card sync.")
+
+    monkeypatch.setattr(TtsCardSheetService, "sync_cards", fail_redundant_sync)
     response = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
     body = b"".join(response.streaming_content)
     response.close()
     with Image.open(BytesIO(body)) as rendered:
         assert rendered.getpixel((10, 10)) == (0, 0, 0)
+    repeated = client.get(f"/tts/card-sheets/{sheet_id}/image.webp")
+    assert repeated.status_code == 200
+    repeated.close()
 
 
 @pytest.mark.django_db(transaction=True)

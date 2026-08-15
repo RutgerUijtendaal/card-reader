@@ -3465,6 +3465,31 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
         entry.card_id: entry.quantity for entry in deck.sideboards.get().entries.all()
     } == {restricted.id: 2, visible.id: 3}
     assert deck.sideboards.get().name == "Renamed Restricted Tech"
+    current_sideboard_id = deck.sideboards.get().id
+
+    duplicate_source = client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "sideboards": [
+                {
+                    "id": current_sideboard_id,
+                    "name": "First copy",
+                    "entries": [{"card_id": restricted_id, "quantity": 2}],
+                },
+                {
+                    "id": current_sideboard_id,
+                    "name": "Second copy",
+                    "entries": [{"card_id": restricted_id, "quantity": 2}],
+                },
+            ],
+        },
+        content_type="application/json",
+    )
+    assert duplicate_source.status_code == 400
+    assert duplicate_source.json() == {
+        "detail": "Each existing sideboard can only be submitted once."
+    }
+    assert deck.sideboards.count() == 1
 
     tampered = client.patch(
         f"/my/decks/{deck.id}",

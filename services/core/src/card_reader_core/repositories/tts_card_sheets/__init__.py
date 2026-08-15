@@ -442,27 +442,48 @@ def _refresh_sheet_source_visibility_once(sheet_id: str) -> None:
     _refresh_sheet_fingerprints({sheet_id})
 
 
-def list_out_of_pool_card_ids_on_sheet(sheet_id: str) -> list[str]:
-    return list(
-        TtsCardSheetSlot.objects.filter(
-            sheet_id=sheet_id,
-            resolved_card__isnull=False,
-        )
-        .filter(
-            ~Q(card_pool=F("sheet__card_pool"))
-            | ~Q(resolved_card__card_pool=F("sheet__card_pool"))
-        )
-        .order_by("slot_index")
-        .values_list("resolved_card_id", flat=True)
-    )
-
-
 def sheet_has_incompatible_slots(sheet_id: str) -> bool:
+    return _incompatible_sheet_slots(sheet_id).exists()
+
+
+def _incompatible_sheet_slots(sheet_id: str) -> QuerySet[TtsCardSheetSlot]:
     return TtsCardSheetSlot.objects.filter(sheet_id=sheet_id).filter(
         Q(resolved_card__isnull=True)
         | ~Q(card_pool=F("sheet__card_pool"))
         | ~Q(resolved_card__card_pool=F("sheet__card_pool"))
-    ).exists()
+    )
+
+
+def _unretired_incompatible_sheet_slots(sheet_id: str) -> QuerySet[TtsCardSheetSlot]:
+    return _incompatible_sheet_slots(sheet_id).filter(
+        Q(card_version__isnull=False)
+        | Q(image__isnull=False)
+        | ~Q(image_checksum="")
+        | ~Q(image_stored_path="")
+    )
+
+
+def sheet_has_unretired_incompatible_slots(sheet_id: str) -> bool:
+    return _unretired_incompatible_sheet_slots(sheet_id).exists()
+
+
+def retire_incompatible_sheet_slots(sheet_id: str) -> None:
+    _retry_sqlite_write(lambda: _retire_incompatible_sheet_slots_once(sheet_id))
+
+
+@transaction.atomic
+def _retire_incompatible_sheet_slots_once(sheet_id: str) -> None:
+    slots = _unretired_incompatible_sheet_slots(sheet_id).select_for_update()
+    if not slots.exists():
+        return
+    slots.update(
+        card_version=None,
+        image=None,
+        image_checksum="",
+        image_stored_path="",
+        updated_at=now_utc(),
+    )
+    _refresh_sheet_fingerprints({sheet_id})
 
 
 def get_sheet_rendered_checksums(sheet_ids: list[str]) -> dict[str, str]:
@@ -700,7 +721,6 @@ __all__ = [
     "get_sheet_with_slots",
     "iter_usable_card_source_batches",
     "list_all_sheet_ids",
-    "list_out_of_pool_card_ids_on_sheet",
     "list_sheet_ids_needing_render",
     "list_usable_card_sources",
     "mark_render_failed",
@@ -708,11 +728,13 @@ __all__ = [
     "prioritize_sheets",
     "refresh_card_source_visibility",
     "refresh_sheet_source_visibility",
+    "retire_incompatible_sheet_slots",
     "release_expired_render_claims",
     "release_render_claim",
     "request_sheet_rerender",
     "resolve_tts_card_image_path",
     "sheet_has_incompatible_slots",
+    "sheet_has_unretired_incompatible_slots",
     "sync_card_sources",
     "sync_merged_card_source",
     "upgrade_sheet_layouts",
