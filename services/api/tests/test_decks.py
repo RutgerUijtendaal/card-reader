@@ -3501,6 +3501,31 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
     }
     assert deck.sideboards.count() == 1
 
+    for source_fields in (({}, {}), ({"id": "missing-a"}, {"id": "missing-b"})):
+        duplicate_name_fallback = client.patch(
+            f"/my/decks/{deck.id}",
+            data={
+                "sideboards": [
+                    {
+                        **source_fields[0],
+                        "name": "Renamed Restricted Tech",
+                        "entries": [{"card_id": restricted_id, "quantity": 2}],
+                    },
+                    {
+                        **source_fields[1],
+                        "name": "Renamed Restricted Tech",
+                        "entries": [{"card_id": restricted_id, "quantity": 2}],
+                    },
+                ],
+            },
+            content_type="application/json",
+        )
+        assert duplicate_name_fallback.status_code == 400
+        assert duplicate_name_fallback.json() == {
+            "detail": "Each existing sideboard can only be submitted once."
+        }
+        assert deck.sideboards.count() == 1
+
     tampered = client.patch(
         f"/my/decks/{deck.id}",
         data={"entries": [{"card_id": restricted_id, "quantity": 2}]},

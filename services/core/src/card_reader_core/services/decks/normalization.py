@@ -36,14 +36,6 @@ def _validate_preserved_restricted_sideboard_entries(
     sideboards: list[DeckSideboardInput],
     existing_sideboards: list[DeckSideboard],
 ) -> None:
-    source_ids = [
-        sideboard.source_id
-        for sideboard in sideboards
-        if sideboard.source_id is not None
-    ]
-    if len(source_ids) != len(set(source_ids)):
-        raise ValueError("Each existing sideboard can only be submitted once.")
-
     restricted_card_ids: set[str] = set()
     existing_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
     existing_by_name = {sideboard.name: sideboard for sideboard in existing_sideboards}
@@ -56,12 +48,17 @@ def _validate_preserved_restricted_sideboard_entries(
             expected_quantities[(existing_sideboard.id, existing_entry.card.id)] = int(
                 existing_entry.quantity
             )
+    used_source_sideboard_ids: set[str] = set()
     for submitted_sideboard in sideboards:
         source_sideboard = (
             existing_by_id.get(submitted_sideboard.source_id)
             if submitted_sideboard.source_id is not None
             else None
         ) or existing_by_name.get(submitted_sideboard.name)
+        if source_sideboard is not None:
+            if source_sideboard.id in used_source_sideboard_ids:
+                raise ValueError("Each existing sideboard can only be submitted once.")
+            used_source_sideboard_ids.add(source_sideboard.id)
         for submitted_entry in submitted_sideboard.entries:
             if submitted_entry.card_id not in restricted_card_ids:
                 continue

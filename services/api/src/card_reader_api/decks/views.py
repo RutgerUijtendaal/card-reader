@@ -95,21 +95,32 @@ def _restore_unchanged_restricted_deck_references(
             sideboard.name: sideboard for sideboard in existing_sideboards
         }
         submitted_sideboards = cast(list[dict[str, object]], validated_data["sideboards"])
-        restored_sideboards = [
-            {
-                **sideboard,
-                "entries": _restore_restricted_entry_references(
-                    cast(list[dict[str, object]], sideboard["entries"]),
-                    existing_entries=_existing_sideboard_entries_for_submission(
-                        sideboard,
-                        existing_sideboards_by_id=existing_sideboards_by_id,
-                        existing_sideboards_by_name=existing_sideboards_by_name,
+        restored_sideboards: list[dict[str, object]] = []
+        used_source_sideboard_ids: set[str] = set()
+        for sideboard in submitted_sideboards:
+            source_sideboard = _existing_sideboard_for_submission(
+                sideboard,
+                existing_sideboards_by_id=existing_sideboards_by_id,
+                existing_sideboards_by_name=existing_sideboards_by_name,
+            )
+            if source_sideboard is not None:
+                if source_sideboard.id in used_source_sideboard_ids:
+                    raise ValueError("Each existing sideboard can only be submitted once.")
+                used_source_sideboard_ids.add(source_sideboard.id)
+            restored_sideboards.append(
+                {
+                    **sideboard,
+                    "entries": _restore_restricted_entry_references(
+                        cast(list[dict[str, object]], sideboard["entries"]),
+                        existing_entries=(
+                            list(source_sideboard.entries.all())
+                            if source_sideboard is not None
+                            else []
+                        ),
+                        card_pool_scope=card_pool_scope,
                     ),
-                    card_pool_scope=card_pool_scope,
-                ),
-            }
-            for sideboard in submitted_sideboards
-        ]
+                }
+            )
         expected_sideboards = [
             {
                 "name": sideboard.name,
@@ -127,18 +138,15 @@ def _restore_unchanged_restricted_deck_references(
             validated_data["sideboards"] = restored_sideboards
 
 
-def _existing_sideboard_entries_for_submission(
+def _existing_sideboard_for_submission(
     submitted_sideboard: dict[str, object],
     *,
     existing_sideboards_by_id: dict[str, DeckSideboard],
     existing_sideboards_by_name: dict[str, DeckSideboard],
-) -> Sequence[DeckSideboardEntry]:
-    existing_sideboard = existing_sideboards_by_id.get(
+) -> DeckSideboard | None:
+    return existing_sideboards_by_id.get(
         str(submitted_sideboard.get("id", ""))
     ) or existing_sideboards_by_name.get(str(submitted_sideboard["name"]))
-    if existing_sideboard is None:
-        return []
-    return list(existing_sideboard.entries.all())
 
 
 def _restore_restricted_entry_references(
@@ -548,11 +556,14 @@ class OwnerDeckDetailView(APIView):
         serializer = DeckWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return serializer_error(serializer)
-        _restore_unchanged_restricted_deck_references(
-            serializer.validated_data,
-            deck=accessible_deck,
-            card_pool_scope=card_pool_scope,
-        )
+        try:
+            _restore_unchanged_restricted_deck_references(
+                serializer.validated_data,
+                deck=accessible_deck,
+                card_pool_scope=card_pool_scope,
+            )
+        except ValueError as exc:
+            return bad_request(str(exc))
         tag_service = DeckTagService()
         service = DeckService(tag_service=tag_service)
         try:
