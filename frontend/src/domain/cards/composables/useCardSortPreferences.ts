@@ -1,6 +1,6 @@
 import { computed } from 'vue';
-import { useLocalStorage } from '@vueuse/core';
-import { DEFAULT_CARD_SORT, type CardSort } from '@/domain/cards/utils/gallery/cardSort';
+import { useStorage } from '@vueuse/core';
+import { DEFAULT_CARD_SORT, isCardSort, type CardSort } from '@/domain/cards/utils/gallery/cardSort';
 
 type CardSortSurface = 'gallery' | 'deckBuilder' | 'deckDetail';
 
@@ -10,32 +10,121 @@ type CardSortOverrideState = {
   deckDetail: CardSort | null;
 };
 
-const DEFAULT_OVERRIDES: CardSortOverrideState = {
-  gallery: null,
-  deckBuilder: null,
-  deckDetail: null,
+export type CardSortPreferencesState = {
+  version: 1;
+  defaultSort: CardSort;
+  overrides: CardSortOverrideState;
+};
+
+export const CARD_SORT_PREFERENCES_STORAGE_KEY = 'card-reader.card-sort-preferences';
+export const LEGACY_DEFAULT_CARD_SORT_STORAGE_KEY = 'card-reader.default-card-sort';
+export const LEGACY_CARD_SORT_OVERRIDES_STORAGE_KEY = 'card-reader.card-sort-overrides';
+
+const createDefaultPreferences = (): CardSortPreferencesState => ({
+  version: 1,
+  defaultSort: DEFAULT_CARD_SORT,
+  overrides: {
+    gallery: null,
+    deckBuilder: null,
+    deckDetail: null,
+  },
+});
+
+const isSortOrNull = (value: unknown): value is CardSort | null => value === null || isCardSort(value);
+
+const isCardSortPreferencesState = (value: unknown): value is CardSortPreferencesState => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<CardSortPreferencesState>;
+  const overrides = candidate.overrides as Partial<CardSortOverrideState> | undefined;
+  return candidate.version === 1
+    && isCardSort(candidate.defaultSort)
+    && !!overrides
+    && isSortOrNull(overrides.gallery)
+    && isSortOrNull(overrides.deckBuilder)
+    && isSortOrNull(overrides.deckDetail);
+};
+
+const parseStoredPreferences = (value: string | null): CardSortPreferencesState | null => {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isCardSortPreferencesState(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+export const migrateCardSortPreferences = (
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null,
+): CardSortPreferencesState => {
+  const defaults = createDefaultPreferences();
+  if (!storage) return defaults;
+
+  try {
+    const current = parseStoredPreferences(storage.getItem(CARD_SORT_PREFERENCES_STORAGE_KEY));
+    if (current) {
+      try {
+        storage.removeItem(LEGACY_DEFAULT_CARD_SORT_STORAGE_KEY);
+        storage.removeItem(LEGACY_CARD_SORT_OVERRIDES_STORAGE_KEY);
+      } catch {
+        // The versioned record remains authoritative even when legacy cleanup is unavailable.
+      }
+      return current;
+    }
+
+    const serialized = JSON.stringify(defaults);
+    storage.setItem(CARD_SORT_PREFERENCES_STORAGE_KEY, serialized);
+    if (storage.getItem(CARD_SORT_PREFERENCES_STORAGE_KEY) === serialized) {
+      storage.removeItem(LEGACY_DEFAULT_CARD_SORT_STORAGE_KEY);
+      storage.removeItem(LEGACY_CARD_SORT_OVERRIDES_STORAGE_KEY);
+    }
+  } catch {
+    return defaults;
+  }
+  return defaults;
+};
+
+const resolveLocalStorage = (): Storage | null => {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage;
+  } catch {
+    return null;
+  }
 };
 
 export const useCardSortPreferences = () => {
-  const storedDefaultSort = useLocalStorage<CardSort>('card-reader.default-card-sort', DEFAULT_CARD_SORT);
-  const storedOverrides = useLocalStorage<CardSortOverrideState>('card-reader.card-sort-overrides', DEFAULT_OVERRIDES, {
-    mergeDefaults: true,
-  });
+  const storage = resolveLocalStorage();
+  const initialPreferences = migrateCardSortPreferences(storage);
+  const storedPreferences = useStorage<CardSortPreferencesState>(
+    CARD_SORT_PREFERENCES_STORAGE_KEY,
+    initialPreferences,
+    storage ?? undefined,
+    {
+      writeDefaults: false,
+      onError: () => undefined,
+    },
+  );
 
   const defaultSort = computed({
-    get: () => storedDefaultSort.value,
+    get: () => storedPreferences.value.defaultSort,
     set: (value: CardSort) => {
-      storedDefaultSort.value = value;
+      storedPreferences.value = {
+        ...storedPreferences.value,
+        defaultSort: value,
+      };
     },
   });
 
   const getOverrideSort = (surface: CardSortSurface) =>
     computed<CardSort | null>({
-      get: () => storedOverrides.value[surface],
+      get: () => storedPreferences.value.overrides[surface],
       set: (value) => {
-        storedOverrides.value = {
-          ...storedOverrides.value,
-          [surface]: value,
+        storedPreferences.value = {
+          ...storedPreferences.value,
+          overrides: {
+            ...storedPreferences.value.overrides,
+            [surface]: value,
+          },
         };
       },
     });

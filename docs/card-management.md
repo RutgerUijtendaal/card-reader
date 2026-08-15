@@ -12,7 +12,7 @@ Content versions provide an additional history boundary for related changes made
 
 ## Pool, roles, and factions
 
-Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boss, Location, Boon, Event, and Shop Item roles, plus any combination of the Order, Blood, and Darkness factions. **Normal** is the displayed name for a card with no role assignments; it is derived rather than stored. A Normal card may still have factions.
+Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boss, Location, Boon, Event, and Shop Item roles, plus any combination of the Order, Blood, Dark, and Metal factions. **Normal** is the displayed name for a card with no role assignments; it is derived rather than stored. A Normal card may still have factions.
 
 Role and faction keys allow up to 64 characters. Their definitions, labels, and ordering are code-owned. Hero remains the only role with existing deck-builder or Playtester behavior; every other role and all factions are descriptive until their gameplay rules are designed.
 
@@ -47,6 +47,12 @@ The application owns six canonical mana families in a fixed release-time order: 
 `CardVersion.mana_family_sort_key` stores an indexed rank derived from the version's linked symbols. Single-family cards use the six family ranks. Multitype cards follow them in lexicographic family-tuple order, and numeric colorless symbols, unmatched named affinities, and cards without a canonical symbol share the final no-family bucket. Replacing, renaming, or deleting linked symbols refreshes the stored rank so gallery queries can sort before pagination without deriving it per result.
 
 Card gallery APIs expose `sort=mana_type_asc` and canonical filters through repeated `mana_family_keys` and `mana_family_exclude_keys` parameters plus `mana_family_match=any|all`. A canonical filter matches either the mana or affinity representation. Existing mana- and affinity-symbol parameters remain literal and backward compatible. `GET /cards/filters` supplies the ordered `mana_families` catalog used by gallery filters, deck-builder hero selection, and hero-derived deck presets; unmatched affinities remain available in the separate Affinity filter.
+
+`sort=default` is the default for single-pool card collections. Player orders by canonical mana family, then Hero, the default role order, and ascending mana value. Evil orders by Order, Blood, Darkness, then no faction, followed by Boss, Location, the default role order, and ascending mana value. Neutral uses the default role order directly. That shared order is Normal, Hero, Boss, Location, Boon, Event, then Shop Item; a pool-specific priority moves the named roles ahead without duplicating them. Multi-valued classifications use their earliest effective value and complete effective membership as tie-breakers; null mana values sort last, and names, labels, and Card ids make every order deterministic. Grouped Gallery results use the anchor Card's classifications and latest-version metadata.
+
+The backend and frontend express these priorities as mirrored declarative component lists. Query-backed collections translate the components to SQL annotations over indexed card, role, and faction fields and paginate after database ordering. The default path does not load the Type catalog or materialize the complete result set, keeping future priority changes localized without sacrificing pagination performance.
+
+Card sort preferences use one versioned browser-origin `localStorage` record. The first load after this change replaces the legacy global default and per-surface overrides with `default` and empty overrides, after which users can customize them again. This migration runs independently in each browser profile when it next opens the app; server-side or Django migrations cannot rewrite remote browser storage.
 
 ## Lifecycle state
 

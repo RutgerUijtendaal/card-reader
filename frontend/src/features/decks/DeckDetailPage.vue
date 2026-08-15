@@ -512,14 +512,20 @@ const activeBoardEmptyLabel = computed(() =>
 const typeSortLookup = computed(() => buildTypeSortLookup(filterOptions.value.types));
 const sortedActiveBoardEntries = computed(() =>
   [...activeBoardEntries.value].sort((left, right) =>
-    compareCardSort(left.card, right.card, effectiveSort.value, typeSortLookup.value),
+    compareCardSort(left.card, right.card, effectiveSort.value, {
+      cardPool: 'player',
+      typeSortLookup: typeSortLookup.value,
+    }),
   ),
 );
 const groupedActiveBoardEntries = computed(() =>
   groupDeckEntriesByType(activeBoardEntries.value, filterOptions.value.types, {
     compareEntries: effectiveSort.value === 'types_asc'
       ? undefined
-      : (left, right) => compareCardSort(left.card, right.card, effectiveSort.value, typeSortLookup.value),
+      : (left, right) => compareCardSort(left.card, right.card, effectiveSort.value, {
+          cardPool: 'player',
+          typeSortLookup: typeSortLookup.value,
+        }),
   }),
 );
 const detailLocation = (cardId: string) => buildDeckCardDetailLocation(cardId, String(route.params.id), route.query);
@@ -552,7 +558,7 @@ const loadDeck = async (): Promise<void> => {
 };
 
 const loadFilterOptions = async (): Promise<void> => {
-  filterOptions.value = await fetchCardFilters();
+  filterOptions.value = await fetchCardFilters('player');
 };
 
 const handleTtsExport = async (): Promise<void> => {

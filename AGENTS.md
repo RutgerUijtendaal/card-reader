@@ -122,7 +122,7 @@ Core stack:
 - The target card classification model has three independent card-level dimensions:
   - `card_pool` is exactly one of `player`, `evil`, or `neutral`; `game_master` is a temporary undeployed value removed by Step 2.1 and must not remain as a compatibility alias.
   - `card_roles` is a set of zero or more code-owned roles: `hero`, `boss`, `location`, `boon`, `event`, and `shop_item`; roles may coexist.
-  - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, and `darkness`; factions may coexist.
+  - `card_factions` is a set of zero or more code-owned factions: `order`, `blood`, `dark`, and `metal`; factions may coexist.
   - Normal is the product label for the derived empty-role state and must not be persisted as a role. Keep `standard` only as the existing internal/query sentinel for that derived state.
   - Pool/role/faction conventions belong in core code, not mutually-exclusive or same-pool database constraints. Cross-pool relationships are allowed.
   - Pool, roles, and factions belong to the stable `Card` record; template remains version/parser configuration.
@@ -154,6 +154,10 @@ Core stack:
   - paginated or query-backed card collections should sort in the backend
   - already-loaded embedded card collections may sort client-side for presentation
   - shared sort keys and semantics must stay aligned across both layers
+  - `default` is the canonical single-pool sort: Player orders by mana family, then Hero before the default role order, then ascending mana value; Evil orders by Order, Blood, Darkness, then no faction, followed by Boss, Location, the default role order, and ascending mana value; Neutral uses the default role order
+  - the default role order is Normal, Hero, Boss, Location, Boon, Event, then Shop Item; pool-specific priority roles are moved ahead of that order without duplicating them
+  - multi-valued factions and roles sort by their earliest effective value, then their complete effective membership vector; grouped Gallery results use their anchor Card's values
+  - keep the pool sort as declarative mirrored component lists in backend and frontend code so future priority changes remain localized; query-backed defaults must translate those components to SQL annotations and paginate in the database
   - canonical mana-family order is Arcane, Dark, Divine, Martial, Occult, then Primal; changing it requires a release
   - paired mana and affinity symbols represent the same canonical family for family sorting, filtering, and deck-builder hero presets
   - query-backed mana-family sorting uses the indexed `CardVersion.mana_family_sort_key`; numeric colorless symbols and unmatched affinities stay in the no-family bucket

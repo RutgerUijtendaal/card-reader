@@ -19,9 +19,18 @@ from card_reader_core.models import (
     Type,
 )
 
-CardSort = Literal["updated_desc", "name_asc", "mana_asc", "mana_desc", "mana_type_asc", "types_asc"]
+CardSort = Literal[
+    "default",
+    "updated_desc",
+    "name_asc",
+    "mana_asc",
+    "mana_desc",
+    "mana_type_asc",
+    "types_asc",
+]
 CardLifecycleFilter = CoreCardLifecycleFilter
 CardRoleMatch = Literal["any", "all"]
+CARD_SORT_DEFAULT: CardSort = "default"
 CARD_SORT_UPDATED_DESC: CardSort = "updated_desc"
 CARD_SORT_NAME_ASC: CardSort = "name_asc"
 CARD_SORT_MANA_ASC: CardSort = "mana_asc"
@@ -29,6 +38,7 @@ CARD_SORT_MANA_DESC: CardSort = "mana_desc"
 CARD_SORT_MANA_TYPE_ASC: CardSort = "mana_type_asc"
 CARD_SORT_TYPES_ASC: CardSort = "types_asc"
 CARD_SORT_VALUES: tuple[CardSort, ...] = (
+    CARD_SORT_DEFAULT,
     CARD_SORT_UPDATED_DESC,
     CARD_SORT_NAME_ASC,
     CARD_SORT_MANA_ASC,

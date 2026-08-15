@@ -113,7 +113,8 @@
     "min_cards_by_faction": {
       "order": 0,
       "blood": 0,
-      "darkness": 0
+      "dark": 0,
+      "metal": 0
     },
     "min_deprecated_cards": 3,
     "min_card_groups": 5,
@@ -129,7 +130,8 @@
       "shop-item",
       "order",
       "blood",
-      "darkness"
+      "dark",
+      "metal"
     ],
     "required_classification_rules": [
       {
@@ -175,9 +177,17 @@
       {
         "card_pool": "evil",
         "target_kind": "faction",
-        "target_key": "darkness",
+        "target_key": "dark",
         "source_kind": "tag",
-        "source_key": "darkness",
+        "source_key": "dark",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "faction",
+        "target_key": "metal",
+        "source_kind": "tag",
+        "source_key": "metal",
         "enabled": true
       },
       {

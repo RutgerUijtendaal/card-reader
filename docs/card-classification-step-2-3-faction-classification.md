@@ -23,7 +23,7 @@ After this step, card classification has three deliberately different dimensions
 
 - `card_pool`: exactly one of Player, Evil, or Neutral; it owns identity scoping and authorization;
 - `card_roles`: zero or more structural/gameplay roles such as Hero, Boss, Location, Boon, Event, and Shop Item;
-- `card_factions`: zero or more affinities: Order, Blood, and Darkness; the exact canonical faction set participates in natural card identity inside a pool.
+- `card_factions`: zero or more affinities: Order, Blood, Dark, and Metal; the exact canonical faction set participates in natural card identity inside a pool.
 
 The implementation must generalize the shared role workflow into a small classification-facet seam without turning persistence or public contracts into an untyped arbitrary-property system.
 
@@ -31,7 +31,7 @@ The implementation must generalize the shared role workflow into a small classif
 
 - Faction is not a role, symbol, tag, or pool. It is a separate card-level dimension.
 - Factions are multi-valued from the start, even if most initial cards have exactly one.
-- Faction keys are code-owned and use 64-character-capable storage. The initial ordered values are **Order** (`order`), **Blood** (`blood`), and **Darkness** (`darkness`).
+- Faction keys are code-owned and use 64-character-capable storage. The ordered values are **Order** (`order`), **Blood** (`blood`), **Dark** (`dark`), and **Metal** (`metal`).
 - The ordered role registry becomes **Hero** (`hero`), **Boss** (`boss`), **Location** (`location`), **Boon** (`boon`), **Event** (`event`), and **Shop Item** (`shop_item`). Hero remains the only role with existing deck-builder and Playtester behavior; the other roles remain descriptive until their own gameplay rules are designed.
 - **Normal** is the product label for the existing derived empty-role state. It is never persisted. Keep the existing `standard` transport/filter sentinel because it already represents that derived query and is not domain data.
 - Factions do not affect whether a card is Normal. An Evil card with no roles and the Blood faction is displayed as Normal + Blood.
@@ -81,7 +81,7 @@ The existing derived `standard` filter value remains rank 0 but is labeled **Nor
 Add a core-owned faction registry parallel to the role registry. It owns:
 
 - typed keys and labels;
-- canonical Order, Blood, Darkness ordering and ranks;
+- canonical Order, Blood, Dark, Metal ordering and ranks;
 - Django field choices;
 - normalization and validation;
 - filter metadata;
@@ -134,7 +134,8 @@ Policy version 3 contains these exact normalized tag mappings:
 | `shop-item` | role | `shop_item` |
 | `order` | faction | `order` |
 | `blood` | faction | `blood` |
-| `darkness` | faction | `darkness` |
+| `dark` | faction | `dark` |
+| `metal` | faction | `metal` |
 
 Boon and Event continue to be inferable from template hints. Templates may also hint Boss, Location, Shop Item, or any faction. Do not infer from localized labels, free text, card names, pool, or hard-coded template IDs.
 
@@ -299,7 +300,7 @@ Implementation order:
 ### Inference and templates
 
 - policy v1 remains Hero-only and policy v2 remains Hero/Location-only with no faction inference;
-- policy v3 infers Hero, Boss, Location, Shop Item, Order, Blood, and Darkness from their exact stable tags;
+- policy v3 infers Hero, Boss, Location, Shop Item, Order, Blood, Dark, and Metal from their exact stable tags;
 - template-only, tag-only, combined, duplicate, and multi-value inference for each facet;
 - independent role override, independent faction override, both overrides, forced Normal, and forced no-faction cases;
 - queued/retry snapshot isolation across later template and policy edits;
@@ -339,7 +340,7 @@ Run targeted core and API tests only; do not run prohibited service/integration 
 
 ## Acceptance criteria
 
-- Faction is a first-class, multi-valued card dimension with Order, Blood, and Darkness.
+- Faction is a first-class, multi-valued card dimension with Order, Blood, Dark, and Metal.
 - Pool plus the exact canonical faction set scopes names, aliases, untargeted image matching, creation races, and merge eligibility, allowing same-name cards in different factions.
 - Boss and Shop Item complete the agreed initial role vocabulary.
 - Roles and factions share mechanics without sharing persistence or losing static typing.

@@ -137,8 +137,9 @@ CARD_ROLE_FILTER_DEFINITIONS: tuple[CardRoleFilterDefinition, ...] = (
 
 ORDER_CARD_FACTION: Literal["order"] = "order"
 BLOOD_CARD_FACTION: Literal["blood"] = "blood"
-DARKNESS_CARD_FACTION: Literal["darkness"] = "darkness"
-CardFaction = Literal["order", "blood", "darkness"]
+DARK_CARD_FACTION: Literal["dark"] = "dark"
+METAL_CARD_FACTION: Literal["metal"] = "metal"
+CardFaction = Literal["order", "blood", "dark", "metal"]
 
 
 @dataclass(frozen=True)
@@ -151,7 +152,8 @@ class CardFactionDefinition:
 CARD_FACTION_DEFINITIONS: tuple[CardFactionDefinition, ...] = (
     CardFactionDefinition(key=ORDER_CARD_FACTION, label="Order", rank=1),
     CardFactionDefinition(key=BLOOD_CARD_FACTION, label="Blood", rank=2),
-    CardFactionDefinition(key=DARKNESS_CARD_FACTION, label="Darkness", rank=3),
+    CardFactionDefinition(key=DARK_CARD_FACTION, label="Dark", rank=3),
+    CardFactionDefinition(key=METAL_CARD_FACTION, label="Metal", rank=4),
 )
 CARD_FACTIONS: tuple[CardFaction, ...] = tuple(
     definition.key for definition in CARD_FACTION_DEFINITIONS

@@ -1,7 +1,8 @@
 export const CARD_FACTION_OPTIONS = [
   { value: 'order', label: 'Order' },
   { value: 'blood', label: 'Blood' },
-  { value: 'darkness', label: 'Darkness' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'metal', label: 'Metal' },
 ] as const;
 
 export type CardFaction = (typeof CARD_FACTION_OPTIONS)[number]['value'];

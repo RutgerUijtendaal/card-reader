@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { ImportJobItem } from '@/features/import-jobs/types';
 import {
+  formatImportFactions,
   formatImportRoles,
   getImportEvidenceState,
   getInferenceEvidence,
@@ -46,6 +47,11 @@ describe('import evidence presentation', () => {
     expect(formatImportRoles([])).toBe('Normal');
     expect(formatImportRoles(['hero', 'location'])).toBe('Hero, Location');
     expect(formatImportRoles(['unknown', 'boon'])).toBe('Boon');
+  });
+
+  test('uses the shared faction registry for Dark and Metal labels', () => {
+    expect(formatImportFactions([])).toBe('None');
+    expect(formatImportFactions(['dark', 'metal'])).toBe('Dark, Metal');
   });
 
   test('renders structured inference and keeps generic warnings safe', () => {
