@@ -1015,7 +1015,7 @@ def _apply_sql_card_sort(
     queryset: QuerySet[CardVersion],
     sort: CardSort,
     *,
-    card_pool: CardPool | None,
+    card_pool: CardPool | None = None,
 ) -> QuerySet[CardVersion]:
     if sort == CARD_SORT_DEFAULT:
         if card_pool is None:
