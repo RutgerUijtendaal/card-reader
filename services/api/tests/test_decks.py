@@ -3476,6 +3476,7 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
     } == {restricted.id: 2, visible.id: 3}
     assert deck.sideboards.get().name == "Renamed Restricted Tech"
     current_sideboard_id = deck.sideboards.get().id
+    assert current_sideboard_id == sideboard_id
 
     duplicate_source = client.patch(
         f"/my/decks/{deck.id}",

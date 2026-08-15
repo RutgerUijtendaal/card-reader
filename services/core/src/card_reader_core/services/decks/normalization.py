@@ -329,6 +329,7 @@ class DeckPayloadNormalizer:
                 {
                     "name": normalized_sideboard_name,
                     "entries": normalized_sideboard_entries,
+                    "source_id": sideboard.source_id,
                 }
             )
         return normalized_sideboards, constraint_entries
