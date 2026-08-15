@@ -121,13 +121,10 @@
     "min_cards_with_multiple_versions": 160,
     "required_template_keys": [
       "basic-mana",
+      "full-height",
       "mtg-like-v1"
     ],
     "required_tag_keys": [
-      "hero",
-      "boss",
-      "location",
-      "shop-item",
       "order",
       "blood",
       "dark",
@@ -138,7 +135,7 @@
         "card_pool": "player",
         "target_kind": "role",
         "target_key": "hero",
-        "source_kind": "tag",
+        "source_kind": "type",
         "source_key": "hero",
         "enabled": true
       },
@@ -146,7 +143,7 @@
         "card_pool": "evil",
         "target_kind": "role",
         "target_key": "boss",
-        "source_kind": "tag",
+        "source_kind": "type",
         "source_key": "boss",
         "enabled": true
       },
@@ -154,7 +151,7 @@
         "card_pool": "evil",
         "target_kind": "role",
         "target_key": "location",
-        "source_kind": "tag",
+        "source_kind": "type",
         "source_key": "location",
         "enabled": true
       },
@@ -193,9 +190,17 @@
       {
         "card_pool": "neutral",
         "target_kind": "role",
-        "target_key": "shop_item",
-        "source_kind": "tag",
-        "source_key": "shop-item",
+        "target_key": "boon",
+        "source_kind": "type",
+        "source_key": "boon",
+        "enabled": true
+      },
+      {
+        "card_pool": "neutral",
+        "target_kind": "role",
+        "target_key": "event",
+        "source_kind": "type",
+        "source_key": "event",
         "enabled": true
       }
     ]
