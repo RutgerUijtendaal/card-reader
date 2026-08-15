@@ -108,7 +108,7 @@ def test_version_two_card_record_rejects_duplicate_roles() -> None:
         )
 
 
-def test_version_five_card_record_rejects_duplicate_factions() -> None:
+def test_version_two_card_record_rejects_duplicate_factions() -> None:
     with pytest.raises(ValueError, match="Card factions must be unique"):
         CardRecord.model_validate(
             {
@@ -124,46 +124,6 @@ def test_version_five_card_record_rejects_duplicate_factions() -> None:
                 "versions": [],
             }
         )
-
-
-def test_version_two_payload_adoption_adds_empty_rule_catalog() -> None:
-    adopted = adopt_payload_for_format(
-        {"templates": [{"key": "legacy", "label": "Legacy", "definition": {}}]},
-        format_version=2,
-    )
-
-    assert adopted == {
-        "classification_rules": [],
-        "templates": [
-            {
-                "key": "legacy",
-                "label": "Legacy",
-                "definition": {},
-            }
-        ],
-    }
-
-
-def test_version_three_payload_adoption_removes_template_inference_hints() -> None:
-    adopted = adopt_payload_for_format(
-        {
-            "templates": [
-                {
-                    "key": "legacy",
-                    "label": "Legacy",
-                    "definition": {},
-                    "inferred_card_roles": ["hero"],
-                    "inferred_card_factions": ["order"],
-                }
-            ]
-        },
-        format_version=3,
-    )
-
-    assert adopted == {
-        "classification_rules": [],
-        "templates": [{"key": "legacy", "label": "Legacy", "definition": {}}],
-    }
 
 
 def test_classification_rule_export_order_uses_source_natural_keys() -> None:
@@ -200,8 +160,7 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
             "cards": [
                 {
                     "key": "legacy-card",
-                    "card_pool": "player",
-                    "card_roles": [],
+                    "is_hero": False,
                 }
             ],
             "card_groups": [
@@ -213,7 +172,7 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
                 }
             ],
         },
-        format_version=3,
+        format_version=1,
     )
 
     reference = {
@@ -282,7 +241,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 4
         assert manifest.counts["card_versions"] == 5
-        assert manifest.format_version == 5
+        assert manifest.format_version == 2
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
@@ -740,9 +699,8 @@ def test_doctor_resolves_symbol_assets_and_honors_legacy_bundle_coverage(
             target_kind="role",
             target_key="hero",
         ).delete()
-        call_command("doctor_dev_data", source_format_version=3)
         with pytest.raises(CommandError, match="required classification rule is missing"):
-            call_command("doctor_dev_data", source_format_version=5)
+            call_command("doctor_dev_data", source_format_version=2)
         CardClassificationRule.objects.all().delete()
         Tag.objects.exclude(key="synthetic").delete()
         call_command("doctor_dev_data", source_format_version=1)

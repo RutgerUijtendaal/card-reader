@@ -17,8 +17,8 @@ from card_reader_core.models import (
     normalize_card_factions,
 )
 
-DEVELOPER_DATA_FORMAT_VERSION = 5
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 2
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, DEVELOPER_DATA_FORMAT_VERSION)
 
 
 def _default_pool_coverage() -> dict[CardPool, int]:
@@ -294,22 +294,10 @@ class DeveloperDataLock(StrictModel):
 
 def adopt_payload_for_format(value: object, *, format_version: int) -> object:
     """Adopt older bundle payloads into the current strict schema."""
-    if format_version not in {1, 2, 3} or not isinstance(value, dict):
+    if format_version != 1 or not isinstance(value, dict):
         return value
     adopted = dict(value)
     adopted["classification_rules"] = []
-    templates = adopted.get("templates")
-    if isinstance(templates, list):
-        adopted["templates"] = [
-            {
-                key: item
-                for key, item in template.items()
-                if key not in {"inferred_card_roles", "inferred_card_factions"}
-            }
-            if isinstance(template, dict)
-            else template
-            for template in templates
-        ]
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted
@@ -319,12 +307,11 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             adopted_cards.append(card)
             continue
         adopted_card = dict(card)
-        if format_version == 1:
-            if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
-                raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
-            was_hero = adopted_card.pop("is_hero")
-            adopted_card["card_pool"] = "player"
-            adopted_card["card_roles"] = ["hero"] if was_hero is True else []
+        if "is_hero" not in adopted_card or type(adopted_card["is_hero"]) is not bool:
+            raise ValueError("Legacy developer-data card is_hero must be a Boolean.")
+        was_hero = adopted_card.pop("is_hero")
+        adopted_card["card_pool"] = "player"
+        adopted_card["card_roles"] = ["hero"] if was_hero is True else []
         adopted_card["card_factions"] = []
         adopted_cards.append(adopted_card)
     adopted["cards"] = adopted_cards

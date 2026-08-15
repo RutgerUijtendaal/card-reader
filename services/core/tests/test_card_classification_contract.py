@@ -65,7 +65,7 @@ def test_role_and_faction_normalization_are_independent_and_canonical() -> None:
         "hero",
         "event",
     )
-    assert normalize_card_factions(("metal", "dark", "order", "dark", "darkness")) == (
+    assert normalize_card_factions(("metal", "dark", "order", "dark", "unsupported")) == (
         "order",
         "dark",
         "metal",

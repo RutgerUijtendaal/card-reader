@@ -217,7 +217,6 @@ def test_filter_metadata_api_validates_and_authorizes_explicit_pool_scope() -> N
     anonymous = Client(HTTP_HOST="localhost")
     assert anonymous.get("/cards/filters", {"card_pool": "evil"}).status_code == 403
     assert anonymous.get("/cards/filters", {"card_pool": "neutral"}).status_code == 403
-    assert anonymous.get("/cards/filters", {"card_pool": "game_master"}).status_code == 400
     assert anonymous.get("/cards/filters", {"card_pool": "unknown"}).status_code == 400
 
     omitted_payload = anonymous.get("/cards/filters").json()

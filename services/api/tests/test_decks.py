@@ -3142,7 +3142,7 @@ def test_card_faction_filters_support_any_all_and_exclusions() -> None:
         row["id"]
         for row in client.get("/cards", {"card_factions": ["metal"]}).json()["results"]
     }
-    invalid_response = client.get("/cards", {"card_factions": ["darkness"]})
+    invalid_response = client.get("/cards", {"card_factions": ["unsupported"]})
 
     assert order_blood_card.id in any_ids
     assert dark_metal_card.id in any_ids
@@ -3755,13 +3755,13 @@ def test_latest_version_patch_can_update_card_roles() -> None:
 
     rejected_response = client.patch(
         f"/cards/{card.id}/latest-version",
-        data={"card_factions": ["darkness"]},
+        data={"card_factions": ["unsupported"]},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
 
     assert rejected_response.status_code == 400
-    assert "darkness" in str(rejected_response.json())
+    assert "unsupported" in str(rejected_response.json())
     card.refresh_from_db()
     assert list(card.faction_assignments.values_list("faction", flat=True)) == ["dark", "metal"]
 

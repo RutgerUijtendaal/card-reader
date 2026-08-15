@@ -78,14 +78,14 @@ class Command(BaseCommand):
             selection = DeveloperDataSelection.model_validate(
                 json.loads(selection_path.read_text(encoding="utf-8"))
             )
-            if source_format_version >= 4:
+            if source_format_version >= 2:
                 missing_tags = sorted(
                     set(selection.coverage.required_tag_keys)
                     - set(Tag.objects.values_list("key", flat=True))
                 )
                 if missing_tags:
                     issues.append(f"required inference tags are missing: {', '.join(missing_tags)}")
-            if source_format_version >= 5:
+            if source_format_version >= 2:
                 available_rules = {
                     (
                         rule.card_pool,

@@ -12,7 +12,6 @@ from card_reader_core.repositories.decks import DeckSummaryPage
 
 from .classification import (
     deck_export_uses_out_of_scope_card,
-    deck_uses_card_pool,
     deck_uses_out_of_scope_card,
     iter_deck_cards,
 )
@@ -34,7 +33,6 @@ __all__ = [
     "DeckService",
     "DeckSummaryPage",
     "deck_export_uses_out_of_scope_card",
-    "deck_uses_card_pool",
     "deck_uses_out_of_scope_card",
     "DeckCreationDeletedError",
     "DeckSideboardInput",

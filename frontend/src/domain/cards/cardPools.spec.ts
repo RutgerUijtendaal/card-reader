@@ -19,7 +19,6 @@ describe('cardPools', () => {
   test('normalizes invalid and obsolete route values to Player', () => {
     expect(isCardPool('evil')).toBe(true);
     expect(normalizeCardPool('neutral')).toBe('neutral');
-    expect(normalizeCardPool('game_master')).toBe('player');
     expect(normalizeCardPool('unknown')).toBe('player');
   });
 });

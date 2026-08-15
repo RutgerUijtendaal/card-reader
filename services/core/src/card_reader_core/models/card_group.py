@@ -52,4 +52,4 @@ class CardGroupMember(TimestampedModel):
             models.UniqueConstraint(fields=("group", "card"), name="ux_card_group_member_group_card"),
             models.UniqueConstraint(fields=("group", "position"), name="ux_card_group_member_group_position"),
         ]
-        indexes = [models.Index(fields=["card", "position"], name="ix_card_group_member_card_position")]
+        indexes = [models.Index(fields=["card", "position"], name="ix_card_group_card_pos")]

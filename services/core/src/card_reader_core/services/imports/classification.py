@@ -9,8 +9,6 @@ from card_reader_core.models import (
     CARD_CLASSIFICATION_SOURCE_TYPE,
     CARD_CLASSIFICATION_TARGET_FACTION,
     CARD_CLASSIFICATION_TARGET_ROLE,
-    CARD_FACTIONS,
-    CARD_ROLES,
     CardClassificationInferenceEvidence,
     CardFaction,
     CardFactionInferenceEvidence,
@@ -179,31 +177,3 @@ def _matched_source_evidence(
         for source in sorted(sources_by_id.values(), key=lambda item: (item.key, item.id))
         if source.id in matched_ids
     ]
-
-
-def normalize_classification_mode(
-    value: object,
-    *,
-    field_name: str,
-) -> CardClassificationMode:
-    if value not in {"automatic", "override"}:
-        raise ValueError(f"{field_name} must be either 'automatic' or 'override'.")
-    return cast(CardClassificationMode, value)
-
-
-def validate_card_roles(values: object, *, field_name: str) -> tuple[CardRole, ...]:
-    if not isinstance(values, (list, tuple)):
-        raise ValueError(f"{field_name} must be an array.")
-    invalid = sorted({str(value) for value in values if value not in CARD_ROLES})
-    if invalid:
-        raise ValueError(f"{field_name} contains unsupported roles: {', '.join(invalid)}")
-    return normalize_card_roles(values)
-
-
-def validate_card_factions(values: object, *, field_name: str) -> tuple[CardFaction, ...]:
-    if not isinstance(values, (list, tuple)):
-        raise ValueError(f"{field_name} must be an array.")
-    invalid = sorted({str(value) for value in values if value not in CARD_FACTIONS})
-    if invalid:
-        raise ValueError(f"{field_name} contains unsupported factions: {', '.join(invalid)}")
-    return normalize_card_factions(values)
