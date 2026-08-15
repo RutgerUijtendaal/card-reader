@@ -84,7 +84,20 @@ def populate_master_data(apps: Any, _schema_editor: Any) -> None:
 
 def restore_master_hero_flags(apps: Any, _schema_editor: Any) -> None:
     Card = apps.get_model("card_reader_core", "Card")
+    CardClassificationRule = apps.get_model("card_reader_core", "CardClassificationRule")
     CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    if CardClassificationRule.objects.exists():
+        raise RuntimeError(
+            "Card classification migration 0054 cannot be reversed while classification rules "
+            "exist. Remove the rules explicitly before rolling back."
+        )
+    if ImportJob.objects.exclude(classification_rule_snapshot_json={}).exists():
+        raise RuntimeError(
+            "Card classification migration 0054 cannot be reversed while import jobs retain "
+            "classification rule snapshots. Preserve or remove those audit snapshots explicitly "
+            "before rolling back."
+        )
     hero_card_ids = CardRoleAssignment.objects.filter(role="hero").values_list(
         "card_id", flat=True
     )

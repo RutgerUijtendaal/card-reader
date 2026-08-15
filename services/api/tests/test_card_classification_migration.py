@@ -100,6 +100,45 @@ def test_final_state_migration_backfills_master_data_and_reverses_hero_roles() -
 
 
 @pytest.mark.django_db(transaction=True)
+def test_final_state_reverse_rejects_classification_rule_data() -> None:
+    apps = _migrate_to(FINAL_MIGRATION)
+    CardClassificationRule = apps.get_model("card_reader_core", "CardClassificationRule")
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    Tag = apps.get_model("card_reader_core", "Tag")
+    Template = apps.get_model("card_reader_core", "Template")
+
+    tag = Tag.objects.create(key="migration-rule-tag", label="Migration Rule Tag")
+    rule = CardClassificationRule.objects.create(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="tag",
+        tag_id=tag.id,
+    )
+
+    with pytest.raises(RuntimeError, match="while classification rules exist"):
+        _migrate_to(BASE_MIGRATION)
+
+    CardClassificationRule.objects.filter(id=rule.id).delete()
+    template = Template.objects.create(
+        key="classification-rule-reverse",
+        label="Classification Rule Reverse",
+    )
+    job = ImportJob.objects.create(
+        source_path="imports/classification-rule-reverse",
+        template_id=template.id,
+        classification_rule_snapshot_json={"schema_version": 1, "digest": "preserved"},
+    )
+
+    with pytest.raises(RuntimeError, match="retain classification rule snapshots"):
+        _migrate_to(BASE_MIGRATION)
+
+    ImportJob.objects.filter(id=job.id).update(classification_rule_snapshot_json={})
+    _migrate_to(BASE_MIGRATION)
+    _restore_leaf()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_final_state_migration_rejects_primary_alias_collisions() -> None:
     old_apps = _migrate_to(BASE_MIGRATION)
     Card = old_apps.get_model("card_reader_core", "Card")
