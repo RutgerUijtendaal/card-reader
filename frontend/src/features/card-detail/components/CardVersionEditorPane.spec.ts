@@ -301,17 +301,23 @@ describe('CardVersionEditorPane tabs', () => {
     const boss = mounted.container.querySelector('[data-testid="card-role-option-boss"]');
     const hero = mounted.container.querySelector('[data-testid="card-role-option-hero"]');
     const order = mounted.container.querySelector('[data-testid="card-faction-option-order"]');
+    const dark = mounted.container.querySelector('[data-testid="card-faction-option-dark"]');
+    const metal = mounted.container.querySelector('[data-testid="card-faction-option-metal"]');
 
     expect(boss?.getAttribute('aria-pressed')).toBe('true');
     expect(hero?.getAttribute('aria-pressed')).toBe('false');
     expect(order?.getAttribute('aria-pressed')).toBe('true');
+    expect(dark?.getAttribute('aria-pressed')).toBe('false');
+    expect(metal?.getAttribute('aria-pressed')).toBe('false');
 
     (hero as HTMLButtonElement).click();
     (order as HTMLButtonElement).click();
+    (metal as HTMLButtonElement).click();
     await nextTick();
 
     expect(mounted.toggleCardRole).toHaveBeenCalledWith('hero', true);
     expect(mounted.toggleCardFaction).toHaveBeenCalledWith('order', false);
+    expect(mounted.toggleCardFaction).toHaveBeenCalledWith('metal', true);
     mounted.unmount();
   });
 

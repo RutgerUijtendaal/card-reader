@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 import pytest
+
+
+def _classification_snapshot_digest(value: dict[str, object]) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -474,5 +482,241 @@ def test_admin_owned_classification_rule_migration_preflights_jobs_and_removes_h
             tag_id=tag.id,
         )
 
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dark_faction_migration_rewrites_identity_rules_and_import_history() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+    old_apps = executor.loader.project_state(
+        [("card_reader_core", "0061_admin_owned_classification_rules")]
+    ).apps
+    Card = old_apps.get_model("card_reader_core", "Card")
+    CardAlias = old_apps.get_model("card_reader_core", "CardAlias")
+    CardFactionAssignment = old_apps.get_model("card_reader_core", "CardFactionAssignment")
+    CardClassificationRule = old_apps.get_model("card_reader_core", "CardClassificationRule")
+    ImportJob = old_apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = old_apps.get_model("card_reader_core", "ImportJobItem")
+    Tag = old_apps.get_model("card_reader_core", "Tag")
+    Template = old_apps.get_model("card_reader_core", "Template")
+
+    card = Card.objects.create(
+        key="migration-dark-card",
+        label="Migration Dark Card",
+        card_pool="evil",
+        faction_identity_key='["order","darkness"]',
+    )
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card_id=card.id, faction="order"),
+            CardFactionAssignment(card_id=card.id, faction="darkness"),
+        ]
+    )
+    alias = CardAlias.objects.create(
+        card_id=card.id,
+        card_pool="evil",
+        faction_identity_key='["order","darkness"]',
+        key="migration-dark-alias",
+        label="Migration Dark Alias",
+    )
+    dark_tag = Tag.objects.create(key="dark", label="Dark", identifiers_json=["dark"])
+    rule = CardClassificationRule.objects.create(
+        card_pool="evil",
+        target_kind="faction",
+        target_key="darkness",
+        source_kind="tag",
+        tag_id=dark_tag.id,
+    )
+    snapshot_rule = {
+        "rule_id": rule.id,
+        "card_pool": "evil",
+        "source_kind": "tag",
+        "source_id": dark_tag.id,
+        "source_key": "dark",
+        "source_label": "Dark",
+        "source_identifiers": ["dark"],
+        "target_kind": "faction",
+        "target_key": "darkness",
+    }
+    snapshot_body: dict[str, object] = {
+        "schema_version": 1,
+        "card_pool": "evil",
+        "rules": [snapshot_rule],
+    }
+    old_digest = _classification_snapshot_digest(snapshot_body)
+    template = Template.objects.create(key="migration-dark-template", label="Migration Dark")
+    job = ImportJob.objects.create(
+        source_path="imports/migration-dark",
+        template_id=template.id,
+        card_pool="evil",
+        card_faction_mode="override",
+        card_faction_override_json=["darkness"],
+        classification_rule_snapshot_json={**snapshot_body, "digest": old_digest},
+        status="completed",
+    )
+    item = ImportJobItem.objects.create(
+        job_id=job.id,
+        source_file="imports/migration-dark/card.webp",
+        status="completed",
+        resolved_card_factions_json=["order", "darkness"],
+        target_card_factions_snapshot_json=["darkness"],
+        classification_inference_json={
+            "roles": {"snapshot_digest": old_digest},
+            "factions": {
+                "matched_rules": [snapshot_rule],
+                "override_factions": ["darkness"],
+                "resolved_factions": ["order", "darkness"],
+                "snapshot_digest": old_digest,
+            },
+            "live_classification": {"card_factions": ["order", "darkness"]},
+            "queued_target_classification": {"card_factions": ["darkness"]},
+        },
+        warnings_json=[
+            {
+                "code": "card_classification_mismatch",
+                "details": {
+                    "inferred": {"card_factions": ["order", "darkness"]},
+                    "existing": {"card_factions": ["darkness"]},
+                },
+            }
+        ],
+    )
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0062_dark_and_metal_factions")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0062_dark_and_metal_factions")]
+    ).apps
+    MigratedCard = apps.get_model("card_reader_core", "Card")
+    MigratedAlias = apps.get_model("card_reader_core", "CardAlias")
+    MigratedAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
+    MigratedRule = apps.get_model("card_reader_core", "CardClassificationRule")
+    MigratedJob = apps.get_model("card_reader_core", "ImportJob")
+    MigratedItem = apps.get_model("card_reader_core", "ImportJobItem")
+
+    assert MigratedAssignment._meta.get_field("faction").choices == [
+        ("order", "Order"),
+        ("blood", "Blood"),
+        ("dark", "Dark"),
+        ("metal", "Metal"),
+    ]
+    assert set(
+        MigratedAssignment.objects.filter(card_id=card.id).values_list("faction", flat=True)
+    ) == {"order", "dark"}
+    assert MigratedCard.objects.get(id=card.id).faction_identity_key == '["order","dark"]'
+    assert MigratedAlias.objects.get(id=alias.id).faction_identity_key == '["order","dark"]'
+    migrated_rule = MigratedRule.objects.select_related("tag").get(id=rule.id)
+    assert migrated_rule.target_key == "dark"
+    assert migrated_rule.tag.key == "dark"
+    migrated_job = MigratedJob.objects.get(id=job.id)
+    migrated_snapshot = migrated_job.classification_rule_snapshot_json
+    new_digest = migrated_snapshot["digest"]
+    assert migrated_job.card_faction_override_json == ["dark"]
+    assert migrated_snapshot["rules"][0]["target_key"] == "dark"
+    assert migrated_snapshot["rules"][0]["source_key"] == "dark"
+    assert new_digest != old_digest
+    assert new_digest == _classification_snapshot_digest(
+        {
+            "schema_version": migrated_snapshot["schema_version"],
+            "card_pool": migrated_snapshot["card_pool"],
+            "rules": migrated_snapshot["rules"],
+        }
+    )
+    migrated_item = MigratedItem.objects.get(id=item.id)
+    assert migrated_item.resolved_card_factions_json == ["order", "dark"]
+    assert migrated_item.target_card_factions_snapshot_json == ["dark"]
+    assert migrated_item.classification_inference_json["roles"]["snapshot_digest"] == new_digest
+    faction_evidence = migrated_item.classification_inference_json["factions"]
+    assert faction_evidence["matched_rules"][0]["target_key"] == "dark"
+    assert faction_evidence["matched_rules"][0]["source_key"] == "dark"
+    assert faction_evidence["override_factions"] == ["dark"]
+    assert faction_evidence["resolved_factions"] == ["order", "dark"]
+    assert faction_evidence["snapshot_digest"] == new_digest
+    assert migrated_item.warnings_json[0]["details"]["inferred"]["card_factions"] == [
+        "order",
+        "dark",
+    ]
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+    reversed_apps = executor.loader.project_state(
+        [("card_reader_core", "0061_admin_owned_classification_rules")]
+    ).apps
+    ReversedCard = reversed_apps.get_model("card_reader_core", "Card")
+    ReversedAlias = reversed_apps.get_model("card_reader_core", "CardAlias")
+    ReversedAssignment = reversed_apps.get_model("card_reader_core", "CardFactionAssignment")
+    ReversedRule = reversed_apps.get_model("card_reader_core", "CardClassificationRule")
+    ReversedJob = reversed_apps.get_model("card_reader_core", "ImportJob")
+    ReversedItem = reversed_apps.get_model("card_reader_core", "ImportJobItem")
+    assert set(
+        ReversedAssignment.objects.filter(card_id=card.id).values_list("faction", flat=True)
+    ) == {"order", "darkness"}
+    assert ReversedCard.objects.get(id=card.id).faction_identity_key == '["order","darkness"]'
+    assert ReversedAlias.objects.get(id=alias.id).faction_identity_key == '["order","darkness"]'
+    assert ReversedRule.objects.get(id=rule.id).target_key == "darkness"
+    reversed_job = ReversedJob.objects.get(id=job.id)
+    assert reversed_job.card_faction_override_json == ["darkness"]
+    assert reversed_job.classification_rule_snapshot_json["digest"] == old_digest
+    reversed_item = ReversedItem.objects.get(id=item.id)
+    assert reversed_item.resolved_card_factions_json == ["order", "darkness"]
+    assert reversed_item.target_card_factions_snapshot_json == ["darkness"]
+    assert reversed_item.classification_inference_json["roles"]["snapshot_digest"] == old_digest
+    assert reversed_item.classification_inference_json["factions"]["snapshot_digest"] == old_digest
+
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dark_faction_migration_preflights_non_terminal_imports() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0061_admin_owned_classification_rules")]
+    ).apps
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    Template = apps.get_model("card_reader_core", "Template")
+    template = Template.objects.create(key="migration-active-template", label="Migration Active")
+    job = ImportJob.objects.create(
+        source_path="imports/migration-active",
+        template_id=template.id,
+        status="queued",
+    )
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="cannot be renamed while import jobs are non-terminal"):
+        executor.migrate([("card_reader_core", "0062_dark_and_metal_factions")])
+
+    ImportJob.objects.filter(id=job.id).update(status="completed")
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dark_faction_migration_reverse_rejects_metal_data() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0062_dark_and_metal_factions")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0062_dark_and_metal_factions")]
+    ).apps
+    Card = apps.get_model("card_reader_core", "Card")
+    CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
+    card = Card.objects.create(
+        key="migration-metal-card",
+        label="Migration Metal Card",
+        card_pool="evil",
+        faction_identity_key='["metal"]',
+    )
+    CardFactionAssignment.objects.create(card_id=card.id, faction="metal")
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="cannot be reversed while Metal faction data exists"):
+        executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+
+    Card.objects.filter(id=card.id).delete()
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
     executor = MigrationExecutor(connection)
     executor.migrate(executor.loader.graph.leaf_nodes())

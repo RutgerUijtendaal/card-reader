@@ -38,7 +38,7 @@ compatibility keeps older immutable bundles usable without making current classi
 Selection coverage is evaluated by pool, role, and faction through `min_cards_by_pool`,
 `min_cards_by_role`, and `min_cards_by_faction`. The existing Hero minimum is retained under the Hero
 role. Evil and Neutral pool coverage remains zero while those pools are excluded; newly introduced
-roles and Order, Blood, and Darkness may remain at zero until reviewed source data is available. The
+roles and Order, Blood, Dark, and Metal may remain at zero until reviewed source data is available. The
 lock file is still generated only by publishing a validated immutable bundle and must not be edited by
 hand.
 

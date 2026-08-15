@@ -12,7 +12,7 @@ Content versions provide an additional history boundary for related changes made
 
 ## Pool, roles, and factions
 
-Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boss, Location, Boon, Event, and Shop Item roles, plus any combination of the Order, Blood, and Darkness factions. **Normal** is the displayed name for a card with no role assignments; it is derived rather than stored. A Normal card may still have factions.
+Every stable card identity belongs to exactly one of the **Player**, **Evil**, or **Neutral** pools. Neutral is currently a separate pool rather than an implicit overlay in Player or Evil views. A card can also hold any combination of the code-owned Hero, Boss, Location, Boon, Event, and Shop Item roles, plus any combination of the Order, Blood, Dark, and Metal factions. **Normal** is the displayed name for a card with no role assignments; it is derived rather than stored. A Normal card may still have factions.
 
 Role and faction keys allow up to 64 characters. Their definitions, labels, and ordering are code-owned. Hero remains the only role with existing deck-builder or Playtester behavior; every other role and all factions are descriptive until their gameplay rules are designed.
 

@@ -50,7 +50,7 @@ Prefer parameterized pool/role/faction matrices and shared fixtures over copying
 
 - Player, Evil, and Neutral keys, labels, ranks, validation, and frontend formatting agree.
 - Hero, Boss, Location, Boon, Event, and Shop Item keys, labels, ranks, normalization, and frontend formatting agree.
-- Order, Blood, and Darkness keys, labels, ranks, normalization, and frontend formatting agree.
+- Order, Blood, Dark, and Metal keys, labels, ranks, normalization, and frontend formatting agree.
 - Normal remains the derived empty-role product label; `standard` remains only the internal empty-role query sentinel.
 - Role and faction assignments remain independently multi-valued and reject duplicate rows without adding pool-validity constraints.
 - The faction assignment set and derived faction identity key stay synchronized through supported mutation paths.

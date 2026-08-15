@@ -244,7 +244,7 @@ def test_create_import_upload_replays_same_creation_key_without_duplicate_work()
                 "card_role_mode": "override",
                 "card_role_override": json.dumps(["boon", "event"]),
                 "card_faction_mode": "override",
-                "card_faction_override": json.dumps(["order", "blood"]),
+                "card_faction_override": json.dumps(["dark", "metal"]),
                 "template_id": "mtg-like-v1",
                 "content_version_base": "97.1",
                 "content_version_description": "Idempotent import.",
@@ -272,7 +272,7 @@ def test_create_import_upload_replays_same_creation_key_without_duplicate_work()
     assert job.card_role_mode == "override"
     assert job.card_role_override_json == ["boon", "event"]
     assert job.card_faction_mode == "override"
-    assert job.card_faction_override_json == ["order", "blood"]
+    assert job.card_faction_override_json == ["dark", "metal"]
 
 
 def test_import_creation_fingerprint_distinguishes_faction_override() -> None:
@@ -1776,7 +1776,8 @@ def test_filters_payload_uses_the_canonical_card_role_registry() -> None:
     assert response.json()["card_factions"] == [
         {"key": "order", "label": "Order", "rank": 1},
         {"key": "blood", "label": "Blood", "rank": 2},
-        {"key": "darkness", "label": "Darkness", "rank": 3},
+        {"key": "dark", "label": "Dark", "rank": 3},
+        {"key": "metal", "label": "Metal", "rank": 4},
     ]
 
 
@@ -3227,7 +3228,7 @@ def test_staff_can_manage_card_groups() -> None:
     )
     member_card.card_pool = "evil"
     member_card.save(update_fields=["card_pool"])
-    CardFactionAssignment.objects.create(card=member_card, faction="darkness")
+    CardFactionAssignment.objects.create(card=member_card, faction="dark")
 
     create_response = client.post(
         "/admin/card-groups",
@@ -3278,7 +3279,7 @@ def test_staff_can_manage_card_groups() -> None:
     ]
     assert [member["card_factions"] for member in patch_response.json()["members"]] == [
         [],
-        ["darkness"],
+        ["dark"],
     ]
     assert all(row["id"] != group_id for row in client.get("/admin/card-groups").json())
 
@@ -3736,7 +3737,7 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
         reparse_existing=False,
         card_pool="evil",
         resolved_card_roles=("hero", "event"),
-        resolved_card_factions=("order", "darkness"),
+        resolved_card_factions=("order", "dark", "metal"),
         classification_evidence={
             "roles": {
                 "mode": "automatic",
@@ -3751,12 +3752,13 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
                 "mode": "automatic",
                 "matched_tag_sources": [
                     {"id": "tag-order", "key": "order"},
-                    {"id": "tag-darkness", "key": "darkness"},
+                    {"id": "tag-dark", "key": "dark"},
+                    {"id": "tag-metal", "key": "metal"},
                 ],
                 "matched_type_sources": [],
                 "matched_rules": [],
                 "override_factions": [],
-                "resolved_factions": ["order", "darkness"],
+                "resolved_factions": ["order", "dark", "metal"],
                 "snapshot_digest": "test-digest",
             },
         },
@@ -3770,10 +3772,10 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
     ]
     assert list(
         version.card.faction_assignments.order_by("faction").values_list("faction", flat=True)
-    ) == ["darkness", "order"]
+    ) == ["dark", "metal", "order"]
     assert item.status == "completed"
     assert item.resolved_card_roles_json == ["hero", "event"]
-    assert item.resolved_card_factions_json == ["order", "darkness"]
+    assert item.resolved_card_factions_json == ["order", "dark", "metal"]
     assert item.classification_inference_json["roles"]["matched_tag_sources"] == [
         {"id": "tag-hero", "key": "hero"}
     ]

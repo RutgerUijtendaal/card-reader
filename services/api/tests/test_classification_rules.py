@@ -101,6 +101,13 @@ def test_catalog_definitions_are_global_and_sources_have_reverse_references() ->
     location = next(row for row in roles if row["key"] == "location")
     assert location["rule_counts"]["evil"]["tag"] == 1
     assert location["rules"][0]["id"] == rule.id
+    assert [row["label"] for row in catalog.json()["classification"]["factions"]] == [
+        "No faction",
+        "Order",
+        "Blood",
+        "Dark",
+        "Metal",
+    ]
 
     detail = client.get(f"/admin/tags/{tag.id}")
     assert detail.status_code == 200
@@ -162,6 +169,29 @@ def test_snapshots_are_pool_scoped_and_exclude_disabled_rules() -> None:
     assert disabled.id not in {rule["rule_id"] for rule in snapshot["rules"]}
 
 
+def test_dark_and_metal_are_supported_faction_rule_targets() -> None:
+    dark_tag = Tag.objects.create(key="dark", label="Dark")
+    metal_tag = Tag.objects.create(key="metal", label="Metal")
+    service = ClassificationRuleService()
+
+    dark_rule = service.create_rule(
+        card_pool="evil",
+        target_kind="faction",
+        target_key="dark",
+        source_kind="tag",
+        source_id=dark_tag.id,
+    )
+    metal_rule = service.create_rule(
+        card_pool="evil",
+        target_kind="faction",
+        target_key="metal",
+        source_kind="tag",
+        source_id=metal_tag.id,
+    )
+
+    assert [dark_rule.target_key, metal_rule.target_key] == ["dark", "metal"]
+
+
 def test_snapshot_detector_sources_survive_later_catalog_edits_and_deletion() -> None:
     tag = Tag.objects.create(
         key="frozen-hero",
@@ -202,7 +232,12 @@ def test_snapshot_detector_sources_survive_later_catalog_edits_and_deletion() ->
 
 @pytest.mark.parametrize(
     ("target_kind", "target_key"),
-    [("role", "unknown"), ("faction", "unknown"), ("unknown", "hero")],
+    [
+        ("role", "unknown"),
+        ("faction", "darkness"),
+        ("faction", "unknown"),
+        ("unknown", "hero"),
+    ],
 )
 def test_rule_service_rejects_unknown_targets(target_kind: str, target_key: str) -> None:
     tag = Tag.objects.create(key=f"invalid-{target_kind}-{target_key}", label="Invalid")

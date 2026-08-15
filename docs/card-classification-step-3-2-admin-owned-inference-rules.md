@@ -154,7 +154,7 @@ The public `/cards/filters` endpoint continues to derive role/faction options fr
 Store reviewed inference rules in developer data so clean environments reproduce admin-owned configuration. The initial configuration should express the agreed pool conventions without inventing unconfirmed metadata:
 
 - Player: the canonical `hero` Tag infers Hero.
-- Evil: canonical `boss` and `location` Tags infer Boss and Location; canonical `order`, `blood`, and `darkness` Tags infer their matching factions.
+- Evil: canonical `boss` and `location` Tags infer Boss and Location; canonical `order`, `blood`, `dark`, and `metal` Tags infer their matching factions.
 - Neutral: the canonical `shop-item` Tag infers Shop Item.
 
 Add Boon, Event, or Type-based defaults only when the actual canonical Tag/Type keys are confirmed in the reviewed catalog. The Admin Catalog may add them immediately without a code release.
