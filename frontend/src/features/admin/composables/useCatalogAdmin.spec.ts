@@ -88,6 +88,37 @@ beforeEach(() => {
 });
 
 describe('useCatalogAdmin deck suggestion details', () => {
+  test('ignores a stale catalog refresh that completes after a newer load', async () => {
+    const staleCatalog = deferred<typeof emptyCardCatalog>();
+    const staleDeckTags = deferred<{
+      roles: never[];
+      types: never[];
+      suggestedTypes: SuggestionRecord[];
+    }>();
+    fetchCatalogMock
+      .mockReturnValueOnce(staleCatalog.promise)
+      .mockResolvedValueOnce({
+        ...emptyCardCatalog,
+        known: {
+          ...emptyCardCatalog.known,
+          tags: [{ id: 'tag-new', key: 'new', label: 'New', identifiers: [] }],
+        },
+      });
+    fetchDeckTagCatalogMock
+      .mockReturnValueOnce(staleDeckTags.promise)
+      .mockResolvedValueOnce({ roles: [], types: [], suggestedTypes: [suggestion('new')] });
+    const controller = useCatalogAdmin();
+
+    const staleLoad = controller.loadCatalog();
+    await controller.loadCatalog();
+    staleCatalog.resolve(emptyCardCatalog);
+    staleDeckTags.resolve({ roles: [], types: [], suggestedTypes: [suggestion('old')] });
+    await staleLoad;
+
+    expect(controller.catalog.tags.map((row) => row.key)).toEqual(['new']);
+    expect(controller.catalog['suggested-deck-types'].map((row) => row.id)).toEqual(['new']);
+  });
+
   test('ignores a detail response after another suggestion is selected', async () => {
     const firstDetail = deferred<SuggestionRecord>();
     const secondDetail = deferred<SuggestionRecord>();

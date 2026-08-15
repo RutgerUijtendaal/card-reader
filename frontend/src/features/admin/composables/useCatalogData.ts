@@ -14,6 +14,7 @@ import type {
 } from '@/features/admin/types';
 
 export const useCatalogData = (resetNewEntryForm: () => void) => {
+  let loadGeneration = 0;
   const selectedKind = ref<CatalogKind>('keywords');
   const searchFilters = reactive<CatalogSearchState>({
     keywords: '',
@@ -75,7 +76,11 @@ export const useCatalogData = (resetNewEntryForm: () => void) => {
   };
 
   const loadCatalog = async (): Promise<void> => {
+    const generation = ++loadGeneration;
     const [data, deckTagData] = await Promise.all([fetchCatalog(), fetchDeckTagCatalog()]);
+    if (generation !== loadGeneration) {
+      return;
+    }
     catalog.keywords = data.known.keywords ?? [];
     catalog.tags = data.known.tags ?? [];
     catalog.symbols = data.known.symbols ?? [];

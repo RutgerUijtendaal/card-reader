@@ -4,7 +4,14 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 
-from card_reader_core.models import Card, CardClassificationRule, Tag, Type
+from card_reader_core.models import (
+    Card,
+    CardClassificationRule,
+    CardFactionAssignment,
+    CardRoleAssignment,
+    Tag,
+    Type,
+)
 from card_reader_core.services.classification_rules import ClassificationRuleService
 
 
@@ -79,10 +86,26 @@ def test_catalog_definitions_are_global_and_sources_have_reverse_references() ->
         source_kind="tag",
         source_id=tag.id,
     )
-    Card.objects.create(
+    active = Card.objects.create(
         key="linked-location",
         label="Linked Location",
         card_pool="evil",
+    )
+    CardRoleAssignment.objects.create(card=active, role="location")
+    CardFactionAssignment.objects.create(card=active, faction="blood")
+    deprecated = Card.objects.create(
+        key="deprecated-location",
+        label="Deprecated Location",
+        card_pool="evil",
+        lifecycle_status="deprecated",
+    )
+    CardRoleAssignment.objects.create(card=deprecated, role="location")
+    CardFactionAssignment.objects.create(card=deprecated, faction="blood")
+    Card.objects.create(
+        key="deprecated-normal",
+        label="Deprecated Normal",
+        card_pool="evil",
+        lifecycle_status="deprecated",
     )
     client = staff_client("classification-catalog-admin")
 
@@ -101,6 +124,19 @@ def test_catalog_definitions_are_global_and_sources_have_reverse_references() ->
     location = next(row for row in roles if row["key"] == "location")
     assert location["rule_counts"]["evil"]["tag"] == 1
     assert location["rules"][0]["id"] == rule.id
+    assert location["linked_card_counts"]["evil"] == 1
+    normal = next(row for row in roles if row["key"] == "standard")
+    assert normal["linked_card_counts"]["evil"] == 0
+    blood = next(
+        row for row in catalog.json()["classification"]["factions"] if row["key"] == "blood"
+    )
+    no_faction = next(
+        row
+        for row in catalog.json()["classification"]["factions"]
+        if row["key"] == "none"
+    )
+    assert blood["linked_card_counts"]["evil"] == 1
+    assert no_faction["linked_card_counts"]["evil"] == 0
 
     detail = client.get(f"/admin/tags/{tag.id}")
     assert detail.status_code == 200

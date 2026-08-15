@@ -3398,6 +3398,79 @@ def test_reclassified_evil_card_is_redacted_in_owner_deck_but_visible_to_staff()
     assert [row["id"] for row in staff_search_response.json()] == [deck.id]
 
 
+def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None:
+    owner = _create_user("restricted-partial-edit-owner", "password")
+    hero = _create_card(name="Restricted Partial Hero", hero=True)
+    restricted = _create_card(name="Restricted Partial Card", hero=False)
+    visible = _create_card(name="Visible Partial Card", hero=False)
+    deck = DeckService().create_owner_deck(
+        owner_id=str(owner.id),
+        name="Restricted Partial Deck",
+        description=None,
+        visibility="private",
+        hero_card_id=hero.id,
+        entries=[
+            DeckEntryInput(card_id=restricted.id, quantity=1),
+            DeckEntryInput(card_id=visible.id, quantity=1),
+        ],
+        sideboards=[
+            DeckSideboardInput(
+                name="Restricted Tech",
+                entries=[
+                    DeckEntryInput(card_id=restricted.id, quantity=2),
+                    DeckEntryInput(card_id=visible.id, quantity=1),
+                ],
+            )
+        ],
+    )
+    restricted.card_pool = "evil"
+    restricted.save(update_fields=["card_pool", "updated_at"])
+    client = Client(HTTP_HOST="localhost")
+    client.force_login(owner)
+    payload = client.get(f"/my/decks/{deck.id}").json()
+    restricted_id = next(
+        entry["card"]["id"]
+        for entry in payload["mainboard"]["entries"]
+        if entry["card"]["restricted"]
+    )
+
+    response = client.patch(
+        f"/my/decks/{deck.id}",
+        data={
+            "entries": [
+                {"card_id": restricted_id, "quantity": 1},
+                {"card_id": visible.id, "quantity": 2},
+            ],
+            "sideboards": [
+                {
+                    "name": "Restricted Tech",
+                    "entries": [
+                        {"card_id": restricted_id, "quantity": 2},
+                        {"card_id": visible.id, "quantity": 3},
+                    ],
+                }
+            ],
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    deck.refresh_from_db()
+    assert {
+        entry.card_id: entry.quantity for entry in deck.entries.all()
+    } == {restricted.id: 1, visible.id: 2}
+    assert {
+        entry.card_id: entry.quantity for entry in deck.sideboards.get().entries.all()
+    } == {restricted.id: 2, visible.id: 3}
+
+    tampered = client.patch(
+        f"/my/decks/{deck.id}",
+        data={"entries": [{"card_id": restricted_id, "quantity": 2}]},
+        content_type="application/json",
+    )
+    assert tampered.status_code == 400
+
+
 def test_standard_cannot_match_all_with_persisted_roles() -> None:
     response = Client(HTTP_HOST="localhost").get(
         "/cards",

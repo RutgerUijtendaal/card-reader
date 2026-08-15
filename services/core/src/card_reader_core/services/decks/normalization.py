@@ -1,10 +1,61 @@
 from __future__ import annotations
 
-from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, HERO_CARD_ROLE, Card, Deck, card_has_role
+from card_reader_core.models import (
+    HERO_CARD_ROLE,
+    PLAYER_CARD_POOL_SCOPE,
+    Card,
+    Deck,
+    DeckEntry,
+    DeckSideboard,
+    card_has_role,
+)
 from card_reader_core.repositories.decks import get_cards_by_ids, get_deck_card
 
 from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
 from .types import DeckEntryInput, DeckSideboardInput
+
+
+def _validate_preserved_restricted_mainboard_entries(
+    *,
+    entries: list[DeckEntryInput],
+    existing_entries: list[DeckEntry],
+) -> None:
+    expected_quantities = {
+        entry.card.id: int(entry.quantity)
+        for entry in existing_entries
+        if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+    }
+    for entry in entries:
+        expected_quantity = expected_quantities.get(entry.card_id)
+        if expected_quantity is not None and int(entry.quantity) != expected_quantity:
+            raise ValueError("Restricted mainboard references can only be preserved unchanged.")
+
+
+def _validate_preserved_restricted_sideboard_entries(
+    *,
+    sideboards: list[DeckSideboardInput],
+    existing_sideboards: list[DeckSideboard],
+) -> None:
+    restricted_card_ids: set[str] = set()
+    expected_quantities: dict[tuple[str, str], int] = {}
+    for existing_sideboard in existing_sideboards:
+        for existing_entry in existing_sideboard.entries.all():
+            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(existing_entry.card.card_pool):
+                continue
+            restricted_card_ids.add(existing_entry.card.id)
+            expected_quantities[(existing_sideboard.name, existing_entry.card.id)] = int(
+                existing_entry.quantity
+            )
+    for submitted_sideboard in sideboards:
+        for submitted_entry in submitted_sideboard.entries:
+            if submitted_entry.card_id not in restricted_card_ids:
+                continue
+            if expected_quantities.get(
+                (submitted_sideboard.name, submitted_entry.card_id)
+            ) != int(
+                submitted_entry.quantity
+            ):
+                raise ValueError("Restricted sideboard references can only be preserved unchanged.")
 
 
 class DeckPayloadNormalizer:
@@ -40,20 +91,31 @@ class DeckPayloadNormalizer:
         hero_card = get_deck_card(hero_card_id) if update_hero_card_id else existing_deck.hero_card
         if hero_card is None:
             raise ValueError("Hero card not found.")
-        retained_mainboard_cards_by_id = (
-            {entry.card.id: entry.card for entry in existing_deck.entries.all()}
+        existing_mainboard_entries = list(existing_deck.entries.all())
+        existing_sideboards = list(existing_deck.sideboards.all())
+        retained_mainboard_cards_by_id = {
+            entry.card.id: entry.card
+            for entry in existing_mainboard_entries
             if not update_entries
-            else {}
-        )
-        retained_sideboard_cards_by_id = (
-            {
-                entry.card.id: entry.card
-                for sideboard in existing_deck.sideboards.all()
-                for entry in sideboard.entries.all()
-            }
+            or not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+        }
+        retained_sideboard_cards_by_id = {
+            entry.card.id: entry.card
+            for sideboard in existing_sideboards
+            for entry in sideboard.entries.all()
             if not update_sideboards
-            else {}
-        )
+            or not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+        }
+        if update_entries:
+            _validate_preserved_restricted_mainboard_entries(
+                entries=entries,
+                existing_entries=existing_mainboard_entries,
+            )
+        if update_sideboards:
+            _validate_preserved_restricted_sideboard_entries(
+                sideboards=sideboards,
+                existing_sideboards=existing_sideboards,
+            )
         return self._normalize_resolved_deck_payload(
             hero_card=hero_card,
             entries=entries,

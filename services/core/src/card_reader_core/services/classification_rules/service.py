@@ -18,6 +18,7 @@ from card_reader_core.models import (
     CARD_POOL_DEFINITIONS,
     CARD_ROLE_DEFINITIONS,
     CARD_ROLES,
+    ACTIVE_CARD_LIFECYCLE_STATUS,
     STANDARD_CARD_ROLE,
     Card,
     CardClassificationRule,
@@ -352,24 +353,38 @@ class ClassificationRuleService:
         )
         role_usage: dict[tuple[str, str], int] = defaultdict(int)
         for row in (
-            CardRoleAssignment.objects.filter(card__card_pool__in=allowed_pools)
+            CardRoleAssignment.objects.filter(
+                card__card_pool__in=allowed_pools,
+                card__lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
+            )
             .values("role", "card__card_pool")
             .annotate(count=Count("card_id"))
         ):
             role_usage[(str(row["role"]), str(row["card__card_pool"]))] = int(row["count"])
         faction_usage: dict[tuple[str, str], int] = defaultdict(int)
         for row in (
-            CardFactionAssignment.objects.filter(card__card_pool__in=allowed_pools)
+            CardFactionAssignment.objects.filter(
+                card__card_pool__in=allowed_pools,
+                card__lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
+            )
             .values("faction", "card__card_pool")
             .annotate(count=Count("card_id"))
         ):
             faction_usage[(str(row["faction"]), str(row["card__card_pool"]))] = int(row["count"])
         normal_usage: dict[str, int] = {
-            pool: Card.objects.filter(card_pool=pool, role_assignments__isnull=True).count()
+            pool: Card.objects.filter(
+                card_pool=pool,
+                lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
+                role_assignments__isnull=True,
+            ).count()
             for pool in allowed_pools
         }
         no_faction_usage: dict[str, int] = {
-            pool: Card.objects.filter(card_pool=pool, faction_assignments__isnull=True).count()
+            pool: Card.objects.filter(
+                card_pool=pool,
+                lifecycle_status=ACTIVE_CARD_LIFECYCLE_STATUS,
+                faction_assignments__isnull=True,
+            ).count()
             for pool in allowed_pools
         }
         rule_counts: dict[tuple[str, str, str, str], int] = defaultdict(int)

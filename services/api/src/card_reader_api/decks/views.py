@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import cast
 from uuid import UUID
 
 from rest_framework import status
@@ -19,7 +21,13 @@ from card_reader_api.decks.serializers import (
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
-from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, CardPoolScope, Deck
+from card_reader_core.models import (
+    PLAYER_CARD_POOL_SCOPE,
+    CardPoolScope,
+    Deck,
+    DeckEntry,
+    DeckSideboardEntry,
+)
 from card_reader_core.services.decks import (
     DeckCreationDeletedError,
     DeckEntryInput,
@@ -50,7 +58,7 @@ def _restricted_creation_replay_response(
     )
 
 
-def _discard_unchanged_restricted_deck_references(
+def _restore_unchanged_restricted_deck_references(
     validated_data: dict[str, object],
     *,
     deck: Deck,
@@ -63,31 +71,79 @@ def _discard_unchanged_restricted_deck_references(
     if validated_data.get("hero_card_id") == expected_hero_id:
         validated_data.pop("hero_card_id")
 
-    expected_entries = [
-        {
-            "card_id": deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope),
-            "quantity": int(entry.quantity),
-        }
-        for entry in deck.entries.all()
-    ]
-    if validated_data.get("entries") == expected_entries:
-        validated_data.pop("entries")
+    if "entries" in validated_data:
+        existing_entries = list(deck.entries.all())
+        restored_entries = _restore_restricted_entry_references(
+            cast(list[dict[str, object]], validated_data["entries"]),
+            existing_entries=existing_entries,
+            card_pool_scope=card_pool_scope,
+        )
+        expected_entries = [
+            {"card_id": entry.card.id, "quantity": int(entry.quantity)}
+            for entry in existing_entries
+        ]
+        if restored_entries == expected_entries:
+            validated_data.pop("entries")
+        else:
+            validated_data["entries"] = restored_entries
 
-    expected_sideboards = [
-        {
-            "name": sideboard.name,
-            "entries": [
-                {
-                    "card_id": deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope),
-                    "quantity": int(entry.quantity),
-                }
-                for entry in sideboard.entries.all()
-            ],
-        }
-        for sideboard in deck.sideboards.all()
-    ]
-    if validated_data.get("sideboards") == expected_sideboards:
-        validated_data.pop("sideboards")
+    if "sideboards" in validated_data:
+        existing_sideboards = {sideboard.name: sideboard for sideboard in deck.sideboards.all()}
+        submitted_sideboards = cast(list[dict[str, object]], validated_data["sideboards"])
+        restored_sideboards = [
+            {
+                **sideboard,
+                "entries": _restore_restricted_entry_references(
+                    cast(list[dict[str, object]], sideboard["entries"]),
+                    existing_entries=(
+                        list(existing_sideboards[str(sideboard["name"])].entries.all())
+                        if str(sideboard["name"]) in existing_sideboards
+                        else []
+                    ),
+                    card_pool_scope=card_pool_scope,
+                ),
+            }
+            for sideboard in submitted_sideboards
+        ]
+        expected_sideboards = [
+            {
+                "name": sideboard.name,
+                "entries": [
+                    {"card_id": entry.card.id, "quantity": int(entry.quantity)}
+                    for entry in sideboard.entries.all()
+                ],
+            }
+            for sideboard in deck.sideboards.all()
+        ]
+        if restored_sideboards == expected_sideboards:
+            validated_data.pop("sideboards")
+        else:
+            validated_data["sideboards"] = restored_sideboards
+
+
+def _restore_restricted_entry_references(
+    submitted_entries: list[dict[str, object]],
+    *,
+    existing_entries: Sequence[DeckEntry | DeckSideboardEntry],
+    card_pool_scope: CardPoolScope,
+) -> list[dict[str, object]]:
+    restricted_entries = {
+        deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope): entry
+        for entry in existing_entries
+        if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+    }
+    restored: list[dict[str, object]] = []
+    for submitted in submitted_entries:
+        placeholder = str(submitted.get("card_id", ""))
+        existing = restricted_entries.get(placeholder)
+        if existing is None:
+            restored.append(submitted)
+            continue
+        if submitted.get("quantity") != int(existing.quantity):
+            restored.append(submitted)
+            continue
+        restored.append({**submitted, "card_id": existing.card.id})
+    return restored
 
 
 def _deck_list_response(
@@ -471,7 +527,7 @@ class OwnerDeckDetailView(APIView):
         serializer = DeckWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return serializer_error(serializer)
-        _discard_unchanged_restricted_deck_references(
+        _restore_unchanged_restricted_deck_references(
             serializer.validated_data,
             deck=accessible_deck,
             card_pool_scope=card_pool_scope,

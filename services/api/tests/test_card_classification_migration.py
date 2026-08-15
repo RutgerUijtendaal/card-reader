@@ -475,4 +475,74 @@ def test_admin_owned_classification_rule_migration_preflights_jobs_and_removes_h
         )
 
     executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="while classification rules exist"):
+        executor.migrate([("card_reader_core", "0060_faction_classification")])
+
+    Rule.objects.all().delete()
+    NewImportJob.objects.filter(id=job.id).update(
+        classification_rule_snapshot_json={"schema_version": 1, "digest": "preserved"}
+    )
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="retain classification rule snapshots"):
+        executor.migrate([("card_reader_core", "0060_faction_classification")])
+
+    NewImportJob.objects.filter(id=job.id).update(classification_rule_snapshot_json={})
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0060_faction_classification")])
+
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_pool_partitioned_tts_sheet_migration_backfills_and_guards_reverse() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+    old_apps = executor.loader.project_state(
+        [("card_reader_core", "0061_admin_owned_classification_rules")]
+    ).apps
+    OldSheet = old_apps.get_model("card_reader_core", "TtsCardSheet")
+    OldSlot = old_apps.get_model("card_reader_core", "TtsCardSheetSlot")
+    player_sheet = OldSheet.objects.create(sequence=991)
+    OldSlot.objects.create(
+        sheet_id=player_sheet.id,
+        slot_index=0,
+        card_identity_id="shared-card-identity",
+    )
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0062_pool_partitioned_tts_card_sheets")])
+    apps = executor.loader.project_state(
+        [("card_reader_core", "0062_pool_partitioned_tts_card_sheets")]
+    ).apps
+    Sheet = apps.get_model("card_reader_core", "TtsCardSheet")
+    Slot = apps.get_model("card_reader_core", "TtsCardSheetSlot")
+    player_slot = Slot.objects.get(card_identity_id="shared-card-identity")
+    assert player_slot.card_pool == "player"
+    assert player_slot.sheet.card_pool == "player"
+
+    evil_sheet = Sheet.objects.create(sequence=992, card_pool="evil")
+    Slot.objects.create(
+        sheet_id=evil_sheet.id,
+        card_pool="evil",
+        slot_index=0,
+        card_identity_id="shared-card-identity",
+    )
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Slot.objects.create(
+            sheet_id=evil_sheet.id,
+            card_pool="evil",
+            slot_index=1,
+            card_identity_id="shared-card-identity",
+        )
+
+    executor = MigrationExecutor(connection)
+    with pytest.raises(RuntimeError, match="while Evil or Neutral sheet data exists"):
+        executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+
+    Slot.objects.filter(card_pool="evil").delete()
+    Sheet.objects.filter(card_pool="evil").delete()
+    executor = MigrationExecutor(connection)
+    executor.migrate([("card_reader_core", "0061_admin_owned_classification_rules")])
+    executor = MigrationExecutor(connection)
     executor.migrate(executor.loader.graph.leaf_nodes())
