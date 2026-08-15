@@ -1851,11 +1851,11 @@ def test_filters_payload_returns_authorized_pool_registry_in_canonical_order() -
         {"key": "neutral", "label": "Neutral", "rank": 2},
     ]
 
-    obsolete_response = _staff_client("obsolete-pool-staff").get(
+    invalid_response = _staff_client("invalid-pool-staff").get(
         "/cards",
-        {"card_pool": "game_master"},
+        {"card_pool": "unsupported"},
     )
-    assert obsolete_response.status_code == 400
+    assert invalid_response.status_code == 400
 
 
 def test_filters_payload_orders_types_by_linked_card_count_without_pinning_mana() -> None:

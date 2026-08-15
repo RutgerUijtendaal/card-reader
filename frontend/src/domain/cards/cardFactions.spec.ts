@@ -16,7 +16,6 @@ describe('card faction registry', () => {
     expect(isCardFaction('blood')).toBe(true);
     expect(isCardFaction('dark')).toBe(true);
     expect(isCardFaction('metal')).toBe(true);
-    expect(isCardFaction('darkness')).toBe(false);
     expect(isCardFaction('unknown')).toBe(false);
     expect(displayCardFactionLabels(['order', 'dark', 'metal'])).toEqual(['Order', 'Dark', 'Metal']);
     expect(displayCardFactionLabels([])).toEqual(['No faction']);

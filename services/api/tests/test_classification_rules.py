@@ -270,7 +270,6 @@ def test_snapshot_detector_sources_survive_later_catalog_edits_and_deletion() ->
     ("target_kind", "target_key"),
     [
         ("role", "unknown"),
-        ("faction", "darkness"),
         ("faction", "unknown"),
         ("unknown", "hero"),
     ],

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from card_reader_core.models import Card, CardPool, CardPoolScope, Deck
+from card_reader_core.models import Card, CardPoolScope, Deck
 
 
 def iter_deck_cards(deck: Deck) -> Iterator[Card]:
@@ -13,10 +13,6 @@ def iter_deck_cards(deck: Deck) -> Iterator[Card]:
     for sideboard in deck.sideboards.all():
         for sideboard_entry in sideboard.entries.all():
             yield sideboard_entry.card
-
-
-def deck_uses_card_pool(deck: Deck, card_pool: CardPool) -> bool:
-    return any(card.card_pool == card_pool for card in iter_deck_cards(deck))
 
 
 def deck_uses_out_of_scope_card(deck: Deck, card_pool_scope: CardPoolScope) -> bool:
@@ -46,7 +42,6 @@ def deck_export_uses_out_of_scope_card(
 
 __all__ = [
     "deck_export_uses_out_of_scope_card",
-    "deck_uses_card_pool",
     "deck_uses_out_of_scope_card",
     "iter_deck_cards",
 ]

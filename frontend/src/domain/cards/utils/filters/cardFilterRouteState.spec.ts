@@ -67,7 +67,7 @@ describe('cardFilterRouteState', () => {
     const state = parseCardFilterRouteQuery({
       card_roles: ['location', 'event', 'boss', 'shop_item'],
       card_role_exclude: 'boon',
-      card_factions: ['metal', 'dark', 'order', 'darkness'],
+      card_factions: ['metal', 'dark', 'order', 'unsupported'],
       card_faction_exclude: 'blood',
       card_faction_match: 'all',
     });
@@ -93,7 +93,6 @@ describe('cardFilterRouteState', () => {
     expect(buildCardFilterRouteQuery(parseCardFilterRouteQuery({ card_pool: 'neutral' }))).toEqual({
       card_pool: 'neutral',
     });
-    expect(parseCardFilterRouteQuery({ card_pool: 'game_master' }).cardPool).toBe('player');
     expect(parseCardFilterRouteQuery({ card_pool: 'unknown' }).cardPool).toBe('player');
   });
 

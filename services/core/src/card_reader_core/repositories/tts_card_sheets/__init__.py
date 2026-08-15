@@ -433,15 +433,6 @@ def _refresh_card_source_visibility_once(card_ids: list[str] | None) -> set[str]
     return sheet_ids
 
 
-def refresh_sheet_source_visibility(sheet_id: str) -> None:
-    _retry_sqlite_write(lambda: _refresh_sheet_source_visibility_once(sheet_id))
-
-
-@transaction.atomic
-def _refresh_sheet_source_visibility_once(sheet_id: str) -> None:
-    _refresh_sheet_fingerprints({sheet_id})
-
-
 def sheet_has_incompatible_slots(sheet_id: str) -> bool:
     return _incompatible_sheet_slots(sheet_id).exists()
 
@@ -727,7 +718,6 @@ __all__ = [
     "mark_render_succeeded",
     "prioritize_sheets",
     "refresh_card_source_visibility",
-    "refresh_sheet_source_visibility",
     "retire_incompatible_sheet_slots",
     "release_expired_render_claims",
     "release_render_claim",

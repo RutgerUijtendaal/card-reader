@@ -152,7 +152,7 @@ describe('card pool workspace routes', () => {
     setSession(['player', 'evil', 'neutral']);
     const router = createAppRouter(createMemoryHistory());
 
-    await router.push('/cards?card_pool=game_master');
+    await router.push('/cards?card_pool=unsupported');
 
     expect(router.currentRoute.value.fullPath).toBe('/cards');
     expect(useCardPoolWorkspaceStore().activePool).toBe('player');
