@@ -177,3 +177,63 @@ def test_seed_migration_reuses_sources_and_creates_missing_defaults() -> None:
     ReappliedRule = reapplied_apps.get_model("card_reader_core", "CardClassificationRule")
     assert _rule_identities(ReappliedRule) == EXPECTED_RULES
     _restore_leaf()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_seed_migration_preserves_existing_rule_and_template_customizations() -> None:
+    old_apps = _migrate_to(BASE_MIGRATION)
+    CardClassificationRule = old_apps.get_model(
+        "card_reader_core",
+        "CardClassificationRule",
+    )
+    Tag = old_apps.get_model("card_reader_core", "Tag")
+    Template = old_apps.get_model("card_reader_core", "Template")
+    Type = old_apps.get_model("card_reader_core", "Type")
+
+    CardClassificationRule.objects.all().delete()
+    Tag.objects.filter(key__in={"order", "blood", "dark", "metal"}).delete()
+    Type.objects.filter(key__in={"hero", "boss", "boon", "event", "location"}).delete()
+    Template.objects.filter(key="full-height").delete()
+    hero_type = Type.objects.create(
+        key="hero",
+        label="Custom Hero",
+        identifiers_json=["custom hero"],
+    )
+    existing_rule = CardClassificationRule.objects.create(
+        card_pool="player",
+        target_kind="role",
+        target_key="hero",
+        source_kind="type",
+        type_id=hero_type.id,
+        enabled=False,
+    )
+    existing_template = Template.objects.create(
+        key="full-height",
+        label="Customized full height",
+        definition_json={"id": "full-height", "version": 7, "regions": []},
+    )
+
+    apps = _migrate_to(SEED_MIGRATION)
+    SeededRule = apps.get_model("card_reader_core", "CardClassificationRule")
+    SeededTemplate = apps.get_model("card_reader_core", "Template")
+
+    preserved_rule = SeededRule.objects.get(id=existing_rule.id)
+    assert preserved_rule.enabled is False
+    preserved_template = SeededTemplate.objects.get(id=existing_template.id)
+    assert preserved_template.label == "Customized full height"
+    assert preserved_template.definition_json == {
+        "id": "full-height",
+        "version": 7,
+        "regions": [],
+    }
+
+    reversed_apps = _migrate_to(BASE_MIGRATION)
+    ReversedRule = reversed_apps.get_model("card_reader_core", "CardClassificationRule")
+    assert list(ReversedRule.objects.values_list("id", "enabled")) == [
+        (existing_rule.id, False)
+    ]
+    assert reversed_apps.get_model("card_reader_core", "Template").objects.filter(
+        id=existing_template.id,
+        label="Customized full height",
+    ).exists()
+    _restore_leaf()

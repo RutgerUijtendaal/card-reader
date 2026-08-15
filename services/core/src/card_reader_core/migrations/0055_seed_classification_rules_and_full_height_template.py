@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID, uuid5
 
 from django.apps.registry import Apps
 from django.db import migrations
 from django.db.backends.base.schema import BaseDatabaseSchemaEditor
-from django.utils.timezone import now
 
+
+MIGRATION_DEFAULT_NAMESPACE = UUID("d5050158-0d5c-419c-9506-e704938447c9")
 
 SOURCE_DEFINITIONS = {
     "tag": (
@@ -92,6 +94,14 @@ FULL_HEIGHT_TEMPLATE_DEFINITION: dict[str, Any] = {
 }
 
 
+def _migration_default_id(kind: str, identity: str) -> str:
+    return str(uuid5(MIGRATION_DEFAULT_NAMESPACE, f"{kind}:{identity}"))
+
+
+def _classification_rule_id(rule: tuple[str, str, str, str, str]) -> str:
+    return _migration_default_id("classification-rule", ":".join(rule))
+
+
 def _source_models(apps: Apps) -> dict[str, Any]:
     return {
         "tag": apps.get_model("card_reader_core", "Tag"),
@@ -110,69 +120,54 @@ def seed_classification_rules_and_template(
         for key, label, identifiers in definitions:
             source, _created = source_model.objects.get_or_create(
                 key=key,
-                defaults={"label": label, "identifiers_json": identifiers},
+                defaults={
+                    "id": _migration_default_id(source_kind, key),
+                    "label": label,
+                    "identifiers_json": identifiers,
+                },
             )
             sources[(source_kind, key)] = source
 
     Template = apps.get_model("card_reader_core", "Template")
-    Template.objects.update_or_create(
+    Template.objects.get_or_create(
         key="full-height",
         defaults={
+            "id": _migration_default_id("template", "full-height"),
             "label": "Full height",
             "definition_json": FULL_HEIGHT_TEMPLATE_DEFINITION,
-            "updated_at": now(),
         },
     )
 
     CardClassificationRule = apps.get_model("card_reader_core", "CardClassificationRule")
-    for card_pool, target_kind, target_key, source_kind, source_key in CLASSIFICATION_RULES:
+    for rule_definition in CLASSIFICATION_RULES:
+        card_pool, target_kind, target_key, source_kind, source_key = rule_definition
         source = sources[(source_kind, source_key)]
         source_fields = (
             {"tag_id": source.id, "type_id": None}
             if source_kind == "tag"
             else {"tag_id": None, "type_id": source.id}
         )
-        rule, created = CardClassificationRule.objects.get_or_create(
+        CardClassificationRule.objects.get_or_create(
             card_pool=card_pool,
             target_kind=target_kind,
             target_key=target_key,
             source_kind=source_kind,
             **source_fields,
-            defaults={"enabled": True},
+            defaults={
+                "id": _classification_rule_id(rule_definition),
+                "enabled": True,
+            },
         )
-        if not created and not rule.enabled:
-            rule.enabled = True
-            rule.updated_at = now()
-            rule.save(update_fields=["enabled", "updated_at"])
 
 
 def remove_seeded_classification_rules(
     apps: Apps,
     _schema_editor: BaseDatabaseSchemaEditor,
 ) -> None:
-    source_models = _source_models(apps)
     CardClassificationRule = apps.get_model("card_reader_core", "CardClassificationRule")
-    for card_pool, target_kind, target_key, source_kind, source_key in CLASSIFICATION_RULES:
-        source_id = (
-            source_models[source_kind]
-            .objects.filter(key=source_key)
-            .values_list("id", flat=True)
-            .first()
-        )
-        if source_id is None:
-            continue
-        source_fields = (
-            {"tag_id": source_id, "type_id": None}
-            if source_kind == "tag"
-            else {"tag_id": None, "type_id": source_id}
-        )
-        CardClassificationRule.objects.filter(
-            card_pool=card_pool,
-            target_kind=target_kind,
-            target_key=target_key,
-            source_kind=source_kind,
-            **source_fields,
-        ).delete()
+    CardClassificationRule.objects.filter(
+        id__in=[_classification_rule_id(rule) for rule in CLASSIFICATION_RULES]
+    ).delete()
 
 
 class Migration(migrations.Migration):

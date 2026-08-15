@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import io
 import json
 from pathlib import Path
 import shutil
 import tarfile
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError, transaction
@@ -215,6 +217,47 @@ def test_developer_data_coverage_rejects_missing_required_classification_rule(
                 output_path=archive_path,
                 source_revision="missing-role-test",
             )
+        transaction.set_rollback(True)
+
+
+def test_import_accepts_only_unmodified_migration_defaults(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    target_storage = tmp_path / "target-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "migration-defaults.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
+        selection_path.write_text(
+            json.dumps(selection),
+            encoding="utf-8",
+        )
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="migration-default-import-test",
+        )
+
+        _clear_domain_data()
+        _seed_migration_defaults()
+        Template.objects.filter(key="full-height").update(label="Admin customization")
+        monkeypatch.setattr(settings, "app_data_dir", target_storage)
+        with pytest.raises(DeveloperDataError, match="requires an empty domain"):
+            import_developer_data(archive_path=archive_path)
+
+        _clear_domain_data()
+        _seed_migration_defaults()
+        result = import_developer_data(archive_path=archive_path)
+
+        assert result.counts["cards"] == 4
+        assert Template.objects.filter(key="full-height", label="Full height").exists()
+        assert CardClassificationRule.objects.count() == 13
         transaction.set_rollback(True)
 
 
@@ -1182,3 +1225,11 @@ def _clear_domain_data() -> None:
     Tag.objects.all().delete()
     Type.objects.all().delete()
     Template.objects.all().delete()
+
+
+def _seed_migration_defaults() -> None:
+    migration = importlib.import_module(
+        "card_reader_core.migrations."
+        "0055_seed_classification_rules_and_full_height_template"
+    )
+    migration.seed_classification_rules_and_template(django_apps, None)

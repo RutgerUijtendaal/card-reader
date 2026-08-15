@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 import shutil
 from typing import Any
+from uuid import UUID, uuid5
 
 from django.db import transaction
 
@@ -50,6 +51,97 @@ from .schema import (
     DeveloperDataPayload,
     card_reference_identity,
 )
+
+
+MIGRATION_DEFAULT_NAMESPACE = UUID("d5050158-0d5c-419c-9506-e704938447c9")
+MIGRATION_DEFAULT_SOURCE_DEFINITIONS = {
+    "tag": {
+        "order": ("Order", ["order"]),
+        "blood": ("Blood", ["blood"]),
+        "dark": ("Dark", ["dark"]),
+        "metal": ("Metal", ["metal"]),
+    },
+    "type": {
+        "hero": ("Hero", ["hero"]),
+        "boss": ("Boss", ["boss"]),
+        "boon": ("Boon", ["boon"]),
+        "event": ("Event", ["event"]),
+        "location": ("Location", ["location"]),
+    },
+}
+MIGRATION_DEFAULT_CLASSIFICATION_RULES = (
+    ("player", "role", "hero", "type", "hero"),
+    ("evil", "role", "boss", "type", "boss"),
+    ("evil", "role", "location", "type", "location"),
+    ("evil", "faction", "order", "tag", "order"),
+    ("evil", "faction", "blood", "tag", "blood"),
+    ("evil", "faction", "dark", "tag", "dark"),
+    ("evil", "faction", "metal", "tag", "metal"),
+    ("neutral", "role", "boon", "type", "boon"),
+    ("neutral", "role", "event", "type", "event"),
+)
+MIGRATION_DEFAULT_FULL_HEIGHT_TEMPLATE: dict[str, Any] = {
+    "id": "full-height",
+    "version": 1,
+    "regions": [
+        {
+            "region_id": "top_bar",
+            "parser_type": "name",
+            "cut_region": {
+                "unit": "relative",
+                "x": 0.04,
+                "y": 0.02,
+                "w": 0.92,
+                "h": 0.07,
+            },
+            "ocr_config": {"ocr_min_confidence": 0.55},
+        },
+        {
+            "region_id": "type_bar",
+            "parser_type": "type_tag",
+            "cut_region": {
+                "unit": "relative",
+                "x": 0.05,
+                "y": 0.93,
+                "w": 0.9,
+                "h": 0.06,
+            },
+            "ocr_config": {},
+        },
+        {
+            "region_id": "rules_text",
+            "parser_type": "rules_text",
+            "cut_region": {
+                "unit": "relative",
+                "x": 0.05,
+                "y": 0.09,
+                "w": 0.9,
+                "h": 0.84,
+            },
+            "ocr_config": {},
+        },
+        {
+            "region_id": "rules_text_fallback",
+            "parser_type": "rules_text",
+            "cut_region": {
+                "unit": "relative",
+                "x": 0.05,
+                "y": 0.37,
+                "w": 0.9,
+                "h": 0.3,
+            },
+            "ocr_config": {},
+        },
+    ],
+}
+
+
+def _migration_default_id(kind: str, identity: str) -> str:
+    return str(uuid5(MIGRATION_DEFAULT_NAMESPACE, f"{kind}:{identity}"))
+
+
+def _migration_default_rule_id(rule: tuple[str, str, str, str, str]) -> str:
+    return _migration_default_id("classification-rule", ":".join(rule))
 
 
 @dataclass(frozen=True)
@@ -148,7 +240,7 @@ def _ensure_domain_is_empty(payload: DeveloperDataPayload) -> None:
         TtsCardSheet,
         Type,
     ):
-        if model.objects.exists():
+        if _model_contains_non_migration_defaults(model):
             populated.append(str(model._meta.verbose_name_plural))
     expected_deck_tags = {(row.kind, row.key): row.label for row in payload.deck_tags}
     incompatible_deck_tags = [
@@ -163,6 +255,60 @@ def _ensure_domain_is_empty(payload: DeveloperDataPayload) -> None:
             "Developer-data bootstrap requires an empty domain database; found data in: "
             + ", ".join(populated)
         )
+
+
+def _model_contains_non_migration_defaults(model: Any) -> bool:
+    if model not in {CardClassificationRule, Tag, Template, Type}:
+        return bool(model.objects.exists())
+    return any(not _is_unmodified_migration_default(model, row) for row in model.objects.all())
+
+
+def _is_unmodified_migration_default(model: Any, row: Any) -> bool:
+    if model is Tag:
+        return _is_unmodified_migration_catalog_source(row, source_kind="tag")
+    if model is Type:
+        return _is_unmodified_migration_catalog_source(row, source_kind="type")
+    if model is Template:
+        return bool(
+            row.id == _migration_default_id("template", "full-height")
+            and row.key == "full-height"
+            and row.label == "Full height"
+            and row.definition_json == MIGRATION_DEFAULT_FULL_HEIGHT_TEMPLATE
+        )
+    return _is_unmodified_migration_rule(row)
+
+
+def _is_unmodified_migration_catalog_source(row: Any, *, source_kind: str) -> bool:
+    definition = MIGRATION_DEFAULT_SOURCE_DEFINITIONS[source_kind].get(row.key)
+    if definition is None:
+        return False
+    label, identifiers = definition
+    return bool(
+        row.id == _migration_default_id(source_kind, row.key)
+        and row.label == label
+        and row.identifiers_json == identifiers
+    )
+
+
+def _is_unmodified_migration_rule(rule: Any) -> bool:
+    definitions_by_id = {
+        _migration_default_rule_id(definition): definition
+        for definition in MIGRATION_DEFAULT_CLASSIFICATION_RULES
+    }
+    definition = definitions_by_id.get(rule.id)
+    if definition is None:
+        return False
+    card_pool, target_kind, target_key, source_kind, source_key = definition
+    expected_source_id = _migration_default_id(source_kind, source_key)
+    return bool(
+        rule.card_pool == card_pool
+        and rule.target_kind == target_kind
+        and rule.target_key == target_key
+        and rule.source_kind == source_kind
+        and rule.tag_id == (expected_source_id if source_kind == "tag" else None)
+        and rule.type_id == (expected_source_id if source_kind == "type" else None)
+        and rule.enabled is True
+    )
 
 
 @contextmanager
@@ -242,26 +388,46 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
         )
         for row in payload.symbols
     }
-    templates = {
-        row.key: Template.objects.create(
-            key=row.key,
-            label=row.label,
-            definition_json=row.definition,
+    templates: dict[str, Template] = {}
+    for template_record in payload.templates:
+        template, _created = Template.objects.update_or_create(
+            key=template_record.key,
+            defaults={
+                "label": template_record.label,
+                "definition_json": template_record.definition,
+            },
         )
-        for row in payload.templates
-    }
+        templates[template_record.key] = template
     classification_rule_service = ClassificationRuleService()
-    for row in payload.classification_rules:
-        source_rows = tags if row.source_kind == "tag" else types
-        source = source_rows[row.source_key]
-        classification_rule_service.create_rule(
-            card_pool=row.card_pool,
-            target_kind=row.target_kind,
-            target_key=row.target_key,
-            source_kind=row.source_kind,
-            source_id=source.id,
-            enabled=row.enabled,
+    for rule_record in payload.classification_rules:
+        source_rows = tags if rule_record.source_kind == "tag" else types
+        source = source_rows[rule_record.source_key]
+        source_fields = (
+            {"tag_id": source.id, "type_id": None}
+            if rule_record.source_kind == "tag"
+            else {"tag_id": None, "type_id": source.id}
         )
+        existing_rule = CardClassificationRule.objects.filter(
+            card_pool=rule_record.card_pool,
+            target_kind=rule_record.target_kind,
+            target_key=rule_record.target_key,
+            source_kind=rule_record.source_kind,
+            **source_fields,
+        ).first()
+        if existing_rule is None:
+            classification_rule_service.create_rule(
+                card_pool=rule_record.card_pool,
+                target_kind=rule_record.target_kind,
+                target_key=rule_record.target_key,
+                source_kind=rule_record.source_kind,
+                source_id=source.id,
+                enabled=rule_record.enabled,
+            )
+        elif existing_rule.enabled != rule_record.enabled:
+            classification_rule_service.update_rule(
+                rule_id=existing_rule.id,
+                enabled=rule_record.enabled,
+            )
     for deck_tag_record in payload.deck_tags:
         DeckTag.objects.update_or_create(
             kind=deck_tag_record.kind,
@@ -412,14 +578,17 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
 
 
 def _create_catalog_rows(model: Any, rows: list[Any]) -> dict[str, Any]:
-    return {
-        row.key: model.objects.create(
+    catalog: dict[str, Any] = {}
+    for row in rows:
+        instance, _created = model.objects.update_or_create(
             key=row.key,
-            label=row.label,
-            identifiers_json=row.identifiers,
+            defaults={
+                "label": row.label,
+                "identifiers_json": row.identifiers,
+            },
         )
-        for row in rows
-    }
+        catalog[row.key] = instance
+    return catalog
 
 
 def _symbol_reference_asset_path(stored_path: str) -> str:
