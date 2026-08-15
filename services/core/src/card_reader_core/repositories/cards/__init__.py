@@ -38,7 +38,9 @@ from .snapshots import (
     decode_field_sources,
     decode_parsed_snapshot,
 )
+from .sorting import build_type_sort_lookup, card_default_sort_key
 from .types import (
+    CARD_SORT_DEFAULT,
     CARD_SORT_MANA_ASC,
     CARD_SORT_MANA_DESC,
     CARD_SORT_MANA_TYPE_ASC,
@@ -61,6 +63,7 @@ from .types import (
     ParsedCardSaveResult,
     ParsedSnapshotPayload,
 )
+
 if TYPE_CHECKING:
     from .edits import promote_card_version, update_latest_card_version
     from .writes import apply_parsed_fields_to_version, save_parsed_card, save_parsed_card_result
@@ -80,6 +83,7 @@ def __getattr__(name: str) -> Any:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module = import_module(module_name, __name__)
     return getattr(module, name)
+
 
 __all__ = [
     "CardListRow",
@@ -101,6 +105,7 @@ __all__ = [
     "SCALAR_FIELD_NAMES",
     "apply_parsed_fields_to_version",
     "CARD_SORT_MANA_ASC",
+    "CARD_SORT_DEFAULT",
     "CARD_SORT_MANA_DESC",
     "CARD_SORT_MANA_TYPE_ASC",
     "CARD_SORT_NAME_ASC",
@@ -109,6 +114,8 @@ __all__ = [
     "CARD_SORT_VALUES",
     "CardLifecycleFilter",
     "CardSort",
+    "build_type_sort_lookup",
+    "card_default_sort_key",
     "decode_field_sources",
     "decode_parsed_snapshot",
     "change_card_identity",

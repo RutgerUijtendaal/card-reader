@@ -616,7 +616,9 @@ def test_processor_uses_frozen_classification_detector_inputs() -> None:
         ) -> SimpleNamespace:
             known_tags = resources["known_tags"]
             assert isinstance(known_tags, list)
-            frozen_tag = next(row for row in known_tags if isinstance(row, Tag) and row.id == tag.id)
+            frozen_tag = next(
+                row for row in known_tags if isinstance(row, Tag) and row.id == tag.id
+            )
             assert frozen_tag.label == "Original Hero Source"
             assert frozen_tag.identifiers_json == ["original hero term"]
             return SimpleNamespace(
@@ -1007,9 +1009,10 @@ def test_staff_can_create_name_only_template() -> None:
 
     assert response.status_code == 200
     assert response.json()["definition_json"]["regions"][0]["parser_type"] == "name"
-    assert Template.objects.get(key="name-only-template").definition_json["regions"][0][
-        "parser_type"
-    ] == "name"
+    assert (
+        Template.objects.get(key="name-only-template").definition_json["regions"][0]["parser_type"]
+        == "name"
+    )
 
 
 def test_staff_can_update_template_to_name_only() -> None:
@@ -1044,9 +1047,7 @@ def test_template_create_rejects_multiple_name_producers(
     first_parser_type: str,
     second_parser_type: str,
 ) -> None:
-    client = _staff_client(
-        f"staff-name-conflict-{first_parser_type}-{second_parser_type}"
-    )
+    client = _staff_client(f"staff-name-conflict-{first_parser_type}-{second_parser_type}")
     definition = _valid_template_definition(parser_type=first_parser_type)
     definition["regions"].append(  # type: ignore[union-attr]
         {
@@ -2580,6 +2581,207 @@ def test_mana_family_sort_key_backfill_and_symbol_mutations_stay_synchronized() 
     assert version.mana_family_sort_key == 63
 
 
+def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
+    arcane_hero, arcane_hero_version = _create_editable_card_version(
+        name="Default Player Arcane Hero"
+    )
+    arcane_normal_low, arcane_normal_low_version = _create_editable_card_version(
+        name="Default Player Arcane Normal Low"
+    )
+    arcane_normal_high, arcane_normal_high_version = _create_editable_card_version(
+        name="Default Player Arcane Normal High"
+    )
+    arcane_normal_null, arcane_normal_null_version = _create_editable_card_version(
+        name="Default Player Arcane Normal Null"
+    )
+    arcane_boss, arcane_boss_version = _create_editable_card_version(
+        name="Default Player Arcane Boss"
+    )
+    dark_hero, dark_hero_version = _create_editable_card_version(name="Default Player Dark Hero")
+
+    for version in (
+        arcane_hero_version,
+        arcane_normal_low_version,
+        arcane_normal_high_version,
+        arcane_normal_null_version,
+        arcane_boss_version,
+        dark_hero_version,
+    ):
+        _create_card_image(version)
+    for version, mana_value in (
+        (arcane_hero_version, 6),
+        (arcane_normal_low_version, 1),
+        (arcane_normal_high_version, 4),
+        (arcane_boss_version, 0),
+    ):
+        version.mana_family_sort_key = 0
+        version.mana_value = mana_value
+        version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    arcane_normal_null_version.mana_family_sort_key = 0
+    arcane_normal_null_version.mana_value = None
+    arcane_normal_null_version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    dark_hero_version.mana_family_sort_key = 1
+    dark_hero_version.mana_value = 0
+    dark_hero_version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=arcane_hero, role="hero"),
+            CardRoleAssignment(card=arcane_boss, role="boss"),
+            CardRoleAssignment(card=dark_hero, role="hero"),
+        ]
+    )
+
+    client = Client(HTTP_HOST="localhost")
+    first_response = client.get("/cards", {"q": "Default Player", "page": 1, "page_size": 2})
+    second_response = client.get("/cards", {"q": "Default Player", "page": 2, "page_size": 2})
+    third_response = client.get("/cards", {"q": "Default Player", "page": 3, "page_size": 2})
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert third_response.status_code == 200
+    assert [row["id"] for row in first_response.json()["results"]] == [
+        arcane_hero.id,
+        arcane_normal_low.id,
+    ]
+    assert [row["id"] for row in second_response.json()["results"]] == [
+        arcane_normal_high.id,
+        arcane_normal_null.id,
+    ]
+    assert [row["id"] for row in third_response.json()["results"]] == [
+        arcane_boss.id,
+        dark_hero.id,
+    ]
+
+
+def test_cards_list_uses_evil_faction_default_order() -> None:
+    order_boss, order_boss_version = _create_editable_card_version(
+        name="Default Evil Order Boss", card_pool="evil"
+    )
+    order_location, order_location_version = _create_editable_card_version(
+        name="Default Evil Order Location", card_pool="evil"
+    )
+    order_normal_low, order_normal_low_version = _create_editable_card_version(
+        name="Default Evil Order Normal Low", card_pool="evil"
+    )
+    order_normal_high, order_normal_high_version = _create_editable_card_version(
+        name="Default Evil Order Normal High", card_pool="evil"
+    )
+    blood_boss, blood_boss_version = _create_editable_card_version(
+        name="Default Evil Blood Boss", card_pool="evil"
+    )
+    no_faction_boss, no_faction_boss_version = _create_editable_card_version(
+        name="Default Evil No Faction Boss", card_pool="evil"
+    )
+    for version, mana_value in (
+        (order_boss_version, 9),
+        (order_location_version, 0),
+        (order_normal_low_version, 1),
+        (order_normal_high_version, 5),
+        (blood_boss_version, 0),
+        (no_faction_boss_version, 0),
+    ):
+        _create_card_image(version)
+        version.mana_value = mana_value
+        version.save(update_fields=["mana_value"])
+    CardFactionAssignment.objects.bulk_create(
+        [
+            CardFactionAssignment(card=order_boss, faction="order"),
+            CardFactionAssignment(card=order_location, faction="order"),
+            CardFactionAssignment(card=order_normal_low, faction="order"),
+            CardFactionAssignment(card=order_normal_high, faction="order"),
+            CardFactionAssignment(card=blood_boss, faction="blood"),
+        ]
+    )
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=order_boss, role="boss"),
+            CardRoleAssignment(card=order_location, role="location"),
+            CardRoleAssignment(card=blood_boss, role="boss"),
+            CardRoleAssignment(card=no_faction_boss, role="boss"),
+        ]
+    )
+
+    response = _staff_client("evil-default-sort-user").get(
+        "/cards", {"card_pool": "evil", "q": "Default Evil"}
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"]] == [
+        order_boss.id,
+        order_location.id,
+        order_normal_low.id,
+        order_normal_high.id,
+        blood_boss.id,
+        no_faction_boss.id,
+    ]
+
+
+def test_cards_list_uses_neutral_role_default_order() -> None:
+    normal_card, normal_version = _create_editable_card_version(
+        name="Default Neutral Normal", card_pool="neutral"
+    )
+    boon_card, boon_version = _create_editable_card_version(
+        name="Default Neutral Boon", card_pool="neutral"
+    )
+    boon_event_card, boon_event_version = _create_editable_card_version(
+        name="Default Neutral Boon Event", card_pool="neutral"
+    )
+    event_card, event_version = _create_editable_card_version(
+        name="Default Neutral Event", card_pool="neutral"
+    )
+    shop_card, shop_version = _create_editable_card_version(
+        name="Default Neutral Shop", card_pool="neutral"
+    )
+    hero_card, hero_version = _create_editable_card_version(
+        name="Default Neutral Hero", card_pool="neutral"
+    )
+    boss_card, boss_version = _create_editable_card_version(
+        name="Default Neutral Boss", card_pool="neutral"
+    )
+    location_card, location_version = _create_editable_card_version(
+        name="Default Neutral Location", card_pool="neutral"
+    )
+    for version in (
+        normal_version,
+        boon_version,
+        boon_event_version,
+        event_version,
+        shop_version,
+        hero_version,
+        boss_version,
+        location_version,
+    ):
+        _create_card_image(version)
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=boon_card, role="boon"),
+            CardRoleAssignment(card=boon_event_card, role="boon"),
+            CardRoleAssignment(card=boon_event_card, role="event"),
+            CardRoleAssignment(card=event_card, role="event"),
+            CardRoleAssignment(card=shop_card, role="shop_item"),
+            CardRoleAssignment(card=hero_card, role="hero"),
+            CardRoleAssignment(card=boss_card, role="boss"),
+            CardRoleAssignment(card=location_card, role="location"),
+        ]
+    )
+
+    response = _staff_client("neutral-default-sort-user").get(
+        "/cards", {"card_pool": "neutral", "q": "Default Neutral"}
+    )
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["results"]] == [
+        normal_card.id,
+        hero_card.id,
+        boss_card.id,
+        location_card.id,
+        boon_card.id,
+        boon_event_card.id,
+        event_card.id,
+        shop_card.id,
+    ]
+
+
 def test_cards_list_supports_type_sorting() -> None:
     spell_type = _create_type(key="sort-type-spell", label="Spell")
     creature_type = _create_type(key="sort-type-creature", label="Creature")
@@ -2834,6 +3036,52 @@ def test_grouped_gallery_type_sort_uses_anchor_card_types() -> None:
 
     assert response.status_code == 200
     results = response.json()["results"][:2]
+    assert results[0]["result_type"] == "card"
+    assert results[0]["id"] == standalone_card.id
+    assert results[1]["result_type"] == "card_group"
+    assert results[1]["anchor_card_id"] == anchor_card.id
+
+
+def test_grouped_gallery_default_sort_uses_anchor_card_values() -> None:
+    anchor_card, anchor_version = _create_editable_card_version(
+        name="Unmatched Default Group Anchor"
+    )
+    member_card, member_version = _create_editable_card_version(
+        name="Default Group Matching Member"
+    )
+    standalone_card, standalone_version = _create_editable_card_version(
+        name="Default Group Matching Standalone"
+    )
+    for version in (anchor_version, member_version, standalone_version):
+        _create_card_image(version)
+    anchor_version.mana_family_sort_key = 0
+    member_version.mana_family_sort_key = 0
+    standalone_version.mana_family_sort_key = 0
+    anchor_version.mana_value = 0
+    member_version.mana_value = 0
+    standalone_version.mana_value = 9
+    anchor_version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    member_version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    standalone_version.save(update_fields=["mana_family_sort_key", "mana_value"])
+    CardRoleAssignment.objects.bulk_create(
+        [
+            CardRoleAssignment(card=anchor_card, role="boss"),
+            CardRoleAssignment(card=member_card, role="hero"),
+        ]
+    )
+    _create_card_group(
+        "default-anchor-sort-group",
+        anchor_card=anchor_card,
+        members=[anchor_card, member_card],
+    )
+
+    response = Client(HTTP_HOST="localhost").get(
+        "/cards",
+        {"show_groups": "true", "sort": "default", "q": "Default Group Matching"},
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"]
     assert results[0]["result_type"] == "card"
     assert results[0]["id"] == standalone_card.id
     assert results[1]["result_type"] == "card_group"

@@ -46,6 +46,12 @@ The application owns six canonical mana families in a fixed release-time order: 
 
 Card gallery APIs expose `sort=mana_type_asc` and canonical filters through repeated `mana_family_keys` and `mana_family_exclude_keys` parameters plus `mana_family_match=any|all`. A canonical filter matches either the mana or affinity representation. Existing mana- and affinity-symbol parameters remain literal and backward compatible. `GET /cards/filters` supplies the ordered `mana_families` catalog used by gallery filters, deck-builder hero selection, and hero-derived deck presets; unmatched affinities remain available in the separate Affinity filter.
 
+`sort=default` is the default for single-pool card collections. Player orders by canonical mana family, then Hero, the default role order, and ascending mana value. Evil orders by Order, Blood, Darkness, then no faction, followed by Boss, Location, the default role order, and ascending mana value. Neutral uses the default role order directly. That shared order is Normal, Hero, Boss, Location, Boon, Event, then Shop Item; a pool-specific priority moves the named roles ahead without duplicating them. Multi-valued classifications use their earliest effective value and complete effective membership as tie-breakers; null mana values sort last, and names, labels, and Card ids make every order deterministic. Grouped Gallery results use the anchor Card's classifications and latest-version metadata.
+
+The backend and frontend express these priorities as mirrored declarative component lists. Query-backed collections translate the components to SQL annotations over indexed card, role, and faction fields and paginate after database ordering. The default path does not load the Type catalog or materialize the complete result set, keeping future priority changes localized without sacrificing pagination performance.
+
+Card sort preferences use one versioned browser-origin `localStorage` record. The first load after this change replaces the legacy global default and per-surface overrides with `default` and empty overrides, after which users can customize them again. This migration runs independently in each browser profile when it next opens the app; server-side or Django migrations cannot rewrite remote browser storage.
+
 ## Lifecycle state
 
 Cards have an explicit lifecycle state:

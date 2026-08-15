@@ -1,3 +1,11 @@
+import type { CardFaction } from '@/domain/cards/cardFactions';
+import type { CardPool } from '@/domain/cards/cardPools';
+import {
+  STANDARD_CARD_ROLE,
+  type CardRole,
+  type CardRoleFilter,
+} from '@/domain/cards/cardRoles';
+
 export type TypeSortMetadata = {
   key: string;
   label: string;
@@ -9,7 +17,7 @@ export type CardTypeMetadata = {
   label: string;
 };
 
-export type CardSort = 'updated_desc' | 'name_asc' | 'mana_asc' | 'mana_desc' | 'mana_type_asc' | 'types_asc';
+export type CardSort = 'default' | 'updated_desc' | 'name_asc' | 'mana_asc' | 'mana_desc' | 'mana_type_asc' | 'types_asc';
 
 export type CardSortOption = {
   value: CardSort;
@@ -17,9 +25,14 @@ export type CardSortOption = {
   description: string;
 };
 
-export const DEFAULT_CARD_SORT: CardSort = 'updated_desc';
+export const DEFAULT_CARD_SORT: CardSort = 'default';
 
 export const cardSortOptions: CardSortOption[] = [
+  {
+    value: 'default',
+    label: 'Default',
+    description: 'Use the natural order for the current card pool.',
+  },
   {
     value: 'updated_desc',
     label: 'Recently Updated',
@@ -56,9 +69,10 @@ export const isCardSort = (value: unknown): value is CardSort =>
   typeof value === 'string' && cardSortOptions.some((option) => option.value === value);
 
 export const getCardSortLabel = (sort: CardSort): string =>
-  cardSortOptions.find((option) => option.value === sort)?.label ?? 'Recently Updated';
+  cardSortOptions.find((option) => option.value === sort)?.label ?? 'Default';
 
 export const getCardSortCompactLabel = (sort: CardSort): string => {
+  if (sort === 'default') return 'Default';
   if (sort === 'name_asc') return 'Name';
   if (sort === 'mana_asc') return 'Mana ↑';
   if (sort === 'mana_desc') return 'Mana ↓';
@@ -79,6 +93,8 @@ type SortableCardLike = {
   mana_value: number | null;
   mana_family_sort_key?: number;
   updated_at: string;
+  card_roles?: readonly CardRole[];
+  card_factions?: readonly CardFaction[];
   types?: CardTypeMetadata[];
 };
 
@@ -88,6 +104,10 @@ type TypeSortLookupEntry = {
 };
 
 export type TypeSortLookup = Record<string, TypeSortLookupEntry>;
+export type CardSortContext = {
+  cardPool: CardPool;
+  typeSortLookup?: TypeSortLookup;
+};
 export type TypeSortBucket = {
   key: string;
   normalizedKey: string;
@@ -112,6 +132,39 @@ const parseTimestamp = (value: string): number => {
 const compareStableText = (left: string, right: string): number => {
   if (left === right) return 0;
   return left < right ? -1 : 1;
+};
+
+const EVIL_FACTION_SORT_ORDER: readonly CardFaction[] = ['order', 'blood', 'darkness'];
+const DEFAULT_ROLE_SORT_ORDER: readonly CardRoleFilter[] = [
+  STANDARD_CARD_ROLE,
+  'hero',
+  'boss',
+  'location',
+  'boon',
+  'event',
+  'shop_item',
+];
+
+type DefaultSortComponent =
+  | { kind: 'manaFamily' }
+  | { kind: 'faction'; order: readonly CardFaction[] }
+  | { kind: 'role'; priorityRoles: readonly CardRole[] }
+  | { kind: 'manaValue' };
+
+const DEFAULT_SORT_COMPONENTS: Record<CardPool, readonly DefaultSortComponent[]> = {
+  player: [
+    { kind: 'manaFamily' },
+    { kind: 'role', priorityRoles: ['hero'] },
+    { kind: 'manaValue' },
+  ],
+  evil: [
+    { kind: 'faction', order: EVIL_FACTION_SORT_ORDER },
+    { kind: 'role', priorityRoles: ['boss', 'location'] },
+    { kind: 'manaValue' },
+  ],
+  neutral: [
+    { kind: 'role', priorityRoles: [] },
+  ],
 };
 
 export const buildTypeSortBuckets = (types: TypeSortMetadata[]): TypeSortBucket[] =>
@@ -191,12 +244,116 @@ const getCardTypeSortValue = (
   };
 };
 
+const firstClassificationRank = (
+  values: readonly string[],
+  order: readonly string[],
+  emptyRank: number,
+): number => {
+  const requested = new Set(values);
+  const rank = order.findIndex((value) => requested.has(value));
+  return rank === -1 ? emptyRank : rank;
+};
+
+const classificationMembershipMask = (
+  values: readonly string[],
+  order: readonly string[],
+): number => {
+  const requested = new Set(values);
+  return order.reduce((mask, value, rank) => (
+    requested.has(value) ? mask + (2 ** rank) : mask
+  ), 0);
+};
+
+const compareCardTypeSort = (
+  left: SortableCardLike,
+  right: SortableCardLike,
+  typeSortLookup?: TypeSortLookup,
+): number => {
+  const leftType = getCardTypeSortValue(left, typeSortLookup);
+  const rightType = getCardTypeSortValue(right, typeSortLookup);
+  return leftType.bucket - rightType.bucket
+    || rightType.linkedCardCount - leftType.linkedCardCount
+    || leftType.typeLabel.localeCompare(rightType.typeLabel);
+};
+
+const effectiveRoleSortOrder = (
+  priorityRoles: readonly CardRole[],
+): readonly CardRoleFilter[] => [
+  ...priorityRoles,
+  ...DEFAULT_ROLE_SORT_ORDER.filter(
+    (role) => role === STANDARD_CARD_ROLE || !priorityRoles.includes(role),
+  ),
+];
+
+const compareDefaultRoleSort = (
+  leftRoles: readonly CardRole[],
+  rightRoles: readonly CardRole[],
+  priorityRoles: readonly CardRole[],
+): number => {
+  const order = effectiveRoleSortOrder(priorityRoles);
+  const emptyRank = order.indexOf(STANDARD_CARD_ROLE);
+  const leftRank = leftRoles.length === 0
+    ? emptyRank
+    : firstClassificationRank(leftRoles, order, order.length);
+  const rightRank = rightRoles.length === 0
+    ? emptyRank
+    : firstClassificationRank(rightRoles, order, order.length);
+  return leftRank - rightRank
+    || classificationMembershipMask(leftRoles, order)
+    - classificationMembershipMask(rightRoles, order);
+};
+
+const compareNullableManaValue = (
+  leftMana: number | null,
+  rightMana: number | null,
+): number => {
+  if (leftMana === null && rightMana !== null) return 1;
+  if (leftMana !== null && rightMana === null) return -1;
+  return leftMana !== null && rightMana !== null ? leftMana - rightMana : 0;
+};
+
+const compareDefaultCardSort = (
+  left: SortableCardLike,
+  right: SortableCardLike,
+  context: CardSortContext,
+): number => {
+  for (const component of DEFAULT_SORT_COMPONENTS[context.cardPool]) {
+    let difference = 0;
+    if (component.kind === 'manaFamily') {
+      difference = (left.mana_family_sort_key ?? Number.MAX_SAFE_INTEGER)
+        - (right.mana_family_sort_key ?? Number.MAX_SAFE_INTEGER);
+    } else if (component.kind === 'faction') {
+      const leftFactions = left.card_factions ?? [];
+      const rightFactions = right.card_factions ?? [];
+      difference = firstClassificationRank(leftFactions, component.order, component.order.length)
+        - firstClassificationRank(rightFactions, component.order, component.order.length)
+        || classificationMembershipMask(leftFactions, component.order)
+        - classificationMembershipMask(rightFactions, component.order);
+    } else if (component.kind === 'role') {
+      difference = compareDefaultRoleSort(
+        left.card_roles ?? [],
+        right.card_roles ?? [],
+        component.priorityRoles,
+      );
+    } else {
+      difference = compareNullableManaValue(left.mana_value, right.mana_value);
+    }
+    if (difference !== 0) return difference;
+  }
+  return compareStableText(left.name, right.name)
+    || compareStableText(left.label, right.label)
+    || compareStableText(left.id, right.id);
+};
+
 export const compareCardSort = <TCard extends SortableCardLike>(
   left: TCard,
   right: TCard,
   sort: CardSort,
-  typeSortLookup?: TypeSortLookup,
+  context: CardSortContext,
 ): number => {
+  if (sort === 'default') {
+    return compareDefaultCardSort(left, right, context);
+  }
   if (sort === 'name_asc') {
     return left.name.localeCompare(right.name) || left.label.localeCompare(right.label) || left.id.localeCompare(right.id);
   }
@@ -224,11 +381,7 @@ export const compareCardSort = <TCard extends SortableCardLike>(
       || compareStableText(left.id, right.id);
   }
   if (sort === 'types_asc') {
-    const leftType = getCardTypeSortValue(left, typeSortLookup);
-    const rightType = getCardTypeSortValue(right, typeSortLookup);
-    return leftType.bucket - rightType.bucket
-      || rightType.linkedCardCount - leftType.linkedCardCount
-      || leftType.typeLabel.localeCompare(rightType.typeLabel)
+    return compareCardTypeSort(left, right, context.typeSortLookup)
       || left.name.localeCompare(right.name)
       || left.label.localeCompare(right.label)
       || left.id.localeCompare(right.id);

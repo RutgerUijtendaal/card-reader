@@ -144,6 +144,7 @@ describe('useDeckEditorFilters', () => {
     const params = controller.buildSearchParams();
 
     expect(params.get('q')).toBe('mage');
+    expect(params.get('sort')).toBe('default');
     expect(params.get('lifecycle_status')).toBe('all');
     expect(params.getAll('card_ids')).toEqual(['card-a', 'card-b']);
   });

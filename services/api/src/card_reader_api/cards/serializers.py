@@ -28,7 +28,11 @@ from card_reader_core.models import (
     normalize_card_lifecycle_filter,
 )
 from card_reader_core.repositories.cards import DEFAULT_CARD_PAGE_SIZE, CardListRow
-from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC, CARD_SORT_VALUES, CardFilterParams
+from card_reader_core.repositories.cards import (
+    CARD_SORT_DEFAULT,
+    CARD_SORT_VALUES,
+    CardFilterParams,
+)
 from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
 
@@ -82,7 +86,9 @@ def card_payload(
         "template_id": version.template.key,
         "version_id": version.id,
         "version_number": version.version_number,
-        "previous_version_id": version.previous_version.id if version.previous_version is not None else None,
+        "previous_version_id": version.previous_version.id
+        if version.previous_version is not None
+        else None,
         "is_latest": version.is_latest,
         "content_version": _content_version_payload(version),
         "type_line": version.type_line,
@@ -223,7 +229,9 @@ def card_group_summary_payload(
 
 
 def card_deck_reference_payload(deck: Deck, *, card_id: str) -> dict[str, object]:
-    mainboard_quantity = sum(int(entry.quantity) for entry in deck.entries.all() if entry.card.id == card_id)
+    mainboard_quantity = sum(
+        int(entry.quantity) for entry in deck.entries.all() if entry.card.id == card_id
+    )
     sideboard_quantity = sum(
         int(entry.quantity)
         for sideboard in deck.sideboards.all()
@@ -242,10 +250,7 @@ def _render_card_rule_text(version: CardVersion, metadata: CardMetadata | None) 
         return version.rules_text
     if metadata is None:
         return version.rules_text
-    symbol_tokens_by_key = {
-        symbol.key: symbol.text_token
-        for symbol in metadata["symbols"]
-    }
+    symbol_tokens_by_key = {symbol.key: symbol.text_token for symbol in metadata["symbols"]}
     return render_enriched_rule_text(
         version.rules_text_enriched,
         symbol_tokens_by_key=symbol_tokens_by_key,
@@ -270,15 +275,25 @@ def _first_symbol_asset_url(raw: object) -> str | None:
 class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
     q = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     query = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    card_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    card_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
     max_confidence = serializers.FloatField(required=False, allow_null=True)
-    keyword_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    keyword_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    keyword_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    keyword_match = serializers.ChoiceField(choices=["any", "all"], required=False, allow_null=True)
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    tag_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    mana_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    mana_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    mana_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    tag_match = serializers.ChoiceField(choices=["any", "all"], required=False, allow_null=True)
+    mana_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    mana_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    mana_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
     mana_family_keys = serializers.ListField(
         child=serializers.ChoiceField(choices=MANA_FAMILY_KEYS),
         required=False,
@@ -289,20 +304,46 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         required=False,
         allow_empty=True,
     )
-    mana_family_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    affinity_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    affinity_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    affinity_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    devotion_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    devotion_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    devotion_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    other_symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    other_symbol_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    other_symbol_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
-    symbol_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    type_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    type_exclude_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
-    type_match = serializers.ChoiceField(choices=['any', 'all'], required=False, allow_null=True)
+    mana_family_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    affinity_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    affinity_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    affinity_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    devotion_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    devotion_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    devotion_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    other_symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    other_symbol_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    other_symbol_match = serializers.ChoiceField(
+        choices=["any", "all"], required=False, allow_null=True
+    )
+    symbol_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    type_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    type_exclude_ids = serializers.ListField(
+        child=serializers.CharField(), required=False, allow_empty=True
+    )
+    type_match = serializers.ChoiceField(choices=["any", "all"], required=False, allow_null=True)
     mana_cost_min = serializers.IntegerField(required=False, allow_null=True)
     mana_cost_max = serializers.IntegerField(required=False, allow_null=True)
     template_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -340,9 +381,13 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
         required=False,
         default=DEFAULT_CARD_LIFECYCLE_FILTER,
     )
-    sort = serializers.ChoiceField(choices=CARD_SORT_VALUES, required=False, default=CARD_SORT_UPDATED_DESC)
+    sort = serializers.ChoiceField(
+        choices=CARD_SORT_VALUES, required=False, default=CARD_SORT_DEFAULT
+    )
     page = serializers.IntegerField(required=False, min_value=1, default=1)
-    page_size = serializers.IntegerField(required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE)
+    page_size = serializers.IntegerField(
+        required=False, min_value=1, default=DEFAULT_CARD_PAGE_SIZE
+    )
     show_groups = serializers.BooleanField(required=False, default=False)
 
     def validated_filters(self) -> CardFilterParams:
@@ -377,7 +422,9 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
             "mana_cost_max": self._int_or_none("mana_cost_max"),
             "template_id": self._string_or_none("template_id"),
             "card_pool": self.validated_data.get("card_pool", "player"),
-            "card_roles": cast(list[CardRoleFilter] | None, self._string_list_or_none("card_roles")),
+            "card_roles": cast(
+                list[CardRoleFilter] | None, self._string_list_or_none("card_roles")
+            ),
             "card_role_exclude": cast(
                 list[CardRoleFilter] | None,
                 self._string_list_or_none("card_role_exclude"),
@@ -391,9 +438,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
                 list[CardFaction] | None,
                 self._string_list_or_none("card_faction_exclude"),
             ),
-            "card_faction_match": self.validated_data.get(
-                "card_faction_match", "any"
-            ),
+            "card_faction_match": self.validated_data.get("card_faction_match", "any"),
             "attack_min": self._int_or_none("attack_min"),
             "attack_max": self._int_or_none("attack_max"),
             "health_min": self._int_or_none("health_min"),
@@ -445,7 +490,7 @@ class CardFiltersQuerySerializer(serializers.Serializer[dict[str, object]]):
 
     def _sort_value(self, key: str) -> CardSort:
         value = self.validated_data.get(key)
-        return value if value in CARD_SORT_VALUES else CARD_SORT_UPDATED_DESC
+        return value if value in CARD_SORT_VALUES else CARD_SORT_DEFAULT
 
     def _lifecycle_status_value(self, key: str) -> CardLifecycleFilter:
         value = self.validated_data.get(key)
@@ -484,10 +529,18 @@ class LatestVersionUpdateSerializer(serializers.Serializer[dict[str, object]]):
     tag_ids = serializers.ListField(child=serializers.CharField(), required=False)
     type_ids = serializers.ListField(child=serializers.CharField(), required=False)
     symbol_ids = serializers.ListField(child=serializers.CharField(), required=False)
-    restore_fields = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    restore_metadata_groups = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    unlock_fields = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    unlock_metadata_groups = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    restore_fields = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    restore_metadata_groups = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    unlock_fields = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    unlock_metadata_groups = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
 
     def validate_restore_fields(self, value: list[str]) -> list[str]:
         return _validated_names(value, SCALAR_FIELDS, "Invalid scalar field name.")
@@ -568,7 +621,9 @@ class CardVersionParseFlagCreateSerializer(serializers.Serializer[dict[str, obje
                 continue
             expected_value = item.get("expected_value")
             if not isinstance(expected_value, str) or not expected_value.strip():
-                raise serializers.ValidationError("Property flag suggestions require an expected value.")
+                raise serializers.ValidationError(
+                    "Property flag suggestions require an expected value."
+                )
         return value
 
 

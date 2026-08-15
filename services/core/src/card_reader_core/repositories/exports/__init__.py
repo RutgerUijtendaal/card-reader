@@ -11,7 +11,7 @@ from card_reader_core.models import (
     CardRoleFilter,
     Symbol,
 )
-from card_reader_core.repositories.cards import CARD_SORT_UPDATED_DESC
+from card_reader_core.repositories.cards import CARD_SORT_DEFAULT
 from card_reader_core.rules import render_enriched_rule_text
 
 from ..cards import DEFAULT_CARD_LIFECYCLE_FILTER, CardLifecycleFilter, list_cards
@@ -65,7 +65,7 @@ def export_cards_csv(
     health_min: int | None = None,
     health_max: int | None = None,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
-    sort: CardSort = CARD_SORT_UPDATED_DESC,
+    sort: CardSort = CARD_SORT_DEFAULT,
 ) -> str:
     stream = io.StringIO()
     writer = csv.DictWriter(
