@@ -180,6 +180,6 @@ class DeckSideboardEntry(TimestampedModel):
         ordering = ["position", "card_id"]
         constraints = [models.UniqueConstraint(fields=("sideboard", "card"), name="ux_deck_sideboard_entry_card")]
         indexes = [
-            models.Index(fields=["sideboard", "created_at"], name="ix_deck_sideboard_entry_created"),
+            models.Index(fields=["sideboard", "created_at"], name="ix_sideboard_entry_created"),
             models.Index(fields=["sideboard", "position"], name="ix_deck_side_entry_pos"),
         ]
