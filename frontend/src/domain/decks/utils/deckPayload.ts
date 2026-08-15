@@ -14,6 +14,7 @@ export const buildDeckUpsertRequestFromRecord = (deck: DeckRecord): DeckUpsertRe
     quantity: entry.quantity,
   })),
   sideboards: deck.sideboards.map((sideboard) => ({
+    id: sideboard.id,
     name: sideboard.name.trim(),
     entries: sideboard.entries.map((entry) => ({
       card_id: entry.card.id,

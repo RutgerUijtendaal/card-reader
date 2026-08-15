@@ -60,6 +60,7 @@ export const buildDeckUpsertPayload = (form: DeckForm): DeckUpsertRequest => ({
   hero_card_id: form.hero_card_id,
   entries: form.entries.map((entry) => ({ ...entry })),
   sideboards: form.sideboards.map((sideboard) => ({
+    id: sideboard.id,
     name: sideboard.name.trim(),
     entries: sideboard.entries.map((entry) => ({ ...entry })),
   })),

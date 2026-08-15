@@ -37,21 +37,31 @@ def _validate_preserved_restricted_sideboard_entries(
     existing_sideboards: list[DeckSideboard],
 ) -> None:
     restricted_card_ids: set[str] = set()
+    existing_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
+    existing_by_name = {sideboard.name: sideboard for sideboard in existing_sideboards}
     expected_quantities: dict[tuple[str, str], int] = {}
     for existing_sideboard in existing_sideboards:
         for existing_entry in existing_sideboard.entries.all():
             if PLAYER_CARD_POOL_SCOPE.allows_card_pool(existing_entry.card.card_pool):
                 continue
             restricted_card_ids.add(existing_entry.card.id)
-            expected_quantities[(existing_sideboard.name, existing_entry.card.id)] = int(
+            expected_quantities[(existing_sideboard.id, existing_entry.card.id)] = int(
                 existing_entry.quantity
             )
     for submitted_sideboard in sideboards:
+        source_sideboard = (
+            existing_by_id.get(submitted_sideboard.source_id)
+            if submitted_sideboard.source_id is not None
+            else None
+        ) or existing_by_name.get(submitted_sideboard.name)
         for submitted_entry in submitted_sideboard.entries:
             if submitted_entry.card_id not in restricted_card_ids:
                 continue
             if expected_quantities.get(
-                (submitted_sideboard.name, submitted_entry.card_id)
+                (
+                    source_sideboard.id if source_sideboard is not None else "",
+                    submitted_entry.card_id,
+                )
             ) != int(
                 submitted_entry.quantity
             ):

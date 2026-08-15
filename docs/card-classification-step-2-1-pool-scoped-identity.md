@@ -136,7 +136,7 @@ The API auth boundary continues mapping a user to `CardPoolScope`:
 
 Rename any public `can_access_game_master_cards` session field and internal `allow_game_master_cards` vocabulary rather than cloning it for each restricted pool. Expose `accessible_card_pools` in canonical order and let frontend pool controls derive their permitted options from that list. The centralized policy remains the only place where staff maps to the restricted pools.
 
-Audit derived behavior through the scope rather than adding Evil/Neutral branches: embedded payloads, groups, catalog previews/counts, exports, TTS allocation and rendering, notifications, deck validation/placeholders, parse flags, and developer-data. Public artifacts remain Player-only even if the restricted-pool audience changes later.
+Audit derived behavior through the scope rather than adding Evil/Neutral branches: embedded payloads, groups, catalog previews/counts, exports, TTS allocation and rendering, notifications, deck validation/placeholders, parse flags, and developer-data. Developer-data remains Player-only; TTS allocation and rendering use explicit pool buckets with stable public sheet URLs.
 
 ## Core identity seam
 
@@ -298,7 +298,7 @@ Audit selectors that can show multiple pools, especially Admin Catalog and merge
 - APIs and routes continue addressing each duplicate-name card independently by id.
 - session pool metadata returns Player only for ordinary users and Player/Evil/Neutral for staff without separate per-pool booleans;
 - unauthorized Evil/Neutral collection requests return `403`, while their direct objects and assets return `404`;
-- Player-only TTS, developer-data, deck, and embedded-payload behavior excludes both restricted pools through the shared scope; notification inboxes use each recipient's scope while deck-version delivery remains Player-only;
+- developer-data, deck, and embedded-payload behavior excludes both restricted pools through the shared scope; TTS sheets are pool-partitioned public artifacts, notification inboxes use each recipient's scope, and deck-version delivery remains Player-only;
 
 ## Validation
 

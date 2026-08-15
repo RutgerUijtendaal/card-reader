@@ -3433,6 +3433,7 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
         for entry in payload["mainboard"]["entries"]
         if entry["card"]["restricted"]
     )
+    sideboard_id = payload["sideboards"][0]["id"]
 
     response = client.patch(
         f"/my/decks/{deck.id}",
@@ -3443,7 +3444,8 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
             ],
             "sideboards": [
                 {
-                    "name": "Restricted Tech",
+                    "id": sideboard_id,
+                    "name": "Renamed Restricted Tech",
                     "entries": [
                         {"card_id": restricted_id, "quantity": 2},
                         {"card_id": visible.id, "quantity": 3},
@@ -3462,6 +3464,7 @@ def test_partial_deck_edits_preserve_unchanged_restricted_placeholders() -> None
     assert {
         entry.card_id: entry.quantity for entry in deck.sideboards.get().entries.all()
     } == {restricted.id: 2, visible.id: 3}
+    assert deck.sideboards.get().name == "Renamed Restricted Tech"
 
     tampered = client.patch(
         f"/my/decks/{deck.id}",

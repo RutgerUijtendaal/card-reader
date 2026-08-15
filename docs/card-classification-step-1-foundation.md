@@ -38,7 +38,7 @@ The existing Player experience must continue to work, Hero behavior must use the
 - Typical pool/role combinations such as Player Hero and Game Master Boon/Event/Location are conventions, not database constraints. Any restrictions or warnings belong in core code.
 - Cross-pool relationships are allowed. Do not add same-pool database constraints to groups, future card links, or other card relationships.
 - Game Master access is controlled through a named backend capability whose initial policy is `is_staff`. Do not scatter direct `is_staff` checks through card queries and views.
-- Public derived artifacts such as developer-data bundles and unauthenticated TTS card sheets are Player-pool scoped. They must not encode the current staff policy; changing who receives the Game Master capability must remain independent from deciding which artifacts are public.
+- Developer-data bundles remain Player-pool scoped. Persistent TTS card sheets are partitioned by pool and deliberately public at stable URLs for every pool so existing TTS objects receive later rerenders; export creation remains staff-scoped for restricted pools.
 - Unauthorized list/filter requests that explicitly request the Game Master pool return `403`. Unauthorized direct access to a Game Master card, version, or image returns `404` to avoid disclosing the object.
 - The ordinary gallery defaults to Player cards with Hero excluded. This is a frontend default, not a hidden backend default for every card query.
 
@@ -53,7 +53,7 @@ Migration completion is authoritative for schema/data conversion. Frontend state
 The foundation implementation closes three derived-data paths that require stronger guarantees than checking the requested card alone:
 
 - A historical image route verifies that the requested `CardVersion` belongs to the requested and authorized `Card` before serving bytes. Supplying a visible Player `card_id` with another card's Game Master `version_id` returns `404` for staff and non-staff callers.
-- Public TTS sheets allocate and render Player cards only. Moving an already allocated Player card to Game Master changes the sheet fingerprint, makes the old atlas unavailable immediately, and rerenders the append-only slot without the restricted artwork before the sheet can be served again.
+- Persistent TTS sheets allocate and render cards only within their own pool bucket. Moving an allocated card changes the old sheet fingerprint, rerenders that append-only slot without the moved artwork, and allocates the card into its destination-pool sheet without reusing the old coordinate.
 - Developer-data selection and export are permanently Player-scoped under the current public-artifact contract. Include-all selection omits Game Master cards, while an explicit Game Master card or cross-pool group selection fails validation instead of producing a mixed-audience archive.
 
 These are artifact/data-scope rules, not copies of the current staff entitlement policy. Step 1.1 replaces their local pool vocabulary with the shared scope seam without weakening the behavior.
@@ -241,7 +241,7 @@ Add or update tests covering:
 - Player default query scope;
 - staff access and non-staff denial/404 behavior for every Game Master surface and asset path;
 - nested historical image ownership, including a visible Player `card_id` paired with another card's Game Master `version_id`;
-- Player-only TTS allocation plus immediate stale-atlas denial and safe rerender after Player-to-Game-Master reclassification;
+- pool-partitioned TTS allocation plus immediate stale-atlas denial and safe old/new bucket rerenders after a pool transition;
 - Hero deck validation and selection through the role helper;
 - developer-data Version 1 adoption, Version 2 round trips, format rejection, role/pool coverage, generated-lock compatibility, include-all exclusion of Game Master cards, and rejection of explicit restricted selections;
 - Card-tab edits, including multiple roles and Standard;
@@ -278,7 +278,7 @@ Use `scripts/run-in-agent-env.py` for ad hoc Python checks as directed by `AGENT
 - Admin Catalog linked cards and suggestion occurrences visibly identify their pool and every role, using Standard for an empty role set.
 - Non-staff cannot list, retrieve, infer the existence of, or load images for Game Master cards.
 - Nested version-image routes cannot authorize one card while serving a version owned by another card.
-- Public TTS sheets and developer-data bundles contain Player cards only, including after card-pool transitions.
+- Public TTS sheets contain cards from exactly one explicit pool and retain stable URLs across rerenders; developer-data bundles remain Player-only.
 - Staff can explicitly query and edit Game Master cards.
 - Developer-data Version 2 round-trips pool and roles, while the pinned Version 1 bundle remains adoptable through the explicit compatibility adapter.
 - No same-pool or mutually-exclusive-role database constraint has been introduced.

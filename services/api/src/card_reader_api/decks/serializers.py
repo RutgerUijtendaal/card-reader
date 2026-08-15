@@ -492,6 +492,7 @@ class SideboardEntryWriteSerializer(serializers.Serializer[dict[str, object]]):
 
 
 class DeckSideboardWriteSerializer(serializers.Serializer[dict[str, object]]):
+    id = serializers.CharField(required=False, allow_blank=False)
     name = serializers.CharField(required=True, allow_blank=False)
     entries = SideboardEntryWriteSerializer(many=True, required=True, allow_empty=True)
 

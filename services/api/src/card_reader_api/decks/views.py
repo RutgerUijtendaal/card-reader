@@ -26,6 +26,7 @@ from card_reader_core.models import (
     CardPoolScope,
     Deck,
     DeckEntry,
+    DeckSideboard,
     DeckSideboardEntry,
 )
 from card_reader_core.services.decks import (
@@ -88,17 +89,21 @@ def _restore_unchanged_restricted_deck_references(
             validated_data["entries"] = restored_entries
 
     if "sideboards" in validated_data:
-        existing_sideboards = {sideboard.name: sideboard for sideboard in deck.sideboards.all()}
+        existing_sideboards = list(deck.sideboards.all())
+        existing_sideboards_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
+        existing_sideboards_by_name = {
+            sideboard.name: sideboard for sideboard in existing_sideboards
+        }
         submitted_sideboards = cast(list[dict[str, object]], validated_data["sideboards"])
         restored_sideboards = [
             {
                 **sideboard,
                 "entries": _restore_restricted_entry_references(
                     cast(list[dict[str, object]], sideboard["entries"]),
-                    existing_entries=(
-                        list(existing_sideboards[str(sideboard["name"])].entries.all())
-                        if str(sideboard["name"]) in existing_sideboards
-                        else []
+                    existing_entries=_existing_sideboard_entries_for_submission(
+                        sideboard,
+                        existing_sideboards_by_id=existing_sideboards_by_id,
+                        existing_sideboards_by_name=existing_sideboards_by_name,
                     ),
                     card_pool_scope=card_pool_scope,
                 ),
@@ -108,17 +113,32 @@ def _restore_unchanged_restricted_deck_references(
         expected_sideboards = [
             {
                 "name": sideboard.name,
+                "id": sideboard.id,
                 "entries": [
                     {"card_id": entry.card.id, "quantity": int(entry.quantity)}
                     for entry in sideboard.entries.all()
                 ],
             }
-            for sideboard in deck.sideboards.all()
+            for sideboard in existing_sideboards
         ]
         if restored_sideboards == expected_sideboards:
             validated_data.pop("sideboards")
         else:
             validated_data["sideboards"] = restored_sideboards
+
+
+def _existing_sideboard_entries_for_submission(
+    submitted_sideboard: dict[str, object],
+    *,
+    existing_sideboards_by_id: dict[str, DeckSideboard],
+    existing_sideboards_by_name: dict[str, DeckSideboard],
+) -> Sequence[DeckSideboardEntry]:
+    existing_sideboard = existing_sideboards_by_id.get(
+        str(submitted_sideboard.get("id", ""))
+    ) or existing_sideboards_by_name.get(str(submitted_sideboard["name"]))
+    if existing_sideboard is None:
+        return []
+    return list(existing_sideboard.entries.all())
 
 
 def _restore_restricted_entry_references(
@@ -433,6 +453,7 @@ class OwnerDeckListCreateView(APIView):
                     DeckSideboardInput(
                         name=sideboard["name"],
                         entries=[DeckEntryInput(**entry) for entry in sideboard["entries"]],
+                        source_id=str(sideboard["id"]) if "id" in sideboard else None,
                     )
                     for sideboard in serializer.validated_data.get("sideboards", [])
                 ],
@@ -554,6 +575,7 @@ class OwnerDeckDetailView(APIView):
                             DeckSideboardInput(
                                 name=sideboard["name"],
                                 entries=[DeckEntryInput(**entry) for entry in sideboard["entries"]],
+                                source_id=str(sideboard["id"]) if "id" in sideboard else None,
                             )
                             for sideboard in serializer.validated_data["sideboards"]
                         ]

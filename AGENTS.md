@@ -140,7 +140,7 @@ Core stack:
   - Gallery must discard stale cross-pool catalog responses and reconcile unavailable route selections so hidden values cannot remain as ghost filters. A failed catalog request must not be treated as a successful empty catalog or erase route state.
   - Keep the initial implementation query-backed and bounded, with query-count coverage and no cache, persistence, migration, or developer-data change. Measure before introducing caching, and leave Symbols, Mana, Templates, numeric ranges, Roles, Factions, and whole-facet visibility unchanged.
 - The Player/Evil/Neutral workspace scopes ordinary browsing and workspace-owned card collections, not global staff operations. Admin and Review always use the staff user's complete authorized pool scope regardless of the selected shell workspace; their mixed-pool records, counts, queues, searches, suggestions, and previews must retain explicit pool labels where ambiguity is possible. Imports may consume the workspace only as a visible, editable default.
-- Evil and Neutral card access must use the centralized backend card-pool scope whose initial policy is staff-only for both pools. Enforce it on direct objects, collections, embedded payloads, exports, and image/assets; frontend visibility is not the security boundary. Session/frontend code consumes ordered accessible pools rather than separate Evil and Neutral booleans. Keep the policy centralized so it can later expand without card-data migration.
+- Evil and Neutral card access must use the centralized backend card-pool scope whose initial policy is staff-only for both pools. Enforce it on direct objects, collections, embedded payloads, exports, and image/assets; frontend visibility is not the security boundary. Persistent TTS card-sheet images are the deliberate exception: export creation remains staff-scoped, but Player, Evil, and Neutral sheets are pool-partitioned public derived artifacts with stable URLs so existing TTS objects receive later rerenders. Session/frontend code consumes ordered accessible pools rather than separate Evil and Neutral booleans. Keep the policy centralized so it can later expand without card-data migration.
 - Until the twelve card-classification checkpoints are complete, preserve their boundaries: Step 1 owns schema/migration/manual editing/filtering and Hero replacement; Step 1.1 owns authorization-seam consolidation; Step 2 owns the initial role import inference and overrides; Step 2.1 owns the final Player/Evil/Neutral pool contract, pool-scoped name/alias/hash identity, and related authorization/session renaming; Step 2.2 owns upload admission and cleanup, grouped-reparse transactionality, import activity/detail refresh consistency, and explicit evidence-state contracts; Step 2.3 owns faction persistence, pool-plus-exact-faction natural identity, the completed role vocabulary, and generalized role/faction mechanics; Step 3 owns the global three-pool sidenav workspace and site-level scoping; Step 3.1 owns context-preserving workspace selection, centralized route capabilities, routed-component lifetime, and safe fallback only for incompatible routes; Step 3.2 removes template inference and hard-coded tag policies, adds admin-owned pool-specific Tag/Type inference rules, and snapshots those rules for deterministic jobs while keeping role/faction definitions code-owned; Step 4.0 owns the integrated classification acceptance and bounded cleanup audit without adding new filter persistence; Step 4.1 owns the code-owned pool-aware Gallery facet matrix, Roles removal from Gallery, and hidden route/request sanitation while preserving global management and backend filter capabilities; Step 4.2 owns exact-pool Keyword/Tag/Type availability from active Cards' latest versions, optional pool-scoped filter metadata, stale-response protection, catalog-backed ghost-filter reconciliation, and bounded query measurement while preserving omitted-pool global catalogs and deferring caching and fully dynamic faceting.
 - SQLite is the default database. Do not introduce Postgres-only behavior without explicit approval.
 - Import flow remains async:
@@ -183,8 +183,10 @@ Core stack:
 
 ## Auth Rules
 - Auth is enabled by default.
-- Card gallery and card assets are public. Deck TTS exports follow deck visibility; gallery and
-  content-version TTS exports require staff access.
+- Player card gallery and direct card assets are public; Evil and Neutral direct data/assets remain
+  staff-only. Pool-partitioned TTS card-sheet images are public at stable URLs for all three pools.
+  Deck TTS exports follow deck visibility; gallery and content-version TTS export creation requires
+  staff access.
 - Player cards remain the public/default pool. Evil and Neutral cards and their direct details, embedded payloads, exports, and assets are staff-only until the centralized restricted-pool scope policy is deliberately expanded.
 - Import jobs, review, admin, catalog, templates, and user-selected exports require `is_staff=true`.
 - Maintenance endpoints require `is_superuser=true`.
@@ -229,8 +231,10 @@ Core stack:
 - `api`, `parser`, and `developer-data-builder` share runtime data at `/var/lib/card-reader`.
 - `tts-sheet-renderer` uses the API image, core polling-worker abstraction, shared database, and shared
   runtime storage. TTS sheet rows are the durable coalescing queue; no external broker is required.
-- Persistent TTS sheet slots are append-only. Never move, compact, delete, or reuse a Card identity's
-  assigned sheet coordinate; merges preserve source slots and resolve them to the target Card.
+- Persistent TTS sheets and slots are partitioned by card pool, and their image endpoint is a stable
+  public derived artifact for every pool. Slots are append-only: never move, compact, delete, or
+  reuse a Card identity's assigned sheet coordinate; merges preserve source slots and resolve them
+  to the target Card.
 - Website TTS exports for decks, sideboards, gallery selections, and content versions all use the
   `card-reader.tts-cards.v2` persistent-sheet payload. The object importer spawns those sheets directly and must not
   depend on scripting regions, preloaded card libraries, name matching, or automatic library synchronization.
