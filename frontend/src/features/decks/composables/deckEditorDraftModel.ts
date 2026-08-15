@@ -31,6 +31,7 @@ export const hydrateDeckForm = (form: DeckForm, deck: DeckRecord): void => {
   }));
   form.sideboards = deck.sideboards.map((sideboard) => ({
     id: sideboard.id,
+    source_id: sideboard.id,
     name: sideboard.name,
     entries: sideboard.entries.map((entry) => ({
       card_id: entry.card.id,
@@ -60,7 +61,7 @@ export const buildDeckUpsertPayload = (form: DeckForm): DeckUpsertRequest => ({
   hero_card_id: form.hero_card_id,
   entries: form.entries.map((entry) => ({ ...entry })),
   sideboards: form.sideboards.map((sideboard) => ({
-    id: sideboard.id,
+    ...(sideboard.source_id ? { id: sideboard.source_id } : {}),
     name: sideboard.name.trim(),
     entries: sideboard.entries.map((entry) => ({ ...entry })),
   })),

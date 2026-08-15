@@ -7,6 +7,7 @@ export type DeckFormEntry = {
 
 export type DeckFormSideboard = {
   id: string;
+  source_id?: string;
   name: string;
   entries: DeckFormEntry[];
 };
