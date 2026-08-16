@@ -128,6 +128,8 @@ def test_catalog_definitions_are_global_and_sources_have_reverse_references() ->
         "Boon",
         "Event",
         "Shop Item",
+        "Directive",
+        "Reminder",
         "Mana",
     ]
     location = next(row for row in roles if row["key"] == "location")

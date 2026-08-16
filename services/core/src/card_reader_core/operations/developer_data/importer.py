@@ -51,7 +51,6 @@ from .schema import (
     CardReferenceRecord,
     CardReferenceIdentity,
     CardRecord as DeveloperDataCardRecord,
-    DEVELOPER_DATA_FORMAT_VERSION,
     DeveloperDataManifest,
     DeveloperDataPayload,
     card_reference_identity,
@@ -72,6 +71,8 @@ MIGRATION_DEFAULT_SOURCE_DEFINITIONS = {
         "boon": ("Boon", ["boon"]),
         "event": ("Event", ["event"]),
         "location": ("Location", ["location"]),
+        "directive": ("Directive", ["directive"]),
+        "reminder": ("Reminder", ["reminder"]),
         "mana": ("Mana", ["mana"]),
     },
 }
@@ -80,6 +81,8 @@ MIGRATION_DEFAULT_CLASSIFICATION_RULES = (
     ("player", "role", "mana", "type", "mana"),
     ("evil", "role", "boss", "type", "boss"),
     ("evil", "role", "location", "type", "location"),
+    ("evil", "role", "directive", "type", "directive"),
+    ("evil", "role", "reminder", "type", "reminder"),
     ("evil", "role", "mana", "type", "mana"),
     ("evil", "faction", "order", "tag", "order"),
     ("evil", "faction", "blood", "tag", "blood"),
@@ -451,7 +454,7 @@ def _import_payload(
                 rule_id=existing_rule.id,
                 enabled=rule_record.enabled,
             )
-    if source_format_version < DEVELOPER_DATA_FORMAT_VERSION:
+    if source_format_version in {1, 2}:
         ensure_default_mana_family_classification_rules()
     for deck_tag_record in payload.deck_tags:
         DeckTag.objects.update_or_create(

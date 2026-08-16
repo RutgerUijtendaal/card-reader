@@ -32,7 +32,9 @@ def test_classification_registries_expose_the_final_canonical_contract() -> None
         ("boon", "Boon", 4),
         ("event", "Event", 5),
         ("shop_item", "Shop Item", 6),
-        ("mana", "Mana", 7),
+        ("directive", "Directive", 7),
+        ("reminder", "Reminder", 8),
+        ("mana", "Mana", 9),
     ]
     assert [
         (definition.key, definition.label, definition.rank)
@@ -58,14 +60,20 @@ def test_normal_is_only_the_derived_empty_role_filter() -> None:
         ("boon", "Boon", 4, False),
         ("event", "Event", 5, False),
         ("shop_item", "Shop Item", 6, False),
-        ("mana", "Mana", 7, False),
+        ("directive", "Directive", 7, False),
+        ("reminder", "Reminder", 8, False),
+        ("mana", "Mana", 9, False),
     ]
 
 
 def test_role_and_faction_normalization_are_independent_and_canonical() -> None:
-    assert normalize_card_roles(("mana", "event", "hero", "event", "unknown")) == (
+    assert normalize_card_roles(
+        ("mana", "reminder", "event", "hero", "directive", "event", "unknown")
+    ) == (
         "hero",
         "event",
+        "directive",
+        "reminder",
         "mana",
     )
     assert normalize_card_factions(("metal", "dark", "order", "dark", "unsupported")) == (

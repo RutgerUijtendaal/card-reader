@@ -45,6 +45,7 @@ from card_reader_core.models import (
     Type,
 )
 from card_reader_core.operations.developer_data import (
+    DEVELOPER_DATA_FORMAT_VERSION,
     DeveloperDataError,
     PublishedBundleStore,
     export_developer_data,
@@ -100,7 +101,12 @@ def test_version_one_payload_adoption_adds_mana_role_from_latest_type() -> None:
                     "key": "legacy-mana",
                     "is_hero": False,
                     "latest_version_number": 1,
-                    "versions": [{"version_number": 1, "type_keys": ["mana"]}],
+                    "versions": [
+                        {
+                            "version_number": 1,
+                            "type_keys": ["directive", "reminder", "mana"],
+                        }
+                    ],
                 }
             ]
         },
@@ -223,7 +229,7 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
     ]
 
 
-def test_version_two_adoption_backfills_only_player_cards_and_group_references() -> None:
+def test_version_two_adoption_backfills_player_families_and_latest_type_roles() -> None:
     adopted = adopt_payload_for_format(
         {
             "cards": [
@@ -251,7 +257,7 @@ def test_version_two_adoption_backfills_only_player_cards_and_group_references()
                         {
                             "version_number": 1,
                             "symbol_keys": ["dark-affinity"],
-                            "type_keys": ["mana"],
+                            "type_keys": ["directive", "reminder", "mana"],
                         }
                     ],
                 },
@@ -285,10 +291,71 @@ def test_version_two_adoption_backfills_only_player_cards_and_group_references()
     ] == [["arcane"], []]
     assert [
         card["card_roles"] for card in adopted["cards"]  # type: ignore[index]
-    ] == [["hero", "mana"], ["boss", "mana"]]
+    ] == [["hero", "mana"], ["boss", "directive", "reminder", "mana"]]
     group = adopted["card_groups"][0]  # type: ignore[index]
     assert group["anchor_card_ref"]["card_mana_families"] == ["arcane"]
     assert group["members"][0]["card_ref"]["card_mana_families"] == []
+
+
+def test_version_three_adoption_adds_latest_type_roles_without_rewriting_families() -> None:
+    adopted = adopt_payload_for_format(
+        {
+            "cards": [
+                {
+                    "key": "retained-version-three-evil",
+                    "card_pool": "evil",
+                    "card_roles": ["boss"],
+                    "card_mana_families": ["dark"],
+                    "latest_version_number": 2,
+                    "versions": [
+                        {"version_number": 1, "type_keys": ["mana"]},
+                        {
+                            "version_number": 2,
+                            "type_keys": ["directive", "reminder"],
+                        },
+                    ],
+                }
+            ]
+        },
+        format_version=3,
+    )
+
+    card = adopted["cards"][0]  # type: ignore[index]
+    assert card["card_roles"] == ["boss", "directive", "reminder"]
+    assert card["card_mana_families"] == ["dark"]
+
+
+def test_version_four_adoption_preserves_authoritative_stored_roles() -> None:
+    payload = {
+        "cards": [
+            {
+                "key": "current-player-without-mana-role",
+                "card_pool": "player",
+                "card_roles": [],
+                "card_mana_families": ["arcane"],
+                "latest_version_number": 1,
+                "versions": [{"version_number": 1, "type_keys": ["mana"]}],
+            },
+            {
+                "key": "current-evil-without-type-roles",
+                "card_pool": "evil",
+                "card_roles": ["boss"],
+                "card_mana_families": [],
+                "latest_version_number": 1,
+                "versions": [
+                    {
+                        "version_number": 1,
+                        "type_keys": ["directive", "reminder"],
+                    }
+                ],
+            },
+        ]
+    }
+
+    adopted = adopt_payload_for_format(payload, format_version=4)
+
+    assert adopted is payload
+    assert [card["card_roles"] for card in adopted["cards"]] == [[], ["boss"]]
 
 
 def test_developer_data_coverage_rejects_missing_required_classification_rule(
@@ -356,7 +423,7 @@ def test_import_accepts_only_unmodified_migration_defaults(
 
         assert result.counts["cards"] == 4
         assert Template.objects.filter(key="full-height", label="Full height").exists()
-        assert CardClassificationRule.objects.count() == 16
+        assert CardClassificationRule.objects.count() == 18
         transaction.set_rollback(True)
 
 
@@ -367,6 +434,7 @@ def test_version_three_import_preserves_an_intentionally_omitted_default_rule(
     source_storage = tmp_path / "source-storage"
     target_storage = tmp_path / "target-storage"
     selection_path = tmp_path / "selection.json"
+    current_archive_path = tmp_path / "current-omitted-mana-rule.tar.gz"
     archive_path = tmp_path / "omitted-mana-rule.tar.gz"
 
     with transaction.atomic():
@@ -396,8 +464,14 @@ def test_version_three_import_preserves_an_intentionally_omitted_default_rule(
         selection_path.write_text(json.dumps(selection), encoding="utf-8")
         export_developer_data(
             selection_path=selection_path,
-            output_path=archive_path,
+            output_path=current_archive_path,
             source_revision="omitted-mana-rule-test",
+        )
+        _build_archive_with_format_version(
+            current_archive_path,
+            archive_path,
+            tmp_path / "version-three-archive",
+            format_version=3,
         )
 
         _clear_domain_data()
@@ -438,7 +512,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 4
         assert manifest.counts["card_versions"] == 5
-        assert manifest.format_version == 3
+        assert manifest.format_version == DEVELOPER_DATA_FORMAT_VERSION
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
@@ -1034,6 +1108,27 @@ def _build_alias_collision_archive(source: Path, target: Path, extraction_root: 
             archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
 
 
+def _build_archive_with_format_version(
+    source: Path,
+    target: Path,
+    extraction_root: Path,
+    *,
+    format_version: int,
+) -> None:
+    extraction_root.mkdir()
+    with tarfile.open(source, "r:gz") as archive:
+        archive.extractall(extraction_root, filter="data")
+    manifest_path = extraction_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["format_version"] = format_version
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    with tarfile.open(target, "w:gz") as archive:
+        for path in sorted(extraction_root.rglob("*")):
+            archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
+
+
 def _build_reclassified_archive(
     source: Path,
     target: Path,
@@ -1350,6 +1445,8 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                 "location": 1,
                 "boss": 0,
                 "shop_item": 0,
+                "directive": 0,
+                "reminder": 0,
                 "mana": 0,
             },
             "min_cards_by_faction": {"order": 1, "blood": 1, "dark": 0, "metal": 0},
@@ -1456,3 +1553,9 @@ def _seed_migration_defaults() -> None:
         "card_reader_core.migrations.0058_add_mana_card_role"
     )
     mana_role_migration.add_mana_role_defaults_and_backfill(django_apps, None)
+    directive_reminder_migration = importlib.import_module(
+        "card_reader_core.migrations.0060_add_evil_directive_reminder_roles"
+    )
+    directive_reminder_migration.add_evil_directive_reminder_defaults_and_backfill(
+        django_apps, None
+    )
