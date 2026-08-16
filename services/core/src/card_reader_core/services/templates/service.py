@@ -15,7 +15,9 @@ from card_reader_core.repositories.templates import (
     update_template,
 )
 from .parser_types import (
+    MAX_MANA_BADGE_OCR_SCALE,
     NAME_PRODUCING_TEMPLATE_PARSER_TYPES,
+    NAME_MANA_COST,
     SUPPORTED_TEMPLATE_PARSER_TYPES,
     TEMPLATE_PARSER_TYPES,
 )
@@ -157,6 +159,14 @@ class TemplateService:
             if not isinstance(ocr_config, dict):
                 raise ValueError(f"definition_json.regions[{index}].ocr_config must be an object")
 
+            mana_badge_ocr = region.get("mana_badge_ocr")
+            if mana_badge_ocr is not None:
+                self._validate_mana_badge_ocr(
+                    mana_badge_ocr,
+                    index=index,
+                    parser_type=parser_type,
+                )
+
             normalized_region = dict(region)
             normalized_region["region_id"] = region_id
             normalized_region["parser_type"] = parser_type
@@ -167,3 +177,33 @@ class TemplateService:
         normalized_definition = dict(definition)
         normalized_definition["regions"] = normalized_regions
         return normalized_definition
+
+    def _validate_mana_badge_ocr(
+        self,
+        config: object,
+        *,
+        index: int,
+        parser_type: str,
+    ) -> None:
+        field = f"definition_json.regions[{index}].mana_badge_ocr"
+        if parser_type != NAME_MANA_COST:
+            raise ValueError(f"{field} is supported only for name_mana_cost regions")
+        if not isinstance(config, dict):
+            raise ValueError(f"{field} must be an object")
+        if not isinstance(config.get("cut_region"), dict):
+            raise ValueError(f"{field}.cut_region must be an object")
+
+        scales = config.get("scales")
+        if scales is None:
+            return
+        if not isinstance(scales, list) or not scales:
+            raise ValueError(f"{field}.scales must be a non-empty array")
+        if any(
+            not isinstance(scale, int)
+            or isinstance(scale, bool)
+            or not 1 <= scale <= MAX_MANA_BADGE_OCR_SCALE
+            for scale in scales
+        ):
+            raise ValueError(
+                f"{field}.scales values must be integers from 1 to {MAX_MANA_BADGE_OCR_SCALE}"
+            )

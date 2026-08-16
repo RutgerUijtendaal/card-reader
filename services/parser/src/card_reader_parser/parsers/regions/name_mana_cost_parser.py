@@ -12,6 +12,7 @@ from card_reader_core.models import (
     CardPool,
     Symbol,
 )
+from card_reader_core.services.templates import MAX_MANA_BADGE_OCR_SCALE
 from PIL import Image
 
 from ..ocr_runner import OcrRunner
@@ -137,7 +138,16 @@ class NameManaCostParser:
                 if has_variable_x:
                     mana_symbol_keys.append("x")
 
-        name = self._extract_name(full_text, has_mana=has_mana) or image_stem
+        name = (
+            self._extract_name(
+                full_text,
+                has_mana=has_mana,
+                confirmed_variable_x=bool(
+                    mana_badge_result is not None and mana_badge_result.mana_cost == "X"
+                ),
+            )
+            or image_stem
+        )
         result_text = full_text
         result_lines = filtered_lines
         result_confidence = ocr_text.confidence
@@ -243,12 +253,20 @@ class NameManaCostParser:
         )
         return mana_typed
 
-    def _extract_name(self, text: str, *, has_mana: bool) -> str:
+    def _extract_name(
+        self,
+        text: str,
+        *,
+        has_mana: bool,
+        confirmed_variable_x: bool = False,
+    ) -> str:
         compact = normalize_name_text(text)
         if not compact:
             return ""
         if has_mana:
             compact = self._trailing_integer_pattern.sub("", compact).strip()
+            if confirmed_variable_x:
+                compact = self._trailing_variable_x_pattern.sub("", compact).strip()
             compact = self._leading_noise_number_pattern.sub("", compact).strip()
         return compact.strip()
 
@@ -363,7 +381,9 @@ class NameManaCostParser:
         scales = tuple(
             value
             for value in raw
-            if isinstance(value, int) and not isinstance(value, bool) and value > 0
+            if isinstance(value, int)
+            and not isinstance(value, bool)
+            and 0 < value <= MAX_MANA_BADGE_OCR_SCALE
         )
         return scales or self._DEFAULT_MANA_BADGE_OCR_SCALES
 
@@ -445,4 +465,3 @@ class NameManaCostParser:
         if mana_total <= 0:
             return "X"
         return f"X+{mana_total}"
-

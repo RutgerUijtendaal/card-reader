@@ -250,6 +250,40 @@ def test_evil_name_mana_cost_parser_does_not_treat_trailing_title_x_as_mana() ->
     assert ocr_runner.calls == [(200, 40), (84, 120), (56, 80)]
 
 
+def test_evil_name_mana_cost_parser_removes_spatially_confirmed_x_from_name() -> None:
+    result, _ocr_runner = _parse_with_runner(
+        text=["Counter Rune X", "X"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=MANA_BADGE_OCR_CONFIG,
+    )
+
+    assert result.normalized_fields["name"] == "Counter Rune"
+    assert result.normalized_fields["mana_cost"] == "X"
+    assert result.normalized_fields["mana_total"] == "0"
+    assert result.normalized_fields["mana_symbols"] == "x"
+
+
+def test_evil_name_mana_cost_parser_rejects_unsafe_badge_scale() -> None:
+    region_spec = {
+        "mana_badge_ocr": {
+            "cut_region": MANA_BADGE_OCR_CONFIG["mana_badge_ocr"]["cut_region"],
+            "scales": [3000, 2],
+        }
+    }
+    result, ocr_runner = _parse_with_runner(
+        text=["Amulet of Order", "1"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+        region_spec=region_spec,
+    )
+
+    assert result.normalized_fields["mana_cost"] == "1"
+    assert ocr_runner.calls == [(200, 40), (56, 80)]
+
+
 def test_neutral_name_mana_cost_parser_leaves_cost_fields_empty() -> None:
     result = _parse(
         text="Neutral Relic",

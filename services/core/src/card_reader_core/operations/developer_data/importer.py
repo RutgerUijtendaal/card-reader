@@ -43,6 +43,7 @@ from card_reader_core.services.classification_rules import (
     ClassificationRuleService,
     ensure_default_mana_family_classification_rules,
 )
+from card_reader_core.services.templates import apply_bundled_template_compatibility
 from card_reader_core.metadata import MANA_FAMILY_BY_KEY
 
 from .archive import DeveloperDataError, extracted_archive, load_extracted_bundle, sha256_file
@@ -401,11 +402,15 @@ def _import_payload(
     }
     templates: dict[str, Template] = {}
     for template_record in payload.templates:
+        template_definition = apply_bundled_template_compatibility(
+            key=template_record.key,
+            definition=template_record.definition,
+        )
         template, _created = Template.objects.update_or_create(
             key=template_record.key,
             defaults={
                 "label": template_record.label,
-                "definition_json": template_record.definition,
+                "definition_json": template_definition,
             },
         )
         templates[template_record.key] = template
