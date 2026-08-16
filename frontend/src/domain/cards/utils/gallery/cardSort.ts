@@ -143,6 +143,7 @@ const DEFAULT_ROLE_SORT_ORDER: readonly CardRoleFilter[] = [
   'boon',
   'event',
   'shop_item',
+  'mana',
 ];
 
 type DefaultSortComponent =

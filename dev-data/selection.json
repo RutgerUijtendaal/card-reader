@@ -108,7 +108,8 @@
       "location": 0,
       "boon": 0,
       "event": 0,
-      "shop_item": 0
+      "shop_item": 0,
+      "mana": 1
     },
     "min_cards_by_faction": {
       "order": 0,
@@ -148,6 +149,14 @@
         "enabled": true
       },
       {
+        "card_pool": "player",
+        "target_kind": "role",
+        "target_key": "mana",
+        "source_kind": "type",
+        "source_key": "mana",
+        "enabled": true
+      },
+      {
         "card_pool": "evil",
         "target_kind": "role",
         "target_key": "boss",
@@ -161,6 +170,14 @@
         "target_key": "location",
         "source_kind": "type",
         "source_key": "location",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "mana",
+        "source_kind": "type",
+        "source_key": "mana",
         "enabled": true
       },
       {

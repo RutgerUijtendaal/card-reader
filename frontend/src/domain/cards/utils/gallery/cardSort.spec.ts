@@ -116,6 +116,9 @@ describe('cardSort default sorting', () => {
       { ...buildCard('arcane-normal-low', 'Arcane Normal Low', []), mana_family_sort_key: 0, mana_value: 1, card_roles: [] },
       { ...buildCard('arcane-normal-null', 'Arcane Normal Null', []), mana_family_sort_key: 0, mana_value: null, card_roles: [] },
       { ...buildCard('arcane-hero', 'Arcane Hero', []), mana_family_sort_key: 0, mana_value: 6, card_roles: ['hero'] as const },
+      { ...buildCard('arcane-shop', 'Arcane Shop', []), mana_family_sort_key: 0, mana_value: 2, card_roles: ['shop_item'] as const },
+      { ...buildCard('arcane-mana', 'Arcane Mana', []), mana_family_sort_key: 0, mana_value: 0, card_roles: ['mana'] as const },
+      { ...buildCard('arcane-hero-mana', 'Arcane Hero Mana', []), mana_family_sort_key: 0, mana_value: 8, card_roles: ['hero', 'mana'] as const },
     ];
 
     cards.sort((left, right) => compareCardSort(left, right, 'default', {
@@ -124,10 +127,13 @@ describe('cardSort default sorting', () => {
 
     expect(cards.map((card) => card.id)).toEqual([
       'arcane-hero',
+      'arcane-hero-mana',
       'arcane-normal-low',
       'arcane-normal-high',
       'arcane-normal-null',
       'arcane-boss',
+      'arcane-shop',
+      'arcane-mana',
       'dark-hero',
     ]);
   });
@@ -142,6 +148,9 @@ describe('cardSort default sorting', () => {
       { ...buildCard('order-location', 'Order Location', []), mana_value: 0, card_factions: ['order'] as const, card_roles: ['location'] as const },
       { ...buildCard('order-normal-low', 'Order Normal Low', []), mana_value: 1, card_factions: ['order'] as const, card_roles: [] },
       { ...buildCard('order-boss', 'Order Boss', []), mana_value: 9, card_factions: ['order'] as const, card_roles: ['boss'] as const },
+      { ...buildCard('order-shop', 'Order Shop', []), mana_value: 1, card_factions: ['order'] as const, card_roles: ['shop_item'] as const },
+      { ...buildCard('order-mana', 'Order Mana', []), mana_value: 0, card_factions: ['order'] as const, card_roles: ['mana'] as const },
+      { ...buildCard('order-location-mana', 'Order Location Mana', []), mana_value: 10, card_factions: ['order'] as const, card_roles: ['location', 'mana'] as const },
     ];
 
     cards.sort((left, right) => compareCardSort(left, right, 'default', { cardPool: 'evil' }));
@@ -149,8 +158,11 @@ describe('cardSort default sorting', () => {
     expect(cards.map((card) => card.id)).toEqual([
       'order-boss',
       'order-location',
+      'order-location-mana',
       'order-normal-low',
       'order-normal-high',
+      'order-shop',
+      'order-mana',
       'blood-boss',
       'dark-boss',
       'metal-boss',
@@ -168,6 +180,7 @@ describe('cardSort default sorting', () => {
       { ...buildCard('boon-event', 'Boon Event', []), card_roles: ['boon', 'event'] as const },
       { ...buildCard('boon', 'Boon', []), card_roles: ['boon'] as const },
       { ...buildCard('normal', 'Normal', []), card_roles: [] },
+      { ...buildCard('mana', 'Mana', []), card_roles: ['mana'] as const },
     ];
 
     cards.sort((left, right) => compareCardSort(left, right, 'default', { cardPool: 'neutral' }));
@@ -181,6 +194,7 @@ describe('cardSort default sorting', () => {
       'boon-event',
       'event',
       'shop',
+      'mana',
     ]);
   });
 });
