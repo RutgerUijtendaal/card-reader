@@ -37,7 +37,7 @@ def rule(
 
 def snapshot(*rules: dict[str, object], card_pool: str = "evil") -> dict[str, object]:
     body: dict[str, object] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "card_pool": card_pool,
         "rules": list(rules),
     }

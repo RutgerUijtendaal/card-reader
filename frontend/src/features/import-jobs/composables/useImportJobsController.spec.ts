@@ -52,7 +52,7 @@ const activeJob = (id = 'active-job'): ImportJob => ({
   card_mana_family_mode: 'automatic',
   card_mana_family_override: [],
   classification_rule_snapshot: {
-    schema_version: 1,
+    schema_version: 3,
     card_pool: 'player',
     rules: [],
     digest: 'abc123',

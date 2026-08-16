@@ -15,7 +15,13 @@ from card_reader_api.cards.deck_references import card_deck_references_payload
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
 from card_reader_api.common.permissions import StaffAllowed
-from card_reader_api.common.responses import bad_request, not_found, serializer_error
+from card_reader_api.common.responses import (
+    RESTRICTED_CARD_POOL_DETAIL,
+    bad_request,
+    forbidden,
+    not_found,
+    serializer_error,
+)
 from card_reader_core.services.card_groups import CardGroupMemberInput, CardGroupService
 
 
@@ -31,7 +37,7 @@ class PublicCardGroupDetailView(APIView):
         lifecycle_status = filters["lifecycle_status"]
         card_pool = filters["card_pool"]
         if not card_pool_scope.allows_card_pool(card_pool):
-            return Response({"detail": "Restricted card pools require staff access."}, status=status.HTTP_403_FORBIDDEN)
+            return forbidden(RESTRICTED_CARD_POOL_DETAIL)
         group = CardGroupService().get_group_for_pool(group_id, card_pool=card_pool)
         if group is None:
             return not_found("Card group not found")

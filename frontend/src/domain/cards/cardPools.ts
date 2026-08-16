@@ -16,4 +16,3 @@ export const normalizeCardPool = (value: unknown): CardPool =>
 
 export const cardPoolLabel = (cardPool: CardPool): string =>
   CARD_POOL_OPTIONS.find((option) => option.value === cardPool)?.label ?? cardPool;
-

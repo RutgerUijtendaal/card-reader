@@ -8,6 +8,9 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 
 
+RESTRICTED_CARD_POOL_DETAIL = "Restricted card pools require staff access."
+
+
 class PaginatedResult(Protocol):
     @property
     def count(self) -> int: ...
@@ -25,6 +28,10 @@ def bad_request(detail: str) -> Response:
 
 def not_found(detail: str) -> Response:
     return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
+
+
+def forbidden(detail: str) -> Response:
+    return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
 
 
 def serializer_error(serializer: BaseSerializer[Any]) -> Response:

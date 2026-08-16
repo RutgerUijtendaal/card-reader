@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from django.http import HttpResponse
 from rest_framework.permissions import AllowAny
-from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,7 +10,12 @@ from card_reader_api.cards.query_params import card_filter_query_data
 from card_reader_api.cards.serializers import CardFiltersQuerySerializer
 from card_reader_api.common.auth_access import card_pool_scope_for_user, is_authenticated
 from card_reader_api.common.permissions import StaffAllowed
-from card_reader_api.common.responses import not_found, serializer_error
+from card_reader_api.common.responses import (
+    RESTRICTED_CARD_POOL_DETAIL,
+    forbidden,
+    not_found,
+    serializer_error,
+)
 from card_reader_api.common.urls import build_public_api_url
 from card_reader_api.exports.serializers import TtsCardExportRequestSerializer
 from card_reader_api.exports.tts_cards import encode_tts_card_export
@@ -45,7 +49,7 @@ class ExportCsvView(APIView):
             return serializer_error(serializer)
         filters = serializer.validated_filters()
         if not card_pool_scope.allows_card_pool(filters["card_pool"]):
-            return Response({"detail": "Restricted card pools require staff access."}, status=status.HTTP_403_FORBIDDEN)
+            return forbidden(RESTRICTED_CARD_POOL_DETAIL)
         content = export_cards_csv(
             query=filters["query"],
             max_confidence=filters["max_confidence"],
@@ -116,10 +120,7 @@ class CardTtsExportView(APIView):
             if source["type"] == "gallery":
                 assert gallery_filters is not None
                 if not card_pool_scope.allows_card_pool(gallery_filters["card_pool"]):
-                    return Response(
-                        {"detail": "Restricted card pools require staff access."},
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
+                    return forbidden(RESTRICTED_CARD_POOL_DETAIL)
                 export_data = service.build_gallery_export(
                     gallery_filters,
                     card_pool_scope=card_pool_scope,

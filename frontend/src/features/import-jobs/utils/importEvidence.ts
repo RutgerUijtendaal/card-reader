@@ -1,11 +1,11 @@
-import { cardRoleLabel, CARD_ROLE_OPTIONS } from '@/domain/cards/cardRoles';
+import { displayCardRoleLabels, isCardRole } from '@/domain/cards/cardRoles';
 import type { CardRole } from '@/domain/cards/cardRoles';
-import { cardFactionLabel, CARD_FACTION_OPTIONS } from '@/domain/cards/cardFactions';
+import { displayCardFactionLabels, isCardFaction } from '@/domain/cards/cardFactions';
 import type { CardFaction } from '@/domain/cards/cardFactions';
 import { cardPoolLabel, isCardPool } from '@/domain/cards/cardPools';
 import {
-  MANA_FAMILY_OPTIONS,
-  manaFamilyLabel,
+  displayManaFamilyLabels,
+  isManaFamily,
   type ManaFamily,
 } from '@/domain/cards/manaFamilies';
 import type { ImportJobItem, ImportWarning } from '@/features/import-jobs/types';
@@ -19,16 +19,6 @@ export type ImportEvidenceState =
 
 export type ImportEvidenceEntry = { label: string; value: string };
 
-const CARD_ROLE_VALUES: ReadonlySet<string> = new Set(
-  CARD_ROLE_OPTIONS.map((option) => option.value),
-);
-const CARD_FACTION_VALUES: ReadonlySet<string> = new Set(
-  CARD_FACTION_OPTIONS.map((option) => option.value),
-);
-const MANA_FAMILY_VALUES: ReadonlySet<string> = new Set(
-  MANA_FAMILY_OPTIONS.map((option) => option.value),
-);
-
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -37,21 +27,21 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const asCardRoles = (value: unknown): CardRole[] =>
   Array.isArray(value)
     ? value.filter(
-      (item): item is CardRole => typeof item === 'string' && CARD_ROLE_VALUES.has(item),
+      (item): item is CardRole => typeof item === 'string' && isCardRole(item),
     )
     : [];
 
 const asCardFactions = (value: unknown): CardFaction[] =>
   Array.isArray(value)
     ? value.filter(
-      (item): item is CardFaction => typeof item === 'string' && CARD_FACTION_VALUES.has(item),
+      (item): item is CardFaction => typeof item === 'string' && isCardFaction(item),
     )
     : [];
 
 const asManaFamilies = (value: unknown): ManaFamily[] =>
   Array.isArray(value)
     ? value.filter(
-      (item): item is ManaFamily => typeof item === 'string' && MANA_FAMILY_VALUES.has(item),
+      (item): item is ManaFamily => typeof item === 'string' && isManaFamily(item),
     )
     : [];
 
@@ -64,19 +54,16 @@ const sourceLabels = (value: unknown): string[] =>
     : [];
 
 export const formatImportRoles = (value: unknown): string => {
-  const roles = asCardRoles(value);
-  return roles.length > 0 ? roles.map(cardRoleLabel).join(', ') : 'Normal';
+  return displayCardRoleLabels(asCardRoles(value)).join(', ');
 };
 
 export const formatImportFactions = (value: unknown): string => {
-  const factions = asCardFactions(value);
-  return factions.length > 0 ? factions.map(cardFactionLabel).join(', ') : 'None';
+  return displayCardFactionLabels(asCardFactions(value)).join(', ');
 };
 
 export const formatImportManaFamilies = (value: unknown): string => {
   if (!Array.isArray(value)) return 'Unavailable';
-  const families = asManaFamilies(value);
-  return families.length > 0 ? families.map(manaFamilyLabel).join(', ') : 'Colorless';
+  return displayManaFamilyLabels(asManaFamilies(value)).join(', ');
 };
 
 export const formatResolvedImportManaFamilies = (item: ImportJobItem): string =>

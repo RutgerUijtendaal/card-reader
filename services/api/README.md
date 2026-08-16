@@ -56,8 +56,11 @@ pnpm --filter @card-reader/api dev-data:doctor
 
 Auth is always enabled.
 
-- `/cards`, `/cards/filters`, card image endpoints, the temporary `/tts/cache-test/card-image`
-  diagnostic, symbol assets, `/health`, and `/auth/*` are public.
+- Player-scoped `/cards`, `/cards/filters`, and direct card image endpoints are public. Evil and
+  Neutral collections return `403` to non-staff callers, while restricted direct objects and assets
+  return `404`. Pool-partitioned TTS sheet images remain public derived artifacts.
+- The temporary `/tts/cache-test/card-image` diagnostic, symbol assets, `/health`, and `/auth/*`
+  are public.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck.
 - Import jobs, review, administrative settings APIs, catalog, templates, CSV exports, and
   `POST /exports/tts/cards` require `is_staff=true`.
@@ -77,7 +80,9 @@ Default seed JSON files live in `src/card_reader_api/seeds`:
 
 - `seed-keywords.json`
 - `seed-symbols.json`
+- `seed-tags.json`
 - `seed-templates.json`
+- `seed-types.json`
 - `seed-users.example.json`
 
 Private local users live in `src/card_reader_api/seeds/seed-users.local.json`. The local users file is

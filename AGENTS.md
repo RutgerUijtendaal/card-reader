@@ -179,7 +179,7 @@ Core stack:
   - Classification review is resolved or dismissed explicitly after staff inspection. Card edits do not silently close review items.
   - Card merges retarget open and historical classification review items to the surviving Card while preserving their captured snapshots and reviewed version.
   - Classification review authorization follows the live Card pool; use the immutable pool snapshot only when the Card no longer exists.
-  - New classification mismatches belong in Review rather than import warnings. Keep historical `card_classification_mismatch` warnings readable without backfilling them into the queue.
+  - Classification mismatches belong in Review rather than import warnings. Do not reintroduce a parallel `card_classification_mismatch` warning path.
 
 ## Auth Rules
 - Auth is enabled by default.

@@ -54,7 +54,7 @@ describe('import evidence presentation', () => {
   });
 
   test('uses the shared faction registry for Dark and Metal labels', () => {
-    expect(formatImportFactions([])).toBe('None');
+    expect(formatImportFactions([])).toBe('No faction');
     expect(formatImportFactions(['dark', 'metal'])).toBe('Dark, Metal');
   });
 

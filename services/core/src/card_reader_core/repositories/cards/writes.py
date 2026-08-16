@@ -34,7 +34,6 @@ from card_reader_core.repositories.classification_reviews import (
 )
 from card_reader_core.repositories.import_jobs import (
     CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
-    CARD_CLASSIFICATION_MISMATCH_WARNING,
     EVIL_FACTION_UNRESOLVED_WARNING,
     MATCHED_DEPRECATED_CARD_WARNING,
     remove_import_warning,
@@ -931,14 +930,13 @@ def finalize_import_item(
         else:
             remove_import_warning(item, CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING)
 
-    if is_new_card or (
-        card.card_pool == card_pool
-        and live_roles == resolved_card_roles
-        and live_factions == resolved_card_factions
-        and live_mana_families == resolved_card_mana_families
-    ):
-        remove_import_warning(item, CARD_CLASSIFICATION_MISMATCH_WARNING)
-    else:
+    classification_mismatch = not is_new_card and (
+        card.card_pool != card_pool
+        or live_roles != resolved_card_roles
+        or live_factions != resolved_card_factions
+        or live_mana_families != resolved_card_mana_families
+    )
+    if classification_mismatch:
         existing_classification: dict[str, object] = {
             "card_pool": card.card_pool,
             "card_roles": list(live_roles),
@@ -951,7 +949,6 @@ def finalize_import_item(
             "card_factions": list(resolved_card_factions),
             "card_mana_families": list(resolved_card_mana_families),
         }
-        remove_import_warning(item, CARD_CLASSIFICATION_MISMATCH_WARNING)
         create_classification_review_item(
             import_item=item,
             card=card,

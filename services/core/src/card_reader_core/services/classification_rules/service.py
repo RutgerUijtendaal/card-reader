@@ -42,7 +42,6 @@ from card_reader_core.repositories.metadata import get_symbol, get_tag, get_type
 
 
 CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION = 3
-SUPPORTED_CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSIONS = (1, 2, 3)
 
 
 class ClassificationRuleError(ValueError):
@@ -276,7 +275,7 @@ class ClassificationRuleService:
     ) -> dict[str, object]:
         if not isinstance(value, dict):
             raise ClassificationRuleError("Classification rule snapshot must be an object.")
-        if value.get("schema_version") not in SUPPORTED_CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSIONS:
+        if value.get("schema_version") != CLASSIFICATION_RULE_SNAPSHOT_SCHEMA_VERSION:
             raise ClassificationRuleError("Unsupported classification rule snapshot schema.")
         if value.get("card_pool") != card_pool:
             raise ClassificationRuleError(
@@ -326,10 +325,7 @@ class ClassificationRuleService:
                 )
             if not isinstance(rule.get("rule_id"), str) or not rule["rule_id"]:
                 raise ClassificationRuleError("Snapshot rule rule_id is required.")
-            if (
-                value["schema_version"] >= 3
-                and rule.get("source_kind") == CARD_CLASSIFICATION_SOURCE_SYMBOL
-            ):
+            if rule.get("source_kind") == CARD_CLASSIFICATION_SOURCE_SYMBOL:
                 _validate_snapshot_symbol(rule.get("source_symbol"))
         return cast(dict[str, object], value)
 

@@ -217,7 +217,7 @@ def backfill_queued_player_rule_snapshots(apps, _schema_editor) -> None:  # type
         )
 
 
-def downgrade_active_rule_snapshots(apps, _schema_editor) -> None:  # type: ignore[no-untyped-def]
+def remove_mana_family_rules_from_active_snapshots(apps: Any, _schema_editor: Any) -> None:
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
     representable_rule_fields = (
         "rule_id",
@@ -236,7 +236,6 @@ def downgrade_active_rule_snapshots(apps, _schema_editor) -> None:  # type: igno
         snapshot = job.classification_rule_snapshot_json
         if (
             not isinstance(snapshot, dict)
-            or snapshot.get("schema_version") == 1
             or not isinstance(snapshot.get("rules"), list)
         ):
             continue
@@ -248,7 +247,7 @@ def downgrade_active_rule_snapshots(apps, _schema_editor) -> None:  # type: igno
             and rule.get("target_kind") in {"role", "faction"}
         ]
         body: dict[str, object] = {
-            "schema_version": 1,
+            "schema_version": 3,
             "card_pool": job.card_pool,
             "rules": rules,
         }
@@ -468,7 +467,7 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(
             backfill_queued_player_rule_snapshots,
-            downgrade_active_rule_snapshots,
+            remove_mana_family_rules_from_active_snapshots,
         ),
         migrations.RunPython(
             backfill_player_mana_families,

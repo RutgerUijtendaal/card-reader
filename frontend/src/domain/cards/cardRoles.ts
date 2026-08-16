@@ -15,6 +15,13 @@ export const CARD_ROLE_OPTIONS = [
 export type CardRole = (typeof CARD_ROLE_OPTIONS)[number]['value'];
 export type CardRoleFilter = typeof STANDARD_CARD_ROLE | CardRole;
 
+const CARD_ROLE_SET: ReadonlySet<string> = new Set(
+  CARD_ROLE_OPTIONS.map((option) => option.value),
+);
+
+export const isCardRole = (value: string): value is CardRole =>
+  CARD_ROLE_SET.has(value);
+
 export const CARD_ROLE_FILTER_VALUES: readonly CardRoleFilter[] = [
   STANDARD_CARD_ROLE,
   ...CARD_ROLE_OPTIONS.map((option) => option.value),
