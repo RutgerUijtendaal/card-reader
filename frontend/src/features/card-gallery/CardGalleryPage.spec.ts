@@ -375,6 +375,30 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
+  test('keeps legacy mana-symbol routes pending when facet hydration fails', async () => {
+    const mounted = await mountGallery(
+      '/cards?mana_symbol_match=all&mana_symbol_keys=arcane-mana'
+        + '&mana_symbol_exclude_keys=dark-affinity',
+      'player',
+      undefined,
+      () => Promise.reject(new Error('facet failure')),
+      false,
+    );
+
+    expect(mounted.requestRoutes).toEqual([]);
+    expect(apiGet.mock.calls.some(([url]) =>
+      typeof url === 'string' && url.startsWith('/cards?'),
+    )).toBe(false);
+    expect(mounted.router.currentRoute.value.query).toEqual({
+      mana_symbol_match: 'all',
+      mana_symbol_keys: 'arcane-mana',
+      mana_symbol_exclude_keys: 'dark-affinity',
+    });
+    expect(mounted.container.textContent).toContain('Filter options could not be loaded');
+
+    mounted.unmount();
+  });
+
   test('reconciles metadata when switching between pool catalogs', async () => {
     const poolFilters: Record<'player' | 'evil' | 'neutral', CardFiltersResponse> = {
       player: {

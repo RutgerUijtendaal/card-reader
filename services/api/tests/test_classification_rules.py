@@ -4,6 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 
+import card_reader_core.services.catalog.service as catalog_service_module
 import card_reader_core.services.classification_rules.service as classification_rule_service_module
 from card_reader_core.models import (
     Card,
@@ -400,6 +401,39 @@ def test_renaming_a_symbol_to_a_canonical_key_reconciles_its_default_rule() -> N
         symbol_id=symbol.id,
         enabled=True,
     ).exists()
+
+
+def test_symbol_rename_rolls_back_when_default_rule_reconciliation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    canonical_symbol = Symbol.objects.get(key="arcane-mana")
+    assert (
+        Symbol.objects.filter(id=canonical_symbol.id).update(
+            key="legacy-arcane-mana"
+        )
+        == 1
+    )
+    symbol = Symbol.objects.create(
+        key="pending-arcane-symbol",
+        label="Pending Arcane Symbol",
+        symbol_type="mana",
+    )
+
+    def fail_rule_reconciliation(*, symbol_keys: set[str] | None = None) -> int:
+        assert symbol_keys == {"arcane-mana"}
+        raise RuntimeError("rule reconciliation failed")
+
+    monkeypatch.setattr(
+        catalog_service_module,
+        "ensure_default_mana_family_classification_rules",
+        fail_rule_reconciliation,
+    )
+
+    with pytest.raises(RuntimeError, match="rule reconciliation failed"):
+        CatalogService().update_symbol(entry_id=symbol.id, key="arcane-mana")
+
+    symbol.refresh_from_db()
+    assert symbol.key == "pending-arcane-symbol"
 
 
 def test_card_mana_family_assignment_is_unique_and_updates_the_cached_sort_key() -> None:

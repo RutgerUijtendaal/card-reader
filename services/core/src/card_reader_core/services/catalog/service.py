@@ -458,6 +458,7 @@ class CatalogService:
         ensure_default_mana_family_classification_rules(symbol_keys={symbol.key})
         return symbol
 
+    @transaction.atomic
     def update_symbol(
         self,
         *,

@@ -358,9 +358,11 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
         symbol_families_by_card.setdefault(str(card_id), set()).add(
             FAMILY_BY_SYMBOL[str(symbol_key)]
         )
+    represented_card_ids = assigned_by_card.keys() | symbol_families_by_card.keys()
     if any(
-        families != symbol_families_by_card.get(card_id, set())
-        for card_id, families in assigned_by_card.items()
+        assigned_by_card.get(card_id, set())
+        != symbol_families_by_card.get(card_id, set())
+        for card_id in represented_card_ids
     ):
         unsupported.append("card mana-family assignments")
 
