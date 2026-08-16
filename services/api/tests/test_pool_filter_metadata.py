@@ -10,7 +10,6 @@ from django.test.utils import CaptureQueriesContext
 from card_reader_core.models import (
     Card,
     CardPool,
-    CardPoolScope,
     CardVersion,
     Keyword,
     Symbol,
@@ -143,10 +142,7 @@ def test_exact_pool_filter_metadata_uses_active_latest_card_links() -> None:
     )
 
     for pool, (keyword, tag, card_type) in pool_rows.items():
-        metadata = get_filter_metadata(
-            card_pool_scope=CardPoolScope(frozenset({pool})),
-            available_only=True,
-        )
+        metadata = get_filter_metadata(card_pool=pool, available_only=True)
         keyword_keys = {row.key for row in metadata["keywords"]}
         tag_keys = {row.key for row in metadata["tags"]}
         type_keys = {row.key for row in metadata["types"]}
@@ -156,7 +152,7 @@ def test_exact_pool_filter_metadata_uses_active_latest_card_links() -> None:
         assert type_keys == {card_type.key, shared_type.key}
 
 
-def test_omitted_scope_metadata_retains_complete_catalog_and_exact_scope_keeps_symbols() -> None:
+def test_omitted_pool_metadata_retains_complete_catalog_and_exact_pool_keeps_symbols() -> None:
     unlinked_keyword = Keyword.objects.create(key="unlinked-keyword", label="Unlinked Keyword")
     unlinked_tag = Tag.objects.create(key="unlinked-tag", label="Unlinked Tag")
     unlinked_type = Type.objects.create(key="unlinked-type", label="Unlinked Type")
@@ -171,10 +167,8 @@ def test_omitted_scope_metadata_retains_complete_catalog_and_exact_scope_keeps_s
         text_token="{UNLINKED}",
         enabled=True,
     )
-    player_scope = CardPoolScope(frozenset({"player"}))
-
-    global_metadata = get_filter_metadata(card_pool_scope=player_scope)
-    exact_metadata = get_filter_metadata(card_pool_scope=player_scope, available_only=True)
+    global_metadata = get_filter_metadata(card_pool=None)
+    exact_metadata = get_filter_metadata(card_pool="player", available_only=True)
 
     assert unlinked_keyword in global_metadata["keywords"]
     assert unlinked_tag in global_metadata["tags"]
@@ -187,9 +181,8 @@ def test_omitted_scope_metadata_retains_complete_catalog_and_exact_scope_keeps_s
 
 
 def test_exact_pool_filter_metadata_query_count_is_bounded() -> None:
-    player_scope = CardPoolScope(frozenset({"player"}))
     with CaptureQueriesContext(connection) as empty_queries:
-        get_filter_metadata(card_pool_scope=player_scope, available_only=True)
+        get_filter_metadata(card_pool="player", available_only=True)
 
     for index in range(30):
         keyword = Keyword.objects.create(key=f"bounded-keyword-{index}", label=f"Keyword {index}")
@@ -199,7 +192,7 @@ def test_exact_pool_filter_metadata_query_count_is_bounded() -> None:
         _link_metadata(version, keyword=keyword, tag=tag, card_type=card_type)
 
     with CaptureQueriesContext(connection) as populated_queries:
-        metadata = get_filter_metadata(card_pool_scope=player_scope, available_only=True)
+        metadata = get_filter_metadata(card_pool="player", available_only=True)
 
     assert len(populated_queries) == len(empty_queries) == 4
     assert len(metadata["keywords"]) == 30
@@ -207,7 +200,7 @@ def test_exact_pool_filter_metadata_query_count_is_bounded() -> None:
     assert len(metadata["types"]) == 30
 
 
-def test_filter_metadata_api_validates_and_authorizes_explicit_pool_scope() -> None:
+def test_filter_metadata_api_validates_and_serves_every_explicit_pool() -> None:
     keyword = Keyword.objects.create(key="evil-api-keyword", label="Evil API Keyword")
     tag = Tag.objects.create(key="evil-api-tag", label="Evil API Tag")
     card_type = Type.objects.create(key="evil-api-type", label="Evil API Type")
@@ -215,8 +208,8 @@ def test_filter_metadata_api_validates_and_authorizes_explicit_pool_scope() -> N
     _link_metadata(version, keyword=keyword, tag=tag, card_type=card_type)
 
     anonymous = Client(HTTP_HOST="localhost")
-    assert anonymous.get("/cards/filters", {"card_pool": "evil"}).status_code == 403
-    assert anonymous.get("/cards/filters", {"card_pool": "neutral"}).status_code == 403
+    assert anonymous.get("/cards/filters", {"card_pool": "evil"}).status_code == 200
+    assert anonymous.get("/cards/filters", {"card_pool": "neutral"}).status_code == 200
     assert anonymous.get("/cards/filters", {"card_pool": "unknown"}).status_code == 400
 
     omitted_payload = anonymous.get("/cards/filters").json()

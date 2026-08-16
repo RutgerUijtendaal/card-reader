@@ -115,7 +115,6 @@ describe('ImportJobsPage', () => {
         username: 'staff',
         is_staff: true,
         can_access_admin: true,
-        accessible_card_pools: ['player', 'evil', 'neutral'],
       },
     });
     app.use(pinia);
@@ -227,7 +226,6 @@ describe('ImportJobsPage', () => {
         username: 'staff',
         is_staff: true,
         can_access_admin: true,
-        accessible_card_pools: ['player', 'evil', 'neutral'],
       },
     });
     await router.push('/operations');

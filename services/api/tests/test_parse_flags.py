@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import Client
@@ -10,7 +9,6 @@ from django.test.utils import CaptureQueriesContext
 
 from card_reader_core.models import (
     EVIL_CARD_POOL,
-    PLAYER_CARD_POOL_SCOPE,
     Card,
     CardClassificationReviewItem,
     CardVersion,
@@ -95,16 +93,16 @@ def test_inactive_session_cannot_create_parse_flag() -> None:
     assert CardVersionParseFlag.objects.count() == 0
 
 
-def test_evil_parse_flags_follow_the_central_access_capability() -> None:
+def test_authenticated_user_can_submit_evil_parse_flags() -> None:
     _clear_parse_flags()
     card, version = _create_card_version(
-        name="Restricted Flag Card",
+        name="Public Evil Flag Card",
         card_pool=EVIL_CARD_POOL,
     )
     regular_client = Client(HTTP_HOST="localhost")
-    regular_client.force_login(_create_user("restricted-flag-user", "password", is_staff=False))
+    regular_client.force_login(_create_user("evil-flag-user", "password", is_staff=False))
     staff_client = Client(HTTP_HOST="localhost")
-    staff_client.force_login(_create_user("restricted-flag-staff", "password", is_staff=True))
+    staff_client.force_login(_create_user("evil-flag-staff", "password", is_staff=True))
     payload = {"items": [{"property_key": "name", "expected_value": "Correct name"}]}
 
     regular_response = regular_client.post(
@@ -118,11 +116,11 @@ def test_evil_parse_flags_follow_the_central_access_capability() -> None:
         content_type="application/json",
     )
 
-    assert regular_response.status_code == 404
+    assert regular_response.status_code == 201
     assert staff_response.status_code == 201
 
 
-def test_review_lists_are_global_across_every_authorized_card_pool() -> None:
+def test_review_lists_are_global_across_every_card_pool() -> None:
     _clear_parse_flags()
     reviewer = _create_user("global-reviewer", "password", is_staff=True)
     client = Client(HTTP_HOST="localhost")
@@ -173,20 +171,14 @@ def test_review_lists_are_global_across_every_authorized_card_pool() -> None:
     })
 
 
-def test_classification_review_update_respects_authorized_card_pool_scope(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_classification_review_update_follows_a_card_after_pool_change() -> None:
     CardClassificationReviewItem.objects.all().delete()
     reviewer = _create_user("pool-scoped-reviewer", "password", is_staff=True)
     client = Client(HTTP_HOST="localhost")
     client.force_login(reviewer)
-    card, version = _create_card_version(name="Restricted Classification Review")
+    card, version = _create_card_version(name="Reclassified Review")
     review_item = _create_classification_review(card=card, version=version)
     change_card_identity(card=card, card_pool=EVIL_CARD_POOL)
-    monkeypatch.setattr(
-        "card_reader_api.review.views.card_pool_scope_for_user",
-        lambda _user: PLAYER_CARD_POOL_SCOPE,
-    )
 
     list_response = client.get("/review/classification-items?status=open")
     summary_response = client.get("/review/summary")
@@ -197,16 +189,14 @@ def test_classification_review_update_respects_authorized_card_pool_scope(
     )
 
     assert list_response.status_code == 200
-    assert list_response.json()["results"] == []
-    assert summary_response.json()["open_classification_review_count"] == 0
-    assert response.status_code == 404
+    assert [row["id"] for row in list_response.json()["results"]] == [review_item.id]
+    assert summary_response.json()["open_classification_review_count"] == 1
+    assert response.status_code == 200
     review_item.refresh_from_db()
-    assert review_item.status == "open"
+    assert review_item.status == "dismissed"
 
 
-def test_classification_review_scope_falls_back_to_snapshot_for_deleted_card(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_classification_review_uses_snapshot_for_deleted_card() -> None:
     CardClassificationReviewItem.objects.all().delete()
     reviewer = _create_user("deleted-review-scope", "password", is_staff=True)
     client = Client(HTTP_HOST="localhost")
@@ -214,10 +204,6 @@ def test_classification_review_scope_falls_back_to_snapshot_for_deleted_card(
     card, version = _create_card_version(name="Deleted Classification Review")
     review_item = _create_classification_review(card=card, version=version)
     card.delete()
-    monkeypatch.setattr(
-        "card_reader_api.review.views.card_pool_scope_for_user",
-        lambda _user: PLAYER_CARD_POOL_SCOPE,
-    )
 
     response = client.get("/review/classification-items?status=open")
 

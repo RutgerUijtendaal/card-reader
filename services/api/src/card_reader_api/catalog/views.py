@@ -27,7 +27,6 @@ from card_reader_api.catalog.serializers import (
     type_payload,
 )
 from card_reader_api.catalog.assets import ALLOWED_SYMBOL_ASSET_SUFFIXES, store_symbol_asset
-from card_reader_api.common.auth_access import card_pool_scope_for_user
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_core.services.catalog import CatalogService
 from card_reader_core.services.classification_rules import (
@@ -41,7 +40,7 @@ from card_reader_core.services.classification_rules import (
 
 class CatalogView(APIView):
     def get(self, request: Request) -> Response:
-        data = CatalogService().list_catalog(card_pool_scope=card_pool_scope_for_user(request.user))
+        data = CatalogService().list_catalog()
         return Response(
             {
                 "known": {
@@ -54,9 +53,7 @@ class CatalogView(APIView):
                     "tags": [suggestion_payload(item) for item in data["suggested"]["tags"]],
                     "types": [suggestion_payload(item) for item in data["suggested"]["types"]],
                 },
-                "classification": ClassificationRuleService().definition_catalog(
-                    card_pool_scope=card_pool_scope_for_user(request.user)
-                ),
+                "classification": ClassificationRuleService().definition_catalog(),
             }
         )
 
@@ -121,7 +118,6 @@ class KeywordDetailView(APIView):
     def get(self, request: Request, entry_id: str) -> Response:
         detail = CatalogService().get_keyword_detail(
             entry_id=entry_id,
-            card_pool_scope=card_pool_scope_for_user(request.user),
         )
         if detail is None:
             return not_found("Keyword not found")
@@ -145,7 +141,6 @@ class TagDetailView(APIView):
     def get(self, request: Request, entry_id: str) -> Response:
         detail = CatalogService().get_tag_detail(
             entry_id=entry_id,
-            card_pool_scope=card_pool_scope_for_user(request.user),
         )
         if detail is None:
             return not_found("Tag not found")
@@ -167,7 +162,6 @@ class TypeDetailView(APIView):
     def get(self, request: Request, entry_id: str) -> Response:
         detail = CatalogService().get_type_detail(
             entry_id=entry_id,
-            card_pool_scope=card_pool_scope_for_user(request.user),
         )
         if detail is None:
             return not_found("Type not found")
@@ -206,7 +200,6 @@ class SymbolDetailView(APIView):
     def get(self, request: Request, entry_id: str) -> Response:
         detail = CatalogService().get_symbol_detail(
             entry_id=entry_id,
-            card_pool_scope=card_pool_scope_for_user(request.user),
         )
         if detail is None:
             return not_found("Symbol not found")
@@ -279,7 +272,6 @@ class SuggestionListView(APIView):
             return bad_request(str(exc))
         suggestions = CatalogService().list_suggestions(
             kind=normalized_kind,
-            card_pool_scope=card_pool_scope_for_user(request.user),
             status=serializer.validated_data.get("status"),
         )
         return Response([suggestion_payload(item) for item in suggestions])
@@ -293,7 +285,6 @@ class SuggestionDetailView(APIView):
             return bad_request(str(exc))
         suggestion = CatalogService().get_suggestion_detail(
             suggestion_id=entry_id,
-            card_pool_scope=card_pool_scope_for_user(request.user),
         )
         if suggestion is None or suggestion["kind"] != normalized_kind:
             return not_found("Suggestion not found")
@@ -329,7 +320,6 @@ class SuggestionAcceptView(APIView):
             if suggestion is None
             else service.get_suggestion_detail(
                 suggestion_id=suggestion.id,
-                card_pool_scope=card_pool_scope_for_user(request.user),
             )
         )
         if detail is None or detail["kind"] != normalized_kind:
@@ -350,7 +340,6 @@ class SuggestionRejectView(APIView):
             if suggestion is None
             else service.get_suggestion_detail(
                 suggestion_id=suggestion.id,
-                card_pool_scope=card_pool_scope_for_user(request.user),
             )
         )
         if detail is None or detail["kind"] != normalized_kind:

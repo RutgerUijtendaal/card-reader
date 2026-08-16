@@ -22,7 +22,6 @@ import {
   buildWorkspaceGalleryLocation,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
-import { resolveResourceWorkspaceAccessDecision } from '@/app/router/workspaceCapabilities';
 
 const APP_TITLE = "Maity's Card Game";
 const buildDocumentTitle = (pageTitle?: string): string => (pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE);
@@ -83,11 +82,6 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
     const workspace = useCardPoolWorkspaceStore();
     const rawRequestedPool = to.query.card_pool;
     const requestedPool = isCardPool(rawRequestedPool) ? rawRequestedPool : undefined;
-    const sessionKey = auth.authenticated
-      ? `user:${auth.user?.id ?? auth.user?.username ?? 'authenticated'}`
-      : 'anonymous';
-    workspace.synchronizeSession(auth.accessibleCardPools, sessionKey);
-
     if (to.meta.requiresAuth && !auth.authenticated) {
       return {
         path: '/login',
@@ -111,28 +105,6 @@ export const createAppRouter = (history: RouterHistory = createWebHistory()) => 
         delete query.card_pool;
         return { path: to.path, query, hash: to.hash };
       }
-    }
-
-    if (to.meta.workspaceCapability === 'resource') {
-      const resourceAccessDecision = resolveResourceWorkspaceAccessDecision(
-        to,
-        workspace.accessiblePools,
-      );
-      if (resourceAccessDecision.kind === 'fallback-gallery') {
-        return buildWorkspaceGalleryLocation('player');
-      }
-      if (resourceAccessDecision.kind === 'strip-return-context') {
-        return resourceAccessDecision.location;
-      }
-    }
-
-    const routeWorkspacePool = resolveRouteWorkspacePool(
-      to.meta.workspaceCapability,
-      rawRequestedPool,
-      to.query.return_card_pool,
-    );
-    if (routeWorkspacePool && !workspace.accessiblePools.includes(routeWorkspacePool)) {
-      return buildWorkspaceGalleryLocation('player');
     }
 
     if (to.meta.workspaceCapability === 'gallery') {

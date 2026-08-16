@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { useLocalStorage } from '@vueuse/core';
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import type { LocationQueryRaw, RouteLocationRaw } from 'vue-router';
 import {
   CARD_POOL_OPTIONS,
@@ -10,25 +10,8 @@ import {
 
 export const CARD_POOL_WORKSPACE_PREFERENCE_KEY = 'card-reader.card-pool-workspace';
 
-export const normalizeAccessibleCardPools = (
-  cardPools: readonly CardPool[],
-): CardPool[] => {
-  const allowed = new Set<CardPool>(['player', ...cardPools]);
-  return CARD_POOL_OPTIONS
-    .map((option) => option.value)
-    .filter((cardPool) => allowed.has(cardPool));
-};
-
-export const resolveCardPoolWorkspace = (
-  accessibleCardPools: readonly CardPool[],
-  preferredCardPool: unknown,
-): CardPool => {
-  const accessible = new Set(normalizeAccessibleCardPools(accessibleCardPools));
-  if (isCardPool(preferredCardPool) && accessible.has(preferredCardPool)) {
-    return preferredCardPool;
-  }
-  return 'player';
-};
+export const resolveCardPoolWorkspace = (preferredCardPool: unknown): CardPool =>
+  isCardPool(preferredCardPool) ? preferredCardPool : 'player';
 
 export const buildWorkspaceGalleryLocation = (
   cardPool: CardPool,
@@ -46,51 +29,16 @@ export const buildWorkspaceGalleryLocation = (
 };
 
 export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () => {
-  const activePool = ref<CardPool>('player');
-  const accessiblePools = ref<CardPool[]>(['player']);
-  const generation = ref(0);
-  const initialized = ref(false);
-  const sessionKey = ref('anonymous');
   const preferredPool = useLocalStorage<CardPool | null>(
     CARD_POOL_WORKSPACE_PREFERENCE_KEY,
     null,
     { writeDefaults: false },
   );
-
-  const availableOptions = computed(() =>
-    CARD_POOL_OPTIONS.filter((option) => accessiblePools.value.includes(option.value)),
-  );
-
-  const synchronizeSession = (
-    nextAccessiblePools: readonly CardPool[],
-    nextSessionKey: string,
-  ): boolean => {
-    const normalizedPools = normalizeAccessibleCardPools(nextAccessiblePools);
-    const scopeChanged = normalizedPools.join(':') !== accessiblePools.value.join(':');
-    const identityChanged = nextSessionKey !== sessionKey.value;
-    const nextPool = initialized.value
-      ? resolveCardPoolWorkspace(
-          normalizedPools,
-          normalizedPools.includes(activePool.value) ? activePool.value : preferredPool.value,
-        )
-      : resolveCardPoolWorkspace(normalizedPools, preferredPool.value);
-    const poolChanged = nextPool !== activePool.value;
-
-    accessiblePools.value = normalizedPools;
-    sessionKey.value = nextSessionKey;
-    activePool.value = nextPool;
-    initialized.value = true;
-    if (poolChanged) {
-      preferredPool.value = nextPool;
-    }
-    if (scopeChanged || identityChanged || poolChanged) {
-      generation.value += 1;
-    }
-    return poolChanged;
-  };
+  const activePool = ref<CardPool>(resolveCardPoolWorkspace(preferredPool.value));
+  const generation = ref(0);
 
   const selectPool = (cardPool: CardPool): boolean => {
-    if (!accessiblePools.value.includes(cardPool) || cardPool === activePool.value) {
+    if (cardPool === activePool.value) {
       return false;
     }
     activePool.value = cardPool;
@@ -101,11 +49,8 @@ export const useCardPoolWorkspaceStore = defineStore('card-pool-workspace', () =
 
   return {
     activePool,
-    accessiblePools,
-    availableOptions,
+    availableOptions: CARD_POOL_OPTIONS,
     generation,
-    initialized,
-    synchronizeSession,
     selectPool,
   };
 });

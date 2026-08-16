@@ -19,7 +19,7 @@ from card_reader_core.models import (
     CARD_POOL_DEFINITIONS,
     CARD_POOLS,
     CARD_ROLE_DEFINITIONS,
-    PLAYER_CARD_POOL_SCOPE,
+    PLAYER_CARD_POOL,
     Card,
     CardBack,
     CardClassificationRule,
@@ -66,9 +66,9 @@ from .schema import (
     TemplateRecord,
 )
 
-DEVELOPER_DATA_CARD_POOL_SCOPE = PLAYER_CARD_POOL_SCOPE
-DEVELOPER_DATA_RESTRICTED_POOLS = tuple(
-    pool for pool in CARD_POOLS if not DEVELOPER_DATA_CARD_POOL_SCOPE.allows_card_pool(pool)
+DEVELOPER_DATA_CARD_POOL = PLAYER_CARD_POOL
+DEVELOPER_DATA_EXCLUDED_POOLS = tuple(
+    pool for pool in CARD_POOLS if pool != DEVELOPER_DATA_CARD_POOL
 )
 
 
@@ -133,8 +133,8 @@ def _resolve_selection(
     selected_keys = set(selection.card_keys)
     group_card_ids: set[str] = set()
     group_queryset = CardGroup.objects.filter(
-        anchor_card__card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools,
-    ).exclude(members__card__card_pool__in=DEVELOPER_DATA_RESTRICTED_POOLS)
+        anchor_card__card_pool=DEVELOPER_DATA_CARD_POOL,
+    ).exclude(members__card__card_pool__in=DEVELOPER_DATA_EXCLUDED_POOLS)
     if not selection.include_all_card_groups:
         group_queryset = group_queryset.filter(key__in=selection.card_group_keys)
     groups = list(
@@ -151,7 +151,7 @@ def _resolve_selection(
         group_card_ids.add(group.anchor_card.id)
         group_card_ids.update(member.card.id for member in group.members.all())
 
-    card_queryset = Card.objects.filter(card_pool__in=DEVELOPER_DATA_CARD_POOL_SCOPE.allowed_pools)
+    card_queryset = Card.objects.filter(card_pool=DEVELOPER_DATA_CARD_POOL)
     explicit_matches: dict[str, list[str]] = {}
     for card_id, card_key in card_queryset.filter(key__in=selected_keys).values_list("id", "key"):
         explicit_matches.setdefault(card_key, []).append(card_id)

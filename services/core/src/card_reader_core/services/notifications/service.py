@@ -11,7 +11,7 @@ from card_reader_core.models import (
     Card,
     CardVersionParseFlagItem,
     Deck,
-    PLAYER_CARD_POOL_SCOPE,
+    PLAYER_CARD_POOL,
     UserNotification,
 )
 from card_reader_core.repositories.notifications import (
@@ -107,7 +107,7 @@ class NotificationService:
         import_item_id: str | None = None,
     ) -> list[UserNotification]:
         card = Card.objects.filter(id=card_id).first()
-        if card is None or not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool):
+        if card is None or card.card_pool != PLAYER_CARD_POOL:
             return []
 
         decks = (
@@ -146,7 +146,7 @@ class NotificationService:
     ) -> UserNotification | None:
         owner_id = str(getattr(deck.owner, "pk", ""))
         if (
-            not PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool)
+            card.card_pool != PLAYER_CARD_POOL
             or not owner_id
             or owner_id == actor_id
         ):

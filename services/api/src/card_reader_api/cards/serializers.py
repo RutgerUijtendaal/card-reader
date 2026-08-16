@@ -39,7 +39,7 @@ from card_reader_core.rules import render_enriched_rule_text
 from card_reader_core.services.decks import normalize_deck_building_config
 
 if TYPE_CHECKING:
-    from card_reader_core.models import CardGroup, CardPoolScope, Deck
+    from card_reader_core.models import CardGroup, Deck
     from card_reader_core.repositories.cards import CardSort
     from card_reader_core.services.cards import CardEditState, CardMetadata
 
@@ -208,13 +208,8 @@ def card_group_summary_payload(
     group: CardGroup,
     *,
     card_id: str | None = None,
-    card_pool_scope: CardPoolScope,
 ) -> dict[str, object]:
-    members = [
-        member
-        for member in group.members.all()
-        if card_pool_scope.allows_card_pool(member.card.card_pool)
-    ]
+    members = list(group.members.all())
     anchor_card_id = group.anchor_card.id
     card_ids = [member.card.id for member in members]
     position = next((member.position for member in members if member.card.id == card_id), None)

@@ -4,14 +4,13 @@ from pathlib import Path
 from typing import TypedDict
 
 from card_reader_core.metadata import MANA_FAMILIES, ManaFamilyDefinition
-from card_reader_core.models import Card, CardPoolScope, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
+from card_reader_core.models import Card, CardPool, CardVersion, CardVersionImage, Keyword, ParseResult, Symbol, Tag, Type
 from card_reader_core.repositories.cards import (
     FieldSourcesPayload,
     ParsedSnapshotPayload,
     decode_field_sources,
     decode_parsed_snapshot,
     get_card,
-    get_card_in_scope,
     get_card_image,
     get_latest_card_version,
     resolve_image_file_path,
@@ -53,23 +52,23 @@ class CardEditState(TypedDict):
 
 def get_filter_metadata(
     *,
-    card_pool_scope: CardPoolScope,
+    card_pool: CardPool | None,
     available_only: bool = False,
 ) -> CardFilterMetadata:
+    if available_only:
+        if card_pool is None:
+            raise ValueError("card_pool is required when available_only is true")
+        keywords = list_available_keywords(card_pool=card_pool)
+        tags = list_available_tags(card_pool=card_pool)
+    else:
+        keywords = list_keywords()
+        tags = list_tags()
     return {
-        "keywords": (
-            list_available_keywords(card_pool_scope=card_pool_scope)
-            if available_only
-            else list_keywords()
-        ),
-        "tags": (
-            list_available_tags(card_pool_scope=card_pool_scope)
-            if available_only
-            else list_tags()
-        ),
+        "keywords": keywords,
+        "tags": tags,
         "symbols": list_symbols(),
         "types": list_types_for_card_sort(
-            card_pool_scope=card_pool_scope,
+            card_pool=card_pool,
             available_only=available_only,
         ),
         "mana_families": MANA_FAMILIES,
@@ -78,21 +77,6 @@ def get_filter_metadata(
 
 def get_card_with_image(card_id: str) -> tuple[Card | None, CardVersion | None, CardVersionImage | None]:
     card = get_card(card_id)
-    if card is None:
-        return None, None, None
-    version = get_latest_card_version(card.id)
-    if version is None:
-        return card, None, None
-    image = get_card_image(version.id)
-    return card, version, image
-
-
-def get_card_with_image_in_scope(
-    card_id: str,
-    *,
-    card_pool_scope: CardPoolScope,
-) -> tuple[Card | None, CardVersion | None, CardVersionImage | None]:
-    card = get_card_in_scope(card_id, card_pool_scope=card_pool_scope)
     if card is None:
         return None, None, None
     version = get_latest_card_version(card.id)

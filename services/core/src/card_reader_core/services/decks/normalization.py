@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from card_reader_core.models import (
     HERO_CARD_ROLE,
-    PLAYER_CARD_POOL_SCOPE,
+    PLAYER_CARD_POOL,
     Card,
     Deck,
     DeckEntry,
@@ -15,7 +15,7 @@ from .constraints import DeckConstraintEntry, DeckConstraintEvaluator
 from .types import DeckEntryInput, DeckSideboardInput
 
 
-def _validate_preserved_restricted_mainboard_entries(
+def _validate_preserved_non_player_mainboard_entries(
     *,
     entries: list[DeckEntryInput],
     existing_entries: list[DeckEntry],
@@ -23,20 +23,20 @@ def _validate_preserved_restricted_mainboard_entries(
     expected_quantities = {
         entry.card.id: int(entry.quantity)
         for entry in existing_entries
-        if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+        if entry.card.card_pool != PLAYER_CARD_POOL
     }
     for entry in entries:
         expected_quantity = expected_quantities.get(entry.card_id)
         if expected_quantity is not None and int(entry.quantity) != expected_quantity:
-            raise ValueError("Restricted mainboard references can only be preserved unchanged.")
+            raise ValueError("Non-Player mainboard references can only be preserved unchanged.")
 
 
-def _validate_preserved_restricted_sideboard_entries(
+def _validate_preserved_non_player_sideboard_entries(
     *,
     sideboards: list[DeckSideboardInput],
     existing_sideboards: list[DeckSideboard],
 ) -> list[str | None]:
-    restricted_card_ids: set[str] = set()
+    non_player_card_ids: set[str] = set()
     existing_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
     existing_by_name: dict[str, list[DeckSideboard]] = {}
     for existing_sideboard in existing_sideboards:
@@ -44,9 +44,9 @@ def _validate_preserved_restricted_sideboard_entries(
     expected_quantities: dict[tuple[str, str], int] = {}
     for existing_sideboard in existing_sideboards:
         for existing_entry in existing_sideboard.entries.all():
-            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(existing_entry.card.card_pool):
+            if existing_entry.card.card_pool == PLAYER_CARD_POOL:
                 continue
-            restricted_card_ids.add(existing_entry.card.id)
+            non_player_card_ids.add(existing_entry.card.id)
             expected_quantities[(existing_sideboard.id, existing_entry.card.id)] = int(
                 existing_entry.quantity
             )
@@ -63,7 +63,7 @@ def _validate_preserved_restricted_sideboard_entries(
     resolved_source_sideboard_ids: list[str | None] = []
     for submitted_sideboard in sideboards:
         requires_source = any(
-            entry.card_id in restricted_card_ids for entry in submitted_sideboard.entries
+            entry.card_id in non_player_card_ids for entry in submitted_sideboard.entries
         )
         source_sideboard = _resolve_source_sideboard(
             submitted_sideboard,
@@ -79,7 +79,7 @@ def _validate_preserved_restricted_sideboard_entries(
         if source_sideboard is not None:
             used_source_sideboard_ids.add(source_sideboard.id)
         for submitted_entry in submitted_sideboard.entries:
-            if submitted_entry.card_id not in restricted_card_ids:
+            if submitted_entry.card_id not in non_player_card_ids:
                 continue
             if expected_quantities.get(
                 (
@@ -89,7 +89,7 @@ def _validate_preserved_restricted_sideboard_entries(
             ) != int(
                 submitted_entry.quantity
             ):
-                raise ValueError("Restricted sideboard references can only be preserved unchanged.")
+                raise ValueError("Non-Player sideboard references can only be preserved unchanged.")
     return resolved_source_sideboard_ids
 
 
@@ -167,7 +167,11 @@ class DeckPayloadNormalizer:
         update_entries: bool,
         update_sideboards: bool,
     ) -> tuple[Card, list[tuple[str, int]], list[dict[str, object]]]:
-        hero_card = get_deck_card(hero_card_id) if update_hero_card_id else existing_deck.hero_card
+        hero_card = (
+            existing_deck.hero_card
+            if not update_hero_card_id or hero_card_id == existing_deck.hero_card.id
+            else get_deck_card(hero_card_id)
+        )
         if hero_card is None:
             raise ValueError("Hero card not found.")
         existing_mainboard_entries = list(existing_deck.entries.all())
@@ -176,23 +180,23 @@ class DeckPayloadNormalizer:
             entry.card.id: entry.card
             for entry in existing_mainboard_entries
             if not update_entries
-            or not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+            or entry.card.card_pool != PLAYER_CARD_POOL
         }
         retained_sideboard_cards_by_id = {
             entry.card.id: entry.card
             for sideboard in existing_sideboards
             for entry in sideboard.entries.all()
             if not update_sideboards
-            or not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+            or entry.card.card_pool != PLAYER_CARD_POOL
         }
         if update_entries:
-            _validate_preserved_restricted_mainboard_entries(
+            _validate_preserved_non_player_mainboard_entries(
                 entries=entries,
                 existing_entries=existing_mainboard_entries,
             )
         sideboard_source_ids: list[str | None] = [None] * len(sideboards)
         if update_sideboards:
-            sideboard_source_ids = _validate_preserved_restricted_sideboard_entries(
+            sideboard_source_ids = _validate_preserved_non_player_sideboard_entries(
                 sideboards=sideboards,
                 existing_sideboards=existing_sideboards,
             )
@@ -215,7 +219,7 @@ class DeckPayloadNormalizer:
         retained_sideboard_cards_by_id: dict[str, Card],
         sideboard_source_ids: list[str | None],
     ) -> tuple[Card, list[tuple[str, int]], list[dict[str, object]]]:
-        if PLAYER_CARD_POOL_SCOPE.allows_card_pool(hero_card.card_pool) and not card_has_role(
+        if hero_card.card_pool == PLAYER_CARD_POOL and not card_has_role(
             hero_card,
             HERO_CARD_ROLE,
         ):
@@ -265,12 +269,12 @@ class DeckPayloadNormalizer:
             source_ids=sideboard_source_ids,
         )
         constraint_hero = (
-            hero_card if PLAYER_CARD_POOL_SCOPE.allows_card_pool(hero_card.card_pool) else None
+            hero_card if hero_card.card_pool == PLAYER_CARD_POOL else None
         )
         constraint_entries = [
             entry
             for entry in [*mainboard_constraint_entries, *sideboard_constraint_entries]
-            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
+            if entry.card.card_pool == PLAYER_CARD_POOL
         ]
         evaluation = DeckConstraintEvaluator().evaluate(
             hero_card=constraint_hero,
@@ -317,7 +321,7 @@ class DeckPayloadNormalizer:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
             card = cards_by_id[card_id]
-            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool):
+            if card.card_pool == PLAYER_CARD_POOL:
                 if card_has_role(card, HERO_CARD_ROLE):
                     raise ValueError("Hero cards cannot appear in mainboard entries.")
                 if card.id == hero_card.id:
@@ -375,7 +379,7 @@ class DeckPayloadNormalizer:
             card_id = entry.card_id.strip()
             quantity = int(entry.quantity)
             card = cards_by_id[card_id]
-            if PLAYER_CARD_POOL_SCOPE.allows_card_pool(card.card_pool) and (
+            if card.card_pool == PLAYER_CARD_POOL and (
                 card_has_role(card, HERO_CARD_ROLE) or card.id == hero_card.id
             ):
                 raise ValueError("Hero cards cannot appear in sideboards.")

@@ -6,42 +6,36 @@ Card Reader combines public browsing with session-authenticated management tools
 
 The web application uses Django session authentication. Login and session responses include a CSRF token, and unsafe browser requests require CSRF protection.
 
-Inactive users cannot authenticate or continue using protected capabilities. The central authenticated-user predicate includes active status, so an existing session whose account becomes inactive is reported as unauthenticated, loses staff and other protected capabilities, and receives only the public Player card scope. Sensitive token-based flows also re-check the issuing account instead of assuming that access remains valid for the token's entire lifetime.
+Inactive users cannot authenticate or continue using protected capabilities. The central authenticated-user predicate includes active status, so an existing session whose account becomes inactive is reported as unauthenticated and loses staff and other protected capabilities. Public card browsing remains available exactly as it is for any anonymous visitor. Sensitive token-based flows also re-check the issuing account instead of assuming that access remains valid for the token's entire lifetime.
 
 ## Access levels
 
 The main access levels are:
 
-- Public visitors can browse Player-card and public deck surfaces and load their public card and symbol assets.
+- Public visitors can browse Player, Evil, and Neutral cards, groups, generations, and direct assets, plus public deck surfaces.
 - Active authenticated users can use account-scoped features and other capabilities granted to ordinary members.
 - Staff users can access administrative workflows including imports, review, catalogs, templates, exports, user management, and developer-data publishing.
-- Admin and Review use the staff user's complete authorized card-pool scope; changing the shell workspace never narrows their catalogs, previews, counts, or queues. Imports require a fresh explicit card-pool selection and do not inherit the shell workspace.
+- Admin and Review operate across all card pools; changing the shell workspace never narrows their catalogs, previews, counts, or queues. Imports require a fresh explicit card-pool selection and do not inherit the shell workspace.
 - Superusers can access maintenance operations and the most sensitive administrative views.
 - Developer users can download developer-data bundles even when they are not staff. Staff receive this capability automatically.
 
 The developer flag is deliberately narrower than staff access: it supports project onboarding without granting import, catalog, user-management, or maintenance permissions. See [Developer data](developer-data.md) for its download and publishing flows.
 
-## Restricted card pools
+## Public card pools
 
-Player is the public/default card pool. Evil and Neutral are separate restricted pools whose current policy grants access to staff only. At the API boundary, `card_pool_scope_for_user` is the single policy seam that translates a user into an immutable core `CardPoolScope`: ordinary and anonymous viewers receive the canonical Player-only scope, while staff receive Player, Evil, and Neutral. Core repositories, services, and payload builders consume the scope without inspecting users or staff state, so changing the entitlement policy remains a single boundary edit.
+Player, Evil, and Neutral card data are public. Anonymous, ordinary, inactive-session, and staff viewers receive the same card visibility for collections, exact-pool filters, details, generations, groups, embedded payloads, and direct or immutable images. Invalid pool values are still rejected, lifecycle visibility is unchanged, and filesystem containment plus database ownership checks still protect immutable asset paths.
 
-An unauthorized collection request that explicitly selects Evil or Neutral returns `403` with generic restricted-pool copy. Direct restricted card, version, image, and immutable-asset lookups return `404` so they do not disclose whether an identity exists. The same policy applies to grouped cards, exports, selectors, filter counts, and other card-derived public data. If a Player card already referenced by an ordinary user's deck is reclassified, the deck reference and invalid-state warning remain, but the embedded restricted card content and image are replaced by a generic placeholder. Deck rules and validation details returned to that owner are computed from visible Player cards or replaced with a generic restricted-card issue, so restricted card configuration and type behavior are not exposed indirectly.
+Staff permissions control actions and administrative workflows rather than card visibility. Imports, Review, Admin, catalog and template mutation, CSV export, and Gallery or content-version TTS creation remain staff-only. Their card-derived searches, counts, previews, and embedded data cover all pools once the endpoint-level permission succeeds.
 
-Developer-data bundles remain fixed Player-only public artifacts. Persistent TTS sheets are instead
-partitioned by card pool and served through stable public sheet URLs for Player, Evil, and Neutral.
-This is a deliberate exception to direct restricted-card asset authorization: staff control creation
-of Gallery and content-version exports, but Tabletop Simulator can keep loading an exported sheet
-without a Django session and sees later card-art updates at the same URL. Deck TTS exports remain
-Player-only because decks are currently a Player workflow, not because TTS cards have a Player-only
-format.
+Developer-data publication and the current deck workflow remain Player-only product contracts. Developer bundles intentionally publish Player content for onboarding. Deck creation, mutation, validation, Playtester eligibility, and deck TTS exports intentionally accept Player references only. Those boundaries do not conceal Evil or Neutral card identities: existing reclassified deck references are returned as real card payloads and marked through `has_non_player_cards`, while unsupported mutations remain invalid.
 
-Card-derived search, counts, ordering, validation, previews, notifications, and generated outputs apply their scope before exposing results. Direct restricted identities still use the established `404` policy, while an explicitly forbidden Evil or Neutral collection selection remains `403`.
+Persistent TTS sheets are partitioned by card pool and served through stable public sheet URLs for all three pools. Staff control Gallery and content-version export creation, while Tabletop Simulator can load the resulting sheets without a Django session and see later card-art updates at the same URL.
 
 ## Capability-driven UI
 
-The authenticated session payload exposes named capabilities plus ordered `accessible_card_pools`. Ordinary sessions receive `player`; staff sessions receive `player`, `evil`, and `neutral`. The global sidenav workspace consumes this list instead of duplicating pool literals or staff checks in the frontend. It shows only permitted pools, restores only a permitted preference, and falls back to Player for logged-out or reduced-scope sessions.
+The authenticated session payload exposes named action capabilities but no card-pool entitlement list. The global sidenav always offers Player, Evil, and Neutral, including before login. Its saved workspace preference survives login, logout, and inactive-session transitions.
 
-Workspace state is navigation context rather than authorization. Voluntary selection uses one typed route-capability policy: global routes stay mounted, Gallery replaces only its pool-owned state, resource routes retain the opened identity and update their return context, and Player-only routes fall back only when the selected pool is incompatible. Route-changing selections commit after navigation is accepted, so a leave guard or superseding selection cannot partially change the stored context. Session identity or pool-scope loss remains stricter: it increments the frontend request generation synchronously, discards restricted card collections and filter metadata, removes disallowed route state, and forces mounted card and group resources to clear and revalidate against the new scope. Late collection and resource responses from the previous generation are ignored. Direct backend authorization remains authoritative throughout every transition.
+Workspace state is navigation context rather than authorization. Selection uses one typed route-capability policy: global routes stay mounted, Gallery replaces only its pool-owned state, resource routes retain the opened identity and update their return context, and Player-only routes fall back when the selected pool is incompatible. Route-changing selections commit after navigation is accepted, so a leave guard or superseding selection cannot partially change the stored context. Actively changing pools still invalidates pool-specific Gallery requests; session changes do not invalidate public card data or redirect public card and group routes.
 
 The server still authorizes every request. Hiding an unavailable control improves the interface but is never treated as the security boundary.
 

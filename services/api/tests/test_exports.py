@@ -210,7 +210,7 @@ def test_deck_tts_export_restricts_only_the_requested_board() -> None:
     assert restricted_sideboard_response.status_code == 404
 
 
-def test_deck_tts_export_rechecks_pool_scope_in_authoritative_snapshot(monkeypatch) -> None:
+def test_deck_tts_export_rechecks_player_pool_rule_in_authoritative_snapshot(monkeypatch) -> None:
     TtsCardSheet.objects.all().delete()
     owner = _create_user("tts-export-reclassification-owner", "password")
     hero = _create_card(name="TTS Reclassification Hero", hero=True)
@@ -231,7 +231,7 @@ def test_deck_tts_export_rechecks_pool_scope_in_authoritative_snapshot(monkeypat
         return False
 
     monkeypatch.setattr(
-        "card_reader_api.exports.views.deck_export_uses_out_of_scope_card",
+        "card_reader_api.exports.views.deck_export_uses_non_player_card",
         reclassify_after_visibility_check,
     )
 

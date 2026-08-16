@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import cast
 from uuid import UUID
 
 from rest_framework import status
@@ -10,25 +8,17 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.common.auth_access import card_pool_scope_for_user, can_access_admin, is_authenticated
+from card_reader_api.common.auth_access import can_access_admin, is_authenticated
 from card_reader_api.common.permissions import AuthenticatedAllowed
 from card_reader_api.common.responses import bad_request, not_found, serializer_error
 from card_reader_api.decks.serializers import (
     DeckListQuerySerializer,
     DeckWriteSerializer,
-    deck_card_reference_id,
     deck_payload,
     deck_summary_payload,
     deck_tag_suggestion_results_payload,
 )
-from card_reader_core.models import (
-    PLAYER_CARD_POOL_SCOPE,
-    CardPoolScope,
-    Deck,
-    DeckEntry,
-    DeckSideboard,
-    DeckSideboardEntry,
-)
+from card_reader_core.models import Deck
 from card_reader_core.services.decks import (
     DeckCreationDeletedError,
     DeckEntryInput,
@@ -37,7 +27,7 @@ from card_reader_core.services.decks import (
     DeckSummaryPage,
     DeckUpdateInput,
     deck_building_rules_metadata_json,
-    deck_uses_out_of_scope_card,
+    deck_uses_non_player_card,
 )
 from card_reader_core.services.deck_tags import DeckTagService
 
@@ -46,224 +36,24 @@ def _user_id(request: Request) -> str:
     return str(getattr(request.user, "pk", ""))
 
 
-def _restricted_creation_replay_response(
-    deck: Deck,
-    *,
-    card_pool_scope: CardPoolScope,
-) -> Response | None:
-    if not deck_uses_out_of_scope_card(deck, card_pool_scope):
+def _ineligible_creation_replay_response(deck: Deck) -> Response | None:
+    if not deck_uses_non_player_card(deck):
         return None
     return Response(
         {"detail": "The deck created by this key is no longer eligible for replay."},
         status=status.HTTP_409_CONFLICT,
     )
 
-
-def _restore_unchanged_restricted_deck_references(
-    validated_data: dict[str, object],
-    *,
-    deck: Deck,
-    card_pool_scope: CardPoolScope,
-) -> None:
-    if not deck_uses_out_of_scope_card(deck, PLAYER_CARD_POOL_SCOPE):
-        return
-
-    expected_hero_id = deck_card_reference_id(deck.hero_card, card_pool_scope=card_pool_scope)
-    if validated_data.get("hero_card_id") == expected_hero_id:
-        validated_data.pop("hero_card_id")
-
-    if "entries" in validated_data:
-        existing_entries = list(deck.entries.all())
-        restored_entries = _restore_restricted_entry_references(
-            cast(list[dict[str, object]], validated_data["entries"]),
-            existing_entries=existing_entries,
-            card_pool_scope=card_pool_scope,
-        )
-        expected_entries = [
-            {"card_id": entry.card.id, "quantity": int(entry.quantity)}
-            for entry in existing_entries
-        ]
-        if restored_entries == expected_entries:
-            validated_data.pop("entries")
-        else:
-            validated_data["entries"] = restored_entries
-
-    if "sideboards" in validated_data:
-        existing_sideboards = list(deck.sideboards.all())
-        existing_sideboards_by_id = {sideboard.id: sideboard for sideboard in existing_sideboards}
-        existing_sideboards_by_name: dict[str, list[DeckSideboard]] = {}
-        for existing_sideboard in existing_sideboards:
-            existing_sideboards_by_name.setdefault(existing_sideboard.name, []).append(
-                existing_sideboard
-            )
-        submitted_sideboards = cast(list[dict[str, object]], validated_data["sideboards"])
-        explicitly_referenced_source_ids = [
-            source.id
-            for submitted_sideboard in submitted_sideboards
-            if (
-                source := existing_sideboards_by_id.get(
-                    str(submitted_sideboard.get("id", ""))
-                )
-            )
-            is not None
-        ]
-        if len(explicitly_referenced_source_ids) != len(
-            set(explicitly_referenced_source_ids)
-        ):
-            raise ValueError("Each existing sideboard can only be submitted once.")
-        reserved_source_sideboard_ids = set(explicitly_referenced_source_ids)
-        restricted_reference_ids = {
-            deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope)
-            for existing_sideboard in existing_sideboards
-            for entry in existing_sideboard.entries.all()
-            if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
-        }
-        restored_sideboards: list[dict[str, object]] = []
-        used_source_sideboard_ids: set[str] = set()
-        for sideboard in submitted_sideboards:
-            submitted_entries = cast(list[dict[str, object]], sideboard["entries"])
-            source_sideboard = _existing_sideboard_for_submission(
-                sideboard,
-                existing_sideboards_by_id=existing_sideboards_by_id,
-                existing_sideboards_by_name=existing_sideboards_by_name,
-                reserved_source_sideboard_ids=reserved_source_sideboard_ids,
-                used_source_sideboard_ids=used_source_sideboard_ids,
-                card_pool_scope=card_pool_scope,
-                requires_source=any(
-                    str(entry.get("card_id", "")) in restricted_reference_ids
-                    for entry in submitted_entries
-                ),
-            )
-            if source_sideboard is not None:
-                used_source_sideboard_ids.add(source_sideboard.id)
-            restored_sideboards.append(
-                {
-                    **sideboard,
-                    **({"id": source_sideboard.id} if source_sideboard is not None else {}),
-                    "entries": _restore_restricted_entry_references(
-                        submitted_entries,
-                        existing_entries=(
-                            list(source_sideboard.entries.all())
-                            if source_sideboard is not None
-                            else []
-                        ),
-                        card_pool_scope=card_pool_scope,
-                    ),
-                }
-            )
-        expected_sideboards = [
-            {
-                "name": sideboard.name,
-                "id": sideboard.id,
-                "entries": [
-                    {"card_id": entry.card.id, "quantity": int(entry.quantity)}
-                    for entry in sideboard.entries.all()
-                ],
-            }
-            for sideboard in existing_sideboards
-        ]
-        if restored_sideboards == expected_sideboards:
-            validated_data.pop("sideboards")
-        else:
-            validated_data["sideboards"] = restored_sideboards
-
-
-def _existing_sideboard_for_submission(
-    submitted_sideboard: dict[str, object],
-    *,
-    existing_sideboards_by_id: dict[str, DeckSideboard],
-    existing_sideboards_by_name: dict[str, list[DeckSideboard]],
-    reserved_source_sideboard_ids: set[str],
-    used_source_sideboard_ids: set[str],
-    card_pool_scope: CardPoolScope,
-    requires_source: bool,
-) -> DeckSideboard | None:
-    requested_id = str(submitted_sideboard.get("id", ""))
-    source_sideboard = existing_sideboards_by_id.get(requested_id)
-    if source_sideboard is not None:
-        if source_sideboard.id in used_source_sideboard_ids:
-            raise ValueError("Each existing sideboard can only be submitted once.")
-        return source_sideboard
-
-    named_candidates = existing_sideboards_by_name.get(str(submitted_sideboard["name"]), [])
-    available_candidates = [
-        sideboard
-        for sideboard in named_candidates
-        if sideboard.id not in used_source_sideboard_ids
-        and sideboard.id not in reserved_source_sideboard_ids
-    ]
-    if not available_candidates:
-        if named_candidates and requires_source:
-            raise ValueError("Each existing sideboard can only be submitted once.")
-        return None
-
-    submitted_entries = cast(list[dict[str, object]], submitted_sideboard["entries"])
-    exact_candidates = [
-        sideboard
-        for sideboard in available_candidates
-        if _existing_sideboard_client_entries(
-            sideboard,
-            card_pool_scope=card_pool_scope,
-        )
-        == submitted_entries
-    ]
-    return exact_candidates[0] if len(exact_candidates) == 1 else available_candidates[0]
-
-
-def _existing_sideboard_client_entries(
-    sideboard: DeckSideboard,
-    *,
-    card_pool_scope: CardPoolScope,
-) -> list[dict[str, object]]:
-    return [
-        {
-            "card_id": deck_card_reference_id(
-                entry.card,
-                card_pool_scope=card_pool_scope,
-            ),
-            "quantity": int(entry.quantity),
-        }
-        for entry in sideboard.entries.all()
-    ]
-
-
-def _restore_restricted_entry_references(
-    submitted_entries: list[dict[str, object]],
-    *,
-    existing_entries: Sequence[DeckEntry | DeckSideboardEntry],
-    card_pool_scope: CardPoolScope,
-) -> list[dict[str, object]]:
-    restricted_entries = {
-        deck_card_reference_id(entry.card, card_pool_scope=card_pool_scope): entry
-        for entry in existing_entries
-        if not PLAYER_CARD_POOL_SCOPE.allows_card_pool(entry.card.card_pool)
-    }
-    restored: list[dict[str, object]] = []
-    for submitted in submitted_entries:
-        placeholder = str(submitted.get("card_id", ""))
-        existing = restricted_entries.get(placeholder)
-        if existing is None:
-            restored.append(submitted)
-            continue
-        if submitted.get("quantity") != int(existing.quantity):
-            restored.append(submitted)
-            continue
-        restored.append({**submitted, "card_id": existing.card.id})
-    return restored
-
-
 def _deck_list_response(
     serializer: DeckListQuerySerializer,
     decks: list[Deck],
     *,
-    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
 ) -> Response:
     if serializer.wants_summary():
         results = [
             deck_summary_payload(
                 deck,
-                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=include_pending_suggestions,
             )
             for deck in decks
@@ -272,7 +62,6 @@ def _deck_list_response(
         results = [
             deck_payload(
                 deck,
-                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=include_pending_suggestions,
             )
             for deck in decks
@@ -283,7 +72,6 @@ def _deck_list_response(
 def _deck_summary_page_response(
     summary_page: DeckSummaryPage,
     *,
-    card_pool_scope: CardPoolScope,
     include_pending_suggestions: bool = False,
 ) -> Response:
     next_cursor = None
@@ -305,7 +93,6 @@ def _deck_summary_page_response(
             "results": [
                 deck_summary_payload(
                     deck,
-                    card_pool_scope=card_pool_scope,
                     include_pending_suggestions=include_pending_suggestions,
                 )
                 for deck in summary_page.results
@@ -325,7 +112,6 @@ class PublicDeckListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
@@ -354,7 +140,6 @@ class PublicDeckListView(APIView):
             page, page_size = serializer.pagination()
             cursor_created_at, cursor_id = serializer.pagination_cursor()
             summary_page = service.list_public_deck_summary_page(
-                card_pool_scope=card_pool_scope,
                 page=page,
                 page_size=page_size,
                 snapshot_at=serializer.pagination_snapshot(),
@@ -364,11 +149,9 @@ class PublicDeckListView(APIView):
             )
             return _deck_summary_page_response(
                 summary_page,
-                card_pool_scope=card_pool_scope,
             )
         list_decks = service.list_public_deck_summaries if serializer.wants_summary() else service.list_public_decks
         decks = list_decks(
-            card_pool_scope=card_pool_scope,
             search_query=filters["search_query"],
             hero_query=filters["hero_query"],
             author_query=filters["author_query"],
@@ -383,7 +166,6 @@ class PublicDeckListView(APIView):
         return _deck_list_response(
             serializer,
             decks,
-            card_pool_scope=card_pool_scope,
         )
 
 
@@ -391,7 +173,6 @@ class PublicDeckDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request, deck_id: str) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         viewer_id = _user_id(request) if is_authenticated(request.user) else None
         deck = DeckService().get_deck_for_viewer(deck_id, viewer_id=viewer_id)
         if deck is None:
@@ -400,7 +181,6 @@ class PublicDeckDetailView(APIView):
         return Response(
             deck_payload(
                 deck,
-                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=is_owner,
             )
         )
@@ -410,7 +190,6 @@ class OwnerDeckListCreateView(APIView):
     permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         serializer = DeckListQuerySerializer(
             data={
                 "hero_q": request.query_params.get("hero_q"),
@@ -455,11 +234,9 @@ class OwnerDeckListCreateView(APIView):
                 deck_tag_ids=filters["deck_tag_ids"],
                 deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
                 deck_tag_match=filters["deck_tag_match"],
-                card_pool_scope=card_pool_scope,
             )
             return _deck_summary_page_response(
                 summary_page,
-                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=True,
             )
         list_decks = service.list_owner_deck_summaries if serializer.wants_summary() else service.list_owner_decks
@@ -474,17 +251,14 @@ class OwnerDeckListCreateView(APIView):
             deck_tag_ids=filters["deck_tag_ids"],
             deck_tag_exclude_ids=filters["deck_tag_exclude_ids"],
             deck_tag_match=filters["deck_tag_match"],
-            card_pool_scope=card_pool_scope,
         )
         return _deck_list_response(
             serializer,
             decks,
-            card_pool_scope=card_pool_scope,
             include_pending_suggestions=True,
         )
 
     def post(self, request: Request) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         raw_creation_id = request.headers.get("Idempotency-Key")
         client_creation_id: UUID | None = None
         if raw_creation_id is not None:
@@ -501,16 +275,12 @@ class OwnerDeckListCreateView(APIView):
                 client_creation_id,
             )
             if existing is not None:
-                restricted_response = _restricted_creation_replay_response(
-                    existing,
-                    card_pool_scope=card_pool_scope,
-                )
-                if restricted_response is not None:
-                    return restricted_response
+                ineligible_response = _ineligible_creation_replay_response(existing)
+                if ineligible_response is not None:
+                    return ineligible_response
                 return Response(
                     deck_payload(
                         existing,
-                        card_pool_scope=card_pool_scope,
                         include_pending_suggestions=True,
                     )
                 )
@@ -563,7 +333,6 @@ class OwnerDeckListCreateView(APIView):
             return bad_request(str(exc))
         payload = deck_payload(
             deck,
-            card_pool_scope=card_pool_scope,
             include_pending_suggestions=True,
         )
         payload["tag_suggestion_results"] = deck_tag_suggestion_results_payload(
@@ -577,7 +346,6 @@ class OwnerDeckCreationLookupView(APIView):
     permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request, client_creation_id: UUID) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         deck, key_used = DeckService().get_owner_deck_creation_result(
             _user_id(request),
             client_creation_id,
@@ -589,16 +357,12 @@ class OwnerDeckCreationLookupView(APIView):
                     status=status.HTTP_410_GONE,
                 )
             return not_found("Deck not found")
-        restricted_response = _restricted_creation_replay_response(
-            deck,
-            card_pool_scope=card_pool_scope,
-        )
-        if restricted_response is not None:
-            return restricted_response
+        ineligible_response = _ineligible_creation_replay_response(deck)
+        if ineligible_response is not None:
+            return ineligible_response
         return Response(
             deck_payload(
                 deck,
-                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=True,
             )
         )
@@ -608,7 +372,6 @@ class OwnerDeckDetailView(APIView):
     permission_classes = [AuthenticatedAllowed]
 
     def get(self, request: Request, deck_id: str) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         service = DeckService()
         deck = service.get_owner_deck(deck_id, _user_id(request))
         if deck is None and can_access_admin(request.user):
@@ -618,13 +381,11 @@ class OwnerDeckDetailView(APIView):
         return Response(
             deck_payload(
                 deck,
-                card_pool_scope=card_pool_scope,
                 include_pending_suggestions=True,
             )
         )
 
     def patch(self, request: Request, deck_id: str) -> Response:
-        card_pool_scope = card_pool_scope_for_user(request.user)
         service = DeckService()
         accessible_deck = service.get_owner_deck(deck_id, _user_id(request))
         if accessible_deck is None and can_access_admin(request.user):
@@ -634,14 +395,6 @@ class OwnerDeckDetailView(APIView):
         serializer = DeckWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return serializer_error(serializer)
-        try:
-            _restore_unchanged_restricted_deck_references(
-                serializer.validated_data,
-                deck=accessible_deck,
-                card_pool_scope=card_pool_scope,
-            )
-        except ValueError as exc:
-            return bad_request(str(exc))
         tag_service = DeckTagService()
         service = DeckService(tag_service=tag_service)
         try:
@@ -701,7 +454,6 @@ class OwnerDeckDetailView(APIView):
             return not_found("Deck not found")
         payload = deck_payload(
             deck,
-            card_pool_scope=card_pool_scope,
             include_pending_suggestions=True,
         )
         submitted_suggestions = (

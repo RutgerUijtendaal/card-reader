@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from django.db.models import Exists, OuterRef, QuerySet
+from django.db.models import QuerySet
 
 from card_reader_core.models import (
     NOTIFICATION_STATUS_FILTERS,
     NOTIFICATION_STATUS_READ,
     NOTIFICATION_STATUS_UNREAD,
-    Card,
-    CardMergeRedirect,
-    CardPoolScope,
     UserNotification,
 )
 
@@ -19,16 +16,13 @@ def is_notification_status_filter(value: object) -> bool:
     return isinstance(value, str) and value in NOTIFICATION_STATUS_FILTERS
 
 
-def count_unread_notifications(recipient_id: str, *, card_pool_scope: CardPoolScope) -> int:
-    return notification_queryset(recipient_id, card_pool_scope=card_pool_scope).filter(
-        read_at__isnull=True
-    ).count()
+def count_unread_notifications(recipient_id: str) -> int:
+    return notification_queryset(recipient_id).filter(read_at__isnull=True).count()
 
 
 def list_notifications(
     recipient_id: str,
     *,
-    card_pool_scope: CardPoolScope,
     status: NotificationStatusFilter = NOTIFICATION_ALL_STATUS,
     event_type: str | None = None,
     page: int = 1,
@@ -38,7 +32,7 @@ def list_notifications(
         raise ValueError("Invalid notification status.")
     normalized_page = max(page, 1)
     normalized_page_size = max(1, min(page_size, 100))
-    queryset = notification_queryset(recipient_id, card_pool_scope=card_pool_scope)
+    queryset = notification_queryset(recipient_id)
     if status == NOTIFICATION_STATUS_UNREAD:
         queryset = queryset.filter(read_at__isnull=True)
     elif status == NOTIFICATION_STATUS_READ:
@@ -55,27 +49,9 @@ def list_notifications(
     )
 
 
-def notification_queryset(
-    recipient_id: str,
-    *,
-    card_pool_scope: CardPoolScope,
-) -> QuerySet[UserNotification]:
-    restricted_card = Card.objects.filter(
-        id=OuterRef("metadata_json__card_id"),
-    ).exclude(card_pool__in=card_pool_scope.allowed_pools)
-    redirected_restricted_card = CardMergeRedirect.objects.filter(
-        old_card_id=OuterRef("metadata_json__card_id"),
-    ).exclude(target_card__card_pool__in=card_pool_scope.allowed_pools)
+def notification_queryset(recipient_id: str) -> QuerySet[UserNotification]:
     return (
         UserNotification.objects.select_related("recipient", "actor")
         .filter(recipient_id=recipient_id, archived_at__isnull=True)
-        .annotate(
-            _references_restricted_card=Exists(restricted_card),
-            _references_redirected_restricted_card=Exists(redirected_restricted_card),
-        )
-        .filter(
-            _references_restricted_card=False,
-            _references_redirected_restricted_card=False,
-        )
         .order_by("-last_event_at", "-created_at", "id")
     )

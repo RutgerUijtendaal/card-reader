@@ -8,11 +8,11 @@ website.
 
 The reviewed `dev-data/selection.json` contains stable must-include keys, inclusion policy, and
 coverage requirements. The current policy includes the complete Player card and Player card-group
-catalog at build time; Evil and Neutral cards are excluded while those pools are restricted. The explicit
+catalog at build time; Evil and Neutral cards are excluded as an intentional onboarding product contract. The explicit
 keys remain regression anchors that must still exist. The committed
 `dev-data.lock.json` pins the required bundle version, format, checksum, and website API.
 
-Selection, group validation, archive construction, and archive loading use a fixed canonical Player-only `CardPoolScope`. Selection keys resolve only against Player cards, so same-key Evil or Neutral twins neither override nor invalidate the selected Player card. Archive validation rejects non-Player card records and cross-pool groups even when an archive was produced outside the normal exporter. This publication scope is intentionally independent of the staff user who starts a build, so expanding interactive restricted-pool eligibility cannot expand published bundles accidentally.
+Selection, group validation, archive construction, and archive loading use an explicit Player predicate. Selection keys resolve only against Player cards, so same-key Evil or Neutral twins neither override nor invalidate the selected Player card. Archive validation rejects non-Player card records and cross-pool groups even when an archive was produced outside the normal exporter. This publication contract is intentionally independent of the staff user who starts a build and of the public visibility of all three pools.
 
 Cards included through a selected group retain their exact database identity during selection; a
 same-key Player card in another faction namespace is not pulled into the bundle merely because it
@@ -43,7 +43,7 @@ compatibility keeps older immutable bundles usable without making current classi
 
 Selection coverage is evaluated by pool, role, faction, and mana family through `min_cards_by_pool`,
 `min_cards_by_role`, `min_cards_by_faction`, and `min_cards_by_mana_family`. The existing Hero minimum is retained under the Hero
-role. Evil and Neutral pool coverage remains zero while those pools are excluded; Directive, Reminder,
+role. Evil and Neutral pool coverage remains zero under the Player-only publication contract; Directive, Reminder,
 and Order, Blood, Dark, and Metal may remain at zero until reviewed source data is available. The
 selection still requires both Evil Type-to-role rules so migration-owned defaults cannot disappear
 silently even while Evil card coverage is optional. Mana coverage is required because existing Player

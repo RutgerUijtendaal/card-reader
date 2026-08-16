@@ -1,10 +1,7 @@
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { CardPool } from '@/domain/cards/cardPools';
-import {
-  buildWorkspaceGalleryLocation,
-  useCardPoolWorkspaceStore,
-} from '@/domain/cards/cardPoolWorkspace';
+import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
 import { clearGalleryNavigationState } from '@/domain/cards/utils/gallery/galleryNavigation';
 import { resolveWorkspaceSelectionDecision } from '@/app/router/workspaceCapabilities';
 
@@ -22,13 +19,12 @@ export const useCardPoolWorkspaceSelection = () => {
       route,
       cardPool,
       workspace.activePool,
-      workspace.accessiblePools,
     );
     if (decision.kind === 'reject') {
       return false;
     }
     if (decision.kind === 'stay') {
-      if (attempt !== selectionAttempt || !workspace.accessiblePools.includes(cardPool)) {
+      if (attempt !== selectionAttempt) {
         return false;
       }
       workspace.selectPool(cardPool);
@@ -40,11 +36,6 @@ export const useCardPoolWorkspaceSelection = () => {
         ? await router.replace(decision.location)
         : await router.push(decision.location);
       if (navigationFailure || attempt !== selectionAttempt) {
-        return false;
-      }
-      if (!workspace.accessiblePools.includes(cardPool)) {
-        await router.replace(buildWorkspaceGalleryLocation(workspace.activePool));
-        clearGalleryNavigationState();
         return false;
       }
       if (

@@ -1,5 +1,3 @@
-import type { CardPool } from '@/domain/cards/cardPools';
-
 export type CurrentUser = {
   authenticated: boolean;
   csrf_token?: string;
@@ -8,7 +6,6 @@ export type CurrentUser = {
   is_staff?: boolean;
   is_superuser?: boolean;
   can_access_admin?: boolean;
-  accessible_card_pools?: CardPool[];
   can_manage_users?: boolean;
   can_access_maintenance?: boolean;
   can_download_developer_data?: boolean;

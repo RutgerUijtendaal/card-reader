@@ -1361,7 +1361,7 @@ def test_current_user_treats_an_inactive_session_as_unauthenticated() -> None:
     assert response.status_code == 200
     assert response.json()["authenticated"] is False
     assert response.json()["can_access_admin"] is False
-    assert response.json()["accessible_card_pools"] == ["player"]
+    assert "accessible_card_pools" not in response.json()
 
 
 def test_cards_list_returns_paginated_payload() -> None:
@@ -1495,15 +1495,15 @@ def test_card_image_asset_endpoint_serves_non_checksum_immutable_image_path() ->
     assert card.id
 
 
-@pytest.mark.parametrize("restricted_pool", ["evil", "neutral"])
-def test_restricted_card_images_are_hidden_from_non_staff_across_all_routes(
-    restricted_pool: str,
+@pytest.mark.parametrize("card_pool", ["evil", "neutral"])
+def test_non_player_card_images_are_public_across_all_routes(
+    card_pool: str,
 ) -> None:
     card, version = _create_editable_card_version(
-        name=f"Restricted {restricted_pool.title()} Image"
+        name=f"Public {card_pool.title()} Image"
     )
     image = _create_card_image(version)
-    card.card_pool = restricted_pool
+    card.card_pool = card_pool
     card.save(update_fields=["card_pool"])
     anonymous = Client(HTTP_HOST="localhost")
     paths = [
@@ -1512,53 +1512,50 @@ def test_restricted_card_images_are_hidden_from_non_staff_across_all_routes(
         f"/card-images/{image.stored_path}",
     ]
 
-    for path in paths:
-        assert anonymous.get(path).status_code == 404
-
-    staff = _staff_client(f"restricted-{restricted_pool}-image-staff")
-    responses = [staff.get(path) for path in paths]
+    responses = [anonymous.get(path) for path in paths]
     try:
         assert [response.status_code for response in responses] == [200, 200, 200]
     finally:
         for response in responses:
             response.close()
 
-
-@pytest.mark.parametrize("restricted_pool", ["evil", "neutral"])
-def test_restricted_card_collections_and_objects_enforce_pool_scope(
-    restricted_pool: str,
+@pytest.mark.parametrize("card_pool", ["evil", "neutral"])
+def test_non_player_card_collections_and_objects_are_public(
+    card_pool: str,
 ) -> None:
     card, _version = _create_editable_card_version(
-        name=f"Restricted {restricted_pool.title()} Collection Card"
+        name=f"Public {card_pool.title()} Collection Card"
     )
-    card.card_pool = restricted_pool
+    card.card_pool = card_pool
     card.save(update_fields=["card_pool"])
     anonymous = Client(HTTP_HOST="localhost")
-    staff = _staff_client(f"restricted-{restricted_pool}-collection-staff")
+    staff = _staff_client(f"public-{card_pool}-collection-staff")
 
-    assert anonymous.get("/cards", {"card_pool": restricted_pool}).status_code == 403
-    assert anonymous.get(f"/cards/{card.id}").status_code == 404
-    assert anonymous.get(f"/cards/{card.id}/generations").status_code == 404
+    anonymous_list = anonymous.get("/cards", {"card_pool": card_pool})
+    assert anonymous_list.status_code == 200
+    assert [row["id"] for row in anonymous_list.json()["results"]] == [card.id]
+    assert anonymous.get(f"/cards/{card.id}").status_code == 200
+    assert anonymous.get(f"/cards/{card.id}/generations").status_code == 200
 
-    staff_list = staff.get("/cards", {"card_pool": restricted_pool})
+    staff_list = staff.get("/cards", {"card_pool": card_pool})
     assert staff_list.status_code == 200
     assert [row["id"] for row in staff_list.json()["results"]] == [card.id]
     assert staff.get(f"/cards/{card.id}").status_code == 200
     assert staff.get(f"/cards/{card.id}/generations").status_code == 200
 
 
-def test_inactive_staff_session_loses_restricted_card_scope() -> None:
-    card, _version = _create_editable_card_version(name="Inactive Staff Restricted Card")
+def test_inactive_staff_session_retains_public_non_player_card_access() -> None:
+    card, _version = _create_editable_card_version(name="Inactive Staff Public Card")
     card.card_pool = "evil"
     card.save(update_fields=["card_pool"])
-    user = _create_user("inactive-restricted-staff", "password", is_staff=True)
+    user = _create_user("inactive-public-staff", "password", is_staff=True)
     client = Client(HTTP_HOST="localhost")
     client.force_login(user)
     user.is_active = False
     user.save(update_fields=["is_active"])
 
-    assert client.get("/cards", {"card_pool": "evil"}).status_code == 403
-    assert client.get(f"/cards/{card.id}").status_code == 404
+    assert client.get("/cards", {"card_pool": "evil"}).status_code == 200
+    assert client.get(f"/cards/{card.id}").status_code == 200
 
 
 def test_card_version_image_route_rejects_a_version_owned_by_another_card() -> None:
@@ -1941,7 +1938,7 @@ def test_filters_payload_includes_type_linked_card_counts() -> None:
     assert returned["linked_card_count"] == 1
 
 
-def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
+def test_filters_payload_counts_all_card_pools_for_every_viewer() -> None:
     counted_type = _create_type(key="filters-pool-counted-type", label="Filters Pool Counted Type")
     _player_card, player_version = _create_editable_card_version(name="Filters Player Counted Card")
     evil_card, evil_version = _create_editable_card_version(name="Filters Evil Counted Card")
@@ -1959,16 +1956,18 @@ def test_filters_payload_scopes_type_counts_to_accessible_card_pools() -> None:
         row for row in public_response.json()["types"] if row["id"] == counted_type.id
     )
     staff_type = next(row for row in staff_response.json()["types"] if row["id"] == counted_type.id)
-    assert public_type["linked_card_count"] == 1
+    assert public_type["linked_card_count"] == 2
     assert staff_type["linked_card_count"] == 2
 
 
-def test_filters_payload_returns_authorized_pool_registry_in_canonical_order() -> None:
+def test_filters_payload_returns_public_pool_registry_in_canonical_order() -> None:
     public_response = Client(HTTP_HOST="localhost").get("/cards/filters")
     staff_response = _staff_client("filters-pool-registry-staff").get("/cards/filters")
 
     assert public_response.json()["card_pools"] == [
         {"key": "player", "label": "Player", "rank": 0},
+        {"key": "evil", "label": "Evil", "rank": 1},
+        {"key": "neutral", "label": "Neutral", "rank": 2},
     ]
     assert staff_response.json()["card_pools"] == [
         {"key": "player", "label": "Player", "rank": 0},
@@ -3442,7 +3441,7 @@ def test_card_detail_and_group_detail_include_card_group_membership() -> None:
     assert group_payload["members"][0]["is_anchor"] is True
 
 
-def test_cross_pool_group_relationships_only_expose_authorized_members() -> None:
+def test_cross_pool_group_relationships_expose_all_members_to_every_viewer() -> None:
     player_card, player_version = _create_editable_card_version(name="Cross Pool Group Player")
     evil_card, evil_version = _create_editable_card_version(name="Cross Pool Group Evil")
     evil_card.card_pool = "evil"
@@ -3463,11 +3462,15 @@ def test_cross_pool_group_relationships_only_expose_authorized_members() -> None
 
     assert anonymous_group_response.status_code == 200
     assert [member["card"]["id"] for member in anonymous_group_response.json()["members"]] == [
-        player_card.id
+        player_card.id,
+        evil_card.id,
     ]
     assert anonymous_card_response.json()["card_groups"][0]["id"] == group.id
-    assert anonymous_card_response.json()["card_groups"][0]["member_count"] == 1
-    assert anonymous_card_response.json()["card_groups"][0]["card_ids"] == [player_card.id]
+    assert anonymous_card_response.json()["card_groups"][0]["member_count"] == 2
+    assert anonymous_card_response.json()["card_groups"][0]["card_ids"] == [
+        player_card.id,
+        evil_card.id,
+    ]
     assert staff_group_response.status_code == 200
     assert [member["card"]["id"] for member in staff_group_response.json()["members"]] == [
         player_card.id,

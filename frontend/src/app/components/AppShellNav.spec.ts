@@ -4,7 +4,6 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import AppShellNav from '@/app/components/AppShellNav.vue';
 import { useCardPoolWorkspaceStore } from '@/domain/cards/cardPoolWorkspace';
-import type { CardPool } from '@/domain/cards/cardPools';
 import {
   clearGalleryNavigationState,
   setGalleryNavigationCards,
@@ -62,7 +61,6 @@ vi.mock('@/app/components/ThemeModeMenu.vue', () => ({
 
 const mountNav = async (
   props: { collapsed?: boolean; mobile?: boolean } = {},
-  accessiblePools: CardPool[] = ['player'],
   blockEvilNavigation: boolean | (() => Promise<boolean>) = false,
   initialPath = '/cards',
 ) => {
@@ -145,7 +143,6 @@ const mountNav = async (
   await router.isReady();
   const pinia = createPinia();
   const workspace = useCardPoolWorkspaceStore(pinia);
-  workspace.synchronizeSession(accessiblePools, 'test-user');
   const closeMobile = vi.fn();
   const app = createApp(AppShellNav, {
     ...props,
@@ -191,17 +188,17 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
-  test('shows Player as the only workspace when restricted pools are unavailable', async () => {
+  test('shows every workspace without depending on authentication', async () => {
     const mounted = await mountNav();
 
     expect(mounted.container.querySelector('[aria-label="Player workspace"]')).not.toBeNull();
-    expect(mounted.container.querySelector('[aria-label="Evil workspace"]')).toBeNull();
-    expect(mounted.container.querySelector('[aria-label="Neutral workspace"]')).toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Evil workspace"]')).not.toBeNull();
+    expect(mounted.container.querySelector('[aria-label="Neutral workspace"]')).not.toBeNull();
     mounted.unmount();
   });
 
   test('places the workspace picker immediately before the hotkeys area', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const mounted = await mountNav();
     const pickerSection = mounted.container.querySelector(
       '[data-testid="card-pool-workspace-switcher"]',
     )?.parentElement;
@@ -255,7 +252,7 @@ describe('AppShellNav', () => {
   });
 
   test('shows permitted workspaces and removes Player-only navigation in Evil', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const mounted = await mountNav();
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -272,7 +269,7 @@ describe('AppShellNav', () => {
   });
 
   test('uses the active pool icon for the Gallery link in every workspace', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const mounted = await mountNav();
 
     expect(
       mounted.container.querySelector('a[href="/cards"] [data-card-pool-icon="player"]'),
@@ -300,7 +297,7 @@ describe('AppShellNav', () => {
   });
 
   test('treats the active workspace button as a no-op', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const mounted = await mountNav();
     const generation = mounted.workspace.generation;
     const playerButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Player workspace"]',
@@ -323,7 +320,7 @@ describe('AppShellNav', () => {
     '/review?view=flags',
     '/admin?tab=catalog',
   ])('switches context without leaving the global route %s', async (initialPath) => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], false, initialPath);
+    const mounted = await mountNav({}, false, initialPath);
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -340,7 +337,6 @@ describe('AppShellNav', () => {
   test('keeps a resource open and updates only its workspace return context', async () => {
     const mounted = await mountNav(
       {},
-      ['player', 'evil', 'neutral'],
       false,
       '/cards/card-1/edit?card_pool=evil&return_card_pool=player&tab=card-version',
     );
@@ -365,7 +361,6 @@ describe('AppShellNav', () => {
   test('clears stale Gallery paging when a resource return workspace changes', async () => {
     const mounted = await mountNav(
       {},
-      ['player', 'evil', 'neutral'],
       false,
       '/cards/card-1/edit?return_card_pool=player',
     );
@@ -396,7 +391,7 @@ describe('AppShellNav', () => {
   });
 
   test('falls back from a Player-only route only after navigation is accepted', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], false, '/my/decks/new');
+    const mounted = await mountNav({}, false, '/my/decks/new');
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -413,7 +408,6 @@ describe('AppShellNav', () => {
   test('closes the mobile drawer after a context-only selection succeeds', async () => {
     const mounted = await mountNav(
       { mobile: true },
-      ['player', 'evil', 'neutral'],
       false,
       '/settings',
     );
@@ -430,7 +424,7 @@ describe('AppShellNav', () => {
   });
 
   test('commits only the latest rapid workspace selection', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const mounted = await mountNav();
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -448,12 +442,12 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
-  test('counter-navigates a pending restricted selection when Player is reselected', async () => {
+  test('counter-navigates a pending non-Player selection when Player is reselected', async () => {
     let releaseNavigation!: (accepted: boolean) => void;
     const navigationGate = new Promise<boolean>((resolve) => {
       releaseNavigation = resolve;
     });
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], () => navigationGate);
+    const mounted = await mountNav({}, () => navigationGate);
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -472,29 +466,8 @@ describe('AppShellNav', () => {
     mounted.unmount();
   });
 
-  test('lets access loss win a pending restricted workspace selection', async () => {
-    let releaseNavigation!: (accepted: boolean) => void;
-    const navigationGate = new Promise<boolean>((resolve) => {
-      releaseNavigation = resolve;
-    });
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], () => navigationGate);
-    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
-      '[aria-label="Evil workspace"]',
-    );
-
-    evilButton?.click();
-    mounted.workspace.synchronizeSession(['player'], 'reduced-user');
-    releaseNavigation(true);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await nextTick();
-
-    expect(mounted.workspace.activePool).toBe('player');
-    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards');
-    mounted.unmount();
-  });
-
   test('keeps the current workspace mounted when guarded navigation is rejected', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], true, '/my/decks/new');
+    const mounted = await mountNav({}, true, '/my/decks/new');
     const generation = mounted.workspace.generation;
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
@@ -512,7 +485,7 @@ describe('AppShellNav', () => {
   });
 
   test('exposes all compact workspace icons with accessible names when collapsed', async () => {
-    const mounted = await mountNav({ collapsed: true }, ['player', 'evil', 'neutral']);
+    const mounted = await mountNav({ collapsed: true });
     const buttons = Array.from(
       mounted.container.querySelectorAll<HTMLButtonElement>(
         '[data-testid="card-pool-workspace-switcher"] button',
@@ -529,7 +502,7 @@ describe('AppShellNav', () => {
   });
 
   test('shows pool names in tooltips on hover', async () => {
-    const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
+    const mounted = await mountNav();
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );

@@ -56,9 +56,9 @@ pnpm --filter @card-reader/api dev-data:doctor
 
 Auth is always enabled.
 
-- Player-scoped `/cards`, `/cards/filters`, and direct card image endpoints are public. Evil and
-  Neutral collections return `403` to non-staff callers, while restricted direct objects and assets
-  return `404`. Pool-partitioned TTS sheet images remain public derived artifacts.
+- Player, Evil, and Neutral `/cards`, `/cards/filters`, card-group, generation, and direct card image
+  endpoints are public. Invalid pools, lifecycle filtering, immutable-path containment, and image
+  ownership checks remain enforced. Pool-partitioned TTS sheet images are public derived artifacts.
 - The temporary `/tts/cache-test/card-image` diagnostic, symbol assets, `/health`, and `/auth/*`
   are public.
 - Public deck detail and deck TTS export are available to any viewer who can access the deck.
@@ -72,7 +72,8 @@ Auth is always enabled.
   yield a hashed bearer token that can retry the pinned download for 30 minutes.
 
 The Vue app uses Django session auth with CSRF protection. `/auth/me` and `/auth/login` return the
-current user payload and a CSRF token used by the browser client for unsafe requests.
+current user payload and a CSRF token used by the browser client for unsafe requests. Session
+payloads expose action capabilities but do not carry card-pool entitlements.
 
 ## Seeds
 

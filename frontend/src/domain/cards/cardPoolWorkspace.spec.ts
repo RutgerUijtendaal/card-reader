@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { nextTick } from 'vue';
 import {
   buildWorkspaceGalleryLocation,
-  normalizeAccessibleCardPools,
+  CARD_POOL_WORKSPACE_PREFERENCE_KEY,
   resolveCardPoolWorkspace,
   useCardPoolWorkspaceStore,
 } from '@/domain/cards/cardPoolWorkspace';
@@ -13,41 +14,27 @@ describe('card pool workspace', () => {
     setActivePinia(createPinia());
   });
 
-  test('normalizes accessible pools into canonical order with Player available', () => {
-    expect(normalizeAccessibleCardPools(['neutral', 'evil'])).toEqual([
+  test('prefers a valid saved preference, then Player', () => {
+    expect(resolveCardPoolWorkspace('evil')).toBe('evil');
+    expect(resolveCardPoolWorkspace('unsupported')).toBe('player');
+  });
+
+  test('makes every pool available and persists selections', async () => {
+    const workspace = useCardPoolWorkspaceStore();
+    expect(workspace.availableOptions.map((option) => option.value)).toEqual([
       'player',
       'evil',
       'neutral',
     ]);
-  });
 
-  test('prefers a permitted preference, then Player', () => {
-    expect(resolveCardPoolWorkspace(['player', 'evil'], 'evil')).toBe('evil');
-    expect(resolveCardPoolWorkspace(['player'], 'neutral')).toBe('player');
-  });
+    expect(workspace.selectPool('evil')).toBe(true);
+    await nextTick();
 
-  test('falls back synchronously and advances the generation when access is lost', () => {
-    const workspace = useCardPoolWorkspaceStore();
-    workspace.synchronizeSession(['player', 'evil', 'neutral'], 'staff:1');
-    workspace.selectPool('evil');
-    const restrictedGeneration = workspace.generation;
-
-    const changed = workspace.synchronizeSession(['player'], 'user:1');
-
-    expect(changed).toBe(true);
-    expect(workspace.activePool).toBe('player');
-    expect(workspace.generation).toBeGreaterThan(restrictedGeneration);
-  });
-
-  test('advances the generation when session identity changes without a pool change', () => {
-    const workspace = useCardPoolWorkspaceStore();
-    workspace.synchronizeSession(['player'], 'anonymous');
-    const anonymousGeneration = workspace.generation;
-
-    workspace.synchronizeSession(['player'], 'user:7');
-
-    expect(workspace.activePool).toBe('player');
-    expect(workspace.generation).toBeGreaterThan(anonymousGeneration);
+    expect(workspace.activePool).toBe('evil');
+    expect(workspace.generation).toBe(1);
+    expect(localStorage.getItem(CARD_POOL_WORKSPACE_PREFERENCE_KEY)).toBe('evil');
+    expect(workspace.selectPool('evil')).toBe(false);
+    expect(workspace.generation).toBe(1);
   });
 
   test('builds a shareable gallery location without serializing the Player default', () => {
@@ -57,5 +44,4 @@ describe('card pool workspace', () => {
       query: { card_pool: 'evil' },
     });
   });
-
 });

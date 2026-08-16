@@ -11,7 +11,6 @@ from card_reader_core.models import (
     CardGroup,
     CardGroupMember,
     CardLifecycleFilter,
-    CardPoolScope,
     CardVersion,
     CardVersionImage,
     card_faction_keys,
@@ -28,7 +27,6 @@ def card_group_visible_members(
     lifecycle_status: CardLifecycleFilter,
     *,
     card_pool: str | None = None,
-    card_pool_scope: CardPoolScope | None = None,
 ) -> list[CardGroupMember]:
     members = sorted(group.members.all(), key=lambda member: (member.position, member.id))
     return [
@@ -36,10 +34,6 @@ def card_group_visible_members(
         for member in members
         if card_is_visible_for_lifecycle(member.card, lifecycle_status)
         and (card_pool is None or member.card.card_pool == card_pool)
-        and (
-            card_pool_scope is None
-            or card_pool_scope.allows_card_pool(member.card.card_pool)
-        )
     ]
 
 
@@ -102,16 +96,11 @@ def card_group_detail_payload(
     group: CardGroup,
     *,
     lifecycle_status: CardLifecycleFilter = DEFAULT_CARD_LIFECYCLE_FILTER,
-    card_pool_scope: CardPoolScope,
     anchor_deck_references: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     anchor_card_id = group.anchor_card.id
     members_payload = []
-    for member in card_group_visible_members(
-        group,
-        lifecycle_status,
-        card_pool_scope=card_pool_scope,
-    ):
+    for member in card_group_visible_members(group, lifecycle_status):
         version = member.card.latest_version
         if version is None:
             continue

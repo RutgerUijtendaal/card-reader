@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from card_reader_core.models import PLAYER_CARD_POOL_SCOPE, CardVersion, CardVersionImage, active_card_lifecycle_q, now_utc
+from card_reader_core.models import CardVersion, CardVersionImage, active_card_lifecycle_q, now_utc
 from card_reader_core.storage import relativize_storage_path, resolve_storage_path, store_image
 
 from .types import CardImageSource
@@ -45,10 +45,7 @@ def list_latest_active_card_image_sources(
     if normalized_limit == 0:
         return []
 
-    images = CardVersionImage.objects.filter(
-        card_version__is_latest=True,
-        card_version__card__card_pool__in=PLAYER_CARD_POOL_SCOPE.allowed_pools,
-    ).filter(
+    images = CardVersionImage.objects.filter(card_version__is_latest=True).filter(
         active_card_lifecycle_q(field_path="card_version__card__lifecycle_status")
     )
     if card_ids is not None:

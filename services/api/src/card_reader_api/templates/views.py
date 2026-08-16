@@ -5,7 +5,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from card_reader_api.common.auth_access import card_pool_scope_for_user
 from card_reader_api.common.responses import (
     bad_request,
     not_found,
@@ -20,7 +19,7 @@ from card_reader_api.templates.serializers import (
     template_payload,
 )
 from card_reader_core.repositories.cards import (
-    list_cards_in_scope,
+    list_cards_across_pools,
     list_latest_card_version_reparse_sources,
 )
 from card_reader_core.services.imports import queue_grouped_reparse_jobs
@@ -51,8 +50,7 @@ class TemplatePreviewCardsView(APIView):
         serializer = TemplatePreviewCardsQuerySerializer(data=request.query_params)
         if not serializer.is_valid():
             return serializer_error(serializer)
-        page = list_cards_in_scope(
-            card_pool_scope=card_pool_scope_for_user(request.user),
+        page = list_cards_across_pools(
             query=serializer.validated_data["q"] or None,
             template_id=serializer.validated_data["template_id"] or None,
             lifecycle_status="all",
