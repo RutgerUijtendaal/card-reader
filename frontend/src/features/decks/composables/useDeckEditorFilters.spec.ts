@@ -160,6 +160,29 @@ describe('useDeckEditorFilters', () => {
     expect(controller.buildSearchParams().get('lifecycle_status')).toBeNull();
   });
 
+  test('omits unsupported role and faction filters from card gallery requests', () => {
+    const controller = useDeckEditorFilters({
+      deckCardIds: ref([]),
+      editorMode: ref<DeckEditorMode>('cards'),
+    });
+
+    const sections = controller.filterSectionsState.value;
+    sections.onUpdateSelectedCardRoles(['boss']);
+    sections.onUpdateExcludedCardRoles(['event']);
+    sections.onUpdateCardRoleMatch('all');
+    sections.onUpdateSelectedCardFactions(['dark']);
+    sections.onUpdateExcludedCardFactions(['blood']);
+    sections.onUpdateCardFactionMatch('all');
+
+    const params = controller.buildSearchParams();
+    expect(params.has('card_roles')).toBe(false);
+    expect(params.has('card_role_exclude')).toBe(false);
+    expect(params.has('card_role_match')).toBe(false);
+    expect(params.has('card_factions')).toBe(false);
+    expect(params.has('card_faction_exclude')).toBe(false);
+    expect(params.has('card_faction_match')).toBe(false);
+  });
+
   test('uses an empty-deck sentinel when current deck only is enabled without cards', () => {
     const controller = useDeckEditorFilters({
       deckCardIds: ref([]),
