@@ -204,6 +204,10 @@ describe('ImportActivityPanel', () => {
               mode: 'automatic',
               matched_tag_sources: [{ id: 'tag-order', key: 'order' }],
             },
+            mana_families: {
+              mode: 'automatic',
+              matched_symbol_sources: [{ id: 'symbol-arcane', key: 'arcane-mana' }],
+            },
           },
           target_card_id: 'card-id',
           target_card_version_id: 'version-id',
@@ -231,6 +235,7 @@ describe('ImportActivityPanel', () => {
     expect(mounted.host.textContent).toContain('Live');
     expect(mounted.host.textContent).toContain('Normal');
     expect(mounted.host.textContent).toContain('Factions: Order');
+    expect(mounted.host.textContent).toContain('Mana: Arcane');
     expect(
       mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
     ).toContain('Review card classification');

@@ -98,7 +98,7 @@
                 Factions: {{ formatImportFactions(item.resolved_card_factions) }}
               </p>
               <p class="theme-section-muted text-xs">
-                Mana: {{ formatImportManaFamilies(item.resolved_card_mana_families) }}
+                Mana: {{ formatResolvedImportManaFamilies(item) }}
               </p>
               <dl class="theme-section-muted grid gap-1 text-xs">
                 <div
@@ -388,7 +388,7 @@ import type { ImportJob, ImportJobDetail } from '@/features/import-jobs/types';
 import {
   formatImportRoles,
   formatImportFactions,
-  formatImportManaFamilies,
+  formatResolvedImportManaFamilies,
   getImportEvidencePlaceholder,
   getImportEvidenceState,
   getInferenceEvidence,

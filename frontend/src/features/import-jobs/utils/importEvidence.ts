@@ -74,9 +74,15 @@ export const formatImportFactions = (value: unknown): string => {
 };
 
 export const formatImportManaFamilies = (value: unknown): string => {
+  if (!Array.isArray(value)) return 'Unavailable';
   const families = asManaFamilies(value);
   return families.length > 0 ? families.map(manaFamilyLabel).join(', ') : 'Colorless';
 };
+
+export const formatResolvedImportManaFamilies = (item: ImportJobItem): string =>
+  asRecord(item.classification_inference.mana_families)
+    ? formatImportManaFamilies(item.resolved_card_mana_families)
+    : 'Unavailable';
 
 const formatPool = (value: unknown): string =>
   isCardPool(value) ? cardPoolLabel(value) : 'Unknown';

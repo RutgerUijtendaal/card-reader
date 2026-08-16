@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest';
 import type { ImportJobItem } from '@/features/import-jobs/types';
 import {
   formatImportFactions,
+  formatImportManaFamilies,
   formatImportRoles,
+  formatResolvedImportManaFamilies,
   getImportEvidenceState,
   getInferenceEvidence,
   getWarningEvidence,
@@ -54,6 +56,21 @@ describe('import evidence presentation', () => {
   test('uses the shared faction registry for Dark and Metal labels', () => {
     expect(formatImportFactions([])).toBe('None');
     expect(formatImportFactions(['dark', 'metal'])).toBe('Dark, Metal');
+  });
+
+  test('distinguishes explicit Colorless from unavailable legacy mana evidence', () => {
+    expect(formatImportManaFamilies([])).toBe('Colorless');
+    expect(formatImportManaFamilies(undefined)).toBe('Unavailable');
+    expect(formatResolvedImportManaFamilies(item({
+      status: 'completed',
+      resolved_card_mana_families: [],
+      classification_inference: { roles: { mode: 'automatic' } },
+    }))).toBe('Unavailable');
+    expect(formatResolvedImportManaFamilies(item({
+      status: 'completed',
+      resolved_card_mana_families: [],
+      classification_inference: { mana_families: { mode: 'automatic' } },
+    }))).toBe('Colorless');
   });
 
   test('renders structured inference and keeps generic warnings safe', () => {
@@ -116,6 +133,7 @@ describe('import evidence presentation', () => {
 
     expect(evidence).toContainEqual({ label: 'Role resolution', value: 'Automatic' });
     expect(evidence).toContainEqual({ label: 'Faction resolution', value: 'Unavailable' });
+    expect(evidence).toContainEqual({ label: 'Mana resolution', value: 'Unavailable' });
     expect(evidence).not.toContainEqual({ label: 'Faction signals', value: 'None matched' });
   });
 });

@@ -5,6 +5,7 @@ import {
   type CardFilterSelectionState,
   type CardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterState';
+import { isManaFamily } from '@/domain/cards/manaFamilies';
 
 export type CardFilterCatalog = {
   keywords: MetadataOption[];
@@ -88,6 +89,13 @@ const resolveKeysFromIds = (ids: string[], options: MetadataOption[]): string[] 
   return ids.map((id) => keyById.get(id)).filter((key): key is string => typeof key === 'string');
 };
 
+const resolveManaFamilyKeys = (
+  keys: string[],
+  legacyManaFamilyBySymbolKey: Readonly<Record<string, string>>,
+): string[] => keys
+  .map((key) => legacyManaFamilyBySymbolKey[key] ?? key)
+  .filter(isManaFamily);
+
 export const buildCardFilterSelectionState = (
   state: CardFilterState,
   catalog: CardFilterCatalog,
@@ -128,27 +136,16 @@ export const buildCardFilterSelectionState = (
     healthMax: state.healthMax,
     keywordIds: resolveIdsFromKeys(state.keywordKeys, catalog.keywords),
     tagIds: resolveIdsFromKeys(state.tagKeys, catalog.tags),
-    manaFamilyIds: resolveIdsFromKeys(
+    manaFamilyIds: resolveManaFamilyKeys(
       [
-        ...state.manaFamilyKeys.map(
-          (key) => catalog.legacyManaFamilyBySymbolKey[key] ?? key,
-        ),
-        ...(translateAffinityPredicate
-          ? pairedAffinityKeys.map((key) => catalog.legacyManaFamilyBySymbolKey[key])
-          : []),
+        ...state.manaFamilyKeys,
+        ...(translateAffinityPredicate ? pairedAffinityKeys : []),
       ],
-      catalog.manaFamilies,
+      catalog.legacyManaFamilyBySymbolKey,
     ),
-    manaFamilyExcludeIds: resolveIdsFromKeys(
-      [
-        ...state.manaFamilyExcludeKeys.map(
-          (key) => catalog.legacyManaFamilyBySymbolKey[key] ?? key,
-        ),
-        ...state.affinitySymbolExcludeKeys
-          .map((key) => catalog.legacyManaFamilyBySymbolKey[key])
-          .filter((key): key is string => Boolean(key)),
-      ],
-      catalog.manaFamilies,
+    manaFamilyExcludeIds: resolveManaFamilyKeys(
+      [...state.manaFamilyExcludeKeys, ...state.affinitySymbolExcludeKeys],
+      catalog.legacyManaFamilyBySymbolKey,
     ),
     affinitySymbolIds: resolveIdsFromKeys(
       translateAffinityPredicate ? [] : state.affinitySymbolKeys,
@@ -199,11 +196,8 @@ export const buildCardFilterStateFromSelection = (
     healthMax: state.healthMax,
     keywordKeys: resolveKeysFromIds(state.keywordIds, catalog.keywords),
     tagKeys: resolveKeysFromIds(state.tagIds, catalog.tags),
-    manaFamilyKeys: resolveKeysFromIds(state.manaFamilyIds, catalog.manaFamilies),
-    manaFamilyExcludeKeys: resolveKeysFromIds(
-      state.manaFamilyExcludeIds,
-      catalog.manaFamilies,
-    ),
+    manaFamilyKeys: state.manaFamilyIds.filter(isManaFamily),
+    manaFamilyExcludeKeys: state.manaFamilyExcludeIds.filter(isManaFamily),
     affinitySymbolKeys: resolveKeysFromIds(state.affinitySymbolIds, catalog.allAffinitySymbols),
     affinitySymbolExcludeKeys: resolveKeysFromIds(state.affinitySymbolExcludeIds, catalog.allAffinitySymbols),
     devotionSymbolKeys: resolveKeysFromIds(state.devotionSymbolIds, catalog.devotionSymbols),

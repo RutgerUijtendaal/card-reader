@@ -270,6 +270,27 @@ describe('cardFilterSelection', () => {
     expect(catalog.manaFamilies).toEqual([]);
   });
 
+  test('preserves code-owned mana-family route keys without a hydrated catalog', () => {
+    const catalog = createCardFilterCatalog({ ...filters, mana_families: undefined });
+    const selection = buildCardFilterSelectionState(
+      {
+        ...createEmptyCardFilterState(),
+        manaFamilyMatch: 'all',
+        manaFamilyKeys: ['arcane'],
+        manaFamilyExcludeKeys: ['dark'],
+      },
+      catalog,
+    );
+
+    expect(selection.manaFamilyMatch).toBe('all');
+    expect(selection.manaFamilyIds).toEqual(['arcane']);
+    expect(selection.manaFamilyExcludeIds).toEqual(['dark']);
+    expect(buildCardFilterStateFromSelection(selection, catalog)).toMatchObject({
+      manaFamilyKeys: ['arcane'],
+      manaFamilyExcludeKeys: ['dark'],
+    });
+  });
+
   test('reconciles only unavailable keyword, tag, and type keys', () => {
     const catalog = createCardFilterCatalog(filters);
     const state = {

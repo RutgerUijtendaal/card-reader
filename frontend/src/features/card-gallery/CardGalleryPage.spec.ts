@@ -289,15 +289,26 @@ describe('CardGalleryPage pool-aware filters', () => {
 
   test('keeps route metadata intact and browsing usable when facet hydration fails', async () => {
     const mounted = await mountGallery(
-      '/cards?tag_keys=keep-on-failure',
+      '/cards?mana_family_match=all&mana_family_keys=arcane'
+        + '&mana_family_exclude_keys=dark&tag_keys=keep-on-failure',
       'player',
       undefined,
       () => Promise.reject(new Error('facet failure')),
     );
 
     expect(mounted.filterRequests).toEqual(['player']);
-    expect(mounted.router.currentRoute.value.fullPath).toBe('/cards?tag_keys=keep-on-failure');
-    expect(mounted.requestRoutes).toEqual(['/cards?tag_keys=keep-on-failure']);
+    expect(mounted.router.currentRoute.value.fullPath).toBe(
+      '/cards?mana_family_match=all&tag_keys=keep-on-failure'
+        + '&mana_family_keys=arcane&mana_family_exclude_keys=dark',
+    );
+    expect(mounted.requestRoutes).toEqual([mounted.router.currentRoute.value.fullPath]);
+    const cardRequest = apiGet.mock.calls.find(([url]) =>
+      typeof url === 'string' && url.startsWith('/cards?'),
+    )?.[0];
+    const params = new URL(String(cardRequest), 'https://cards.test').searchParams;
+    expect(params.getAll('mana_family_keys')).toEqual(['arcane']);
+    expect(params.getAll('mana_family_exclude_keys')).toEqual(['dark']);
+    expect(params.get('mana_family_match')).toBe('all');
     expect(mounted.container.textContent).toContain('Filter options could not be loaded');
 
     mounted.unmount();
