@@ -84,8 +84,9 @@ BOON_CARD_ROLE: Literal["boon"] = "boon"
 EVENT_CARD_ROLE: Literal["event"] = "event"
 LOCATION_CARD_ROLE: Literal["location"] = "location"
 SHOP_ITEM_CARD_ROLE: Literal["shop_item"] = "shop_item"
+MANA_CARD_ROLE: Literal["mana"] = "mana"
 STANDARD_CARD_ROLE: Literal["standard"] = "standard"
-CardRole = Literal["hero", "boss", "location", "boon", "event", "shop_item"]
+CardRole = Literal["hero", "boss", "location", "boon", "event", "shop_item", "mana"]
 CardRoleFilter = Literal[
     "standard",
     "hero",
@@ -94,6 +95,7 @@ CardRoleFilter = Literal[
     "boon",
     "event",
     "shop_item",
+    "mana",
 ]
 
 
@@ -121,6 +123,7 @@ CARD_ROLE_DEFINITIONS: tuple[CardRoleDefinition, ...] = (
     CardRoleDefinition(key=BOON_CARD_ROLE, label="Boon", rank=4),
     CardRoleDefinition(key=EVENT_CARD_ROLE, label="Event", rank=5),
     CardRoleDefinition(key=SHOP_ITEM_CARD_ROLE, label="Shop Item", rank=6),
+    CardRoleDefinition(key=MANA_CARD_ROLE, label="Mana", rank=7),
 )
 CARD_ROLES: tuple[CardRole, ...] = tuple(definition.key for definition in CARD_ROLE_DEFINITIONS)
 CARD_ROLE_CHOICES: tuple[tuple[CardRole, str], ...] = tuple(

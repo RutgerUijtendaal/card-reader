@@ -273,6 +273,7 @@ describe('CardVersionEditorPane tabs', () => {
     expect(mounted.container.textContent).toContain('Boss');
     expect(mounted.container.textContent).toContain('Location');
     expect(mounted.container.textContent).toContain('Shop Item');
+    expect(mounted.container.textContent).toContain('Mana');
     expect(mounted.container.textContent).toContain('Order');
     expect(mounted.container.textContent).toContain('Mana Families');
     expect(mounted.container.textContent).toContain('Arcane');

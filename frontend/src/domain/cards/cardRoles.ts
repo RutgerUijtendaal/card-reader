@@ -7,6 +7,7 @@ export const CARD_ROLE_OPTIONS = [
   { value: 'boon', label: 'Boon' },
   { value: 'event', label: 'Event' },
   { value: 'shop_item', label: 'Shop Item' },
+  { value: 'mana', label: 'Mana' },
 ] as const;
 
 export type CardRole = (typeof CARD_ROLE_OPTIONS)[number]['value'];

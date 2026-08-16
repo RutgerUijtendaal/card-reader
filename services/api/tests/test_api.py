@@ -1895,6 +1895,7 @@ def test_filters_payload_uses_the_canonical_card_role_registry() -> None:
         {"key": "boon", "label": "Boon", "rank": 4, "derived": False},
         {"key": "event", "label": "Event", "rank": 5, "derived": False},
         {"key": "shop_item", "label": "Shop Item", "rank": 6, "derived": False},
+        {"key": "mana", "label": "Mana", "rank": 7, "derived": False},
     ]
     assert response.json()["card_factions"] == [
         {"key": "order", "label": "Order", "rank": 1},
@@ -2720,6 +2721,12 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
     arcane_boss, arcane_boss_version = _create_editable_card_version(
         name="Default Player Arcane Boss"
     )
+    arcane_shop, arcane_shop_version = _create_editable_card_version(
+        name="Default Player Arcane Shop"
+    )
+    arcane_mana, arcane_mana_version = _create_editable_card_version(
+        name="Default Player Arcane Mana"
+    )
     dark_hero, dark_hero_version = _create_editable_card_version(name="Default Player Dark Hero")
 
     for version in (
@@ -2728,6 +2735,8 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
         arcane_normal_high_version,
         arcane_normal_null_version,
         arcane_boss_version,
+        arcane_shop_version,
+        arcane_mana_version,
         dark_hero_version,
     ):
         _create_card_image(version)
@@ -2736,6 +2745,8 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
         (arcane_normal_low, arcane_normal_low_version, 1),
         (arcane_normal_high, arcane_normal_high_version, 4),
         (arcane_boss, arcane_boss_version, 0),
+        (arcane_shop, arcane_shop_version, 2),
+        (arcane_mana, arcane_mana_version, 0),
     ):
         set_card_mana_families(card=card, mana_families=("arcane",))
         version.mana_value = mana_value
@@ -2750,6 +2761,8 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
         [
             CardRoleAssignment(card=arcane_hero, role="hero"),
             CardRoleAssignment(card=arcane_boss, role="boss"),
+            CardRoleAssignment(card=arcane_shop, role="shop_item"),
+            CardRoleAssignment(card=arcane_mana, role="mana"),
             CardRoleAssignment(card=dark_hero, role="hero"),
         ]
     )
@@ -2758,10 +2771,12 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
     first_response = client.get("/cards", {"q": "Default Player", "page": 1, "page_size": 2})
     second_response = client.get("/cards", {"q": "Default Player", "page": 2, "page_size": 2})
     third_response = client.get("/cards", {"q": "Default Player", "page": 3, "page_size": 2})
+    fourth_response = client.get("/cards", {"q": "Default Player", "page": 4, "page_size": 2})
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200
     assert third_response.status_code == 200
+    assert fourth_response.status_code == 200
     assert [row["id"] for row in first_response.json()["results"]] == [
         arcane_hero.id,
         arcane_normal_low.id,
@@ -2772,6 +2787,10 @@ def test_cards_list_uses_pool_aware_player_default_before_pagination() -> None:
     ]
     assert [row["id"] for row in third_response.json()["results"]] == [
         arcane_boss.id,
+        arcane_shop.id,
+    ]
+    assert [row["id"] for row in fourth_response.json()["results"]] == [
+        arcane_mana.id,
         dark_hero.id,
     ]
 
@@ -2788,6 +2807,12 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
     )
     order_normal_high, order_normal_high_version = _create_editable_card_version(
         name="Default Evil Order Normal High", card_pool="evil"
+    )
+    order_shop, order_shop_version = _create_editable_card_version(
+        name="Default Evil Order Shop", card_pool="evil"
+    )
+    order_mana, order_mana_version = _create_editable_card_version(
+        name="Default Evil Order Mana", card_pool="evil"
     )
     blood_boss, blood_boss_version = _create_editable_card_version(
         name="Default Evil Blood Boss", card_pool="evil"
@@ -2806,6 +2831,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
         (order_location_version, 0),
         (order_normal_low_version, 1),
         (order_normal_high_version, 5),
+        (order_shop_version, 2),
+        (order_mana_version, 0),
         (blood_boss_version, 0),
         (dark_boss_version, 0),
         (metal_boss_version, 0),
@@ -2820,6 +2847,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
             CardFactionAssignment(card=order_location, faction="order"),
             CardFactionAssignment(card=order_normal_low, faction="order"),
             CardFactionAssignment(card=order_normal_high, faction="order"),
+            CardFactionAssignment(card=order_shop, faction="order"),
+            CardFactionAssignment(card=order_mana, faction="order"),
             CardFactionAssignment(card=blood_boss, faction="blood"),
             CardFactionAssignment(card=dark_boss, faction="dark"),
             CardFactionAssignment(card=metal_boss, faction="metal"),
@@ -2829,6 +2858,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
         [
             CardRoleAssignment(card=order_boss, role="boss"),
             CardRoleAssignment(card=order_location, role="location"),
+            CardRoleAssignment(card=order_shop, role="shop_item"),
+            CardRoleAssignment(card=order_mana, role="mana"),
             CardRoleAssignment(card=blood_boss, role="boss"),
             CardRoleAssignment(card=dark_boss, role="boss"),
             CardRoleAssignment(card=metal_boss, role="boss"),
@@ -2846,6 +2877,8 @@ def test_cards_list_uses_evil_faction_default_order() -> None:
         order_location.id,
         order_normal_low.id,
         order_normal_high.id,
+        order_shop.id,
+        order_mana.id,
         blood_boss.id,
         dark_boss.id,
         metal_boss.id,

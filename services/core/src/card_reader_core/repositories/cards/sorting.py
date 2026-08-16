@@ -26,6 +26,7 @@ from card_reader_core.models import (
     EVIL_CARD_POOL,
     HERO_CARD_ROLE,
     LOCATION_CARD_ROLE,
+    MANA_CARD_ROLE,
     METAL_CARD_FACTION,
     NEUTRAL_CARD_POOL,
     ORDER_CARD_FACTION,
@@ -59,6 +60,7 @@ DEFAULT_ROLE_SORT_ORDER: tuple[CardRoleFilter, ...] = (
     BOON_CARD_ROLE,
     EVENT_CARD_ROLE,
     SHOP_ITEM_CARD_ROLE,
+    MANA_CARD_ROLE,
 )
 
 
