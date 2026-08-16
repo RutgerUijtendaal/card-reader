@@ -121,7 +121,11 @@ def isolate_api_test_state(
     db: None,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    request: pytest.FixtureRequest,
 ) -> Iterator[None]:
+    if request.node.get_closest_marker("migration_state") is not None:
+        yield
+        return
     monkeypatch.setattr(core_settings, "app_data_dir", tmp_path)
     CardClassificationRule.objects.all().delete()
     Template.objects.update_or_create(

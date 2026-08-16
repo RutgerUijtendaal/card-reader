@@ -4,6 +4,8 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 import pytest
 
+pytestmark = pytest.mark.migration_state
+
 
 MANA_MIGRATION = ("card_reader_core", "0056_card_mana_families")
 REVIEW_MIGRATION = ("card_reader_core", "0057_card_classification_review_item")
