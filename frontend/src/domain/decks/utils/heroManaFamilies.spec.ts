@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildHeroManaFamilyPreset, getManaFamilyKeysForSymbolKeys } from '@/domain/decks/utils/affinityMana';
+import { buildHeroManaFamilyPreset } from '@/domain/decks/utils/heroManaFamilies';
 import type { SymbolFilterOption } from '@/domain/cards/types';
 
 const manaOption = (key: string): SymbolFilterOption => ({
@@ -7,29 +7,12 @@ const manaOption = (key: string): SymbolFilterOption => ({
   key,
   label: key,
   linked_card_count: 1,
-  symbol_type: 'mana',
+  symbol_type: 'mana_family',
   text_token: `{${key}}`,
   asset_url: null,
 });
 
-const familyBySymbolKey = {
-  'arcane-affinity': 'arcane',
-  'divine-affinity': 'divine',
-  'martial-affinity': 'martial',
-  'martial-mana': 'martial',
-};
-
 describe('hero mana-family presets', () => {
-  test('maps standardized Symbol keys to mana-family keys', () => {
-    expect(getManaFamilyKeysForSymbolKeys(
-      ['martial-affinity', 'arcane-affinity', 'martial-affinity'],
-      familyBySymbolKey,
-    )).toEqual([
-      'arcane',
-      'martial',
-    ]);
-  });
-
   test('builds an include/exclude mana preset from stored hero families', () => {
     const hero = {
       card_mana_families: ['martial', 'divine'] as Array<'martial' | 'divine'>,

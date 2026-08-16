@@ -25,7 +25,7 @@ describe('cardFilterRouteState', () => {
     expect(state).toMatchObject({
       query: 'dragons',
       keywordKeys: ['dragon', 'flying'],
-      manaSymbolKeys: ['mana-fire', 'mana-water'],
+      manaFamilyKeys: ['mana-fire', 'mana-water'],
       otherSymbolKeys: ['tap'],
       typeKeys: ['creature'],
       typeExcludeKeys: ['spell'],
@@ -45,9 +45,9 @@ describe('cardFilterRouteState', () => {
       mana_family_match: 'all',
     });
 
-    expect(state.manaSymbolKeys).toEqual(['arcane', 'dark']);
-    expect(state.manaSymbolExcludeKeys).toEqual(['primal']);
-    expect(state.manaSymbolMatch).toBe('all');
+    expect(state.manaFamilyKeys).toEqual(['arcane', 'dark']);
+    expect(state.manaFamilyExcludeKeys).toEqual(['primal']);
+    expect(state.manaFamilyMatch).toBe('all');
   });
 
   test('round-trips non-default lifecycle status through route query state', () => {

@@ -9,13 +9,6 @@ export type HeroManaFamilyPreset = {
 const uniqueSorted = (values: readonly string[]): string[] =>
   [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
 
-export const getManaFamilyKeysForSymbolKeys = (
-  symbolKeys: readonly string[],
-  manaFamilyBySymbolKey: Readonly<Record<string, string>>,
-): string[] => uniqueSorted(
-  symbolKeys.map((key) => manaFamilyBySymbolKey[key]).filter((key): key is string => Boolean(key)),
-);
-
 const getHeroManaFamilyKeys = (
   hero: Pick<CardHoverTooltipModel, 'card_mana_families'> | null,
 ): string[] => {
@@ -27,9 +20,9 @@ const getHeroManaFamilyKeys = (
 
 export const buildHeroManaFamilyPreset = (
   hero: Pick<CardHoverTooltipModel, 'card_mana_families'> | null,
-  manaSymbols: readonly SymbolFilterOption[],
+  manaFamilies: readonly SymbolFilterOption[],
 ): HeroManaFamilyPreset | null => {
-  const manaFamilyKeys = uniqueSorted(manaSymbols.map((symbol) => symbol.key));
+  const manaFamilyKeys = uniqueSorted(manaFamilies.map((family) => family.key));
   const availableManaFamilyKeys = new Set(manaFamilyKeys);
   const includedManaFamilyKeys = getHeroManaFamilyKeys(hero).filter((key) =>
     availableManaFamilyKeys.has(key),
