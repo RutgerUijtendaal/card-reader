@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from ..extractors import KnownMetadataExtractor
-from card_reader_core.models import Keyword, Symbol, Tag, Type
+from card_reader_core.models import CardPool, Keyword, Symbol, Tag, Type
 from card_reader_core.services.templates import (
     AFFINITY,
     ATTACK,
@@ -54,15 +54,18 @@ class CardParser:
         self,
         image_path: Path,
         template_id: str,
+        *,
+        card_pool: CardPool,
         symbols: list[Symbol] | None = None,
         known_keywords: list[Keyword] | None = None,
         known_tags: list[Tag] | None = None,
         known_types: list[Type] | None = None,
     ) -> ParsedCard:
         logger.info(
-            "Card parse started. image_path=%s template_id=%s symbols=%s known_keywords=%s",
+            "Card parse started. image_path=%s template_id=%s card_pool=%s symbols=%s known_keywords=%s",
             image_path,
             template_id,
+            card_pool,
             0 if symbols is None else len(symbols),
             0 if known_keywords is None else len(known_keywords),
         )
@@ -107,6 +110,7 @@ class CardParser:
                 parser_type=parser_type,
                 region_id=region_id,
                 image_path=image_path,
+                card_pool=card_pool,
                 region_spec=region_spec,
                 region_crops=region_crops,
                 symbols=symbols,
@@ -189,6 +193,7 @@ class CardParser:
         parser_type: str,
         region_id: str,
         image_path: Path,
+        card_pool: CardPool,
         region_spec: dict[str, object],
         region_crops: dict[str, RegionCrop],
         symbols: list[Symbol],
@@ -219,6 +224,7 @@ class CardParser:
                 region_name=region_id,
                 image=image,
                 image_stem=image_path.stem,
+                card_pool=card_pool,
                 region_spec=region_spec,
                 symbols=symbols,
             )
@@ -350,10 +356,12 @@ class CardParser:
     def _confidence_breakdown(self, semantic_results: dict[str, RegionParseResult]) -> dict[str, float]:
         name_result = semantic_results.get(NAME) or semantic_results.get(NAME_MANA_COST)
         name_conf = name_result.confidence if name_result is not None else 0.0
-        mana_conf = semantic_results.get(
-            NAME_MANA_COST,
-            RegionParseResult(NAME_MANA_COST),
-        ).confidence
+        mana_result = semantic_results.get(NAME_MANA_COST)
+        mana_conf = (
+            mana_result.confidence
+            if mana_result is not None and mana_result.normalized_fields.get("mana_cost", "").strip()
+            else 0.0
+        )
         type_conf = semantic_results.get(TYPE_TAG, RegionParseResult(TYPE_TAG)).confidence
         rules_conf = semantic_results.get(RULES_TEXT, RegionParseResult(RULES_TEXT)).confidence
         attack_conf = semantic_results.get(ATTACK, RegionParseResult(ATTACK)).confidence

@@ -152,6 +152,7 @@ class ImportProcessorService:
         parsed = self._parser.parse(
             resolve_storage_path(item.source_file),
             template_id,
+            card_pool=cast(CardPool, job.card_pool),
             symbols=resources.detectable_symbols,
             known_keywords=resources.known_keywords,
             known_tags=detection_tags,

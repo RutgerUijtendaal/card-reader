@@ -2,23 +2,32 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from PIL import Image
 
-from card_reader_core.models import Symbol
+from card_reader_core.models import (
+    EVIL_CARD_POOL,
+    NEUTRAL_CARD_POOL,
+    PLAYER_CARD_POOL,
+    CardPool,
+    Symbol,
+)
 from card_reader_parser.parsers.regions.name_mana_cost_parser import NameManaCostParser
 from card_reader_parser.parsers.symbol_detector import DetectedSymbol, DetectionBBox
 
 
 class StubOcrRunner:
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, *, lines: list[str] | None = None) -> None:
         self._text = text
+        self._lines = lines or [text]
 
     def run(self, _image: Image.Image, config: dict[str, object] | None = None) -> dict[str, object]:
         _ = config
         return {
             "text": self._text,
             "confidence": 0.9,
-            "lines": [{"text": self._text, "confidence": 0.9}],
+            "lines": [{"text": line, "confidence": 0.9} for line in self._lines],
         }
 
 
@@ -26,6 +35,7 @@ class StubSymbolDetector:
     def __init__(self, detections: list[DetectedSymbol]) -> None:
         self._detections = detections
         self.last_expected_symbol_types: set[str] | None = None
+        self.call_count = 0
 
     def detect(
         self,
@@ -36,6 +46,7 @@ class StubSymbolDetector:
     ) -> list[DetectedSymbol]:
         _ = image
         _ = symbols
+        self.call_count += 1
         self.last_expected_symbol_types = expected_symbol_types
         return self._detections
 
@@ -103,18 +114,100 @@ def test_name_mana_cost_parser_keeps_x_without_detected_symbols() -> None:
     assert result.normalized_fields["mana_symbols"] == "x"
 
 
-def _parse(*, text: str, detections: list[DetectedSymbol]) -> Any:
-    parser = NameManaCostParser(StubOcrRunner(text), StubSymbolDetector(detections))
-    return parser.parse(
+@pytest.mark.parametrize(
+    ("text", "expected_name", "expected_cost"),
+    [
+        ("Devourer 4", "Devourer", "4"),
+        ("Ancient Devourer 12", "Ancient Devourer", "12"),
+        ("Ancient Devourer 004", "Ancient Devourer", "4"),
+    ],
+)
+def test_evil_name_mana_cost_parser_uses_trailing_ocr_integer(
+    text: str,
+    expected_name: str,
+    expected_cost: str,
+) -> None:
+    result = _parse(
+        text=text,
+        detections=[_detection("occult-mana", x=120)],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+    )
+
+    assert result.normalized_fields["name"] == expected_name
+    assert result.normalized_fields["mana_cost"] == expected_cost
+    assert result.normalized_fields["mana_total"] == expected_cost
+    assert result.normalized_fields["mana_symbols"] == ""
+    assert result.detected_symbols == []
+
+
+def test_evil_name_mana_cost_parser_combines_split_ocr_lines() -> None:
+    result = _parse(
+        text="Devourer\n4",
+        lines=["Devourer", "4"],
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+    )
+
+    assert result.normalized_fields["name"] == "Devourer"
+    assert result.normalized_fields["mana_cost"] == "4"
+    assert result.normalized_fields["mana_total"] == "4"
+
+
+@pytest.mark.parametrize("text", ["Devourer", "Devourer X"])
+def test_evil_name_mana_cost_parser_leaves_missing_or_invalid_cost_empty(text: str) -> None:
+    result = _parse(
+        text=text,
+        detections=[],
+        card_pool=EVIL_CARD_POOL,
+        expected_detector_calls=0,
+    )
+
+    assert result.normalized_fields["name"] == text
+    assert result.normalized_fields["mana_cost"] == ""
+    assert result.normalized_fields["mana_total"] == ""
+    assert result.normalized_fields["mana_symbols"] == ""
+
+
+def test_neutral_name_mana_cost_parser_leaves_cost_fields_empty() -> None:
+    result = _parse(
+        text="Neutral Relic",
+        detections=[_detection("occult-mana", x=120)],
+        card_pool=NEUTRAL_CARD_POOL,
+        expected_detector_calls=0,
+    )
+
+    assert result.normalized_fields["name"] == "Neutral Relic"
+    assert result.normalized_fields["mana_cost"] == ""
+    assert result.normalized_fields["mana_total"] == ""
+    assert result.normalized_fields["mana_symbols"] == ""
+    assert result.detected_symbols == []
+
+
+def _parse(
+    *,
+    text: str,
+    detections: list[DetectedSymbol],
+    lines: list[str] | None = None,
+    card_pool: CardPool = PLAYER_CARD_POOL,
+    expected_detector_calls: int = 1,
+) -> Any:
+    detector = StubSymbolDetector(detections)
+    parser = NameManaCostParser(StubOcrRunner(text, lines=lines), detector)
+    result = parser.parse(
         region_name="top_bar",
         image=Image.new("RGB", (200, 40), "white"),
         image_stem="fallback-name",
+        card_pool=card_pool,
         region_spec={},
         symbols=[
             _symbol("colorless-mana-1"),
             _symbol("occult-mana"),
         ],
     )
+    assert detector.call_count == expected_detector_calls
+    return result
 
 
 def _symbol(key: str) -> Symbol:
