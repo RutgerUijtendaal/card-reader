@@ -75,6 +75,16 @@ def import_detail_payload(job: ImportJob, items: list[ImportJobItem]) -> dict[st
                     if item.target_card is not None
                     else None
                 ),
+                "classification_review": (
+                    {
+                        "id": review_item.id,
+                        "status": review_item.status,
+                        "url": f"/review?view=classification&status={review_item.status}",
+                    }
+                    if (review_item := getattr(item, "classification_review_item", None))
+                    is not None
+                    else None
+                ),
             }
             for item in items
         ],

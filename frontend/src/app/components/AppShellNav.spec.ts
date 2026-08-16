@@ -25,7 +25,7 @@ vi.mock('@/domain/session/store', () => ({
 
 vi.mock('@/domain/review/composables/useReviewSummary', () => ({
   useReviewSummary: () => ({
-    openParseFlagItemCount: { value: 0, __v_isRef: true },
+    openReviewCount: { value: 0, __v_isRef: true },
     loadReviewSummary: vi.fn(),
   }),
 }));
@@ -71,18 +71,66 @@ const mountNav = async (
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/cards', component: { template: '<div />' }, meta: { workspaceCapability: 'gallery' } },
-      { path: '/cards/:id/edit', component: { template: '<div />' }, meta: { workspaceCapability: 'resource' } },
-      { path: '/decks', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
-      { path: '/playtester', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
-      { path: '/my/decks', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
-      { path: '/my/decks/new', component: { template: '<div />' }, meta: { workspaceCapability: 'player-only' } },
-      { path: '/notifications', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
-      { path: '/settings', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
-      { path: '/imports', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
-      { path: '/operations', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
-      { path: '/review', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
-      { path: '/admin', component: { template: '<div />' }, meta: { workspaceCapability: 'global' } },
+      {
+        path: '/cards',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'gallery' },
+      },
+      {
+        path: '/cards/:id/edit',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'resource' },
+      },
+      {
+        path: '/decks',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'player-only' },
+      },
+      {
+        path: '/playtester',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'player-only' },
+      },
+      {
+        path: '/my/decks',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'player-only' },
+      },
+      {
+        path: '/my/decks/new',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'player-only' },
+      },
+      {
+        path: '/notifications',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
+      {
+        path: '/settings',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
+      {
+        path: '/imports',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
+      {
+        path: '/operations',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
+      {
+        path: '/review',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
+      {
+        path: '/admin',
+        component: { template: '<div />' },
+        meta: { workspaceCapability: 'global' },
+      },
     ],
   });
   if (blockEvilNavigation) {
@@ -90,9 +138,7 @@ const mountNav = async (
       if (to.query.card_pool !== 'evil') {
         return true;
       }
-      return typeof blockEvilNavigation === 'function'
-        ? blockEvilNavigation()
-        : false;
+      return typeof blockEvilNavigation === 'function' ? blockEvilNavigation() : false;
     });
   }
   await router.push(initialPath);
@@ -139,7 +185,9 @@ describe('AppShellNav', () => {
     expect(mounted.container.textContent).toContain('Notifications');
     expect(mounted.container.textContent).toContain('3');
     expect(mounted.container.querySelector('a[href="/notifications"]')).not.toBeNull();
-    expect(mounted.container.querySelector('a[href="/notifications"] .nav-badge')?.textContent).toContain('3');
+    expect(
+      mounted.container.querySelector('a[href="/notifications"] .nav-badge')?.textContent,
+    ).toContain('3');
     mounted.unmount();
   });
 
@@ -154,14 +202,21 @@ describe('AppShellNav', () => {
 
   test('places the workspace picker immediately before the hotkeys area', async () => {
     const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
-    const pickerSection = mounted.container.querySelector('[data-testid="card-pool-workspace-switcher"]')?.parentElement;
-    const hotkeysSection = mounted.container.querySelector('[data-testid="hotkeys-panel"]')?.parentElement?.parentElement;
-    const poolButtons = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>(
-      '[data-testid="card-pool-workspace-switcher"] button',
-    ));
+    const pickerSection = mounted.container.querySelector(
+      '[data-testid="card-pool-workspace-switcher"]',
+    )?.parentElement;
+    const hotkeysSection = mounted.container.querySelector('[data-testid="hotkeys-panel"]')
+      ?.parentElement?.parentElement;
+    const poolButtons = Array.from(
+      mounted.container.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="card-pool-workspace-switcher"] button',
+      ),
+    );
 
     expect(pickerSection?.nextElementSibling).toBe(hotkeysSection);
-    expect(poolButtons.every((button) => button.parentElement?.classList.contains('flex-1'))).toBe(true);
+    expect(poolButtons.every((button) => button.parentElement?.classList.contains('flex-1'))).toBe(
+      true,
+    );
     mounted.unmount();
   });
 
@@ -193,13 +248,17 @@ describe('AppShellNav', () => {
 
     expect(adminLink).not.toBeNull();
     expect(adminLink?.querySelector('.nav-badge')?.textContent).toContain('2');
-    expect(mounted.container.querySelector('a[href="/operations"] .lucide-activity')).not.toBeNull();
+    expect(
+      mounted.container.querySelector('a[href="/operations"] .lucide-activity'),
+    ).not.toBeNull();
     mounted.unmount();
   });
 
   test('shows permitted workspaces and removes Player-only navigation in Evil', async () => {
     const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
-    const evilButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]');
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
     expect(evilButton).toBeInstanceOf(HTMLButtonElement);
 
     evilButton?.click();
@@ -215,23 +274,27 @@ describe('AppShellNav', () => {
   test('uses the active pool icon for the Gallery link in every workspace', async () => {
     const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
 
-    expect(mounted.container.querySelector(
-      'a[href="/cards"] [data-card-pool-icon="player"]',
-    )).not.toBeNull();
+    expect(
+      mounted.container.querySelector('a[href="/cards"] [data-card-pool-icon="player"]'),
+    ).not.toBeNull();
 
     mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]')?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     await nextTick();
-    expect(mounted.container.querySelector(
-      'a[href="/cards?card_pool=evil"] [data-card-pool-icon="evil"]',
-    )).not.toBeNull();
+    expect(
+      mounted.container.querySelector(
+        'a[href="/cards?card_pool=evil"] [data-card-pool-icon="evil"]',
+      ),
+    ).not.toBeNull();
 
     mounted.container.querySelector<HTMLButtonElement>('[aria-label="Neutral workspace"]')?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     await nextTick();
-    expect(mounted.container.querySelector(
-      'a[href="/cards?card_pool=neutral"] [data-card-pool-icon="neutral"]',
-    )).not.toBeNull();
+    expect(
+      mounted.container.querySelector(
+        'a[href="/cards?card_pool=neutral"] [data-card-pool-icon="neutral"]',
+      ),
+    ).not.toBeNull();
 
     mounted.unmount();
   });
@@ -239,7 +302,9 @@ describe('AppShellNav', () => {
   test('treats the active workspace button as a no-op', async () => {
     const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
     const generation = mounted.workspace.generation;
-    const playerButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Player workspace"]');
+    const playerButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Player workspace"]',
+    );
 
     playerButton?.click();
     await nextTick();
@@ -258,12 +323,7 @@ describe('AppShellNav', () => {
     '/review?view=flags',
     '/admin?tab=catalog',
   ])('switches context without leaving the global route %s', async (initialPath) => {
-    const mounted = await mountNav(
-      {},
-      ['player', 'evil', 'neutral'],
-      false,
-      initialPath,
-    );
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], false, initialPath);
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -336,12 +396,7 @@ describe('AppShellNav', () => {
   });
 
   test('falls back from a Player-only route only after navigation is accepted', async () => {
-    const mounted = await mountNav(
-      {},
-      ['player', 'evil', 'neutral'],
-      false,
-      '/my/decks/new',
-    );
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], false, '/my/decks/new');
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -398,11 +453,7 @@ describe('AppShellNav', () => {
     const navigationGate = new Promise<boolean>((resolve) => {
       releaseNavigation = resolve;
     });
-    const mounted = await mountNav(
-      {},
-      ['player', 'evil', 'neutral'],
-      () => navigationGate,
-    );
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], () => navigationGate);
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -426,11 +477,7 @@ describe('AppShellNav', () => {
     const navigationGate = new Promise<boolean>((resolve) => {
       releaseNavigation = resolve;
     });
-    const mounted = await mountNav(
-      {},
-      ['player', 'evil', 'neutral'],
-      () => navigationGate,
-    );
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], () => navigationGate);
     const evilButton = mounted.container.querySelector<HTMLButtonElement>(
       '[aria-label="Evil workspace"]',
     );
@@ -447,14 +494,11 @@ describe('AppShellNav', () => {
   });
 
   test('keeps the current workspace mounted when guarded navigation is rejected', async () => {
-    const mounted = await mountNav(
-      {},
-      ['player', 'evil', 'neutral'],
-      true,
-      '/my/decks/new',
-    );
+    const mounted = await mountNav({}, ['player', 'evil', 'neutral'], true, '/my/decks/new');
     const generation = mounted.workspace.generation;
-    const evilButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]');
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
 
     evilButton?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -469,9 +513,11 @@ describe('AppShellNav', () => {
 
   test('exposes all compact workspace icons with accessible names when collapsed', async () => {
     const mounted = await mountNav({ collapsed: true }, ['player', 'evil', 'neutral']);
-    const buttons = Array.from(mounted.container.querySelectorAll<HTMLButtonElement>(
-      '[data-testid="card-pool-workspace-switcher"] button',
-    ));
+    const buttons = Array.from(
+      mounted.container.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="card-pool-workspace-switcher"] button',
+      ),
+    );
 
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Player workspace',
@@ -484,7 +530,9 @@ describe('AppShellNav', () => {
 
   test('shows pool names in tooltips on hover', async () => {
     const mounted = await mountNav({}, ['player', 'evil', 'neutral']);
-    const evilButton = mounted.container.querySelector<HTMLButtonElement>('[aria-label="Evil workspace"]');
+    const evilButton = mounted.container.querySelector<HTMLButtonElement>(
+      '[aria-label="Evil workspace"]',
+    );
 
     evilButton?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     await nextTick();

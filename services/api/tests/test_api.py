@@ -11,6 +11,7 @@ import pytest
 from card_reader_core.models import (
     Card,
     CardAlias,
+    CardClassificationReviewItem,
     CardFactionAssignment,
     CardGroup,
     CardGroupMember,
@@ -4270,6 +4271,7 @@ def test_import_assigns_resolved_pool_roles_and_evidence_to_new_card() -> None:
     assert item.classification_inference_json["roles"]["matched_tag_sources"] == [
         {"id": "tag-hero", "key": "hero"}
     ]
+    assert not CardClassificationReviewItem.objects.filter(import_item=item).exists()
 
 
 def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifecycle_warning() -> (
@@ -4353,16 +4355,13 @@ def test_classification_mismatch_preserves_existing_card_and_coexists_with_lifec
     assert item.status == "completed"
     assert [warning["code"] for warning in item.warnings_json] == [
         "matched_deprecated_card",
-        "card_classification_mismatch",
     ]
-    mismatch = next(
-        warning
-        for warning in item.warnings_json
-        if warning["code"] == "card_classification_mismatch"
-    )
-    assert mismatch["details"]["stored"]["card_mana_families"] == ["arcane"]
-    assert mismatch["details"]["live"]["card_mana_families"] == ["arcane"]
-    assert mismatch["details"]["inferred"]["card_mana_families"] == ["dark"]
+    review_item = CardClassificationReviewItem.objects.get(import_item=item)
+    assert review_item.status == "open"
+    assert review_item.card == card
+    assert review_item.card_version == version
+    assert review_item.existing_classification_json["card_mana_families"] == ["arcane"]
+    assert review_item.inferred_classification_json["card_mana_families"] == ["dark"]
     assert item.classification_inference_json["mana_families"][
         "matched_symbol_sources"
     ] == [{"id": "symbol-dark", "key": "dark-mana"}]

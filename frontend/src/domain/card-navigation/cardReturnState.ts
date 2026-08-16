@@ -1,6 +1,9 @@
 import type { LocationQuery, RouteLocationRaw } from 'vue-router';
 import { buildGalleryLocation } from '@/domain/cards/utils/gallery/galleryNavigation';
-import { buildAdminReturnLocation, isAdminReturnQuery } from '@/domain/cards/utils/cards/adminCardNavigation';
+import {
+  buildAdminReturnLocation,
+  isAdminReturnQuery,
+} from '@/domain/cards/utils/cards/adminCardNavigation';
 import { buildDeckReturnLocation, isDeckReturnQuery } from '@/domain/decks/utils/deckRouteState';
 import {
   buildNotificationsReturnLocation,
@@ -38,11 +41,13 @@ export const buildReviewCardEditorLocation = (
   {
     versionId,
     propertyKey,
+    tab,
     view,
     status,
   }: {
-    versionId: string;
+    versionId?: string;
     propertyKey?: string;
+    tab?: 'card';
     view: string;
     status: string;
   },
@@ -51,6 +56,7 @@ export const buildReviewCardEditorLocation = (
   query: addReturnToQuery(query, REVIEW_RETURN_TO, {
     version_id: versionId,
     property_key: propertyKey,
+    tab,
     [REVIEW_VIEW_QUERY_KEY]: view,
     [REVIEW_STATUS_QUERY_KEY]: status,
   }),

@@ -117,7 +117,7 @@ Core stack:
   - Mana-family assignments and the indexed `Card.mana_family_sort_key` form one invariant. Runtime mutations must use the cards classification seam so the complete assignment set and cached sort key update atomically.
   - Mana families do not participate in Card identity, alias namespaces, or merge namespace validation.
   - Stable human-readable card identity is scoped by pool plus the exact canonical faction set: normalized primary names, aliases, and ordinary untargeted image-hash matching must resolve inside one explicit `(card_pool, card_factions)` namespace. Same-name cards may coexist in different faction namespaces. Roles and mana families never participate in identity matching.
-  - Empty factions on an untargeted Evil import mean unknown classification rather than an intentional stable Evil namespace. After ordinary empty-namespace matching, search currently factioned Evil Cards across all historical image checksums and then normalized primary names and aliases. Reuse only one unambiguous Card: either evidence set may resolve alone, both singleton sets must agree, and any multiple or conflicting candidates must refuse the merge. Preserve a matched Card's stored roles, factions, and mana families and emit the classification-mismatch warning. An unmatched or ambiguous import may create or reuse a transitional no-faction Evil Card, must emit `evil_faction_unresolved` with candidate counts, and must link reviewers to its Card tab. Targeted reparses, known-faction imports, other pools, and imports with reparse matching disabled do not use this fallback.
+  - Empty factions on an untargeted Evil import mean unknown classification rather than an intentional stable Evil namespace. After ordinary empty-namespace matching, search currently factioned Evil Cards across all historical image checksums and then normalized primary names and aliases. Reuse only one unambiguous Card: either evidence set may resolve alone, both singleton sets must agree, and any multiple or conflicting candidates must refuse the merge. Preserve a matched Card's stored roles, factions, and mana families and create a durable staff classification-review item when inferred values differ. An unmatched or ambiguous import may create or reuse a transitional no-faction Evil Card, must emit `evil_faction_unresolved` with candidate counts, and must link reviewers to its Card tab. Targeted reparses, known-faction imports, other pools, and imports with reparse matching disabled do not use this fallback.
   - Faction assignments and the derived faction identity key form one invariant. Runtime faction mutations must go through the cards identity seam so assignments plus card and alias namespace keys update atomically.
   - Neutral remains a separate stable pool. Do not include it implicitly in Player or Evil queries; any future Neutral overlay must be an explicit, authorized multi-pool view state.
 - Ordinary Gallery filter visibility is code-owned frontend presentation policy, not card validity, authorization, or import inference:
@@ -174,6 +174,10 @@ Core stack:
   - Stored in-app notifications are the source of truth. Future email, push, realtime, and digest delivery should dispatch after notification creation instead of branching inside cards, decks, parse flags, or other feature services.
   - Store rendered title/message snapshots plus structured metadata so old notifications remain readable and future channels can render richer payloads.
   - Noisy notification types must intentionally use stable dedupe keys or explicitly opt into one notification per event.
+- Classification review items are durable, core-owned staff work records.
+  - Create one immutable evidence snapshot per mismatching import item; do not coalesce separate imports for the same Card.
+  - Classification review is resolved or dismissed explicitly after staff inspection. Card edits do not silently close review items.
+  - New classification mismatches belong in Review rather than import warnings. Keep historical `card_classification_mismatch` warnings readable without backfilling them into the queue.
 
 ## Auth Rules
 - Auth is enabled by default.
@@ -311,6 +315,11 @@ Local app URL:
 - `GET /notifications/summary`
 - `PATCH /notifications/{notification_id}`
 - `POST /notifications/mark-all-read`
+- `GET /review/classification-items`
+- `PATCH /review/classification-items/{item_id}`
+- `GET /review/parse-flags`
+- `PATCH /review/parse-flags/items/{item_id}`
+- `GET /review/summary`
 - `GET /developer-data/current`
 - `POST /developer-data/grants`
 - `POST /developer-data/grants/exchange`

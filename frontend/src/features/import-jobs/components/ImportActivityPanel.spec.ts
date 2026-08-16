@@ -61,6 +61,7 @@ const mountPanel = async (
     history: createMemoryHistory(),
     routes: [
       { path: '/operations', component: { template: '<div />' } },
+      { path: '/review', component: { template: '<div />' } },
       { path: '/cards/:cardId/edit', component: { template: '<div />' } },
     ],
   });
@@ -114,7 +115,9 @@ describe('ImportActivityPanel', () => {
     expect(actions?.classList.contains('flex-nowrap')).toBe(true);
     expect(actions?.classList.contains('flex-wrap')).toBe(false);
 
-    mounted.host.querySelector<HTMLButtonElement>('button[aria-label="Refresh import activity"]')?.click();
+    mounted.host
+      .querySelector<HTMLButtonElement>('button[aria-label="Refresh import activity"]')
+      ?.click();
     Array.from(mounted.host.querySelectorAll('button'))
       .find((button) => button.textContent?.trim() === 'Interrupt')
       ?.click();
@@ -149,7 +152,7 @@ describe('ImportActivityPanel', () => {
     mounted.app.unmount();
   });
 
-  test('shows every item warning and links classification mismatches to the Card tab', async () => {
+  test('shows historical warnings and a neutral classification review handoff', async () => {
     const detail: ImportJobDetail = {
       ...activeJob,
       id: 'finished-job',
@@ -216,6 +219,11 @@ describe('ImportActivityPanel', () => {
           target_card_factions_snapshot: [],
           target_card_mana_families_snapshot: [],
           card_tab_url: '/cards/card-id/edit?tab=card',
+          classification_review: {
+            id: 'review-id',
+            status: 'open',
+            url: '/review?view=classification&status=open',
+          },
         },
       ],
     };
@@ -239,9 +247,11 @@ describe('ImportActivityPanel', () => {
     expect(
       mounted.host.querySelector('a[href="/cards/card-id/edit?tab=card"]')?.textContent,
     ).toContain('Review card classification');
-    expect(
-      mounted.host.querySelectorAll('a[href="/cards/card-id/edit?tab=card"]'),
-    ).toHaveLength(2);
+    expect(mounted.host.querySelectorAll('a[href="/cards/card-id/edit?tab=card"]')).toHaveLength(2);
+    const reviewLink = Array.from(mounted.host.querySelectorAll('a')).find((link) =>
+      link.textContent?.includes('Sent to Review · open'),
+    );
+    expect(reviewLink?.getAttribute('href')).toContain('view=classification');
 
     mounted.app.unmount();
   });
