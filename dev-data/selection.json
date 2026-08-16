@@ -109,6 +109,8 @@
       "boon": 0,
       "event": 0,
       "shop_item": 0,
+      "directive": 0,
+      "reminder": 0,
       "mana": 1
     },
     "min_cards_by_faction": {
@@ -170,6 +172,22 @@
         "target_key": "location",
         "source_kind": "type",
         "source_key": "location",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "directive",
+        "source_kind": "type",
+        "source_key": "directive",
+        "enabled": true
+      },
+      {
+        "card_pool": "evil",
+        "target_kind": "role",
+        "target_key": "reminder",
+        "source_kind": "type",
+        "source_key": "reminder",
         "enabled": true
       },
       {

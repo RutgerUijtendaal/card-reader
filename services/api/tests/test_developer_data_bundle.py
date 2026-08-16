@@ -100,7 +100,12 @@ def test_version_one_payload_adoption_adds_mana_role_from_latest_type() -> None:
                     "key": "legacy-mana",
                     "is_hero": False,
                     "latest_version_number": 1,
-                    "versions": [{"version_number": 1, "type_keys": ["mana"]}],
+                    "versions": [
+                        {
+                            "version_number": 1,
+                            "type_keys": ["directive", "reminder", "mana"],
+                        }
+                    ],
                 }
             ]
         },
@@ -223,7 +228,7 @@ def test_legacy_payload_adoption_namespaces_card_group_references() -> None:
     ]
 
 
-def test_version_two_adoption_backfills_only_player_cards_and_group_references() -> None:
+def test_version_two_adoption_backfills_player_families_and_latest_type_roles() -> None:
     adopted = adopt_payload_for_format(
         {
             "cards": [
@@ -251,7 +256,7 @@ def test_version_two_adoption_backfills_only_player_cards_and_group_references()
                         {
                             "version_number": 1,
                             "symbol_keys": ["dark-affinity"],
-                            "type_keys": ["mana"],
+                            "type_keys": ["directive", "reminder", "mana"],
                         }
                     ],
                 },
@@ -285,7 +290,7 @@ def test_version_two_adoption_backfills_only_player_cards_and_group_references()
     ] == [["arcane"], []]
     assert [
         card["card_roles"] for card in adopted["cards"]  # type: ignore[index]
-    ] == [["hero", "mana"], ["boss", "mana"]]
+    ] == [["hero", "mana"], ["boss", "directive", "reminder", "mana"]]
     group = adopted["card_groups"][0]  # type: ignore[index]
     assert group["anchor_card_ref"]["card_mana_families"] == ["arcane"]
     assert group["members"][0]["card_ref"]["card_mana_families"] == []
@@ -356,7 +361,7 @@ def test_import_accepts_only_unmodified_migration_defaults(
 
         assert result.counts["cards"] == 4
         assert Template.objects.filter(key="full-height", label="Full height").exists()
-        assert CardClassificationRule.objects.count() == 16
+        assert CardClassificationRule.objects.count() == 18
         transaction.set_rollback(True)
 
 
@@ -1350,6 +1355,8 @@ def _build_synthetic_source(storage_root: Path) -> dict[str, object]:
                 "location": 1,
                 "boss": 0,
                 "shop_item": 0,
+                "directive": 0,
+                "reminder": 0,
                 "mana": 0,
             },
             "min_cards_by_faction": {"order": 1, "blood": 1, "dark": 0, "metal": 0},
@@ -1456,3 +1463,9 @@ def _seed_migration_defaults() -> None:
         "card_reader_core.migrations.0058_add_mana_card_role"
     )
     mana_role_migration.add_mana_role_defaults_and_backfill(django_apps, None)
+    directive_reminder_migration = importlib.import_module(
+        "card_reader_core.migrations.0059_add_evil_directive_reminder_roles"
+    )
+    directive_reminder_migration.add_evil_directive_reminder_defaults_and_backfill(
+        django_apps, None
+    )

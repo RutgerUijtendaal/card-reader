@@ -7,6 +7,8 @@ export const CARD_ROLE_OPTIONS = [
   { value: 'boon', label: 'Boon' },
   { value: 'event', label: 'Event' },
   { value: 'shop_item', label: 'Shop Item' },
+  { value: 'directive', label: 'Directive' },
+  { value: 'reminder', label: 'Reminder' },
   { value: 'mana', label: 'Mana' },
 ] as const;
 

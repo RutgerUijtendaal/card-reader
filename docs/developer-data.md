@@ -32,7 +32,8 @@ The importer supports current Version 3 archives and explicitly adopts pinned Ve
 Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to the Hero role
 before strict current-schema validation. Older formats derive missing Player mana-family assignments
 from each Card's latest-version Symbols and add the Mana role to Player or Evil cards whose latest
-version has the Mana Type. After all Symbols are present, import idempotently reconciles
+version has the Mana Type. Version 2 Evil Cards also gain Directive and Reminder from matching Types
+on the authoritative latest version; Version 1 remains Player-only and gains neither. After all Symbols are present, import idempotently reconciles
 the default Player mana and affinity Symbol rules without creating placeholder Symbols.
 Import reconstructs the
 pool-plus-faction natural identity namespace rather than trusting a serialized internal key. This
@@ -40,10 +41,11 @@ compatibility keeps older immutable bundles usable without making current classi
 
 Selection coverage is evaluated by pool, role, faction, and mana family through `min_cards_by_pool`,
 `min_cards_by_role`, `min_cards_by_faction`, and `min_cards_by_mana_family`. The existing Hero minimum is retained under the Hero
-role. Evil and Neutral pool coverage remains zero while those pools are excluded; newly introduced
-roles and Order, Blood, Dark, and Metal may remain at zero until reviewed source data is available.
-Mana coverage is required because existing Player and Evil cards with the Mana Type are assigned the
-Mana role. The lock file is still generated only by publishing a validated immutable bundle and must
+role. Evil and Neutral pool coverage remains zero while those pools are excluded; Directive, Reminder,
+and Order, Blood, Dark, and Metal may remain at zero until reviewed source data is available. The
+selection still requires both Evil Type-to-role rules so migration-owned defaults cannot disappear
+silently even while Evil card coverage is optional. Mana coverage is required because existing Player
+and Evil cards with the Mana Type are assigned the Mana role. The lock file is still generated only by publishing a validated immutable bundle and must
 not be edited by hand.
 
 `required_tag_keys` and `required_classification_rules` in the reviewed selection make expected

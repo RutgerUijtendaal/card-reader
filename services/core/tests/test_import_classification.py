@@ -161,6 +161,37 @@ def test_mana_type_infers_only_the_mana_role(card_pool: str) -> None:
     ]
 
 
+def test_evil_directive_and_reminder_types_infer_only_matching_roles() -> None:
+    rules = tuple(
+        rule(
+            f"rule-evil-{role}-role",
+            target_kind="role",
+            target_key=role,
+            source_kind="type",
+            source_id=f"type-{role}",
+            source_key=role,
+            card_pool="evil",
+        )
+        for role in ("directive", "reminder")
+    )
+
+    result = classify_import_card(
+        classification_input(
+            card_pool="evil",
+            rules=rules,
+            types=(("type-directive", "directive"), ("type-reminder", "reminder")),
+        )
+    )
+
+    assert result.roles == ("directive", "reminder")
+    assert result.factions == ()
+    assert result.mana_families == ()
+    assert result.evidence["roles"]["matched_type_sources"] == [
+        {"id": "type-directive", "key": "directive"},
+        {"id": "type-reminder", "key": "reminder"},
+    ]
+
+
 def test_role_and_faction_overrides_are_independent_and_exact() -> None:
     rules = (
         rule(

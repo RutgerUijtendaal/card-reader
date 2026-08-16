@@ -25,6 +25,11 @@ from card_reader_core.metadata import (
 
 DEVELOPER_DATA_FORMAT_VERSION = 3
 SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
+LEGACY_ROLE_TYPE_POOLS: tuple[tuple[CardRole, frozenset[CardPool]], ...] = (
+    ("directive", frozenset({"evil"})),
+    ("reminder", frozenset({"evil"})),
+    ("mana", frozenset({"player", "evil"})),
+)
 
 
 def _default_pool_coverage() -> dict[CardPool, int]:
@@ -363,16 +368,20 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
             if isinstance(latest_version, dict)
             else []
         )
-        if (
-            isinstance(role_values, list)
-            and isinstance(type_keys, list)
-            and adopted_card.get("card_pool") in {"player", "evil"}
-            and any(
-                isinstance(key, str) and key.strip().casefold() == "mana"
-                for key in type_keys
+        if isinstance(role_values, list) and isinstance(type_keys, list):
+            normalized_type_keys = {
+                key.strip().casefold() for key in type_keys if isinstance(key, str)
+            }
+            card_pool = adopted_card.get("card_pool")
+            inferred_roles = tuple(
+                role
+                for role, pools in LEGACY_ROLE_TYPE_POOLS
+                if card_pool in pools and role in normalized_type_keys
             )
-        ):
-            adopted_card["card_roles"] = list(normalize_card_roles((*role_values, "mana")))
+            if inferred_roles:
+                adopted_card["card_roles"] = list(
+                    normalize_card_roles((*role_values, *inferred_roles))
+                )
         symbol_keys = (
             latest_version.get("symbol_keys", [])
             if isinstance(latest_version, dict)
