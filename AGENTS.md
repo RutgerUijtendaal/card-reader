@@ -198,15 +198,16 @@ Core stack:
 - The Vue app uses Django session auth with CSRF protection.
 - `/auth/me` and `/auth/login` return a CSRF token for unsafe browser requests.
 
-## Seed Files
-- Default seed JSON files live in `services/api/src/card_reader_api/seeds`:
+## Seed And Fixture Files
+- Catalog seed fixtures used by integration tests live in
+  `services/integration/tests/fixtures/catalog`:
   - `seed-keywords.json`
   - `seed-symbols.json`
   - `seed-tags.json`
   - `seed-templates.json`
   - `seed-types.json`
-  - `seed-users.example.json`
-- Local development users live in:
+- The example and local development users live in:
+  - `services/api/src/card_reader_api/seeds/seed-users.example.json`
   - `services/api/src/card_reader_api/seeds/seed-users.local.json`
 - `seed-users.local.json` is gitignored.
 

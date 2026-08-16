@@ -76,17 +76,19 @@ current user payload and a CSRF token used by the browser client for unsafe requ
 
 ## Seeds
 
-Default seed JSON files live in `src/card_reader_api/seeds`:
+Catalog seed fixtures used by the integration suite live in
+`../integration/tests/fixtures/catalog`:
 
 - `seed-keywords.json`
 - `seed-symbols.json`
 - `seed-tags.json`
 - `seed-templates.json`
 - `seed-types.json`
-- `seed-users.example.json`
 
-Private local users live in `src/card_reader_api/seeds/seed-users.local.json`. The local users file is
-gitignored and read by `python manage.py seed_users`.
+The example users file instead lives at
+`src/card_reader_api/seeds/seed-users.example.json`. Private local users live at
+`src/card_reader_api/seeds/seed-users.local.json`; that local file is gitignored and read by
+`python manage.py seed_users`.
 
 Re-running `seed_users` updates existing configured users, including their password and staff flags.
 

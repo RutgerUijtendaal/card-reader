@@ -22,7 +22,7 @@ def rule(
     source_key: str,
     card_pool: str = "evil",
 ) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "rule_id": rule_id,
         "card_pool": card_pool,
         "target_kind": target_kind,
@@ -33,6 +33,17 @@ def rule(
         "source_label": source_key,
         "source_identifiers": [],
     }
+    if source_kind == "symbol":
+        payload["source_symbol"] = {
+            "symbol_type": "affinity" if source_key.endswith("-affinity") else "mana",
+            "detector_type": "template",
+            "detection_config": {},
+            "text_enrichment": {},
+            "reference_assets": [],
+            "text_token": "",
+            "enabled": True,
+        }
+    return payload
 
 
 def snapshot(*rules: dict[str, object], card_pool: str = "evil") -> dict[str, object]:
