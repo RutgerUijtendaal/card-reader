@@ -434,6 +434,7 @@ def test_version_three_import_preserves_an_intentionally_omitted_default_rule(
     source_storage = tmp_path / "source-storage"
     target_storage = tmp_path / "target-storage"
     selection_path = tmp_path / "selection.json"
+    current_archive_path = tmp_path / "current-omitted-mana-rule.tar.gz"
     archive_path = tmp_path / "omitted-mana-rule.tar.gz"
 
     with transaction.atomic():
@@ -463,8 +464,14 @@ def test_version_three_import_preserves_an_intentionally_omitted_default_rule(
         selection_path.write_text(json.dumps(selection), encoding="utf-8")
         export_developer_data(
             selection_path=selection_path,
-            output_path=archive_path,
+            output_path=current_archive_path,
             source_revision="omitted-mana-rule-test",
+        )
+        _build_archive_with_format_version(
+            current_archive_path,
+            archive_path,
+            tmp_path / "version-three-archive",
+            format_version=3,
         )
 
         _clear_domain_data()
@@ -1093,6 +1100,27 @@ def _build_alias_collision_archive(source: Path, target: Path, extraction_root: 
     data_entry = next(entry for entry in manifest["files"] if entry["path"] == "data.json")
     data_entry["sha256"] = hashlib.sha256(serialized).hexdigest()
     data_entry["size_bytes"] = len(serialized)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    with tarfile.open(target, "w:gz") as archive:
+        for path in sorted(extraction_root.rglob("*")):
+            archive.add(path, arcname=path.relative_to(extraction_root).as_posix())
+
+
+def _build_archive_with_format_version(
+    source: Path,
+    target: Path,
+    extraction_root: Path,
+    *,
+    format_version: int,
+) -> None:
+    extraction_root.mkdir()
+    with tarfile.open(source, "r:gz") as archive:
+        archive.extractall(extraction_root, filter="data")
+    manifest_path = extraction_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["format_version"] = format_version
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

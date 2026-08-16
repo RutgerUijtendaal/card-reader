@@ -51,7 +51,6 @@ from .schema import (
     CardReferenceRecord,
     CardReferenceIdentity,
     CardRecord as DeveloperDataCardRecord,
-    DEVELOPER_DATA_FORMAT_VERSION,
     DeveloperDataManifest,
     DeveloperDataPayload,
     card_reference_identity,
@@ -455,7 +454,7 @@ def _import_payload(
                 rule_id=existing_rule.id,
                 enabled=rule_record.enabled,
             )
-    if source_format_version < DEVELOPER_DATA_FORMAT_VERSION:
+    if source_format_version in {1, 2}:
         ensure_default_mana_family_classification_rules()
     for deck_tag_record in payload.deck_tags:
         DeckTag.objects.update_or_create(
