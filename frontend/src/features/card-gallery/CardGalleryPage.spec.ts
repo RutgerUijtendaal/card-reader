@@ -399,6 +399,25 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
+  test('clears fallback results when navigation introduces a catalog-backed filter', async () => {
+    const mounted = await mountGallery(
+      '/cards',
+      'player',
+      () => Promise.resolve({ data: { ...emptyCardsPage, count: 7 } }),
+      () => Promise.reject(new Error('facet failure')),
+    );
+    expect(mounted.container.textContent).toContain('7 results');
+
+    await mounted.router.push('/cards?tag_keys=dragon');
+    await flushPromises();
+
+    expect(mounted.requestRoutes).toEqual(['/cards']);
+    expect(mounted.container.textContent).not.toContain('7 results');
+    expect(mounted.container.textContent).toContain('Filter options could not be loaded');
+
+    mounted.unmount();
+  });
+
   test('reconciles metadata when switching between pool catalogs', async () => {
     const poolFilters: Record<'player' | 'evil' | 'neutral', CardFiltersResponse> = {
       player: {

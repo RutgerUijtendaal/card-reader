@@ -110,7 +110,7 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   const searchCards = async (): Promise<boolean> => loadCardsPage(1, 'replace');
 
   const loadNextPage = async (): Promise<void> => {
-    if ((enabled && !enabled.value) || isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
+    if (!filtersLoaded.value || (enabled && !enabled.value) || isLoadingInitial.value || isRefreshing.value || isLoadingPage.value || nextPage.value === null) {
       return;
     }
     await loadCardsPage(nextPage.value, 'append');
@@ -130,6 +130,16 @@ export const useCardCollection = <TCard extends IdentifiableCard>({
   if (resultSetKey) {
     watch(resultSetKey, resetCollection, { flush: 'sync' });
   }
+
+  watch(
+    filtersLoaded,
+    (areFiltersLoaded) => {
+      if (!areFiltersLoaded) {
+        resetCollection();
+      }
+    },
+    { flush: 'sync' },
+  );
 
   if (enabled) {
     watch(

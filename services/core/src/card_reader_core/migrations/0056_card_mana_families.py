@@ -340,6 +340,7 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
     ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
     Rule = apps.get_model("card_reader_core", "CardClassificationRule")
+    Symbol = apps.get_model("card_reader_core", "Symbol")
     VersionSymbol = apps.get_model("card_reader_core", "CardVersionSymbol")
 
     unsupported: list[str] = []
@@ -366,10 +367,26 @@ def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
     ):
         unsupported.append("card mana-family assignments")
 
-    mana_rules = Rule.objects.filter(
-        models.Q(source_kind="symbol") | models.Q(target_kind="mana_family")
-    ).select_related("symbol")
-    if any(not _is_reversible_seed_rule(rule) for rule in mana_rules.iterator()):
+    mana_rules = list(
+        Rule.objects.filter(
+            models.Q(source_kind="symbol") | models.Q(target_kind="mana_family")
+        ).select_related("symbol")
+    )
+    expected_seed_symbol_ids = {
+        str(symbol_id)
+        for symbol_id in Symbol.objects.filter(
+            key__in=tuple(FAMILY_BY_SYMBOL)
+        ).values_list("id", flat=True)
+    }
+    reversible_seed_symbol_ids = {
+        str(rule.symbol_id)
+        for rule in mana_rules
+        if _is_reversible_seed_rule(rule) and rule.symbol_id is not None
+    }
+    if (
+        any(not _is_reversible_seed_rule(rule) for rule in mana_rules)
+        or reversible_seed_symbol_ids != expected_seed_symbol_ids
+    ):
         unsupported.append("custom or edited Symbol classification rules")
 
     if (

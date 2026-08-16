@@ -819,6 +819,70 @@ def test_processor_rejects_a_queued_reparse_after_the_target_pool_changes() -> N
     )
 
 
+def test_processor_revalidates_target_pool_after_ocr_before_persisting() -> None:
+    card, target_version = _create_editable_card_version(name="In-flight Pool Drift")
+    source_file = build_storage_relative_path("uploads", "in-flight-pool-drift.png")
+    source_path = resolve_storage_path(source_file)
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_bytes(b"in-flight-pool-drift")
+    job = ImportJob.objects.create(
+        source_path=source_file,
+        template=target_version.template,
+        options_json={"reparse_existing": True},
+        card_pool="player",
+        classification_rule_snapshot_json=ClassificationRuleService().build_snapshot(
+            card_pool="player",
+            include_roles=True,
+            include_factions=True,
+            include_mana_families=True,
+        ),
+        total_items=1,
+    )
+    item = ImportJobItem.objects.create(
+        job=job,
+        source_file=source_file,
+        target_card=card,
+        target_card_version=target_version,
+        target_card_pool_snapshot="player",
+    )
+
+    class PoolChangingParser:
+        def parse(self, *_args: object, **_kwargs: object) -> SimpleNamespace:
+            change_card_identity(card=card, card_pool="evil", card_factions=())
+            return SimpleNamespace(
+                checksum="in-flight-pool-drift",
+                normalized_fields={
+                    "name": "Must Not Persist",
+                    "type_line": "Type",
+                    "mana_cost": "",
+                    "attack": "",
+                    "health": "",
+                    "rules_text": "",
+                },
+                confidence={"overall": 0.9},
+                raw_ocr={},
+                keyword_ids=[],
+                tag_ids=[],
+                type_ids=[],
+                symbol_ids=[],
+                tag_suggestions=[],
+                type_suggestions=[],
+            )
+
+    ImportProcessorService(PoolChangingParser()).process_job(job.id)
+
+    job.refresh_from_db()
+    item.refresh_from_db()
+    target_version.refresh_from_db()
+    assert job.status == "failed"
+    assert item.status == "failed"
+    assert item.error_message == (
+        "The target Card pool changed while this reparse was queued; "
+        "queue a new reparse for its current pool."
+    )
+    assert target_version.name == "In-flight Pool Drift"
+
+
 def test_card_gallery_routes_are_public() -> None:
     client = Client(HTTP_HOST="localhost")
 

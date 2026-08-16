@@ -207,6 +207,7 @@ def save_parsed_card_result(
         if item.target_card_version is not None:
             version = reparse_target_version(
                 item=item,
+                card_pool=card_pool,
                 template_id=template_id,
                 checksum=checksum,
                 normalized_fields=normalized_fields,
@@ -710,6 +711,7 @@ def clone_card_version_for_content_version_snapshot(
 def reparse_target_version(
     *,
     item: ImportJobItem,
+    card_pool: CardPool,
     template_id: str,
     checksum: str,
     normalized_fields: dict[str, str],
@@ -725,20 +727,33 @@ def reparse_target_version(
     target_version = item.target_card_version
     if target_version is None:
         raise ValueError("Target card version is required for targeted reparses")
-    version = (
-        CardVersion.objects.select_related("card", "template", "previous_version")
-        .filter(id=target_version.id)
-        .first()
-    )
-    if version is None:
-        raise ValueError(f"Target card version '{target_version.id}' does not exist")
-    if not version.is_latest:
-        raise ValueError("Only latest card versions can be reparsed")
-    if item.target_card is not None and version.card.id != item.target_card.id:
-        raise ValueError("Target card version does not belong to the requested card")
-
-    reset_manual_state = version.template.key != template_id
+    requested_card = item.target_card
     with transaction.atomic():
+        version = (
+            CardVersion.objects.select_for_update()
+            .select_related("card", "template", "previous_version")
+            .filter(id=target_version.id)
+            .first()
+        )
+        if version is None:
+            raise ValueError(f"Target card version '{target_version.id}' does not exist")
+        if not version.is_latest:
+            raise ValueError("Only latest card versions can be reparsed")
+        if requested_card is not None and version.card.id != requested_card.id:
+            raise ValueError("Target card version does not belong to the requested card")
+
+        target_card = (
+            Card.objects.select_for_update().filter(id=version.card.id).first()
+        )
+        if target_card is None:
+            raise ValueError("The target Card no longer exists; queue a new reparse.")
+        if target_card.card_pool != card_pool:
+            raise ValueError(
+                "The target Card pool changed while this reparse was queued; "
+                "queue a new reparse for its current pool."
+            )
+        version.card = target_card
+        reset_manual_state = version.template.key != template_id
         return update_existing_version(
             item,
             version,

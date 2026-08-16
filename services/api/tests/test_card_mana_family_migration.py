@@ -303,6 +303,26 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         },
     )
 
+    deleted_seed_rule = Rule.objects.get(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol__key="arcane-mana",
+    )
+    deleted_seed_symbol_id = deleted_seed_rule.symbol_id
+    deleted_seed_rule.delete()
+    with pytest.raises(RuntimeError, match="Symbol classification rules"):
+        _migrate_to(BASE_MIGRATION)
+    Rule.objects.create(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol_id=deleted_seed_symbol_id,
+        enabled=True,
+    )
+
     Assignment.objects.filter(card_id=multicolor.id).delete()
     with pytest.raises(RuntimeError, match="card mana-family assignments"):
         _migrate_to(BASE_MIGRATION)
