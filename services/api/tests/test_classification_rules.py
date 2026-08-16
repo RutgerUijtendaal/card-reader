@@ -371,6 +371,9 @@ def test_creating_a_symbol_only_reconciles_that_symbol_default() -> None:
 
 
 def test_renaming_a_symbol_to_a_canonical_key_reconciles_its_default_rule() -> None:
+    canonical_symbol = Symbol.objects.get(key="arcane-mana")
+    Symbol.objects.filter(id=canonical_symbol.id).update(key="legacy-arcane-mana")
+
     symbol = Symbol.objects.create(
         key="pending-arcane-symbol",
         label="Pending Arcane Symbol",
