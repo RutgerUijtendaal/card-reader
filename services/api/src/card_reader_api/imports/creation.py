@@ -333,6 +333,7 @@ class ImportUploadAdmission:
                 content_version_description=str(validated_data["content_version_description"]),
                 creation_key=creation_key,
                 creation_fingerprint=fingerprint,
+                accepted_creation_fingerprints=accepted_fingerprints,
                 card_pool=card_pool,
                 card_role_mode=card_role_mode,
                 card_role_override=card_role_override,

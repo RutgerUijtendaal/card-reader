@@ -47,6 +47,7 @@ class ImportService:
         content_version_description: str,
         creation_key: str,
         creation_fingerprint: str,
+        accepted_creation_fingerprints: Sequence[str] = (),
         card_pool: CardPool,
         card_role_mode: CardClassificationMode = "automatic",
         card_role_override: Sequence[CardRole] = (),
@@ -55,10 +56,13 @@ class ImportService:
         card_mana_family_mode: CardClassificationMode = "automatic",
         card_mana_family_override: Sequence[ManaFamily] = (),
     ) -> ImportJobCreationResult:
+        accepted_fingerprints = tuple(
+            dict.fromkeys((creation_fingerprint, *accepted_creation_fingerprints))
+        )
         existing = self.get_job_by_creation_key(creation_key=creation_key)
         if existing is not None:
             return ImportJobCreationResult(
-                job=self._matching_replay(existing, creation_fingerprint),
+                job=self._matching_replay(existing, accepted_fingerprints),
                 outcome="replayed",
             )
         self.prevalidate_job_creation(
@@ -109,7 +113,7 @@ class ImportService:
             if existing is None:
                 raise
             return ImportJobCreationResult(
-                job=self._matching_replay(existing, creation_fingerprint),
+                job=self._matching_replay(existing, accepted_fingerprints),
                 outcome="replayed",
             )
         return ImportJobCreationResult(job=job, outcome="created")
@@ -173,8 +177,12 @@ class ImportService:
     def get_job_by_creation_key(self, *, creation_key: str) -> ImportJob | None:
         return fetch_job_by_creation_key(creation_key)
 
-    def _matching_replay(self, job: ImportJob, fingerprint: str) -> ImportJob:
-        if job.creation_fingerprint != fingerprint:
+    def _matching_replay(
+        self,
+        job: ImportJob,
+        accepted_fingerprints: Sequence[str],
+    ) -> ImportJob:
+        if job.creation_fingerprint not in accepted_fingerprints:
             raise ImportCreationKeyConflict(
                 "This creation key has already been used for a different import payload."
             )

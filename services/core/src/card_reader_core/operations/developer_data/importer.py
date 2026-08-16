@@ -50,6 +50,7 @@ from .schema import (
     CardReferenceRecord,
     CardReferenceIdentity,
     CardRecord as DeveloperDataCardRecord,
+    DEVELOPER_DATA_FORMAT_VERSION,
     DeveloperDataManifest,
     DeveloperDataPayload,
     card_reference_identity,
@@ -185,7 +186,10 @@ def import_developer_data(
         ) as created_assets:
             with transaction.atomic():
                 lock_card_identity_pools("player")
-                _import_payload(payload)
+                _import_payload(
+                    payload,
+                    source_format_version=manifest.format_version,
+                )
     return DeveloperDataImportResult(
         bundle_version=manifest.bundle_version,
         counts=manifest.counts,
@@ -371,7 +375,11 @@ def _copy_assets(
         created.append(target)
 
 
-def _import_payload(payload: DeveloperDataPayload) -> None:
+def _import_payload(
+    payload: DeveloperDataPayload,
+    *,
+    source_format_version: int,
+) -> None:
     keywords = _create_catalog_rows(Keyword, payload.keywords)
     tags = _create_catalog_rows(Tag, payload.tags)
     types = _create_catalog_rows(Type, payload.types)
@@ -435,7 +443,8 @@ def _import_payload(payload: DeveloperDataPayload) -> None:
                 rule_id=existing_rule.id,
                 enabled=rule_record.enabled,
             )
-    ensure_default_mana_family_classification_rules()
+    if source_format_version < DEVELOPER_DATA_FORMAT_VERSION:
+        ensure_default_mana_family_classification_rules()
     for deck_tag_record in payload.deck_tags:
         DeckTag.objects.update_or_create(
             kind=deck_tag_record.kind,

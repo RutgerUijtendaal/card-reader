@@ -329,6 +329,61 @@ def test_import_accepts_only_unmodified_migration_defaults(
         transaction.set_rollback(True)
 
 
+def test_version_three_import_preserves_an_intentionally_omitted_default_rule(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_storage = tmp_path / "source-storage"
+    target_storage = tmp_path / "target-storage"
+    selection_path = tmp_path / "selection.json"
+    archive_path = tmp_path / "omitted-mana-rule.tar.gz"
+
+    with transaction.atomic():
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", source_storage)
+        selection = _build_synthetic_source(source_storage)
+        selection["include_all_cards"] = True
+        CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+        ).delete()
+        coverage = selection["coverage"]
+        assert isinstance(coverage, dict)
+        required_rules = coverage["required_classification_rules"]
+        assert isinstance(required_rules, list)
+        coverage["required_classification_rules"] = [
+            rule
+            for rule in required_rules
+            if not (
+                isinstance(rule, dict)
+                and rule.get("target_kind") == "mana_family"
+            )
+        ]
+        selection_path.write_text(json.dumps(selection), encoding="utf-8")
+        export_developer_data(
+            selection_path=selection_path,
+            output_path=archive_path,
+            source_revision="omitted-mana-rule-test",
+        )
+
+        _clear_domain_data()
+        monkeypatch.setattr(settings, "app_data_dir", target_storage)
+        import_developer_data(archive_path=archive_path)
+
+        assert Symbol.objects.filter(key="arcane-mana").exists()
+        assert not CardClassificationRule.objects.filter(
+            card_pool="player",
+            target_kind="mana_family",
+            target_key="arcane",
+            source_kind="symbol",
+            symbol__key="arcane-mana",
+        ).exists()
+        transaction.set_rollback(True)
+
+
 def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
