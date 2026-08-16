@@ -45,6 +45,7 @@ from card_reader_core.models import (
     Type,
 )
 from card_reader_core.operations.developer_data import (
+    DEVELOPER_DATA_FORMAT_VERSION,
     DeveloperDataError,
     PublishedBundleStore,
     export_developer_data,
@@ -504,7 +505,7 @@ def test_synthetic_bundle_round_trip_reconstructs_allowlisted_data(
         )
         assert manifest.counts["cards"] == 4
         assert manifest.counts["card_versions"] == 5
-        assert manifest.format_version == 3
+        assert manifest.format_version == DEVELOPER_DATA_FORMAT_VERSION
 
         _, validated_payload = validate_archive(archive_path)
         mainboard_record = next(
