@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from django.db import transaction
-from django.db.models import F
 
 from card_reader_core.database import retry_sqlite_write
 from card_reader_core.models import (
     Card,
+    CardAlias,
     CardClassificationInferenceEvidence,
     DEFAULT_CARD_POOL,
+    EVIL_CARD_POOL,
     CardFaction,
     CardPool,
     CardRole,
@@ -27,6 +30,7 @@ from card_reader_core.models import (
 from card_reader_core.repositories.import_jobs import (
     CARD_CLASSIFICATION_CHANGED_WHILE_QUEUED_WARNING,
     CARD_CLASSIFICATION_MISMATCH_WARNING,
+    EVIL_FACTION_UNRESOLVED_WARNING,
     MATCHED_DEPRECATED_CARD_WARNING,
     remove_import_warning,
     upsert_import_warning,
@@ -47,7 +51,7 @@ from ..metadata import (
 )
 from ..templates import get_template_by_key
 from .images import save_image_record
-from .identity import change_card_identity, create_card_identity
+from .identity import change_card_identity, create_card_identity, resolve_card_by_name_key
 from .queries import get_latest_card_version
 from .snapshots import (
     DEFAULT_FIELD_SOURCES,
@@ -56,6 +60,26 @@ from .snapshots import (
     decode_field_sources,
 )
 from .types import ParsedCardSaveResult
+
+
+UnknownEvilFactionMatchReason = Literal[
+    "existing_unresolved_card",
+    "matched_checksum",
+    "matched_name",
+    "matched_checksum_and_name",
+    "no_candidate",
+    "ambiguous_checksum",
+    "ambiguous_name",
+    "conflicting_evidence",
+]
+
+
+@dataclass(frozen=True)
+class UnknownEvilFactionMatch:
+    card: Card | None
+    reason: UnknownEvilFactionMatchReason
+    checksum_candidate_count: int
+    name_candidate_count: int
 
 
 def save_parsed_card(
@@ -141,6 +165,12 @@ def save_parsed_card_result(
         },
     }
     parsed_name = normalized_fields.get("name", "").strip() or Path(item.source_file).stem
+    is_unknown_evil_faction_import = (
+        item.target_card_version is None
+        and reparse_existing
+        and card_pool == EVIL_CARD_POOL
+        and not resolved_card_factions
+    )
     with transaction.atomic():
         if item.target_card_version is not None:
             version = reparse_target_version(
@@ -219,30 +249,61 @@ def save_parsed_card_result(
                 resolved_card_factions=resolved_card_factions,
                 evidence=resolved_evidence,
                 is_new_card=False,
+                unknown_evil_faction_match=(
+                    UnknownEvilFactionMatch(
+                        card=existing_version.card,
+                        reason="existing_unresolved_card",
+                        checksum_candidate_count=0,
+                        name_candidate_count=0,
+                    )
+                    if is_unknown_evil_faction_import
+                    else None
+                ),
             )
             return ParsedCardSaveResult(
                 version=version,
                 created_new_version=created_new_version,
             )
 
-        corrected_card = (
-            _resolve_corrected_import_card(
-                checksum=checksum,
+        existing_unknown_faction_card = (
+            resolve_card_by_name_key(
+                name=parsed_name,
                 card_pool=card_pool,
-                resolved_card_roles=resolved_card_roles,
-                resolved_card_factions=resolved_card_factions,
+                card_factions=resolved_card_factions,
             )
-            if reparse_existing
+            if is_unknown_evil_faction_import
             else None
         )
-        if corrected_card is None:
+        unknown_evil_faction_match = (
+            UnknownEvilFactionMatch(
+                card=existing_unknown_faction_card,
+                reason="existing_unresolved_card",
+                checksum_candidate_count=0,
+                name_candidate_count=0,
+            )
+            if existing_unknown_faction_card is not None
+            else (
+                _resolve_unknown_evil_faction_import(
+                    checksum=checksum,
+                    parsed_name=parsed_name,
+                )
+                if is_unknown_evil_faction_import
+                else None
+            )
+        )
+        matched_card = (
+            unknown_evil_faction_match.card
+            if unknown_evil_faction_match is not None
+            else None
+        )
+        if matched_card is None:
             card, created_new_card = create_card_identity(
                 name=parsed_name,
                 card_pool=card_pool,
                 card_factions=resolved_card_factions,
             )
         else:
-            card = corrected_card
+            card = matched_card
             created_new_card = False
         if created_new_card:
             CardRoleAssignment.objects.bulk_create(
@@ -292,6 +353,7 @@ def save_parsed_card_result(
                 resolved_card_factions=resolved_card_factions,
                 evidence=resolved_evidence,
                 is_new_card=created_new_card,
+                unknown_evil_faction_match=unknown_evil_faction_match,
             )
             return ParsedCardSaveResult(
                 version=version,
@@ -322,6 +384,7 @@ def save_parsed_card_result(
             resolved_card_factions=resolved_card_factions,
             evidence=resolved_evidence,
             is_new_card=created_new_card,
+            unknown_evil_faction_match=unknown_evil_faction_match,
         )
         return ParsedCardSaveResult(version=version, created_new_version=True)
 
@@ -345,42 +408,88 @@ def _resolve_existing_import_version(
     )
 
 
-def _resolve_corrected_import_card(
+def _resolve_unknown_evil_faction_import(
     *,
     checksum: str,
-    card_pool: CardPool,
-    resolved_card_roles: tuple[CardRole, ...],
-    resolved_card_factions: tuple[CardFaction, ...],
-) -> Card | None:
-    """Recover one same-pool manual faction correction from its completed import."""
-    faction_key = card_faction_identity_key(resolved_card_factions)
-    corrected_card_ids = list(
-        ImportJobItem.objects.filter(
-            status=ImportJobStatus.completed,
-            job__card_pool=card_pool,
-            target_card_pool_snapshot__isnull=True,
-            resolved_card_roles_json=list(resolved_card_roles),
-            resolved_card_factions_json=list(resolved_card_factions),
-            classification_inference_json__live_classification__card_pool=card_pool,
-            classification_inference_json__live_classification__card_roles=list(
-                resolved_card_roles
-            ),
-            classification_inference_json__live_classification__card_factions=list(
-                resolved_card_factions
-            ),
-            target_card__card_pool=card_pool,
-            target_card_version__card_id=F("target_card_id"),
-            target_card_version__image_hash=checksum,
+    parsed_name: str,
+) -> UnknownEvilFactionMatch:
+    """Resolve an unclassified Evil import only when its evidence is unambiguous."""
+    empty_faction_key = card_faction_identity_key(())
+    checksum_candidates = (
+        CardVersion.objects.filter(
+            image_hash=checksum,
+            card__card_pool=EVIL_CARD_POOL,
         )
-        .exclude(target_card__faction_identity_key=faction_key)
+        .exclude(card__faction_identity_key=empty_faction_key)
         .order_by()
-        .values_list("target_card_id", flat=True)
-        .distinct()[:2]
+        .values_list("card_id", flat=True)
+        .distinct()
     )
-    if len(corrected_card_ids) != 1:
-        return None
+    checksum_candidate_count = checksum_candidates.count()
+    checksum_card_id = checksum_candidates.first() if checksum_candidate_count == 1 else None
 
-    return Card.objects.filter(id=corrected_card_ids[0], card_pool=card_pool).first()
+    name_key = normalize_slug_key(parsed_name)
+    name_card_ids: set[str] = set()
+    if name_key:
+        name_card_ids.update(
+            Card.objects.filter(card_pool=EVIL_CARD_POOL, key=name_key)
+            .exclude(faction_identity_key=empty_faction_key)
+            .values_list("id", flat=True)
+        )
+        name_card_ids.update(
+            CardAlias.objects.filter(card_pool=EVIL_CARD_POOL, key=name_key)
+            .exclude(faction_identity_key=empty_faction_key)
+            .values_list("card_id", flat=True)
+        )
+    name_candidate_count = len(name_card_ids)
+    name_card_id = next(iter(name_card_ids)) if name_candidate_count == 1 else None
+
+    if checksum_candidate_count > 1:
+        reason: UnknownEvilFactionMatchReason = "ambiguous_checksum"
+        matched_card_id = None
+    elif name_candidate_count > 1:
+        reason = "ambiguous_name"
+        matched_card_id = None
+    elif (
+        checksum_card_id is not None
+        and name_card_id is not None
+        and checksum_card_id != name_card_id
+    ):
+        reason = "conflicting_evidence"
+        matched_card_id = None
+    elif checksum_card_id is not None:
+        reason = (
+            "matched_checksum_and_name"
+            if name_card_id == checksum_card_id
+            else "matched_checksum"
+        )
+        matched_card_id = checksum_card_id
+    elif name_card_id is not None:
+        reason = "matched_name"
+        matched_card_id = name_card_id
+    else:
+        reason = "no_candidate"
+        matched_card_id = None
+
+    matched_card = (
+        Card.objects.filter(
+            id=matched_card_id,
+            card_pool=EVIL_CARD_POOL,
+        )
+        .exclude(faction_identity_key=empty_faction_key)
+        .first()
+        if matched_card_id is not None
+        else None
+    )
+    if matched_card_id is not None and matched_card is None:
+        reason = "no_candidate"
+
+    return UnknownEvilFactionMatch(
+        card=matched_card,
+        reason=reason,
+        checksum_candidate_count=checksum_candidate_count,
+        name_candidate_count=name_candidate_count,
+    )
 
 
 def apply_latest_version_identity(card: Card, version: CardVersion) -> None:
@@ -705,6 +814,40 @@ def sync_import_item_lifecycle_warning(item: ImportJobItem, card: Card) -> None:
     )
 
 
+def sync_unknown_evil_faction_warning(
+    item: ImportJobItem,
+    card: Card,
+    match: UnknownEvilFactionMatch | None,
+) -> None:
+    if match is None or card_faction_keys(card):
+        remove_import_warning(item, EVIL_FACTION_UNRESOLVED_WARNING)
+        return
+
+    ambiguous_reasons = {
+        "ambiguous_checksum",
+        "ambiguous_name",
+        "conflicting_evidence",
+    }
+    message = (
+        "No Evil faction was inferred and existing Card evidence was ambiguous. "
+        "No automatic merge was performed; review and assign this Card's faction."
+        if match.reason in ambiguous_reasons
+        else "No Evil faction was inferred. Review and assign this Card's faction."
+    )
+    upsert_import_warning(
+        item,
+        {
+            "code": EVIL_FACTION_UNRESOLVED_WARNING,
+            "message": message,
+            "details": {
+                "reason": match.reason,
+                "checksum_candidate_count": match.checksum_candidate_count,
+                "name_candidate_count": match.name_candidate_count,
+            },
+        },
+    )
+
+
 def finalize_import_item(
     item: ImportJobItem,
     version: CardVersion,
@@ -714,6 +857,7 @@ def finalize_import_item(
     resolved_card_factions: tuple[CardFaction, ...],
     evidence: CardClassificationInferenceEvidence,
     is_new_card: bool,
+    unknown_evil_faction_match: UnknownEvilFactionMatch | None = None,
 ) -> None:
     card = version.card
     live_roles = card_role_keys(card)
@@ -780,6 +924,7 @@ def finalize_import_item(
     item.classification_inference_json = evidence_payload
     item.target_card = card
     item.target_card_version = version
+    sync_unknown_evil_faction_warning(item, card, unknown_evil_faction_match)
     sync_import_item_lifecycle_warning(item, card)
     mark_item_completed(item)
 
