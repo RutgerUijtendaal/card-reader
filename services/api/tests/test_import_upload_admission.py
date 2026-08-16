@@ -288,6 +288,7 @@ def test_legacy_fingerprint_replays_when_mana_fields_have_compatibility_defaults
 
 def test_legacy_fingerprint_is_passed_through_the_inner_creation_race() -> None:
     data = _validated_data()
+    creation_key = str(data["creation_key"])
     legacy_fingerprint, _uploads = _upload_fingerprint(
         template_id=str(data["template_id"]),
         content_version_base=str(data["content_version_base"]),
@@ -321,6 +322,43 @@ def test_legacy_fingerprint_is_passed_through_the_inner_creation_race() -> None:
 
     assert result.idempotent_replay is True
     assert result.job.id == "legacy-race-winner"
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
+
+
+def test_legacy_fingerprint_recovery_discards_the_unused_current_stage() -> None:
+    data = _validated_data()
+    creation_key = str(data["creation_key"])
+    legacy_fingerprint, _uploads = _upload_fingerprint(
+        template_id=str(data["template_id"]),
+        content_version_base=str(data["content_version_base"]),
+        content_version_description=str(data["content_version_description"]),
+        options={},
+        card_pool="player",
+        card_role_mode="automatic",
+        card_role_override=[],
+        card_faction_mode="automatic",
+        card_faction_override=[],
+        files=data["files"],  # type: ignore[arg-type]
+        include_mana_families=False,
+    )
+    service = _FakeImportService()
+
+    def commit_then_lose_response(**_kwargs: object) -> object:
+        service.existing = SimpleNamespace(
+            id="legacy-recovered-winner",
+            creation_fingerprint=legacy_fingerprint,
+        )
+        raise RuntimeError("database response lost")
+
+    service.create_job = commit_then_lose_response  # type: ignore[method-assign]
+
+    result = ImportUploadAdmission(service=service).admit(data)  # type: ignore[arg-type]
+
+    assert result.idempotent_replay is True
+    assert result.job.id == "legacy-recovered-winner"
+    creation_dir = resolve_storage_path(build_storage_relative_path("uploads", creation_key))
+    assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
 def test_legacy_fingerprint_does_not_match_an_explicit_mana_override() -> None:

@@ -367,11 +367,27 @@ class ImportUploadAdmission:
                 error=exc,
             )
 
-        staged.claim()
+        self._settle_successful_stage(
+            staged=staged,
+            job=result.job,
+            idempotent_replay=result.idempotent_replay,
+        )
         return ImportAdmissionResult(
             job=result.job,
             idempotent_replay=result.idempotent_replay,
         )
+
+    @staticmethod
+    def _settle_successful_stage(
+        *,
+        staged: StagedImportUpload,
+        job: ImportJob,
+        idempotent_replay: bool,
+    ) -> None:
+        if not idempotent_replay or job.creation_fingerprint == staged.fingerprint:
+            staged.claim()
+            return
+        staged.discard()
 
     def _reconcile_prevalidation_rejection(
         self,
@@ -445,7 +461,11 @@ class ImportUploadAdmission:
                 raise ImportAdmissionConflict(
                     "This creation key has already been used for a different import payload."
                 ) from error
-            staged.claim()
+            self._settle_successful_stage(
+                staged=staged,
+                job=existing,
+                idempotent_replay=True,
+            )
             logger.warning(
                 "Recovered committed import after an unexpected creation error. job_id=%s",
                 existing.id,
