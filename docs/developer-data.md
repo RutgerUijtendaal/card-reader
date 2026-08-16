@@ -20,7 +20,7 @@ shares the group's member key.
 
 Bundles contain complete catalogs, parsing-only templates, pool-specific classification rules, deck
 tags, symbol assets, the current card back, and cards with the public relationships needed for
-gallery, history, metadata, deck building, and Playtester workflows. Version 3 classification-rule
+gallery, history, metadata, deck building, and Playtester workflows. Version 3 and Version 4 classification-rule
 records identify their Tag, Type, or Symbol source by stable natural key; template records contain no
 classification hints. Card records include the required `card_pool`, canonical `card_roles`,
 canonical `card_factions`, and canonical `card_mana_families` fields; they never emit
@@ -28,7 +28,7 @@ the removed Hero boolean or internal faction identity key. Card-group anchors an
 structured card reference containing the pool, canonical faction set, mana-family context, and normalized card key, so
 same-key cards in different faction namespaces remain distinct throughout validation and import.
 
-The importer supports current Version 3 archives and explicitly adopts pinned Version 1 and Version 2 archives.
+The importer writes current Version 4 archives and explicitly adopts retained Versions 1, 2, and 3.
 Version 1 adoption assigns every card to the Player pool and converts `is_hero=true` to the Hero role
 before strict current-schema validation. Older formats derive missing Player mana-family assignments
 from each Card's latest-version Symbols and add the Mana role to Player or Evil cards whose latest
@@ -51,14 +51,14 @@ and Evil cards with the Mana Type are assigned the Mana role. The lock file is s
 not be edited by hand.
 
 `required_tag_keys` and `required_classification_rules` in the reviewed selection make expected
-inference inputs explicit. Version 3 bundle validation and normal `doctor_dev_data` source-readiness
+inference inputs explicit. Version 4 bundle validation and normal `doctor_dev_data` source-readiness
 checks fail when a source Tag, Type, or Symbol or exact pool/target/source rule is missing.
 `bootstrap_dev` passes the pinned source format to the doctor so the immutable Version 1 bundle is
 checked only against fields it can represent. Templates and catalogs are supplied by developer-data
 on a clean checkout; there is no parallel built-in catalog seed to keep in sync. The committed lock
-continues to pin Version 1 so clean checkouts remain bootstrappable; Version 3 adoption derives its
+continues to pin Version 1 so clean checkouts remain bootstrappable; Version 1 adoption derives its
 missing Card mana families after import. After the compatible application is deployed, publish a Version
-3 bundle through the normal staff workflow and commit its generated lock; never hand-edit the lock as
+4 bundle through the normal staff workflow and commit its generated lock; never hand-edit the lock as
 a substitute for that publish.
 
 They exclude accounts, decks, notifications, access and activity records, import jobs, uploads, raw

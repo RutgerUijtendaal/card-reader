@@ -23,8 +23,8 @@ from card_reader_core.metadata import (
     normalize_mana_family_keys,
 )
 
-DEVELOPER_DATA_FORMAT_VERSION = 3
-SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, DEVELOPER_DATA_FORMAT_VERSION)
+DEVELOPER_DATA_FORMAT_VERSION = 4
+SUPPORTED_DEVELOPER_DATA_FORMAT_VERSIONS = (1, 2, 3, DEVELOPER_DATA_FORMAT_VERSION)
 TYPE_INFERRED_ROLE_POOLS: tuple[tuple[CardRole, frozenset[CardPool]], ...] = (
     ("directive", frozenset({"evil"})),
     ("reminder", frozenset({"evil"})),
@@ -378,11 +378,13 @@ def adopt_payload_for_format(value: object, *, format_version: int) -> object:
         or not isinstance(value, dict)
     ):
         return value
+    if format_version == DEVELOPER_DATA_FORMAT_VERSION:
+        return value
     adopted = dict(value)
     cards = adopted.get("cards")
     if not isinstance(cards, list):
         return adopted
-    if format_version == DEVELOPER_DATA_FORMAT_VERSION:
+    if format_version == 3:
         adopted["cards"] = [
             _adopt_type_inferred_roles(card) if isinstance(card, dict) else card
             for card in cards

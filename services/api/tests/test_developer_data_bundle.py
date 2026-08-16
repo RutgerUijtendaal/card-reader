@@ -324,6 +324,39 @@ def test_version_three_adoption_adds_latest_type_roles_without_rewriting_familie
     assert card["card_mana_families"] == ["dark"]
 
 
+def test_version_four_adoption_preserves_authoritative_stored_roles() -> None:
+    payload = {
+        "cards": [
+            {
+                "key": "current-player-without-mana-role",
+                "card_pool": "player",
+                "card_roles": [],
+                "card_mana_families": ["arcane"],
+                "latest_version_number": 1,
+                "versions": [{"version_number": 1, "type_keys": ["mana"]}],
+            },
+            {
+                "key": "current-evil-without-type-roles",
+                "card_pool": "evil",
+                "card_roles": ["boss"],
+                "card_mana_families": [],
+                "latest_version_number": 1,
+                "versions": [
+                    {
+                        "version_number": 1,
+                        "type_keys": ["directive", "reminder"],
+                    }
+                ],
+            },
+        ]
+    }
+
+    adopted = adopt_payload_for_format(payload, format_version=4)
+
+    assert adopted is payload
+    assert [card["card_roles"] for card in adopted["cards"]] == [[], ["boss"]]
+
+
 def test_developer_data_coverage_rejects_missing_required_classification_rule(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
