@@ -190,7 +190,10 @@ import {
   sameCardFilterState,
 } from '@/domain/cards/utils/filters/cardFilterRouteState';
 import { useCardFilterController } from '@/domain/cards/composables/filters/useCardFilterController';
-import { reconcileCardFilterStateWithCatalog } from '@/domain/cards/utils/filters/cardFilterSelection';
+import {
+  cardFilterStateRequiresCatalog,
+  reconcileCardFilterStateWithCatalog,
+} from '@/domain/cards/utils/filters/cardFilterSelection';
 import {
   getGallerySnapshot,
   clearGalleryNavigationState,
@@ -268,7 +271,13 @@ const {
   setOverrideHoverMode,
   clearOverrideHoverMode,
 } = useHoverModeSurface('gallery');
-const cardCollectionFiltersReady = computed(() => filtersLoaded.value || filtersError.value !== null);
+const cardCollectionFiltersReady = computed(() => (
+  filtersLoaded.value
+  || (
+    filtersError.value !== null
+    && !cardFilterStateRequiresCatalog(visibleRouteFilterState.value)
+  )
+));
 const collection = useCardCollection<GalleryItem>({
   buildSearchParams: () => {
     const params = buildCardFilterApiSearchParams(selectionState.value);

@@ -1,7 +1,14 @@
 from .cancellation import cancel_import_job, requeue_running_import_jobs
 from .creation import create_import_job, create_import_job_with_files, prepare_import_job_inputs
 from .files import collect_supported_files
-from .queries import fetch_items_for_job, fetch_job, fetch_job_by_creation_key, get_next_queued_job, list_import_jobs
+from .queries import (
+    fetch_import_item_target_state,
+    fetch_items_for_job,
+    fetch_job,
+    fetch_job_by_creation_key,
+    get_next_queued_job,
+    list_import_jobs,
+)
 from .status import (
     bump_job_processed,
     count_terminal_items,
@@ -41,6 +48,7 @@ __all__ = [
     "create_import_job_with_files",
     "prepare_import_job_inputs",
     "fetch_items_for_job",
+    "fetch_import_item_target_state",
     "fetch_job",
     "fetch_job_by_creation_key",
     "get_next_queued_job",

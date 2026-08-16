@@ -34,6 +34,7 @@ from card_reader_core.services.classification_rules import (
     ClassificationRuleError,
     ClassificationRuleNotFoundError,
     ClassificationRuleService,
+    ClassificationRuleUpdateConflictError,
     classification_rule_payload,
 )
 
@@ -96,6 +97,8 @@ class ClassificationRuleDetailView(APIView):
         except ClassificationRuleNotFoundError:
             return not_found("Classification rule not found")
         except ClassificationRuleDuplicateError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ClassificationRuleUpdateConflictError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except ClassificationRuleError as exc:
             return bad_request(str(exc))

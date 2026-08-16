@@ -302,6 +302,215 @@ def remove_symbol_rules_for_downgrade(apps, _schema_editor) -> None:  # type: ig
     Rule.objects.filter(source_kind="symbol").delete()
 
 
+def _is_reversible_seed_rule(rule: Any) -> bool:
+    symbol = getattr(rule, "symbol", None)
+    symbol_key = getattr(symbol, "key", None)
+    family_key = FAMILY_BY_SYMBOL.get(symbol_key)
+    expected_id = (
+        uuid5(
+            RULE_NAMESPACE,
+            f"player:mana_family:{family_key}:symbol:{symbol_key}",
+        )
+        if family_key is not None
+        else None
+    )
+    return (
+        rule.card_pool == "player"
+        and rule.target_kind == "mana_family"
+        and rule.target_key == family_key
+        and rule.source_kind == "symbol"
+        and rule.enabled is True
+        and str(rule.id) == str(expected_id)
+    )
+
+
+def _expected_mana_snapshot_rules(symbols_by_key: dict[str, Any]) -> list[dict[str, object]]:
+    rules: list[dict[str, object]] = []
+    for family_key, _label, mana_key, affinity_keys in FAMILIES:
+        for symbol_key in (mana_key, *affinity_keys):
+            symbol = symbols_by_key.get(symbol_key)
+            if symbol is None:
+                continue
+            identity = f"player:mana_family:{family_key}:symbol:{symbol_key}"
+            rules.append(
+                {
+                    "rule_id": str(uuid5(RULE_NAMESPACE, identity)),
+                    "card_pool": "player",
+                    "source_kind": "symbol",
+                    "source_id": str(symbol.id),
+                    "source_key": symbol.key,
+                    "source_label": symbol.label,
+                    "source_identifiers": [],
+                    "source_symbol": {
+                        "symbol_type": symbol.symbol_type,
+                        "detector_type": symbol.detector_type,
+                        "detection_config": symbol.detection_config_json,
+                        "text_enrichment": symbol.text_enrichment_json,
+                        "reference_assets": symbol.reference_assets_json,
+                        "text_token": symbol.text_token,
+                        "enabled": symbol.enabled,
+                    },
+                    "target_kind": "mana_family",
+                    "target_key": family_key,
+                }
+            )
+    return rules
+
+
+def _snapshot_has_custom_mana_data(
+    snapshot: object,
+    *,
+    card_pool: str,
+    expected_player_rules: list[dict[str, object]],
+) -> bool:
+    if not isinstance(snapshot, dict) or not isinstance(snapshot.get("rules"), list):
+        return False
+    mana_rules: list[dict[str, object]] = []
+    for rule in snapshot["rules"]:
+        if not isinstance(rule, dict):
+            continue
+        source_kind = rule.get("source_kind")
+        target_kind = rule.get("target_kind")
+        if source_kind != "symbol" and target_kind != "mana_family":
+            continue
+        mana_rules.append(rule)
+    expected_rules = expected_player_rules if card_pool == "player" else []
+    return mana_rules != expected_rules
+
+
+def guard_mana_family_downgrade(apps: Any, _schema_editor: Any) -> None:
+    CardAssignment = apps.get_model("card_reader_core", "CardManaFamilyAssignment")
+    ImportJob = apps.get_model("card_reader_core", "ImportJob")
+    ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
+    Rule = apps.get_model("card_reader_core", "CardClassificationRule")
+    Symbol = apps.get_model("card_reader_core", "Symbol")
+    VersionSymbol = apps.get_model("card_reader_core", "CardVersionSymbol")
+
+    unsupported: list[str] = []
+
+    if CardAssignment.objects.exclude(card__card_pool="player").exists():
+        unsupported.append("non-Player card mana-family assignments")
+
+    assigned_by_card: dict[str, set[str]] = {}
+    for card_id, mana_family in CardAssignment.objects.filter(
+        card__card_pool="player"
+    ).values_list("card_id", "mana_family").iterator():
+        assigned_by_card.setdefault(str(card_id), set()).add(str(mana_family))
+    symbol_families_by_card: dict[str, set[str]] = {}
+    latest_symbol_links = VersionSymbol.objects.filter(
+        card_version__card__card_pool="player",
+        card_version__card__latest_version_id=models.F("card_version_id"),
+        symbol__key__in=tuple(FAMILY_BY_SYMBOL),
+    ).values_list("card_version__card_id", "symbol__key")
+    for card_id, symbol_key in latest_symbol_links.iterator():
+        symbol_families_by_card.setdefault(str(card_id), set()).add(
+            FAMILY_BY_SYMBOL[str(symbol_key)]
+        )
+    represented_card_ids = assigned_by_card.keys() | symbol_families_by_card.keys()
+    if any(
+        assigned_by_card.get(card_id, set())
+        != symbol_families_by_card.get(card_id, set())
+        for card_id in represented_card_ids
+    ):
+        unsupported.append("card mana-family assignments")
+
+    mana_rules = list(
+        Rule.objects.filter(
+            models.Q(source_kind="symbol") | models.Q(target_kind="mana_family")
+        ).select_related("symbol")
+    )
+    expected_seed_symbol_ids = {
+        str(symbol_id)
+        for symbol_id in Symbol.objects.filter(
+            key__in=tuple(FAMILY_BY_SYMBOL)
+        ).values_list("id", flat=True)
+    }
+    reversible_seed_symbol_ids = {
+        str(rule.symbol_id)
+        for rule in mana_rules
+        if _is_reversible_seed_rule(rule) and rule.symbol_id is not None
+    }
+    if (
+        any(not _is_reversible_seed_rule(rule) for rule in mana_rules)
+        or reversible_seed_symbol_ids != expected_seed_symbol_ids
+    ):
+        unsupported.append("custom or edited Symbol classification rules")
+
+    if (
+        ImportJob.objects.exclude(card_mana_family_mode="automatic").exists()
+        or ImportJob.objects.exclude(card_mana_family_override_json=[]).exists()
+    ):
+        unsupported.append("import mana-family configuration")
+    symbols_by_key = {
+        row.key: row for row in Symbol.objects.filter(key__in=tuple(FAMILY_BY_SYMBOL))
+    }
+    expected_player_snapshot_rules = _expected_mana_snapshot_rules(symbols_by_key)
+    active_snapshots = ImportJob.objects.filter(
+        status__in=("queued", "running", "canceling")
+    ).values_list("card_pool", "classification_rule_snapshot_json")
+    if any(
+        _snapshot_has_custom_mana_data(
+            snapshot,
+            card_pool=str(card_pool),
+            expected_player_rules=expected_player_snapshot_rules,
+        )
+        for card_pool, snapshot in active_snapshots.iterator()
+    ):
+        unsupported.append("classification rule snapshots")
+    if ImportJobItem.objects.exclude(resolved_card_mana_families_json=[]).exists():
+        unsupported.append("resolved import mana-family evidence")
+
+    active_statuses = ("queued", "running", "canceling")
+    target_rows = list(
+        ImportJobItem.objects.filter(
+            models.Q(target_card_pool_snapshot__isnull=False)
+            | models.Q(target_card_version_id__isnull=False)
+            | ~models.Q(target_card_mana_families_snapshot_json=[])
+        ).values_list(
+            "job__card_pool",
+            "job__status",
+            "target_card_version_id",
+            "target_card_mana_families_snapshot_json",
+        )
+    )
+    target_version_ids = {
+        str(version_id)
+        for card_pool, status, version_id, _families in target_rows
+        if card_pool == "player"
+        and status in active_statuses
+        and version_id is not None
+    }
+    symbol_families_by_version: dict[str, set[str]] = {}
+    version_symbol_links = VersionSymbol.objects.filter(
+        card_version_id__in=target_version_ids,
+        symbol__key__in=tuple(FAMILY_BY_SYMBOL),
+    ).values_list("card_version_id", "symbol__key")
+    for version_id, symbol_key in version_symbol_links.iterator():
+        symbol_families_by_version.setdefault(str(version_id), set()).add(
+            FAMILY_BY_SYMBOL[str(symbol_key)]
+        )
+    if any(
+        (
+            bool(families)
+            if card_pool != "player"
+            or status not in active_statuses
+            or version_id is None
+            else set(families)
+            != symbol_families_by_version.get(str(version_id), set())
+        )
+        for card_pool, status, version_id, families in target_rows
+    ):
+        unsupported.append("target Card mana-family snapshots")
+
+    if unsupported:
+        raise RuntimeError(
+            "Card mana-family migration 0056 cannot be reversed while non-representable "
+            "mana-family data exists in: "
+            + ", ".join(unsupported)
+            + ". Preserve or remove that data explicitly before rolling back."
+        )
+
+
 class Migration(migrations.Migration):
     dependencies = [("card_reader_core", "0055_seed_classification_rules_and_full_height_template")]
 
@@ -481,5 +690,9 @@ class Migration(migrations.Migration):
         migrations.RemoveField(
             model_name="cardversion",
             name="mana_family_sort_key",
+        ),
+        migrations.RunPython(
+            migrations.RunPython.noop,
+            guard_mana_family_downgrade,
         ),
     ]

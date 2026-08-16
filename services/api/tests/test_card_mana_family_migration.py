@@ -7,6 +7,8 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 import pytest
 
+pytestmark = pytest.mark.migration_state
+
 
 BASE_MIGRATION = ("card_reader_core", "0055_seed_classification_rules_and_full_height_template")
 MANA_MIGRATION = ("card_reader_core", "0056_card_mana_families")
@@ -246,9 +248,49 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
         MigratedJob.objects.get(id=completed_job.id).classification_rule_snapshot_json
         == pre_mana_snapshot
     )
-    assert MigratedItem.objects.get(
-        id=queued_target_item.id
-    ).target_card_mana_families_snapshot_json == ["arcane", "dark"]
+    migrated_legacy_target = MigratedItem.objects.get(id=queued_target_item.id)
+    assert migrated_legacy_target.target_card_pool_snapshot is None
+    assert migrated_legacy_target.target_card_mana_families_snapshot_json == [
+        "arcane",
+        "dark",
+    ]
+    migrated_legacy_target.target_card_mana_families_snapshot_json = []
+    migrated_legacy_target.save(
+        update_fields=["target_card_mana_families_snapshot_json"]
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    migrated_legacy_target.target_card_mana_families_snapshot_json = ["arcane", "dark"]
+    migrated_legacy_target.save(
+        update_fields=["target_card_mana_families_snapshot_json"]
+    )
+
+    edited_snapshot = json.loads(json.dumps(queued_snapshot))
+    edited_arcane_rule = next(
+        rule
+        for rule in edited_snapshot["rules"]
+        if rule.get("source_key") == "arcane-mana"
+    )
+    edited_arcane_rule["source_symbol"]["text_token"] = "{EDITED}"
+    queued_job_row = MigratedJob.objects.get(id=queued_job.id)
+    queued_job_row.classification_rule_snapshot_json = edited_snapshot
+    queued_job_row.save(update_fields=["classification_rule_snapshot_json"])
+    with pytest.raises(RuntimeError, match="classification rule snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    queued_job_row.classification_rule_snapshot_json = queued_snapshot
+    queued_job_row.save(update_fields=["classification_rule_snapshot_json"])
+
+    colorless_target_item = MigratedItem.objects.create(
+        job_id=queued_job.id,
+        source_file="imports/pre-mana-queued/colorless-target.png",
+        target_card_id=multicolor.id,
+        target_card_version_id=multicolor.latest_version_id,
+        target_card_pool_snapshot="player",
+        target_card_mana_families_snapshot_json=[],
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    colorless_target_item.delete()
 
     rollback_role_rule = {
         "rule_id": "rollback-role-rule",
@@ -302,6 +344,113 @@ def test_mana_migration_backfills_latest_player_symbols_and_seeds_available_rule
             ).hexdigest(),
         },
     )
+
+    deleted_seed_rule = Rule.objects.get(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol__key="arcane-mana",
+    )
+    deleted_seed_rule_id = deleted_seed_rule.id
+    deleted_seed_symbol_id = deleted_seed_rule.symbol_id
+    deleted_seed_rule.delete()
+    with pytest.raises(RuntimeError, match="Symbol classification rules"):
+        _migrate_to(BASE_MIGRATION)
+    recreated_seed_rule = Rule.objects.create(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol_id=deleted_seed_symbol_id,
+        enabled=True,
+    )
+    with pytest.raises(RuntimeError, match="Symbol classification rules"):
+        _migrate_to(BASE_MIGRATION)
+    recreated_seed_rule.delete()
+    Rule.objects.create(
+        id=deleted_seed_rule_id,
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol_id=deleted_seed_symbol_id,
+        enabled=True,
+    )
+
+    completed_target_item = MigratedItem.objects.create(
+        job_id=completed_job.id,
+        source_file="imports/pre-mana-completed/targeted.png",
+        target_card_id=multicolor.id,
+        target_card_version_id=multicolor.latest_version_id,
+        target_card_pool_snapshot="player",
+        target_card_mana_families_snapshot_json=["arcane", "dark"],
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    completed_target_item.delete()
+
+    non_player_job = MigratedJob.objects.create(
+        source_path="imports/non-player-target",
+        template_id=template.id,
+        card_pool="evil",
+        status="queued",
+        classification_rule_snapshot_json={"rules": []},
+    )
+    non_player_target_item = MigratedItem.objects.create(
+        job_id=non_player_job.id,
+        source_file="imports/non-player-target/targeted.png",
+        target_card_id=evil.id,
+        target_card_version_id=evil.latest_version_id,
+        target_card_pool_snapshot="evil",
+        target_card_mana_families_snapshot_json=["arcane"],
+    )
+    with pytest.raises(RuntimeError, match="target Card mana-family snapshots"):
+        _migrate_to(BASE_MIGRATION)
+    non_player_target_item.delete()
+    non_player_job.delete()
+
+    Assignment.objects.filter(card_id=multicolor.id).delete()
+    with pytest.raises(RuntimeError, match="card mana-family assignments"):
+        _migrate_to(BASE_MIGRATION)
+    Assignment.objects.bulk_create(
+        [
+            Assignment(card_id=multicolor.id, mana_family="arcane"),
+            Assignment(card_id=multicolor.id, mana_family="dark"),
+        ]
+    )
+
+    custom_assignment = Assignment.objects.create(card_id=evil.id, mana_family="dark")
+    with pytest.raises(RuntimeError, match="card mana-family assignments"):
+        _migrate_to(BASE_MIGRATION)
+    custom_assignment.delete()
+    matching_non_player_assignment = Assignment.objects.create(
+        card_id=evil.id,
+        mana_family="arcane",
+    )
+    with pytest.raises(RuntimeError, match="non-Player card mana-family assignments"):
+        _migrate_to(BASE_MIGRATION)
+    matching_non_player_assignment.delete()
+
+    with pytest.raises(RuntimeError, match="classification rule snapshots"):
+        _migrate_to(BASE_MIGRATION)
+
+    reversible_body: dict[str, object] = {
+        "schema_version": 3,
+        "card_pool": "evil",
+        "rules": [rollback_role_rule],
+    }
+    rollback_job.classification_rule_snapshot_json = {
+        **reversible_body,
+        "digest": hashlib.sha256(
+            json.dumps(
+                reversible_body,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+    rollback_job.save(update_fields=["classification_rule_snapshot_json"])
 
     downgraded_apps = _migrate_to(BASE_MIGRATION)
     DowngradedRule = downgraded_apps.get_model(

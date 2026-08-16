@@ -4,6 +4,8 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 import pytest
 
+pytestmark = pytest.mark.migration_state
+
 
 BASE_MIGRATION = ("card_reader_core", "0054_card_classification_final_state")
 TARGET_MIGRATION = (

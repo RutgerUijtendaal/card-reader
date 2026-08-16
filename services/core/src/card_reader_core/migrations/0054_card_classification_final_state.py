@@ -45,6 +45,7 @@ def populate_master_data(apps: Any, _schema_editor: Any) -> None:
     Card = apps.get_model("card_reader_core", "Card")
     CardAlias = apps.get_model("card_reader_core", "CardAlias")
     CardIdentityPoolLock = apps.get_model("card_reader_core", "CardIdentityPoolLock")
+    CardFactionAssignment = apps.get_model("card_reader_core", "CardFactionAssignment")
     CardRoleAssignment = apps.get_model("card_reader_core", "CardRoleAssignment")
     ImportJob = apps.get_model("card_reader_core", "ImportJob")
     ImportJobItem = apps.get_model("card_reader_core", "ImportJobItem")
@@ -84,7 +85,11 @@ def populate_master_data(apps: Any, _schema_editor: Any) -> None:
         job.classification_rule_snapshot_json = initial_classification_snapshot
         job.save(update_fields=["creation_key", "classification_rule_snapshot_json"])
 
-    for item in ImportJobItem.objects.iterator():
+    for item in ImportJobItem.objects.select_related(
+        "target_card",
+        "target_card_version__card",
+    ).iterator():
+        update_fields: list[str] = []
         if item.warning_code or item.warning_message:
             item.warnings_json = [
                 {
@@ -92,7 +97,39 @@ def populate_master_data(apps: Any, _schema_editor: Any) -> None:
                     "message": item.warning_message or "Import completed with a warning.",
                 }
             ]
-            item.save(update_fields=["warnings_json"])
+            update_fields.append("warnings_json")
+        target_card = item.target_card
+        if target_card is None and item.target_card_version is not None:
+            target_card = item.target_card_version.card
+        if target_card is not None:
+            assigned_roles = set(
+                CardRoleAssignment.objects.filter(card_id=target_card.id).values_list(
+                    "role", flat=True
+                )
+            )
+            assigned_factions = set(
+                CardFactionAssignment.objects.filter(card_id=target_card.id).values_list(
+                    "faction", flat=True
+                )
+            )
+            item.target_card_pool_snapshot = target_card.card_pool
+            item.target_card_roles_snapshot_json = [
+                role for role, _label in CARD_ROLE_CHOICES if role in assigned_roles
+            ]
+            item.target_card_factions_snapshot_json = [
+                faction
+                for faction, _label in CARD_FACTION_CHOICES
+                if faction in assigned_factions
+            ]
+            update_fields.extend(
+                [
+                    "target_card_pool_snapshot",
+                    "target_card_roles_snapshot_json",
+                    "target_card_factions_snapshot_json",
+                ]
+            )
+        if update_fields:
+            item.save(update_fields=update_fields)
 
     CardIdentityPoolLock.objects.bulk_create(
         [CardIdentityPoolLock(card_pool=card_pool) for card_pool, _label in CARD_POOL_CHOICES]

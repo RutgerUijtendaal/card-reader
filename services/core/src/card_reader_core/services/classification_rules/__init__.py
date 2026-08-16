@@ -5,6 +5,7 @@ from .service import (
     ClassificationRuleNotFoundError,
     ClassificationRuleService,
     ClassificationRuleSourceNotFoundError,
+    ClassificationRuleUpdateConflictError,
     classification_rule_payload,
 )
 from .defaults import ensure_default_mana_family_classification_rules
@@ -16,6 +17,7 @@ __all__ = [
     "ClassificationRuleNotFoundError",
     "ClassificationRuleService",
     "ClassificationRuleSourceNotFoundError",
+    "ClassificationRuleUpdateConflictError",
     "classification_rule_payload",
     "ensure_default_mana_family_classification_rules",
 ]

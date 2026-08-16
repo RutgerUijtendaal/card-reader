@@ -7,6 +7,8 @@ from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 import pytest
 
+pytestmark = pytest.mark.migration_state
+
 
 BASE_MIGRATION = ("card_reader_core", "0053_deck_creation")
 FINAL_MIGRATION = ("card_reader_core", "0054_card_classification_final_state")
@@ -28,6 +30,7 @@ def test_final_state_migration_backfills_master_data_and_reverses_hero_roles() -
     old_apps = _migrate_to(BASE_MIGRATION)
     Card = old_apps.get_model("card_reader_core", "Card")
     CardAlias = old_apps.get_model("card_reader_core", "CardAlias")
+    CardVersion = old_apps.get_model("card_reader_core", "CardVersion")
     ImportJob = old_apps.get_model("card_reader_core", "ImportJob")
     ImportJobItem = old_apps.get_model("card_reader_core", "ImportJobItem")
     Template = old_apps.get_model("card_reader_core", "Template")
@@ -46,10 +49,22 @@ def test_final_state_migration_backfills_master_data_and_reverses_hero_roles() -
         label="Migration Hero Alias",
     )
     template = Template.objects.create(key="migration-template", label="Migration Template")
+    target_version = CardVersion.objects.create(
+        card_id=hero.id,
+        template_id=template.id,
+        version_number=1,
+        image_hash="migration-target",
+        name="Migration Hero",
+        is_latest=True,
+    )
+    hero.latest_version_id = target_version.id
+    hero.save(update_fields=["latest_version"])
     job = ImportJob.objects.create(source_path="migration", template_id=template.id)
     item = ImportJobItem.objects.create(
         job_id=job.id,
         source_file="migration.png",
+        target_card_id=hero.id,
+        target_card_version_id=target_version.id,
         warning_code="legacy_warning",
         warning_message="Legacy warning message.",
     )
@@ -94,12 +109,18 @@ def test_final_state_migration_backfills_master_data_and_reverses_hero_roles() -
         json.dumps(snapshot_body, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     assert snapshot == {**snapshot_body, "digest": expected_digest}
-    assert NewImportJobItem.objects.get(id=item.id).warnings_json == [
+    migrated_item = NewImportJobItem.objects.get(id=item.id)
+    assert migrated_item.warnings_json == [
         {"code": "legacy_warning", "message": "Legacy warning message."}
     ]
+    assert migrated_item.target_card_pool_snapshot == "player"
+    assert migrated_item.target_card_roles_snapshot_json == ["hero"]
+    assert migrated_item.target_card_factions_snapshot_json == []
     assert NewSheet.objects.get(id=sheet.id).card_pool == "player"
     assert NewSlot.objects.get(id=slot.id).card_pool == "player"
 
+    migrated_item.delete()
+    NewImportJob.objects.get(id=job.id).delete()
     reversed_apps = _migrate_to(BASE_MIGRATION)
     ReversedCard = reversed_apps.get_model("card_reader_core", "Card")
     assert ReversedCard.objects.get(id=hero.id).is_hero is True

@@ -325,7 +325,7 @@ def test_late_creation_key_conflict_discards_a_preserved_losing_fingerprint() ->
     assert not creation_dir.exists() or list(creation_dir.iterdir()) == []
 
 
-def test_identical_admissions_serialize_publication_and_ownership(
+def test_same_creation_key_admissions_serialize_before_comparing_fingerprints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     creation_key = str(uuid4())
@@ -354,13 +354,16 @@ def test_identical_admissions_serialize_publication_and_ownership(
     monkeypatch.setattr(ImportUploadAdmission, "_admit_locked", observe_locked_admission)
     first_admission = ImportUploadAdmission(service=_FakeImportService())
     second_admission = ImportUploadAdmission(service=_FakeImportService())
+    first_data = _validated_data(creation_key=creation_key)
+    second_data = _validated_data(creation_key=creation_key)
+    second_data["content_version_description"] = "Conflicting admission payload."
 
     def run_second_admission() -> object:
         second_started.set()
-        return second_admission.admit(_validated_data(creation_key=creation_key))
+        return second_admission.admit(second_data)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        first_result = executor.submit(first_admission.admit, _validated_data(creation_key=creation_key))
+        first_result = executor.submit(first_admission.admit, first_data)
         assert first_entered.wait(timeout=5)
         second_result = executor.submit(run_second_admission)
         assert second_started.wait(timeout=5)

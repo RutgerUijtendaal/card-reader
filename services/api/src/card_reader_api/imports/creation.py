@@ -219,7 +219,7 @@ class ImportUploadAdmission:
             build_storage_relative_path(
                 "uploads",
                 ".admission-locks",
-                f"{creation_key}-{fingerprint}.lock",
+                f"{creation_key}.lock",
             )
         )
         lock_path.parent.mkdir(parents=True, exist_ok=True)

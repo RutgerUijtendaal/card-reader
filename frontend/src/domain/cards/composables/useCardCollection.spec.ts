@@ -243,6 +243,27 @@ describe('useCardCollection', () => {
     expect(collection.hasLoadedOnce.value).toBe(false);
   });
 
+  test('clears results and blocks pagination when filter readiness is lost', async () => {
+    mockedGet.mockResolvedValueOnce(
+      buildResponse([{ id: 'card-1', name: 'First Card' }], 2),
+    );
+    const filtersLoaded = ref(true);
+    const collection = useCardCollection<TestCard>({
+      buildSearchParams: () => new URLSearchParams(),
+      filtersLoaded,
+      pageSize: 30,
+    });
+
+    await collection.searchCards();
+    filtersLoaded.value = false;
+
+    expect(collection.cards.value).toEqual([]);
+    expect(collection.nextPage.value).toBe(1);
+    expect(collection.hasLoadedOnce.value).toBe(false);
+    await collection.loadNextPage();
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+  });
+
   test('loads the collection when it becomes enabled', async () => {
     vi.useFakeTimers();
     mockedGet.mockResolvedValueOnce(buildResponse([{ id: 'card-1', name: 'First Card' }]));

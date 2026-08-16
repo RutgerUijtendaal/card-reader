@@ -209,6 +209,12 @@
                     </p>
                     <div class="mt-1 flex flex-wrap gap-1">
                       <span
+                        class="theme-pill theme-pill-accent px-1.5 py-0.5 text-[9px] font-semibold"
+                        :data-card-pool="member.card_pool"
+                      >
+                        {{ cardPoolLabel(member.card_pool) }}
+                      </span>
+                      <span
                         v-for="faction in displayCardFactionLabels(member.card_factions)"
                         :key="`${member.card_id}-${faction}`"
                         class="theme-pill theme-pill-success px-1.5 py-0.5 text-[9px] font-semibold"
@@ -334,7 +340,7 @@ import { fetchCards } from '@/domain/cards/api';
 import SmallCardSearchResultRow from '@/domain/cards/components/SmallCardSearchResultRow.vue';
 import { managementCardSearchLifecycleParams } from '@/domain/cards/utils/filters/cardLifecycle';
 import type { CardListItem } from '@/domain/cards/types';
-import { CARD_POOL_OPTIONS, type CardPool } from '@/domain/cards/cardPools';
+import { CARD_POOL_OPTIONS, cardPoolLabel, type CardPool } from '@/domain/cards/cardPools';
 import { displayCardFactionLabels } from '@/domain/cards/cardFactions';
 import type { CardGroupMemberRecord, CardGroupRecord } from '@/features/admin/types';
 import {

@@ -17,6 +17,7 @@ from card_reader_core.models import (
 from card_reader_core.metadata import ManaFamily
 from card_reader_core.repositories.import_jobs import (
     bump_job_processed,
+    fetch_import_item_target_state,
     fetch_job,
     fetch_items_for_job,
     mark_job_cancelled,
@@ -143,6 +144,7 @@ class ImportProcessorService:
         options: JobOptions,
         resources: ParserResources,
     ) -> ItemProcessingResult:
+        self._validate_target_card_pool(item, expected_pool=cast(CardPool, job.card_pool))
         template_id = job.template.key
         snapshot = cast(dict[str, object], job.classification_rule_snapshot_json)
         frozen_tags, frozen_types, frozen_symbols = (
@@ -261,6 +263,25 @@ class ImportProcessorService:
             tag_count=tag_count,
             type_count=type_count,
         )
+
+    @staticmethod
+    def _validate_target_card_pool(
+        item: ImportJobItem,
+        *,
+        expected_pool: CardPool,
+    ) -> None:
+        target_state = fetch_import_item_target_state(item.id)
+        if target_state is None:
+            raise ValueError("The import item no longer exists.")
+        if not target_state.was_targeted:
+            return
+        if target_state.live_card_pool is None:
+            raise ValueError("The target Card no longer exists; queue a new reparse.")
+        if target_state.live_card_pool != expected_pool:
+            raise ValueError(
+                "The target Card pool changed while this reparse was queued; "
+                "queue a new reparse for its current pool."
+            )
 
     def _log_item_processed(
         self,

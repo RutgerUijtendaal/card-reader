@@ -78,6 +78,7 @@ const mountGallery = async (
   fetchFilters: (
     pool: 'player' | 'evil' | 'neutral',
   ) => Promise<{ data: CardFiltersResponse }> = () => Promise.resolve({ data: filters }),
+  waitForCards = true,
 ) => {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -118,7 +119,11 @@ const mountGallery = async (
   app.mount(container);
   await flushPromises();
   await vi.waitFor(() => {
-    expect(requestRoutes.length).toBeGreaterThan(0);
+    if (waitForCards) {
+      expect(requestRoutes.length).toBeGreaterThan(0);
+    } else {
+      expect(filterRequests.length).toBeGreaterThan(0);
+    }
   });
 
   return {
@@ -286,28 +291,25 @@ describe('CardGalleryPage pool-aware filters', () => {
     mounted.unmount();
   });
 
-  test('keeps route metadata intact and browsing usable when facet hydration fails', async () => {
+  test('keeps catalog-backed route metadata pending when facet hydration fails', async () => {
     const mounted = await mountGallery(
       '/cards?mana_family_match=all&mana_family_keys=arcane'
         + '&mana_family_exclude_keys=dark&tag_keys=keep-on-failure',
       'player',
       undefined,
       () => Promise.reject(new Error('facet failure')),
+      false,
     );
 
     expect(mounted.filterRequests).toEqual(['player']);
     expect(mounted.router.currentRoute.value.fullPath).toBe(
-      '/cards?mana_family_match=all&tag_keys=keep-on-failure'
-        + '&mana_family_keys=arcane&mana_family_exclude_keys=dark',
+      '/cards?mana_family_match=all&mana_family_keys=arcane'
+        + '&mana_family_exclude_keys=dark&tag_keys=keep-on-failure',
     );
-    expect(mounted.requestRoutes).toEqual([mounted.router.currentRoute.value.fullPath]);
-    const cardRequest = apiGet.mock.calls.find(([url]) =>
+    expect(mounted.requestRoutes).toEqual([]);
+    expect(apiGet.mock.calls.some(([url]) =>
       typeof url === 'string' && url.startsWith('/cards?'),
-    )?.[0];
-    const params = new URL(String(cardRequest), 'https://cards.test').searchParams;
-    expect(params.getAll('mana_family_keys')).toEqual(['arcane']);
-    expect(params.getAll('mana_family_exclude_keys')).toEqual(['dark']);
-    expect(params.get('mana_family_match')).toBe('all');
+    )).toBe(false);
     expect(mounted.container.textContent).toContain('Filter options could not be loaded');
 
     mounted.unmount();
@@ -331,6 +333,7 @@ describe('CardGalleryPage pool-aware filters', () => {
           },
         });
       },
+      false,
     );
 
     const retryButton = Array.from(mounted.container.querySelectorAll('button')).find(
@@ -340,14 +343,77 @@ describe('CardGalleryPage pool-aware filters', () => {
     retryButton?.click();
 
     await vi.waitFor(() => {
-      expect(mounted.requestRoutes).toHaveLength(2);
+      expect(mounted.requestRoutes).toHaveLength(1);
     });
     const cardRequests = apiGet.mock.calls.filter(([url]) =>
       typeof url === 'string' && url.startsWith('/cards?'),
     );
-    expect(cardRequests).toHaveLength(2);
-    const recoveredParams = new URL(String(cardRequests[1]?.[0]), 'https://cards.test').searchParams;
+    expect(cardRequests).toHaveLength(1);
+    const recoveredParams = new URL(String(cardRequests[0]?.[0]), 'https://cards.test').searchParams;
     expect(recoveredParams.getAll('tag_ids')).toEqual(['tag-recovered']);
+
+    mounted.unmount();
+  });
+
+  test('keeps browsing with direct-key filters when facet hydration fails', async () => {
+    const mounted = await mountGallery(
+      '/cards?mana_family_match=all&mana_family_keys=arcane&mana_family_exclude_keys=dark',
+      'player',
+      undefined,
+      () => Promise.reject(new Error('facet failure')),
+    );
+
+    expect(mounted.requestRoutes).toEqual([mounted.router.currentRoute.value.fullPath]);
+    const cardRequest = apiGet.mock.calls.find(([url]) =>
+      typeof url === 'string' && url.startsWith('/cards?'),
+    )?.[0];
+    const params = new URL(String(cardRequest), 'https://cards.test').searchParams;
+    expect(params.getAll('mana_family_keys')).toEqual(['arcane']);
+    expect(params.getAll('mana_family_exclude_keys')).toEqual(['dark']);
+    expect(params.get('mana_family_match')).toBe('all');
+
+    mounted.unmount();
+  });
+
+  test('keeps legacy mana-symbol routes pending when facet hydration fails', async () => {
+    const mounted = await mountGallery(
+      '/cards?mana_symbol_match=all&mana_symbol_keys=arcane-mana'
+        + '&mana_symbol_exclude_keys=dark-affinity',
+      'player',
+      undefined,
+      () => Promise.reject(new Error('facet failure')),
+      false,
+    );
+
+    expect(mounted.requestRoutes).toEqual([]);
+    expect(apiGet.mock.calls.some(([url]) =>
+      typeof url === 'string' && url.startsWith('/cards?'),
+    )).toBe(false);
+    expect(mounted.router.currentRoute.value.query).toEqual({
+      mana_symbol_match: 'all',
+      mana_symbol_keys: 'arcane-mana',
+      mana_symbol_exclude_keys: 'dark-affinity',
+    });
+    expect(mounted.container.textContent).toContain('Filter options could not be loaded');
+
+    mounted.unmount();
+  });
+
+  test('clears fallback results when navigation introduces a catalog-backed filter', async () => {
+    const mounted = await mountGallery(
+      '/cards',
+      'player',
+      () => Promise.resolve({ data: { ...emptyCardsPage, count: 7 } }),
+      () => Promise.reject(new Error('facet failure')),
+    );
+    expect(mounted.container.textContent).toContain('7 results');
+
+    await mounted.router.push('/cards?tag_keys=dragon');
+    await flushPromises();
+
+    expect(mounted.requestRoutes).toEqual(['/cards']);
+    expect(mounted.container.textContent).not.toContain('7 results');
+    expect(mounted.container.textContent).toContain('Filter options could not be loaded');
 
     mounted.unmount();
   });

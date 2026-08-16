@@ -152,6 +152,27 @@ def save_parsed_card_result(
     resolved_card_mana_families: tuple[ManaFamily, ...] = (),
     classification_evidence: CardClassificationInferenceEvidence | None = None,
 ) -> ParsedCardSaveResult:
+    # A failed atomic attempt can leave relation assignments cached on the Python
+    # instance even though the database transaction rolled them back. Every retry
+    # must therefore start from the authoritative persisted item state.
+    was_targeted = (
+        item.target_card_pool_snapshot is not None
+        or item.target_card is not None
+        or item.target_card_version is not None
+    )
+    item = (
+        ImportJobItem.objects.select_related(
+            "job__content_version",
+            "job__template",
+            "target_card",
+            "target_card_version__card",
+        )
+        .get(id=item.id)
+    )
+    if was_targeted and (
+        item.target_card is None or item.target_card_version is None
+    ):
+        raise ValueError("The target Card no longer exists; queue a new reparse.")
     resolved_evidence: CardClassificationInferenceEvidence = classification_evidence or {
         "roles": {
             "mode": "automatic",
@@ -195,6 +216,7 @@ def save_parsed_card_result(
         if item.target_card_version is not None:
             version = reparse_target_version(
                 item=item,
+                card_pool=card_pool,
                 template_id=template_id,
                 checksum=checksum,
                 normalized_fields=normalized_fields,
@@ -698,6 +720,7 @@ def clone_card_version_for_content_version_snapshot(
 def reparse_target_version(
     *,
     item: ImportJobItem,
+    card_pool: CardPool,
     template_id: str,
     checksum: str,
     normalized_fields: dict[str, str],
@@ -713,20 +736,33 @@ def reparse_target_version(
     target_version = item.target_card_version
     if target_version is None:
         raise ValueError("Target card version is required for targeted reparses")
-    version = (
-        CardVersion.objects.select_related("card", "template", "previous_version")
-        .filter(id=target_version.id)
-        .first()
-    )
-    if version is None:
-        raise ValueError(f"Target card version '{target_version.id}' does not exist")
-    if not version.is_latest:
-        raise ValueError("Only latest card versions can be reparsed")
-    if item.target_card is not None and version.card.id != item.target_card.id:
-        raise ValueError("Target card version does not belong to the requested card")
-
-    reset_manual_state = version.template.key != template_id
+    requested_card = item.target_card
     with transaction.atomic():
+        version = (
+            CardVersion.objects.select_for_update()
+            .select_related("card", "template", "previous_version")
+            .filter(id=target_version.id)
+            .first()
+        )
+        if version is None:
+            raise ValueError(f"Target card version '{target_version.id}' does not exist")
+        if not version.is_latest:
+            raise ValueError("Only latest card versions can be reparsed")
+        if requested_card is not None and version.card.id != requested_card.id:
+            raise ValueError("Target card version does not belong to the requested card")
+
+        target_card = (
+            Card.objects.select_for_update().filter(id=version.card.id).first()
+        )
+        if target_card is None:
+            raise ValueError("The target Card no longer exists; queue a new reparse.")
+        if target_card.card_pool != card_pool:
+            raise ValueError(
+                "The target Card pool changed while this reparse was queued; "
+                "queue a new reparse for its current pool."
+            )
+        version.card = target_card
+        reset_manual_state = version.template.key != template_id
         return update_existing_version(
             item,
             version,

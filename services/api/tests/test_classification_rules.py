@@ -4,6 +4,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 
+import card_reader_core.services.catalog.service as catalog_service_module
+import card_reader_core.services.classification_rules.service as classification_rule_service_module
 from card_reader_core.models import (
     Card,
     CardClassificationRule,
@@ -17,6 +19,7 @@ from card_reader_core.models import (
 from card_reader_core.repositories.cards import set_card_mana_families
 from card_reader_core.services.classification_rules import (
     ClassificationRuleService,
+    ClassificationRuleUpdateConflictError,
     ensure_default_mana_family_classification_rules,
 )
 from card_reader_core.services.catalog import CatalogService
@@ -82,6 +85,34 @@ def test_rule_crud_is_staff_only_and_rejects_duplicates() -> None:
     assert disabled.json()["enabled"] is False
     assert client.delete(f"/admin/classification-rules/{rule_id}").status_code == 204
     assert not CardClassificationRule.objects.filter(id=rule_id).exists()
+
+
+def test_rule_update_rejects_a_stale_read_instead_of_overwriting_a_concurrent_patch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tag = Tag.objects.create(key="concurrent-rule", label="Concurrent Rule")
+    service = ClassificationRuleService()
+    rule = service.create_rule(
+        card_pool="evil",
+        target_kind="role",
+        target_key="boss",
+        source_kind="tag",
+        source_id=tag.id,
+    )
+    stale_rule = CardClassificationRule.objects.select_related("tag").get(id=rule.id)
+    service.update_rule(rule_id=rule.id, enabled=False)
+    monkeypatch.setattr(
+        classification_rule_service_module,
+        "get_classification_rule",
+        lambda _rule_id: stale_rule,
+    )
+
+    with pytest.raises(ClassificationRuleUpdateConflictError, match="Reload and retry"):
+        service.update_rule(rule_id=rule.id, target_key="location")
+
+    rule.refresh_from_db()
+    assert rule.target_key == "boss"
+    assert rule.enabled is False
 
 
 def test_catalog_definitions_are_global_and_sources_have_reverse_references() -> None:
@@ -338,6 +369,71 @@ def test_creating_a_symbol_only_reconciles_that_symbol_default() -> None:
         )
         == 1
     )
+
+
+def test_renaming_a_symbol_to_a_canonical_key_reconciles_its_default_rule() -> None:
+    canonical_symbol = Symbol.objects.get(key="arcane-mana")
+    assert (
+        Symbol.objects.filter(id=canonical_symbol.id).update(
+            key="legacy-arcane-mana"
+        )
+        == 1
+    )
+
+    symbol = Symbol.objects.create(
+        key="pending-arcane-symbol",
+        label="Pending Arcane Symbol",
+        symbol_type="mana",
+    )
+
+    updated = CatalogService().update_symbol(
+        entry_id=symbol.id,
+        key="arcane-mana",
+    )
+
+    assert updated is not None
+    assert updated.key == "arcane-mana"
+    assert CardClassificationRule.objects.filter(
+        card_pool="player",
+        target_kind="mana_family",
+        target_key="arcane",
+        source_kind="symbol",
+        symbol_id=symbol.id,
+        enabled=True,
+    ).exists()
+
+
+def test_symbol_rename_rolls_back_when_default_rule_reconciliation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    canonical_symbol = Symbol.objects.get(key="arcane-mana")
+    assert (
+        Symbol.objects.filter(id=canonical_symbol.id).update(
+            key="legacy-arcane-mana"
+        )
+        == 1
+    )
+    symbol = Symbol.objects.create(
+        key="pending-arcane-symbol",
+        label="Pending Arcane Symbol",
+        symbol_type="mana",
+    )
+
+    def fail_rule_reconciliation(*, symbol_keys: set[str] | None = None) -> int:
+        assert symbol_keys == {"arcane-mana"}
+        raise RuntimeError("rule reconciliation failed")
+
+    monkeypatch.setattr(
+        catalog_service_module,
+        "ensure_default_mana_family_classification_rules",
+        fail_rule_reconciliation,
+    )
+
+    with pytest.raises(RuntimeError, match="rule reconciliation failed"):
+        CatalogService().update_symbol(entry_id=symbol.id, key="arcane-mana")
+
+    symbol.refresh_from_db()
+    assert symbol.key == "pending-arcane-symbol"
 
 
 def test_card_mana_family_assignment_is_unique_and_updates_the_cached_sort_key() -> None:

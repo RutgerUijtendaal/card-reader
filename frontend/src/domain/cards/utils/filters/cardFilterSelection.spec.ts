@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   buildCardFilterSelectionState,
   buildCardFilterStateFromSelection,
+  cardFilterStateRequiresCatalog,
   createCardFilterCatalog,
   reconcileCardFilterStateWithCatalog,
 } from './cardFilterSelection';
@@ -289,6 +290,22 @@ describe('cardFilterSelection', () => {
       manaFamilyKeys: ['arcane'],
       manaFamilyExcludeKeys: ['dark'],
     });
+  });
+
+  test('requires catalog hydration only for legacy mana-family symbol keys', () => {
+    expect(cardFilterStateRequiresCatalog({
+      ...createEmptyCardFilterState(),
+      manaFamilyKeys: ['arcane'],
+      manaFamilyExcludeKeys: ['dark'],
+    })).toBe(false);
+    expect(cardFilterStateRequiresCatalog({
+      ...createEmptyCardFilterState(),
+      manaFamilyKeys: ['arcane-mana'],
+    })).toBe(true);
+    expect(cardFilterStateRequiresCatalog({
+      ...createEmptyCardFilterState(),
+      manaFamilyExcludeKeys: ['dark-affinity'],
+    })).toBe(true);
   });
 
   test('reconciles only unavailable keyword, tag, and type keys', () => {
